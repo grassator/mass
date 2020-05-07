@@ -74,15 +74,27 @@ typedef struct {
   };
 } Operand;
 
-const Operand rax = {
-  .type = Operand_Type_Register,
-  .reg = { .index = 0b0000 },
-};
+#define define_register(reg_name, reg_index) \
+const Operand reg_name = { .type = Operand_Type_Register, .reg = { .index = (reg_index) } };
 
-const Operand rcx = {
-  .type = Operand_Type_Register,
-  .reg = { .index = 0b0001 },
-};
+define_register(rax, 0);
+define_register(rcx, 1);
+define_register(rdx, 2);
+define_register(rbx, 3);
+define_register(rsp, 4);
+define_register(rbp, 5);
+define_register(rsi, 6);
+define_register(rdi, 7);
+
+define_register(r8,  8);
+define_register(r9,  9);
+define_register(r10, 10);
+define_register(r11, 11);
+define_register(r12, 12);
+define_register(r13, 13);
+define_register(r14, 14);
+define_register(r15, 15);
+#undef define_register
 
 typedef enum {
   mov = 1,
