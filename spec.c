@@ -1,48 +1,8 @@
 #include "bdd-for-c.h"
 #include "windows.h"
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <assert.h>
 
-typedef int64_t s64;
-typedef uint64_t u64;
-typedef int32_t s32;
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef int8_t s8;
-
-#define x64_ret 0xc3
-
-typedef struct {
-  u8 *memory;
-  u64 occupied;
-  u64 capacity;
-} Buffer;
-
-void
-buffer_append_u8(
-  Buffer *buffer,
-  u8 value
-) {
-  assert(buffer->occupied + sizeof(value) <= buffer->capacity);
-  buffer->memory[buffer->occupied] = value;
-  buffer->occupied += sizeof(value);
-}
-
-void
-buffer_append_s32(
-  Buffer *buffer,
-  s32 value
-) {
-  assert(buffer->occupied + sizeof(value) <= buffer->capacity);
-  u8 *first_non_occupied_address = buffer->memory + buffer->occupied;
-  s32 *target = (s32 *)first_non_occupied_address;
-  *target  = value;
-  buffer->occupied += sizeof(value);
-}
-
-typedef s32 (*constant_s32)();
+#include "prelude.c"
 
 typedef enum {
   MOD_Displacement_0   = 0b00,
@@ -60,7 +20,9 @@ typedef enum {
 } REX_BYTE;
 
 typedef enum {
-  Operand_Type_Register = 1,
+  Operand_Type_None,
+  Operand_Type_Register,
+  Operand_Type_Immediate_8,
 } Operand_Type;
 
 typedef struct {
@@ -71,6 +33,7 @@ typedef struct {
   Operand_Type type;
   union {
     Register reg;
+    s8 imm8;
   };
 } Operand;
 
@@ -97,71 +60,123 @@ define_register(r15, 15);
 #undef define_register
 
 typedef enum {
-  mov = 1,
-} X64_Mnemonic;
-
-typedef struct {
-  X64_Mnemonic mnemonic;
-  Operand operands[2];
-} Instruction;
-
-typedef enum {
   Instruction_Extension_Type_Register = 1,
   Instruction_Extension_Type_Op_Code,
   Instruction_Extension_Type_Plus_Register,
 } Instruction_Extension_Type;
 
 typedef enum {
-  Operand_Encoding_Type_Register = 1,
+  Operand_Encoding_Type_None,
+  Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_Memory,
+  Operand_Encoding_Type_Immediate_8,
 } Operand_Encoding_Type;
 
 typedef struct {
   u16 op_code;
   Instruction_Extension_Type extension_type;
+  u8 op_code_extension;
   Operand_Encoding_Type operand_encoding_types[2];
 } Instruction_Encoding;
+
+
+typedef struct {
+  Instruction_Encoding *encoding_list;
+  u32 encoding_count;
+} X64_Mnemonic;
+
+typedef struct {
+  const X64_Mnemonic mnemonic;
+  Operand operands[2];
+} Instruction;
+
+X64_Mnemonic mov = {0};
+X64_Mnemonic ret = {0};
+X64_Mnemonic add = {0};
 
 void
 encode(
   Buffer *buffer,
   Instruction instruction
 ) {
-  // FIXME this should be a lookup
-  Instruction_Encoding encoding = {
-    .op_code = 0x89,
-    .extension_type = Instruction_Extension_Type_Register,
-    .operand_encoding_types = {
-      Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Register
-    },
-  };
-  // FIXME check that encoding matches the instruction
-  // FIXME add REX.W prefix only if necessary
-  buffer_append_u8(buffer, REX_W);
-  // FIXME if op code is 2 bytes need different append
-  buffer_append_u8(buffer, (u8) encoding.op_code);
-  // FIXME Implement proper mod support
-  // FIXME mask register index
-  u8 mod_r_m = (
-    (MOD_Register << 6) |
-    (instruction.operands[0].reg.index << 3) |
-    (instruction.operands[1].reg.index)
-  );
-  buffer_append_u8(buffer, mod_r_m);
-}
+  for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
+    Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
+    bool match = true;
+    // FIXME remove hardcoded 2 for operand count
+    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+      Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
+      Operand_Type operand_type = instruction.operands[operand_index].type;
+      if (operand_type == Operand_Type_None && encoding_type == Operand_Encoding_Type_None) {
+        continue;
+      }
+      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register) {
+        continue;
+      }
+      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register_Memory) {
+        continue;
+      }
+      if (operand_type == Operand_Type_Immediate_8 && encoding_type == Operand_Encoding_Type_Immediate_8) {
+        continue;
+      }
+      match = false;
+    }
 
-Buffer
-make_buffer(
-  u64 capacity,
-  s32 permission_flags
-) {
-  u8 *memory = VirtualAlloc(0, capacity, MEM_COMMIT | MEM_RESERVE, permission_flags);
-  return (const Buffer) {
-    .memory = memory,
-    .occupied = 0,
-    .capacity = capacity,
-  };
+    if (!match) continue;
+
+    bool needs_mod_r_m = false;
+    u8 reg_or_op_code = 0;
+    u8 rex_byte = 0;
+    u8 r_m = 0;
+    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+      Operand *operand = &instruction.operands[operand_index];
+      Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
+
+      if (operand->type == Operand_Type_Register) {
+        // FIXME check is this is actuall true
+        needs_mod_r_m = true;
+        // FIXME add REX.W prefix only if 64 bit
+        rex_byte |= REX_W;
+        if (encoding_type == Operand_Encoding_Type_Register) {
+          assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
+          reg_or_op_code = operand->reg.index;
+        } else if (encoding_type == Operand_Encoding_Type_Register_Memory) {
+          r_m = operand->reg.index;
+        }
+      }
+    }
+
+    if (encoding->extension_type == Instruction_Extension_Type_Op_Code) {
+      reg_or_op_code = encoding->op_code_extension;
+    }
+
+    if (rex_byte) {
+      buffer_append_u8(buffer, REX_W);
+    }
+
+    // FIXME if op code is 2 bytes need different append
+    buffer_append_u8(buffer, (u8) encoding->op_code);
+
+    // FIXME Implement proper mod support
+    // FIXME mask register index
+    if (needs_mod_r_m) {
+      u8 mod_r_m = (
+        (MOD_Register << 6) |
+        (reg_or_op_code << 3) |
+        (r_m)
+      );
+      buffer_append_u8(buffer, mod_r_m);
+    }
+    // Write out immediate operand(s?)
+    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+      Operand *operand = &instruction.operands[operand_index];
+      if (operand->type == Operand_Type_Immediate_8) {
+        buffer_append_u8(buffer, operand->imm8);
+      }
+    }
+    return;
+  }
+  // Didn't find any encoding
+  assert(false);
 }
 
 void
@@ -180,10 +195,8 @@ buffer_append_add_rsp_imm_8(
   Buffer *buffer,
   s8 value
 ) {
-  buffer_append_u8(buffer, 0x48);
-  buffer_append_u8(buffer, 0x83);
-  buffer_append_u8(buffer, 0xc4);
-  buffer_append_u8(buffer, value);
+  const Operand imm8 = { .type = Operand_Type_Immediate_8, .imm8 = value };
+  encode(buffer, (Instruction) {add, {rsp, imm8}});
 }
 
 void
@@ -210,6 +223,7 @@ buffer_append_add_to_ecx_value_at_stack_offset(
   buffer_append_u8(buffer, value);
 }
 
+typedef s32 (*constant_s32)();
 constant_s32
 make_constant_s32(
   s32 value
@@ -219,17 +233,16 @@ make_constant_s32(
   buffer_append_u8(&buffer, 0xc7);
   buffer_append_u8(&buffer, 0xc0);
   buffer_append_s32(&buffer, value);
-  buffer_append_u8(&buffer, x64_ret);
+  encode(&buffer, (Instruction) {ret, {0}});
   return (constant_s32)buffer.memory;
 }
 
 typedef s64 (*identity_s64)();
-
 identity_s64
 make_identity_s64() {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  encode(&buffer, (Instruction) {mov, {rcx, rax}});
-  buffer_append_u8(&buffer, x64_ret);
+  encode(&buffer, (Instruction) {mov, {rax, rcx}});
+  encode(&buffer, (Instruction) {ret, {0}});
   return (identity_s64)buffer.memory;
 }
 
@@ -240,13 +253,50 @@ make_increment_s64() {
   buffer_append_sub_rsp_imm_8(&buffer, 24);
   buffer_append_mov_to_stack_offset_imm_32(&buffer, 0, 1);
   buffer_append_add_to_ecx_value_at_stack_offset(&buffer, 0);
-  encode(&buffer, (Instruction) {mov, {rcx, rax}});
+  encode(&buffer, (Instruction) {mov, {rax, rcx}});
   buffer_append_add_rsp_imm_8(&buffer, 24);
-  buffer_append_u8(&buffer, x64_ret);
+  encode(&buffer, (Instruction) {ret, {0}});
   return (increment_s64)buffer.memory;
 }
 
 spec("mass") {
+  before() {
+    mov.encoding_list = malloc(sizeof(Instruction_Encoding));
+    *mov.encoding_list = (const Instruction_Encoding) {
+      .op_code = 0x89,
+      .extension_type = Instruction_Extension_Type_Register,
+      .operand_encoding_types = {
+        Operand_Encoding_Type_Register_Memory,
+        Operand_Encoding_Type_Register
+      },
+    };
+    mov.encoding_count++;
+
+    add.encoding_list = malloc(sizeof(Instruction_Encoding));
+    *add.encoding_list = (const Instruction_Encoding) {
+      .op_code = 0x83,
+      .extension_type = Instruction_Extension_Type_Op_Code,
+      .op_code_extension = 0,
+      .operand_encoding_types = {
+        Operand_Encoding_Type_Register_Memory,
+        Operand_Encoding_Type_Immediate_8
+      },
+    };
+    add.encoding_count++;
+
+    ret.encoding_list = malloc(sizeof(Instruction_Encoding));
+    *ret.encoding_list = (const Instruction_Encoding) {
+      .op_code = 0xc3,
+      .extension_type = Instruction_Extension_Type_Register,
+      .operand_encoding_types = {
+        Operand_Encoding_Type_None,
+        Operand_Encoding_Type_None
+      },
+    };
+    ret.encoding_count++;
+  }
+
+
   it("should create function that will return 42") {
     constant_s32 the_answer = make_constant_s32(42);
     s32 result = the_answer();
