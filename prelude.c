@@ -31,6 +31,8 @@ make_buffer(
   };
 }
 
+#define static_array_size(Array) (sizeof(Array) / sizeof(Array[0]))
+
 #define define_buffer_append(Type) \
 inline void \
 buffer_append_##Type( \

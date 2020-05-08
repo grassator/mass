@@ -81,7 +81,7 @@ typedef struct {
 
 
 typedef struct {
-  Instruction_Encoding *encoding_list;
+  const Instruction_Encoding *encoding_list;
   u32 encoding_count;
 } X64_Mnemonic;
 
@@ -90,9 +90,55 @@ typedef struct {
   Operand operands[2];
 } Instruction;
 
-X64_Mnemonic mov = {0};
-X64_Mnemonic ret = {0};
-X64_Mnemonic add = {0};
+// mov
+const Instruction_Encoding mov_encoding_list[] = {
+  {
+    .op_code = 0x89,
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Register
+    },
+  },
+};
+
+const X64_Mnemonic mov = {
+  .encoding_list = (const Instruction_Encoding *)mov_encoding_list,
+  .encoding_count = static_array_size(mov_encoding_list),
+};
+
+// ret
+const Instruction_Encoding ret_encoding_list[] = {
+  {
+    .op_code = 0xc3,
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic ret = {
+  .encoding_list = (const Instruction_Encoding *)ret_encoding_list,
+  .encoding_count = static_array_size(ret_encoding_list),
+};
+
+// add
+const Instruction_Encoding add_encoding_list[] = {
+  {
+    .op_code = 0x83,
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 0,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_8
+    },
+  },
+};
+const X64_Mnemonic add = {
+  .encoding_list = (const Instruction_Encoding *)add_encoding_list,
+  .encoding_count = static_array_size(add_encoding_list),
+};
 
 void
 encode(
@@ -100,7 +146,7 @@ encode(
   Instruction instruction
 ) {
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
-    Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
+    const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
     bool match = true;
     // FIXME remove hardcoded 2 for operand count
     for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
@@ -260,43 +306,6 @@ make_increment_s64() {
 }
 
 spec("mass") {
-  before() {
-    mov.encoding_list = malloc(sizeof(Instruction_Encoding));
-    *mov.encoding_list = (const Instruction_Encoding) {
-      .op_code = 0x89,
-      .extension_type = Instruction_Extension_Type_Register,
-      .operand_encoding_types = {
-        Operand_Encoding_Type_Register_Memory,
-        Operand_Encoding_Type_Register
-      },
-    };
-    mov.encoding_count++;
-
-    add.encoding_list = malloc(sizeof(Instruction_Encoding));
-    *add.encoding_list = (const Instruction_Encoding) {
-      .op_code = 0x83,
-      .extension_type = Instruction_Extension_Type_Op_Code,
-      .op_code_extension = 0,
-      .operand_encoding_types = {
-        Operand_Encoding_Type_Register_Memory,
-        Operand_Encoding_Type_Immediate_8
-      },
-    };
-    add.encoding_count++;
-
-    ret.encoding_list = malloc(sizeof(Instruction_Encoding));
-    *ret.encoding_list = (const Instruction_Encoding) {
-      .op_code = 0xc3,
-      .extension_type = Instruction_Extension_Type_Register,
-      .operand_encoding_types = {
-        Operand_Encoding_Type_None,
-        Operand_Encoding_Type_None
-      },
-    };
-    ret.encoding_count++;
-  }
-
-
   it("should create function that will return 42") {
     constant_s32 the_answer = make_constant_s32(42);
     s32 result = the_answer();
