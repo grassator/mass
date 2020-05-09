@@ -6,6 +6,13 @@
 #include "encoding.c"
 
 typedef enum {
+  SIB_Scale_1 = 0b00,
+  SIB_Scale_2 = 0b01,
+  SIB_Scale_4 = 0b10,
+  SIB_Scale_8 = 0b11,
+} SIB_Scale;
+
+typedef enum {
   MOD_Displacement_0   = 0b00,
   MOD_Displacement_s8  = 0b01,
   MOD_Displacement_s32 = 0b10,
@@ -24,6 +31,8 @@ typedef enum {
   Operand_Type_None,
   Operand_Type_Register,
   Operand_Type_Immediate_8,
+  Operand_Type_Immediate_32,
+  Operand_Type_Memory_Indirect,
 } Operand_Type;
 
 typedef struct {
@@ -31,10 +40,17 @@ typedef struct {
 } Register;
 
 typedef struct {
+  Register reg;
+  s32 displacement;
+} Operand_Memory_Indirect;
+
+typedef struct {
   Operand_Type type;
   union {
     Register reg;
     s8 imm8;
+    s32 imm32;
+    Operand_Memory_Indirect indirect;
   };
 } Operand;
 
@@ -65,6 +81,33 @@ typedef struct {
   Operand operands[2];
 } Instruction;
 
+inline Operand
+imm8(
+  s8 value
+) {
+  return (const Operand) { .type = Operand_Type_Immediate_8, .imm8 = value };
+}
+
+inline Operand
+imm32(
+  s32 value
+) {
+  return (const Operand) { .type = Operand_Type_Immediate_32, .imm32 = value };
+}
+
+inline Operand
+stack(
+  s32 offset
+) {
+  return (const Operand) {
+    .type = Operand_Type_Memory_Indirect,
+    .indirect = (const Operand_Memory_Indirect) {
+      .reg = rsp.reg.index,
+      .displacement = offset,
+    }
+  };
+}
+
 void
 encode(
   Buffer *buffer,
@@ -86,7 +129,13 @@ encode(
       if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
+      if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Register_Memory) {
+        continue;
+      }
       if (operand_type == Operand_Type_Immediate_8 && encoding_type == Operand_Encoding_Type_Immediate_8) {
+        continue;
+      }
+      if (operand_type == Operand_Type_Immediate_32 && encoding_type == Operand_Encoding_Type_Immediate_32) {
         continue;
       }
       match = false;
@@ -98,20 +147,39 @@ encode(
     u8 reg_or_op_code = 0;
     u8 rex_byte = 0;
     u8 r_m = 0;
+    u8 mod = MOD_Register;
+    bool needs_sib = false;
+    u8 sib_byte = 0;
     for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
 
       if (operand->type == Operand_Type_Register) {
-        // FIXME check is this is actuall true
-        needs_mod_r_m = true;
         // FIXME add REX.W prefix only if 64 bit
         rex_byte |= REX_W;
         if (encoding_type == Operand_Encoding_Type_Register) {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
           reg_or_op_code = operand->reg.index;
-        } else if (encoding_type == Operand_Encoding_Type_Register_Memory) {
+        }
+      }
+      if(encoding_type == Operand_Encoding_Type_Register_Memory) {
+        needs_mod_r_m = true;
+        if (operand->type == Operand_Type_Register) {
           r_m = operand->reg.index;
+          mod = MOD_Register;
+        } else {
+          mod = MOD_Displacement_s32;
+          assert(operand->type == Operand_Type_Memory_Indirect);
+          r_m = operand->indirect.reg.index;
+          if (r_m == rsp.reg.index) {
+            needs_sib = true;
+            // FIXME support proper SIB for non-rsp registers
+            sib_byte = (
+              (SIB_Scale_1 << 6) |
+              (r_m << 3) |
+              (r_m)
+            );
+          }
         }
       }
     }
@@ -131,67 +199,38 @@ encode(
     // FIXME mask register index
     if (needs_mod_r_m) {
       u8 mod_r_m = (
-        (MOD_Register << 6) |
+        (mod << 6) |
         (reg_or_op_code << 3) |
         (r_m)
       );
       buffer_append_u8(buffer, mod_r_m);
     }
+
+    if (needs_sib) {
+      buffer_append_u8(buffer, sib_byte);
+    }
+
+    // Write out displacement
+    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+      Operand *operand = &instruction.operands[operand_index];
+      if (operand->type == Operand_Type_Memory_Indirect) {
+        buffer_append_s32(buffer, operand->indirect.displacement);
+      }
+    }
     // Write out immediate operand(s?)
     for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       if (operand->type == Operand_Type_Immediate_8) {
-        buffer_append_u8(buffer, operand->imm8);
+        buffer_append_s8(buffer, operand->imm8);
+      }
+      if (operand->type == Operand_Type_Immediate_32) {
+        buffer_append_s32(buffer, operand->imm32);
       }
     }
     return;
   }
   // Didn't find any encoding
-  assert(false);
-}
-
-void
-buffer_append_sub_rsp_imm_8(
-  Buffer *buffer,
-  s8 value
-) {
-  buffer_append_u8(buffer, 0x48);
-  buffer_append_u8(buffer, 0x83);
-  buffer_append_u8(buffer, 0xec);
-  buffer_append_u8(buffer, value);
-}
-
-void
-buffer_append_add_rsp_imm_8(
-  Buffer *buffer,
-  s8 value
-) {
-  const Operand imm8 = { .type = Operand_Type_Immediate_8, .imm8 = value };
-  encode(buffer, (Instruction) {add, {rsp, imm8}});
-}
-
-void
-buffer_append_mov_to_stack_offset_imm_32(
-  Buffer *buffer,
-  s8 offset,
-  s32 value
-) {
-  buffer_append_u8(buffer, 0xc7);
-  buffer_append_u8(buffer, 0x44);
-  buffer_append_u8(buffer, 0x24);
-  buffer_append_u8(buffer, offset);
-  buffer_append_s32(buffer, value);
-}
-
-void
-buffer_append_add_to_ecx_value_at_stack_offset(
-  Buffer *buffer,
-  s8 value
-) {
-  buffer_append_u8(buffer, 0x03);
-  buffer_append_u8(buffer, 0x4C);
-  buffer_append_u8(buffer, 0x24);
-  buffer_append_u8(buffer, value);
+  assert(!"Did not find acceptable encoding");
 }
 
 typedef s32 (*constant_s32)();
@@ -200,10 +239,7 @@ make_constant_s32(
   s32 value
 ) {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  buffer_append_u8(&buffer, 0x48);
-  buffer_append_u8(&buffer, 0xc7);
-  buffer_append_u8(&buffer, 0xc0);
-  buffer_append_s32(&buffer, value);
+  encode(&buffer, (Instruction) {mov, {rax, imm32(value)}});
   encode(&buffer, (Instruction) {ret, {0}});
   return (constant_s32)buffer.memory;
 }
@@ -221,11 +257,11 @@ typedef s64 (*increment_s64)();
 increment_s64
 make_increment_s64() {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  buffer_append_sub_rsp_imm_8(&buffer, 24);
-  buffer_append_mov_to_stack_offset_imm_32(&buffer, 0, 1);
-  buffer_append_add_to_ecx_value_at_stack_offset(&buffer, 0);
+  encode(&buffer, (Instruction) {sub, {rsp, imm8(24)}});
+  encode(&buffer, (Instruction) {mov, {stack(0), imm32(1)}});
+  encode(&buffer, (Instruction) {add, {rcx, stack(0)}});
   encode(&buffer, (Instruction) {mov, {rax, rcx}});
-  buffer_append_add_rsp_imm_8(&buffer, 24);
+  encode(&buffer, (Instruction) {add, {rsp, imm8(24)}});
   encode(&buffer, (Instruction) {ret, {0}});
   return (increment_s64)buffer.memory;
 }
