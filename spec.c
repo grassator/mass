@@ -170,6 +170,8 @@ encode(
         } else {
           mod = MOD_Displacement_s32;
           assert(operand->type == Operand_Type_Memory_Indirect);
+		  // FIXME add REX.W prefix only if 64 bit
+		  rex_byte |= REX_W;
           r_m = operand->indirect.reg.index;
           if (r_m == rsp.reg.index) {
             needs_sib = true;
@@ -253,17 +255,97 @@ make_identity_s64() {
   return (identity_s64)buffer.memory;
 }
 
+// 16 byte alignment
+// 0x0000_0000_1000_2340
+// push ...
+// jmp our_function_address
+// 0x0000_0000_1000_2348
+// sub rsp, 8
+// 0x0000_0000_1000_2350
+// sub rsp, 16
+
+typedef struct {
+  // TODO args
+  // TODO make it s32
+  u8 stack_reserve;
+  Buffer buffer;
+} Fn;
+
+Operand
+declare_variable(
+  Fn *fn
+) {
+  Operand result = stack(fn->stack_reserve);
+  fn->stack_reserve += 0x10;
+  return result;
+}
+
+void
+assign(
+  Fn *fn,
+  Operand a,
+  Operand b
+) {
+  encode(&fn->buffer, (Instruction) {mov, {a, b}});
+}
+
+Operand
+mutating_plus(
+  Fn *fn,
+  Operand a,
+  Operand b
+) {
+  // TODO Create a temp value for result
+  encode(&fn->buffer, (Instruction) {add, {a, b}});
+  return a;
+}
+
+Fn
+fn_begin() {
+  Fn fn = {
+    .stack_reserve = 0x0,
+    .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
+  };
+  // @Volatile @ReserveStack
+  encode(&fn.buffer, (Instruction) {sub, {rsp, imm8(0xcc)}});
+  return fn;
+}
+
+void
+fn_return(
+  Fn *fn,
+  Operand to_return
+) {
+  u8 alignment = 0x8;
+  u8 stack_size = fn->stack_reserve + alignment;
+
+  { // Override stack reservation
+    u64 save_occupied = fn->buffer.occupied;
+    fn->buffer.occupied = 0;
+
+    // @Volatile @ReserveStack
+    encode(&fn->buffer, (Instruction) {sub, {rsp, imm8(stack_size)}});
+    fn->buffer.occupied = save_occupied;
+  }
+
+  encode(&fn->buffer, (Instruction) {mov, {rax, to_return}});
+  encode(&fn->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
+  encode(&fn->buffer, (Instruction) {ret, {0}});
+
+}
+
 typedef s64 (*increment_s64)();
 increment_s64
 make_increment_s64() {
-  Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  encode(&buffer, (Instruction) {sub, {rsp, imm8(24)}});
-  encode(&buffer, (Instruction) {mov, {stack(0), imm32(1)}});
-  encode(&buffer, (Instruction) {add, {rcx, stack(0)}});
-  encode(&buffer, (Instruction) {mov, {rax, rcx}});
-  encode(&buffer, (Instruction) {add, {rsp, imm8(24)}});
-  encode(&buffer, (Instruction) {ret, {0}});
-  return (increment_s64)buffer.memory;
+  Fn fn = fn_begin();
+  Operand x = declare_variable(&fn);
+  assign(&fn, x, imm32(1));
+  Operand y = declare_variable(&fn);
+  assign(&fn, y, imm32(2));
+  mutating_plus(&fn, rcx, x);
+  mutating_plus(&fn, rcx, y);
+  fn_return(&fn, rcx);
+  return (increment_s64)fn.buffer.memory;
 }
 
 spec("mass") {
@@ -285,18 +367,8 @@ spec("mass") {
   }
 
   it("should create function increments s64 value passed to it") {
-    identity_s64 inc_s64 = make_increment_s64();
-    s64 result = inc_s64(42);
-    check(result == 43);
+    identity_s64 add_3_s64 = make_increment_s64();
+    s64 result = add_3_s64(42);
+    check(result == 45);
   }
 }
-
-
-
-
-
-
-
-
-
-
