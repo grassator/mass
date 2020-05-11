@@ -32,6 +32,7 @@ typedef enum {
   Operand_Type_Register,
   Operand_Type_Immediate_8,
   Operand_Type_Immediate_32,
+  Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
 } Operand_Type;
 
@@ -50,6 +51,7 @@ typedef struct {
     Register reg;
     s8 imm8;
     s32 imm32;
+    s64 imm64;
     Operand_Memory_Indirect indirect;
   };
 } Operand;
@@ -96,6 +98,13 @@ imm32(
 }
 
 inline Operand
+imm64(
+  s64 value
+) {
+  return (const Operand) { .type = Operand_Type_Immediate_64, .imm64 = value };
+}
+
+inline Operand
 stack(
   s32 offset
 ) {
@@ -126,6 +135,9 @@ encode(
       if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register) {
         continue;
       }
+      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
+        continue;
+      }
       if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
@@ -138,6 +150,9 @@ encode(
       if (operand_type == Operand_Type_Immediate_32 && encoding_type == Operand_Encoding_Type_Immediate_32) {
         continue;
       }
+      if (operand_type == Operand_Type_Immediate_64 && encoding_type == Operand_Encoding_Type_Immediate_64) {
+        continue;
+      }
       match = false;
     }
 
@@ -148,6 +163,7 @@ encode(
     u8 rex_byte = 0;
     u8 r_m = 0;
     u8 mod = MOD_Register;
+    u8 op_code = (u8) encoding->op_code;
     bool needs_sib = false;
     u8 sib_byte = 0;
     for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
@@ -160,6 +176,9 @@ encode(
         if (encoding_type == Operand_Encoding_Type_Register) {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
           reg_or_op_code = operand->reg.index;
+        } else if (encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
+          // TODO use REX bit for extended register like r9
+          op_code += operand->reg.index & 0b111;
         }
       }
       if(encoding_type == Operand_Encoding_Type_Register_Memory) {
@@ -195,7 +214,7 @@ encode(
     }
 
     // FIXME if op code is 2 bytes need different append
-    buffer_append_u8(buffer, (u8) encoding->op_code);
+    buffer_append_u8(buffer, op_code);
 
     // FIXME Implement proper mod support
     // FIXME mask register index
@@ -227,6 +246,9 @@ encode(
       }
       if (operand->type == Operand_Type_Immediate_32) {
         buffer_append_s32(buffer, operand->imm32);
+      }
+      if (operand->type == Operand_Type_Immediate_64) {
+        buffer_append_s64(buffer, operand->imm64);
       }
     }
     return;
@@ -328,7 +350,10 @@ fn_return(
     fn->buffer.occupied = save_occupied;
   }
 
-  encode(&fn->buffer, (Instruction) {mov, {rax, to_return}});
+
+  if (memcmp(&rax, &to_return, sizeof(rax)) != 0) {
+    encode(&fn->buffer, (Instruction) {mov, {rax, to_return}});
+  }
   encode(&fn->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
   encode(&fn->buffer, (Instruction) {ret, {0}});
 
@@ -348,6 +373,35 @@ make_increment_s64() {
   return (increment_s64)fn.buffer.memory;
 }
 
+
+typedef s32 (*proxy_s32)(constant_s32);
+proxy_s32
+make_proxy_no_arg_return_s32() {
+  Fn fn = fn_begin();
+  encode(&fn.buffer, (Instruction) {call, {rcx, 0}});
+
+  fn_return(&fn, rax);
+  return (proxy_s32)fn.buffer.memory;
+}
+
+typedef s64 (*constant_s64)();
+
+constant_s64
+make_partial_application_s64(
+  identity_s64 original_fn,
+  s64 arg
+) {
+  Fn fn = fn_begin();
+
+  encode(&fn.buffer, (Instruction) {mov, {rcx, imm64(arg)}});
+
+  encode(&fn.buffer, (Instruction) {mov, {rax, imm64((s64) original_fn)}});
+  encode(&fn.buffer, (Instruction) {call, {rax, 0}});
+
+  fn_return(&fn, rax);
+  return (constant_s64)fn.buffer.memory;
+}
+
 spec("mass") {
   it("should create function that will return 42") {
     constant_s32 the_answer = make_constant_s32(42);
@@ -360,6 +414,7 @@ spec("mass") {
     s32 result = not_the_answer();
     check(result == 21);
   }
+
   it("should create function that returns s64 value that was passed") {
     identity_s64 id_s64 = make_identity_s64();
     s64 result = id_s64(42);
@@ -370,5 +425,19 @@ spec("mass") {
     identity_s64 add_3_s64 = make_increment_s64();
     s64 result = add_3_s64(42);
     check(result == 45);
+  }
+
+  it("should create a proxy function for no argument fn") {
+    constant_s32 the_answer = make_constant_s32(42);
+    proxy_s32 proxy = make_proxy_no_arg_return_s32();
+    s32 result = proxy(the_answer);
+    check(result == 42);
+  }
+
+  it("should create a partially applied function") {
+    identity_s64 id_s64 = make_identity_s64();
+    constant_s64 the_answer = make_partial_application_s64(id_s64, 42);
+    s64 result = the_answer();
+    check(result == 42);
   }
 }

@@ -1,15 +1,18 @@
 typedef enum {
-  Instruction_Extension_Type_Register = 1,
+  Instruction_Extension_Type_None,
+  Instruction_Extension_Type_Register,
   Instruction_Extension_Type_Op_Code,
   Instruction_Extension_Type_Plus_Register,
 } Instruction_Extension_Type;
 
 typedef enum {
   Operand_Encoding_Type_None,
+  Operand_Encoding_Type_Op_Code_Plus_Register,
   Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_Memory,
   Operand_Encoding_Type_Immediate_8,
   Operand_Encoding_Type_Immediate_32,
+  Operand_Encoding_Type_Immediate_64,
 } Operand_Encoding_Type;
 
 typedef struct {
@@ -43,6 +46,14 @@ const Instruction_Encoding mov_encoding_list[] = {
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
       Operand_Encoding_Type_Immediate_32
+    },
+  },
+  {
+    .op_code = 0xb8,
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Op_Code_Plus_Register,
+      Operand_Encoding_Type_Immediate_64
     },
   },
 };
@@ -116,3 +127,22 @@ const X64_Mnemonic sub = {
   .encoding_count = static_array_size(sub_encoding_list),
 };
 
+
+////////////////////////////////////////////////////////////////////////////////
+// call
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding call_encoding_list[] = {
+  {
+    .op_code = 0xFF,
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 2,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic call = {
+  .encoding_list = (const Instruction_Encoding *)call_encoding_list,
+  .encoding_count = static_array_size(call_encoding_list),
+};
