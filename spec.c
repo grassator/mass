@@ -257,24 +257,22 @@ encode(
   assert(!"Did not find acceptable encoding");
 }
 
-typedef s32 (*constant_s32)();
-constant_s32
+fn_type_void_to_s32
 make_constant_s32(
   s32 value
 ) {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
   encode(&buffer, (Instruction) {mov, {rax, imm32(value)}});
   encode(&buffer, (Instruction) {ret, {0}});
-  return (constant_s32)buffer.memory;
+  return (fn_type_void_to_s32)buffer.memory;
 }
 
-typedef s64 (*identity_s64)();
-identity_s64
+fn_type_s64_to_s64
 make_identity_s64() {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
   encode(&buffer, (Instruction) {mov, {rax, rcx}});
   encode(&buffer, (Instruction) {ret, {0}});
-  return (identity_s64)buffer.memory;
+  return (fn_type_s64_to_s64)buffer.memory;
 }
 
 // 16 byte alignment
@@ -359,8 +357,7 @@ fn_return(
 
 }
 
-typedef s64 (*increment_s64)();
-increment_s64
+fn_type_s64_to_s64
 make_increment_s64() {
   Fn fn = fn_begin();
   Operand x = declare_variable(&fn);
@@ -370,25 +367,21 @@ make_increment_s64() {
   mutating_plus(&fn, rcx, x);
   mutating_plus(&fn, rcx, y);
   fn_return(&fn, rcx);
-  return (increment_s64)fn.buffer.memory;
+  return (fn_type_s64_to_s64)fn.buffer.memory;
 }
 
-
-typedef s32 (*proxy_s32)(constant_s32);
-proxy_s32
+fn_type__void_to_s32__to_s32
 make_proxy_no_arg_return_s32() {
   Fn fn = fn_begin();
   encode(&fn.buffer, (Instruction) {call, {rcx, 0}});
 
   fn_return(&fn, rax);
-  return (proxy_s32)fn.buffer.memory;
+  return (fn_type__void_to_s32__to_s32)fn.buffer.memory;
 }
 
-typedef s64 (*constant_s64)();
-
-constant_s64
+fn_type_void_to_s64
 make_partial_application_s64(
-  identity_s64 original_fn,
+  fn_type_s64_to_s64 original_fn,
   s64 arg
 ) {
   Fn fn = fn_begin();
@@ -399,44 +392,44 @@ make_partial_application_s64(
   encode(&fn.buffer, (Instruction) {call, {rax, 0}});
 
   fn_return(&fn, rax);
-  return (constant_s64)fn.buffer.memory;
+  return (fn_type_void_to_s64)fn.buffer.memory;
 }
 
 spec("mass") {
   it("should create function that will return 42") {
-    constant_s32 the_answer = make_constant_s32(42);
+    fn_type_void_to_s32 the_answer = make_constant_s32(42);
     s32 result = the_answer();
     check(result == 42);
     check(the_answer() == 42);
   }
   it("should create function that will return 21") {
-    constant_s32 not_the_answer = make_constant_s32(21);
+    fn_type_void_to_s32 not_the_answer = make_constant_s32(21);
     s32 result = not_the_answer();
     check(result == 21);
   }
 
   it("should create function that returns s64 value that was passed") {
-    identity_s64 id_s64 = make_identity_s64();
+    fn_type_s64_to_s64 id_s64 = make_identity_s64();
     s64 result = id_s64(42);
     check(result == 42);
   }
 
   it("should create function increments s64 value passed to it") {
-    identity_s64 add_3_s64 = make_increment_s64();
+    fn_type_s64_to_s64 add_3_s64 = make_increment_s64();
     s64 result = add_3_s64(42);
     check(result == 45);
   }
 
-  it("should create a proxy function for no argument fn") {
-    constant_s32 the_answer = make_constant_s32(42);
-    proxy_s32 proxy = make_proxy_no_arg_return_s32();
+  it("should create a function to call a no argument fn") {
+    fn_type_void_to_s32 the_answer = make_constant_s32(42);
+    fn_type__void_to_s32__to_s32 proxy = make_proxy_no_arg_return_s32();
     s32 result = proxy(the_answer);
     check(result == 42);
   }
 
   it("should create a partially applied function") {
-    identity_s64 id_s64 = make_identity_s64();
-    constant_s64 the_answer = make_partial_application_s64(id_s64, 42);
+    fn_type_s64_to_s64 id_s64 = make_identity_s64();
+    fn_type_void_to_s64 the_answer = make_partial_application_s64(id_s64, 42);
     s64 result = the_answer();
     check(result == 42);
   }
