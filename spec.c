@@ -439,6 +439,46 @@ make_partial_application_s64(
   return (fn_type_void_to_s64)fn.buffer.memory;
 }
 
+typedef struct {
+  u8 *location;
+  u64 ip;
+} Patch;
+
+Patch
+make_jnz(
+  Fn *fn
+) {
+  encode(&fn->buffer, (Instruction) {jnz, {imm8(0xcc), 0}});
+  u64 ip = fn->buffer.occupied;
+  u8 *location = fn->buffer.memory + fn->buffer.occupied - 1;
+  return (const Patch) { .location = location, .ip = ip };
+}
+
+void
+patch_jump_to_here(
+  Fn *fn,
+  Patch patch
+) {
+  u64 diff = fn->buffer.occupied - patch.ip;
+  assert(diff < 0x80);
+  *patch.location = (u8) diff;
+}
+
+fn_type_s32_to_s32
+make_is_non_zero() {
+  Fn fn = fn_begin();
+  encode(&fn.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
+  Patch patch = make_jnz(&fn);
+
+  encode(&fn.buffer, (Instruction) {mov, {rax, imm64(0)}});
+  fn_return(&fn, rax);
+  patch_jump_to_here(&fn, patch);
+
+  encode(&fn.buffer, (Instruction) {mov, {rax, imm64(1)}});
+  fn_return(&fn, rax);
+  return (fn_type_s32_to_s32)fn.buffer.memory;
+}
+
 spec("mass") {
   it("should create function that will return 42") {
     fn_type_void_to_s32 the_answer = make_constant_s32(42);
@@ -476,5 +516,13 @@ spec("mass") {
     fn_type_void_to_s64 the_answer = make_partial_application_s64(id_s64, 42);
     s64 result = the_answer();
     check(result == 42);
+  }
+
+  it("should have a function that returns 0 if arg is zero, 1 otherwise") {
+    fn_type_s32_to_s32 is_non_zero = make_is_non_zero();
+    s64 result = is_non_zero(0);
+    check(result == 0);
+    result = is_non_zero(42);
+    check(result == 1);
   }
 }

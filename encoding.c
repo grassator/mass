@@ -146,3 +146,42 @@ const X64_Mnemonic call = {
   .encoding_list = (const Instruction_Encoding *)call_encoding_list,
   .encoding_count = static_array_size(call_encoding_list),
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
+// cmp
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding cmp_encoding_list[] = {
+  {
+    .op_code = 0x81,
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 7,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_32
+    },
+  },
+};
+const X64_Mnemonic cmp = {
+  .encoding_list = (const Instruction_Encoding *)cmp_encoding_list,
+  .encoding_count = static_array_size(cmp_encoding_list),
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// jnz
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding jnz_encoding_list[] = {
+  {
+    .op_code = 0x75,
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic jnz = {
+  .encoding_list = (const Instruction_Encoding *)jnz_encoding_list,
+  .encoding_count = static_array_size(jnz_encoding_list),
+};
