@@ -47,6 +47,7 @@ typedef struct {
 
 typedef struct {
   Operand_Type type;
+  u32 byte_size;
   union {
     Register reg;
     s8 imm8;
@@ -56,26 +57,40 @@ typedef struct {
   };
 } Operand;
 
-#define define_register(reg_name, reg_index) \
-const Operand reg_name = { .type = Operand_Type_Register, .reg = { .index = (reg_index) } };
 
-define_register(rax, 0);
-define_register(rcx, 1);
-define_register(rdx, 2);
-define_register(rbx, 3);
-define_register(rsp, 4);
-define_register(rbp, 5);
-define_register(rsi, 6);
-define_register(rdi, 7);
+#define define_register(reg_name, reg_index, reg_byte_size) \
+const Operand reg_name = { \
+  .type = Operand_Type_Register, \
+  .byte_size = (reg_byte_size), \
+  .reg = { .index = (reg_index) }, \
+};
 
-define_register(r8,  8);
-define_register(r9,  9);
-define_register(r10, 10);
-define_register(r11, 11);
-define_register(r12, 12);
-define_register(r13, 13);
-define_register(r14, 14);
-define_register(r15, 15);
+define_register(rax, 0, 8);
+define_register(rcx, 1, 8);
+define_register(rdx, 2, 8);
+define_register(rbx, 3, 8);
+define_register(rsp, 4, 8);
+define_register(rbp, 5, 8);
+define_register(rsi, 6, 8);
+define_register(rdi, 7, 8);
+
+define_register(eax, 0, 4);
+define_register(ecx, 1, 4);
+define_register(edx, 2, 4);
+define_register(ebx, 3, 4);
+define_register(esp, 4, 4);
+define_register(ebp, 5, 4);
+define_register(esi, 6, 4);
+define_register(edi, 7, 4);
+
+define_register(r8,  8, 8);
+define_register(r9,  9, 8);
+define_register(r10, 10, 8);
+define_register(r11, 11, 8);
+define_register(r12, 12, 8);
+define_register(r13, 13, 8);
+define_register(r14, 14, 8);
+define_register(r15, 15, 8);
 #undef define_register
 
 typedef struct {
@@ -87,29 +102,43 @@ inline Operand
 imm8(
   s8 value
 ) {
-  return (const Operand) { .type = Operand_Type_Immediate_8, .imm8 = value };
+  return (const Operand) {
+    .type = Operand_Type_Immediate_8,
+    .byte_size = 1,
+    .imm8 = value
+  };
 }
 
 inline Operand
 imm32(
   s32 value
 ) {
-  return (const Operand) { .type = Operand_Type_Immediate_32, .imm32 = value };
+  return (const Operand) {
+    .type = Operand_Type_Immediate_32,
+    .byte_size = 4,
+    .imm32 = value
+  };
 }
 
 inline Operand
 imm64(
   s64 value
 ) {
-  return (const Operand) { .type = Operand_Type_Immediate_64, .imm64 = value };
+  return (const Operand) {
+    .type = Operand_Type_Immediate_64,
+    .byte_size = 8,
+    .imm64 = value
+  };
 }
 
 inline Operand
 stack(
-  s32 offset
+  s32 offset,
+  u32 byte_size
 ) {
   return (const Operand) {
     .type = Operand_Type_Memory_Indirect,
+    .byte_size = byte_size,
     .indirect = (const Operand_Memory_Indirect) {
       .reg = rsp.reg.index,
       .displacement = offset,
@@ -170,9 +199,11 @@ encode(
       Operand *operand = &instruction.operands[operand_index];
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
 
-      if (operand->type == Operand_Type_Register) {
-        // FIXME add REX.W prefix only if 64 bit
+      if (operand->byte_size == 8) {
         rex_byte |= REX_W;
+      }
+
+      if (operand->type == Operand_Type_Register) {
         if (encoding_type == Operand_Encoding_Type_Register) {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
           reg_or_op_code = operand->reg.index;
@@ -188,9 +219,13 @@ encode(
           mod = MOD_Register;
         } else {
           mod = MOD_Displacement_s32;
+          s32 displacement = operand->indirect.displacement;
+          if (displacement == 0) {
+            mod = MOD_Displacement_0;
+          } else if (displacement <= 127 || displacement >= -128) {
+            mod = MOD_Displacement_s8;
+          }
           assert(operand->type == Operand_Type_Memory_Indirect);
-		  // FIXME add REX.W prefix only if 64 bit
-		  rex_byte |= REX_W;
           r_m = operand->indirect.reg.index;
           if (r_m == rsp.reg.index) {
             needs_sib = true;
@@ -232,10 +267,18 @@ encode(
     }
 
     // Write out displacement
-    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
-      Operand *operand = &instruction.operands[operand_index];
-      if (operand->type == Operand_Type_Memory_Indirect) {
-        buffer_append_s32(buffer, operand->indirect.displacement);
+    if (needs_mod_r_m && mod != MOD_Register) {
+      for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+        Operand *operand = &instruction.operands[operand_index];
+        if (operand->type == Operand_Type_Memory_Indirect) {
+          if (mod == MOD_Displacement_s32) {
+            buffer_append_s32(buffer, operand->indirect.displacement);
+          } else if (mod == MOD_Displacement_s8) {
+            buffer_append_s8(buffer, (s8)operand->indirect.displacement);
+          } else {
+            assert(mod == MOD_Displacement_0);
+          }
+        }
       }
     }
     // Write out immediate operand(s?)
@@ -262,7 +305,7 @@ make_constant_s32(
   s32 value
 ) {
   Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  encode(&buffer, (Instruction) {mov, {rax, imm32(value)}});
+  encode(&buffer, (Instruction) {mov, {eax, imm32(value)}});
   encode(&buffer, (Instruction) {ret, {0}});
   return (fn_type_void_to_s32)buffer.memory;
 }
@@ -293,9 +336,10 @@ typedef struct {
 
 Operand
 declare_variable(
-  Fn *fn
+  Fn *fn,
+  u32 byte_size
 ) {
-  Operand result = stack(fn->stack_reserve);
+  Operand result = stack(fn->stack_reserve, byte_size);
   fn->stack_reserve += 0x10;
   return result;
 }
@@ -360,9 +404,9 @@ fn_return(
 fn_type_s64_to_s64
 make_increment_s64() {
   Fn fn = fn_begin();
-  Operand x = declare_variable(&fn);
+  Operand x = declare_variable(&fn, sizeof(s64));
   assign(&fn, x, imm32(1));
-  Operand y = declare_variable(&fn);
+  Operand y = declare_variable(&fn, sizeof(s64));
   assign(&fn, y, imm32(2));
   mutating_plus(&fn, rcx, x);
   mutating_plus(&fn, rcx, y);
