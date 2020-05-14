@@ -83,7 +83,7 @@ define_register(ebp, 5, 4);
 define_register(esi, 6, 4);
 define_register(edi, 7, 4);
 
-define_register(r8,  8, 8); // 0b1000
+define_register(r8,  8, 8);
 define_register(r9,  9, 8);
 define_register(r10, 10, 8);
 define_register(r11, 11, 8);
@@ -91,6 +91,15 @@ define_register(r12, 12, 8);
 define_register(r13, 13, 8);
 define_register(r14, 14, 8);
 define_register(r15, 15, 8);
+
+define_register(r8d,  8, 4);
+define_register(r9d,  9, 4);
+define_register(r10d, 10, 4);
+define_register(r11d, 11, 4);
+define_register(r12d, 12, 4);
+define_register(r13d, 13, 4);
+define_register(r14d, 14, 4);
+define_register(r15d, 15, 4);
 #undef define_register
 
 typedef struct {
