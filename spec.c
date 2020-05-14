@@ -65,7 +65,7 @@ const Operand reg_name = { \
   .reg = { .index = (reg_index) }, \
 };
 
-define_register(rax, 0, 8);
+define_register(rax, 0, 8); // 0b0000
 define_register(rcx, 1, 8);
 define_register(rdx, 2, 8);
 define_register(rbx, 3, 8);
@@ -83,7 +83,7 @@ define_register(ebp, 5, 4);
 define_register(esi, 6, 4);
 define_register(edi, 7, 4);
 
-define_register(r8,  8, 8);
+define_register(r8,  8, 8); // 0b1000
 define_register(r9,  9, 8);
 define_register(r10, 10, 8);
 define_register(r11, 11, 8);
@@ -207,15 +207,23 @@ encode(
         if (encoding_type == Operand_Encoding_Type_Register) {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
           reg_or_op_code = operand->reg.index;
+          if (operand->reg.index & 0b1000) {
+            rex_byte |= REX_R;
+          }
         } else if (encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
-          // TODO use REX bit for extended register like r9
           op_code += operand->reg.index & 0b111;
+          if (operand->reg.index & 0b1000) {
+            rex_byte |= REX_B;
+          }
         }
       }
       if(encoding_type == Operand_Encoding_Type_Register_Memory) {
         needs_mod_r_m = true;
         if (operand->type == Operand_Type_Register) {
           r_m = operand->reg.index;
+          if (operand->reg.index & 0b1000) {
+            rex_byte |= REX_B;
+          }
           mod = MOD_Register;
         } else {
           mod = MOD_Displacement_s32;
@@ -245,7 +253,7 @@ encode(
     }
 
     if (rex_byte) {
-      buffer_append_u8(buffer, REX_W);
+      buffer_append_u8(buffer, rex_byte);
     }
 
     // FIXME if op code is 2 bytes need different append
@@ -300,24 +308,6 @@ encode(
   assert(!"Did not find acceptable encoding");
 }
 
-fn_type_void_to_s32
-make_constant_s32(
-  s32 value
-) {
-  Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  encode(&buffer, (Instruction) {mov, {eax, imm32(value)}});
-  encode(&buffer, (Instruction) {ret, {0}});
-  return (fn_type_void_to_s32)buffer.memory;
-}
-
-fn_type_s64_to_s64
-make_identity_s64() {
-  Buffer buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE);
-  encode(&buffer, (Instruction) {mov, {rax, rcx}});
-  encode(&buffer, (Instruction) {ret, {0}});
-  return (fn_type_s64_to_s64)buffer.memory;
-}
-
 // 16 byte alignment
 // 0x0000_0000_1000_2340
 // push ...
@@ -331,6 +321,7 @@ typedef struct {
   // TODO args
   // TODO make it s32
   u8 stack_reserve;
+  u8 next_argument_index;
   Buffer buffer;
 } Fn;
 
@@ -375,6 +366,30 @@ fn_begin() {
   return fn;
 }
 
+Operand
+fn_arg(
+  Fn *fn,
+  u32 byte_size
+) {
+  assert(byte_size == 8);
+  switch (fn->next_argument_index++) {
+    case 0: {
+      return rcx;
+    }
+    case 1: {
+      return rdx;
+    }
+    case 2: {
+      return r8;
+    }
+    case 3: {
+      return r9;
+    }
+  }
+  assert(!"More than 4 arguments are not supported at the moment.");
+  return (const Operand){0};
+}
+
 void
 fn_return(
   Fn *fn,
@@ -398,7 +413,23 @@ fn_return(
   }
   encode(&fn->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
   encode(&fn->buffer, (Instruction) {ret, {0}});
+}
 
+fn_type_void_to_s32
+make_constant_s32(
+  s32 value
+) {
+  Fn fn = fn_begin();
+  fn_return(&fn, imm32(value));
+  return (fn_type_void_to_s32)fn.buffer.memory;
+}
+
+fn_type_s64_to_s64
+make_identity_s64() {
+  Fn fn = fn_begin();
+  Operand arg0 = fn_arg(&fn, sizeof(s64));
+  fn_return(&fn, arg0);
+  return (fn_type_s64_to_s64)fn.buffer.memory;
 }
 
 fn_type_s64_to_s64
@@ -408,16 +439,18 @@ make_increment_s64() {
   assign(&fn, x, imm32(1));
   Operand y = declare_variable(&fn, sizeof(s64));
   assign(&fn, y, imm32(2));
-  mutating_plus(&fn, rcx, x);
-  mutating_plus(&fn, rcx, y);
-  fn_return(&fn, rcx);
+  Operand arg0 = fn_arg(&fn, sizeof(s64));
+  mutating_plus(&fn, arg0, x);
+  mutating_plus(&fn, arg0, y);
+  fn_return(&fn, arg0);
   return (fn_type_s64_to_s64)fn.buffer.memory;
 }
 
 fn_type__void_to_s32__to_s32
 make_proxy_no_arg_return_s32() {
   Fn fn = fn_begin();
-  encode(&fn.buffer, (Instruction) {call, {rcx, 0}});
+  Operand arg0 = fn_arg(&fn, sizeof(s64));
+  encode(&fn.buffer, (Instruction) {call, {arg0, 0}});
 
   fn_return(&fn, rax);
   return (fn_type__void_to_s32__to_s32)fn.buffer.memory;
@@ -429,8 +462,9 @@ make_partial_application_s64(
   s64 arg
 ) {
   Fn fn = fn_begin();
+  Operand arg0 = fn_arg(&fn, sizeof(s64));
 
-  encode(&fn.buffer, (Instruction) {mov, {rcx, imm64(arg)}});
+  encode(&fn.buffer, (Instruction) {mov, {arg0, imm64(arg)}});
 
   encode(&fn.buffer, (Instruction) {mov, {rax, imm64((s64) original_fn)}});
   encode(&fn.buffer, (Instruction) {call, {rax, 0}});
@@ -524,5 +558,20 @@ spec("mass") {
     check(result == 0);
     result = is_non_zero(42);
     check(result == 1);
+  }
+
+  it("should return 3rd argument") {
+
+    Fn fn = fn_begin();
+    {
+      (void)fn_arg(&fn, sizeof(s64));
+      (void)fn_arg(&fn, sizeof(s64));
+      Operand arg2 = fn_arg(&fn, sizeof(s64));
+      fn_return(&fn, arg2);
+    }
+    fn_type_s64_s64_s64_to_s64 third = (fn_type_s64_s64_s64_to_s64)fn.buffer.memory;
+
+    s64 result = third(1, 2, 3);
+    check(result == 3);
   }
 }
