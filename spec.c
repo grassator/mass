@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #include "prelude.c"
-#include "encoding.c"
+#include "instructions.c"
 
 typedef enum {
   SIB_Scale_1 = 0b00,
