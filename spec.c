@@ -350,11 +350,11 @@ typedef struct {
   Buffer buffer;
 
   Descriptor_Function descriptor;
-} Fn_Builder;
+} Function_Builder;
 
 Operand
 declare_variable(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   u32 byte_size
 ) {
   Operand result = stack(fn->stack_reserve, byte_size);
@@ -364,7 +364,7 @@ declare_variable(
 
 void
 assign(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   Operand a,
   Operand b
 ) {
@@ -373,7 +373,7 @@ assign(
 
 Operand
 mutating_plus(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   Operand a,
   Operand b
 ) {
@@ -382,9 +382,9 @@ mutating_plus(
   return a;
 }
 
-Fn_Builder
+Function_Builder
 fn_begin() {
-  Fn_Builder fn = {
+  Function_Builder fn = {
     .stack_reserve = 0x0,
     .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
     .descriptor = (const Descriptor_Function) {0}
@@ -401,7 +401,7 @@ fn_begin() {
 
 Value
 fn_end(
-  Fn_Builder *builder
+  Function_Builder *builder
 ) {
   return (const Value) {
     .descriptor = {
@@ -414,7 +414,7 @@ fn_end(
 
 Value
 fn_arg(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   Descriptor descriptor
 ) {
   //assert(byte_size == 8);
@@ -459,7 +459,7 @@ fn_arg(
 
 void
 fn_return(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   Value to_return
 ) {
   u8 alignment = 0x8;
@@ -487,7 +487,7 @@ fn_type_void_to_s32
 make_constant_s32(
   s32 value
 ) {
-  Fn_Builder fn = fn_begin();
+  Function_Builder fn = fn_begin();
   fn_return(&fn, (const Value){
     .descriptor = { .type = Descriptor_Type_Integer },
     .operand = imm32(value),
@@ -497,7 +497,7 @@ make_constant_s32(
 
 fn_type_s64_to_s64
 make_identity_s64() {
-  Fn_Builder fn = fn_begin();
+  Function_Builder fn = fn_begin();
   Value arg0 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
   fn_return(&fn, arg0);
   return (fn_type_s64_to_s64)fn.buffer.memory;
@@ -505,7 +505,7 @@ make_identity_s64() {
 
 fn_type_s64_to_s64
 make_increment_s64() {
-  Fn_Builder fn = fn_begin();
+  Function_Builder fn = fn_begin();
   Operand x = declare_variable(&fn, sizeof(s64));
   assign(&fn, x, imm32(1));
   Operand y = declare_variable(&fn, sizeof(s64));
@@ -519,7 +519,7 @@ make_increment_s64() {
 
 fn_type__void_to_s32__to_s32
 make_proxy_no_arg_return_s32() {
-  Fn_Builder fn = fn_begin();
+  Function_Builder fn = fn_begin();
   Value arg0 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
   encode(&fn.buffer, (Instruction) {call, {arg0.operand, 0}});
 
@@ -532,7 +532,7 @@ make_proxy_no_arg_return_s32() {
 
 Value
 call_1(
-  Fn_Builder *builder,
+  Function_Builder *builder,
   Value *to_call,
   Value *arg0
 ) {
@@ -554,7 +554,7 @@ make_partial_application_s64(
   Value *original_fn,
   s64 arg
 ) {
-  Fn_Builder builder = fn_begin();
+  Function_Builder builder = fn_begin();
   Value applied_arg0 = {
     .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
     .operand = imm64(arg),
@@ -571,7 +571,7 @@ typedef struct {
 
 Patch
 make_jnz(
-  Fn_Builder *fn
+  Function_Builder *fn
 ) {
   encode(&fn->buffer, (Instruction) {jnz, {imm8(0xcc), 0}});
   u64 ip = fn->buffer.occupied;
@@ -581,7 +581,7 @@ make_jnz(
 
 void
 patch_jump_to_here(
-  Fn_Builder *fn,
+  Function_Builder *fn,
   Patch patch
 ) {
   u64 diff = fn->buffer.occupied - patch.ip;
@@ -591,7 +591,7 @@ patch_jump_to_here(
 
 fn_type_s32_to_s32
 make_is_non_zero() {
-  Fn_Builder fn = fn_begin();
+  Function_Builder fn = fn_begin();
   encode(&fn.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
   Patch patch = make_jnz(&fn);
 
@@ -681,7 +681,7 @@ spec("mass") {
 
   it("should return 3rd argument") {
 
-    Fn_Builder fn = fn_begin();
+    Function_Builder fn = fn_begin();
     {
       (void)fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
       (void)fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
