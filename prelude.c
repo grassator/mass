@@ -56,6 +56,11 @@ define_buffer_append(u32)
 define_buffer_append(u64)
 #undef define_buffer_append
 
+
+typedef void (*fn_type_void_to_void)(void);
+
+typedef fn_type_void_to_void fn_type_opaque;
+
 typedef s32 (*fn_type_void_to_s32)(void);
 typedef s64 (*fn_type_void_to_s64)(void);
 
