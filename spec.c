@@ -65,7 +65,7 @@ typedef enum {
 struct Value;
 
 typedef struct {
-  struct Value *arguments;
+  struct Value *argument_list;
   s64 argument_count;
 
   struct Value *returns;
@@ -391,7 +391,7 @@ fn_begin() {
   };
 
   // @Volatile @ArgumentCount
-  fn.descriptor.arguments = malloc(sizeof(Value) * 4);
+  fn.descriptor.argument_list = malloc(sizeof(Value) * 4);
   fn.descriptor.returns = malloc(sizeof(Value));
 
   // @Volatile @ReserveStack
@@ -403,6 +403,7 @@ Value
 fn_end(
   Function_Builder *builder
 ) {
+  builder->descriptor.argument_count = builder->next_argument_index;
   return (const Value) {
     .descriptor = {
       .type = Descriptor_Type_Function,
@@ -424,7 +425,7 @@ fn_arg(
         .descriptor = descriptor,
         .operand = rcx,
       };
-      fn->descriptor.arguments[0] = arg;
+      fn->descriptor.argument_list[0] = arg;
       return arg;
     }
     case 1: {
@@ -432,7 +433,7 @@ fn_arg(
         .descriptor = descriptor,
         .operand = rdx,
       };
-      fn->descriptor.arguments[1] = arg;
+      fn->descriptor.argument_list[1] = arg;
       return arg;
     }
     case 2: {
@@ -440,7 +441,7 @@ fn_arg(
         .descriptor = descriptor,
         .operand = r8,
       };
-      fn->descriptor.arguments[2] = arg;
+      fn->descriptor.argument_list[2] = arg;
       return arg;
     }
     case 3: {
@@ -448,7 +449,7 @@ fn_arg(
         .descriptor = descriptor,
         .operand = r9,
       };
-      fn->descriptor.arguments[3] = arg;
+      fn->descriptor.argument_list[3] = arg;
       return arg;
     }
   }
@@ -483,70 +484,94 @@ fn_return(
   encode(&fn->buffer, (Instruction) {ret, {0}});
 }
 
-fn_type_void_to_s32
+Value
 make_constant_s32(
   s32 value
 ) {
-  Function_Builder fn = fn_begin();
-  fn_return(&fn, (const Value){
-    .descriptor = { .type = Descriptor_Type_Integer },
-    .operand = imm32(value),
-  });
-  return (fn_type_void_to_s32)fn.buffer.memory;
-}
-
-fn_type_s64_to_s64
-make_identity_s64() {
-  Function_Builder fn = fn_begin();
-  Value arg0 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-  fn_return(&fn, arg0);
-  return (fn_type_s64_to_s64)fn.buffer.memory;
-}
-
-fn_type_s64_to_s64
-make_increment_s64() {
-  Function_Builder fn = fn_begin();
-  Operand x = declare_variable(&fn, sizeof(s64));
-  assign(&fn, x, imm32(1));
-  Operand y = declare_variable(&fn, sizeof(s64));
-  assign(&fn, y, imm32(2));
-  Value arg0 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-  mutating_plus(&fn, arg0.operand, x);
-  mutating_plus(&fn, arg0.operand, y);
-  fn_return(&fn, arg0);
-  return (fn_type_s64_to_s64)fn.buffer.memory;
-}
-
-fn_type__void_to_s32__to_s32
-make_proxy_no_arg_return_s32() {
-  Function_Builder fn = fn_begin();
-  Value arg0 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-  encode(&fn.buffer, (Instruction) {call, {arg0.operand, 0}});
-
-  fn_return(&fn, (const Value){
-    .descriptor = { .type = Descriptor_Type_Integer },
-    .operand = rax,
-  });
-  return (fn_type__void_to_s32__to_s32)fn.buffer.memory;
+  Function_Builder builder = fn_begin();
+  {
+    fn_return(&builder, (const Value){
+      .descriptor = { .type = Descriptor_Type_Integer },
+      .operand = imm32(value),
+    });
+  }
+  return fn_end(&builder);
 }
 
 Value
-call_1(
+make_identity_s64() {
+  Function_Builder builder = fn_begin();
+  {
+    Value arg0 = fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
+    fn_return(&builder, arg0);
+  }
+  return fn_end(&builder);
+}
+
+Value
+make_increment_s64() {
+  Function_Builder builder = fn_begin();
+  {
+    Operand x = declare_variable(&builder, sizeof(s64));
+    assign(&builder, x, imm32(1));
+    Operand y = declare_variable(&builder, sizeof(s64));
+    assign(&builder, y, imm32(2));
+    Value arg0 = fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
+    mutating_plus(&builder, arg0.operand, x);
+    mutating_plus(&builder, arg0.operand, y);
+    fn_return(&builder, arg0);
+  }
+  return fn_end(&builder);
+}
+
+Value
+call_function_value(
   Function_Builder *builder,
   Value *to_call,
-  Value *arg0
+  Value *argument_list,
+  s64 argument_count
 ) {
   assert(to_call->descriptor.type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor.function;
-  assert(descriptor->arguments);
-  assert(descriptor->argument_count == 1);
-  // FIXME type check arguments
+  assert(descriptor->argument_count == argument_count);
 
-  encode(&builder->buffer, (Instruction) {mov, {descriptor->arguments[0].operand, arg0->operand}});
+  for (s64 i = 0; i < argument_count; ++i) {
+    // FIXME add proper type checks for arguments
+    assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
+    encode(
+      &builder->buffer,
+      (Instruction) {mov, {descriptor->argument_list[i].operand, argument_list[i].operand}}
+     );
+  }
+
   encode(&builder->buffer, (Instruction) {mov, {rax, to_call->operand}});
   encode(&builder->buffer, (Instruction) {call, {rax, 0}});
 
   return *descriptor->returns;
+}
+
+Value
+make_call_no_arg_return_s32() {
+  Function_Builder builder = fn_begin();
+  {
+    Value *returns = malloc(sizeof(Value));
+    *returns = (const Value){0};
+    returns->descriptor = (const Descriptor){.type = Descriptor_Type_Integer};
+    returns->operand = rax;
+
+    Value arg0 = fn_arg(&builder, (const Descriptor){
+      .type = Descriptor_Type_Function,
+      .function = {
+        .argument_list = 0,
+        .argument_count = 0,
+        .returns = returns,
+      }
+    });
+
+    Value result = call_function_value(&builder, &arg0, 0, 0);
+    fn_return(&builder, result);
+  }
+  return fn_end(&builder);
 }
 
 Value
@@ -555,12 +580,14 @@ make_partial_application_s64(
   s64 arg
 ) {
   Function_Builder builder = fn_begin();
-  Value applied_arg0 = {
-    .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
-    .operand = imm64(arg),
-  };
-  Value result = call_1(&builder, original_fn, &applied_arg0);
-  fn_return(&builder, result);
+  {
+    Value applied_arg0 = {
+      .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
+      .operand = imm64(arg),
+    };
+    Value result = call_function_value(&builder, original_fn, &applied_arg0, 1);
+    fn_return(&builder, result);
+  }
   return fn_end(&builder);
 }
 
@@ -589,90 +616,78 @@ patch_jump_to_here(
   *patch.location = (u8) diff;
 }
 
-fn_type_s32_to_s32
+Value
 make_is_non_zero() {
-  Function_Builder fn = fn_begin();
-  encode(&fn.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
-  Patch patch = make_jnz(&fn);
+  Function_Builder builder = fn_begin();
+  {
+    encode(&builder.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
+    Patch patch = make_jnz(&builder);
 
-  encode(&fn.buffer, (Instruction) {mov, {rax, imm64(0)}});
-  fn_return(&fn, (const Value){
-    .descriptor = { .type = Descriptor_Type_Integer },
-    .operand = rax,
-  });
-  patch_jump_to_here(&fn, patch);
+    fn_return(&builder, (const Value){
+      .descriptor = { .type = Descriptor_Type_Integer },
+      .operand = imm64(0),
+    });
+    patch_jump_to_here(&builder, patch);
 
-  encode(&fn.buffer, (Instruction) {mov, {rax, imm64(1)}});
-  fn_return(&fn, (const Value){
-    .descriptor = { .type = Descriptor_Type_Integer },
-    .operand = rax,
-  });
-  return (fn_type_s32_to_s32)fn.buffer.memory;
+    fn_return(&builder, (const Value){
+      .descriptor = { .type = Descriptor_Type_Integer },
+      .operand = imm64(1),
+    });
+  }
+  return fn_end(&builder);
 }
+
+s64
+helper_value_as_function(
+  Value *value
+) {
+  assert(value->operand.type == Operand_Type_Immediate_64);
+  return value->operand.imm64;
+}
+
+#define value_as_function(_value_, _type_) \
+  ((_type_)helper_value_as_function(_value_))
 
 spec("mass") {
   it("should create function that will return 42") {
-    fn_type_void_to_s32 the_answer = make_constant_s32(42);
-    s32 result = the_answer();
+    Value the_answer = make_constant_s32(42);
+    s32 result = value_as_function(&the_answer, fn_type_void_to_s32)();
     check(result == 42);
-    check(the_answer() == 42);
-  }
-  it("should create function that will return 21") {
-    fn_type_void_to_s32 not_the_answer = make_constant_s32(21);
-    s32 result = not_the_answer();
-    check(result == 21);
   }
 
   it("should create function that returns s64 value that was passed") {
-    fn_type_s64_to_s64 id_s64 = make_identity_s64();
+    Value id_value = make_identity_s64();
+    fn_type_s64_to_s64 id_s64 = (fn_type_s64_to_s64)id_value.operand.imm64;
     s64 result = id_s64(42);
     check(result == 42);
   }
 
   it("should create function increments s64 value passed to it") {
-    fn_type_s64_to_s64 add_3_s64 = make_increment_s64();
-    s64 result = add_3_s64(42);
+    Value add_3_s64 = make_increment_s64();
+    s64 result = value_as_function(&add_3_s64, fn_type_s64_to_s64)(42);
     check(result == 45);
   }
 
   it("should create a function to call a no argument fn") {
-    fn_type_void_to_s32 the_answer = make_constant_s32(42);
-    fn_type__void_to_s32__to_s32 proxy = make_proxy_no_arg_return_s32();
-    s32 result = proxy(the_answer);
+    Value the_answer = make_constant_s32(42);
+    Value caller= make_call_no_arg_return_s32();
+    s32 result = value_as_function(&caller, fn_type__void_to_s32__to_s32)(
+      value_as_function(&the_answer, fn_type_void_to_s32)
+    );
     check(result == 42);
   }
 
   it("should create a partially applied function") {
-    fn_type_s64_to_s64 id_s64 = make_identity_s64();
-    Value arg0 = {
-      .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
-      .operand = rcx,
-    };
-    Value returns = {
-      .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
-      .operand = rax,
-    };
-    Value id_s64_value = {
-      .descriptor = {
-        .type = Descriptor_Type_Function,
-        .function = {
-          .arguments = &arg0,
-          .argument_count = 1,
-          .returns = &returns,
-        },
-      },
-      .operand = imm64((s64) id_s64)
-    };
-
-
-    Value partial_fn_value = make_partial_application_s64(&id_s64_value, 42);
+    Value id_value = make_identity_s64();
+    Value partial_fn_value = make_partial_application_s64(&id_value, 42);
     fn_type_void_to_s64 the_answer = (fn_type_void_to_s64) partial_fn_value.operand.imm64;
     s64 result = the_answer();
     check(result == 42);
   }
 
   it("should have a function that returns 0 if arg is zero, 1 otherwise") {
-    fn_type_s32_to_s32 is_non_zero = make_is_non_zero();
+    Value is_non_zero_value = make_is_non_zero();
+    fn_type_s32_to_s32 is_non_zero = value_as_function(&is_non_zero_value, fn_type_s32_to_s32);
     s64 result = is_non_zero(0);
     check(result == 0);
     result = is_non_zero(42);
@@ -680,15 +695,14 @@ spec("mass") {
   }
 
   it("should return 3rd argument") {
-
-    Function_Builder fn = fn_begin();
+    Function_Builder builder = fn_begin();
     {
-      (void)fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-      (void)fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-      Value arg2 = fn_arg(&fn, (const Descriptor){.type = Descriptor_Type_Integer});
-      fn_return(&fn, arg2);
+      (void)fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
+      (void)fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
+      Value arg2 = fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
+      fn_return(&builder, arg2);
     }
-    fn_type_s64_s64_s64_to_s64 third = (fn_type_s64_s64_s64_to_s64)fn.buffer.memory;
+    fn_type_s64_s64_s64_to_s64 third = (fn_type_s64_s64_s64_to_s64)fn_end(&builder).operand.imm64;
 
     s64 result = third(1, 2, 3);
     check(result == 3);
