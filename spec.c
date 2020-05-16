@@ -59,6 +59,8 @@ typedef struct {
 
 typedef enum {
   Descriptor_Type_Integer,
+  Descriptor_Type_Pointer,
+  Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
 } Descriptor_Type;
 
@@ -72,9 +74,16 @@ typedef struct {
 } Descriptor_Function;
 
 typedef struct {
+  struct Descriptor *item;
+  s64 length;
+} Descriptor_Fixed_Size_Array;
+
+typedef struct Descriptor {
   Descriptor_Type type;
   union {
     Descriptor_Function function;
+    Descriptor_Fixed_Size_Array array;
+    struct Descriptor *pointer_to;
   };
 } Descriptor;
 
@@ -680,7 +689,7 @@ spec("mass") {
   it("should create a partially applied function") {
     Value id_value = make_identity_s64();
     Value partial_fn_value = make_partial_application_s64(&id_value, 42);
-    fn_type_void_to_s64 the_answer = (fn_type_void_to_s64) partial_fn_value.operand.imm64;
+    fn_type_void_to_s64 the_answer = value_as_function(&partial_fn_value, fn_type_void_to_s64);
     s64 result = the_answer();
     check(result == 42);
   }
@@ -702,9 +711,66 @@ spec("mass") {
       Value arg2 = fn_arg(&builder, (const Descriptor){.type = Descriptor_Type_Integer});
       fn_return(&builder, arg2);
     }
-    fn_type_s64_s64_s64_to_s64 third = (fn_type_s64_s64_s64_to_s64)fn_end(&builder).operand.imm64;
+    Value value = fn_end(&builder);
+    fn_type_s64_s64_s64_to_s64 third = value_as_function(&value, fn_type_s64_s64_s64_to_s64);
 
     s64 result = third(1, 2, 3);
     check(result == 3);
+  }
+
+  it("should say 'Hello, world!'") {
+    // FIXME should support functions that do not return a value
+    Value dummy_return = {
+      .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
+      .operand = imm32(0),
+    };
+
+    const char *message = "Hello, world!";
+
+    Descriptor item_descriptor = (const Descriptor){.type = Descriptor_Type_Integer};
+
+    Descriptor message_descriptor = {
+      .type = Descriptor_Type_Fixed_Size_Array,
+      .array = {
+        .item = &item_descriptor,
+        .length = strlen(message + 1/* null terminator */),
+      },
+    };
+
+    Value message_value = {
+      .descriptor = {
+        .type = Descriptor_Type_Pointer,
+        .pointer_to = &message_descriptor,
+      },
+      .operand = imm64((s64) message),
+    };
+
+    Value puts_arg = {
+      .descriptor = {
+        .type = Descriptor_Type_Pointer,
+        .pointer_to = &message_descriptor,
+      },
+      .operand = rcx,
+    };
+    Value puts_value = {
+      .descriptor = {
+        .type = Descriptor_Type_Function,
+        .function = {
+          .argument_list = &puts_arg,
+          .argument_count = 1,
+          .returns = &dummy_return,
+        },
+      },
+      .operand = imm64((s64) puts),
+    };
+
+    Function_Builder builder = fn_begin();
+    {
+      call_function_value(&builder, &puts_value, &message_value, 1);
+      fn_return(&builder, dummy_return);
+    }
+    Value value = fn_end(&builder);
+
+    value_as_function(&value, fn_type_void_to_void)();
   }
 }
