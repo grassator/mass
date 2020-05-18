@@ -16,7 +16,7 @@ typedef enum {
 } Operand_Encoding_Type;
 
 typedef struct {
-  u16 op_code;
+  u8 op_code[2];
   Instruction_Extension_Type extension_type;
   u8 op_code_extension;
   Operand_Encoding_Type operand_encoding_types[2];
@@ -32,7 +32,7 @@ typedef struct {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding mov_encoding_list[] = {
   {
-    .op_code = 0x89,
+    .op_code = { 0x00, 0x89 },
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
@@ -40,7 +40,7 @@ const Instruction_Encoding mov_encoding_list[] = {
     },
   },
   {
-    .op_code = 0xc7,
+    .op_code = { 0x00, 0xc7 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 0,
     .operand_encoding_types = {
@@ -49,7 +49,7 @@ const Instruction_Encoding mov_encoding_list[] = {
     },
   },
   {
-    .op_code = 0xb8,
+    .op_code = { 0x00, 0xb8 },
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Op_Code_Plus_Register,
@@ -68,7 +68,7 @@ const X64_Mnemonic mov = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding ret_encoding_list[] = {
   {
-    .op_code = 0xc3,
+    .op_code = { 0x00, 0xc3 },
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
       Operand_Encoding_Type_None,
@@ -86,7 +86,7 @@ const X64_Mnemonic ret = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding add_encoding_list[] = {
   {
-    .op_code = 0x03,
+    .op_code = { 0x00, 0x03 },
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register,
@@ -94,7 +94,7 @@ const Instruction_Encoding add_encoding_list[] = {
     },
   },
   {
-    .op_code = 0x83,
+    .op_code = { 0x00, 0x83 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 0,
     .operand_encoding_types = {
@@ -113,7 +113,7 @@ const X64_Mnemonic add = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding sub_encoding_list[] = {
   {
-    .op_code = 0x83,
+    .op_code = { 0x00, 0x83 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 5,
     .operand_encoding_types = {
@@ -133,7 +133,7 @@ const X64_Mnemonic sub = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding call_encoding_list[] = {
   {
-    .op_code = 0xFF,
+    .op_code = { 0x00, 0xFF },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 2,
     .operand_encoding_types = {
@@ -153,7 +153,7 @@ const X64_Mnemonic call = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding cmp_encoding_list[] = {
   {
-    .op_code = 0x81,
+    .op_code = { 0x00, 0x81 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 7,
     .operand_encoding_types = {
@@ -173,10 +173,18 @@ const X64_Mnemonic cmp = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding jnz_encoding_list[] = {
   {
-    .op_code = 0x75,
+    .op_code = { 0x00, 0x75 },
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
+    .op_code = { 0x0F, 0x85 },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_32,
       Operand_Encoding_Type_None
     },
   },
@@ -184,4 +192,31 @@ const Instruction_Encoding jnz_encoding_list[] = {
 const X64_Mnemonic jnz = {
   .encoding_list = (const Instruction_Encoding *)jnz_encoding_list,
   .encoding_count = static_array_size(jnz_encoding_list),
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// jmp
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding jmp_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0xEB },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
+    .op_code = { 0x00, 0xE9 },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic jmp = {
+  .encoding_list = (const Instruction_Encoding *)jmp_encoding_list,
+  .encoding_count = static_array_size(jmp_encoding_list),
 };

@@ -58,6 +58,7 @@ typedef struct {
 } Operand;
 
 typedef enum {
+  Descriptor_Type_Void,
   Descriptor_Type_Integer,
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
@@ -91,6 +92,11 @@ typedef struct Value {
   Descriptor descriptor;
   Operand operand;
 } Value;
+
+Value void_value = {
+  .descriptor = { .type = Descriptor_Type_Void },
+  .operand = { .type = Operand_Type_None },
+};
 
 
 #define define_register(reg_name, reg_index, reg_byte_size) \
@@ -236,7 +242,7 @@ encode(
     u8 rex_byte = 0;
     u8 r_m = 0;
     u8 mod = MOD_Register;
-    u8 op_code = (u8) encoding->op_code;
+    u8 op_code[2] = { encoding->op_code[0], encoding->op_code[1] };
     bool needs_sib = false;
     u8 sib_byte = 0;
     for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
@@ -255,7 +261,7 @@ encode(
             rex_byte |= REX_R;
           }
         } else if (encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
-          op_code += operand->reg.index & 0b111;
+          op_code[1] += operand->reg.index & 0b111;
           if (operand->reg.index & 0b1000) {
             rex_byte |= REX_B;
           }
@@ -301,7 +307,10 @@ encode(
     }
 
     // FIXME if op code is 2 bytes need different append
-    buffer_append_u8(buffer, op_code);
+    if (op_code[0]) {
+      buffer_append_u8(buffer, op_code[0]);
+    }
+    buffer_append_u8(buffer, op_code[1]);
 
     // FIXME Implement proper mod support
     // FIXME mask register index
@@ -412,6 +421,21 @@ Value
 fn_end(
   Function_Builder *builder
 ) {
+  u8 alignment = 0x8;
+  u8 stack_size = builder->stack_reserve + alignment;
+
+  { // Override stack reservation
+    u64 save_occupied = builder->buffer.occupied;
+    builder->buffer.occupied = 0;
+
+    // @Volatile @ReserveStack
+    encode(&builder->buffer, (Instruction) {sub, {rsp, imm8(stack_size)}});
+    builder->buffer.occupied = save_occupied;
+  }
+
+  encode(&builder->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
+  encode(&builder->buffer, (Instruction) {ret, {0}});
+
   builder->descriptor.argument_count = builder->next_argument_index;
   return (const Value) {
     .descriptor = {
@@ -472,25 +496,14 @@ fn_return(
   Function_Builder *fn,
   Value to_return
 ) {
-  u8 alignment = 0x8;
-  u8 stack_size = fn->stack_reserve + alignment;
-
-  { // Override stack reservation
-    u64 save_occupied = fn->buffer.occupied;
-    fn->buffer.occupied = 0;
-
-    // @Volatile @ReserveStack
-    encode(&fn->buffer, (Instruction) {sub, {rsp, imm8(stack_size)}});
-    fn->buffer.occupied = save_occupied;
-  }
-
+  // FIXME check that all return paths return the same type
   *fn->descriptor.returns = to_return;
 
-  if (memcmp(&rax, &to_return, sizeof(rax)) != 0) {
-    encode(&fn->buffer, (Instruction) {mov, {rax, to_return.operand}});
+  if (to_return.descriptor.type != Descriptor_Type_Void) {
+    if (memcmp(&rax, &to_return, sizeof(rax)) != 0) {
+      encode(&fn->buffer, (Instruction) {mov, {rax, to_return.operand}});
+    }
   }
-  encode(&fn->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
-  encode(&fn->buffer, (Instruction) {ret, {0}});
 }
 
 Value
@@ -601,28 +614,36 @@ make_partial_application_s64(
 }
 
 typedef struct {
-  u8 *location;
+  s32 *location;
   u64 ip;
-} Patch;
+} Patch_32;
 
-Patch
+Patch_32
 make_jnz(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jnz, {imm8(0xcc), 0}});
+  encode(&fn->buffer, (Instruction) {jnz, {imm32(0xcc), 0}});
   u64 ip = fn->buffer.occupied;
-  u8 *location = fn->buffer.memory + fn->buffer.occupied - 1;
-  return (const Patch) { .location = location, .ip = ip };
+  s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
+  return (const Patch_32) { .location = location, .ip = ip };
+}
+
+Patch_32
+make_jmp(
+  Function_Builder *fn
+) {
+  encode(&fn->buffer, (Instruction) {jmp, {imm32(0xcc), 0}});
+  u64 ip = fn->buffer.occupied;
+  s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
+  return (const Patch_32) { .location = location, .ip = ip };
 }
 
 void
 patch_jump_to_here(
   Function_Builder *fn,
-  Patch patch
+  Patch_32 patch
 ) {
-  u64 diff = fn->buffer.occupied - patch.ip;
-  assert(diff < 0x80);
-  *patch.location = (u8) diff;
+  *patch.location = (s32) (fn->buffer.occupied - patch.ip);
 }
 
 Value
@@ -630,18 +651,20 @@ make_is_non_zero() {
   Function_Builder builder = fn_begin();
   {
     encode(&builder.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
-    Patch patch = make_jnz(&builder);
+    Patch_32 patch = make_jnz(&builder);
 
     fn_return(&builder, (const Value){
       .descriptor = { .type = Descriptor_Type_Integer },
       .operand = imm64(0),
     });
+    Patch_32 return_patch = make_jmp(&builder);
     patch_jump_to_here(&builder, patch);
 
     fn_return(&builder, (const Value){
       .descriptor = { .type = Descriptor_Type_Integer },
       .operand = imm64(1),
     });
+    patch_jump_to_here(&builder, return_patch);
   }
   return fn_end(&builder);
 }
@@ -719,12 +742,6 @@ spec("mass") {
   }
 
   it("should say 'Hello, world!'") {
-    // FIXME should support functions that do not return a value
-    Value dummy_return = {
-      .descriptor = (const Descriptor){.type = Descriptor_Type_Integer},
-      .operand = imm32(0),
-    };
-
     const char *message = "Hello, world!";
 
     Descriptor item_descriptor = (const Descriptor){.type = Descriptor_Type_Integer};
@@ -758,7 +775,7 @@ spec("mass") {
         .function = {
           .argument_list = &puts_arg,
           .argument_count = 1,
-          .returns = &dummy_return,
+          .returns = &void_value,
         },
       },
       .operand = imm64((s64) puts),
@@ -767,7 +784,7 @@ spec("mass") {
     Function_Builder builder = fn_begin();
     {
       call_function_value(&builder, &puts_value, &message_value, 1);
-      fn_return(&builder, dummy_return);
+      fn_return(&builder, void_value);
     }
     Value value = fn_end(&builder);
 
