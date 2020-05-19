@@ -16,14 +16,19 @@ typedef struct {
   Descriptor_Function descriptor;
 } Function_Builder;
 
-Operand
-declare_variable(
+Value
+reserve_stack(
   Function_Builder *fn,
-  u32 byte_size
+  Descriptor *descriptor
 ) {
-  Operand result = stack(fn->stack_reserve, byte_size);
+  // TODO take size from the descriptor when available
+  u32 byte_size = sizeof(s64);
+  Operand operand = stack(fn->stack_reserve, byte_size);
   fn->stack_reserve += 0x10;
-  return result;
+  return (const Value) {
+    .descriptor = *descriptor,
+    .operand = operand,
+  };
 }
 
 void
@@ -32,19 +37,121 @@ assign(
   Operand a,
   Operand b
 ) {
-  encode(&fn->buffer, (Instruction) {mov, {a, b}});
+  encode(&fn->buffer, (Instruction) {mov, {a, b, 0}});
 }
 
-Operand
-mutating_plus(
-  Function_Builder *fn,
-  Operand a,
-  Operand b
+void
+assert_not_register_ax(
+  Value *value
 ) {
-  // TODO Create a temp value for result
-  encode(&fn->buffer, (Instruction) {add, {a, b}});
-  return a;
+  assert(value);
+  if (value->operand.type == Operand_Type_Register) {
+    assert(value->operand.reg.index != rax.reg.index);
+  }
 }
+
+Value
+plus(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  // TODO type check values
+  assert_not_register_ax(a);
+  assert_not_register_ax(b);
+
+  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+
+  // TODO deal with imm64
+  encode(&builder->buffer, (Instruction) {add, {rax, b->operand, 0}});
+
+  // TODO correctly size the temporary value
+  Value temp = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {temp.operand, rax, 0}});
+
+  return temp;
+}
+
+Value
+minus(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  // TODO type check values
+  assert_not_register_ax(a);
+  assert_not_register_ax(b);
+
+  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+
+  // TODO deal with imm64
+  encode(&builder->buffer, (Instruction) {sub, {rax, b->operand, 0}});
+
+  // TODO correctly size the temporary value
+  Value temp = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {temp.operand, rax, 0}});
+
+  return temp;
+}
+
+Value
+multiply(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  // TODO type check values
+  assert_not_register_ax(a);
+  assert_not_register_ax(b);
+
+  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+
+  // TODO deal with imm64
+  // TODO deal with signed / unsigned
+  // TODO support double the size of the result?
+  encode(&builder->buffer, (Instruction) {imul, {rax, rax, b->operand}});
+
+  // TODO correctly size the temporary value
+  Value temp = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {temp.operand, rax, 0}});
+
+  return temp;
+}
+
+Value
+divide(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  // TODO type check values
+  assert_not_register_ax(a);
+  assert_not_register_ax(b);
+
+  // Save RDX as it will be used for the remainder
+  Value rdx_temp = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {rdx_temp.operand, rdx, 0}});
+
+  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+
+  // TODO deal with signed / unsigned
+  Value divisor = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {divisor.operand, rdx, 0}});
+
+  // TODO choose the right extension based on the size
+  encode(&builder->buffer, (Instruction) {cqo, {0}});
+  encode(&builder->buffer, (Instruction) {idiv, {divisor.operand, 0, 0}});
+
+  // TODO correctly size the temporary value
+  Value temp = reserve_stack(builder, &a->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {temp.operand, rax, 0}});
+
+  // Restore RDX
+  encode(&builder->buffer, (Instruction) {mov, {rdx, rdx_temp.operand, 0}});
+
+  return temp;
+}
+
 
 Function_Builder
 fn_begin() {
@@ -59,7 +166,7 @@ fn_begin() {
   fn.descriptor.returns = malloc(sizeof(Value));
 
   // @Volatile @ReserveStack
-  encode(&fn.buffer, (Instruction) {sub, {rsp, imm8(0xcc)}});
+  encode(&fn.buffer, (Instruction) {sub, {rsp, imm8(0xcc), 0}});
   return fn;
 }
 
@@ -75,11 +182,11 @@ fn_end(
     builder->buffer.occupied = 0;
 
     // @Volatile @ReserveStack
-    encode(&builder->buffer, (Instruction) {sub, {rsp, imm8(stack_size)}});
+    encode(&builder->buffer, (Instruction) {sub, {rsp, imm8(stack_size), 0}});
     builder->buffer.occupied = save_occupied;
   }
 
-  encode(&builder->buffer, (Instruction) {add, {rsp, imm8(stack_size)}});
+  encode(&builder->buffer, (Instruction) {add, {rsp, imm8(stack_size), 0}});
   encode(&builder->buffer, (Instruction) {ret, {0}});
 
   builder->descriptor.argument_count = builder->next_argument_index;
@@ -146,9 +253,7 @@ fn_return(
   *fn->descriptor.returns = to_return;
 
   if (to_return.descriptor.type != Descriptor_Type_Void) {
-    if (memcmp(&rax, &to_return, sizeof(rax)) != 0) {
-      encode(&fn->buffer, (Instruction) {mov, {rax, to_return.operand}});
-    }
+    encode(&fn->buffer, (Instruction) {mov, {rax, to_return.operand, 0}});
   }
 }
 
@@ -177,14 +282,14 @@ Value
 make_increment_s64() {
   Function_Builder builder = fn_begin();
   {
-    Operand x = declare_variable(&builder, sizeof(s64));
-    assign(&builder, x, imm32(1));
-    Operand y = declare_variable(&builder, sizeof(s64));
-    assign(&builder, y, imm32(2));
+    Value x = reserve_stack(&builder, &descriptor_integer);
+    assign(&builder, x.operand, imm32(1));
+    Value y = reserve_stack(&builder, &descriptor_integer);
+    assign(&builder, y.operand, imm32(2));
     Value arg0 = fn_arg(&builder, descriptor_integer);
-    mutating_plus(&builder, arg0.operand, x);
-    mutating_plus(&builder, arg0.operand, y);
-    fn_return(&builder, arg0);
+    Value temp = minus(&builder, &arg0, &x);
+    Value temp2 = plus(&builder, &temp, &y);
+    fn_return(&builder, temp2);
   }
   return fn_end(&builder);
 }
@@ -205,12 +310,12 @@ call_function_value(
     assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
     encode(
       &builder->buffer,
-      (Instruction) {mov, {descriptor->argument_list[i].operand, argument_list[i].operand}}
+      (Instruction) {mov, {descriptor->argument_list[i].operand, argument_list[i].operand, 0}}
      );
   }
 
-  encode(&builder->buffer, (Instruction) {mov, {rax, to_call->operand}});
-  encode(&builder->buffer, (Instruction) {call, {rax, 0}});
+  encode(&builder->buffer, (Instruction) {mov, {rax, to_call->operand, 0}});
+  encode(&builder->buffer, (Instruction) {call, {rax, 0, 0}});
 
   return *descriptor->returns;
 }
@@ -262,7 +367,7 @@ Patch_32
 make_jnz(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jnz, {imm32(0xcc), 0}});
+  encode(&fn->buffer, (Instruction) {jnz, {imm32(0xcc), 0, 0}});
   u64 ip = fn->buffer.occupied;
   s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
@@ -272,7 +377,7 @@ Patch_32
 make_jmp(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jmp, {imm32(0xcc), 0}});
+  encode(&fn->buffer, (Instruction) {jmp, {imm32(0xcc), 0, 0}});
   u64 ip = fn->buffer.occupied;
   s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
@@ -290,7 +395,7 @@ Value
 make_is_non_zero() {
   Function_Builder builder = fn_begin();
   {
-    encode(&builder.buffer, (Instruction) {cmp, {ecx, imm32(0)}});
+    encode(&builder.buffer, (Instruction) {cmp, {ecx, imm32(0), 0}});
     Patch_32 patch = make_jnz(&builder);
 
     fn_return(&builder, value_from_s64(0));
@@ -318,9 +423,9 @@ spec("mass") {
   }
 
   it("should create function increments s64 value passed to it") {
-    Value add_3_s64 = make_increment_s64();
-    s64 result = value_as_function(&add_3_s64, fn_type_s64_to_s64)(42);
-    check(result == 45);
+    Value inc_s64 = make_increment_s64();
+    s64 result = value_as_function(&inc_s64, fn_type_s64_to_s64)(42);
+    check(result == 43);
   }
 
   it("should create a function to call a no argument fn") {
@@ -362,6 +467,36 @@ spec("mass") {
 
     s64 result = third(1, 2, 3);
     check(result == 3);
+  }
+
+  it("should make function that multiplies by 2") {
+    Function_Builder builder = fn_begin();
+    {
+      Value arg0 = fn_arg(&builder, descriptor_integer);
+      Value two = value_from_s32(2);
+      Value to_return = multiply(&builder, &arg0, &two);
+      fn_return(&builder, to_return);
+    }
+    Value value = fn_end(&builder);
+    fn_type_s64_to_s64 twice = value_as_function(&value, fn_type_s64_to_s64);
+
+    s64 result = twice(42);
+    check(result == 84);
+  }
+
+  it("should make function that divides two number") {
+    Function_Builder builder = fn_begin();
+    {
+      Value arg0 = fn_arg(&builder, descriptor_integer);
+      Value arg1 = fn_arg(&builder, descriptor_integer);
+      Value to_return = divide(&builder, &arg0, &arg1);
+      fn_return(&builder, to_return);
+    }
+    Value value = fn_end(&builder);
+    fn_type_s64_s64_to_s64 divide_fn = value_as_function(&value, fn_type_s64_s64_to_s64);
+
+    s64 result = divide_fn(42, 2);
+    check(result == 21);
   }
 
   it("should parse c function forward declarations") {

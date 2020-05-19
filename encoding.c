@@ -30,8 +30,8 @@ encode(
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
     bool match = true;
-    // FIXME remove hardcoded 2 for operand count
-    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+    u32 operand_count = sizeof(encoding->operand_encoding_types) / sizeof(Operand_Encoding_Type);
+    for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
       Operand_Type operand_type = instruction.operands[operand_index].type;
       if (operand_type == Operand_Type_None && encoding_type == Operand_Encoding_Type_None) {
@@ -71,7 +71,7 @@ encode(
     u8 op_code[2] = { encoding->op_code[0], encoding->op_code[1] };
     bool needs_sib = false;
     u8 sib_byte = 0;
-    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+    for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
 
@@ -155,7 +155,7 @@ encode(
 
     // Write out displacement
     if (needs_mod_r_m && mod != MOD_Register) {
-      for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+      for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
         Operand *operand = &instruction.operands[operand_index];
         if (operand->type == Operand_Type_Memory_Indirect) {
           if (mod == MOD_Displacement_s32) {
@@ -169,7 +169,7 @@ encode(
       }
     }
     // Write out immediate operand(s?)
-    for (u32 operand_index = 0; operand_index < 2; ++operand_index) {
+    for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       if (operand->type == Operand_Type_Immediate_8) {
         buffer_append_s8(buffer, operand->imm8);

@@ -21,7 +21,7 @@ typedef struct {
   u8 op_code[2];
   Instruction_Extension_Type extension_type;
   u8 op_code_extension;
-  Operand_Encoding_Type operand_encoding_types[2];
+  Operand_Encoding_Type operand_encoding_types[3];
 } Instruction_Encoding;
 
 typedef struct {
@@ -31,7 +31,7 @@ typedef struct {
 
 typedef struct {
   const X64_Mnemonic mnemonic;
-  Operand operands[2];
+  Operand operands[3];
 } Instruction;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,17 @@ const Instruction_Encoding mov_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Register
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
+    .op_code = { 0x00, 0x8B },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
     },
   },
   {
@@ -52,7 +62,8 @@ const Instruction_Encoding mov_encoding_list[] = {
     .op_code_extension = 0,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Immediate_32
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None
     },
   },
   {
@@ -60,7 +71,8 @@ const Instruction_Encoding mov_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Op_Code_Plus_Register,
-      Operand_Encoding_Type_Immediate_64
+      Operand_Encoding_Type_Immediate_64,
+      Operand_Encoding_Type_None
     },
   },
 };
@@ -78,6 +90,7 @@ const Instruction_Encoding ret_encoding_list[] = {
     .op_code = { 0x00, 0xc3 },
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
@@ -97,7 +110,8 @@ const Instruction_Encoding add_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register,
-      Operand_Encoding_Type_Register_Memory
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
     },
   },
   {
@@ -106,7 +120,8 @@ const Instruction_Encoding add_encoding_list[] = {
     .op_code_extension = 0,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Immediate_8
+      Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
     },
   },
 };
@@ -120,18 +135,102 @@ const X64_Mnemonic add = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding sub_encoding_list[] = {
   {
+    .op_code = { 0x00, 0x29 },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
+    .op_code = { 0x00, 0x2B },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
     .op_code = { 0x00, 0x83 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 5,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Immediate_8
+      Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
     },
   },
 };
 const X64_Mnemonic sub = {
   .encoding_list = (const Instruction_Encoding *)sub_encoding_list,
   .encoding_count = static_array_size(sub_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// imul
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding imul_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0x69 },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_32
+    },
+  },
+};
+const X64_Mnemonic imul = {
+  .encoding_list = (const Instruction_Encoding *)imul_encoding_list,
+  .encoding_count = static_array_size(imul_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// idiv
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding idiv_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0xF7 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 7,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory
+    },
+  },
+};
+const X64_Mnemonic idiv = {
+  .encoding_list = (const Instruction_Encoding *)idiv_encoding_list,
+  .encoding_count = static_array_size(idiv_encoding_list),
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// cwd/cdq/cqo
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding cqo_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0x99 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic cqo = {
+  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
+  .encoding_count = static_array_size(cqo_encoding_list),
+};
+const X64_Mnemonic cdq = {
+  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
+  .encoding_count = static_array_size(cqo_encoding_list),
+};
+const X64_Mnemonic cwd = {
+  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
+  .encoding_count = static_array_size(cqo_encoding_list),
 };
 
 
@@ -145,6 +244,7 @@ const Instruction_Encoding call_encoding_list[] = {
     .op_code_extension = 2,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
   },
@@ -165,7 +265,8 @@ const Instruction_Encoding cmp_encoding_list[] = {
     .op_code_extension = 7,
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
-      Operand_Encoding_Type_Immediate_32
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None
     },
   },
 };
@@ -184,6 +285,7 @@ const Instruction_Encoding jnz_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
   },
@@ -192,6 +294,7 @@ const Instruction_Encoding jnz_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
   },
@@ -211,6 +314,7 @@ const Instruction_Encoding jmp_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
   },
@@ -219,6 +323,7 @@ const Instruction_Encoding jmp_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_None,
     .operand_encoding_types = {
       Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None,
       Operand_Encoding_Type_None
     },
   },
