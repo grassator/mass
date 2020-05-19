@@ -1,3 +1,5 @@
+#include "value.h"
+
 typedef enum {
   Instruction_Extension_Type_None,
   Instruction_Extension_Type_Register,
@@ -26,6 +28,11 @@ typedef struct {
   const Instruction_Encoding *encoding_list;
   u32 encoding_count;
 } X64_Mnemonic;
+
+typedef struct {
+  const X64_Mnemonic mnemonic;
+  Operand operands[2];
+} Instruction;
 
 ////////////////////////////////////////////////////////////////////////////////
 // mov

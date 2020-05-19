@@ -1,0 +1,71 @@
+#ifndef VALUE_H
+#define VALUE_H
+#include "types.h"
+
+typedef enum {
+  Operand_Type_None,
+  Operand_Type_Register,
+  Operand_Type_Immediate_8,
+  Operand_Type_Immediate_32,
+  Operand_Type_Immediate_64,
+  Operand_Type_Memory_Indirect,
+} Operand_Type;
+
+typedef struct {
+  u8 index;
+} Register;
+
+typedef struct {
+  Register reg;
+  s32 displacement;
+} Operand_Memory_Indirect;
+
+typedef struct {
+  Operand_Type type;
+  u32 byte_size;
+  union {
+    Register reg;
+    s8 imm8;
+    s32 imm32;
+    s64 imm64;
+    Operand_Memory_Indirect indirect;
+  };
+} Operand;
+
+typedef enum {
+  Descriptor_Type_Void,
+  Descriptor_Type_Integer,
+  Descriptor_Type_Pointer,
+  Descriptor_Type_Fixed_Size_Array,
+  Descriptor_Type_Function,
+} Descriptor_Type;
+
+struct Value;
+
+typedef struct {
+  struct Value *argument_list;
+  s64 argument_count;
+
+  struct Value *returns;
+} Descriptor_Function;
+
+typedef struct {
+  struct Descriptor *item;
+  s64 length;
+} Descriptor_Fixed_Size_Array;
+
+typedef struct Descriptor {
+  Descriptor_Type type;
+  union {
+    Descriptor_Function function;
+    Descriptor_Fixed_Size_Array array;
+    struct Descriptor *pointer_to;
+  };
+} Descriptor;
+
+typedef struct Value {
+  Descriptor descriptor;
+  Operand operand;
+} Value;
+
+#endif VALUE_H
