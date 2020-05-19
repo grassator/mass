@@ -694,8 +694,8 @@ helper_value_as_function(
 
 bool
 memory_range_equal_to_c_string(
-  void *memory_range_start,
-  void *memory_range_end,
+  const void *memory_range_start,
+  const void *memory_range_end,
   const char *string
 ) {
   s64 length = ((char *)memory_range_end) - ((char *)memory_range_start);
@@ -704,12 +704,91 @@ memory_range_equal_to_c_string(
   return memcmp(memory_range_start, string, string_length) == 0;
 }
 
+Descriptor *
+parse_c_type(
+  const char *range_start,
+  const char *range_end
+) {
+  Descriptor *descriptor = 0;
+
+  const char *start = range_start;
+  for(const char *ch = range_start; ch <= range_end; ++ch) {
+    if (!(*ch == ' ' || *ch == '*' || ch == range_end)) continue;
+    if (start != ch) {
+      if (memory_range_equal_to_c_string(start, ch, "char")) {
+        descriptor = &descriptor_integer;
+      } else if (memory_range_equal_to_c_string(start, ch, "int")) {
+        descriptor = &descriptor_integer;
+      } else if (memory_range_equal_to_c_string(start, ch, "void")) {
+        descriptor = &void_value.descriptor;
+      } else if (memory_range_equal_to_c_string(start, ch, "const")) {
+        // TODO support const values?
+      } else {
+        assert(!"Unsupported argument type");
+      }
+    }
+    if (*ch == '*') {
+      assert(descriptor);
+      Descriptor *previous_descriptor = descriptor;
+      descriptor = malloc(sizeof(Descriptor));
+      *descriptor = (const Descriptor) {
+        .type = Descriptor_Type_Pointer,
+        .pointer_to = previous_descriptor,
+      };
+    }
+    start = ch + 1;
+  }
+  return descriptor;
+}
+
+Value *
+c_function_return_value(
+  const char *forward_declaration
+) {
+  char *ch = strchr(forward_declaration, '(');
+  assert(ch);
+  --ch;
+
+  // skip whitespace before (
+  for(; *ch == ' '; --ch);
+  for(;
+    (*ch >= 'a' && *ch <= 'z') ||
+    (*ch >= 'A' && *ch <= 'Z') ||
+    (*ch >= '0' && *ch <= '9') ||
+    *ch == '_';
+    --ch
+  )
+  // skip whitespace before function name
+  for(; *ch == ' '; --ch);
+  ++ch;
+  Descriptor *descriptor = parse_c_type(forward_declaration, ch);
+  assert(descriptor);
+  switch(descriptor->type) {
+    case Descriptor_Type_Void: {
+      return &void_value;
+    }
+    case Descriptor_Type_Function:
+    case Descriptor_Type_Integer:
+    case Descriptor_Type_Pointer: {
+      Value *return_value = malloc(sizeof(Value));
+      *return_value = (const Value) {
+        .descriptor = *descriptor,
+        .operand = eax,
+      };
+      return return_value;
+    }
+    default: {
+      assert(!"Unsupported return type");
+    }
+  }
+  return 0;
+}
+
 Value
 c_function_value(
   const char *forward_declaration,
   fn_type_opaque fn
 ) {
-
   Value result = {
     .descriptor = {
       .type = Descriptor_Type_Function,
@@ -718,53 +797,31 @@ c_function_value(
     .operand = imm64((s64) fn),
   };
 
-  if (strstr(forward_declaration, "void") == forward_declaration) {
-    result.descriptor.function.returns = &void_value;
-  } else if (strstr(forward_declaration, "int") == forward_declaration) {
-    Value *return_value = malloc(sizeof(Value));
-    *return_value = (const Value) {
-      .descriptor = descriptor_integer,
-      .operand = eax,
-    };
-    result.descriptor.function.returns = return_value;
-  } else {
-    assert(!"Unknown return type");
-  }
-
+  result.descriptor.function.returns = c_function_return_value(forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;
 
   char *start = ch;
-
-  Value *arg = malloc(sizeof(Value));
-  // FIXME should not use hardcoded register here
-  arg->operand = rcx;
-
+  Descriptor *argument_descriptor = 0;
   for (; *ch; ++ch) {
-    if (*ch == ',') assert(!"Multiple arguments are not supported");
-    if (*ch == ' ' || *ch == ')' || *ch == '*') {
+    if (*ch == ',' || *ch == ')') {
       if (start != ch) {
-        if (memory_range_equal_to_c_string(start, ch, "char")) {
-          arg->descriptor = descriptor_integer;
-          result.descriptor.function.argument_list = arg;
-          result.descriptor.function.argument_count = 1;
-        } else if (memory_range_equal_to_c_string(start, ch, "const")) {
-          // TODO support const values?
-        } else {
-          assert(!"Unsupported argument type");
-        }
+        argument_descriptor = parse_c_type(start, ch);
+        assert(argument_descriptor);
       }
       start = ch + 1;
-      if (*ch == '*') {
-        Descriptor *previous_descriptor = malloc(sizeof(Descriptor));
-        *previous_descriptor = arg->descriptor;
-        arg->descriptor = (const Descriptor) {
-          .type = Descriptor_Type_Pointer,
-          .pointer_to = previous_descriptor,
-        };
-      }
     }
+  }
+
+  if (argument_descriptor && argument_descriptor->type != Descriptor_Type_Void) {
+    Value *arg = malloc(sizeof(Value));
+    arg->descriptor = *argument_descriptor;
+    // FIXME should not use a hardcoded register here
+    arg->operand = rcx;
+
+    result.descriptor.function.argument_list = arg;
+    result.descriptor.function.argument_count = 1;
   }
 
   return result;
@@ -829,6 +886,13 @@ spec("mass") {
 
     s64 result = third(1, 2, 3);
     check(result == 3);
+  }
+
+  it("should parse c function forward declarations") {
+    c_function_value("void fn_void()", 0);
+    c_function_value("void fn_int(int)", 0);
+    Value explicit_void_arg = c_function_value("void fn_void(void)", 0);
+    check(explicit_void_arg.descriptor.function.argument_count == 0);
   }
 
   it("should say 'Hello, world!'") {

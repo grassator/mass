@@ -1,12 +1,12 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
-VisualStudioVersion = 16.0.28729.10
+VisualStudioVersion = 16.0.30104.148
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "mass", "build\mass.exe", "{9D7AFC7A-EC28-4002-AB58-E09B509B4E5D}"
+Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "test", "build\test.exe", "{8B80DA53-E22C-4E31-84AF-3111A9314573}"
 	ProjectSection(DebuggerProjectSystem) = preProject
 		PortSupplier = 00000000-0000-0000-0000-000000000000
-		Executable = C:\dev\mass\build\mass.exe
+		Executable = C:\dev\mass\build\test.exe
 		RemoteMachine = DESKTOP-5J2C7M1
 		StartingDirectory = C:\dev\mass\build
 		Environment = Default
@@ -21,12 +21,12 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9D7AFC7A-EC28-4002-AB58-E09B509B4E5D}.Release|x64.ActiveCfg = Release|x64
+		{8B80DA53-E22C-4E31-84AF-3111A9314573}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {5E9342C6-5F4F-4F8A-BF61-80D173E97368}
+		SolutionGuid = {0D721291-1DB6-4910-9EFD-A19972D05F50}
 	EndGlobalSection
 EndGlobal
