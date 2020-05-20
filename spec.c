@@ -364,10 +364,10 @@ typedef struct {
 } Patch_32;
 
 Patch_32
-make_jnz(
+make_jz(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jnz, {imm32(0xcc), 0, 0}});
+  encode(&fn->buffer, (Instruction) {jz, {imm32(0xcc), 0, 0}});
   u64 ip = fn->buffer.occupied;
   s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
@@ -391,16 +391,49 @@ patch_jump_to_here(
   *patch.location = (s32) (fn->buffer.occupied - patch.ip);
 }
 
+Patch_32 make_if(
+  Function_Builder *builder,
+  Value value
+) {
+  encode(&builder->buffer, (Instruction) {cmp, {value.operand, imm32(0), 0}});
+
+  return make_jz(builder);
+}
+
+#define If(_value_) \
+  for (Patch_32 patch__ = make_if(&builder, _value_), *dummy__ = 0; !(dummy__++) ; patch_jump_to_here(&builder, patch__))
+
+Value
+equals(
+  Function_Builder *builder,
+  Value a,
+  Value b
+) {
+  // TODO typechecking
+  encode(&builder->buffer, (Instruction) {cmp, {a.operand, b.operand, 0}});
+  // TODO use xor
+  encode(&builder->buffer, (Instruction) {mov, {rax, imm32(0), 0}});
+  encode(&builder->buffer, (Instruction) {setz, {rax, 0, 0}});
+
+  Value result = reserve_stack(builder, &descriptor_integer);
+  encode(&builder->buffer, (Instruction) {mov, {result.operand, rax, 0}});
+  return result;
+}
+
+#define Eq(_a_, _b_) \
+  equals(&builder, (_a_), (_b_))
+
 Value
 make_is_non_zero() {
   Function_Builder builder = fn_begin();
   {
-    encode(&builder.buffer, (Instruction) {cmp, {ecx, imm32(0), 0}});
-    Patch_32 patch = make_jnz(&builder);
+    Patch_32 return_patch = {0};
+    Value arg0 = fn_arg(&builder, descriptor_integer);
 
-    fn_return(&builder, value_from_s64(0));
-    Patch_32 return_patch = make_jmp(&builder);
-    patch_jump_to_here(&builder, patch);
+    If(Eq(arg0, value_from_s32(0))) {
+      fn_return(&builder, value_from_s64(0));
+      return_patch = make_jmp(&builder);
+    }
 
     fn_return(&builder, value_from_s64(1));
     patch_jump_to_here(&builder, return_patch);

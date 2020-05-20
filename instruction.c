@@ -306,6 +306,50 @@ const X64_Mnemonic jnz = {
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// jz
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding jz_encoding_list[] = {
+  {
+    .op_code = { 0x0F, 0x84 },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic jz = {
+  .encoding_list = (const Instruction_Encoding *)jz_encoding_list,
+  .encoding_count = static_array_size(jz_encoding_list),
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// setz
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setz_encoding_list[] = {
+  {
+    .op_code = { 0x0F, 0x94 },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic setz = {
+  .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
+  .encoding_count = static_array_size(setz_encoding_list),
+};
+const X64_Mnemonic sete = {
+  .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
+  .encoding_count = static_array_size(setz_encoding_list),
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
 // jmp
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding jmp_encoding_list[] = {
