@@ -124,6 +124,16 @@ const Instruction_Encoding add_encoding_list[] = {
       Operand_Encoding_Type_None
     },
   },
+  {
+    .op_code = { 0x00, 0x81 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 0,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None
+    },
+  },
 };
 const X64_Mnemonic add = {
   .encoding_list = (const Instruction_Encoding *)add_encoding_list,
@@ -159,6 +169,16 @@ const Instruction_Encoding sub_encoding_list[] = {
     .operand_encoding_types = {
       Operand_Encoding_Type_Register_Memory,
       Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
+    .op_code = { 0x00, 0x81 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 5,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_32,
       Operand_Encoding_Type_None
     },
   },

@@ -8,8 +8,7 @@
 #include "encoding.c"
 
 typedef struct {
-  // TODO make it s32
-  u8 stack_reserve;
+  s32 stack_reserve;
   u8 next_argument_index;
   Buffer buffer;
 
@@ -166,7 +165,7 @@ fn_begin() {
   fn.descriptor.returns = malloc(sizeof(Value));
 
   // @Volatile @ReserveStack
-  encode(&fn.buffer, (Instruction) {sub, {rsp, imm8(0xcc), 0}});
+  encode(&fn.buffer, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
   return fn;
 }
 
@@ -175,18 +174,18 @@ fn_end(
   Function_Builder *builder
 ) {
   u8 alignment = 0x8;
-  u8 stack_size = builder->stack_reserve + alignment;
+  s32 stack_size = builder->stack_reserve + alignment;
 
   { // Override stack reservation
     u64 save_occupied = builder->buffer.occupied;
     builder->buffer.occupied = 0;
 
     // @Volatile @ReserveStack
-    encode(&builder->buffer, (Instruction) {sub, {rsp, imm8(stack_size), 0}});
+    encode(&builder->buffer, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
     builder->buffer.occupied = save_occupied;
   }
 
-  encode(&builder->buffer, (Instruction) {add, {rsp, imm8(stack_size), 0}});
+  encode(&builder->buffer, (Instruction) {add, {rsp, imm32(stack_size), 0}});
   encode(&builder->buffer, (Instruction) {ret, {0}});
 
   builder->descriptor.argument_count = builder->next_argument_index;
