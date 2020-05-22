@@ -102,6 +102,26 @@ const X64_Mnemonic ret = {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// inc
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding inc_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0xFF },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 0,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic inc = {
+  .encoding_list = (const Instruction_Encoding *)inc_encoding_list,
+  .encoding_count = static_array_size(inc_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // add
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding add_encoding_list[] = {
@@ -392,6 +412,26 @@ const X64_Mnemonic setz = {
 const X64_Mnemonic sete = {
   .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
   .encoding_count = static_array_size(setz_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// setl
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setl_encoding_list[] = {
+  {
+    .op_code = { 0x0F, 0x9C },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      // TODO encoding that this only operates on a byte value
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic setl = {
+  .encoding_list = (const Instruction_Encoding *)setl_encoding_list,
+  .encoding_count = static_array_size(setl_encoding_list),
 };
 
 
