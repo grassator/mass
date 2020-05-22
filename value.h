@@ -54,9 +54,14 @@ typedef struct {
   s64 length;
 } Descriptor_Fixed_Size_Array;
 
+typedef struct {
+  u32 byte_size;
+} Descriptor_Integer;
+
 typedef struct Descriptor {
   Descriptor_Type type;
   union {
+    Descriptor_Integer integer;
     Descriptor_Function function;
     Descriptor_Fixed_Size_Array array;
     struct Descriptor *pointer_to;
@@ -67,5 +72,10 @@ typedef struct Value {
   Descriptor descriptor;
   Operand operand;
 } Value;
+
+u32
+descriptor_byte_size(
+  const Descriptor *descriptor
+);
 
 #endif VALUE_H

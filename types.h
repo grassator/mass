@@ -21,6 +21,7 @@ typedef fn_type_void_to_void fn_type_opaque;
 typedef s32 (*fn_type_void_to_s32)(void);
 typedef s64 (*fn_type_void_to_s64)(void);
 typedef s32 (*fn_type_s32_to_s32)(s32);
+typedef s32 (*fn_type_s32_s32_to_s32)(s32, s32);
 typedef s64 (*fn_type_s64_to_s64)(s64);
 typedef s64 (*fn_type_s64_s64_to_s64)(s64, s64);
 typedef s64 (*fn_type_s64_s64_s64_to_s64)(s64, s64, s64);

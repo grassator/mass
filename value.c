@@ -1,7 +1,46 @@
 #include "value.h"
 
-Descriptor descriptor_integer = {
-  .type = { Descriptor_Type_Integer }
+u32
+descriptor_byte_size(
+  const Descriptor *descriptor
+) {
+  assert(descriptor);
+  switch(descriptor->type) {
+    case Descriptor_Type_Void: {
+      return 0;
+    }
+    case Descriptor_Type_Integer: {
+      return descriptor->integer.byte_size;
+    }
+    case Descriptor_Type_Fixed_Size_Array: {
+      return (u32)(descriptor_byte_size(descriptor->array.item) * descriptor->array.length);
+    }
+    case Descriptor_Type_Pointer:
+    case Descriptor_Type_Function: {
+      return 8;
+    }
+    default: {
+      assert(!"Unknown Descriptor Type");
+    }
+  }
+  return 0;
+}
+
+Descriptor descriptor_s8 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 1 },
+};
+Descriptor descriptor_s16 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 2 },
+};
+Descriptor descriptor_s32 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 4 },
+};
+Descriptor descriptor_s64 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 8 },
 };
 
 Value void_value = {
@@ -157,9 +196,9 @@ parse_c_type(
     if (!(*ch == ' ' || *ch == '*' || ch == range_end)) continue;
     if (start != ch) {
       if (memory_range_equal_to_c_string(start, ch, "char")) {
-        descriptor = &descriptor_integer;
+        descriptor = &descriptor_s8;
       } else if (memory_range_equal_to_c_string(start, ch, "int")) {
-        descriptor = &descriptor_integer;
+        descriptor = &descriptor_s32;
       } else if (memory_range_equal_to_c_string(start, ch, "void")) {
         descriptor = &void_value.descriptor;
       } else if (memory_range_equal_to_c_string(start, ch, "const")) {

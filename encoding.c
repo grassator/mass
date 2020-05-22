@@ -71,6 +71,11 @@ encode(
     u8 op_code[2] = { encoding->op_code[0], encoding->op_code[1] };
     bool needs_sib = false;
     u8 sib_byte = 0;
+
+    if (encoding->explicit_byte_size == 8) {
+      rex_byte |= REX_W;
+    }
+
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];

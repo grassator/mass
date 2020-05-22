@@ -20,6 +20,7 @@ typedef enum {
 typedef struct {
   u8 op_code[2];
   Instruction_Extension_Type extension_type;
+  u32 explicit_byte_size;
   u8 op_code_extension;
   Operand_Encoding_Type operand_encoding_types[3];
 } Instruction_Encoding;
@@ -233,6 +234,7 @@ const Instruction_Encoding cqo_encoding_list[] = {
   {
     .op_code = { 0x00, 0x99 },
     .extension_type = Instruction_Extension_Type_Op_Code,
+    .explicit_byte_size = 8,
     .operand_encoding_types = {
       Operand_Encoding_Type_None,
       Operand_Encoding_Type_None,
@@ -240,17 +242,45 @@ const Instruction_Encoding cqo_encoding_list[] = {
     },
   },
 };
+
 const X64_Mnemonic cqo = {
   .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
   .encoding_count = static_array_size(cqo_encoding_list),
 };
-const X64_Mnemonic cdq = {
-  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
-  .encoding_count = static_array_size(cqo_encoding_list),
+
+const Instruction_Encoding cdq_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0x99 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .explicit_byte_size = 4,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
 };
+const X64_Mnemonic cdq = {
+  .encoding_list = (const Instruction_Encoding *)cdq_encoding_list,
+  .encoding_count = static_array_size(cdq_encoding_list),
+};
+
+const Instruction_Encoding cwd_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0x99 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .explicit_byte_size = 2,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+
 const X64_Mnemonic cwd = {
-  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
-  .encoding_count = static_array_size(cqo_encoding_list),
+  .encoding_list = (const Instruction_Encoding *)cwd_encoding_list,
+  .encoding_count = static_array_size(cwd_encoding_list),
 };
 
 

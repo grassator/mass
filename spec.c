@@ -1,6 +1,7 @@
 #include "bdd-for-c.h"
 #include "windows.h"
 #include <stdio.h>
+#include <math.h>
 
 #include "value.c"
 #include "prelude.c"
@@ -20,10 +21,9 @@ reserve_stack(
   Function_Builder *fn,
   Descriptor *descriptor
 ) {
-  // TODO take size from the descriptor when available
-  u32 byte_size = sizeof(s64);
+  u32 byte_size = descriptor_byte_size(descriptor);
   Operand operand = stack(fn->stack_reserve, byte_size);
-  fn->stack_reserve += 0x10;
+  fn->stack_reserve += byte_size;
   return (const Value) {
     .descriptor = *descriptor,
     .operand = operand,
@@ -128,17 +128,33 @@ divide(
   assert_not_register_ax(b);
 
   // Save RDX as it will be used for the remainder
-  Value rdx_temp = reserve_stack(builder, &a->descriptor);
+  Value rdx_temp = reserve_stack(builder, &descriptor_s64);
   encode(&builder->buffer, (Instruction) {mov, {rdx_temp.operand, rdx, 0}});
 
+  // TODO make a move version that checks size of operands
   encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
 
   // TODO deal with signed / unsigned
-  Value divisor = reserve_stack(builder, &a->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {divisor.operand, rdx, 0}});
+  Value divisor = reserve_stack(builder, &b->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {divisor.operand, b->operand, 0}});
 
-  // TODO choose the right extension based on the size
-  encode(&builder->buffer, (Instruction) {cqo, {0}});
+  switch (descriptor_byte_size(&a->descriptor)) {
+    case 8: {
+      encode(&builder->buffer, (Instruction) {cqo, {0}});
+      break;
+    }
+    case 4: {
+      encode(&builder->buffer, (Instruction) {cdq, {0}});
+      break;
+    }
+    case 2: {
+      encode(&builder->buffer, (Instruction) {cwd, {0}});
+      break;
+    }
+    default: {
+      assert(!"Unsupported byte size when dividing");
+    }
+  }
   encode(&builder->buffer, (Instruction) {idiv, {divisor.operand, 0, 0}});
 
   // TODO correctly size the temporary value
@@ -169,12 +185,20 @@ fn_begin() {
   return fn;
 }
 
+s32
+align(
+  s32 number,
+  s32 alignment
+) {
+  return (s32)(ceil((double)number / alignment) * alignment);
+}
+
 Value
 fn_end(
   Function_Builder *builder
 ) {
   u8 alignment = 0x8;
-  s32 stack_size = builder->stack_reserve + alignment;
+  s32 stack_size = align(builder->stack_reserve, 16) + alignment;
 
   { // Override stack reservation
     u64 save_occupied = builder->buffer.occupied;
@@ -203,20 +227,30 @@ fn_arg(
   Function_Builder *fn,
   Descriptor descriptor
 ) {
-  //assert(byte_size == 8);
+  u32 byte_size = descriptor_byte_size(&descriptor);
+  assert(byte_size <= 8);
   switch (fn->next_argument_index++) {
     case 0: {
       Value arg = {
         .descriptor = descriptor,
-        .operand = rcx,
+        .operand = {
+          .type = Operand_Type_Register,
+          .reg = rcx.reg,
+          .byte_size = byte_size,
+        },
       };
+
       fn->descriptor.argument_list[0] = arg;
       return arg;
     }
     case 1: {
       Value arg = {
         .descriptor = descriptor,
-        .operand = rdx,
+        .operand = {
+          .type = Operand_Type_Register,
+          .reg = rdx.reg,
+          .byte_size = byte_size,
+        },
       };
       fn->descriptor.argument_list[1] = arg;
       return arg;
@@ -224,7 +258,11 @@ fn_arg(
     case 2: {
       Value arg = {
         .descriptor = descriptor,
-        .operand = r8,
+        .operand = {
+          .type = Operand_Type_Register,
+          .reg = r8.reg,
+          .byte_size = byte_size,
+        },
       };
       fn->descriptor.argument_list[2] = arg;
       return arg;
@@ -232,7 +270,11 @@ fn_arg(
     case 3: {
       Value arg = {
         .descriptor = descriptor,
-        .operand = r9,
+        .operand = {
+          .type = Operand_Type_Register,
+          .reg = r9.reg,
+          .byte_size = byte_size,
+        },
       };
       fn->descriptor.argument_list[3] = arg;
       return arg;
@@ -251,8 +293,17 @@ fn_return(
   // FIXME check that all return paths return the same type
   *fn->descriptor.returns = to_return;
 
+  u32 byte_size = descriptor_byte_size(&to_return.descriptor);
+  assert(byte_size <= 8);
+
+  Operand return_operand = {
+    .type = Operand_Type_Register,
+    .reg = rax.reg,
+    .byte_size = byte_size,
+  };
+
   if (to_return.descriptor.type != Descriptor_Type_Void) {
-    encode(&fn->buffer, (Instruction) {mov, {rax, to_return.operand, 0}});
+    encode(&fn->buffer, (Instruction) {mov, {return_operand, to_return.operand, 0}});
   }
 }
 
@@ -271,7 +322,7 @@ Value
 make_identity_s64() {
   Function_Builder builder = fn_begin();
   {
-    Value arg0 = fn_arg(&builder, descriptor_integer);
+    Value arg0 = fn_arg(&builder, descriptor_s64);
     fn_return(&builder, arg0);
   }
   return fn_end(&builder);
@@ -281,11 +332,11 @@ Value
 make_increment_s64() {
   Function_Builder builder = fn_begin();
   {
-    Value x = reserve_stack(&builder, &descriptor_integer);
+    Value x = reserve_stack(&builder, &descriptor_s64);
     assign(&builder, x.operand, imm32(1));
-    Value y = reserve_stack(&builder, &descriptor_integer);
+    Value y = reserve_stack(&builder, &descriptor_s64);
     assign(&builder, y.operand, imm32(2));
-    Value arg0 = fn_arg(&builder, descriptor_integer);
+    Value arg0 = fn_arg(&builder, descriptor_s64);
     Value temp = minus(&builder, &arg0, &x);
     Value temp2 = plus(&builder, &temp, &y);
     fn_return(&builder, temp2);
@@ -325,7 +376,7 @@ make_call_no_arg_return_s32() {
   {
     Value *returns = malloc(sizeof(Value));
     *returns = (const Value){0};
-    returns->descriptor = descriptor_integer;
+    returns->descriptor = descriptor_s32;
     returns->operand = rax;
 
     Value arg0 = fn_arg(&builder, (const Descriptor){
@@ -414,7 +465,7 @@ equals(
   encode(&builder->buffer, (Instruction) {mov, {rax, imm32(0), 0}});
   encode(&builder->buffer, (Instruction) {setz, {rax, 0, 0}});
 
-  Value result = reserve_stack(builder, &descriptor_integer);
+  Value result = reserve_stack(builder, &descriptor_s64);
   encode(&builder->buffer, (Instruction) {mov, {result.operand, rax, 0}});
   return result;
 }
@@ -427,14 +478,14 @@ make_is_non_zero() {
   Function_Builder builder = fn_begin();
   {
     Patch_32 return_patch = {0};
-    Value arg0 = fn_arg(&builder, descriptor_integer);
+    Value arg0 = fn_arg(&builder, descriptor_s32);
 
     If(Eq(arg0, value_from_s32(0))) {
-      fn_return(&builder, value_from_s64(0));
+      fn_return(&builder, value_from_s32(0));
       return_patch = make_jmp(&builder);
     }
 
-    fn_return(&builder, value_from_s64(1));
+    fn_return(&builder, value_from_s32(1));
     patch_jump_to_here(&builder, return_patch);
   }
   return fn_end(&builder);
@@ -480,7 +531,7 @@ spec("mass") {
   it("should have a function that returns 0 if arg is zero, 1 otherwise") {
     Value is_non_zero_value = make_is_non_zero();
     fn_type_s32_to_s32 is_non_zero = value_as_function(&is_non_zero_value, fn_type_s32_to_s32);
-    s64 result = is_non_zero(0);
+    s32 result = is_non_zero(0);
     check(result == 0);
     result = is_non_zero(42);
     check(result == 1);
@@ -489,9 +540,9 @@ spec("mass") {
   it("should return 3rd argument") {
     Function_Builder builder = fn_begin();
     {
-      (void)fn_arg(&builder, descriptor_integer);
-      (void)fn_arg(&builder, descriptor_integer);
-      Value arg2 = fn_arg(&builder, descriptor_integer);
+      (void)fn_arg(&builder, descriptor_s64);
+      (void)fn_arg(&builder, descriptor_s64);
+      Value arg2 = fn_arg(&builder, descriptor_s64);
       fn_return(&builder, arg2);
     }
     Value value = fn_end(&builder);
@@ -504,7 +555,7 @@ spec("mass") {
   it("should make function that multiplies by 2") {
     Function_Builder builder = fn_begin();
     {
-      Value arg0 = fn_arg(&builder, descriptor_integer);
+      Value arg0 = fn_arg(&builder, descriptor_s64);
       Value two = value_from_s32(2);
       Value to_return = multiply(&builder, &arg0, &two);
       fn_return(&builder, to_return);
@@ -519,16 +570,16 @@ spec("mass") {
   it("should make function that divides two number") {
     Function_Builder builder = fn_begin();
     {
-      Value arg0 = fn_arg(&builder, descriptor_integer);
-      Value arg1 = fn_arg(&builder, descriptor_integer);
+      Value arg0 = fn_arg(&builder, descriptor_s32);
+      Value arg1 = fn_arg(&builder, descriptor_s32);
       Value to_return = divide(&builder, &arg0, &arg1);
       fn_return(&builder, to_return);
     }
     Value value = fn_end(&builder);
-    fn_type_s64_s64_to_s64 divide_fn = value_as_function(&value, fn_type_s64_s64_to_s64);
+    fn_type_s32_s32_to_s32 divide_fn = value_as_function(&value, fn_type_s32_s32_to_s32);
 
-    s64 result = divide_fn(42, 2);
-    check(result == 21);
+    s32 result = divide_fn(-42, 2);
+    check(result == -21);
   }
 
   it("should parse c function forward declarations") {
@@ -543,7 +594,7 @@ spec("mass") {
     Descriptor message_descriptor = {
       .type = Descriptor_Type_Fixed_Size_Array,
       .array = {
-        .item = &descriptor_integer,
+        .item = &descriptor_s8,
         .length = strlen(message + 1/* null terminator */),
       },
     };
