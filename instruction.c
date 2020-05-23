@@ -213,6 +213,15 @@ const X64_Mnemonic sub = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding imul_encoding_list[] = {
   {
+    .op_code = { 0x0F, 0xAF },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
     .op_code = { 0x00, 0x69 },
     .extension_type = Instruction_Extension_Type_Register,
     .operand_encoding_types = {
@@ -236,7 +245,9 @@ const Instruction_Encoding idiv_encoding_list[] = {
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 7,
     .operand_encoding_types = {
-      Operand_Encoding_Type_Register_Memory
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
     },
   },
 };

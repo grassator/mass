@@ -38,6 +38,7 @@ typedef enum {
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
+  Descriptor_Type_Struct,
 } Descriptor_Type;
 
 struct Value;
@@ -48,6 +49,16 @@ typedef struct {
 
   struct Value *returns;
 } Descriptor_Function;
+
+typedef struct {
+  struct Descriptor *descriptor;
+  s32 offset;
+} Descriptor_Struct_Field;
+
+typedef struct {
+  Descriptor_Struct_Field *field_list;
+  s64 field_count;
+} Descriptor_Struct;
 
 typedef struct {
   struct Descriptor *item;
@@ -64,6 +75,7 @@ typedef struct Descriptor {
     Descriptor_Integer integer;
     Descriptor_Function function;
     Descriptor_Fixed_Size_Array array;
+    Descriptor_Struct struct_;
     struct Descriptor *pointer_to;
   };
 } Descriptor;

@@ -103,12 +103,15 @@ multiply(
   assert_not_register_ax(a);
   assert_not_register_ax(b);
 
-  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
-
-  // TODO deal with imm64
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
-  encode(&builder->buffer, (Instruction) {imul, {rax, rax, b->operand}});
+  // TODO make the move only for imm value
+  Value b_temp = reserve_stack(builder, &b->descriptor);
+  encode(&builder->buffer, (Instruction) {mov, {rax, b->operand, 0}});
+  encode(&builder->buffer, (Instruction) {mov, {b_temp.operand, rax, 0}});
+
+  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+  encode(&builder->buffer, (Instruction) {imul, {rax, b_temp.operand}});
 
   // TODO correctly size the temporary value
   Value temp = reserve_stack(builder, &a->descriptor);
@@ -646,6 +649,77 @@ spec("mass") {
     Value value = fn_end(&builder);
 
     value_as_function(&value, fn_type_void_to_void)();
+  }
+
+
+  it("should support structs") {
+    // struct Size { s32 width; s32 height; };
+    Descriptor_Struct_Field fields[2] = {
+      {
+        .descriptor = &descriptor_s32,
+        .offset = 0,
+      },
+      {
+        .descriptor = &descriptor_s32,
+        .offset = sizeof(s32),
+      },
+    };
+    Descriptor_Struct_Field *width_field = &fields[0];
+    Descriptor_Struct_Field *height_field = &fields[1];
+
+    Descriptor size_struct_descriptor = {
+      .type = Descriptor_Type_Struct,
+      .struct_ = {
+        .field_list = fields,
+        .field_count = 2,
+      },
+    };
+
+    Descriptor size_struct_pointer_descriptor = {
+      .type = Descriptor_Type_Pointer,
+      .pointer_to = &size_struct_descriptor,
+    };
+
+    Function_Builder builder = fn_begin();
+    {
+      Value arg0 = fn_arg(&builder, &size_struct_pointer_descriptor);
+
+      // TODO figure out how to deal with temporary values
+      encode(&builder.buffer, (Instruction) {mov, {rcx, arg0.operand, 0}});
+
+      Value width_value = {
+        .descriptor = *width_field->descriptor,
+        .operand = {
+          .type = Operand_Type_Memory_Indirect,
+          .byte_size = descriptor_byte_size(width_field->descriptor),
+          .indirect = (const Operand_Memory_Indirect) {
+            .reg = rcx.reg.index,
+            .displacement = width_field->offset,
+          }
+        }
+      };
+
+      Value height_value = {
+        .descriptor = *height_field->descriptor,
+        .operand = {
+          .type = Operand_Type_Memory_Indirect,
+          .byte_size = descriptor_byte_size(height_field->descriptor),
+          .indirect = (const Operand_Memory_Indirect) {
+            .reg = rcx.reg.index,
+            .displacement = height_field->offset,
+          }
+        }
+      };
+
+      fn_return(&builder, multiply(&builder, &width_value, &height_value));
+    }
+    Value value = fn_end(&builder);
+
+    fn_type_voidp_to_s32 area = value_as_function(&value, fn_type_voidp_to_s32);
+
+    struct { s32 width; s32 height; } size = { 10, 42 };
+    s32 result = area(&size);
+    check(result == 420);
   }
 
   it("should add 1 to all numbers in an array") {
