@@ -1,10 +1,4 @@
-#include "types.h"
-
-typedef struct {
-  u8 *memory;
-  u64 occupied;
-  u64 capacity;
-} Buffer;
+#include "prelude.h"
 
 Buffer
 make_buffer(
@@ -65,6 +59,3 @@ define_buffer_append(u64)
 #undef define_buffer_append
 
 Buffer temp_buffer = {0};
-
-#define temp_allocate(_type_) \
-  (_type_ *)buffer_allocate_size(&temp_buffer, sizeof(_type_))

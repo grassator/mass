@@ -29,4 +29,45 @@ typedef s64 (*fn_type_s64_s64_to_s64)(s64, s64);
 typedef s64 (*fn_type_s64_s64_s64_to_s64)(s64, s64, s64);
 typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 
+typedef struct {
+  u8 *memory;
+  u64 occupied;
+  u64 capacity;
+} Buffer;
+
+void
+buffer_reset(
+  Buffer *buffer
+);
+
+void *
+buffer_allocate_size(
+  Buffer *buffer,
+  u64 byte_size
+);
+
+#define buffer_allocate(_buffer_, _type_) \
+  (_type_ *)buffer_allocate_size((_buffer_), sizeof(_type_))
+
+#define define_buffer_append(_type_) \
+inline _type_ * \
+buffer_append_##_type_( \
+  Buffer *buffer, \
+  _type_ value \
+);
+
+define_buffer_append(s8)
+define_buffer_append(s16)
+define_buffer_append(s32)
+define_buffer_append(s64)
+
+define_buffer_append(u8)
+define_buffer_append(u16)
+define_buffer_append(u32)
+define_buffer_append(u64)
+#undef define_buffer_append
+
+#define temp_allocate(_type_) \
+  (_type_ *)buffer_allocate_size(&temp_buffer, sizeof(_type_))
+
 #endif TYPES_H
