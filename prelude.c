@@ -1,4 +1,13 @@
 #include "prelude.h"
+#include <math.h>
+
+s32
+align(
+  s32 number,
+  s32 alignment
+) {
+  return (s32)(ceil((double)number / alignment) * alignment);
+}
 
 Buffer
 make_buffer(

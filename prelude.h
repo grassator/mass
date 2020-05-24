@@ -29,6 +29,12 @@ typedef s64 (*fn_type_s64_s64_to_s64)(s64, s64);
 typedef s64 (*fn_type_s64_s64_s64_to_s64)(s64, s64, s64);
 typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 
+s32
+align(
+  s32 number,
+  s32 alignment
+);
+
 typedef struct {
   u8 *memory;
   u64 occupied;

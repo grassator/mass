@@ -42,6 +42,9 @@ Descriptor descriptor_s64 = {
   .type = { Descriptor_Type_Integer },
   .integer = { .byte_size = 8 },
 };
+Descriptor descriptor_void = {
+  .type = Descriptor_Type_Void,
+};
 
 Value void_value = {
   .descriptor = { .type = Descriptor_Type_Void },
@@ -140,24 +143,28 @@ stack(
   };
 }
 
-Value
+Value *
 value_from_s64(
   s64 integer
 ) {
-  return (const Value) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = { .type = Descriptor_Type_Integer },
     .operand = imm64(integer),
   };
+  return result;
 }
 
-Value
+Value *
 value_from_s32(
   s32 integer
 ) {
-  return (const Value) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = { .type = Descriptor_Type_Integer },
     .operand = imm32(integer),
   };
+  return result;
 }
 
 s64
@@ -210,7 +217,7 @@ parse_c_type(
     if (*ch == '*') {
       assert(descriptor);
       Descriptor *previous_descriptor = descriptor;
-      descriptor = malloc(sizeof(Descriptor));
+      descriptor = temp_allocate(Descriptor);
       *descriptor = (const Descriptor) {
         .type = Descriptor_Type_Pointer,
         .pointer_to = previous_descriptor,
@@ -250,7 +257,7 @@ c_function_return_value(
     case Descriptor_Type_Function:
     case Descriptor_Type_Integer:
     case Descriptor_Type_Pointer: {
-      Value *return_value = malloc(sizeof(Value));
+      Value *return_value = temp_allocate(Value);
       *return_value = (const Value) {
         .descriptor = *descriptor,
         .operand = eax,
