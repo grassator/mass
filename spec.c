@@ -524,6 +524,14 @@ make_is_non_zero() {
 }
 
 spec("mass") {
+  before() {
+    temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
+  }
+
+  before_each() {
+    buffer_reset(&temp_buffer);
+  }
+
   it("should create function that will return 42") {
     Value the_answer = make_constant_s32(42);
     s32 result = value_as_function(&the_answer, fn_type_void_to_s32)();

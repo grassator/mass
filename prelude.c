@@ -21,16 +21,36 @@ make_buffer(
 
 #define static_array_size(Array) (sizeof(Array) / sizeof(Array[0]))
 
-#define define_buffer_append(Type) \
-inline void \
-buffer_append_##Type( \
+void
+buffer_reset(
+  Buffer *buffer
+) {
+  buffer->occupied = 0;
+}
+
+void *
+buffer_allocate_size(
+  Buffer *buffer,
+  u64 byte_size
+) {
+  assert(buffer->occupied + byte_size <= buffer->capacity);
+  void *target = buffer->memory + buffer->occupied;
+  buffer->occupied += byte_size;
+  return target;
+}
+
+#define buffer_allocate(_buffer_, _type_) \
+  (_type_ *)buffer_allocate_size((_buffer_), sizeof(_type_))
+
+#define define_buffer_append(_type_) \
+inline _type_ * \
+buffer_append_##_type_( \
   Buffer *buffer, \
-  Type value \
+  _type_ value \
 ) { \
-  assert(buffer->occupied + sizeof(Type) <= buffer->capacity); \
-  Type *target = (Type *)(buffer->memory + buffer->occupied); \
+  _type_ *target = buffer_allocate(buffer, _type_); \
   *target = value; \
-  buffer->occupied += sizeof(Type); \
+  return target; \
 }
 
 define_buffer_append(s8)
@@ -43,3 +63,8 @@ define_buffer_append(u16)
 define_buffer_append(u32)
 define_buffer_append(u64)
 #undef define_buffer_append
+
+Buffer temp_buffer = {0};
+
+#define temp_allocate(_type_) \
+  (_type_ *)buffer_allocate_size(&temp_buffer, sizeof(_type_))
