@@ -445,6 +445,26 @@ const X64_Mnemonic setl = {
   .encoding_count = static_array_size(setl_encoding_list),
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// setg
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setg_encoding_list[] = {
+  {
+    .op_code = { 0x0F, 0x9F },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      // TODO encoding that this only operates on a byte value
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic setg = {
+  .encoding_list = (const Instruction_Encoding *)setg_encoding_list,
+  .encoding_count = static_array_size(setg_encoding_list),
+};
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // jmp

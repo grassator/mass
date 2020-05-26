@@ -12,17 +12,17 @@ typedef struct {
   u64 ip;
 } Patch_32;
 
-typedef struct Function_Return_Patch {
+typedef struct Jump_Patch_List {
   Patch_32 patch;
-  struct Function_Return_Patch *next;
-} Function_Return_Patch;
+  struct Jump_Patch_List *next;
+} Jump_Patch_List;
 
 typedef struct {
   s32 stack_reserve;
   u8 next_argument_index;
   Buffer buffer;
 
-  Function_Return_Patch *return_patch_list;
+  Jump_Patch_List *return_patch_list;
 
   Descriptor_Function descriptor;
 } Function_Builder;
@@ -219,6 +219,31 @@ patch_jump_to_ip(
   *patch.location = (s32) (ip - patch.ip);
 }
 
+Jump_Patch_List *
+make_jump_patch(
+  Function_Builder *builder,
+  Jump_Patch_List *next
+) {
+  Jump_Patch_List *return_patch = temp_allocate(Jump_Patch_List);
+  *return_patch = (const Jump_Patch_List) {
+    .patch = make_jmp(builder),
+    .next = next,
+  };
+  return return_patch;
+}
+
+void
+resolve_jump_patch_list(
+  Function_Builder *builder,
+  Jump_Patch_List *list
+) {
+  Jump_Patch_List *jump_patch = list;
+  while (jump_patch) {
+    patch_jump_to_here(builder, jump_patch->patch);
+    jump_patch = jump_patch->next;
+  }
+}
+
 Function_Builder
 fn_begin() {
   Function_Builder fn = {
@@ -253,11 +278,7 @@ fn_end(
     builder->buffer.occupied = save_occupied;
   }
 
-  Function_Return_Patch *return_patch = builder->return_patch_list;
-  while (return_patch) {
-    patch_jump_to_here(builder, return_patch->patch);
-    return_patch = return_patch->next;
-  }
+  resolve_jump_patch_list(builder, builder->return_patch_list);
 
   encode(&builder->buffer, (Instruction) {add, {rsp, imm32(stack_size), 0}});
   encode(&builder->buffer, (Instruction) {ret, {0}});
@@ -352,12 +373,7 @@ fn_return(
   if (to_return->descriptor.type != Descriptor_Type_Void) {
     encode(&builder->buffer, (Instruction) {mov, {return_operand, to_return->operand, 0}});
   }
-  Function_Return_Patch *return_patch = temp_allocate(Function_Return_Patch);
-  *return_patch = (const Function_Return_Patch) {
-    .patch = make_jmp(builder),
-    .next = builder->return_patch_list,
-  };
-  builder->return_patch_list = return_patch;
+  builder->return_patch_list = make_jump_patch(builder, builder->return_patch_list);
 
   return to_return;
 }
@@ -426,9 +442,37 @@ Patch_32 make_if(
 #define If(_value_) \
   for (Patch_32 patch__ = make_if(&builder_, _value_), *dummy__ = 0; !(dummy__++) ; patch_jump_to_here(&builder_, patch__))
 
+typedef struct {
+  bool done;
+  u64 start_ip;
+  Jump_Patch_List *jump_patch_list;
+} Loop_Builder;
+
+
+void
+make_loop_end(
+  Function_Builder *builder,
+  Loop_Builder *loop
+) {
+  patch_jump_to_ip(make_jmp(builder), loop->start_ip);
+  resolve_jump_patch_list(builder, loop->jump_patch_list);
+  loop->done = true;
+}
+
+#define Loop \
+  for ( \
+    Loop_Builder loop_builder_ = { .start_ip = builder_.buffer.occupied, .jump_patch_list = 0 }; \
+    !loop_builder_.done; \
+    make_loop_end(&builder_, &loop_builder_) \
+  )
+
+#define Continue patch_jump_to_ip(make_jmp(&builder_), loop_builder_.start_ip)
+#define Break loop_builder_.jump_patch_list = make_jump_patch(&builder_, loop_builder_.jump_patch_list)
+
 typedef enum {
   Compare_Equal,
   Compare_Less,
+  Compare_Greater,
 } Compare;
 
 Value *
@@ -452,6 +496,10 @@ compare(
       encode(&builder->buffer, (Instruction) {setl, {rax, 0, 0}});
       break;
     }
+    case Compare_Greater: {
+      encode(&builder->buffer, (Instruction) {setg, {rax, 0, 0}});
+      break;
+    }
     default: {
       assert(!"Unsupported comparison");
     }
@@ -465,6 +513,7 @@ compare(
 
 #define Eq(_a_, _b_) compare(&builder_, Compare_Equal, (_a_), (_b_))
 #define Less(_a_, _b_) compare(&builder_, Compare_Less, (_a_), (_b_))
+#define Greater(_a_, _b_) compare(&builder_, Compare_Greater, (_a_), (_b_))
 
 spec("mass") {
   before() {
@@ -705,8 +754,13 @@ spec("mass") {
       Stack(temp, &arr->descriptor, arr);
 
       u32 item_byte_size = descriptor_byte_size(array_pointer_descriptor.pointer_to->array.item);
-      u64 loop_start_ip = builder_.buffer.occupied;
-      {
+      Loop {
+        // TODO check that the descriptor in indeed an array
+        s32 length = (s32)array_pointer_descriptor.pointer_to->array.length;
+        If(Greater(index, value_from_s32(length))) {
+          Break;
+        }
+
         encode(&builder_.buffer, (Instruction) {mov, {rax, temp->operand, 0}});
 
         Operand pointer = {
@@ -718,17 +772,11 @@ spec("mass") {
           }
         };
         encode(&builder_.buffer, (Instruction) {inc, {pointer, 0, 0}});
-
         encode(&builder_.buffer, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
+
+        encode(&builder_.buffer, (Instruction) {inc, {index->operand, 0, 0}});
       }
 
-      // TODO this is a do {} while loop and we should use while
-      encode(&builder_.buffer, (Instruction) {inc, {index->operand, 0, 0}});
-      // TODO check that the descriptor in indeed an array
-      s32 length = (s32)array_pointer_descriptor.pointer_to->array.length;
-      If(Less(index, value_from_s32(length))) {
-        patch_jump_to_ip(make_jmp(&builder_), loop_start_ip);
-      }
     }
     value_as_function(increment, fn_type_s32p_to_void)(array);
 
