@@ -9,6 +9,22 @@ descriptor_byte_size(
     case Descriptor_Type_Void: {
       return 0;
     }
+    case Descriptor_Type_Struct: {
+      s64 count = descriptor->struct_.field_count;
+      assert(count);
+      u32 alignment = 0;
+      u32 raw_size = 0;
+      for (s32 i = 0; i < count; ++i) {
+        Descriptor_Struct_Field *field = &descriptor->struct_.field_list[i];
+        u32 field_size = descriptor_byte_size(field->descriptor);
+        alignment = max(alignment, field_size);
+        bool is_last_field = i == count - 1;
+        if (is_last_field) {
+          raw_size = field->offset + field_size;
+        }
+      }
+      return align(raw_size, alignment);
+    }
     case Descriptor_Type_Integer: {
       return descriptor->integer.byte_size;
     }
@@ -163,6 +179,18 @@ value_from_s32(
   *result = (const Value) {
     .descriptor = { .type = Descriptor_Type_Integer },
     .operand = imm32(integer),
+  };
+  return result;
+}
+
+Descriptor *
+descriptor_pointer_to(
+  Descriptor *descriptor
+) {
+  Descriptor *result = temp_allocate(Descriptor);
+  *result = (const Descriptor) {
+    .type = Descriptor_Type_Pointer,
+    .pointer_to = descriptor,
   };
   return result;
 }

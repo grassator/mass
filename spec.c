@@ -440,7 +440,11 @@ Patch_32 make_if(
 }
 
 #define If(_value_) \
-  for (Patch_32 patch__ = make_if(&builder_, _value_), *dummy__ = 0; !(dummy__++) ; patch_jump_to_here(&builder_, patch__))
+  for (\
+    Patch_32 patch__ = make_if(&builder_, _value_), *dummy__ = 0; \
+    !(dummy__++); \
+    patch_jump_to_here(&builder_, patch__)\
+  )
 
 typedef struct {
   bool done;
@@ -467,7 +471,8 @@ make_loop_end(
   )
 
 #define Continue patch_jump_to_ip(make_jmp(&builder_), loop_builder_.start_ip)
-#define Break loop_builder_.jump_patch_list = make_jump_patch(&builder_, loop_builder_.jump_patch_list)
+#define Break \
+  loop_builder_.jump_patch_list = make_jump_patch(&builder_, loop_builder_.jump_patch_list)
 
 typedef enum {
   Compare_Equal,
@@ -514,6 +519,71 @@ compare(
 #define Eq(_a_, _b_) compare(&builder_, Compare_Equal, (_a_), (_b_))
 #define Less(_a_, _b_) compare(&builder_, Compare_Less, (_a_), (_b_))
 #define Greater(_a_, _b_) compare(&builder_, Compare_Greater, (_a_), (_b_))
+
+typedef struct Struct_Builder_Field {
+  Descriptor_Struct_Field struct_field;
+  struct Struct_Builder_Field *next;
+} Struct_Builder_Field;
+
+typedef struct {
+  u32 offset;
+  u32 field_count;
+  Struct_Builder_Field *field_list;
+} Struct_Builder;
+
+Struct_Builder
+struct_begin() {
+  return (const Struct_Builder) {0};
+}
+
+Descriptor_Struct_Field *
+struct_add_field(
+  Struct_Builder *builder,
+  Descriptor *descriptor
+) {
+  Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
+
+  u32 size = descriptor_byte_size(descriptor);
+  builder->offset = align(builder->offset, size);
+
+  builder_field->struct_field.descriptor = descriptor;
+  builder_field->struct_field.offset = builder->offset;
+
+  builder_field->next = builder->field_list;
+  builder->field_list = builder_field;
+
+  // TODO alignment
+  builder->offset += size;
+  builder->field_count++;
+
+  return &builder_field->struct_field;
+}
+
+Descriptor *
+struct_end(
+  Struct_Builder *builder
+) {
+  assert(builder->field_count);
+
+  Descriptor *result = temp_allocate(Descriptor);
+  Descriptor_Struct_Field *field_list = temp_allocate_size(
+    sizeof(Descriptor_Struct_Field) * builder->field_count
+  );
+
+  Struct_Builder_Field *field = builder->field_list;
+  u64 index = builder->field_count - 1;
+  while (field) {
+    field_list[index--] = field->struct_field;
+    field = field->next;
+  }
+  result->type = Descriptor_Type_Struct;
+  result->struct_ = (const Descriptor_Struct) {
+    .field_list = field_list,
+    .field_count = builder->field_count,
+  };
+
+  return result;
+}
 
 spec("mass") {
   before() {
@@ -669,35 +739,20 @@ spec("mass") {
 
 
   it("should support structs") {
-    // struct Size { s32 width; s32 height; };
-    Descriptor_Struct_Field fields[2] = {
-      {
-        .descriptor = &descriptor_s32,
-        .offset = 0,
-      },
-      {
-        .descriptor = &descriptor_s32,
-        .offset = sizeof(s32),
-      },
-    };
-    Descriptor_Struct_Field *width_field = &fields[0];
-    Descriptor_Struct_Field *height_field = &fields[1];
+    // struct Size { s8 width; s32 height; };
 
-    Descriptor size_struct_descriptor = {
-      .type = Descriptor_Type_Struct,
-      .struct_ = {
-        .field_list = fields,
-        .field_count = 2,
-      },
-    };
+    Struct_Builder struct_builder = struct_begin();
 
-    Descriptor size_struct_pointer_descriptor = {
-      .type = Descriptor_Type_Pointer,
-      .pointer_to = &size_struct_descriptor,
-    };
+    Descriptor_Struct_Field *width_field = struct_add_field(&struct_builder, &descriptor_s32);
+    Descriptor_Struct_Field *height_field = struct_add_field(&struct_builder, &descriptor_s64);
+    struct_add_field(&struct_builder, &descriptor_s32);
+
+    Descriptor *size_struct_descriptor = struct_end(&struct_builder);
+
+    Descriptor *size_struct_pointer_descriptor = descriptor_pointer_to(size_struct_descriptor);
 
     Function(area) {
-      Arg(size_struct, &size_struct_pointer_descriptor);
+      Arg(size_struct, size_struct_pointer_descriptor);
       encode(&builder_.buffer, (Instruction) {mov, {rcx, size_struct->operand, 0}});
 
       Value width_value = {
@@ -727,9 +782,10 @@ spec("mass") {
       Return(Multiply(&width_value, &height_value));
     }
 
-    struct { s32 width; s32 height; } size = { 10, 42 };
+    struct { s32 width; s64 height; s32 dummy; } size = { 10, 42 };
     s32 result = value_as_function(area, fn_type_voidp_to_s32)(&size);
     check(result == 420);
+    check(sizeof(size) == descriptor_byte_size(size_struct_descriptor));
   }
 
   it("should add 1 to all numbers in an array") {

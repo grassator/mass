@@ -73,7 +73,11 @@ define_buffer_append(u32)
 define_buffer_append(u64)
 #undef define_buffer_append
 
+#define temp_allocate_size(_size_) \
+  buffer_allocate_size(&temp_buffer, _size_)
+
 #define temp_allocate(_type_) \
-  (_type_ *)buffer_allocate_size(&temp_buffer, sizeof(_type_))
+  (_type_ *)temp_allocate_size(sizeof(_type_))
+
 
 #endif TYPES_H
