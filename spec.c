@@ -44,12 +44,25 @@ reserve_stack(
 }
 
 void
-assign(
+move_value(
   Function_Builder *fn,
-  Operand a,
-  Operand b
+  Value *a,
+  Value *b
 ) {
-  encode(&fn->buffer, (Instruction) {mov, {a, b, 0}});
+  u32 a_size = descriptor_byte_size(&a->descriptor);
+  u32 b_size = descriptor_byte_size(&b->descriptor);
+
+  // TODO deal with imm64
+  if (a_size != b_size) {
+    if (!(
+      b->operand.type == Operand_Type_Immediate_32 &&
+      a_size == 8
+    )) {
+      assert(!"Mismatched operand size when moving");
+    }
+  }
+
+  encode(&fn->buffer, (Instruction) {mov, {a->operand, b->operand, 0}});
 }
 
 void
@@ -58,8 +71,47 @@ assert_not_register_ax(
 ) {
   assert(value);
   if (value->operand.type == Operand_Type_Register) {
-    assert(value->operand.reg.index != rax.reg.index);
+    assert(value->operand.reg != Register_A);
   }
+}
+
+typedef enum {
+  Arithmetic_Operation_Plus,
+  Arithmetic_Operation_Minus,
+} Arithmetic_Operation;
+
+Value *
+plus_or_minus(
+  Arithmetic_Operation operation,
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  // TODO type check values
+  assert_not_register_ax(a);
+  assert_not_register_ax(b);
+
+  Value *reg_a = value_register_for_descriptor(Register_A, &a->descriptor);
+  move_value(builder, reg_a, a);
+
+  switch(operation) {
+    case Arithmetic_Operation_Plus: {
+      encode(&builder->buffer, (Instruction) {add, {reg_a->operand, b->operand, 0}});
+      break;
+    }
+    case Arithmetic_Operation_Minus: {
+      encode(&builder->buffer, (Instruction) {sub, {reg_a->operand, b->operand, 0}});
+      break;
+    }
+    default: {
+      assert(!"Unknown arithmetic operation");
+    }
+  }
+
+  Value *temp = reserve_stack(builder, &a->descriptor);
+  move_value(builder, temp, reg_a);
+
+  return temp;
 }
 
 Value *
@@ -68,20 +120,7 @@ plus(
   Value *a,
   Value *b
 ) {
-  // TODO type check values
-  assert_not_register_ax(a);
-  assert_not_register_ax(b);
-
-  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
-
-  // TODO deal with imm64
-  encode(&builder->buffer, (Instruction) {add, {rax, b->operand, 0}});
-
-  // TODO correctly size the temporary value
-  Value *temp = reserve_stack(builder, &a->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {temp->operand, rax, 0}});
-
-  return temp;
+  return plus_or_minus(Arithmetic_Operation_Plus, builder, a, b);
 }
 
 Value *
@@ -90,45 +129,36 @@ minus(
   Value *a,
   Value *b
 ) {
-  // TODO type check values
-  assert_not_register_ax(a);
-  assert_not_register_ax(b);
-
-  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
-
-  // TODO deal with imm64
-  encode(&builder->buffer, (Instruction) {sub, {rax, b->operand, 0}});
-
-  // TODO correctly size the temporary value
-  Value *temp = reserve_stack(builder, &a->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {temp->operand, rax, 0}});
-
-  return temp;
+  return plus_or_minus(Arithmetic_Operation_Minus, builder, a, b);
 }
 
 Value *
 multiply(
   Function_Builder *builder,
-  Value *a,
-  Value *b
+  Value *x,
+  Value *y
 ) {
   // TODO type check values
-  assert_not_register_ax(a);
-  assert_not_register_ax(b);
+  assert_not_register_ax(x);
+  assert_not_register_ax(y);
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
   // TODO make the move only for imm value
-  Value *b_temp = reserve_stack(builder, &b->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {rax, b->operand, 0}});
-  encode(&builder->buffer, (Instruction) {mov, {b_temp->operand, rax, 0}});
+  Value *y_temp = reserve_stack(builder, &y->descriptor);
 
-  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
-  encode(&builder->buffer, (Instruction) {imul, {rax, b_temp->operand}});
+  Value *reg_a = value_register_for_descriptor(Register_A, &y->descriptor);
+  move_value(builder, reg_a, y);
+  move_value(builder, y_temp, reg_a);
 
-  // TODO correctly size the temporary value
-  Value *temp = reserve_stack(builder, &a->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {temp->operand, rax, 0}});
+  reg_a = value_register_for_descriptor(Register_A, &x->descriptor);
+  move_value(builder, reg_a, x);
+
+  // TODO check operand sizes
+  encode(&builder->buffer, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
+
+  Value *temp = reserve_stack(builder, &x->descriptor);
+  move_value(builder, temp, reg_a);
 
   return temp;
 }
@@ -145,14 +175,16 @@ divide(
 
   // Save RDX as it will be used for the remainder
   Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
-  encode(&builder->buffer, (Instruction) {mov, {rdx_temp->operand, rdx, 0}});
 
-  // TODO make a move version that checks size of operands
-  encode(&builder->buffer, (Instruction) {mov, {rax, a->operand, 0}});
+  Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
+  move_value(builder, rdx_temp, reg_rdx);
+
+  Value *reg_a = value_register_for_descriptor(Register_A, &a->descriptor);
+  move_value(builder, reg_a, a);
 
   // TODO deal with signed / unsigned
   Value *divisor = reserve_stack(builder, &b->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {divisor->operand, b->operand, 0}});
+  move_value(builder, divisor, b);
 
   switch (descriptor_byte_size(&a->descriptor)) {
     case 8: {
@@ -173,12 +205,11 @@ divide(
   }
   encode(&builder->buffer, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
-  // TODO correctly size the temporary value
   Value *temp = reserve_stack(builder, &a->descriptor);
-  encode(&builder->buffer, (Instruction) {mov, {temp->operand, rax, 0}});
+  move_value(builder, temp, reg_a);
 
   // Restore RDX
-  encode(&builder->buffer, (Instruction) {mov, {rdx, rdx_temp->operand, 0}});
+  move_value(builder, reg_rdx, rdx_temp);
 
   return temp;
 }
@@ -361,17 +392,9 @@ fn_return(
   // FIXME check that all return paths return the same type
   *builder->descriptor.returns = *to_return;
 
-  u32 byte_size = descriptor_byte_size(&to_return->descriptor);
-  assert(byte_size <= 8);
-
-  Operand return_operand = {
-    .type = Operand_Type_Register,
-    .reg = rax.reg,
-    .byte_size = byte_size,
-  };
-
   if (to_return->descriptor.type != Descriptor_Type_Void) {
-    encode(&builder->buffer, (Instruction) {mov, {return_operand, to_return->operand, 0}});
+    Value *reg_a = value_register_for_descriptor(Register_A, &to_return->descriptor);
+    move_value(builder, reg_a, to_return);
   }
   builder->return_patch_list = make_jump_patch(builder, builder->return_patch_list);
 
@@ -393,14 +416,13 @@ call_function_value(
   for (s64 i = 0; i < argument_count; ++i) {
     // FIXME add proper type checks for arguments
     assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
-    encode(
-      &builder->buffer,
-      (Instruction) {mov, {descriptor->argument_list[i].operand, argument_list[i].operand, 0}}
-     );
+    move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
   }
 
-  encode(&builder->buffer, (Instruction) {mov, {rax, to_call->operand, 0}});
-  encode(&builder->buffer, (Instruction) {call, {rax, 0, 0}});
+  Value *reg_a = value_register_for_descriptor(Register_A, &to_call->descriptor);
+  move_value(builder, reg_a, to_call);
+
+  encode(&builder->buffer, (Instruction) {call, {reg_a->operand, 0, 0}});
 
   return descriptor->returns;
 }
@@ -420,7 +442,7 @@ call_function_value(
 
 #define Stack(_id_, _descriptor_, _value_) \
   Value *_id_ = reserve_stack(&builder_, (_descriptor_)); \
-  assign(&builder_, (_id_)->operand, (_value_)->operand)
+  move_value(&builder_, (_id_), (_value_))
 
 #define Stack_s32(_id_, _value_) Stack((_id_), &descriptor_s32, _value_)
 #define Stack_s64(_id_, _value_) Stack((_id_), &descriptor_s64, _value_)
@@ -490,8 +512,14 @@ compare(
   // TODO typechecking
   encode(&builder->buffer, (Instruction) {cmp, {a->operand, b->operand, 0}});
   // TODO use xor
-  encode(&builder->buffer, (Instruction) {mov, {rax, imm32(0), 0}});
+  Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
+  move_value(
+    builder,
+    reg_a,
+    value_from_s64(0)
+  );
 
+  // TODO use correct operand size of a byte for these instructions
   switch(operation) {
     case Compare_Equal: {
       encode(&builder->buffer, (Instruction) {setz, {rax, 0, 0}});
@@ -510,9 +538,8 @@ compare(
     }
   }
 
-
   Value *result = reserve_stack(builder, &descriptor_s64);
-  encode(&builder->buffer, (Instruction) {mov, {result->operand, rax, 0}});
+  move_value(builder, result, reg_a);
   return result;
 }
 
@@ -611,17 +638,17 @@ spec("mass") {
     check(result == 42);
   }
 
-  it("should create function increments s64 value passed to it") {
+  it("should create function increments s32 value passed to it") {
     Function(increment) {
       // TODO add a check that all argument are defined before stack variables
-      Arg_s64(x);
+      Arg_s32(x);
 
-      Stack_s64(one, value_from_s32(1));
-      Stack_s64(two, value_from_s32(2));
+      Stack_s32(one, value_from_s32(1));
+      Stack_s32(two, value_from_s32(2));
 
       Return(Plus(x, Minus(two, one)));
     }
-    s64 result = value_as_function(increment, fn_type_s64_to_s64)(42);
+    s32 result = value_as_function(increment, fn_type_s32_to_s32)(42);
     check(result == 43);
   }
 
@@ -753,6 +780,7 @@ spec("mass") {
 
     Function(area) {
       Arg(size_struct, size_struct_pointer_descriptor);
+      // TODO deal with temporaries here instead of hardcoding RCX
       encode(&builder_.buffer, (Instruction) {mov, {rcx, size_struct->operand, 0}});
 
       Value width_value = {
@@ -761,7 +789,7 @@ spec("mass") {
           .type = Operand_Type_Memory_Indirect,
           .byte_size = descriptor_byte_size(width_field->descriptor),
           .indirect = (const Operand_Memory_Indirect) {
-            .reg = rcx.reg.index,
+            .reg = rcx.reg,
             .displacement = width_field->offset,
           }
         }
@@ -773,7 +801,7 @@ spec("mass") {
           .type = Operand_Type_Memory_Indirect,
           .byte_size = descriptor_byte_size(height_field->descriptor),
           .indirect = (const Operand_Memory_Indirect) {
-            .reg = rcx.reg.index,
+            .reg = rcx.reg,
             .displacement = height_field->offset,
           }
         }
@@ -807,7 +835,7 @@ spec("mass") {
     Function(increment) {
       Arg(arr, &array_pointer_descriptor);
       Stack_s32(index, value_from_s32(0));
-      Stack(temp, &arr->descriptor, arr);
+      Stack(temp, &array_pointer_descriptor, arr);
 
       u32 item_byte_size = descriptor_byte_size(array_pointer_descriptor.pointer_to->array.item);
       Loop {
@@ -817,13 +845,14 @@ spec("mass") {
           Break;
         }
 
-        encode(&builder_.buffer, (Instruction) {mov, {rax, temp->operand, 0}});
+        Value *reg_a = value_register_for_descriptor(Register_A, &temp->descriptor);
+        move_value(&builder_, reg_a, temp);
 
         Operand pointer = {
           .type = Operand_Type_Memory_Indirect,
           .byte_size = item_byte_size,
           .indirect = (const Operand_Memory_Indirect) {
-            .reg = rax.reg.index,
+            .reg = rax.reg,
             .displacement = 0,
           }
         };

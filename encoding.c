@@ -83,13 +83,13 @@ encode(
       if (operand->type == Operand_Type_Register) {
         if (encoding_type == Operand_Encoding_Type_Register) {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
-          reg_or_op_code = operand->reg.index;
-          if (operand->reg.index & 0b1000) {
+          reg_or_op_code = operand->reg;
+          if (operand->reg & 0b1000) {
             rex_byte |= REX_R;
           }
         } else if (encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
-          op_code[1] += operand->reg.index & 0b111;
-          if (operand->reg.index & 0b1000) {
+          op_code[1] += operand->reg & 0b111;
+          if (operand->reg & 0b1000) {
             rex_byte |= REX_B;
           }
         }
@@ -97,8 +97,8 @@ encode(
       if(encoding_type == Operand_Encoding_Type_Register_Memory) {
         needs_mod_r_m = true;
         if (operand->type == Operand_Type_Register) {
-          r_m = operand->reg.index;
-          if (operand->reg.index & 0b1000) {
+          r_m = operand->reg;
+          if (operand->reg & 0b1000) {
             rex_byte |= REX_B;
           }
           mod = MOD_Register;
@@ -111,8 +111,8 @@ encode(
             mod = MOD_Displacement_s8;
           }
           assert(operand->type == Operand_Type_Memory_Indirect);
-          r_m = operand->indirect.reg.index;
-          if (r_m == rsp.reg.index) {
+          r_m = operand->indirect.reg;
+          if (r_m == rsp.reg) {
             needs_sib = true;
             // FIXME support proper SIB for non-rsp registers
             sib_byte = (

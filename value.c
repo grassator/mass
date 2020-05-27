@@ -71,7 +71,7 @@ Value void_value = {
 const Operand reg_name = { \
   .type = Operand_Type_Register, \
   .byte_size = (reg_byte_size), \
-  .reg = { .index = (reg_index) }, \
+  .reg = (reg_index), \
 };
 
 define_register(rax, 0, 8); // 0b0000
@@ -153,7 +153,7 @@ stack(
     .type = Operand_Type_Memory_Indirect,
     .byte_size = byte_size,
     .indirect = (const Operand_Memory_Indirect) {
-      .reg = rsp.reg.index,
+      .reg = rsp.reg,
       .displacement = offset,
     }
   };
@@ -165,7 +165,12 @@ value_from_s64(
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = { .type = Descriptor_Type_Integer },
+    .descriptor = {
+      .type = Descriptor_Type_Integer,
+      .integer = {
+        .byte_size = 8,
+      },
+    },
     .operand = imm64(integer),
   };
   return result;
@@ -177,8 +182,32 @@ value_from_s32(
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = { .type = Descriptor_Type_Integer },
+    .descriptor = {
+      .type = Descriptor_Type_Integer,
+      .integer = {
+        .byte_size = 4,
+      },
+    },
     .operand = imm32(integer),
+  };
+  return result;
+}
+
+Value *
+value_register_for_descriptor(
+  Register reg,
+  Descriptor *descriptor
+) {
+  u32 byte_size = descriptor_byte_size(descriptor);
+  assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
+
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = *descriptor,
+    .operand = {
+      .type = Operand_Type_Register,
+      .byte_size = byte_size,
+    },
   };
   return result;
 }

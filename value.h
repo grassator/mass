@@ -11,8 +11,24 @@ typedef enum {
   Operand_Type_Memory_Indirect,
 } Operand_Type;
 
-typedef struct {
-  u8 index;
+typedef enum {
+  Register_A   = 0b0000,
+  Register_C   = 0b0001,
+  Register_D   = 0b0010,
+  Register_B   = 0b0011,
+  Register_SP  = 0b0100,
+  Register_BP  = 0b0101,
+  Register_SI  = 0b0110,
+  Register_DI  = 0b0111,
+
+  Register_R8  = 0b1000,
+  Register_R9  = 0b1001,
+  Register_R10 = 0b1010,
+  Register_R11 = 0b1011,
+  Register_R12 = 0b1100,
+  Register_R13 = 0b1101,
+  Register_R14 = 0b1110,
+  Register_R15 = 0b1111,
 } Register;
 
 typedef struct {
