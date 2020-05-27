@@ -133,19 +133,16 @@ encode(
       buffer_append_u8(buffer, rex_byte);
     }
 
-    // FIXME if op code is 2 bytes need different append
     if (op_code[0]) {
       buffer_append_u8(buffer, op_code[0]);
     }
     buffer_append_u8(buffer, op_code[1]);
 
-    // FIXME Implement proper mod support
-    // FIXME mask register index
     if (needs_mod_r_m) {
       u8 mod_r_m = (
         (mod << 6) |
-        (reg_or_op_code << 3) |
-        (r_m)
+        ((reg_or_op_code & 0b111) << 3) |
+        ((r_m & 0b111))
       );
       buffer_append_u8(buffer, mod_r_m);
     }
