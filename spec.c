@@ -335,47 +335,19 @@ fn_arg(
   assert(byte_size <= 8);
   switch (fn->next_argument_index++) {
     case 0: {
-      fn->descriptor.argument_list[0] = (const Value) {
-        .descriptor = *descriptor,
-        .operand = {
-          .type = Operand_Type_Register,
-          .reg = rcx.reg,
-          .byte_size = byte_size,
-        },
-      };
+      fn->descriptor.argument_list[0] = *value_register_for_descriptor(Register_C, descriptor);
       return &fn->descriptor.argument_list[0];
     }
     case 1: {
-      fn->descriptor.argument_list[1] = (const Value) {
-        .descriptor = *descriptor,
-        .operand = {
-          .type = Operand_Type_Register,
-          .reg = rdx.reg,
-          .byte_size = byte_size,
-        },
-      };
+      fn->descriptor.argument_list[1] = *value_register_for_descriptor(Register_D, descriptor);
       return &fn->descriptor.argument_list[1];
     }
     case 2: {
-      fn->descriptor.argument_list[2] = (const Value) {
-        .descriptor = *descriptor,
-        .operand = {
-          .type = Operand_Type_Register,
-          .reg = r8.reg,
-          .byte_size = byte_size,
-        },
-      };
+      fn->descriptor.argument_list[2] = *value_register_for_descriptor(Register_R8, descriptor);
       return &fn->descriptor.argument_list[2];
     }
     case 3: {
-      fn->descriptor.argument_list[3] = (const Value) {
-        .descriptor = *descriptor,
-        .operand = {
-          .type = Operand_Type_Register,
-          .reg = r9.reg,
-          .byte_size = byte_size,
-        },
-      };
+      fn->descriptor.argument_list[3] = *value_register_for_descriptor(Register_R9, descriptor);
       return &fn->descriptor.argument_list[3];
     }
   }

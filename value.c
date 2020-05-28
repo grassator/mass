@@ -206,6 +206,7 @@ value_register_for_descriptor(
     .descriptor = *descriptor,
     .operand = {
       .type = Operand_Type_Register,
+      .reg = reg,
       .byte_size = byte_size,
     },
   };
