@@ -28,10 +28,10 @@ encode(
   Instruction instruction
 ) {
   Buffer *buffer = &builder->buffer;
+  u32 operand_count = sizeof(instruction.operands) / sizeof(instruction.operands[0]);
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
     bool match = true;
-    u32 operand_count = sizeof(encoding->operand_encoding_types) / sizeof(Operand_Encoding_Type);
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
       Operand_Type operand_type = instruction.operands[operand_index].type;
@@ -195,6 +195,12 @@ encode(
     }
     return;
   }
+  printf("%s", instruction.mnemonic.name);
+  for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
+    Operand *operand = &instruction.operands[operand_index];
+    printf(" %s", operand_type_string(operand->type));
+  }
+  printf("\n");
   // Didn't find any encoding
   assert(!"Did not find acceptable encoding");
 }

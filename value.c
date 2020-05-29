@@ -67,6 +67,34 @@ Value void_value = {
   .operand = { .type = Operand_Type_None },
 };
 
+
+const char *
+operand_type_string(
+  Operand_Type type
+) {
+  switch (type) {
+    case Operand_Type_None: {
+      return "_";
+    }
+    case Operand_Type_Register: {
+      return "r8";
+    }
+    case Operand_Type_Immediate_8: {
+      return "imm8";
+    }
+    case Operand_Type_Immediate_32: {
+      return "imm32";
+    }
+    case Operand_Type_Immediate_64: {
+      return "imm64";
+    }
+    case Operand_Type_Memory_Indirect: {
+      return "m";
+    }
+  }
+  return "Unknown";
+}
+
 #define define_register(reg_name, reg_index, reg_byte_size) \
 const Operand reg_name = { \
   .type = Operand_Type_Register, \

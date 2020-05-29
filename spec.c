@@ -14,8 +14,8 @@ reserve_stack(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  Operand operand = stack(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
+  Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = *descriptor,
@@ -43,7 +43,16 @@ move_value(
     }
   }
 
-  encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
+  if (
+    b->operand.type == Operand_Type_Immediate_64 &&
+    a->operand.type != Operand_Type_Register
+  ) {
+    // TODO Can be a problem if RAX is already used as temp
+    encode(fn, (Instruction) {mov, {rax, b->operand, 0}});
+    encode(fn, (Instruction) {mov, {a->operand, rax}});
+  } else {
+    encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
+  }
 }
 
 void
@@ -294,9 +303,17 @@ fn_end(
   for (u64 i = 0; i < builder->stack_displacement_count; ++i) {
     Stack_Patch *patch = &builder->stack_displacements[i];
     s32 displacement = *patch->location;
-    u32 byte_size = patch->byte_size;
     // @Volatile @StackPatch
-    *patch->location = stack_size - displacement - byte_size;
+    // Negative diplacement is used to encode local variables
+    if (displacement < 0) {
+      *patch->location = stack_size + displacement;
+    } else
+    // Positive values larger than max_call_parameters_stack_size
+    if (displacement >= (s32)builder->max_call_parameters_stack_size) {
+      // Return address will be pushed on the stack by the caller and we need to account for that
+      s32 return_address_size = 8;
+      *patch->location = stack_size + displacement + return_address_size;
+    }
   }
 
   resolve_jump_patch_list(builder, builder->return_patch_list);
@@ -343,12 +360,8 @@ fn_arg(
       break;
     }
     default: {
-      // Return address will be pushed on the stack by the caller and we need to account for that
-      s32 return_address_size = 8;
-      // @Volatile @StackPatch This relies on the algorithm used in fn_end
-      //                       to update stack locations after we known how much stack space
-      //                       is going be required for the function.
-      s32 offset = -argument_index * 8 - byte_size - return_address_size;
+      // @Volatile @StackPatch
+      s32 offset = argument_index * 8;
       Operand operand = stack(offset, byte_size);
 
       fn->descriptor.argument_list[argument_index] = (const Value) {
@@ -367,11 +380,12 @@ fn_return(
   Value *to_return
 ) {
   // FIXME check that all return paths return the same type
-  *builder->descriptor.returns = *to_return;
-
   if (to_return->descriptor.type != Descriptor_Type_Void) {
     Value *reg_a = value_register_for_descriptor(Register_A, &to_return->descriptor);
     move_value(builder, reg_a, to_return);
+    *builder->descriptor.returns = *reg_a;
+  } else {
+    *builder->descriptor.returns = void_value;
   }
   builder->return_patch_list = make_jump_patch(builder, builder->return_patch_list);
 
@@ -390,14 +404,15 @@ call_function_value(
   Descriptor_Function *descriptor = &to_call->descriptor.function;
   assert(descriptor->argument_count == argument_count);
 
-  // If we call a function, then we need to reserve space for the home
-  // area of at least 4 arguments?
-  u32 parameters_stack_size = (u32)max(4, argument_count) * 8;
   for (s64 i = 0; i < argument_count; ++i) {
     // FIXME add proper type checks for arguments
     assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
     move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
   }
+
+  // If we call a function, then we need to reserve space for the home
+  // area of at least 4 arguments?
+  u32 parameters_stack_size = (u32)max(4, argument_count) * 8;
   builder->max_call_parameters_stack_size = max(
     builder->max_call_parameters_stack_size,
     parameters_stack_size
@@ -693,7 +708,7 @@ spec("mass") {
     check(result == 3);
   }
 
-  it("should return 5th argument") {
+  it("should return 6th argument") {
     Function(args) {
       Arg_s64(arg0);
       Arg_s64(arg1);
@@ -712,6 +727,38 @@ spec("mass") {
     }
     s64 result = value_as_function(args, fn_type_s64_s64_s64_s64_s64_s64_to_s64)(1, 2, 3, 4, 5, 6);
     check(result == 6);
+  }
+
+  it("should be able to call a function with more than 4 arguments") {
+    Function(args) {
+      Arg_s64(arg0);
+      Arg_s64(arg1);
+      Arg_s64(arg2);
+      Arg_s64(arg3);
+      Arg_s32(arg4);
+      Arg_s64(arg5);
+
+      (void)arg0; // unused
+      (void)arg1; // unused
+      (void)arg2; // unused
+      (void)arg3; // unused
+      (void)arg4; // unused
+
+      Return(arg5);
+    }
+    Function(caller) {
+      Value arguments[6] = {
+        *value_from_s64(10),
+        *value_from_s64(20),
+        *value_from_s64(30),
+        *value_from_s64(40),
+        *value_from_s32(50),
+        *value_from_s64(60),
+      };
+      Return(call_function_value(&builder_, args, arguments, static_array_size(arguments)));
+    }
+    s64 result = value_as_function(caller, fn_type_void_to_s64)();
+    check(result == 60);
   }
 
   it("should make function that multiplies by 2") {

@@ -48,6 +48,11 @@ typedef struct {
   };
 } Operand;
 
+const char *
+operand_type_string(
+  Operand_Type type
+);
+
 typedef enum {
   Descriptor_Type_Void,
   Descriptor_Type_Integer,
