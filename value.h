@@ -106,4 +106,35 @@ descriptor_byte_size(
   const Descriptor *descriptor
 );
 
+typedef struct {
+  s32 *location;
+  u64 ip;
+} Patch_32;
+
+typedef struct Jump_Patch_List {
+  Patch_32 patch;
+  struct Jump_Patch_List *next;
+} Jump_Patch_List;
+
+typedef struct {
+  s32 *location;
+  u32 byte_size;
+} Stack_Patch;
+
+#define MAX_DISPLACEMENT_COUNT 128
+
+typedef struct {
+  s32 stack_reserve;
+  u32 max_call_parameters_stack_size;
+  u8 next_argument_index;
+  Buffer buffer;
+
+  Jump_Patch_List *return_patch_list;
+
+  Stack_Patch stack_displacements[MAX_DISPLACEMENT_COUNT];
+  u32 stack_displacement_count;
+
+  Descriptor_Function descriptor;
+} Function_Builder;
+
 #endif VALUE_H

@@ -24,9 +24,10 @@ typedef enum {
 
 void
 encode(
-  Buffer *buffer,
+  Function_Builder *builder,
   Instruction instruction
 ) {
+  Buffer *buffer = &builder->buffer;
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
     bool match = true;
@@ -72,6 +73,8 @@ encode(
     bool needs_sib = false;
     u8 sib_byte = 0;
 
+    bool encoding_stack_operand = false;
+
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
@@ -104,15 +107,10 @@ encode(
           mod = MOD_Register;
         } else {
           mod = MOD_Displacement_s32;
-          s32 displacement = operand->indirect.displacement;
-          if (displacement == 0) {
-            mod = MOD_Displacement_0;
-          } else if (displacement <= 127 || displacement >= -128) {
-            mod = MOD_Displacement_s8;
-          }
           assert(operand->type == Operand_Type_Memory_Indirect);
           r_m = operand->indirect.reg;
           if (r_m == rsp.reg) {
+            encoding_stack_operand = true;
             needs_sib = true;
             // FIXME support proper SIB for non-rsp registers
             sib_byte = (
@@ -151,12 +149,19 @@ encode(
       buffer_append_u8(buffer, sib_byte);
     }
 
+    u64 offset_of_displacement = 0;
+    u32 stack_byte_size = 0;
+
     // Write out displacement
     if (needs_mod_r_m && mod != MOD_Register) {
       for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
         Operand *operand = &instruction.operands[operand_index];
         if (operand->type == Operand_Type_Memory_Indirect) {
           if (mod == MOD_Displacement_s32) {
+            if (encoding_stack_operand) {
+              offset_of_displacement = buffer->occupied;
+              stack_byte_size = operand->byte_size;
+            }
             buffer_append_s32(buffer, operand->indirect.displacement);
           } else if (mod == MOD_Displacement_s8) {
             buffer_append_s8(buffer, (s8)operand->indirect.displacement);
@@ -178,6 +183,15 @@ encode(
       if (operand->type == Operand_Type_Immediate_64) {
         buffer_append_s64(buffer, operand->imm64);
       }
+    }
+    if (offset_of_displacement) {
+      assert(builder->stack_displacement_count < MAX_DISPLACEMENT_COUNT);
+      s32 *location = (s32 *)(buffer->memory + offset_of_displacement);
+      builder->stack_displacements[builder->stack_displacement_count] = (const Stack_Patch) {
+        .location = location,
+        .byte_size = stack_byte_size,
+      };
+      builder->stack_displacement_count++;
     }
     return;
   }

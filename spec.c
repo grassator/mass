@@ -7,25 +7,6 @@
 #include "instruction.c"
 #include "encoding.c"
 
-typedef struct {
-  s32 *location;
-  u64 ip;
-} Patch_32;
-
-typedef struct Jump_Patch_List {
-  Patch_32 patch;
-  struct Jump_Patch_List *next;
-} Jump_Patch_List;
-
-typedef struct {
-  s32 stack_reserve;
-  u8 next_argument_index;
-  Buffer buffer;
-
-  Jump_Patch_List *return_patch_list;
-
-  Descriptor_Function descriptor;
-} Function_Builder;
 
 Value *
 reserve_stack(
@@ -62,7 +43,7 @@ move_value(
     }
   }
 
-  encode(&fn->buffer, (Instruction) {mov, {a->operand, b->operand, 0}});
+  encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
 }
 
 void
@@ -96,11 +77,11 @@ plus_or_minus(
 
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      encode(&builder->buffer, (Instruction) {add, {reg_a->operand, b->operand, 0}});
+      encode(builder, (Instruction) {add, {reg_a->operand, b->operand, 0}});
       break;
     }
     case Arithmetic_Operation_Minus: {
-      encode(&builder->buffer, (Instruction) {sub, {reg_a->operand, b->operand, 0}});
+      encode(builder, (Instruction) {sub, {reg_a->operand, b->operand, 0}});
       break;
     }
     default: {
@@ -155,7 +136,7 @@ multiply(
   move_value(builder, reg_a, x);
 
   // TODO check operand sizes
-  encode(&builder->buffer, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
+  encode(builder, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
   Value *temp = reserve_stack(builder, &x->descriptor);
   move_value(builder, temp, reg_a);
@@ -188,22 +169,22 @@ divide(
 
   switch (descriptor_byte_size(&a->descriptor)) {
     case 8: {
-      encode(&builder->buffer, (Instruction) {cqo, {0}});
+      encode(builder, (Instruction) {cqo, {0}});
       break;
     }
     case 4: {
-      encode(&builder->buffer, (Instruction) {cdq, {0}});
+      encode(builder, (Instruction) {cdq, {0}});
       break;
     }
     case 2: {
-      encode(&builder->buffer, (Instruction) {cwd, {0}});
+      encode(builder, (Instruction) {cwd, {0}});
       break;
     }
     default: {
       assert(!"Unsupported byte size when dividing");
     }
   }
-  encode(&builder->buffer, (Instruction) {idiv, {divisor->operand, 0, 0}});
+  encode(builder, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
   Value *temp = reserve_stack(builder, &a->descriptor);
   move_value(builder, temp, reg_a);
@@ -218,7 +199,7 @@ Patch_32
 make_jz(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jz, {imm32(0xcc), 0, 0}});
+  encode(fn, (Instruction) {jz, {imm32(0xcc), 0, 0}});
   u64 ip = fn->buffer.occupied;
   s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
@@ -228,7 +209,7 @@ Patch_32
 make_jmp(
   Function_Builder *fn
 ) {
-  encode(&fn->buffer, (Instruction) {jmp, {imm32(0xcc), 0, 0}});
+  encode(fn, (Instruction) {jmp, {imm32(0xcc), 0, 0}});
   u64 ip = fn->buffer.occupied;
   s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
@@ -285,11 +266,11 @@ fn_begin() {
   };
 
   // @Volatile @ArgumentCount
-  fn.descriptor.argument_list = malloc(sizeof(Value) * 4);
+  fn.descriptor.argument_list = malloc(sizeof(Value) * 16);
   fn.descriptor.returns = malloc(sizeof(Value));
 
   // @Volatile @ReserveStack
-  encode(&fn.buffer, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
+  encode(&fn, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
   return fn;
 }
 
@@ -298,6 +279,7 @@ fn_end(
   Function_Builder *builder
 ) {
   u8 alignment = 0x8;
+  builder->stack_reserve += builder->max_call_parameters_stack_size;
   s32 stack_size = align(builder->stack_reserve, 16) + alignment;
 
   { // Override stack reservation
@@ -305,14 +287,22 @@ fn_end(
     builder->buffer.occupied = 0;
 
     // @Volatile @ReserveStack
-    encode(&builder->buffer, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
+    encode(builder, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
     builder->buffer.occupied = save_occupied;
+  }
+
+  for (u64 i = 0; i < builder->stack_displacement_count; ++i) {
+    Stack_Patch *patch = &builder->stack_displacements[i];
+    s32 displacement = *patch->location;
+    u32 byte_size = patch->byte_size;
+    // @Volatile @StackPatch
+    *patch->location = stack_size - displacement - byte_size;
   }
 
   resolve_jump_patch_list(builder, builder->return_patch_list);
 
-  encode(&builder->buffer, (Instruction) {add, {rsp, imm32(stack_size), 0}});
-  encode(&builder->buffer, (Instruction) {ret, {0}});
+  encode(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
+  encode(builder, (Instruction) {ret, {0}});
 
   builder->descriptor.argument_count = builder->next_argument_index;
   Value *result = temp_allocate(Value);
@@ -333,27 +323,42 @@ fn_arg(
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size <= 8);
-  switch (fn->next_argument_index++) {
+  s32 argument_index = fn->next_argument_index;
+  fn->next_argument_index++;
+  switch (argument_index) {
     case 0: {
       fn->descriptor.argument_list[0] = *value_register_for_descriptor(Register_C, descriptor);
-      return &fn->descriptor.argument_list[0];
+      break;
     }
     case 1: {
       fn->descriptor.argument_list[1] = *value_register_for_descriptor(Register_D, descriptor);
-      return &fn->descriptor.argument_list[1];
+      break;
     }
     case 2: {
       fn->descriptor.argument_list[2] = *value_register_for_descriptor(Register_R8, descriptor);
-      return &fn->descriptor.argument_list[2];
+      break;
     }
     case 3: {
       fn->descriptor.argument_list[3] = *value_register_for_descriptor(Register_R9, descriptor);
-      return &fn->descriptor.argument_list[3];
+      break;
+    }
+    default: {
+      // Return address will be pushed on the stack by the caller and we need to account for that
+      s32 return_address_size = 8;
+      // @Volatile @StackPatch This relies on the algorithm used in fn_end
+      //                       to update stack locations after we known how much stack space
+      //                       is going be required for the function.
+      s32 offset = -argument_index * 8 - byte_size - return_address_size;
+      Operand operand = stack(offset, byte_size);
+
+      fn->descriptor.argument_list[argument_index] = (const Value) {
+        .descriptor = *descriptor,
+        .operand = operand,
+      };
+      break;
     }
   }
-  // @Volatile @ArgumentCount
-  assert(!"More than 4 arguments are not supported at the moment.");
-  return 0;
+  return &fn->descriptor.argument_list[argument_index];
 }
 
 Value *
@@ -385,16 +390,23 @@ call_function_value(
   Descriptor_Function *descriptor = &to_call->descriptor.function;
   assert(descriptor->argument_count == argument_count);
 
+  // If we call a function, then we need to reserve space for the home
+  // area of at least 4 arguments?
+  u32 parameters_stack_size = (u32)max(4, argument_count) * 8;
   for (s64 i = 0; i < argument_count; ++i) {
     // FIXME add proper type checks for arguments
     assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
     move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
   }
+  builder->max_call_parameters_stack_size = max(
+    builder->max_call_parameters_stack_size,
+    parameters_stack_size
+  );
 
   Value *reg_a = value_register_for_descriptor(Register_A, &to_call->descriptor);
   move_value(builder, reg_a, to_call);
 
-  encode(&builder->buffer, (Instruction) {call, {reg_a->operand, 0, 0}});
+  encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
 
   return descriptor->returns;
 }
@@ -428,7 +440,7 @@ Patch_32 make_if(
   Function_Builder *builder,
   Value *value
 ) {
-  encode(&builder->buffer, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+  encode(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
 
   return make_jz(builder);
 }
@@ -482,7 +494,7 @@ compare(
   Value *b
 ) {
   // TODO typechecking
-  encode(&builder->buffer, (Instruction) {cmp, {a->operand, b->operand, 0}});
+  encode(builder, (Instruction) {cmp, {a->operand, b->operand, 0}});
   // TODO use xor
   Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
   move_value(
@@ -494,15 +506,15 @@ compare(
   // TODO use correct operand size of a byte for these instructions
   switch(operation) {
     case Compare_Equal: {
-      encode(&builder->buffer, (Instruction) {setz, {rax, 0, 0}});
+      encode(builder, (Instruction) {setz, {rax, 0, 0}});
       break;
     }
     case Compare_Less: {
-      encode(&builder->buffer, (Instruction) {setl, {rax, 0, 0}});
+      encode(builder, (Instruction) {setl, {rax, 0, 0}});
       break;
     }
     case Compare_Greater: {
-      encode(&builder->buffer, (Instruction) {setg, {rax, 0, 0}});
+      encode(builder, (Instruction) {setg, {rax, 0, 0}});
       break;
     }
     default: {
@@ -681,10 +693,31 @@ spec("mass") {
     check(result == 3);
   }
 
+  it("should return 5th argument") {
+    Function(args) {
+      Arg_s64(arg0);
+      Arg_s64(arg1);
+      Arg_s64(arg2);
+      Arg_s64(arg3);
+      Arg_s32(arg4);
+      Arg_s64(arg5);
+
+      (void)arg0; // unused
+      (void)arg1; // unused
+      (void)arg2; // unused
+      (void)arg3; // unused
+      (void)arg4; // unused
+
+      Return(arg5);
+    }
+    s64 result = value_as_function(args, fn_type_s64_s64_s64_s64_s64_s64_to_s64)(1, 2, 3, 4, 5, 6);
+    check(result == 6);
+  }
+
   it("should make function that multiplies by 2") {
     Function(twice) {
       Arg_s64(x);
-      Return(Multiply(x, value_from_s32(2)));
+      Return(Multiply(x, value_from_s64(2)));
     }
 
     s64 result = value_as_function(twice, fn_type_s64_to_s64)(42);
@@ -753,7 +786,7 @@ spec("mass") {
     Function(area) {
       Arg(size_struct, size_struct_pointer_descriptor);
       // TODO deal with temporaries here instead of hardcoding RCX
-      encode(&builder_.buffer, (Instruction) {mov, {rcx, size_struct->operand, 0}});
+      encode(&builder_, (Instruction) {mov, {rcx, size_struct->operand, 0}});
 
       Value width_value = {
         .descriptor = *width_field->descriptor,
@@ -828,10 +861,10 @@ spec("mass") {
             .displacement = 0,
           }
         };
-        encode(&builder_.buffer, (Instruction) {inc, {pointer, 0, 0}});
-        encode(&builder_.buffer, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
+        encode(&builder_, (Instruction) {inc, {pointer, 0, 0}});
+        encode(&builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
 
-        encode(&builder_.buffer, (Instruction) {inc, {index->operand, 0, 0}});
+        encode(&builder_, (Instruction) {inc, {index->operand, 0, 0}});
       }
 
     }
