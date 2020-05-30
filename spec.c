@@ -30,6 +30,7 @@ move_value(
   Value *a,
   Value *b
 ) {
+  // TODO figure out more type checking
   u32 a_size = descriptor_byte_size(&a->descriptor);
   u32 b_size = descriptor_byte_size(&b->descriptor);
 
@@ -77,7 +78,9 @@ plus_or_minus(
   Value *a,
   Value *b
 ) {
-  // TODO type check values
+  assert(same_value_type(a, b));
+  assert(a->descriptor.type == Descriptor_Type_Integer);
+
   assert_not_register_ax(a);
   assert_not_register_ax(b);
 
@@ -128,7 +131,9 @@ multiply(
   Value *x,
   Value *y
 ) {
-  // TODO type check values
+  assert(same_value_type(x, y));
+  assert(x->descriptor.type == Descriptor_Type_Integer);
+
   assert_not_register_ax(x);
   assert_not_register_ax(y);
 
@@ -159,6 +164,9 @@ divide(
   Value *a,
   Value *b
 ) {
+  assert(same_value_type(a, b));
+  assert(a->descriptor.type == Descriptor_Type_Integer);
+
   // TODO type check values
   assert_not_register_ax(a);
   assert_not_register_ax(b);
@@ -508,7 +516,8 @@ compare(
   Value *a,
   Value *b
 ) {
-  // TODO typechecking
+  assert(same_value_type(a, b));
+  // TODO check that types are comparable
   encode(builder, (Instruction) {cmp, {a->operand, b->operand, 0}});
   // TODO use xor
   Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
@@ -618,6 +627,86 @@ spec("mass") {
 
   before_each() {
     buffer_reset(&temp_buffer);
+  }
+
+  it("should say that the types are the same for integers of the same size") {
+    check(same_type(&descriptor_s32, &descriptor_s32));
+  }
+
+  it("should say that the types are not the same for integers of different sizes") {
+    check(!same_type(&descriptor_s64, &descriptor_s32));
+  }
+
+  it("should say that pointer and a s64 are different types") {
+    check(!same_type(&descriptor_s64, descriptor_pointer_to(&descriptor_s64)));
+  }
+
+  it("should say that (s64 *) is not the same as (s32 *)") {
+    check(!same_type(descriptor_pointer_to(&descriptor_s32), descriptor_pointer_to(&descriptor_s64)));
+  }
+
+  it("should say that (s64[2]) is not the same as (s32[2])") {
+    check(!same_type(
+      descriptor_array_of(&descriptor_s32, 2),
+      descriptor_array_of(&descriptor_s64, 2)
+    ));
+  }
+
+  it("should say that (s64[10]) is not the same as (s64[2])") {
+    check(!same_type(
+      descriptor_array_of(&descriptor_s64, 10),
+      descriptor_array_of(&descriptor_s64, 2)
+    ));
+  }
+
+  it("should say that structs are different if their descriptors are different pointers") {
+    Struct_Builder struct_builder = struct_begin();
+    struct_add_field(&struct_builder, &descriptor_s32);
+    Descriptor *a = struct_end(&struct_builder);
+
+    struct_builder = struct_begin();
+    struct_add_field(&struct_builder, &descriptor_s32);
+    Descriptor *b = struct_end(&struct_builder);
+
+    check(same_type(a, a));
+    check(!same_type(a, b));
+  }
+
+  it("should say functions with the same signature have the same type") {
+    Function(a) {
+      Arg(arg0, &descriptor_s32);
+      (void)arg0;
+    }
+    Function(b) {
+      Arg(arg0, &descriptor_s32);
+      (void)arg0;
+    }
+    check(same_type(&a->descriptor, &b->descriptor));
+  }
+
+  it("should say functions with the different signatures have the different type") {
+    Function(a) {
+      Arg(arg0, &descriptor_s32);
+      (void)arg0;
+    }
+    Function(b) {
+      Arg(arg0, &descriptor_s32);
+      Arg(arg1, &descriptor_s32);
+      (void)arg0;
+      (void)arg1;
+    }
+    Function(c) {
+      Arg(arg0, &descriptor_s64);
+      (void)arg0;
+    }
+    Function(d) {
+      Arg(arg0, &descriptor_s32);
+      (void)arg0;
+      Return(value_from_s32(0));
+    }
+    check(!same_type(&a->descriptor, &b->descriptor));
+    check(!same_type(&a->descriptor, &c->descriptor));
+    check(!same_type(&a->descriptor, &d->descriptor));
   }
 
   it("should create function that will return 42") {
@@ -795,7 +884,7 @@ spec("mass") {
       .type = Descriptor_Type_Fixed_Size_Array,
       .array = {
         .item = &descriptor_s8,
-        .length = strlen(message + 1/* null terminator */),
+        .length = (u32)strlen(message + 1/* null terminator */),
       },
     };
 
@@ -823,7 +912,7 @@ spec("mass") {
     Struct_Builder struct_builder = struct_begin();
 
     Descriptor_Struct_Field *width_field = struct_add_field(&struct_builder, &descriptor_s32);
-    Descriptor_Struct_Field *height_field = struct_add_field(&struct_builder, &descriptor_s64);
+    Descriptor_Struct_Field *height_field = struct_add_field(&struct_builder, &descriptor_s32);
     struct_add_field(&struct_builder, &descriptor_s32);
 
     Descriptor *size_struct_descriptor = struct_end(&struct_builder);
@@ -862,7 +951,7 @@ spec("mass") {
       Return(Multiply(&width_value, &height_value));
     }
 
-    struct { s32 width; s64 height; s32 dummy; } size = { 10, 42 };
+    struct { s32 width; s32 height; s32 dummy; } size = { 10, 42 };
     s32 result = value_as_function(area, fn_type_voidp_to_s32)(&size);
     check(result == 420);
     check(sizeof(size) == descriptor_byte_size(size_struct_descriptor));

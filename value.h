@@ -83,7 +83,7 @@ typedef struct {
 
 typedef struct {
   struct Descriptor *item;
-  s64 length;
+  u32 length;
 } Descriptor_Fixed_Size_Array;
 
 typedef struct {
@@ -109,6 +109,18 @@ typedef struct Value {
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
+);
+
+bool
+same_type(
+  Descriptor *a,
+  Descriptor *b
+);
+
+bool
+same_value_type(
+  Value *a,
+  Value *b
 );
 
 typedef struct {

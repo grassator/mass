@@ -1,5 +1,52 @@
 #include "value.h"
 
+bool
+same_type(
+  Descriptor *a,
+  Descriptor *b
+) {
+  if (a->type != b->type) return false;
+  switch(a->type) {
+    case Descriptor_Type_Pointer: {
+      return same_type(a->pointer_to, b->pointer_to);
+    }
+    case Descriptor_Type_Fixed_Size_Array: {
+      return same_type(a->array.item, b->array.item) && a->array.length == b->array.length;
+    }
+    case Descriptor_Type_Struct: {
+      return a == b;
+    }
+    case Descriptor_Type_Function: {
+      if (!same_type(&a->function.returns->descriptor, &b->function.returns->descriptor)) {
+        return false;
+      }
+      if (a->function.argument_count != b->function.argument_count) {
+        return false;
+      }
+      for (s64 i = 0; i < a->function.argument_count; ++i) {
+        if (!same_type(
+          &a->function.argument_list[i].descriptor,
+          &b->function.argument_list[i].descriptor)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    default: {
+      return descriptor_byte_size(a) == descriptor_byte_size(b);
+    }
+  }
+}
+
+inline bool
+same_value_type(
+  Value *a,
+  Value *b
+) {
+  return same_type(&a->descriptor, &b->descriptor);
+}
+
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
@@ -29,7 +76,7 @@ descriptor_byte_size(
       return descriptor->integer.byte_size;
     }
     case Descriptor_Type_Fixed_Size_Array: {
-      return (u32)(descriptor_byte_size(descriptor->array.item) * descriptor->array.length);
+      return descriptor_byte_size(descriptor->array.item) * descriptor->array.length;
     }
     case Descriptor_Type_Pointer:
     case Descriptor_Type_Function: {
@@ -249,6 +296,22 @@ descriptor_pointer_to(
   *result = (const Descriptor) {
     .type = Descriptor_Type_Pointer,
     .pointer_to = descriptor,
+  };
+  return result;
+}
+
+Descriptor *
+descriptor_array_of(
+  Descriptor *descriptor,
+  u32 length
+) {
+  Descriptor *result = temp_allocate(Descriptor);
+  *result = (const Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = descriptor,
+      .length = length,
+    },
   };
   return result;
 }
