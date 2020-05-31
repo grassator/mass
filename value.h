@@ -69,6 +69,7 @@ typedef struct {
   s64 argument_count;
 
   struct Value *returns;
+  bool frozen;
 } Descriptor_Function;
 
 typedef struct {
@@ -154,7 +155,6 @@ typedef struct {
   Descriptor_Function descriptor;
 
   Value **result;
-  bool frozen;
 } Function_Builder;
 
 #endif VALUE_H

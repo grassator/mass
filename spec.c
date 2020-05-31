@@ -321,16 +321,34 @@ fn_update_result(
   return result_descriptor;
 }
 
-void fn_ensure_frozen(
+void
+fn_ensure_frozen(
+  Descriptor_Function *function
+) {
+  if(function->frozen) return;
+
+  if (!function->returns) {
+    function->returns = &void_value;
+  }
+  function->frozen = true;
+}
+
+void
+fn_freeze(
   Function_Builder *builder
 ) {
-  if (builder->frozen) return;
+  //Descriptor *result_descriptor = (*builder->result)->descriptor;
+  //if(result_descriptor->function.frozen) return;
+//
+  //fn_update_result(builder);
+  fn_ensure_frozen(&(*builder->result)->descriptor->function);
+}
 
-  Descriptor *result_descriptor = fn_update_result(builder);
-  if (!result_descriptor->function.returns) {
-    result_descriptor->function.returns = &void_value;
-  }
-  builder->frozen = true;
+bool
+fn_is_frozen(
+  Function_Builder *builder
+) {
+  return (*builder->result)->descriptor->function.frozen;
 }
 
 void
@@ -370,7 +388,7 @@ fn_end(
 
   encode(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
   encode(builder, (Instruction) {ret, {0}});
-  fn_ensure_frozen(builder);
+  fn_freeze(builder);
 }
 
 Value *
@@ -378,6 +396,7 @@ fn_arg(
   Function_Builder *builder,
   Descriptor *descriptor
 ) {
+  assert(!fn_is_frozen(builder));
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size <= 8);
   s32 argument_index = builder->next_argument_index;
@@ -420,9 +439,15 @@ fn_return(
   Function_Builder *builder,
   Value *to_return
 ) {
+  // We can no longer modify the return value after fn has been called
+  // or after builder has been committed through fn_end() call
+  // FIXME
+  //assert(!builder->frozen);
+
   if (builder->descriptor.returns) {
     assert(same_type(builder->descriptor.returns->descriptor, to_return->descriptor));
   } else {
+    assert(!fn_is_frozen(builder));
     if (to_return->descriptor->type != Descriptor_Type_Void) {
       builder->descriptor.returns =
         value_register_for_descriptor(Register_A, to_return->descriptor);
@@ -452,6 +477,8 @@ call_function_value(
   Descriptor_Function *descriptor = &to_call->descriptor->function;
   assert(descriptor->argument_count == argument_count);
 
+  fn_ensure_frozen(descriptor);
+
   for (s64 i = 0; i < argument_count; ++i) {
     assert(same_value_type(&descriptor->argument_list[i], &argument_list[i]));
     move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
@@ -477,7 +504,7 @@ call_function_value(
 
 #define Function(_id_) \
   Value *_id_ = 0; \
-  for (Function_Builder builder_ = fn_begin(&_id_); !(builder_.frozen); fn_end(&builder_))
+  for (Function_Builder builder_ = fn_begin(&_id_); !fn_is_frozen(&builder_); fn_end(&builder_))
 
 #define Return(_value_) \
   fn_return(&builder_, _value_)
