@@ -358,6 +358,15 @@ const Instruction_Encoding cmp_encoding_list[] = {
       Operand_Encoding_Type_None
     },
   },
+  {
+    .op_code = { 0x00, 0x3B },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_None
+    },
+  },
 };
 const X64_Mnemonic cmp = {
   .name = "cmp",

@@ -152,6 +152,9 @@ typedef struct {
   u32 stack_displacement_count;
 
   Descriptor_Function descriptor;
+
+  Value **result;
+  bool done;
 } Function_Builder;
 
 #endif VALUE_H
