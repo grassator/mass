@@ -321,6 +321,18 @@ fn_update_result(
   return result_descriptor;
 }
 
+void fn_ensure_frozen(
+  Function_Builder *builder
+) {
+  if (builder->frozen) return;
+
+  Descriptor *result_descriptor = fn_update_result(builder);
+  if (!result_descriptor->function.returns) {
+    result_descriptor->function.returns = &void_value;
+  }
+  builder->frozen = true;
+}
+
 void
 fn_end(
   Function_Builder *builder
@@ -358,12 +370,7 @@ fn_end(
 
   encode(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
   encode(builder, (Instruction) {ret, {0}});
-
-  Descriptor *result_descriptor = fn_update_result(builder);
-  if (!result_descriptor->function.returns) {
-    result_descriptor->function.returns = &void_value;
-  }
-  builder->done = true;
+  fn_ensure_frozen(builder);
 }
 
 Value *
@@ -471,7 +478,7 @@ call_function_value(
 
 #define Function(_id_) \
   Value *_id_ = 0; \
-  for (Function_Builder builder_ = fn_begin(&_id_); !(builder_.done); fn_end(&builder_))
+  for (Function_Builder builder_ = fn_begin(&_id_); !(builder_.frozen); fn_end(&builder_))
 
 #define Return(_value_) \
   fn_return(&builder_, _value_)

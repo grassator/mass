@@ -154,7 +154,7 @@ typedef struct {
   Descriptor_Function descriptor;
 
   Value **result;
-  bool done;
+  bool frozen;
 } Function_Builder;
 
 #endif VALUE_H
