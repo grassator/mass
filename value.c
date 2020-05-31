@@ -410,7 +410,7 @@ c_function_return_value(
   return 0;
 }
 
-Value
+Value *
 c_function_value(
   const char *forward_declaration,
   fn_type_opaque fn
@@ -420,12 +420,13 @@ c_function_value(
     .type = Descriptor_Type_Function,
     .function = {0},
   };
-  Value result = {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = descriptor,
     .operand = imm64((s64) fn),
   };
 
-  result.descriptor->function.returns = c_function_return_value(forward_declaration);
+  result->descriptor->function.returns = c_function_return_value(forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;
@@ -448,8 +449,8 @@ c_function_value(
     // FIXME should not use a hardcoded register here
     arg->operand = rcx;
 
-    result.descriptor->function.argument_list = arg;
-    result.descriptor->function.argument_count = 1;
+    result->descriptor->function.argument_list = arg;
+    result->descriptor->function.argument_count = 1;
   }
 
   return result;

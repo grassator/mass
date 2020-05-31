@@ -950,8 +950,8 @@ spec("mass") {
   it("should parse c function forward declarations") {
     c_function_value("void fn_void()", 0);
     c_function_value("void fn_int(int)", 0);
-    Value explicit_void_arg = c_function_value("void fn_void(void)", 0);
-    check(explicit_void_arg.descriptor->function.argument_count == 0);
+    Value *explicit_void_arg = c_function_value("void fn_void(void)", 0);
+    check(explicit_void_arg->descriptor->function.argument_count == 0);
   }
 
   it("should say 'Hello, world!'") {
@@ -962,10 +962,10 @@ spec("mass") {
       .operand = imm64((s64) message),
     };
 
-    Value puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
+    Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
 
     Function(hello) {
-      call_function_value(&builder_, &puts_value, &message_value, 1);
+      call_function_value(&builder_, puts_value, &message_value, 1);
     }
 
     value_as_function(hello, fn_type_void_to_void)();
