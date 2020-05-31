@@ -18,7 +18,7 @@ reserve_stack(
   Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = *descriptor,
+    .descriptor = descriptor,
     .operand = operand,
   };
   return result;
@@ -31,8 +31,8 @@ move_value(
   Value *b
 ) {
   // TODO figure out more type checking
-  u32 a_size = descriptor_byte_size(&a->descriptor);
-  u32 b_size = descriptor_byte_size(&b->descriptor);
+  u32 a_size = descriptor_byte_size(a->descriptor);
+  u32 b_size = descriptor_byte_size(b->descriptor);
 
   // TODO deal with imm64
   if (a_size != b_size) {
@@ -79,12 +79,12 @@ plus_or_minus(
   Value *b
 ) {
   assert(same_value_type(a, b));
-  assert(a->descriptor.type == Descriptor_Type_Integer);
+  assert(a->descriptor->type == Descriptor_Type_Integer);
 
   assert_not_register_ax(a);
   assert_not_register_ax(b);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, &a->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
   move_value(builder, reg_a, a);
 
   switch(operation) {
@@ -101,7 +101,7 @@ plus_or_minus(
     }
   }
 
-  Value *temp = reserve_stack(builder, &a->descriptor);
+  Value *temp = reserve_stack(builder, a->descriptor);
   move_value(builder, temp, reg_a);
 
   return temp;
@@ -132,7 +132,7 @@ multiply(
   Value *y
 ) {
   assert(same_value_type(x, y));
-  assert(x->descriptor.type == Descriptor_Type_Integer);
+  assert(x->descriptor->type == Descriptor_Type_Integer);
 
   assert_not_register_ax(x);
   assert_not_register_ax(y);
@@ -140,19 +140,19 @@ multiply(
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
   // TODO make the move only for imm value
-  Value *y_temp = reserve_stack(builder, &y->descriptor);
+  Value *y_temp = reserve_stack(builder, y->descriptor);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, &y->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, y->descriptor);
   move_value(builder, reg_a, y);
   move_value(builder, y_temp, reg_a);
 
-  reg_a = value_register_for_descriptor(Register_A, &x->descriptor);
+  reg_a = value_register_for_descriptor(Register_A, x->descriptor);
   move_value(builder, reg_a, x);
 
   // TODO check operand sizes
   encode(builder, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
-  Value *temp = reserve_stack(builder, &x->descriptor);
+  Value *temp = reserve_stack(builder, x->descriptor);
   move_value(builder, temp, reg_a);
 
   return temp;
@@ -165,7 +165,7 @@ divide(
   Value *b
 ) {
   assert(same_value_type(a, b));
-  assert(a->descriptor.type == Descriptor_Type_Integer);
+  assert(a->descriptor->type == Descriptor_Type_Integer);
 
   // TODO type check values
   assert_not_register_ax(a);
@@ -177,14 +177,14 @@ divide(
   Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
   move_value(builder, rdx_temp, reg_rdx);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, &a->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
   move_value(builder, reg_a, a);
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(builder, &b->descriptor);
+  Value *divisor = reserve_stack(builder, b->descriptor);
   move_value(builder, divisor, b);
 
-  switch (descriptor_byte_size(&a->descriptor)) {
+  switch (descriptor_byte_size(a->descriptor)) {
     case 8: {
       encode(builder, (Instruction) {cqo, {0}});
       break;
@@ -203,7 +203,7 @@ divide(
   }
   encode(builder, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
-  Value *temp = reserve_stack(builder, &a->descriptor);
+  Value *temp = reserve_stack(builder, a->descriptor);
   move_value(builder, temp, reg_a);
 
   // Restore RDX
@@ -283,8 +283,8 @@ fn_begin() {
   };
 
   // @Volatile @ArgumentCount
-  fn.descriptor.argument_list = malloc(sizeof(Value) * 16);
-  fn.descriptor.returns = malloc(sizeof(Value));
+  fn.descriptor.argument_list = temp_allocate_size(sizeof(Value) * 16);
+  fn.descriptor.returns = temp_allocate(Value);
 
   // @Volatile @ReserveStack
   encode(&fn, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
@@ -330,12 +330,17 @@ fn_end(
   encode(builder, (Instruction) {ret, {0}});
 
   builder->descriptor.argument_count = builder->next_argument_index;
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  *descriptor = (const Descriptor) {
+    .type = Descriptor_Type_Function,
+    .function = builder->descriptor,
+  };
+  if (!descriptor->function.returns->descriptor) {
+    descriptor->function.returns->descriptor = &descriptor_void;
+  }
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = {
-      .type = Descriptor_Type_Function,
-      .function = builder->descriptor,
-    },
+    .descriptor = descriptor,
     .operand = imm64((s64) builder->buffer.memory)
   };
   return result;
@@ -373,7 +378,7 @@ fn_arg(
       Operand operand = stack(offset, byte_size);
 
       fn->descriptor.argument_list[argument_index] = (const Value) {
-        .descriptor = *descriptor,
+        .descriptor = descriptor,
         .operand = operand,
       };
       break;
@@ -388,8 +393,8 @@ fn_return(
   Value *to_return
 ) {
   // FIXME check that all return paths return the same type
-  if (to_return->descriptor.type != Descriptor_Type_Void) {
-    Value *reg_a = value_register_for_descriptor(Register_A, &to_return->descriptor);
+  if (to_return->descriptor->type != Descriptor_Type_Void) {
+    Value *reg_a = value_register_for_descriptor(Register_A, to_return->descriptor);
     move_value(builder, reg_a, to_return);
     *builder->descriptor.returns = *reg_a;
   } else {
@@ -408,13 +413,13 @@ call_function_value(
   Value *argument_list,
   s64 argument_count
 ) {
-  assert(to_call->descriptor.type == Descriptor_Type_Function);
-  Descriptor_Function *descriptor = &to_call->descriptor.function;
+  assert(to_call->descriptor->type == Descriptor_Type_Function);
+  Descriptor_Function *descriptor = &to_call->descriptor->function;
   assert(descriptor->argument_count == argument_count);
 
   for (s64 i = 0; i < argument_count; ++i) {
     // FIXME add proper type checks for arguments
-    assert(descriptor->argument_list[i].descriptor.type == argument_list[i].descriptor.type);
+    assert(descriptor->argument_list[i].descriptor->type == argument_list[i].descriptor->type);
     move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
   }
 
@@ -426,7 +431,7 @@ call_function_value(
     parameters_stack_size
   );
 
-  Value *reg_a = value_register_for_descriptor(Register_A, &to_call->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
   move_value(builder, reg_a, to_call);
 
   encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
@@ -681,7 +686,7 @@ spec("mass") {
       Arg(arg0, &descriptor_s32);
       (void)arg0;
     }
-    check(same_type(&a->descriptor, &b->descriptor));
+    check(same_type(a->descriptor, b->descriptor));
   }
 
   it("should say functions with the different signatures have the different type") {
@@ -704,9 +709,9 @@ spec("mass") {
       (void)arg0;
       Return(value_from_s32(0));
     }
-    check(!same_type(&a->descriptor, &b->descriptor));
-    check(!same_type(&a->descriptor, &c->descriptor));
-    check(!same_type(&a->descriptor, &d->descriptor));
+    check(!same_type(a->descriptor, b->descriptor));
+    check(!same_type(a->descriptor, c->descriptor));
+    check(!same_type(a->descriptor, d->descriptor));
   }
 
   it("should create function that will return 42") {
@@ -745,7 +750,7 @@ spec("mass") {
       Return(value_from_s32(42));
     }
     Function(caller) {
-      Arg(fn, &the_answer->descriptor);
+      Arg(fn, the_answer->descriptor);
       Return(call_function_value(&builder_, fn, 0, 0));
     }
     s32 result = value_as_function(caller, fn_type__void_to_s32__to_s32)(
@@ -875,7 +880,7 @@ spec("mass") {
     c_function_value("void fn_void()", 0);
     c_function_value("void fn_int(int)", 0);
     Value explicit_void_arg = c_function_value("void fn_void(void)", 0);
-    check(explicit_void_arg.descriptor.function.argument_count == 0);
+    check(explicit_void_arg.descriptor->function.argument_count == 0);
   }
 
   it("should say 'Hello, world!'") {
@@ -889,10 +894,7 @@ spec("mass") {
     };
 
     Value message_value = {
-      .descriptor = {
-        .type = Descriptor_Type_Pointer,
-        .pointer_to = &message_descriptor,
-      },
+      .descriptor = descriptor_pointer_to(&message_descriptor),
       .operand = imm64((s64) message),
     };
 
@@ -925,7 +927,7 @@ spec("mass") {
       encode(&builder_, (Instruction) {mov, {rcx, size_struct->operand, 0}});
 
       Value width_value = {
-        .descriptor = *width_field->descriptor,
+        .descriptor = width_field->descriptor,
         .operand = {
           .type = Operand_Type_Memory_Indirect,
           .byte_size = descriptor_byte_size(width_field->descriptor),
@@ -937,7 +939,7 @@ spec("mass") {
       };
 
       Value height_value = {
-        .descriptor = *height_field->descriptor,
+        .descriptor = height_field->descriptor,
         .operand = {
           .type = Operand_Type_Memory_Indirect,
           .byte_size = descriptor_byte_size(height_field->descriptor),
@@ -986,7 +988,7 @@ spec("mass") {
           Break;
         }
 
-        Value *reg_a = value_register_for_descriptor(Register_A, &temp->descriptor);
+        Value *reg_a = value_register_for_descriptor(Register_A, temp->descriptor);
         move_value(&builder_, reg_a, temp);
 
         Operand pointer = {

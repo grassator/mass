@@ -17,7 +17,7 @@ same_type(
       return a == b;
     }
     case Descriptor_Type_Function: {
-      if (!same_type(&a->function.returns->descriptor, &b->function.returns->descriptor)) {
+      if (!same_type(a->function.returns->descriptor, b->function.returns->descriptor)) {
         return false;
       }
       if (a->function.argument_count != b->function.argument_count) {
@@ -25,8 +25,8 @@ same_type(
       }
       for (s64 i = 0; i < a->function.argument_count; ++i) {
         if (!same_type(
-          &a->function.argument_list[i].descriptor,
-          &b->function.argument_list[i].descriptor)
+          a->function.argument_list[i].descriptor,
+          b->function.argument_list[i].descriptor)
         ) {
           return false;
         }
@@ -44,7 +44,7 @@ same_value_type(
   Value *a,
   Value *b
 ) {
-  return same_type(&a->descriptor, &b->descriptor);
+  return same_type(a->descriptor, b->descriptor);
 }
 
 u32
@@ -110,7 +110,7 @@ Descriptor descriptor_void = {
 };
 
 Value void_value = {
-  .descriptor = { .type = Descriptor_Type_Void },
+  .descriptor = &descriptor_void,
   .operand = { .type = Operand_Type_None },
 };
 
@@ -240,12 +240,7 @@ value_from_s64(
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = {
-      .type = Descriptor_Type_Integer,
-      .integer = {
-        .byte_size = 8,
-      },
-    },
+    .descriptor = &descriptor_s64,
     .operand = imm64(integer),
   };
   return result;
@@ -257,12 +252,7 @@ value_from_s32(
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = {
-      .type = Descriptor_Type_Integer,
-      .integer = {
-        .byte_size = 4,
-      },
-    },
+    .descriptor = &descriptor_s32,
     .operand = imm32(integer),
   };
   return result;
@@ -278,7 +268,7 @@ value_register_for_descriptor(
 
   Value *result = temp_allocate(Value);
   *result = (const Value) {
-    .descriptor = *descriptor,
+    .descriptor = descriptor,
     .operand = {
       .type = Operand_Type_Register,
       .reg = reg,
@@ -356,7 +346,7 @@ parse_c_type(
       } else if (memory_range_equal_to_c_string(start, ch, "int")) {
         descriptor = &descriptor_s32;
       } else if (memory_range_equal_to_c_string(start, ch, "void")) {
-        descriptor = &void_value.descriptor;
+        descriptor = &descriptor_void;
       } else if (memory_range_equal_to_c_string(start, ch, "const")) {
         // TODO support const values?
       } else {
@@ -408,7 +398,7 @@ c_function_return_value(
     case Descriptor_Type_Pointer: {
       Value *return_value = temp_allocate(Value);
       *return_value = (const Value) {
-        .descriptor = *descriptor,
+        .descriptor = descriptor,
         .operand = eax,
       };
       return return_value;
@@ -425,15 +415,17 @@ c_function_value(
   const char *forward_declaration,
   fn_type_opaque fn
 ) {
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  *descriptor = (const Descriptor) {
+    .type = Descriptor_Type_Function,
+    .function = {0},
+  };
   Value result = {
-    .descriptor = {
-      .type = Descriptor_Type_Function,
-      .function = {0},
-    },
+    .descriptor = descriptor,
     .operand = imm64((s64) fn),
   };
 
-  result.descriptor.function.returns = c_function_return_value(forward_declaration);
+  result.descriptor->function.returns = c_function_return_value(forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;
@@ -451,13 +443,13 @@ c_function_value(
   }
 
   if (argument_descriptor && argument_descriptor->type != Descriptor_Type_Void) {
-    Value *arg = malloc(sizeof(Value));
-    arg->descriptor = *argument_descriptor;
+    Value *arg = temp_allocate(Value);
+    arg->descriptor = argument_descriptor;
     // FIXME should not use a hardcoded register here
     arg->operand = rcx;
 
-    result.descriptor.function.argument_list = arg;
-    result.descriptor.function.argument_count = 1;
+    result.descriptor->function.argument_list = arg;
+    result.descriptor->function.argument_count = 1;
   }
 
   return result;

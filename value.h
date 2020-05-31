@@ -102,7 +102,7 @@ typedef struct Descriptor {
 } Descriptor;
 
 typedef struct Value {
-  Descriptor descriptor;
+  Descriptor *descriptor;
   Operand operand;
 } Value;
 
