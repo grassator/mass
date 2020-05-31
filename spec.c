@@ -453,8 +453,7 @@ call_function_value(
   assert(descriptor->argument_count == argument_count);
 
   for (s64 i = 0; i < argument_count; ++i) {
-    // FIXME add proper type checks for arguments
-    assert(descriptor->argument_list[i].descriptor->type == argument_list[i].descriptor->type);
+    assert(same_value_type(&descriptor->argument_list[i], &argument_list[i]));
     move_value(builder, &descriptor->argument_list[i], &argument_list[i]);
   }
 
@@ -930,16 +929,9 @@ spec("mass") {
 
   it("should say 'Hello, world!'") {
     const char *message = "Hello, world!";
-    Descriptor message_descriptor = {
-      .type = Descriptor_Type_Fixed_Size_Array,
-      .array = {
-        .item = &descriptor_s8,
-        .length = (u32)strlen(message + 1/* null terminator */),
-      },
-    };
 
     Value message_value = {
-      .descriptor = descriptor_pointer_to(&message_descriptor),
+      .descriptor = descriptor_pointer_to(&descriptor_s8),
       .operand = imm64((s64) message),
     };
 
