@@ -7,7 +7,6 @@
 #include "instruction.c"
 #include "encoding.c"
 
-
 Value *
 reserve_stack(
   Function_Builder *fn,
@@ -465,6 +464,42 @@ fn_return(
   return to_return;
 }
 
+Value *
+call_function_value(
+  Function_Builder *builder,
+  Value *to_call,
+  Value *argument_list,
+  s64 argument_count
+);
+
+Value *
+call_function_overload_set(
+  Function_Builder *builder,
+  Value *to_call,
+  Value *argument_list,
+  s64 argument_count
+) {
+  assert(to_call->descriptor->type == Descriptor_Type_Function_Overload_Set);
+  Descriptor_Function_Overload_Set overload_set = to_call->descriptor->overload_set;
+
+  for (s64 overload_index = 0; overload_index < overload_set.overload_count; ++overload_index) {
+    Value *overload = overload_set.overload_list[overload_index];
+    Descriptor_Function *descriptor = &overload->descriptor->function;
+    bool match = true;
+    for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
+      if(!same_value_type(&descriptor->argument_list[arg_index], &argument_list[arg_index])) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return call_function_value(builder, overload, argument_list, argument_count);
+    }
+  }
+  assert(!"No matching overload found");
+  return 0;
+}
+
 // TODO create variadic macro for call_function_value
 Value *
 call_function_value(
@@ -473,6 +508,10 @@ call_function_value(
   Value *argument_list,
   s64 argument_count
 ) {
+  if (to_call->descriptor->type == Descriptor_Type_Function_Overload_Set) {
+    return call_function_overload_set(builder, to_call, argument_list, argument_count);
+  }
+
   assert(to_call->descriptor->type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->function;
   assert(descriptor->argument_count == argument_count);
@@ -696,6 +735,28 @@ struct_end(
   return result;
 }
 
+Value *
+make_identity(
+  Descriptor *type
+) {
+  Function(id) {
+    Arg(x, type);
+    Return(x);
+  }
+  return id;
+}
+
+Value *
+make_add_two(
+  Descriptor *type
+) {
+  Function(addtwo) {
+    Arg(x, type);
+    Return(Plus(x, value_from_s64(2)));
+  }
+  return addtwo;
+}
+
 spec("mass") {
   before() {
     temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
@@ -703,6 +764,54 @@ spec("mass") {
 
   before_each() {
     buffer_reset(&temp_buffer);
+  }
+
+  it("should support ad-hoc polymorphism / overloading") {
+    Function(sizeof_s32) {
+      Arg_s32(x);
+      (void)x;
+      Return(value_from_s64(4));
+    }
+    Function(sizeof_s64) {
+      Arg_s64(x);
+      (void)x;
+      Return(value_from_s64(8));
+    }
+    Value *overload_list[] = {
+      sizeof_s32,
+      sizeof_s64,
+    };
+    Descriptor overload_descriptor = {
+      .type = Descriptor_Type_Function_Overload_Set,
+      .overload_set = {
+        .overload_list = overload_list,
+        .overload_count = static_array_size(overload_list),
+      },
+    };
+    Value overload = {
+      .descriptor = &overload_descriptor,
+      .operand = {0},
+    };
+
+    Function(checker_value) {
+      Value *a = call_function_value(&builder_, &overload, value_from_s64(0), 1);
+      Value *b = call_function_value(&builder_, &overload, value_from_s32(0), 1);
+      Return(Plus(a, b));
+    }
+
+    fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
+    check(checker() == 12);
+  }
+
+  it("should support parametric polymorphism") {
+    Value *id_s64 = make_identity(&descriptor_s64);
+    Value *id_s32 = make_identity(&descriptor_s32);
+    Value *addtwo_s64 = make_add_two(&descriptor_s64);
+    Function(check) {
+      call_function_value(&builder_, id_s64, value_from_s64(0), 1);
+      call_function_value(&builder_, id_s32, value_from_s32(0), 1);
+      call_function_value(&builder_, addtwo_s64, value_from_s64(0), 1);
+    }
   }
 
   it("should say that the types are the same for integers of the same size") {

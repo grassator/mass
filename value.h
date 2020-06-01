@@ -59,6 +59,7 @@ typedef enum {
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
+  Descriptor_Type_Function_Overload_Set,
   Descriptor_Type_Struct,
 } Descriptor_Type;
 
@@ -71,6 +72,11 @@ typedef struct {
   struct Value *returns;
   bool frozen;
 } Descriptor_Function;
+
+typedef struct {
+  struct Value **overload_list;
+  s64 overload_count;
+} Descriptor_Function_Overload_Set;
 
 typedef struct {
   struct Descriptor *descriptor;
@@ -99,6 +105,7 @@ typedef struct Descriptor {
     Descriptor_Fixed_Size_Array array;
     Descriptor_Struct struct_;
     struct Descriptor *pointer_to;
+    Descriptor_Function_Overload_Set overload_set;
   };
 } Descriptor;
 
