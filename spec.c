@@ -319,6 +319,7 @@ fn_begin(Value **result) {
     .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
     .descriptor = descriptor,
     .result = result,
+    .stack_displacements = temp_allocate_array(Stack_Patch, MAX_DISPLACEMENT_COUNT),
   };
   Value_Overload *fn_value = temp_allocate(Value_Overload);
   *fn_value = (const Value_Overload) {

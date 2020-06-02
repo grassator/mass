@@ -150,7 +150,6 @@ typedef struct {
   u32 byte_size;
 } Stack_Patch;
 
-#define MAX_DISPLACEMENT_COUNT 128
 
 typedef struct {
   s32 stack_reserve;
@@ -160,7 +159,8 @@ typedef struct {
 
   Jump_Patch_List *return_patch_list;
 
-  Stack_Patch stack_displacements[MAX_DISPLACEMENT_COUNT];
+  #define MAX_DISPLACEMENT_COUNT 128
+  Stack_Patch *stack_displacements;
   u32 stack_displacement_count;
 
   Descriptor *descriptor;
