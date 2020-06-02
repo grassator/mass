@@ -372,16 +372,14 @@ void
 fn_freeze(
   Function_Builder *builder
 ) {
-  Value_Overload *overload = fn_get_value_overload(builder);
-  fn_ensure_frozen(&overload->descriptor->function);
+  fn_ensure_frozen(&builder->descriptor->function);
 }
 
 bool
 fn_is_frozen(
   Function_Builder *builder
 ) {
-  Value_Overload *overload = fn_get_value_overload(builder);
-  return overload->descriptor->function.frozen;
+  return builder->descriptor->function.frozen;
 }
 
 void
@@ -546,7 +544,7 @@ call_function_value(
 ) {
   Value_Overload **arg_overload_list = temp_allocate_array(Value_Overload, argument_count);
   for (s64 overload_index = 0; overload_index < to_call->overload_count; ++overload_index) {
-    Value_Overload *overload = &to_call->overload_list[overload_index];
+    Value_Overload *overload = to_call->overload_list[overload_index];
     Descriptor_Function *descriptor = &overload->descriptor->function;
     bool match = true;
     for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
@@ -816,7 +814,7 @@ spec("mass") {
     Value_Overload *a = maybe_get_if_single_overload(sizeof_s32);
     Value_Overload *b = maybe_get_if_single_overload(sizeof_s64);
 
-    Value_Overload overload_list[] = {*a, *b};
+    Value_Overload *overload_list[] = {a, b};
 
     Value overload = {
       .overload_list = overload_list,
@@ -878,7 +876,7 @@ spec("mass") {
     Value_Overload *a = maybe_get_if_single_overload(value_from_s32(0));
     Value_Overload *b = maybe_get_if_single_overload(value_from_s64(0));
 
-    Value_Overload overload_list[] = {*a, *b};
+    Value_Overload *overload_list[] = {a, b};
 
     Value overload = {
       .overload_list = overload_list,

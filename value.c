@@ -44,7 +44,7 @@ maybe_get_if_single_overload(
   Value *value
 ) {
   if (value->overload_count == 1) {
-    return &value->overload_list[0];
+    return value->overload_list[0];
   }
   return 0;
 }
@@ -81,9 +81,9 @@ get_matching_values(
   Value *b_value
 ) {
   for (u32 a_index = 0; a_index < a_value->overload_count; ++a_index) {
-    Value_Overload *a = &a_value->overload_list[a_index];
+    Value_Overload *a = a_value->overload_list[a_index];
     for (u32 b_index = 0; b_index < b_value->overload_count; ++b_index) {
-      Value_Overload *b = &b_value->overload_list[b_index];
+      Value_Overload *b = b_value->overload_list[b_index];
       if (same_overload_type(a, b)) {
         Value_Overload_Pair *result = temp_allocate(Value_Overload_Pair);
         *result = (const Value_Overload_Pair) { a, b };
@@ -160,8 +160,9 @@ Value_Overload void_value_overload = {
   .descriptor = &descriptor_void,
   .operand = { .type = Operand_Type_None },
 };
+Value_Overload *vode_value_overload_pointer = &void_value_overload;
 Value void_value = {
-  .overload_list = &void_value_overload,
+  .overload_list = &vode_value_overload_pointer,
   .overload_count = 1,
 };
 
@@ -290,8 +291,10 @@ single_overload_value(
   Value_Overload *overload
 ) {
   Value *result = temp_allocate(Value);
+  Value_Overload **overload_list = temp_allocate_array(Value_Overload *, 1);
+  overload_list[0] = overload;
   *result = (const Value) {
-    .overload_list = overload,
+    .overload_list = overload_list,
     .overload_count = 1,
   };
   return result;
