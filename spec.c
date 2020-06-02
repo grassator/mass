@@ -308,7 +308,7 @@ fn_begin(Value **result) {
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .argument_list = temp_allocate_size(sizeof(Value) * 16),
+      .argument_list = temp_allocate_array(Value, 16),
       .argument_count = 0,
       .returns = 0,
     },
@@ -543,8 +543,7 @@ call_function_value(
   Value *argument_list,
   s64 argument_count
 ) {
-  Value_Overload **arg_overload_list =
-    temp_allocate_size(sizeof(Value_Overload *) * argument_count);
+  Value_Overload **arg_overload_list = temp_allocate_array(Value_Overload, argument_count);
   for (s64 overload_index = 0; overload_index < to_call->overload_count; ++overload_index) {
     Value_Overload *overload = &to_call->overload_list[overload_index];
     Descriptor_Function *descriptor = &overload->descriptor->function;
@@ -751,8 +750,8 @@ struct_end(
   assert(builder->field_count);
 
   Descriptor *result = temp_allocate(Descriptor);
-  Descriptor_Struct_Field *field_list = temp_allocate_size(
-    sizeof(Descriptor_Struct_Field) * builder->field_count
+  Descriptor_Struct_Field *field_list = temp_allocate_array(
+    Descriptor_Struct_Field, builder->field_count
   );
 
   Struct_Builder_Field *field = builder->field_list;
