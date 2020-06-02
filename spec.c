@@ -802,43 +802,37 @@ spec("mass") {
     buffer_reset(&temp_buffer);
   }
 
-  // FIXME @Overload
-  //it("should support ad-hoc polymorphism / overloading") {
-    //Function(sizeof_s32) {
-      //Arg_s32(x);
-      //(void)x;
-      //Return(value_from_s64(4));
-    //}
-    //Function(sizeof_s64) {
-      //Arg_s64(x);
-      //(void)x;
-      //Return(value_from_s64(8));
-    //}
-    //Value *overload_list[] = {
-      //sizeof_s32,
-      //sizeof_s64,
-    //};
-    //Descriptor overload_descriptor = {
-      //.type = Descriptor_Type_Function_Overload_Set,
-      //.overload_set = {
-        //.overload_list = overload_list,
-        //.overload_count = static_array_size(overload_list),
-      //},
-    //};
-    //Value_Overload overload = {
-      //.descriptor = &overload_descriptor,
-      //.operand = {0},
-    //};
-//
-    //Function(checker_value) {
-      //Value *a = call_function_value(&builder_, &overload, value_from_s64(0), 1);
-      //Value *b = call_function_value(&builder_, &overload, value_from_s32(0), 1);
-      //Return(Plus(a, b));
-    //}
-//
-    //fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
-    //check(checker() == 12);
-  //}
+  it("should support ad-hoc polymorphism / overloading") {
+    Function(sizeof_s32) {
+      Arg_s32(x);
+      (void)x;
+      Return(value_from_s64(4));
+    }
+    Function(sizeof_s64) {
+      Arg_s64(x);
+      (void)x;
+      Return(value_from_s64(8));
+    }
+
+    Value_Overload *a = maybe_get_if_single_overload(sizeof_s32);
+    Value_Overload *b = maybe_get_if_single_overload(sizeof_s64);
+
+    Value_Overload overload_list[] = {*a, *b};
+
+    Value overload = {
+      .overload_list = overload_list,
+      .overload_count = 2,
+    };
+
+    Function(checker_value) {
+      Value *x = call_function_value(&builder_, &overload, value_from_s64(0), 1);
+      Value *y = call_function_value(&builder_, &overload, value_from_s32(0), 1);
+      Return(Plus(x, y));
+    }
+
+    fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
+    check(checker() == 12);
+  }
 
   it("should support parametric polymorphism") {
     Value *id_s64 = make_identity(&descriptor_s64);
@@ -879,6 +873,21 @@ spec("mass") {
       descriptor_array_of(&descriptor_s64, 10),
       descriptor_array_of(&descriptor_s64, 2)
     ));
+  }
+
+  it("should support polymorphic values") {
+    Value_Overload *a = maybe_get_if_single_overload(value_from_s32(0));
+    Value_Overload *b = maybe_get_if_single_overload(value_from_s64(0));
+
+    Value_Overload overload_list[] = {*a, *b};
+
+    Value overload = {
+      .overload_list = overload_list,
+      .overload_count = 2,
+    };
+
+    Value_Overload_Pair *pair = get_matching_values(&overload, value_from_s64(0));
+    check(same_overload_type(pair->a, b));
   }
 
   it("should say that structs are different if their descriptors are different pointers") {

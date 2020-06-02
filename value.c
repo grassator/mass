@@ -70,6 +70,30 @@ same_value_type(
   return same_type(a_overload->descriptor, b_overload->descriptor);
 }
 
+typedef struct {
+  Value_Overload *a;
+  Value_Overload *b;
+} Value_Overload_Pair;
+
+Value_Overload_Pair *
+get_matching_values(
+  Value *a_value,
+  Value *b_value
+) {
+  for (u32 a_index = 0; a_index < a_value->overload_count; ++a_index) {
+    Value_Overload *a = &a_value->overload_list[a_index];
+    for (u32 b_index = 0; b_index < b_value->overload_count; ++b_index) {
+      Value_Overload *b = &b_value->overload_list[b_index];
+      if (same_overload_type(a, b)) {
+        Value_Overload_Pair *result = temp_allocate(Value_Overload_Pair);
+        *result = (const Value_Overload_Pair) { a, b };
+        return result;
+      }
+    }
+  }
+  return 0;
+}
+
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
