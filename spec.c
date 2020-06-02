@@ -303,18 +303,22 @@ resolve_jump_patch_list(
 
 Function_Builder
 fn_begin(Value **result) {
-  Function_Builder builder = {
-    .stack_reserve = 0,
-    .return_patch_list = 0,
-    .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
-    .descriptor = (const Descriptor_Function) {0},
-    .result = result,
-  };
 
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
-    .function = builder.descriptor,
+    .function = {
+      .argument_list = temp_allocate_size(sizeof(Value) * 16),
+      .argument_count = 0,
+      .returns = 0,
+    },
+  };
+  Function_Builder builder = {
+    .stack_reserve = 0,
+    .return_patch_list = 0,
+    .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
+    .descriptor = descriptor,
+    .result = result,
   };
   Value_Overload *fn_value = temp_allocate(Value_Overload);
   *fn_value = (const Value_Overload) {
@@ -325,8 +329,6 @@ fn_begin(Value **result) {
 
   *result = result_value;
 
-  // @Volatile @ArgumentCount
-  builder.descriptor.argument_list = temp_allocate_size(sizeof(Value) * 16);
 
   // @Volatile @ReserveStack
   encode(&builder, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
@@ -348,11 +350,9 @@ Descriptor *
 fn_update_result(
   Function_Builder *builder
 ) {
-  builder->descriptor.argument_count = builder->next_argument_index;
+  builder->descriptor->function.argument_count = builder->next_argument_index;
   Value_Overload *overload = fn_get_value_overload(builder);
-  Descriptor *result_descriptor = overload->descriptor;
-  result_descriptor->function = builder->descriptor;
-  return result_descriptor;
+  return overload->descriptor;
 }
 
 void
@@ -431,23 +431,24 @@ fn_arg(
   assert(!fn_is_frozen(builder));
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size <= 8);
+  Descriptor_Function *function = &builder->descriptor->function;
   s32 argument_index = builder->next_argument_index;
   builder->next_argument_index++;
   switch (argument_index) {
     case 0: {
-      builder->descriptor.argument_list[0] = *value_register_for_descriptor(Register_C, descriptor);
+      function->argument_list[0] = *value_register_for_descriptor(Register_C, descriptor);
       break;
     }
     case 1: {
-      builder->descriptor.argument_list[1] = *value_register_for_descriptor(Register_D, descriptor);
+      function->argument_list[1] = *value_register_for_descriptor(Register_D, descriptor);
       break;
     }
     case 2: {
-      builder->descriptor.argument_list[2] = *value_register_for_descriptor(Register_R8, descriptor);
+      function->argument_list[2] = *value_register_for_descriptor(Register_R8, descriptor);
       break;
     }
     case 3: {
-      builder->descriptor.argument_list[3] = *value_register_for_descriptor(Register_R9, descriptor);
+      function->argument_list[3] = *value_register_for_descriptor(Register_R9, descriptor);
       break;
     }
     default: {
@@ -455,7 +456,7 @@ fn_arg(
       s32 offset = argument_index * 8;
       Operand operand = stack(offset, byte_size);
 
-      builder->descriptor.argument_list[argument_index] = (const Value_Overload) {
+      function->argument_list[argument_index] = (const Value_Overload) {
         .descriptor = descriptor,
         .operand = operand,
       };
@@ -463,9 +464,7 @@ fn_arg(
     }
   }
   fn_update_result(builder);
-  return single_overload_value(
-    &builder->descriptor.argument_list[argument_index]
-  );
+  return single_overload_value(&function->argument_list[argument_index]);
 }
 
 void
@@ -481,20 +480,20 @@ fn_return(
   // FIXME @Overloads
   Value_Overload *overload = maybe_get_if_single_overload(to_return);
   assert(overload);
-  if (builder->descriptor.returns) {
-    assert(same_type(builder->descriptor.returns->descriptor, overload->descriptor));
+  Descriptor_Function *function = &builder->descriptor->function;
+  if (function->returns) {
+    assert(same_type(function->returns->descriptor, overload->descriptor));
   } else {
     assert(!fn_is_frozen(builder));
     if (overload->descriptor->type != Descriptor_Type_Void) {
-      builder->descriptor.returns =
-        value_register_for_descriptor(Register_A, overload->descriptor);
+      function->returns = value_register_for_descriptor(Register_A, overload->descriptor);
     } else {
-      builder->descriptor.returns = &void_value_overload;
+      function->returns = &void_value_overload;
     }
   }
 
   if (overload->descriptor->type != Descriptor_Type_Void) {
-    move_value(builder, builder->descriptor.returns, overload);
+    move_value(builder, function->returns, overload);
   }
   builder->return_patch_list = make_jump_patch(builder, builder->return_patch_list);
   fn_update_result(builder);

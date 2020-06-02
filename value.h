@@ -163,7 +163,7 @@ typedef struct {
   Stack_Patch stack_displacements[MAX_DISPLACEMENT_COUNT];
   u32 stack_displacement_count;
 
-  Descriptor_Function descriptor;
+  Descriptor *descriptor;
 
   Value **result;
 } Function_Builder;
