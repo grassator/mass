@@ -73,13 +73,14 @@ typedef struct {
 } Descriptor_Function;
 
 typedef struct {
+  const char *name;
   struct Descriptor *descriptor;
   s32 offset;
 } Descriptor_Struct_Field;
 
 typedef struct {
   Descriptor_Struct_Field *field_list;
-  s64 field_count;
+  s32 field_count;
 } Descriptor_Struct;
 
 typedef struct {

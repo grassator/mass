@@ -498,6 +498,20 @@ fn_return(
   fn_update_result(builder);
 }
 
+Value *
+fn_reflect(
+  Function_Builder *builder,
+  Descriptor *descriptor
+) {
+  Value_Overload *result = reserve_stack(builder, &descriptor_struct_reflection);
+  // FIXME support all types
+  assert(descriptor->type == Descriptor_Type_Struct);
+  // FIXME support generic allocation of structs on the stack
+  move_value(builder, result,
+    maybe_get_if_single_overload(value_from_s32(descriptor->struct_.field_count)));
+  return single_overload_value(result);
+}
+
 // TODO create variadic macro for call_function_value
 Value *
 call_function_overload(
@@ -592,6 +606,11 @@ call_function_value(
 #define Minus(_a_, _b_) minus(&builder_, _a_, _b_)
 #define Multiply(_a_, _b_) multiply(&builder_, _a_, _b_)
 #define Divide(_a_, _b_) divide(&builder_, _a_, _b_)
+
+#define SizeOfDescriptor(_descriptor_) value_from_s32(descriptor_byte_size(_descriptor_))
+#define SizeOf(_value_) value_byte_size(_value_)
+
+#define ReflectDescriptor (_descriptor_) fn_reflect(&builder_, _descriptor_)
 
 Patch_32 make_if(
   Function_Builder *builder,
@@ -722,13 +741,15 @@ struct_begin() {
 Descriptor_Struct_Field *
 struct_add_field(
   Struct_Builder *builder,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  const char *name
 ) {
   Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
 
   u32 size = descriptor_byte_size(descriptor);
   builder->offset = align(builder->offset, size);
 
+  builder_field->struct_field.name = name;
   builder_field->struct_field.descriptor = descriptor;
   builder_field->struct_field.offset = builder->offset;
 
@@ -766,6 +787,35 @@ struct_end(
   };
 
   return result;
+}
+
+Value *
+struct_get_field(
+  Value *struct_value,
+  const char *name
+) {
+  Value_Overload *struct_overload = maybe_get_if_single_overload(struct_value);
+  assert(struct_overload);
+  Descriptor *descriptor = struct_overload->descriptor;
+  assert(descriptor->type == Descriptor_Type_Struct);
+  for (s32 i = 0; i < descriptor->struct_.field_count; ++i) {
+    Descriptor_Struct_Field *field = &descriptor->struct_.field_list[i];
+    if (strcmp(field->name, name) == 0) {
+      Value_Overload *result = temp_allocate(Value_Overload);
+      Operand operand = struct_overload->operand;
+      // FIXME support more operands
+      assert(operand.type == Operand_Type_Memory_Indirect);
+      operand.indirect.displacement += field->offset;
+      *result = (const Value_Overload) {
+        .descriptor = field->descriptor,
+        .operand = operand,
+      };
+      return single_overload_value(result);
+    }
+  }
+
+  assert(!"Could not find a field with specified name");
+  return 0;
 }
 
 Value *
@@ -831,6 +881,39 @@ spec("mass") {
     check(checker() == 12);
   }
 
+  it("should support sizeof operator on values") {
+    Value *sizeof_s32 = SizeOf(value_from_s32(0));
+    Value_Overload *overload = maybe_get_if_single_overload(sizeof_s32);
+    check(overload);
+    check(overload->operand.type == Operand_Type_Immediate_32);
+    check(overload->operand.imm32 == 4);
+  }
+
+  it("should support sizeof operator on descriptors") {
+    Value *sizeof_s32 = SizeOfDescriptor(&descriptor_s32);
+    Value_Overload *overload = maybe_get_if_single_overload(sizeof_s32);
+    check(overload);
+    check(overload->operand.type == Operand_Type_Immediate_32);
+    check(overload->operand.imm32 == 4);
+  }
+
+  it("should support reflection on structs") {
+    Struct_Builder struct_builder = struct_begin();
+    struct_add_field(&struct_builder, &descriptor_s32, "x");
+    struct_add_field(&struct_builder, &descriptor_s32, "y");
+    Descriptor *point_struct_descriptor = struct_end(&struct_builder);
+
+    Function(field_count) {
+      Value_Overload *overload = maybe_get_if_single_overload(
+        fn_reflect(&builder_, point_struct_descriptor)
+      );
+      Stack(struct_, &descriptor_struct_reflection, overload);
+      Return(struct_get_field(struct_, "field_count"));
+    }
+    s32 count = value_as_function(field_count, fn_type_void_to_s32)();
+    check(count == 2);
+  }
+
   it("should support parametric polymorphism") {
     Value *id_s64 = make_identity(&descriptor_s64);
     Value *id_s32 = make_identity(&descriptor_s32);
@@ -889,11 +972,11 @@ spec("mass") {
 
   it("should say that structs are different if their descriptors are different pointers") {
     Struct_Builder struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s32);
+    struct_add_field(&struct_builder, &descriptor_s32, "x");
     Descriptor *a = struct_end(&struct_builder);
 
     struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s32);
+    struct_add_field(&struct_builder, &descriptor_s32, "x");
     Descriptor *b = struct_end(&struct_builder);
 
     check(same_type(a, a));
@@ -1161,9 +1244,11 @@ spec("mass") {
 
     Struct_Builder struct_builder = struct_begin();
 
-    Descriptor_Struct_Field *width_field = struct_add_field(&struct_builder, &descriptor_s32);
-    Descriptor_Struct_Field *height_field = struct_add_field(&struct_builder, &descriptor_s32);
-    struct_add_field(&struct_builder, &descriptor_s32);
+    Descriptor_Struct_Field *width_field =
+      struct_add_field(&struct_builder, &descriptor_s32, "width");
+    Descriptor_Struct_Field *height_field =
+      struct_add_field(&struct_builder, &descriptor_s32, "height");
+    struct_add_field(&struct_builder, &descriptor_s32, "dummy");
 
     Descriptor *size_struct_descriptor = struct_end(&struct_builder);
 

@@ -48,7 +48,6 @@ maybe_get_if_single_overload(
   }
   return 0;
 }
-
 inline bool
 same_overload_type(
   Value_Overload *a_overload,
@@ -154,6 +153,29 @@ Descriptor descriptor_s64 = {
 };
 Descriptor descriptor_void = {
   .type = Descriptor_Type_Void,
+};
+
+
+// @Volatile @Reflection
+typedef struct {
+  s32 field_count;
+} Descriptor_Struct_Reflection;
+
+// @Volatile @Reflection
+Descriptor_Struct_Field struct_reflection_fields[] = {
+  {
+    .name = "field_count",
+    .offset = 0,
+    .descriptor = &descriptor_s32,
+  }
+};
+
+Descriptor descriptor_struct_reflection = {
+  .type = Descriptor_Type_Struct,
+  .struct_ = {
+    .field_list = struct_reflection_fields,
+    .field_count = static_array_size(struct_reflection_fields),
+  },
 };
 
 Value_Overload void_value_overload = {
@@ -323,6 +345,25 @@ value_from_s32(
   };
   return single_overload_value(result);
 }
+
+Value *
+value_byte_size(
+  Value *value
+) {
+  s32 byte_size = 0;
+  for (s32 i = 0; i < value->overload_count; ++i){
+    Value_Overload *overload = value->overload_list[i];
+    s32 overload_byte_size = descriptor_byte_size(overload->descriptor);
+    if (i == 0) {
+      byte_size = overload_byte_size;
+    } else {
+      assert(byte_size == overload_byte_size);
+    }
+  }
+  assert(byte_size);
+  return value_from_s32(byte_size);
+}
+
 
 Value_Overload *
 value_register_for_descriptor(
