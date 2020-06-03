@@ -789,13 +789,36 @@ struct_end(
   return result;
 }
 
+Value_Overload *
+ensure_memory(
+  Value_Overload *overload
+) {
+  Operand operand = overload->operand;
+  if (operand.type == Operand_Type_Memory_Indirect) return overload;
+  Value_Overload *result = temp_allocate(Value_Overload);
+  if (overload->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
+  if (overload->operand.type != Operand_Type_Register) assert(!"Not implemented");
+  *result = (const Value_Overload) {
+    .descriptor = overload->descriptor->pointer_to,
+    .operand = {
+      .type = Operand_Type_Memory_Indirect,
+      .indirect = {
+        .reg = overload->operand.reg,
+        .displacement = 0,
+      },
+    },
+  };
+  return result;
+}
+
 Value *
 struct_get_field(
   Value *struct_value,
   const char *name
 ) {
-  Value_Overload *struct_overload = maybe_get_if_single_overload(struct_value);
-  assert(struct_overload);
+  Value_Overload *raw_overload = maybe_get_if_single_overload(struct_value);
+  assert(raw_overload);
+  Value_Overload *struct_overload = ensure_memory(raw_overload);
   Descriptor *descriptor = struct_overload->descriptor;
   assert(descriptor->type == Descriptor_Type_Struct);
   for (s32 i = 0; i < descriptor->struct_.field_count; ++i) {
@@ -1244,10 +1267,8 @@ spec("mass") {
 
     Struct_Builder struct_builder = struct_begin();
 
-    Descriptor_Struct_Field *width_field =
-      struct_add_field(&struct_builder, &descriptor_s32, "width");
-    Descriptor_Struct_Field *height_field =
-      struct_add_field(&struct_builder, &descriptor_s32, "height");
+    struct_add_field(&struct_builder, &descriptor_s32, "width");
+    struct_add_field(&struct_builder, &descriptor_s32, "height");
     struct_add_field(&struct_builder, &descriptor_s32, "dummy");
 
     Descriptor *size_struct_descriptor = struct_end(&struct_builder);
@@ -1256,38 +1277,9 @@ spec("mass") {
 
     Function(area) {
       Arg(size_struct, size_struct_pointer_descriptor);
-      Value_Overload *size_struct_overload = maybe_get_if_single_overload(size_struct);
-      assert(size_struct_overload);
-      // TODO deal with temporaries here instead of hardcoding RCX
-      encode(&builder_, (Instruction) {mov, {rcx, size_struct_overload->operand, 0}});
-
-      Value_Overload width_value = {
-        .descriptor = width_field->descriptor,
-        .operand = {
-          .type = Operand_Type_Memory_Indirect,
-          .byte_size = descriptor_byte_size(width_field->descriptor),
-          .indirect = (const Operand_Memory_Indirect) {
-            .reg = rcx.reg,
-            .displacement = width_field->offset,
-          }
-        }
-      };
-
-      Value_Overload height_value = {
-        .descriptor = height_field->descriptor,
-        .operand = {
-          .type = Operand_Type_Memory_Indirect,
-          .byte_size = descriptor_byte_size(height_field->descriptor),
-          .indirect = (const Operand_Memory_Indirect) {
-            .reg = rcx.reg,
-            .displacement = height_field->offset,
-          }
-        }
-      };
-
       Return(Multiply(
-        single_overload_value(&width_value),
-        single_overload_value(&height_value)
+        struct_get_field(size_struct, "width"),
+        struct_get_field(size_struct, "height")
       ));
     }
 
