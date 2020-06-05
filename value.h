@@ -9,6 +9,7 @@ typedef enum {
   Operand_Type_Immediate_32,
   Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
+  Operand_Type_RIP_Relative,
 } Operand_Type;
 
 typedef enum {

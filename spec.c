@@ -539,9 +539,24 @@ call_function_overload(
     parameters_stack_size
   );
 
+  //s64 start_address = (s64) builder->buffer->memory;
+  //s64 end_address = start_address + builder->buffer->capacity;
+  // FIXME do relative address
+  //if (
+    //to_call->operand.type == Operand_Type_Immediate_64 &&
+    //to_call->operand.imm64 >= start_address && to_call->operand.imm64 <= end_address
+  //) {
+    //Operand rip_relative = {
+      //.type = Operand_Type_RIP_Relative,
+      //.imm64 = to_call->operand.imm64,
+    //};
+    //encode(builder, (Instruction) {call, {rip_relative, 0, 0}});
+  //} else {
   Value_Overload *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
   move_value(builder, reg_a, to_call);
   encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
+  //}
+
 
   Value_Overload *result = reserve_stack(builder, descriptor->returns->descriptor);
   move_value(builder, result, descriptor->returns);
@@ -879,6 +894,24 @@ spec("mass") {
 
   after_each() {
     free_buffer(&function_buffer);
+  }
+
+  it("should support RIP-relative addressing") {
+    buffer_append_s32(&function_buffer, 42);
+    Value_Overload rip_overload = {
+      .descriptor = &descriptor_s32,
+      .operand = {
+        .type = Operand_Type_RIP_Relative,
+        .imm64 = (s64) function_buffer.memory,
+      },
+    };
+    Value *rip_value = single_overload_value(&rip_overload);
+
+    Function(checker_value) {
+      Return(rip_value);
+    }
+    fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
+    check(checker() == 42);
   }
 
   it("should support ad-hoc polymorphism / overloading") {

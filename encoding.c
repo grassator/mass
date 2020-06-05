@@ -47,6 +47,9 @@ encode(
       if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
+      if (operand_type == Operand_Type_RIP_Relative && encoding_type == Operand_Encoding_Type_Register_Memory) {
+        continue;
+      }
       if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
@@ -99,7 +102,10 @@ encode(
       }
       if(encoding_type == Operand_Encoding_Type_Register_Memory) {
         needs_mod_r_m = true;
-        if (operand->type == Operand_Type_Register) {
+        if (operand->type == Operand_Type_RIP_Relative) {
+          r_m = 0b101;
+          mod = 0;
+        } else if (operand->type == Operand_Type_Register) {
           r_m = operand->reg;
           if (operand->reg & 0b1000) {
             rex_byte |= REX_B;
@@ -156,7 +162,16 @@ encode(
     if (needs_mod_r_m && mod != MOD_Register) {
       for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
         Operand *operand = &instruction.operands[operand_index];
-        if (operand->type == Operand_Type_Memory_Indirect) {
+        if (operand->type == Operand_Type_RIP_Relative) {
+          s64 start_address = (s64) buffer->memory;
+          s64 end_address = start_address + buffer->capacity;
+          assert(operand->imm64 >= start_address && operand->imm64 <= end_address);
+          s64 next_instruction_address = start_address + buffer->occupied + sizeof(s32);
+
+          s32 displacement = (s32)(operand->imm64 - next_instruction_address);
+
+          buffer_append_s32(buffer, displacement);
+        }  else if (operand->type == Operand_Type_Memory_Indirect) {
           if (mod == MOD_Displacement_s32) {
             if (encoding_stack_operand) {
               offset_of_displacement = buffer->occupied;

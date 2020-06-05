@@ -217,6 +217,9 @@ operand_type_string(
     case Operand_Type_Memory_Indirect: {
       return "m";
     }
+    case Operand_Type_RIP_Relative: {
+      return "[rip + xxx]";
+    }
   }
   return "Unknown";
 }
