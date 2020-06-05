@@ -33,8 +33,13 @@ same_type(
       }
       return true;
     }
-    default: {
+    case Descriptor_Type_Void:
+    case Descriptor_Type_Integer: {
       return descriptor_byte_size(a) == descriptor_byte_size(b);
+    }
+    default: {
+      assert(!"Unsupported descriptor type");
+      return false;
     }
   }
 }
@@ -512,6 +517,8 @@ c_function_return_value(
       };
       return return_value;
     }
+    case Descriptor_Type_Fixed_Size_Array:
+    case Descriptor_Type_Struct:
     default: {
       assert(!"Unsupported return type");
     }
