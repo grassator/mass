@@ -22,6 +22,13 @@ make_buffer(
   };
 }
 
+void
+free_buffer(
+  Buffer *buffer
+) {
+  VirtualFree(buffer->memory, 0, MEM_RELEASE);
+}
+
 #define static_array_size(Array) (sizeof(Array) / sizeof(Array[0]))
 
 void

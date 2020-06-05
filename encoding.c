@@ -27,7 +27,7 @@ encode(
   Function_Builder *builder,
   Instruction instruction
 ) {
-  Buffer *buffer = &builder->buffer;
+  Buffer *buffer = builder->buffer;
   u32 operand_count = sizeof(instruction.operands) / sizeof(instruction.operands[0]);
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];

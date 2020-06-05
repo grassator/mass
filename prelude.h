@@ -54,6 +54,11 @@ buffer_allocate_size(
   u64 byte_size
 );
 
+void
+buffer_reset(
+  Buffer *buffer
+);
+
 #define buffer_allocate(_buffer_, _type_) \
   (_type_ *)buffer_allocate_size((_buffer_), sizeof(_type_))
 

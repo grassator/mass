@@ -155,7 +155,8 @@ typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   u8 next_argument_index;
-  Buffer buffer;
+  Buffer *buffer;
+  u8 *code;
 
   Jump_Patch_List *return_patch_list;
 

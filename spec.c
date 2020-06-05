@@ -245,8 +245,8 @@ make_jz(
   Function_Builder *fn
 ) {
   encode(fn, (Instruction) {jz, {imm32(0xcc), 0, 0}});
-  u64 ip = fn->buffer.occupied;
-  s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
+  u64 ip = fn->buffer->occupied;
+  s32 *location = (s32 *)(fn->buffer->memory + fn->buffer->occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
 }
 
@@ -255,8 +255,8 @@ make_jmp(
   Function_Builder *fn
 ) {
   encode(fn, (Instruction) {jmp, {imm32(0xcc), 0, 0}});
-  u64 ip = fn->buffer.occupied;
-  s32 *location = (s32 *)(fn->buffer.memory + fn->buffer.occupied - sizeof(s32));
+  u64 ip = fn->buffer->occupied;
+  s32 *location = (s32 *)(fn->buffer->memory + fn->buffer->occupied - sizeof(s32));
   return (const Patch_32) { .location = location, .ip = ip };
 }
 
@@ -265,7 +265,7 @@ patch_jump_to_here(
   Function_Builder *fn,
   Patch_32 patch
 ) {
-  *patch.location = (s32) (fn->buffer.occupied - patch.ip);
+  *patch.location = (s32) (fn->buffer->occupied - patch.ip);
 }
 
 void
@@ -302,8 +302,7 @@ resolve_jump_patch_list(
 }
 
 Function_Builder
-fn_begin(Value **result) {
-
+fn_begin(Value **result, Buffer *buffer) {
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
@@ -316,15 +315,16 @@ fn_begin(Value **result) {
   Function_Builder builder = {
     .stack_reserve = 0,
     .return_patch_list = 0,
-    .buffer = make_buffer(1024, PAGE_EXECUTE_READWRITE),
+    .buffer = buffer,
     .descriptor = descriptor,
     .result = result,
+    .code = buffer->memory + buffer->occupied,
     .stack_displacements = temp_allocate_array(Stack_Patch, MAX_DISPLACEMENT_COUNT),
   };
   Value_Overload *fn_value = temp_allocate(Value_Overload);
   *fn_value = (const Value_Overload) {
     .descriptor = descriptor,
-    .operand = imm64((s64) builder.buffer.memory)
+    .operand = imm64((s64) builder.code)
   };
   Value *result_value = single_overload_value(fn_value);
 
@@ -391,12 +391,12 @@ fn_end(
   s32 stack_size = align(builder->stack_reserve, 16) + alignment;
 
   { // Override stack reservation
-    u64 save_occupied = builder->buffer.occupied;
-    builder->buffer.occupied = 0;
+    u64 save_occupied = builder->buffer->occupied;
+    builder->buffer->occupied = (builder->code - builder->buffer->memory);
 
     // @Volatile @ReserveStack
     encode(builder, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
-    builder->buffer.occupied = save_occupied;
+    builder->buffer->occupied = save_occupied;
   }
 
   for (u64 i = 0; i < builder->stack_displacement_count; ++i) {
@@ -581,7 +581,7 @@ call_function_value(
 
 #define Function(_id_) \
   Value *_id_ = 0; \
-  for (Function_Builder builder_ = fn_begin(&_id_); !fn_is_frozen(&builder_); fn_end(&builder_))
+  for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))
 
 #define Return(_value_) \
   fn_return(&builder_, _value_)
@@ -649,7 +649,7 @@ make_loop_end(
 
 #define Loop \
   for ( \
-    Loop_Builder loop_builder_ = { .start_ip = builder_.buffer.occupied, .jump_patch_list = 0 }; \
+    Loop_Builder loop_builder_ = { .start_ip = builder_.buffer->occupied, .jump_patch_list = 0 }; \
     !loop_builder_.done; \
     make_loop_end(&builder_, &loop_builder_) \
   )
@@ -841,6 +841,9 @@ struct_get_field(
   return 0;
 }
 
+
+Buffer function_buffer;
+
 Value *
 make_identity(
   Descriptor *type
@@ -864,12 +867,18 @@ make_add_two(
 }
 
 spec("mass") {
+
   before() {
     temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   }
 
   before_each() {
+    function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE);
     buffer_reset(&temp_buffer);
+  }
+
+  after_each() {
+    free_buffer(&function_buffer);
   }
 
   it("should support ad-hoc polymorphism / overloading") {
@@ -899,6 +908,9 @@ spec("mass") {
       Value *y = call_function_value(&builder_, &overload, value_from_s32(0), 1);
       Return(Plus(x, y));
     }
+
+    DWORD previous;
+    VirtualProtect(function_buffer.memory, function_buffer.capacity, PAGE_EXECUTE, &previous);
 
     fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
     check(checker() == 12);
