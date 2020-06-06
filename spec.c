@@ -651,12 +651,13 @@ make_loop_end(
 
 #define ReflectDescriptor (_descriptor_) fn_reflect(&builder_, _descriptor_)
 
-#define If(_value_) \
+#define IfBuilder(_builder_, _value_) \
   for (\
-    Patch_32 patch__ = make_if(&builder_, _value_), *dummy__ = 0; \
+    Patch_32 patch__ = make_if(_builder_, _value_), *dummy__ = 0; \
     !(dummy__++); \
-    patch_jump_to_here(&builder_, patch__)\
+    patch_jump_to_here(_builder_, patch__)\
   )
+#define If(_value_) IfBuilder(&builder_, _value_)
 
 #define Loop \
   for ( \
@@ -923,19 +924,13 @@ maybe_cast_to_tag(
       Value *comparison = compare(
         builder, Compare_Equal, single_overload_value(tag_overload), value_from_s64(i)
       );
-      for (
-        Patch_32 patch__ = make_if(builder, comparison), *dummy__ = 0;
-        !(dummy__++);
-        patch_jump_to_here(builder, patch__)
-      ) {
+      Value *result_value = single_overload_value(result_overload);
+      IfBuilder(builder, comparison) {
         move_value(builder, result_overload, overload);
-        Value *sum = plus(builder, single_overload_value(result_overload), value_from_s64(sizeof(s64)));
-        move_value(
-          builder, result_overload,
-          maybe_get_if_single_overload(sum)
-        );
+        Value *sum = plus(builder, result_value, value_from_s64(sizeof(s64)));
+        move_value(builder, result_overload, maybe_get_if_single_overload(sum));
       }
-      return single_overload_value(result_overload);
+      return result_value;
     }
   }
   assert(!"Could not find specified name in the tagged union");
