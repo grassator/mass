@@ -13,6 +13,7 @@ same_type(
     case Descriptor_Type_Fixed_Size_Array: {
       return same_type(a->array.item, b->array.item) && a->array.length == b->array.length;
     }
+    case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Struct: {
       return a == b;
     }
@@ -99,6 +100,26 @@ get_matching_values(
 }
 
 u32
+struct_byte_size(
+  const Descriptor_Struct *struct_
+) {
+  s64 count = struct_->field_count;
+  assert(count);
+  u32 alignment = 0;
+  u32 raw_size = 0;
+  for (s32 i = 0; i < count; ++i) {
+    Descriptor_Struct_Field *field = &struct_->field_list[i];
+    u32 field_size = descriptor_byte_size(field->descriptor);
+    alignment = max(alignment, field_size);
+    bool is_last_field = i == count - 1;
+    if (is_last_field) {
+      raw_size = field->offset + field_size;
+    }
+  }
+  return align(raw_size, alignment);
+}
+
+u32
 descriptor_byte_size(
   const Descriptor *descriptor
 ) {
@@ -107,21 +128,19 @@ descriptor_byte_size(
     case Descriptor_Type_Void: {
       return 0;
     }
-    case Descriptor_Type_Struct: {
-      s64 count = descriptor->struct_.field_count;
-      assert(count);
-      u32 alignment = 0;
-      u32 raw_size = 0;
+    case Descriptor_Type_Tagged_Union: {
+      s64 count = descriptor->tagged_union.struct_count;
+      u32 tag_size = sizeof(s64);
+      u32 body_size = 0;
       for (s32 i = 0; i < count; ++i) {
-        Descriptor_Struct_Field *field = &descriptor->struct_.field_list[i];
-        u32 field_size = descriptor_byte_size(field->descriptor);
-        alignment = max(alignment, field_size);
-        bool is_last_field = i == count - 1;
-        if (is_last_field) {
-          raw_size = field->offset + field_size;
-        }
+        Descriptor_Struct *struct_ = &descriptor->tagged_union.struct_list[i];
+        u32 struct_size = struct_byte_size(struct_);
+        body_size = max(body_size, struct_size);
       }
-      return align(raw_size, alignment);
+      return tag_size + body_size;
+    }
+    case Descriptor_Type_Struct: {
+      return struct_byte_size(&descriptor->struct_);
     }
     case Descriptor_Type_Integer: {
       return descriptor->integer.byte_size;
@@ -520,6 +539,7 @@ c_function_return_value(
       };
       return return_value;
     }
+    case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:
     case Descriptor_Type_Struct:
     default: {

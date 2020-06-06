@@ -80,8 +80,14 @@ plus_or_minus(
   Value_Overload *a,
   Value_Overload *b
 ) {
-  assert(same_overload_type(a, b));
-  assert(a->descriptor->type == Descriptor_Type_Integer);
+  if (!(
+    a->descriptor->type == Descriptor_Type_Pointer &&
+    b->descriptor->type == Descriptor_Type_Integer &&
+    b->descriptor->integer.byte_size == 8
+  )) {
+    assert(same_overload_type(a, b));
+    assert(a->descriptor->type == Descriptor_Type_Integer);
+  }
 
   assert_not_register_ax(a);
   assert_not_register_ax(b);
@@ -870,6 +876,72 @@ make_add_two(
   return addtwo;
 }
 
+Value *
+maybe_cast_to_tag(
+  Function_Builder *builder,
+  const char *name,
+  Value *value
+) {
+  Value_Overload *overload = maybe_get_if_single_overload(value);
+  assert(overload);
+  assert(overload->descriptor->type == Descriptor_Type_Pointer);
+  Descriptor *descriptor = overload->descriptor->pointer_to;
+
+  // FIXME
+  assert(overload->operand.type == Operand_Type_Register);
+  Value_Overload *tag_overload = temp_allocate(Value_Overload);
+  *tag_overload = (const Value_Overload) {
+    .descriptor = &descriptor_s64,
+    .operand = {
+      .type = Operand_Type_Memory_Indirect,
+      .indirect = {
+        .reg = overload->operand.reg,
+        .displacement = 0,
+      },
+    },
+  };
+
+  s64 count = descriptor->tagged_union.struct_count;
+  for (s32 i = 0; i < count; ++i) {
+    Descriptor_Struct *struct_ = &descriptor->tagged_union.struct_list[i];
+    if (strcmp(struct_->name, name) == 0) {
+
+      Descriptor *constructor_descriptor = temp_allocate(Descriptor);
+      *constructor_descriptor = (const Descriptor) {
+        .type = Descriptor_Type_Struct,
+        .struct_ = *struct_,
+      };
+      Descriptor *pointer_descriptor = descriptor_pointer_to(constructor_descriptor);
+      Value_Overload *result_overload = temp_allocate(Value_Overload);
+      *result_overload = (const Value_Overload) {
+        .descriptor = pointer_descriptor,
+        .operand = rbx,
+      };
+
+      move_value(builder, result_overload,  maybe_get_if_single_overload(value_from_s64(0)));
+
+      Value *comparison = compare(
+        builder, Compare_Equal, single_overload_value(tag_overload), value_from_s64(i)
+      );
+      for (
+        Patch_32 patch__ = make_if(builder, comparison), *dummy__ = 0;
+        !(dummy__++);
+        patch_jump_to_here(builder, patch__)
+      ) {
+        move_value(builder, result_overload, overload);
+        Value *sum = plus(builder, single_overload_value(result_overload), value_from_s64(sizeof(s64)));
+        move_value(
+          builder, result_overload,
+          maybe_get_if_single_overload(sum)
+        );
+      }
+      return single_overload_value(result_overload);
+    }
+  }
+  assert(!"Could not find specified name in the tagged union");
+  return 0;
+}
+
 spec("mass") {
 
   before() {
@@ -980,6 +1052,56 @@ spec("mass") {
       call_function_value(&builder_, id_s32, value_from_s32(0), 1);
       call_function_value(&builder_, addtwo_s64, value_from_s64(0), 1);
     }
+  }
+
+  it("should support tagged unions") {
+    Descriptor_Struct_Field some_fields[] = {
+      {
+        .name = "value",
+        .descriptor = &descriptor_s64,
+        .offset = 0,
+      },
+    };
+
+    Descriptor_Struct constructors[] = {
+      {
+        .name = "None",
+        .field_list = 0,
+        .field_count = 0,
+      },
+      {
+        .name = "Some",
+        .field_list = some_fields,
+        .field_count = static_array_size(some_fields),
+      },
+    };
+
+    Descriptor option_s64_descriptor = {
+      .type = Descriptor_Type_Tagged_Union,
+      .tagged_union = {
+        .struct_list = constructors,
+        .struct_count = static_array_size(constructors),
+      },
+    };
+
+
+    Function(with_default_value) {
+      Arg(option_value, descriptor_pointer_to(&option_s64_descriptor));
+      Arg_s64(default_value);
+      Value *some = maybe_cast_to_tag(&builder_, "Some", option_value);
+      If(some) {
+        Value *value = struct_get_field(some, "value");
+        Return(value);
+      }
+      Return(default_value);
+    }
+
+    fn_type_voidp_s64_to_s64 with_default =
+      value_as_function(with_default_value, fn_type_voidp_s64_to_s64);
+    struct { s64 tag; s64 maybe_value; } test_none = {0};
+    struct { s64 tag; s64 maybe_value; } test_some = {1, 21};
+    check(with_default(&test_none, 42) == 42);
+    check(with_default(&test_some, 42) == 21);
   }
 
   it("should say that the types are the same for integers of the same size") {
