@@ -33,7 +33,6 @@ move_value(
   u32 a_size = descriptor_byte_size(a->descriptor);
   u32 b_size = descriptor_byte_size(b->descriptor);
 
-  // TODO deal with imm64
   if (a_size != b_size) {
     if (!(
       b->operand.type == Operand_Type_Immediate_32 &&
@@ -471,11 +470,6 @@ fn_return(
   Function_Builder *builder,
   Value *to_return
 ) {
-  // We can no longer modify the return value after fn has been called
-  // or after builder has been committed through fn_end() call
-  // FIXME
-  //assert(!builder->frozen);
-
   // FIXME @Overloads
   Value_Overload *overload = maybe_get_if_single_overload(to_return);
   assert(overload);
@@ -594,6 +588,33 @@ call_function_value(
   return 0;
 }
 
+Patch_32 make_if(
+  Function_Builder *builder,
+  Value *value
+) {
+  Value_Overload *overload = maybe_get_if_single_overload(value);
+  assert(overload);
+  encode(builder, (Instruction) {cmp, {overload->operand, imm32(0), 0}});
+
+  return make_jz(builder);
+}
+
+typedef struct {
+  bool done;
+  u64 start_ip;
+  Jump_Patch_List *jump_patch_list;
+} Loop_Builder;
+
+void
+make_loop_end(
+  Function_Builder *builder,
+  Loop_Builder *loop
+) {
+  patch_jump_to_ip(make_jmp(builder), loop->start_ip);
+  resolve_jump_patch_list(builder, loop->jump_patch_list);
+  loop->done = true;
+}
+
 #define Function(_id_) \
   Value *_id_ = 0; \
   for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))
@@ -606,9 +627,6 @@ call_function_value(
 
 #define Arg_s32(_id_) Arg((_id_), &descriptor_s32)
 #define Arg_s64(_id_) Arg((_id_), &descriptor_s64)
-
-//#define CONCAT_HELPER(A,B) A##B
-//#define CONCAT(A,B) CONCAT_HELPER(A, B)
 
 #define Stack(_id_, _descriptor_, _value_) \
   Value *_id_ = single_overload_value(reserve_stack(&builder_, (_descriptor_))); \
@@ -627,40 +645,12 @@ call_function_value(
 
 #define ReflectDescriptor (_descriptor_) fn_reflect(&builder_, _descriptor_)
 
-Patch_32 make_if(
-  Function_Builder *builder,
-  Value *value
-) {
-  Value_Overload *overload = maybe_get_if_single_overload(value);
-  assert(overload);
-  encode(builder, (Instruction) {cmp, {overload->operand, imm32(0), 0}});
-
-  return make_jz(builder);
-}
-
 #define If(_value_) \
   for (\
     Patch_32 patch__ = make_if(&builder_, _value_), *dummy__ = 0; \
     !(dummy__++); \
     patch_jump_to_here(&builder_, patch__)\
   )
-
-typedef struct {
-  bool done;
-  u64 start_ip;
-  Jump_Patch_List *jump_patch_list;
-} Loop_Builder;
-
-
-void
-make_loop_end(
-  Function_Builder *builder,
-  Loop_Builder *loop
-) {
-  patch_jump_to_ip(make_jmp(builder), loop->start_ip);
-  resolve_jump_patch_list(builder, loop->jump_patch_list);
-  loop->done = true;
-}
 
 #define Loop \
   for ( \
@@ -771,7 +761,6 @@ struct_add_field(
   builder_field->next = builder->field_list;
   builder->field_list = builder_field;
 
-  // TODO alignment
   builder->offset += size;
   builder->field_count++;
 
