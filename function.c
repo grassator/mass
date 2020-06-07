@@ -672,7 +672,7 @@ Value *
 call_function_value(
   Function_Builder *builder,
   Value *to_call,
-  Value *argument_list,
+  Value **argument_list,
   s64 argument_count
 ) {
   Value_Overload **arg_overload_list = temp_allocate_array(Value_Overload, argument_count);
@@ -682,7 +682,7 @@ call_function_value(
     bool match = true;
     for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
       // FIXME @Overloads
-      Value_Overload *arg_overload = maybe_get_if_single_overload(&argument_list[arg_index]);
+      Value_Overload *arg_overload = maybe_get_if_single_overload(argument_list[arg_index]);
       assert(arg_overload);
       arg_overload_list[arg_index] = arg_overload;
       if(!same_overload_type(&descriptor->argument_list[arg_index], arg_overload)) {
@@ -717,4 +717,14 @@ call_function_value(
 
 #define Stack_s32(_id_, _value_) Stack((_id_), &descriptor_s32, _value_)
 #define Stack_s64(_id_, _value_) Stack((_id_), &descriptor_s64, _value_)
+
+
+#define Call(_target_, ...)\
+  call_function_value(\
+    &builder_,\
+    (_target_),\
+    (Value **)((Value *[]){##__VA_ARGS__}), \
+    static_array_size((Value *[]){##__VA_ARGS__}) \
+  )
+
 

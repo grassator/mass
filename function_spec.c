@@ -1,3 +1,5 @@
+#ifndef MACRO_DEBUG
+
 #include "bdd-for-c.h"
 
 #include "prelude.c"
@@ -5,6 +7,8 @@
 #include "instruction.c"
 #include "encoding.c"
 #include "function.c"
+
+#endif
 
 Buffer function_buffer;
 
@@ -68,8 +72,8 @@ spec("function") {
     };
 
     Function(checker_value) {
-      Value *x = call_function_value(&builder_, &overload, value_from_s64(0), 1);
-      Value *y = call_function_value(&builder_, &overload, value_from_s32(0), 1);
+      Value *x = Call(&overload, value_from_s64(0));
+      Value *y = Call(&overload, value_from_s32(0));
       Return(Plus(x, y));
     }
 
@@ -85,9 +89,9 @@ spec("function") {
     Value *id_s32 = make_identity(&descriptor_s32);
     Value *addtwo_s64 = make_add_two(&descriptor_s64);
     Function(check) {
-      call_function_value(&builder_, id_s64, value_from_s64(0), 1);
-      call_function_value(&builder_, id_s32, value_from_s32(0), 1);
-      call_function_value(&builder_, addtwo_s64, value_from_s64(0), 1);
+      Call(id_s64, value_from_s64(0));
+      Call(id_s32, value_from_s32(0));
+      Call(addtwo_s64, value_from_s64(0));
     }
   }
 
@@ -215,7 +219,10 @@ spec("function") {
       Return(x);
     }
     Function(partial) {
-      Return(call_function_value(&builder_, id, value_from_s64(42), 1));
+      Return(Call(
+        id,
+        value_from_s64(42)
+      ));
     }
     fn_type_void_to_s64 the_answer = value_as_function(partial, fn_type_void_to_s64);
     s64 result = the_answer();
@@ -276,15 +283,15 @@ spec("function") {
       Return(arg5);
     }
     Function(caller) {
-      Value arguments[6] = {
-        *value_from_s64(10),
-        *value_from_s64(20),
-        *value_from_s64(30),
-        *value_from_s64(40),
-        *value_from_s32(50),
-        *value_from_s64(60),
-      };
-      Return(call_function_value(&builder_, args, arguments, static_array_size(arguments)));
+      Return(Call(
+        args,
+        value_from_s64(10),
+        value_from_s64(20),
+        value_from_s64(30),
+        value_from_s64(40),
+        value_from_s32(50),
+        value_from_s64(60),
+      ));
     }
     s64 result = value_as_function(caller, fn_type_void_to_s64)();
     check(result == 60);
@@ -312,7 +319,7 @@ spec("function") {
     Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
 
     Function(hello) {
-      call_function_value(&builder_, puts_value, message_value, 1);
+      Call(puts_value, message_value);
     }
 
     value_as_function(hello, fn_type_void_to_void)();
@@ -331,8 +338,8 @@ spec("function") {
       Value *minusOne = Minus(n, value_from_s64(1));
       Value *minusTwo = Minus(n, value_from_s64(2));
 
-      Value *fMinusOne = call_function_value(&builder_, fib, minusOne, 1);
-      Value *fMinusTwo = call_function_value(&builder_, fib, minusTwo, 1);
+      Value *fMinusOne = Call(fib, minusOne);
+      Value *fMinusTwo = Call(fib, minusTwo);
 
       Value *result = Plus(fMinusOne, fMinusTwo);
 
