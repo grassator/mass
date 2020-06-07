@@ -327,6 +327,15 @@ const X64_Mnemonic cwd = {
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding call_encoding_list[] = {
   {
+    .op_code = { 0x00, 0xE8 },
+    .extension_type = Instruction_Extension_Type_None,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Immediate_32,
+      Operand_Encoding_Type_None,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
     .op_code = { 0x00, 0xFF },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 2,

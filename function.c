@@ -640,23 +640,26 @@ call_function_overload(
     parameters_stack_size
   );
 
-  //s64 start_address = (s64) builder->buffer->memory;
-  //s64 end_address = start_address + builder->buffer->capacity;
-  // FIXME do relative address
-  //if (
-    //to_call->operand.type == Operand_Type_Immediate_64 &&
-    //to_call->operand.imm64 >= start_address && to_call->operand.imm64 <= end_address
-  //) {
-    //Operand rip_relative = {
-      //.type = Operand_Type_RIP_Relative,
-      //.imm64 = to_call->operand.imm64,
-    //};
-    //encode(builder, (Instruction) {call, {rip_relative, 0, 0}});
-  //} else {
-  Value_Overload *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
-  move_value(builder, reg_a, to_call);
-  encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
-  //}
+  s64 start_address = (s64) builder->buffer->memory;
+  s64 end_address = start_address + builder->buffer->capacity;
+  if (
+    to_call->operand.type == Operand_Type_Immediate_64 &&
+    to_call->operand.imm64 >= start_address && to_call->operand.imm64 <= end_address
+  ) {
+    encode(builder, (Instruction) {call, {imm32(0xCCCCCCCC), 0, 0}});
+    u8 *current_address = builder->buffer->memory + builder->buffer->occupied;
+    s32 *offset_for_immediate = (s32 *)(current_address - sizeof(s32));
+
+    s64 relative_offset = to_call->operand.imm64 - (s64)current_address;
+    assert(relative_offset > INT_MIN);
+    assert(relative_offset < INT_MAX);
+    s32 rel32 = (s32)relative_offset;
+    *offset_for_immediate = rel32;
+  } else {
+    Value_Overload *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
+    move_value(builder, reg_a, to_call);
+    encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
+  }
 
 
   Value_Overload *result = reserve_stack(builder, descriptor->returns->descriptor);
