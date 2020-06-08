@@ -8,6 +8,14 @@ same_type(
   if (a->type != b->type) return false;
   switch(a->type) {
     case Descriptor_Type_Pointer: {
+      if (
+        a->pointer_to->type == Descriptor_Type_Fixed_Size_Array &&
+        same_type(a->pointer_to->array.item, b->pointer_to)
+      ) return true;
+      if (
+        b->pointer_to->type == Descriptor_Type_Fixed_Size_Array &&
+        same_type(b->pointer_to->array.item, a->pointer_to)
+      ) return true;
       return same_type(a->pointer_to, b->pointer_to);
     }
     case Descriptor_Type_Fixed_Size_Array: {

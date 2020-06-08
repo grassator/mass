@@ -698,6 +698,30 @@ call_function_value(
   return 0;
 }
 
+Value *
+value_pointer_to(
+  Function_Builder *builder,
+  Value *value
+) {
+  Value_Overload *overload = maybe_get_if_single_overload(value);
+  assert(overload);
+  // TODO support register
+  // TODO support immediates
+  assert(
+    overload->operand.type == Operand_Type_Memory_Indirect ||
+    overload->operand.type == Operand_Type_RIP_Relative
+  );
+  Descriptor *result_descriptor = descriptor_pointer_to(overload->descriptor);
+
+  Value_Overload *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
+  encode(builder, (Instruction) {lea, {reg_a->operand, overload->operand, 0}});
+
+  Value_Overload *result = reserve_stack(builder, result_descriptor);
+  move_value(builder, result, reg_a);
+
+  return single_overload_value(result);
+}
+
 #define Function(_id_) \
   Value *_id_ = 0; \
   for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))

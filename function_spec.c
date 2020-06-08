@@ -325,6 +325,30 @@ spec("function") {
     value_as_function(hello, fn_type_void_to_void)();
   }
 
+  it("should be able to call puts() to say 'Hi!'") {
+    Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
+
+    Descriptor message_descriptor = {
+      .type = Descriptor_Type_Fixed_Size_Array,
+      .array = {
+        .item = &descriptor_s8,
+        .length = 4,
+      },
+    };
+
+    u8 hi[] = {'H', 'i', '!', 0};
+    s32 hi_s32 = *((s32 *)hi);
+    Function(hello) {
+      Value_Overload *message_overload = reserve_stack(&builder_, &message_descriptor);
+      move_value(&builder_, message_overload, maybe_get_if_single_overload(value_from_s32(hi_s32)));
+      Value *message_value = single_overload_value(message_overload);
+      Value *message_pointer_value = value_pointer_to(&builder_, message_value);
+      Call(puts_value, message_pointer_value);
+    }
+
+    value_as_function(hello, fn_type_void_to_void)();
+  }
+
   it("should calculate fibonacci numbers") {
     Function(fib) {
       Arg_s64(n);

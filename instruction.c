@@ -12,6 +12,7 @@ typedef enum {
   Operand_Encoding_Type_Op_Code_Plus_Register,
   Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_Memory,
+  Operand_Encoding_Type_Memory,
   Operand_Encoding_Type_Immediate_8,
   Operand_Encoding_Type_Immediate_32,
   Operand_Encoding_Type_Immediate_64,
@@ -82,6 +83,26 @@ const X64_Mnemonic mov = {
   .name = "mov",
   .encoding_list = (const Instruction_Encoding *)mov_encoding_list,
   .encoding_count = static_array_size(mov_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// lea
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding lea_encoding_list[] = {
+  {
+    .op_code = { 0x00, 0x8d },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Memory,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+const X64_Mnemonic lea = {
+  .name = "lea",
+  .encoding_list = (const Instruction_Encoding *)lea_encoding_list,
+  .encoding_count = static_array_size(lea_encoding_list),
 };
 
 ////////////////////////////////////////////////////////////////////////////////

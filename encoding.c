@@ -53,6 +53,12 @@ encode(
       if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
+      if (operand_type == Operand_Type_RIP_Relative && encoding_type == Operand_Encoding_Type_Memory) {
+        continue;
+      }
+      if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Memory) {
+        continue;
+      }
       if (operand_type == Operand_Type_Immediate_8 && encoding_type == Operand_Encoding_Type_Immediate_8) {
         continue;
       }
@@ -100,7 +106,10 @@ encode(
           }
         }
       }
-      if(encoding_type == Operand_Encoding_Type_Register_Memory) {
+      if(
+        encoding_type == Operand_Encoding_Type_Memory ||
+        encoding_type == Operand_Encoding_Type_Register_Memory
+      ) {
         needs_mod_r_m = true;
         if (operand->type == Operand_Type_RIP_Relative) {
           r_m = 0b101;
