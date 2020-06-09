@@ -33,7 +33,6 @@ make_add_two(
   }
   return addtwo;
 }
-
 spec("function") {
 
   before() {

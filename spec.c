@@ -203,6 +203,16 @@ maybe_cast_to_tag(
   return 0;
 }
 
+typedef struct {
+  int64_t x;
+  int64_t y;
+} Point;
+
+Point test() {
+  return (Point){42, 84};
+}
+
+
 spec("mass") {
 
   before() {
@@ -216,6 +226,52 @@ spec("mass") {
 
   after_each() {
     free_buffer(&function_buffer);
+  }
+
+  it("should support returning structs larger than 64 bits on the stack") {
+    Struct_Builder struct_builder = struct_begin();
+    struct_add_field(&struct_builder, &descriptor_s64, "x");
+    struct_add_field(&struct_builder, &descriptor_s64, "y");
+    Descriptor *point_struct_descriptor = struct_end(&struct_builder);
+
+    Value_Overload *return_overload = temp_allocate(Value_Overload);
+    *return_overload = (Value_Overload) {
+      .descriptor = point_struct_descriptor,
+      .operand = {
+        .type = Operand_Type_Memory_Indirect,
+        .indirect = {
+          .reg = rsp.reg,
+          .displacement = 0,
+        },
+      },
+    };
+
+    Descriptor *c_test_fn_descriptor = temp_allocate(Descriptor);
+    *c_test_fn_descriptor = (Descriptor){
+      .type = Descriptor_Type_Function,
+      .function = {
+        .argument_list = 0,
+        .argument_count = 0,
+        .returns = return_overload,
+        .frozen = false,
+      },
+    };
+    Value_Overload *c_test_fn_overload = temp_allocate(Value_Overload);
+    *c_test_fn_overload = (Value_Overload) {
+      .descriptor = c_test_fn_descriptor,
+      .operand = imm64((s64)test),
+    };
+
+    Value *c_test_fn_value = single_overload_value(c_test_fn_overload);
+
+    Function(checker_value) {
+      Value *test_result = call_function_value(&builder_, c_test_fn_value, 0, 0);
+      Value *x = struct_get_field(test_result, "x");
+      Return(x);
+    }
+
+    fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
+    check(checker() == 42);
   }
 
   it("should support RIP-relative addressing") {

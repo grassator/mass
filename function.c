@@ -612,8 +612,31 @@ compare(
 #define Less(_a_, _b_) compare(&builder_, Compare_Less, (_a_), (_b_))
 #define Greater(_a_, _b_) compare(&builder_, Compare_Greater, (_a_), (_b_))
 
+Value *
+value_pointer_to(
+  Function_Builder *builder,
+  Value *value
+) {
+  Value_Overload *overload = maybe_get_if_single_overload(value);
+  assert(overload);
+  // TODO support register
+  // TODO support immediates
+  assert(
+    overload->operand.type == Operand_Type_Memory_Indirect ||
+    overload->operand.type == Operand_Type_RIP_Relative
+  );
+  Descriptor *result_descriptor = descriptor_pointer_to(overload->descriptor);
 
-// TODO create variadic macro for call_function_value
+  Value_Overload *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
+  encode(builder, (Instruction) {lea, {reg_a->operand, overload->operand, 0}});
+
+  Value_Overload *result = reserve_stack(builder, result_descriptor);
+  move_value(builder, result, reg_a);
+
+  return single_overload_value(result);
+}
+
+
 Value *
 call_function_overload(
   Function_Builder *builder,
@@ -635,6 +658,17 @@ call_function_overload(
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
   u32 parameters_stack_size = (u32)max(4, argument_count) * 8;
+
+  // FIXME support this for fns that accept arguments
+  u32 return_size = descriptor_byte_size(descriptor->returns->descriptor);
+  if (return_size > 8) {
+    parameters_stack_size += return_size;
+    Descriptor *return_pointer_descriptor = descriptor_pointer_to(descriptor->returns->descriptor);
+    Value_Overload *reg_c =
+      value_register_for_descriptor(Register_C, return_pointer_descriptor);
+    encode(builder, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}});
+  }
+
   builder->max_call_parameters_stack_size = max(
     builder->max_call_parameters_stack_size,
     parameters_stack_size
@@ -661,11 +695,13 @@ call_function_overload(
     encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
   }
 
+  if (return_size <= 8) {
+    Value_Overload *result = reserve_stack(builder, descriptor->returns->descriptor);
+    move_value(builder, result, descriptor->returns);
+    return single_overload_value(result);
+  }
 
-  Value_Overload *result = reserve_stack(builder, descriptor->returns->descriptor);
-  move_value(builder, result, descriptor->returns);
-
-  return single_overload_value(result);
+  return single_overload_value(descriptor->returns);
 }
 
 Value *
@@ -696,30 +732,6 @@ call_function_value(
   }
   assert(!"No matching overload found");
   return 0;
-}
-
-Value *
-value_pointer_to(
-  Function_Builder *builder,
-  Value *value
-) {
-  Value_Overload *overload = maybe_get_if_single_overload(value);
-  assert(overload);
-  // TODO support register
-  // TODO support immediates
-  assert(
-    overload->operand.type == Operand_Type_Memory_Indirect ||
-    overload->operand.type == Operand_Type_RIP_Relative
-  );
-  Descriptor *result_descriptor = descriptor_pointer_to(overload->descriptor);
-
-  Value_Overload *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
-  encode(builder, (Instruction) {lea, {reg_a->operand, overload->operand, 0}});
-
-  Value_Overload *result = reserve_stack(builder, result_descriptor);
-  move_value(builder, result, reg_a);
-
-  return single_overload_value(result);
 }
 
 #define Function(_id_) \
