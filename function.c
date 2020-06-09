@@ -759,8 +759,8 @@ call_function_value(
   call_function_value(\
     &builder_,\
     (_target_),\
-    (Value **)((Value *[]){##__VA_ARGS__}), \
-    static_array_size((Value *[]){##__VA_ARGS__}) \
+    (Value **)((Value *[]){0, ##__VA_ARGS__}) + 1, \
+    static_array_size(((Value *[]){0, ##__VA_ARGS__})) - 1 \
   )
 
 

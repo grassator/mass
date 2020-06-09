@@ -265,7 +265,7 @@ spec("mass") {
     Value *c_test_fn_value = single_overload_value(c_test_fn_overload);
 
     Function(checker_value) {
-      Value *test_result = call_function_value(&builder_, c_test_fn_value, 0, 0);
+      Value *test_result = Call(c_test_fn_value);
       Value *x = struct_get_field(test_result, "x");
       Return(x);
     }
