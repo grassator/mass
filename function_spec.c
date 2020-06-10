@@ -60,19 +60,11 @@ spec("function") {
       Return(value_from_s64(8));
     }
 
-    Value_Overload *a = maybe_get_if_single_overload(sizeof_s32);
-    Value_Overload *b = maybe_get_if_single_overload(sizeof_s64);
-
-    Value_Overload *overload_list[] = {a, b};
-
-    Value overload = {
-      .overload_list = overload_list,
-      .overload_count = 2,
-    };
+    sizeof_s32->descriptor->function.next_overload = sizeof_s64;
 
     Function(checker_value) {
-      Value *x = Call(&overload, value_from_s64(0));
-      Value *y = Call(&overload, value_from_s32(0));
+      Value *x = Call(sizeof_s32, value_from_s64(0));
+      Value *y = Call(sizeof_s32, value_from_s32(0));
       Return(Plus(x, y));
     }
 
@@ -153,8 +145,8 @@ spec("function") {
       // TODO add a check that all argument are defined before stack variables
       Arg_s32(x);
 
-      Stack_s32(one, maybe_get_if_single_overload(value_from_s32(1)));
-      Stack_s32(two, maybe_get_if_single_overload(value_from_s32(2)));
+      Stack_s32(one, value_from_s32(1));
+      Stack_s32(two, value_from_s32(2));
 
       Return(Plus(x, Minus(two, one)));
     }
@@ -203,7 +195,7 @@ spec("function") {
       Return(value_from_s32(42));
     }
     Function(caller) {
-      Arg(fn, maybe_get_if_single_overload(the_answer)->descriptor);
+      Arg(fn, the_answer->descriptor);
       Return(call_function_value(&builder_, fn, 0, 0));
     }
     s32 result = value_as_function(caller, fn_type__void_to_s32__to_s32)(
@@ -300,25 +292,21 @@ spec("function") {
     c_function_value("void fn_void()", 0);
     c_function_value("void fn_int(int)", 0);
     Value *explicit_void_arg = c_function_value("void fn_void(void)", 0);
-    Value_Overload *overload = maybe_get_if_single_overload(explicit_void_arg);
-    check(overload);
-    check(overload->descriptor->function.argument_count == 0);
+    check(explicit_void_arg->descriptor->function.argument_count == 0);
   }
 
   it("should be able to call puts() to say 'Hello, world!'") {
     const char *message = "Hello, world!";
 
-    Value_Overload message_overload = {
+    Value message_value = {
       .descriptor = descriptor_pointer_to(&descriptor_s8),
       .operand = imm64((s64) message),
     };
 
-    Value *message_value = single_overload_value(&message_overload);
-
     Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
 
     Function(hello) {
-      Call(puts_value, message_value);
+      Call(puts_value, &message_value);
     }
 
     value_as_function(hello, fn_type_void_to_void)();
@@ -338,9 +326,8 @@ spec("function") {
     u8 hi[] = {'H', 'i', '!', 0};
     s32 hi_s32 = *((s32 *)hi);
     Function(hello) {
-      Value_Overload *message_overload = reserve_stack(&builder_, &message_descriptor);
-      move_value(&builder_, message_overload, maybe_get_if_single_overload(value_from_s32(hi_s32)));
-      Value *message_value = single_overload_value(message_overload);
+      Value *message_value = reserve_stack(&builder_, &message_descriptor);
+      move_value(&builder_, message_value, value_from_s32(hi_s32));
       Value *message_pointer_value = value_pointer_to(&builder_, message_value);
       Call(puts_value, message_pointer_value);
     }

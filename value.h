@@ -66,12 +66,13 @@ typedef enum {
 
 struct Value;
 
-typedef struct {
-  struct Value_Overload *argument_list;
+typedef struct Descriptor_Function {
+  struct Value *argument_list;
   s64 argument_count;
 
-  struct Value_Overload *returns;
+  struct Value *returns;
   bool frozen;
+  struct Value *next_overload;
 } Descriptor_Function;
 
 typedef struct {
@@ -112,20 +113,10 @@ typedef struct Descriptor {
   };
 } Descriptor;
 
-typedef struct Value_Overload {
+typedef struct Value {
   Descriptor *descriptor;
   Operand operand;
-} Value_Overload;
-
-typedef struct Value {
-  Value_Overload **overload_list;
-  s64 overload_count;
 } Value;
-
-Value_Overload *
-maybe_get_if_single_overload(
-  Value *
-);
 
 u32
 descriptor_byte_size(

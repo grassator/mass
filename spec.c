@@ -13,13 +13,12 @@ fn_reflect(
   Function_Builder *builder,
   Descriptor *descriptor
 ) {
-  Value_Overload *result = reserve_stack(builder, &descriptor_struct_reflection);
+  Value *result = reserve_stack(builder, &descriptor_struct_reflection);
   // FIXME support all types
   assert(descriptor->type == Descriptor_Type_Struct);
   // FIXME support generic allocation of structs on the stack
-  move_value(builder, result,
-    maybe_get_if_single_overload(value_from_s32(descriptor->struct_.field_count)));
-  return single_overload_value(result);
+  move_value(builder, result, value_from_s32(descriptor->struct_.field_count));
+  return result;
 }
 
 typedef struct Struct_Builder_Field {
@@ -88,21 +87,21 @@ struct_end(
   return result;
 }
 
-Value_Overload *
+Value *
 ensure_memory(
-  Value_Overload *overload
+  Value *value
 ) {
-  Operand operand = overload->operand;
-  if (operand.type == Operand_Type_Memory_Indirect) return overload;
-  Value_Overload *result = temp_allocate(Value_Overload);
-  if (overload->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
-  if (overload->operand.type != Operand_Type_Register) assert(!"Not implemented");
-  *result = (const Value_Overload) {
-    .descriptor = overload->descriptor->pointer_to,
+  Operand operand = value->operand;
+  if (operand.type == Operand_Type_Memory_Indirect) return value;
+  Value *result = temp_allocate(Value);
+  if (value->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
+  if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
+  *result = (const Value) {
+    .descriptor = value->descriptor->pointer_to,
     .operand = {
       .type = Operand_Type_Memory_Indirect,
       .indirect = {
-        .reg = overload->operand.reg,
+        .reg = value->operand.reg,
         .displacement = 0,
       },
     },
@@ -112,27 +111,25 @@ ensure_memory(
 
 Value *
 struct_get_field(
-  Value *struct_value,
+  Value *raw_value,
   const char *name
 ) {
-  Value_Overload *raw_overload = maybe_get_if_single_overload(struct_value);
-  assert(raw_overload);
-  Value_Overload *struct_overload = ensure_memory(raw_overload);
-  Descriptor *descriptor = struct_overload->descriptor;
+  Value *struct_value = ensure_memory(raw_value);
+  Descriptor *descriptor = struct_value->descriptor;
   assert(descriptor->type == Descriptor_Type_Struct);
   for (s32 i = 0; i < descriptor->struct_.field_count; ++i) {
     Descriptor_Struct_Field *field = &descriptor->struct_.field_list[i];
     if (strcmp(field->name, name) == 0) {
-      Value_Overload *result = temp_allocate(Value_Overload);
-      Operand operand = struct_overload->operand;
+      Value *result = temp_allocate(Value);
+      Operand operand = struct_value->operand;
       // FIXME support more operands
       assert(operand.type == Operand_Type_Memory_Indirect);
       operand.indirect.displacement += field->offset;
-      *result = (const Value_Overload) {
+      *result = (const Value) {
         .descriptor = field->descriptor,
         .operand = operand,
       };
-      return single_overload_value(result);
+      return result;
     }
   }
 
@@ -149,20 +146,18 @@ maybe_cast_to_tag(
   const char *name,
   Value *value
 ) {
-  Value_Overload *overload = maybe_get_if_single_overload(value);
-  assert(overload);
-  assert(overload->descriptor->type == Descriptor_Type_Pointer);
-  Descriptor *descriptor = overload->descriptor->pointer_to;
+  assert(value->descriptor->type == Descriptor_Type_Pointer);
+  Descriptor *descriptor = value->descriptor->pointer_to;
 
   // FIXME
-  assert(overload->operand.type == Operand_Type_Register);
-  Value_Overload *tag_overload = temp_allocate(Value_Overload);
-  *tag_overload = (const Value_Overload) {
+  assert(value->operand.type == Operand_Type_Register);
+  Value *tag_value = temp_allocate(Value);
+  *tag_value = (const Value) {
     .descriptor = &descriptor_s64,
     .operand = {
       .type = Operand_Type_Memory_Indirect,
       .indirect = {
-        .reg = overload->operand.reg,
+        .reg = value->operand.reg,
         .displacement = 0,
       },
     },
@@ -179,22 +174,19 @@ maybe_cast_to_tag(
         .struct_ = *struct_,
       };
       Descriptor *pointer_descriptor = descriptor_pointer_to(constructor_descriptor);
-      Value_Overload *result_overload = temp_allocate(Value_Overload);
-      *result_overload = (const Value_Overload) {
+      Value *result_value = temp_allocate(Value);
+      *result_value = (const Value) {
         .descriptor = pointer_descriptor,
         .operand = rbx,
       };
 
-      move_value(builder, result_overload,  maybe_get_if_single_overload(value_from_s64(0)));
+      move_value(builder, result_value, value_from_s64(0));
 
-      Value *comparison = compare(
-        builder, Compare_Equal, single_overload_value(tag_overload), value_from_s64(i)
-      );
-      Value *result_value = single_overload_value(result_overload);
+      Value *comparison = compare(builder, Compare_Equal, tag_value, value_from_s64(i));
       IfBuilder(builder, comparison) {
-        move_value(builder, result_overload, overload);
+        move_value(builder, result_value, value);
         Value *sum = plus(builder, result_value, value_from_s64(sizeof(s64)));
-        move_value(builder, result_overload, maybe_get_if_single_overload(sum));
+        move_value(builder, result_value, sum);
       }
       return result_value;
     }
@@ -234,8 +226,8 @@ spec("mass") {
     struct_add_field(&struct_builder, &descriptor_s64, "y");
     Descriptor *point_struct_descriptor = struct_end(&struct_builder);
 
-    Value_Overload *return_overload = temp_allocate(Value_Overload);
-    *return_overload = (Value_Overload) {
+    Value *return_overload = temp_allocate(Value);
+    *return_overload = (Value) {
       .descriptor = point_struct_descriptor,
       .operand = {
         .type = Operand_Type_Memory_Indirect,
@@ -256,13 +248,11 @@ spec("mass") {
         .frozen = false,
       },
     };
-    Value_Overload *c_test_fn_overload = temp_allocate(Value_Overload);
-    *c_test_fn_overload = (Value_Overload) {
+    Value *c_test_fn_value = temp_allocate(Value);
+    *c_test_fn_value = (Value) {
       .descriptor = c_test_fn_descriptor,
       .operand = imm64((s64)test),
     };
-
-    Value *c_test_fn_value = single_overload_value(c_test_fn_overload);
 
     Function(checker_value) {
       Value *test_result = Call(c_test_fn_value);
@@ -276,17 +266,16 @@ spec("mass") {
 
   it("should support RIP-relative addressing") {
     buffer_append_s32(&function_buffer, 42);
-    Value_Overload rip_overload = {
+    Value rip = {
       .descriptor = &descriptor_s32,
       .operand = {
         .type = Operand_Type_RIP_Relative,
         .imm64 = (s64) function_buffer.memory,
       },
     };
-    Value *rip_value = single_overload_value(&rip_overload);
 
     Function(checker_value) {
-      Return(rip_value);
+      Return(&rip);
     }
     fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
     check(checker() == 42);
@@ -294,18 +283,16 @@ spec("mass") {
 
   it("should support sizeof operator on values") {
     Value *sizeof_s32 = SizeOf(value_from_s32(0));
-    Value_Overload *overload = maybe_get_if_single_overload(sizeof_s32);
-    check(overload);
-    check(overload->operand.type == Operand_Type_Immediate_32);
-    check(overload->operand.imm32 == 4);
+    check(sizeof_s32);
+    check(sizeof_s32->operand.type == Operand_Type_Immediate_32);
+    check(sizeof_s32->operand.imm32 == 4);
   }
 
   it("should support sizeof operator on descriptors") {
     Value *sizeof_s32 = SizeOfDescriptor(&descriptor_s32);
-    Value_Overload *overload = maybe_get_if_single_overload(sizeof_s32);
-    check(overload);
-    check(overload->operand.type == Operand_Type_Immediate_32);
-    check(overload->operand.imm32 == 4);
+    check(sizeof_s32);
+    check(sizeof_s32->operand.type == Operand_Type_Immediate_32);
+    check(sizeof_s32->operand.imm32 == 4);
   }
 
   it("should support reflection on structs") {
@@ -315,9 +302,7 @@ spec("mass") {
     Descriptor *point_struct_descriptor = struct_end(&struct_builder);
 
     Function(field_count) {
-      Value_Overload *overload = maybe_get_if_single_overload(
-        fn_reflect(&builder_, point_struct_descriptor)
-      );
+      Value *overload = fn_reflect(&builder_, point_struct_descriptor);
       Stack(struct_, &descriptor_struct_reflection, overload);
       Return(struct_get_field(struct_, "field_count"));
     }
@@ -405,21 +390,6 @@ spec("mass") {
     ));
   }
 
-  it("should support polymorphic values") {
-    Value_Overload *a = maybe_get_if_single_overload(value_from_s32(0));
-    Value_Overload *b = maybe_get_if_single_overload(value_from_s64(0));
-
-    Value_Overload *overload_list[] = {a, b};
-
-    Value overload = {
-      .overload_list = overload_list,
-      .overload_count = 2,
-    };
-
-    Value_Overload_Pair *pair = get_matching_values(&overload, value_from_s64(0));
-    check(same_overload_type(pair->a, b));
-  }
-
   it("should say that structs are different if their descriptors are different pointers") {
     Struct_Builder struct_builder = struct_begin();
     struct_add_field(&struct_builder, &descriptor_s32, "x");
@@ -479,10 +449,9 @@ spec("mass") {
     Function(increment) {
       Arg(arr, &array_pointer_descriptor);
 
-      Stack_s32(index, maybe_get_if_single_overload(value_from_s32(0)));
-      Value_Overload *index_overload = maybe_get_if_single_overload(index);
+      Stack_s32(index, value_from_s32(0));
 
-      Stack(temp, &array_pointer_descriptor, maybe_get_if_single_overload(arr));
+      Stack(temp, &array_pointer_descriptor, arr);
 
       u32 item_byte_size = descriptor_byte_size(array_pointer_descriptor.pointer_to->array.item);
       Loop {
@@ -492,10 +461,8 @@ spec("mass") {
           Break;
         }
 
-        Value_Overload *temp_overload = maybe_get_if_single_overload(temp);
-        Value_Overload *reg_a = value_register_for_descriptor(Register_A,
-          temp_overload->descriptor);
-        move_value(&builder_, reg_a, temp_overload);
+        Value *reg_a = value_register_for_descriptor(Register_A, temp->descriptor);
+        move_value(&builder_, reg_a, temp);
 
         Operand pointer = {
           .type = Operand_Type_Memory_Indirect,
@@ -506,9 +473,9 @@ spec("mass") {
           }
         };
         encode(&builder_, (Instruction) {inc, {pointer, 0, 0}});
-        encode(&builder_, (Instruction) {add, {temp_overload->operand, imm32(item_byte_size), 0}});
+        encode(&builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
 
-        encode(&builder_, (Instruction) {inc, {index_overload->operand, 0, 0}});
+        encode(&builder_, (Instruction) {inc, {index->operand, 0, 0}});
       }
 
     }

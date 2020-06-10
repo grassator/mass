@@ -53,58 +53,12 @@ same_type(
   }
 }
 
-Value_Overload *
-maybe_get_if_single_overload(
-  Value *value
-) {
-  if (value->overload_count == 1) {
-    return value->overload_list[0];
-  }
-  return 0;
-}
-inline bool
-same_overload_type(
-  Value_Overload *a_overload,
-  Value_Overload *b_overload
-) {
-  return same_type(a_overload->descriptor, b_overload->descriptor);
-}
-
 inline bool
 same_value_type(
   Value *a,
   Value *b
 ) {
-  // FIXME
-  Value_Overload *a_overload = maybe_get_if_single_overload(a);
-  Value_Overload *b_overload = maybe_get_if_single_overload(b);
-  assert(a_overload);
-  assert(b_overload);
-  return same_type(a_overload->descriptor, b_overload->descriptor);
-}
-
-typedef struct {
-  Value_Overload *a;
-  Value_Overload *b;
-} Value_Overload_Pair;
-
-Value_Overload_Pair *
-get_matching_values(
-  Value *a_value,
-  Value *b_value
-) {
-  for (u32 a_index = 0; a_index < a_value->overload_count; ++a_index) {
-    Value_Overload *a = a_value->overload_list[a_index];
-    for (u32 b_index = 0; b_index < b_value->overload_count; ++b_index) {
-      Value_Overload *b = b_value->overload_list[b_index];
-      if (same_overload_type(a, b)) {
-        Value_Overload_Pair *result = temp_allocate(Value_Overload_Pair);
-        *result = (const Value_Overload_Pair) { a, b };
-        return result;
-      }
-    }
-  }
-  return 0;
+  return same_type(a->descriptor, b->descriptor);
 }
 
 u32
@@ -210,16 +164,10 @@ Descriptor descriptor_struct_reflection = {
   },
 };
 
-Value_Overload void_value_overload = {
+Value void_value = {
   .descriptor = &descriptor_void,
   .operand = { .type = Operand_Type_None },
 };
-Value_Overload *vode_value_overload_pointer = &void_value_overload;
-Value void_value = {
-  .overload_list = &vode_value_overload_pointer,
-  .overload_count = 1,
-};
-
 
 const char *
 operand_type_string(
@@ -344,63 +292,39 @@ stack(
 }
 
 Value *
-single_overload_value(
-  Value_Overload *overload
-) {
-  Value *result = temp_allocate(Value);
-  Value_Overload **overload_list = temp_allocate_array(Value_Overload *, 1);
-  overload_list[0] = overload;
-  *result = (const Value) {
-    .overload_list = overload_list,
-    .overload_count = 1,
-  };
-  return result;
-}
-
-Value *
 value_from_s64(
   s64 integer
 ) {
-  Value_Overload *result = temp_allocate(Value_Overload);
-  *result = (const Value_Overload) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
     .descriptor = &descriptor_s64,
     .operand = imm64(integer),
   };
-  return single_overload_value(result);
+  return result;
 }
 
 Value *
 value_from_s32(
   s32 integer
 ) {
-  Value_Overload *result = temp_allocate(Value_Overload);
-  *result = (const Value_Overload) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = &descriptor_s32,
     .operand = imm32(integer),
   };
-  return single_overload_value(result);
+  return result;
 }
 
 Value *
 value_byte_size(
   Value *value
 ) {
-  s32 byte_size = 0;
-  for (s32 i = 0; i < value->overload_count; ++i){
-    Value_Overload *overload = value->overload_list[i];
-    s32 overload_byte_size = descriptor_byte_size(overload->descriptor);
-    if (i == 0) {
-      byte_size = overload_byte_size;
-    } else {
-      assert(byte_size == overload_byte_size);
-    }
-  }
-  assert(byte_size);
+  s32 byte_size = descriptor_byte_size(value->descriptor);
   return value_from_s32(byte_size);
 }
 
 
-Value_Overload *
+Value *
 value_register_for_descriptor(
   Register reg,
   Descriptor *descriptor
@@ -408,8 +332,8 @@ value_register_for_descriptor(
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
-  Value_Overload *result = temp_allocate(Value_Overload);
-  *result = (const Value_Overload) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = descriptor,
     .operand = {
       .type = Operand_Type_Register,
@@ -452,10 +376,8 @@ s64
 helper_value_as_function(
   Value *value
 ) {
-  Value_Overload *overload = maybe_get_if_single_overload(value);
-  assert(overload);
-  assert(overload->operand.type == Operand_Type_Immediate_64);
-  return overload->operand.imm64;
+  assert(value->operand.type == Operand_Type_Immediate_64);
+  return value->operand.imm64;
 }
 
 #define value_as_function(_value_, _type_) \
@@ -511,7 +433,7 @@ parse_c_type(
   return descriptor;
 }
 
-Value_Overload *
+Value *
 c_function_return_value(
   const char *forward_declaration
 ) {
@@ -535,13 +457,13 @@ c_function_return_value(
   assert(descriptor);
   switch(descriptor->type) {
     case Descriptor_Type_Void: {
-      return &void_value_overload;
+      return &void_value;
     }
     case Descriptor_Type_Function:
     case Descriptor_Type_Integer:
     case Descriptor_Type_Pointer: {
-      Value_Overload *return_value = temp_allocate(Value_Overload);
-      *return_value = (const Value_Overload) {
+      Value *return_value = temp_allocate(Value);
+      *return_value = (const Value) {
         .descriptor = descriptor,
         .operand = eax,
       };
@@ -567,8 +489,8 @@ c_function_value(
     .type = Descriptor_Type_Function,
     .function = {0},
   };
-  Value_Overload *result = temp_allocate(Value_Overload);
-  *result = (const Value_Overload) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
     .descriptor = descriptor,
     .operand = imm64((s64) fn),
   };
@@ -591,7 +513,7 @@ c_function_value(
   }
 
   if (argument_descriptor && argument_descriptor->type != Descriptor_Type_Void) {
-    Value_Overload *arg = temp_allocate(Value_Overload);
+    Value *arg = temp_allocate(Value);
     arg->descriptor = argument_descriptor;
     // FIXME should not use a hardcoded register here
     arg->operand = rcx;
@@ -600,5 +522,5 @@ c_function_value(
     result->descriptor->function.argument_count = 1;
   }
 
-  return single_overload_value(result);
+  return result;
 }
