@@ -33,40 +33,45 @@ encode(
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
     bool match = true;
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-      Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
+      const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
       Operand_Type operand_type = instruction.operands[operand_index].type;
-      if (operand_type == Operand_Type_None && encoding_type == Operand_Encoding_Type_None) {
+      if (operand_type == Operand_Type_None && operand_encoding->type == Operand_Encoding_Type_None) {
         continue;
       }
-      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register) {
+      if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Register) {
         continue;
       }
-      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
+      // FIXME Needs to be handled in the encoding below
+      //if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Op_Code_Plus_Register) {
+        //continue;
+      //}
+      // FIXME check sizes for register and memory operands
+      if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
-      if (operand_type == Operand_Type_Register && encoding_type == Operand_Encoding_Type_Register_Memory) {
+      if (operand_type == Operand_Type_RIP_Relative && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
-      if (operand_type == Operand_Type_RIP_Relative && encoding_type == Operand_Encoding_Type_Register_Memory) {
+      if (operand_type == Operand_Type_Memory_Indirect && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
         continue;
       }
-      if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Register_Memory) {
+      if (operand_type == Operand_Type_RIP_Relative && operand_encoding->type == Operand_Encoding_Type_Memory) {
         continue;
       }
-      if (operand_type == Operand_Type_RIP_Relative && encoding_type == Operand_Encoding_Type_Memory) {
+      if (operand_type == Operand_Type_Memory_Indirect && operand_encoding->type == Operand_Encoding_Type_Memory) {
         continue;
       }
-      if (operand_type == Operand_Type_Memory_Indirect && encoding_type == Operand_Encoding_Type_Memory) {
-        continue;
-      }
-      if (operand_type == Operand_Type_Immediate_8 && encoding_type == Operand_Encoding_Type_Immediate_8) {
-        continue;
-      }
-      if (operand_type == Operand_Type_Immediate_32 && encoding_type == Operand_Encoding_Type_Immediate_32) {
-        continue;
-      }
-      if (operand_type == Operand_Type_Immediate_64 && encoding_type == Operand_Encoding_Type_Immediate_64) {
-        continue;
+      if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
+        Operand_Size encoding_size = operand_encoding->size;
+        if (operand_type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
+          continue;
+        }
+        if (operand_type == Operand_Type_Immediate_32 && encoding_size == Operand_Size_32) {
+          continue;
+        }
+        if (operand_type == Operand_Type_Immediate_64 && encoding_size == Operand_Size_64) {
+          continue;
+        }
       }
       match = false;
     }
@@ -86,29 +91,31 @@ encode(
 
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
-      Operand_Encoding_Type encoding_type = encoding->operand_encoding_types[operand_index];
+      const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
 
       if (operand->byte_size == 8) {
         rex_byte |= REX_W;
       }
 
       if (operand->type == Operand_Type_Register) {
-        if (encoding_type == Operand_Encoding_Type_Register) {
-          assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
-          reg_or_op_code = operand->reg;
-          if (operand->reg & 0b1000) {
-            rex_byte |= REX_R;
-          }
-        } else if (encoding_type == Operand_Encoding_Type_Op_Code_Plus_Register) {
-          op_code[1] += operand->reg & 0b111;
-          if (operand->reg & 0b1000) {
-            rex_byte |= REX_B;
+        if (operand_encoding->type == Operand_Encoding_Type_Register) {
+          if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
+            op_code[1] += operand->reg & 0b111;
+            if (operand->reg & 0b1000) {
+              rex_byte |= REX_B;
+            }
+          } else {
+            assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
+            reg_or_op_code = operand->reg;
+            if (operand->reg & 0b1000) {
+              rex_byte |= REX_R;
+            }
           }
         }
       }
       if(
-        encoding_type == Operand_Encoding_Type_Memory ||
-        encoding_type == Operand_Encoding_Type_Register_Memory
+        operand_encoding->type == Operand_Encoding_Type_Memory ||
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         needs_mod_r_m = true;
         if (operand->type == Operand_Type_RIP_Relative) {
