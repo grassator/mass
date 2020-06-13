@@ -316,6 +316,18 @@ value_from_s32(
 }
 
 Value *
+value_from_s8(
+  s8 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = &descriptor_s8,
+    .operand = imm8(integer),
+  };
+  return result;
+}
+
+Value *
 value_byte_size(
   Value *value
 ) {

@@ -204,6 +204,38 @@ Point test() {
   return (Point){42, 84};
 }
 
+//bool
+//is_whitespace(
+  //s32 code_point
+//) {
+  //if (code_point == ' ') return true;
+  //if (code_point == '\r') return true;
+  //if (code_point == '\n') return true;
+  //if (code_point == '\t') return true;
+  //return false
+//}
+
+fn_type_s32_to_s8
+create_is_character_in_set_checker_fn(
+  const char *characters
+) {
+  assert(characters);
+
+  Function(checker) {
+    Arg_s32(character);
+
+    for (const char *ch = characters; *ch; ++ch) {
+      If(Eq(character, value_from_s32(*ch))) {
+        Return(value_from_s8(1));
+      }
+    }
+
+    Return(value_from_s8(0));
+  }
+
+  return value_as_function(checker, fn_type_s32_to_s8);
+}
+
 
 spec("mass") {
 
@@ -218,6 +250,17 @@ spec("mass") {
 
   after_each() {
     free_buffer(&function_buffer);
+  }
+
+  it("should have a way to create a function to checks if a character is one of the provided set") {
+    fn_type_s32_to_s8 is_whitespace = create_is_character_in_set_checker_fn(" \n\r\t");
+    check(is_whitespace(' '));
+    check(is_whitespace('\r'));
+    check(is_whitespace('\n'));
+    check(is_whitespace('\t'));
+    check(!is_whitespace('a'));
+    check(!is_whitespace('2'));
+    check(!is_whitespace('-'));
   }
 
   it("should support returning structs larger than 64 bits on the stack") {

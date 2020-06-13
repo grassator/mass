@@ -26,14 +26,29 @@ move_value(
   // TODO figure out more type checking
   u32 a_size = descriptor_byte_size(a->descriptor);
   u32 b_size = descriptor_byte_size(b->descriptor);
+//
+//
+  //if (a_size != b_size) {
+    //if (b->operand.type == Operand_Type_Memory_Indirect || )
+    //if (!(
+      //b->operand.type == Operand_Type_Immediate_32 &&
+      //a_size == 8
+    //)) {
+      //assert(!"Mismatched operand size when moving");
+    //}
+  //}
+  if ((
+    b_size == 1 && (a_size >= 2 && a_size <= 8)
+  )) {
+    assert(a->operand.type == Operand_Type_Register);
+    Value *zero = value_from_s64(0);
+    zero->descriptor = a->descriptor;
 
-  if (a_size != b_size) {
-    if (!(
-      b->operand.type == Operand_Type_Immediate_32 &&
-      a_size == 8
-    )) {
-      assert(!"Mismatched operand size when moving");
-    }
+    move_value(fn, a, zero);
+    encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
+    // FIXME use movsx
+    //encode(fn, (Instruction) {movsx, {a->operand, b->operand, 0}});
+    return;
   }
 
   if ((

@@ -12,6 +12,7 @@ typedef enum {
   Operand_Encoding_Type_Op_Code_Plus_Register,
   Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_Memory,
+  Operand_Encoding_Type_Register_Memory_8,
   Operand_Encoding_Type_Memory,
   Operand_Encoding_Type_Immediate_8,
   Operand_Encoding_Type_Immediate_32,
@@ -59,6 +60,16 @@ const Instruction_Encoding mov_encoding_list[] = {
     },
   },
   {
+    .op_code = { 0x00, 0xc6 },
+    .extension_type = Instruction_Extension_Type_Op_Code,
+    .op_code_extension = 0,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register_Memory,
+      Operand_Encoding_Type_Immediate_8,
+      Operand_Encoding_Type_None
+    },
+  },
+  {
     .op_code = { 0x00, 0xc7 },
     .extension_type = Instruction_Extension_Type_Op_Code,
     .op_code_extension = 0,
@@ -83,6 +94,27 @@ const X64_Mnemonic mov = {
   .name = "mov",
   .encoding_list = (const Instruction_Encoding *)mov_encoding_list,
   .encoding_count = static_array_size(mov_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// movsx
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding movsx_encoding_list[] = {
+  {
+    .op_code = { 0x0F, 0xBE },
+    .extension_type = Instruction_Extension_Type_Register,
+    .operand_encoding_types = {
+      Operand_Encoding_Type_Register,
+      Operand_Encoding_Type_Register_Memory_8,
+      Operand_Encoding_Type_None
+    },
+  },
+};
+
+const X64_Mnemonic movsx = {
+  .name = "movsx",
+  .encoding_list = (const Instruction_Encoding *)movsx_encoding_list,
+  .encoding_count = static_array_size(movsx_encoding_list),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
