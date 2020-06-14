@@ -552,18 +552,23 @@ compare(
     value_from_s64(0)
   );
 
+
+  // TODO We can use a separate value here because of manual clearing of
+  //      of the register above, but it is not great.
+  Value *reg_a8 = value_register_for_descriptor(Register_A, &descriptor_s8);
+
   // TODO use correct operand size of a byte for these instructions
   switch(operation) {
     case Compare_Equal: {
-      encode(builder, (Instruction) {setz, {rax, 0, 0}});
+      encode(builder, (Instruction) {setz, {reg_a8->operand, 0, 0}});
       break;
     }
     case Compare_Less: {
-      encode(builder, (Instruction) {setl, {rax, 0, 0}});
+      encode(builder, (Instruction) {setl, {reg_a8->operand, 0, 0}});
       break;
     }
     case Compare_Greater: {
-      encode(builder, (Instruction) {setg, {rax, 0, 0}});
+      encode(builder, (Instruction) {setg, {reg_a8->operand, 0, 0}});
       break;
     }
     default: {

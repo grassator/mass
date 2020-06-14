@@ -124,6 +124,7 @@ struct_get_field(
       Operand operand = struct_value->operand;
       // FIXME support more operands
       assert(operand.type == Operand_Type_Memory_Indirect);
+      operand.byte_size = descriptor_byte_size(field->descriptor);
       operand.indirect.displacement += field->offset;
       *result = (const Value) {
         .descriptor = field->descriptor,
@@ -156,6 +157,7 @@ maybe_cast_to_tag(
     .descriptor = &descriptor_s64,
     .operand = {
       .type = Operand_Type_Memory_Indirect,
+      .byte_size = descriptor_byte_size(&descriptor_s64),
       .indirect = {
         .reg = value->operand.reg,
         .displacement = 0,
@@ -203,17 +205,6 @@ typedef struct {
 Point test() {
   return (Point){42, 84};
 }
-
-//bool
-//is_whitespace(
-  //s32 code_point
-//) {
-  //if (code_point == ' ') return true;
-  //if (code_point == '\r') return true;
-  //if (code_point == '\n') return true;
-  //if (code_point == '\t') return true;
-  //return false
-//}
 
 fn_type_s32_to_s8
 create_is_character_in_set_checker_fn(
@@ -272,13 +263,7 @@ spec("mass") {
     Value *return_overload = temp_allocate(Value);
     *return_overload = (Value) {
       .descriptor = point_struct_descriptor,
-      .operand = {
-        .type = Operand_Type_Memory_Indirect,
-        .indirect = {
-          .reg = rsp.reg,
-          .displacement = 0,
-        },
-      },
+      .operand = stack(0, descriptor_byte_size(point_struct_descriptor)),
     };
 
     Descriptor *c_test_fn_descriptor = temp_allocate(Descriptor);
@@ -313,6 +298,7 @@ spec("mass") {
       .descriptor = &descriptor_s32,
       .operand = {
         .type = Operand_Type_RIP_Relative,
+        .byte_size = descriptor_byte_size(&descriptor_s32),
         .imm64 = (s64) function_buffer.memory,
       },
     };

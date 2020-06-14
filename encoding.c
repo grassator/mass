@@ -34,42 +34,66 @@ encode(
     bool match = true;
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
-      Operand_Type operand_type = instruction.operands[operand_index].type;
-      if (operand_type == Operand_Type_None && operand_encoding->type == Operand_Encoding_Type_None) {
+      Operand *operand = &instruction.operands[operand_index];
+
+      if (operand_encoding->size != Operand_Size_Any) {
+        if (operand->byte_size != (u32)operand_encoding->size) {
+          match = false;
+          break;
+        }
+      }
+
+      if (
+        operand->type == Operand_Type_None &&
+        operand_encoding->type == Operand_Encoding_Type_None
+      ) {
         continue;
       }
-      if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Register) {
+      if (
+        operand->type == Operand_Type_Register &&
+        operand_encoding->type == Operand_Encoding_Type_Register
+      ) {
         continue;
       }
-      // FIXME Needs to be handled in the encoding below
-      //if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Op_Code_Plus_Register) {
-        //continue;
-      //}
-      // FIXME check sizes for register and memory operands
-      if (operand_type == Operand_Type_Register && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
+      if (
+        operand->type == Operand_Type_Register &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      ) {
         continue;
       }
-      if (operand_type == Operand_Type_RIP_Relative && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
+      if (
+        operand->type == Operand_Type_RIP_Relative &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      ) {
         continue;
       }
-      if (operand_type == Operand_Type_Memory_Indirect && operand_encoding->type == Operand_Encoding_Type_Register_Memory) {
+      if (
+        operand->type == Operand_Type_Memory_Indirect &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      ) {
         continue;
       }
-      if (operand_type == Operand_Type_RIP_Relative && operand_encoding->type == Operand_Encoding_Type_Memory) {
+      if (
+        operand->type == Operand_Type_RIP_Relative &&
+        operand_encoding->type == Operand_Encoding_Type_Memory
+      ) {
         continue;
       }
-      if (operand_type == Operand_Type_Memory_Indirect && operand_encoding->type == Operand_Encoding_Type_Memory) {
+      if (
+        operand->type == Operand_Type_Memory_Indirect &&
+        operand_encoding->type == Operand_Encoding_Type_Memory
+      ) {
         continue;
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
         Operand_Size encoding_size = operand_encoding->size;
-        if (operand_type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
+        if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
           continue;
         }
-        if (operand_type == Operand_Type_Immediate_32 && encoding_size == Operand_Size_32) {
+        if (operand->type == Operand_Type_Immediate_32 && encoding_size == Operand_Size_32) {
           continue;
         }
-        if (operand_type == Operand_Type_Immediate_64 && encoding_size == Operand_Size_64) {
+        if (operand->type == Operand_Type_Immediate_64 && encoding_size == Operand_Size_64) {
           continue;
         }
       }
@@ -229,7 +253,8 @@ encode(
   printf("%s", instruction.mnemonic.name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction.operands[operand_index];
-    printf(" %s", operand_type_string(operand->type));
+    printf(" ");
+    print_operand(operand);
   }
   printf("\n");
   // Didn't find any encoding

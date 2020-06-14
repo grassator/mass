@@ -169,34 +169,46 @@ Value void_value = {
   .operand = { .type = Operand_Type_None },
 };
 
-const char *
-operand_type_string(
-  Operand_Type type
+void
+print_operand(
+  const Operand *operand
 ) {
-  switch (type) {
+  switch (operand->type) {
     case Operand_Type_None: {
-      return "_";
+      printf("_");
+      break;
     }
     case Operand_Type_Register: {
-      return "r8";
+      u32 bits = operand->byte_size * 8;
+      printf("r%d", bits);
+      break;
     }
     case Operand_Type_Immediate_8: {
-      return "imm8";
+      printf("imm8(0x%02x)", operand->imm8);
+      break;
     }
     case Operand_Type_Immediate_32: {
-      return "imm32";
+      printf("imm32(0x%08x)", operand->imm32);
+      break;
     }
     case Operand_Type_Immediate_64: {
-      return "imm64";
+      printf("imm64(0x%016llx)", operand->imm64);
+      break;
     }
     case Operand_Type_Memory_Indirect: {
-      return "m";
+      u32 bits = operand->byte_size * 8;
+      printf("m%d", bits);
+      break;
     }
     case Operand_Type_RIP_Relative: {
-      return "[rip + xxx]";
+      printf("[rip + xxx]");
+      break;
+    }
+    default: {
+      printf("<unknown>");
+      break;
     }
   }
-  return "Unknown";
 }
 
 #define define_register(reg_name, reg_index, reg_byte_size) \
@@ -281,6 +293,7 @@ stack(
   s32 offset,
   u32 byte_size
 ) {
+  assert(byte_size);
   return (const Operand) {
     .type = Operand_Type_Memory_Indirect,
     .byte_size = byte_size,

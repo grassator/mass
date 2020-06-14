@@ -16,10 +16,11 @@ typedef enum {
 } Operand_Encoding_Type;
 
 typedef enum {
-  Operand_Size_8,
-  Operand_Size_16,
-  Operand_Size_32,
-  Operand_Size_64,
+  Operand_Size_Any = 0,
+  Operand_Size_8 = 1,
+  Operand_Size_16 = 2,
+  Operand_Size_32 = 4,
+  Operand_Size_64 = 8,
 } Operand_Size;
 
 typedef struct {
@@ -62,6 +63,7 @@ typedef struct {
 #define r_m32 { Operand_Encoding_Type_Register_Memory, Operand_Size_32 }
 #define r_m64 { Operand_Encoding_Type_Register_Memory, Operand_Size_64 }
 
+#define m   { Operand_Encoding_Type_Memory, Operand_Size_Any }
 #define m8  { Operand_Encoding_Type_Memory, Operand_Size_8 }
 #define m16 { Operand_Encoding_Type_Memory, Operand_Size_16 }
 #define m32 { Operand_Encoding_Type_Memory, Operand_Size_32 }
@@ -114,10 +116,7 @@ const X64_Mnemonic mov = {
 // lea
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding lea_encoding_list[] = {
-  encoding(0x8d, _r, r64, m8),
-  encoding(0x8d, _r, r64, m16),
-  encoding(0x8d, _r, r64, m32),
-  encoding(0x8d, _r, r64, m64),
+  encoding(0x8d, _r, r64, m),
 };
 const X64_Mnemonic lea = {
   .name = "lea",
