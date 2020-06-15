@@ -95,7 +95,6 @@ fn_begin(Value **result, Buffer *buffer) {
     .descriptor = descriptor,
     .result = result,
     .code = buffer->memory + buffer->occupied,
-    .stack_displacements = malloc(sizeof(Stack_Patch) * MAX_DISPLACEMENT_COUNT),
     .instructions = malloc(sizeof(Instruction) * MAX_INSTRUCTION_COUNT),
   };
   Value *fn_value = temp_allocate(Value);
@@ -150,37 +149,19 @@ fn_end(
 ) {
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
-  s32 stack_size = align(builder->stack_reserve, 16) + alignment;
-  encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(stack_size), 0}});
+  builder->stack_reserve = align(builder->stack_reserve, 16) + alignment;
+  encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
 
   for (u32 i = 0; i < builder->instruction_count; ++i) {
     encode_instruction(builder, builder->instructions[i]);
   }
 
-  for (u64 i = 0; i < builder->stack_displacement_count; ++i) {
-    Stack_Patch *patch = &builder->stack_displacements[i];
-    s32 displacement = *patch->location;
-    // @Volatile @StackPatch
-    // Negative diplacement is used to encode local variables
-    if (displacement < 0) {
-      *patch->location = stack_size + displacement;
-    } else
-    // Positive values larger than max_call_parameters_stack_size
-    if (displacement >= (s32)builder->max_call_parameters_stack_size) {
-      // Return address will be pushed on the stack by the caller and we need to account for that
-      s32 return_address_size = 8;
-      *patch->location = stack_size + displacement + return_address_size;
-    }
-  }
-
   encode_instruction(builder, (Instruction) {.maybe_label = builder->epilog_label});
 
-  encode_instruction(builder, (Instruction) {add, {rsp, imm_auto(stack_size), 0}});
+  encode_instruction(builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
   encode_instruction(builder, (Instruction) {ret, {0}});
 
   fn_freeze(builder);
-
-  free(builder->stack_displacements);
   free(builder->instructions);
 }
 

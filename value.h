@@ -149,11 +149,6 @@ same_value_type(
   Value *b
 );
 
-typedef struct {
-  s32 *location;
-  u32 byte_size;
-} Stack_Patch;
-
 typedef enum {
   Instruction_Extension_Type_None,
   Instruction_Extension_Type_Register,
@@ -213,10 +208,6 @@ typedef struct {
   #define MAX_INSTRUCTION_COUNT 4096
   Instruction *instructions;
   u32 instruction_count;
-
-  #define MAX_DISPLACEMENT_COUNT 128
-  Stack_Patch *stack_displacements;
-  u32 stack_displacement_count;
 
   Descriptor *descriptor;
 

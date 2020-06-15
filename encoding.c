@@ -219,9 +219,6 @@ encode_instruction(
       buffer_append_u8(buffer, sib_byte);
     }
 
-    u64 offset_of_displacement = 0;
-    u32 stack_byte_size = 0;
-
     // Write out displacement
     if (needs_mod_r_m && mod != MOD_Register) {
       for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
@@ -236,14 +233,26 @@ encode_instruction(
 
           buffer_append_s32(buffer, displacement);
         }  else if (operand->type == Operand_Type_Memory_Indirect) {
-          if (mod == MOD_Displacement_s32) {
-            if (encoding_stack_operand) {
-              offset_of_displacement = buffer->occupied;
-              stack_byte_size = operand->byte_size;
+          s32 displacement = operand->indirect.displacement;
+
+
+          if (encoding_stack_operand) {
+            // Negative diplacement is used to encode local variables
+            if (displacement < 0) {
+              displacement += builder->stack_reserve;
+            } else
+            // Positive values larger than max_call_parameters_stack_size
+            if (displacement >= (s32)builder->max_call_parameters_stack_size) {
+              // Return address will be pushed on the stack by the caller
+              // and we need to account for that
+              s32 return_address_size = 8;
+              displacement += builder->stack_reserve + return_address_size;
             }
-            buffer_append_s32(buffer, operand->indirect.displacement);
+          }
+          if (mod == MOD_Displacement_s32) {
+            buffer_append_s32(buffer, displacement);
           } else if (mod == MOD_Displacement_s8) {
-            buffer_append_s8(buffer, (s8)operand->indirect.displacement);
+            buffer_append_s8(buffer, (s8)displacement);
           } else {
             assert(mod == MOD_Displacement_0);
           }
@@ -283,16 +292,6 @@ encode_instruction(
       if (operand->type == Operand_Type_Immediate_64) {
         buffer_append_s64(buffer, operand->imm64);
       }
-    }
-
-    if (offset_of_displacement) {
-      assert(builder->stack_displacement_count < MAX_DISPLACEMENT_COUNT);
-      s32 *location = (s32 *)(buffer->memory + offset_of_displacement);
-      builder->stack_displacements[builder->stack_displacement_count] = (const Stack_Patch) {
-        .location = location,
-        .byte_size = stack_byte_size,
-      };
-      builder->stack_displacement_count++;
     }
     return;
   }
