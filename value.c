@@ -313,6 +313,20 @@ imm64(
 }
 
 inline Operand
+imm_auto(
+  s64 value
+) {
+  u64 unsigned_value = value;
+  if (unsigned_value <= 0xFF) {
+    return imm8((s8) value);
+  }
+  if (unsigned_value <= 0xFFFFFFFF) {
+    return imm32((s32) value);
+  }
+  return imm64(value);
+}
+
+inline Operand
 stack(
   s32 offset,
   u32 byte_size

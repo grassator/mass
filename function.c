@@ -151,13 +151,9 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   s32 stack_size = align(builder->stack_reserve, 16) + alignment;
-  // TODO Use imm8 when stack size is less than 7bits
-  encode_instruction(builder, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
-
-  void **instruction_index_offsets = malloc(sizeof(u64) * builder->instruction_count);
+  encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(stack_size), 0}});
 
   for (u32 i = 0; i < builder->instruction_count; ++i) {
-    instruction_index_offsets[i] = (void *)(builder->buffer->memory + builder->buffer->occupied);
     encode_instruction(builder, builder->instructions[i]);
   }
 
@@ -179,7 +175,7 @@ fn_end(
 
   encode_instruction(builder, (Instruction) {.maybe_label = builder->epilog_label});
 
-  encode_instruction(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
+  encode_instruction(builder, (Instruction) {add, {rsp, imm_auto(stack_size), 0}});
   encode_instruction(builder, (Instruction) {ret, {0}});
 
   fn_freeze(builder);
