@@ -18,8 +18,18 @@ reserve_stack(
 }
 
 void
+push_instruction(
+  Function_Builder *builder,
+  Instruction instruction
+) {
+  assert(builder->instruction_count < MAX_INSTRUCTION_COUNT);
+  builder->instructions[builder->instruction_count] = instruction;
+  builder->instruction_count++;
+}
+
+void
 move_value(
-  Function_Builder *fn,
+  Function_Builder *builder,
   Value *a,
   Value *b
 ) {
@@ -44,10 +54,10 @@ move_value(
     Value *zero = value_from_s64(0);
     zero->descriptor = a->descriptor;
 
-    move_value(fn, a, zero);
-    encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
+    move_value(builder, a, zero);
+    push_instruction(builder, (Instruction) {mov, {a->operand, b->operand, 0}});
     // FIXME use movsx
-    //encode(fn, (Instruction) {movsx, {a->operand, b->operand, 0}});
+    //push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
     return;
   }
 
@@ -60,71 +70,10 @@ move_value(
   )) {
     Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
     // TODO Can be a problem if RAX is already used as temp
-    encode(fn, (Instruction) {mov, {reg_a->operand, b->operand, 0}});
-    encode(fn, (Instruction) {mov, {a->operand, reg_a->operand}});
+    push_instruction(builder, (Instruction) {mov, {reg_a->operand, b->operand, 0}});
+    push_instruction(builder, (Instruction) {mov, {a->operand, reg_a->operand}});
   } else {
-    encode(fn, (Instruction) {mov, {a->operand, b->operand, 0}});
-  }
-}
-
-Patch_32
-make_jz(
-  Function_Builder *fn
-) {
-  encode(fn, (Instruction) {jz, {imm32(0xcc), 0, 0}});
-  u64 ip = fn->buffer->occupied;
-  s32 *location = (s32 *)(fn->buffer->memory + fn->buffer->occupied - sizeof(s32));
-  return (const Patch_32) { .location = location, .ip = ip };
-}
-
-Patch_32
-make_jmp(
-  Function_Builder *fn
-) {
-  encode(fn, (Instruction) {jmp, {imm32(0xcc), 0, 0}});
-  u64 ip = fn->buffer->occupied;
-  s32 *location = (s32 *)(fn->buffer->memory + fn->buffer->occupied - sizeof(s32));
-  return (const Patch_32) { .location = location, .ip = ip };
-}
-
-void
-patch_jump_to_here(
-  Function_Builder *fn,
-  Patch_32 patch
-) {
-  *patch.location = (s32) (fn->buffer->occupied - patch.ip);
-}
-
-void
-patch_jump_to_ip(
-  Patch_32 patch,
-  u64 ip
-) {
-  *patch.location = (s32) (ip - patch.ip);
-}
-
-Jump_Patch_List *
-make_jump_patch(
-  Function_Builder *builder,
-  Jump_Patch_List *next
-) {
-  Jump_Patch_List *return_patch = temp_allocate(Jump_Patch_List);
-  *return_patch = (const Jump_Patch_List) {
-    .patch = make_jmp(builder),
-    .next = next,
-  };
-  return return_patch;
-}
-
-void
-resolve_jump_patch_list(
-  Function_Builder *builder,
-  Jump_Patch_List *list
-) {
-  Jump_Patch_List *jump_patch = list;
-  while (jump_patch) {
-    patch_jump_to_here(builder, jump_patch->patch);
-    jump_patch = jump_patch->next;
+    push_instruction(builder, (Instruction) {mov, {a->operand, b->operand, 0}});
   }
 }
 
@@ -141,23 +90,23 @@ fn_begin(Value **result, Buffer *buffer) {
   };
   Function_Builder builder = {
     .stack_reserve = 0,
-    .return_patch_list = 0,
     .buffer = buffer,
+    .epilog_label = make_label(),
     .descriptor = descriptor,
     .result = result,
     .code = buffer->memory + buffer->occupied,
-    .stack_displacements = temp_allocate_array(Stack_Patch, MAX_DISPLACEMENT_COUNT),
+    .stack_displacements = malloc(sizeof(Stack_Patch) * MAX_DISPLACEMENT_COUNT),
+    .instructions = malloc(sizeof(Instruction) * MAX_INSTRUCTION_COUNT),
   };
   Value *fn_value = temp_allocate(Value);
+  Label *label = make_label();
+  label->target = builder.code;
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = imm64((s64) builder.code)
+    .operand = label32(label),
   };
   *result = fn_value;
 
-
-  // @Volatile @ReserveStack
-  encode(&builder, (Instruction) {sub, {rsp, imm32(0xcccccccc), 0}});
   return builder;
 }
 
@@ -202,14 +151,14 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   s32 stack_size = align(builder->stack_reserve, 16) + alignment;
+  // TODO Use imm8 when stack size is less than 7bits
+  encode_instruction(builder, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
 
-  { // Override stack reservation
-    u64 save_occupied = builder->buffer->occupied;
-    builder->buffer->occupied = (builder->code - builder->buffer->memory);
+  void **instruction_index_offsets = malloc(sizeof(u64) * builder->instruction_count);
 
-    // @Volatile @ReserveStack
-    encode(builder, (Instruction) {sub, {rsp, imm32(stack_size), 0}});
-    builder->buffer->occupied = save_occupied;
+  for (u32 i = 0; i < builder->instruction_count; ++i) {
+    instruction_index_offsets[i] = (void *)(builder->buffer->memory + builder->buffer->occupied);
+    encode_instruction(builder, builder->instructions[i]);
   }
 
   for (u64 i = 0; i < builder->stack_displacement_count; ++i) {
@@ -228,11 +177,15 @@ fn_end(
     }
   }
 
-  resolve_jump_patch_list(builder, builder->return_patch_list);
+  encode_instruction(builder, (Instruction) {.maybe_label = builder->epilog_label});
 
-  encode(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
-  encode(builder, (Instruction) {ret, {0}});
+  encode_instruction(builder, (Instruction) {add, {rsp, imm32(stack_size), 0}});
+  encode_instruction(builder, (Instruction) {ret, {0}});
+
   fn_freeze(builder);
+
+  free(builder->stack_displacements);
+  free(builder->instructions);
 }
 
 Value *
@@ -299,32 +252,47 @@ fn_return(
   if (to_return->descriptor->type != Descriptor_Type_Void) {
     move_value(builder, function->returns, to_return);
   }
-  builder->return_patch_list = make_jump_patch(builder, builder->return_patch_list);
+
+  push_instruction(builder, (Instruction) {jmp, {label32(builder->epilog_label), 0, 0}});
   fn_update_result(builder);
 }
 
-Patch_32 make_if(
+Label *make_if(
   Function_Builder *builder,
   Value *value
 ) {
-  encode(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
-
-  return make_jz(builder);
+  Label *label = make_label();
+  push_instruction(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+  push_instruction(builder, (Instruction) {jz, {label32(label), 0, 0}});
+  return label;
 }
 
 typedef struct {
   bool done;
-  u64 start_ip;
-  Jump_Patch_List *jump_patch_list;
+  Label *label_start;
+  Label *label_end;
 } Loop_Builder;
 
+Loop_Builder
+loop_start(
+  Function_Builder *builder
+) {
+  Label *label_start = make_label();
+  push_instruction(builder, (Instruction) { .maybe_label = label_start });
+  return (Loop_Builder) {
+    .done = false,
+    .label_start = label_start,
+    .label_end = make_label(),
+  };
+}
+
 void
-make_loop_end(
+loop_end(
   Function_Builder *builder,
   Loop_Builder *loop
 ) {
-  patch_jump_to_ip(make_jmp(builder), loop->start_ip);
-  resolve_jump_patch_list(builder, loop->jump_patch_list);
+  push_instruction(builder, (Instruction) {jmp, {label32(loop->label_start), 0, 0}});
+  push_instruction(builder, (Instruction) { .maybe_label = loop->label_end });
   loop->done = true;
 }
 
@@ -370,11 +338,11 @@ plus_or_minus(
 
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      encode(builder, (Instruction) {add, {reg_a->operand, temp_b->operand, 0}});
+      push_instruction(builder, (Instruction) {add, {reg_a->operand, temp_b->operand, 0}});
       break;
     }
     case Arithmetic_Operation_Minus: {
-      encode(builder, (Instruction) {sub, {reg_a->operand, temp_b->operand, 0}});
+      push_instruction(builder, (Instruction) {sub, {reg_a->operand, temp_b->operand, 0}});
       break;
     }
     default: {
@@ -431,7 +399,7 @@ multiply(
   move_value(builder, reg_a, x);
 
   // TODO check operand sizes
-  encode(builder, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
+  push_instruction(builder, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
   Value *temp = reserve_stack(builder, x->descriptor);
   move_value(builder, temp, reg_a);
@@ -467,22 +435,22 @@ divide(
 
   switch (descriptor_byte_size(a->descriptor)) {
     case 8: {
-      encode(builder, (Instruction) {cqo, {0}});
+      push_instruction(builder, (Instruction) {cqo, {0}});
       break;
     }
     case 4: {
-      encode(builder, (Instruction) {cdq, {0}});
+      push_instruction(builder, (Instruction) {cdq, {0}});
       break;
     }
     case 2: {
-      encode(builder, (Instruction) {cwd, {0}});
+      push_instruction(builder, (Instruction) {cwd, {0}});
       break;
     }
     default: {
       assert(!"Unsupported byte size when dividing");
     }
   }
-  encode(builder, (Instruction) {idiv, {divisor->operand, 0, 0}});
+  push_instruction(builder, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
   Value *temp = reserve_stack(builder, a->descriptor);
   move_value(builder, temp, reg_a);
@@ -505,22 +473,23 @@ divide(
 
 #define IfBuilder(_builder_, _value_) \
   for (\
-    Patch_32 patch__ = make_if(_builder_, _value_), *dummy__ = 0; \
+    Label *label__ = make_if(_builder_, _value_), *dummy__ = 0; \
     !(dummy__++); \
-    patch_jump_to_here(_builder_, patch__)\
+     push_instruction(_builder_, (Instruction) {.maybe_label = label__})\
   )
 #define If(_value_) IfBuilder(&builder_, _value_)
 
 #define Loop \
   for ( \
-    Loop_Builder loop_builder_ = { .start_ip = builder_.buffer->occupied, .jump_patch_list = 0 }; \
+    Loop_Builder loop_builder_ = loop_start(&builder_); \
     !loop_builder_.done; \
-    make_loop_end(&builder_, &loop_builder_) \
+    loop_end(&builder_, &loop_builder_) \
   )
 
-#define Continue patch_jump_to_ip(make_jmp(&builder_), loop_builder_.start_ip)
+#define Continue \
+  push_instruction(&builder_, (Instruction) {jmp, {label32(loop_builder_.label_start), 0, 0}})
 #define Break \
-  loop_builder_.jump_patch_list = make_jump_patch(&builder_, loop_builder_.jump_patch_list)
+  push_instruction(&builder_, (Instruction) {jmp, {label32(loop_builder_.label_end), 0, 0}})
 
 typedef enum {
   Compare_Equal,
@@ -542,7 +511,7 @@ compare(
   move_value(builder, reg_a, a);
 
   // TODO check that types are comparable
-  encode(builder, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
+  push_instruction(builder, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
 
   // TODO use xor
   reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
@@ -560,15 +529,15 @@ compare(
   // TODO use correct operand size of a byte for these instructions
   switch(operation) {
     case Compare_Equal: {
-      encode(builder, (Instruction) {setz, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setz, {reg_a8->operand, 0, 0}});
       break;
     }
     case Compare_Less: {
-      encode(builder, (Instruction) {setl, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setl, {reg_a8->operand, 0, 0}});
       break;
     }
     case Compare_Greater: {
-      encode(builder, (Instruction) {setg, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setg, {reg_a8->operand, 0, 0}});
       break;
     }
     default: {
@@ -599,7 +568,7 @@ value_pointer_to(
   Descriptor *result_descriptor = descriptor_pointer_to(value->descriptor);
 
   Value *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
-  encode(builder, (Instruction) {lea, {reg_a->operand, value->operand, 0}});
+  push_instruction(builder, (Instruction) {lea, {reg_a->operand, value->operand, 0}});
 
   Value *result = reserve_stack(builder, result_descriptor);
   move_value(builder, result, reg_a);
@@ -637,7 +606,7 @@ call_function_overload(
     Descriptor *return_pointer_descriptor = descriptor_pointer_to(descriptor->returns->descriptor);
     Value *reg_c =
       value_register_for_descriptor(Register_C, return_pointer_descriptor);
-    encode(builder, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}});
+    push_instruction(builder, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}});
   }
 
   builder->max_call_parameters_stack_size = max(
@@ -645,25 +614,12 @@ call_function_overload(
     parameters_stack_size
   );
 
-  s64 start_address = (s64) builder->buffer->memory;
-  s64 end_address = start_address + builder->buffer->capacity;
-  if (
-    to_call->operand.type == Operand_Type_Immediate_64 &&
-    to_call->operand.imm64 >= start_address && to_call->operand.imm64 <= end_address
-  ) {
-    encode(builder, (Instruction) {call, {imm32(0xCCCCCCCC), 0, 0}});
-    u8 *current_address = builder->buffer->memory + builder->buffer->occupied;
-    s32 *offset_for_immediate = (s32 *)(current_address - sizeof(s32));
-
-    s64 relative_offset = to_call->operand.imm64 - (s64)current_address;
-    assert(relative_offset > INT_MIN);
-    assert(relative_offset < INT_MAX);
-    s32 rel32 = (s32)relative_offset;
-    *offset_for_immediate = rel32;
+  if (to_call->operand.type == Operand_Type_Label_32) {
+    push_instruction(builder, (Instruction) {call, {to_call->operand, 0, 0}});
   } else {
     Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
     move_value(builder, reg_a, to_call);
-    encode(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
+    push_instruction(builder, (Instruction) {call, {reg_a->operand, 0, 0}});
   }
 
   if (return_size <= 8) {

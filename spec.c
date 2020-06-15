@@ -501,10 +501,10 @@ spec("mass") {
             .displacement = 0,
           }
         };
-        encode(&builder_, (Instruction) {inc, {pointer, 0, 0}});
-        encode(&builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
+        push_instruction(&builder_, (Instruction) {inc, {pointer, 0, 0}});
+        push_instruction(&builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
 
-        encode(&builder_, (Instruction) {inc, {index->operand, 0, 0}});
+        push_instruction(&builder_, (Instruction) {inc, {index->operand, 0, 0}});
       }
 
     }

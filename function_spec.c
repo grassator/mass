@@ -54,13 +54,13 @@ spec("function") {
       (void)x;
       Return(value_from_s64(4));
     }
-    Function(sizeof_s64) {
+    Function(sizeof_s64_value) {
       Arg_s64(x);
       (void)x;
       Return(value_from_s64(8));
     }
 
-    sizeof_s32->descriptor->function.next_overload = sizeof_s64;
+    sizeof_s32->descriptor->function.next_overload = sizeof_s64_value;
 
     Function(checker_value) {
       Value *x = Call(sizeof_s32, value_from_s64(0));
@@ -70,6 +70,9 @@ spec("function") {
 
     DWORD previous;
     VirtualProtect(function_buffer.memory, function_buffer.capacity, PAGE_EXECUTE, &previous);
+
+    fn_type_void_to_s64 sizeof_s64 = value_as_function(sizeof_s64_value, fn_type_void_to_s64);
+    check(sizeof_s64() == 8);
 
     fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
     check(checker() == 12);

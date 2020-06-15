@@ -10,6 +10,7 @@ typedef enum {
   Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
   Operand_Type_RIP_Relative,
+  Operand_Type_Label_32,
 } Operand_Type;
 
 typedef enum {
@@ -38,6 +39,18 @@ typedef struct {
 } Operand_Memory_Indirect;
 
 typedef struct {
+  s32 *patch_target;
+  u8 *from_offset;
+} Label_Location;
+
+typedef struct {
+  u8 *target;
+  #define MAX_LABEL_LOCATION_COUNT 32
+  Label_Location *locations;
+  u32 location_count;
+} Label;
+
+typedef struct {
   Operand_Type type;
   u32 byte_size;
   union {
@@ -45,6 +58,7 @@ typedef struct {
     s8 imm8;
     s32 imm32;
     s64 imm64;
+    Label *label32;
     Operand_Memory_Indirect indirect;
   };
 } Operand;
@@ -137,19 +151,55 @@ same_value_type(
 
 typedef struct {
   s32 *location;
-  u64 ip;
-} Patch_32;
-
-typedef struct Jump_Patch_List {
-  Patch_32 patch;
-  struct Jump_Patch_List *next;
-} Jump_Patch_List;
-
-typedef struct {
-  s32 *location;
   u32 byte_size;
 } Stack_Patch;
 
+typedef enum {
+  Instruction_Extension_Type_None,
+  Instruction_Extension_Type_Register,
+  Instruction_Extension_Type_Op_Code,
+  Instruction_Extension_Type_Plus_Register,
+} Instruction_Extension_Type;
+
+typedef enum {
+  Operand_Encoding_Type_None,
+  Operand_Encoding_Type_Register,
+  Operand_Encoding_Type_Register_Memory,
+  Operand_Encoding_Type_Memory,
+  Operand_Encoding_Type_Immediate,
+} Operand_Encoding_Type;
+
+typedef enum {
+  Operand_Size_Any = 0,
+  Operand_Size_8 = 1,
+  Operand_Size_16 = 2,
+  Operand_Size_32 = 4,
+  Operand_Size_64 = 8,
+} Operand_Size;
+
+typedef struct {
+  Operand_Encoding_Type type;
+  Operand_Size size;
+} Operand_Encoding;
+
+typedef struct {
+  u8 op_code[2];
+  Instruction_Extension_Type extension_type;
+  u8 op_code_extension;
+  Operand_Encoding operands[3];
+} Instruction_Encoding;
+
+typedef struct {
+  const char *name;
+  const Instruction_Encoding *encoding_list;
+  u32 encoding_count;
+} X64_Mnemonic;
+
+typedef struct {
+  X64_Mnemonic mnemonic;
+  Operand operands[3];
+  Label *maybe_label;
+} Instruction;
 
 typedef struct {
   s32 stack_reserve;
@@ -158,7 +208,11 @@ typedef struct {
   Buffer *buffer;
   u8 *code;
 
-  Jump_Patch_List *return_patch_list;
+  Label *epilog_label;
+
+  #define MAX_INSTRUCTION_COUNT 4096
+  Instruction *instructions;
+  u32 instruction_count;
 
   #define MAX_DISPLACEMENT_COUNT 128
   Stack_Patch *stack_displacements;
@@ -168,5 +222,4 @@ typedef struct {
 
   Value **result;
 } Function_Builder;
-
 #endif VALUE_H

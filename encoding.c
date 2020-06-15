@@ -23,11 +23,26 @@ typedef enum {
 } REX_BYTE;
 
 void
-encode(
+encode_instruction(
   Function_Builder *builder,
   Instruction instruction
 ) {
   Buffer *buffer = builder->buffer;
+
+  if (instruction.maybe_label) {
+    Label *label = instruction.maybe_label;
+    assert(!label->target);
+    label->target = buffer->memory + buffer->occupied;
+
+    for (u32 i = 0; i < label->location_count; ++i) {
+      Label_Location label_location = label->locations[i];
+      s32 diff = (s32)(label->target - label_location.from_offset);
+      assert(diff >= 0);
+      *label_location.patch_target = diff;
+    }
+    return;
+  }
+
   u32 operand_count = sizeof(instruction.operands) / sizeof(instruction.operands[0]);
   for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
@@ -90,7 +105,16 @@ encode(
         if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
           continue;
         }
-        if (operand->type == Operand_Type_Immediate_32 && encoding_size == Operand_Size_32) {
+        if (
+          operand->type == Operand_Type_Label_32 &&
+          encoding_size == Operand_Size_32
+        ) {
+          continue;
+        }
+        if (
+          operand->type == Operand_Type_Immediate_32 &&
+          encoding_size == Operand_Size_32
+        ) {
           continue;
         }
         if (operand->type == Operand_Type_Immediate_64 && encoding_size == Operand_Size_64) {
@@ -229,8 +253,29 @@ encode(
     // Write out immediate operand(s?)
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
+
       if (operand->type == Operand_Type_Immediate_8) {
         buffer_append_s8(buffer, operand->imm8);
+      }
+      if (operand->type == Operand_Type_Label_32) {
+        if (operand->label32->target) {
+          u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
+          s32 diff = (s32)(operand->label32->target - from);
+          assert(diff < 0);
+          buffer_append_s32(buffer, diff);
+        } else {
+          assert(operand->label32->location_count < MAX_LABEL_LOCATION_COUNT);
+          s32 *patch_target = (s32 *)(buffer->memory + buffer->occupied);
+          buffer_append_s32(buffer, 0xCCCCCCCC);
+
+          operand->label32->locations[operand->label32->location_count] =
+            (Label_Location) {
+              .patch_target = patch_target,
+              .from_offset = buffer->memory + buffer->occupied,
+            };
+          operand->label32->location_count++;
+        }
+
       }
       if (operand->type == Operand_Type_Immediate_32) {
         buffer_append_s32(buffer, operand->imm32);
@@ -239,6 +284,7 @@ encode(
         buffer_append_s64(buffer, operand->imm64);
       }
     }
+
     if (offset_of_displacement) {
       assert(builder->stack_displacement_count < MAX_DISPLACEMENT_COUNT);
       s32 *location = (s32 *)(buffer->memory + offset_of_displacement);

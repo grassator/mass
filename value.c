@@ -204,6 +204,10 @@ print_operand(
       printf("[rip + xxx]");
       break;
     }
+    case Operand_Type_Label_32: {
+      printf("rel....UNIMPLEMENTED");
+      break;
+    }
     default: {
       printf("<unknown>");
       break;
@@ -254,6 +258,26 @@ define_register(r13d, 13, 4);
 define_register(r14d, 14, 4);
 define_register(r15d, 15, 4);
 #undef define_register
+
+inline Label*
+make_label() {
+  Label *label = temp_allocate(Label);
+  *label = (Label) {
+    .locations = temp_allocate_array(s32 *, MAX_LABEL_LOCATION_COUNT)
+  };
+  return label;
+}
+
+inline Operand
+label32(
+  Label *label
+) {
+  return (const Operand) {
+    .type = Operand_Type_Label_32,
+    .byte_size = 4,
+    .label32 = label
+  };
+}
 
 inline Operand
 imm8(
@@ -397,12 +421,13 @@ descriptor_array_of(
   return result;
 }
 
-s64
+fn_type_opaque
 helper_value_as_function(
   Value *value
 ) {
-  assert(value->operand.type == Operand_Type_Immediate_64);
-  return value->operand.imm64;
+  assert(value->operand.type == Operand_Type_Label_32);
+  assert(value->operand.label32->target);
+  return (fn_type_opaque)value->operand.label32->target;
 }
 
 #define value_as_function(_value_, _type_) \
