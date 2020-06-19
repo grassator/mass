@@ -41,10 +41,12 @@
 // mov
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding mov_encoding_list[] = {
+  encoding(0x88, _r, r_m8, r8),
   encoding(0x89, _r, r_m16, r16),
   encoding(0x89, _r, r_m32, r32),
   encoding(0x89, _r, r_m64, r64),
 
+  encoding(0x8A, _r, r8, r_m8),
   encoding(0x8B, _r, r16, r_m16),
   encoding(0x8B, _r, r32, r_m32),
   encoding(0x8B, _r, r64, r_m64),
@@ -102,6 +104,21 @@ const X64_Mnemonic inc = {
   .name = "inc",
   .encoding_list = (const Instruction_Encoding *)inc_encoding_list,
   .encoding_count = static_array_size(inc_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// xor
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding xor_encoding_list[] = {
+  encoding(0x32, _r, r8, r_m8),
+  encoding(0x33, _r, r16, r_m16),
+  encoding(0x33, _r, r32, r_m32),
+  encoding(0x33, _r, r64, r_m64),
+};
+const X64_Mnemonic xor = {
+  .name = "xor",
+  .encoding_list = (const Instruction_Encoding *)xor_encoding_list,
+  .encoding_count = static_array_size(xor_encoding_list),
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -240,10 +257,17 @@ const X64_Mnemonic call = {
 // cmp
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding cmp_encoding_list[] = {
+  encoding(0x80, _op_code(7), r_m8, imm8),
   encoding(0x81, _op_code(7), r_m16, imm16),
   encoding(0x81, _op_code(7), r_m32, imm32),
   encoding(0x81, _op_code(7), r_m64, imm32),
 
+  encoding(0x38, _r, r_m8, r8),
+  encoding(0x39, _r, r_m16, r16),
+  encoding(0x39, _r, r_m32, r32),
+  encoding(0x39, _r, r_m64, r64),
+
+  encoding(0x3A, _r, r8, r_m8),
   encoding(0x3B, _r, r16, r_m16),
   encoding(0x3B, _r, r32, r_m32),
   encoding(0x3B, _r, r64, r_m64),
@@ -297,6 +321,18 @@ const X64_Mnemonic sete = {
   .name = "sete",
   .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
   .encoding_count = static_array_size(setz_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// setne
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setne_encoding_list[] = {
+  encoding(0x0F95, none, r_m8),
+};
+const X64_Mnemonic setne = {
+  .name = "setne",
+  .encoding_list = (const Instruction_Encoding *)setne_encoding_list,
+  .encoding_count = static_array_size(setne_encoding_list),
 };
 
 ////////////////////////////////////////////////////////////////////////////////

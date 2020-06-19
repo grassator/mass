@@ -61,6 +61,23 @@ move_value(
     return;
   }
 
+  if (
+    a->operand.type == Operand_Type_Register &&
+    (
+      (b->operand.type == Operand_Type_Immediate_64 && b->operand.imm64 == 0) ||
+      (b->operand.type == Operand_Type_Immediate_32 && b->operand.imm32 == 0) ||
+      (b->operand.type == Operand_Type_Immediate_8  && b->operand.imm8 == 0)
+    )
+  ) {
+    // This messes up flags register so comparisons need to be aware of this optimization
+    push_instruction(builder, (Instruction) {xor, {a->operand, a->operand, 0}});
+    return;
+  }
+
+  if (b->operand.type == Operand_Type_Immediate_64 && ((s32)b->operand.imm64) >= 0) {
+    move_value(builder, a, value_from_s32(b->operand.imm32));
+  }
+
   if ((
     b->operand.type == Operand_Type_Immediate_64 &&
     a->operand.type != Operand_Type_Register
@@ -69,9 +86,8 @@ move_value(
     b->operand.type == Operand_Type_Memory_Indirect
   )) {
     Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
-    // TODO Can be a problem if RAX is already used as temp
-    push_instruction(builder, (Instruction) {mov, {reg_a->operand, b->operand, 0}});
-    push_instruction(builder, (Instruction) {mov, {a->operand, reg_a->operand}});
+    move_value(builder, reg_a, b);
+    move_value(builder, a, reg_a);
   } else {
     push_instruction(builder, (Instruction) {mov, {a->operand, b->operand, 0}});
   }
@@ -239,7 +255,14 @@ Label *make_if(
   Value *value
 ) {
   Label *label = make_label();
-  push_instruction(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+  u32 byte_size = descriptor_byte_size(value->descriptor);
+  if (byte_size == 4 || byte_size == 8) {
+    push_instruction(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+  } else if (byte_size == 1) {
+    push_instruction(builder, (Instruction) {cmp, {value->operand, imm8(0), 0}});
+  } else {
+    assert(!"Unsupported value inside `if`");
+  }
   push_instruction(builder, (Instruction) {jz, {label32(label), 0, 0}});
   return label;
 }
@@ -469,7 +492,8 @@ divide(
   push_instruction(&builder_, (Instruction) {jmp, {label32(loop_builder_.label_end), 0, 0}})
 
 typedef enum {
-  Compare_Equal,
+  Compare_Equal = 1,
+  Compare_Not_Equal,
   Compare_Less,
   Compare_Greater,
 } Compare;
@@ -489,44 +513,33 @@ compare(
 
   // TODO check that types are comparable
   push_instruction(builder, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
+  Value *result = reserve_stack(builder, &descriptor_s8);
 
-  // TODO use xor
-  reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
-  move_value(
-    builder,
-    reg_a,
-    value_from_s64(0)
-  );
-
-
-  // TODO We can use a separate value here because of manual clearing of
-  //      of the register above, but it is not great.
-  Value *reg_a8 = value_register_for_descriptor(Register_A, &descriptor_s8);
-
-  // TODO use correct operand size of a byte for these instructions
   switch(operation) {
     case Compare_Equal: {
-      push_instruction(builder, (Instruction) {setz, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setz, {result->operand, 0, 0}});
+      break;
+    }
+    case Compare_Not_Equal: {
+      push_instruction(builder, (Instruction) {setne, {result->operand, 0, 0}});
       break;
     }
     case Compare_Less: {
-      push_instruction(builder, (Instruction) {setl, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setl, {result->operand, 0, 0}});
       break;
     }
     case Compare_Greater: {
-      push_instruction(builder, (Instruction) {setg, {reg_a8->operand, 0, 0}});
+      push_instruction(builder, (Instruction) {setg, {result->operand, 0, 0}});
       break;
     }
     default: {
       assert(!"Unsupported comparison");
     }
   }
-
-  Value *result = reserve_stack(builder, &descriptor_s64);
-  move_value(builder, result, reg_a);
   return result;
 }
 
+#define NotEq(_a_, _b_) compare(&builder_, Compare_Not_Equal, (_a_), (_b_))
 #define Eq(_a_, _b_) compare(&builder_, Compare_Equal, (_a_), (_b_))
 #define Less(_a_, _b_) compare(&builder_, Compare_Less, (_a_), (_b_))
 #define Greater(_a_, _b_) compare(&builder_, Compare_Greater, (_a_), (_b_))
@@ -636,6 +649,24 @@ call_function_value(
   return 0;
 }
 
+Value *
+make_and(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  Value *result = reserve_stack(builder, &descriptor_s8);
+  Label *label = make_label();
+  IfBuilder(builder, a) {
+    Value *rhs = compare(builder, Compare_Not_Equal, b, value_from_s8(0));
+    move_value(builder, result, rhs);
+    push_instruction(builder, (Instruction) {jmp, {label32(label), 0, 0}});
+  }
+  move_value(builder, result, value_from_s8(0));
+  push_instruction(builder, (Instruction) {.maybe_label = label});
+  return result;
+}
+
 #define Function(_id_) \
   Value *_id_ = 0; \
   for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))
@@ -646,6 +677,7 @@ call_function_value(
 #define Arg(_id_, _descriptor_) \
   Value *_id_ = fn_arg(&builder_, (_descriptor_))
 
+#define Arg_s8(_id_) Arg((_id_), &descriptor_s8)
 #define Arg_s32(_id_) Arg((_id_), &descriptor_s32)
 #define Arg_s64(_id_) Arg((_id_), &descriptor_s64)
 
@@ -664,5 +696,19 @@ call_function_value(
     (Value **)((Value *[]){0, ##__VA_ARGS__}) + 1, \
     static_array_size(((Value *[]){0, ##__VA_ARGS__})) - 1 \
   )
+
+#define And(_a_, _b_) make_and(&builder_, (_a_), (_b_))
+
+
+
+
+
+
+
+
+
+
+
+
 
 

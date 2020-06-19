@@ -48,6 +48,21 @@ spec("function") {
     free_buffer(&function_buffer);
   }
 
+  it("should support short-curciting &&") {
+    Function(checker_value) {
+      Arg_s32(number);
+      Arg_s8(condition);
+
+      Value *less = Less(number, value_from_s32(42));
+      Return(And(less, condition));
+    }
+
+    fn_type_s32_s8_to_s8 checker = value_as_function(checker_value, fn_type_s32_s8_to_s8);
+    check(!checker(52, true));
+    check(!checker(32, false));
+    check(checker(32, true));
+  }
+
   it("should support ad-hoc polymorphism / overloading") {
     Function(sizeof_s32) {
       Arg_s32(x);
