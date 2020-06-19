@@ -667,6 +667,24 @@ make_and(
   return result;
 }
 
+Value *
+make_or(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  Value *result = reserve_stack(builder, &descriptor_s8);
+  Label *label = make_label();
+  IfBuilder(builder, compare(builder, Compare_Equal, b, value_from_s8(0))) {
+    Value *rhs = compare(builder, Compare_Not_Equal, b, value_from_s8(0));
+    move_value(builder, result, rhs);
+    push_instruction(builder, (Instruction) {jmp, {label32(label), 0, 0}});
+  }
+  move_value(builder, result, value_from_s8(1));
+  push_instruction(builder, (Instruction) {.maybe_label = label});
+  return result;
+}
+
 #define Function(_id_) \
   Value *_id_ = 0; \
   for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))
@@ -698,6 +716,7 @@ make_and(
   )
 
 #define And(_a_, _b_) make_and(&builder_, (_a_), (_b_))
+#define Or(_a_, _b_) make_or(&builder_, (_a_), (_b_))
 
 
 
