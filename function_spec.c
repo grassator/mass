@@ -78,6 +78,29 @@ spec("function") {
     check(checker(32, true));
   }
 
+  it("should support multi-way case block") {
+    Function(checker_value) {
+      Arg_s32(number);
+
+      Match {
+        Case(Eq(number, value_from_s32(42))) {
+          Return(number);
+        }
+        Case(Less(number, value_from_s32(50))) {
+          Return(value_from_s32(0));
+        }
+        CaseAny {
+          Return(value_from_s32(100));
+        }
+      }
+    }
+
+    fn_type_s32_to_s32 checker = value_as_function(checker_value, fn_type_s32_to_s32);
+    check(checker(42) == 42);
+    check(checker(32) == 0);
+    check(checker(52) == 100);
+  }
+
   it("should support ad-hoc polymorphism / overloading") {
     Function(sizeof_s32) {
       Arg_s32(x);

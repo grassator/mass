@@ -479,6 +479,21 @@ divide(
   )
 #define If(_value_) IfBuilder(&builder_, _value_)
 
+#define Match\
+  for (\
+    Label *match_end_label__ = make_label(), *dummy__ = 0; \
+    !(dummy__++); \
+    push_instruction(&builder_, (Instruction) {.maybe_label = match_end_label__})\
+  )
+#define Case(_value_)\
+  for (\
+    Label *label__ = make_if(&builder_, _value_), *dummy__ = 0; \
+    !(dummy__++); \
+    push_instruction(&builder_, (Instruction) {jmp, {label32(match_end_label__), 0, 0}}),\
+    push_instruction(&builder_, (Instruction) {.maybe_label = label__})\
+  )
+#define CaseAny
+
 #define Loop \
   for ( \
     Loop_Builder loop_builder_ = loop_start(&builder_); \
