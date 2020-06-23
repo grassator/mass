@@ -17,14 +17,12 @@ reserve_stack(
   return result;
 }
 
-void
+inline void
 push_instruction(
   Function_Builder *builder,
   Instruction instruction
 ) {
-  assert(builder->instruction_count < MAX_INSTRUCTION_COUNT);
-  builder->instructions[builder->instruction_count] = instruction;
-  builder->instruction_count++;
+  array_push(builder->instructions, instruction);
 }
 
 void
@@ -111,7 +109,7 @@ fn_begin(Value **result, Buffer *buffer) {
     .descriptor = descriptor,
     .result = result,
     .code = buffer->memory + buffer->occupied,
-    .instructions = malloc(sizeof(Instruction) * MAX_INSTRUCTION_COUNT),
+    .instructions = array_alloc(Array_Instruction, 32),
   };
   Value *fn_value = temp_allocate(Value);
   Label *label = make_label();
@@ -168,8 +166,12 @@ fn_end(
   builder->stack_reserve = align(builder->stack_reserve, 16) + alignment;
   encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
 
-  for (u32 i = 0; i < builder->instruction_count; ++i) {
-    encode_instruction(builder, builder->instructions[i]);
+  for (
+    Instruction *instruction = array_begin(builder->instructions);
+    instruction != array_end(builder->instructions);
+    ++instruction
+  ) {
+    encode_instruction(builder, *instruction);
   }
 
   encode_instruction(builder, (Instruction) {.maybe_label = builder->epilog_label});
@@ -178,7 +180,7 @@ fn_end(
   encode_instruction(builder, (Instruction) {ret, {0}});
 
   fn_freeze(builder);
-  free(builder->instructions);
+  array_free(builder->instructions);
 }
 
 Value *

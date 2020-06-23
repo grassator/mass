@@ -42,11 +42,11 @@ typedef struct {
   s32 *patch_target;
   u8 *from_offset;
 } Label_Location;
-array_typedef(Label_Location);
+typedef array_type(Label_Location) Array_Label_Location;
 
 typedef struct {
   u8 *target;
-  array_type(Label_Location) locations;
+  Array_Label_Location locations;
 } Label;
 
 typedef struct {
@@ -194,6 +194,7 @@ typedef struct {
   Operand operands[3];
   Label *maybe_label;
 } Instruction;
+typedef array_type(Instruction) Array_Instruction;
 
 typedef struct {
   s32 stack_reserve;
@@ -204,12 +205,11 @@ typedef struct {
 
   Label *epilog_label;
 
-  #define MAX_INSTRUCTION_COUNT 4096
-  Instruction *instructions;
-  u32 instruction_count;
+  Array_Instruction instructions;
 
   Descriptor *descriptor;
 
   Value **result;
 } Function_Builder;
+
 #endif VALUE_H

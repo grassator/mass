@@ -8,15 +8,15 @@
 #define CONCAT_HELPER(a, b) a ## b
 #define CONCAT(a, b) CONCAT_HELPER(a, b)
 
-typedef int8_t  s8,  *s8_ptr;
-typedef int16_t s16, *s16_ptr;
-typedef int32_t s32, *s32_ptr;
-typedef int64_t s64, *s64_ptr;
+typedef int8_t  s8;
+typedef int16_t s16;
+typedef int32_t s32;
+typedef int64_t s64;
 
-typedef uint8_t  u8,  *u8_ptr;
-typedef uint16_t u16, *u16_ptr;
-typedef uint32_t u32, *u32_ptr;
-typedef uint64_t u64, *u64_ptr;
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 typedef void (*fn_type_void_to_void)(void);
 typedef fn_type_void_to_void fn_type_opaque;
@@ -103,35 +103,25 @@ typedef struct {
   s8 items[];
 } Dynamic_Array_Internal;
 
-#define array_typedef(_type_)\
-  typedef union {\
+#define array_type(_type_)\
+  union {\
     Dynamic_Array_Internal *internal;\
     struct {\
       _type_ *next_free;\
       _type_ *after_last;\
       _type_ items[];\
     } *array;\
-  } CONCAT(Dynamic_Array__, _type_)
+  }
 
-array_typedef(s8);
-array_typedef(s16);
-array_typedef(s32);
-array_typedef(s64);
+typedef array_type(s8)  Array_s8;
+typedef array_type(s16) Array_s16;
+typedef array_type(s32) Array_s32;
+typedef array_type(s64) Array_s64;
 
-array_typedef(u8);
-array_typedef(u16);
-array_typedef(u32);
-array_typedef(u64);
-
-array_typedef(s8_ptr);
-array_typedef(s16_ptr);
-array_typedef(s32_ptr);
-array_typedef(s64_ptr);
-
-array_typedef(u8_ptr);
-array_typedef(u16_ptr);
-array_typedef(u32_ptr);
-array_typedef(u64_ptr);
+typedef array_type(u8)  Array_u8;
+typedef array_type(u16) Array_u16;
+typedef array_type(u32) Array_u32;
+typedef array_type(u64) Array_u64;
 
 Dynamic_Array_Internal *
 dynamic_array_realloc_internal(
@@ -157,11 +147,16 @@ dynamic_array_ensure_capacity(
   }
 }
 
-#define array_type(_type_) CONCAT(Dynamic_Array__, _type_)
-#define array_alloc(_type_, _count_)\
-  ((CONCAT(Dynamic_Array__, _type_)) {\
-    .internal = dynamic_array_realloc_internal(0, sizeof(_type_), (_count_)),\
+#define array_alloc(_array_type_, _count_)\
+  ((_array_type_) {\
+    .internal = dynamic_array_realloc_internal(\
+      0, sizeof(((_array_type_ *) 0)->array->items[0]), (_count_)\
+    ),\
   })
+
+#define array_free(_array_)\
+  free((_array_).array)
+
 #define array_push(_array_, ...)\
   do {\
     dynamic_array_ensure_capacity(&((_array_).internal), sizeof((_array_).array->items[0]), 1);\
@@ -184,5 +179,7 @@ dynamic_array_ensure_capacity(
   ((_array_).array->next_free)
 
 #define at(_index_) array->items[_index_]
+
+
 
 #endif PRELUDE_H
