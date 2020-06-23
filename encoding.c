@@ -34,11 +34,14 @@ encode_instruction(
     assert(!label->target);
     label->target = buffer->memory + buffer->occupied;
 
-    for (u32 i = 0; i < label->location_count; ++i) {
-      Label_Location label_location = label->locations[i];
-      s32 diff = (s32)(label->target - label_location.from_offset);
+    for (
+      Label_Location *label_location = array_begin(label->locations);
+      label_location != array_end(label->locations);
+      ++label_location
+    ) {
+      s32 diff = (s32)(label->target - label_location->from_offset);
       assert(diff >= 0);
-      *label_location.patch_target = diff;
+      *label_location->patch_target = diff;
     }
     return;
   }
@@ -273,16 +276,13 @@ encode_instruction(
           assert(diff < 0);
           buffer_append_s32(buffer, diff);
         } else {
-          assert(operand->label32->location_count < MAX_LABEL_LOCATION_COUNT);
           s32 *patch_target = (s32 *)(buffer->memory + buffer->occupied);
           buffer_append_s32(buffer, 0xCCCCCCCC);
 
-          operand->label32->locations[operand->label32->location_count] =
-            (Label_Location) {
-              .patch_target = patch_target,
-              .from_offset = buffer->memory + buffer->occupied,
-            };
-          operand->label32->location_count++;
+          array_push(operand->label32->locations, (Label_Location) {
+            .patch_target = patch_target,
+            .from_offset = buffer->memory + buffer->occupied,
+          });
         }
 
       }

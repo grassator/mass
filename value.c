@@ -263,7 +263,7 @@ inline Label*
 make_label() {
   Label *label = temp_allocate(Label);
   *label = (Label) {
-    .locations = temp_allocate_array(s32 *, MAX_LABEL_LOCATION_COUNT)
+    .locations = array_alloc(Label_Location, 16),
   };
   return label;
 }

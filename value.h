@@ -42,12 +42,11 @@ typedef struct {
   s32 *patch_target;
   u8 *from_offset;
 } Label_Location;
+array_typedef(Label_Location);
 
 typedef struct {
   u8 *target;
-  #define MAX_LABEL_LOCATION_COUNT 32
-  Label_Location *locations;
-  u32 location_count;
+  array_type(Label_Location) locations;
 } Label;
 
 typedef struct {

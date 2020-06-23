@@ -29,7 +29,7 @@ free_buffer(
   VirtualFree(buffer->memory, 0, MEM_RELEASE);
 }
 
-#define static_array_size(Array) (sizeof(Array) / sizeof(Array[0]))
+#define static_array_size(_array_) (sizeof(_array_) / sizeof((_array_)[0]))
 
 void
 buffer_reset(
@@ -75,3 +75,34 @@ define_buffer_append(u64)
 #undef define_buffer_append
 
 Buffer temp_buffer = {0};
+
+Dynamic_Array_Internal *
+dynamic_array_realloc_internal(
+  Dynamic_Array_Internal *internal,
+  size_t item_size,
+  size_t item_count
+) {
+  size_t new_allocation_size = sizeof(Dynamic_Array_Internal) + item_count * item_size;
+  Dynamic_Array_Internal *result = realloc(internal, new_allocation_size);
+  if (result) {
+    result->next_free = result->items;
+    result->after_last = result->items + item_count * item_size;
+  } else {
+    free(internal);
+  }
+  return result;
+}
+
+void
+dynamic_array_increase_capacity(
+  Dynamic_Array_Internal **internal,
+  size_t item_size
+) {
+  size_t current_capacity = ((*internal)->after_last - (*internal)->items) / item_size;
+  size_t new_capacity = current_capacity + current_capacity / 2;
+  size_t next_free_offset = (*internal)->next_free - (*internal)->items;
+  *internal = dynamic_array_realloc_internal(*internal, item_size, new_capacity);
+  if (*internal) {
+    (*internal)->next_free += next_free_offset;
+  }
+}
