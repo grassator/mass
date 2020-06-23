@@ -471,10 +471,21 @@ parse_c_type(
   for(const char *ch = range_start; ch <= range_end; ++ch) {
     if (!(*ch == ' ' || *ch == '*' || ch == range_end)) continue;
     if (start != ch) {
-      if (memory_range_equal_to_c_string(start, ch, "char")) {
+      if (
+        memory_range_equal_to_c_string(start, ch, "char") ||
+        memory_range_equal_to_c_string(start, ch, "s8")
+      ) {
         descriptor = &descriptor_s8;
-      } else if (memory_range_equal_to_c_string(start, ch, "int")) {
+      } else if (
+        memory_range_equal_to_c_string(start, ch, "int") ||
+        memory_range_equal_to_c_string(start, ch, "s32")
+      ) {
         descriptor = &descriptor_s32;
+      } else if (
+        memory_range_equal_to_c_string(start, ch, "void *") ||
+        memory_range_equal_to_c_string(start, ch, "s64")
+      ) {
+        descriptor = &descriptor_s64;
       } else if (memory_range_equal_to_c_string(start, ch, "void")) {
         descriptor = &descriptor_void;
       } else if (memory_range_equal_to_c_string(start, ch, "const")) {
@@ -526,11 +537,7 @@ c_function_return_value(
     case Descriptor_Type_Function:
     case Descriptor_Type_Integer:
     case Descriptor_Type_Pointer: {
-      Value *return_value = temp_allocate(Value);
-      *return_value = (const Value) {
-        .descriptor = descriptor,
-        .operand = eax,
-      };
+      Value *return_value = value_register_for_descriptor(Register_A, descriptor);
       return return_value;
     }
     case Descriptor_Type_Tagged_Union:

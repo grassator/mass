@@ -368,6 +368,28 @@ spec("function") {
     value_as_function(hello, fn_type_void_to_void)();
   }
 
+  it("should be able to call imported function") {
+    HINSTANCE kernel32 = LoadLibraryA("Kernel32.dll");
+    check(kernel32);
+    fn_type_opaque GetStdHandle_from_dll = (fn_type_opaque)GetProcAddress(kernel32, "GetStdHandle");
+    check(GetStdHandle_from_dll);
+
+    buffer_append_s64(&function_buffer, (s64)GetStdHandle_from_dll);
+
+    Value *GetStdHandle_value = c_function_value("s64 GetStdHandle(s32)", (fn_type_opaque) puts);
+    GetStdHandle_value->operand = (Operand) {
+      .type = Operand_Type_RIP_Relative,
+      .byte_size = descriptor_byte_size(&descriptor_s64),
+      .imm64 = (s64) function_buffer.memory,
+    };
+
+    Function(checker_value) {
+      Return(Call(GetStdHandle_value, value_from_s32(STD_INPUT_HANDLE)));
+    }
+    HANDLE actual = (HANDLE) value_as_function(checker_value, fn_type_void_to_s64)();
+    check(actual == GetStdHandle(STD_INPUT_HANDLE));
+  }
+
   it("should be able to call puts() to say 'Hi!'") {
     Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
 
