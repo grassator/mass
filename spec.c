@@ -139,8 +139,6 @@ struct_get_field(
 }
 
 
-Buffer function_buffer;
-
 Value *
 maybe_cast_to_tag(
   Function_Builder *builder,
@@ -208,6 +206,7 @@ Point test() {
 
 fn_type_s32_to_s8
 create_is_character_in_set_checker_fn(
+  Program *program_,
   const char *characters
 ) {
   assert(characters);
@@ -230,21 +229,29 @@ create_is_character_in_set_checker_fn(
 
 spec("mass") {
 
+  static Program test_program;
+  static Program *program_;
+
   before() {
     temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   }
 
   before_each() {
-    function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE);
+    test_program = (Program) {
+      .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
+      .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
+    };
+    program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
 
   after_each() {
-    free_buffer(&function_buffer);
+    free_buffer(&test_program.function_buffer);
+    free_buffer(&test_program.data_buffer);
   }
 
   it("should have a way to create a function to checks if a character is one of the provided set") {
-    fn_type_s32_to_s8 is_whitespace = create_is_character_in_set_checker_fn(" \n\r\t");
+    fn_type_s32_to_s8 is_whitespace = create_is_character_in_set_checker_fn(program_, " \n\r\t");
     check(is_whitespace(' '));
     check(is_whitespace('\r'));
     check(is_whitespace('\n'));
@@ -293,18 +300,21 @@ spec("mass") {
   }
 
   it("should support RIP-relative addressing") {
-    buffer_append_s32(&function_buffer, 42);
-    Value rip = {
-      .descriptor = &descriptor_s32,
-      .operand = {
-        .type = Operand_Type_RIP_Relative,
-        .byte_size = descriptor_byte_size(&descriptor_s32),
-        .imm64 = (s64) function_buffer.memory,
-      },
-    };
+    Value *global_a = value_global(program_, &descriptor_s32);
+    {
+      check(global_a->operand.type == Operand_Type_RIP_Relative);
+      s32 *address = (s32 *)global_a->operand.imm64;
+      *address = 32;
+    }
+    Value *global_b = value_global(program_, &descriptor_s32);
+    {
+      check(global_b->operand.type == Operand_Type_RIP_Relative);
+      s32 *address = (s32 *)global_b->operand.imm64;
+      *address = 10;
+    }
 
     Function(checker_value) {
-      Return(&rip);
+      Return(Plus(global_a, global_b));
     }
     fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
     check(checker() == 42);

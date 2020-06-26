@@ -228,11 +228,11 @@ encode_instruction(
         Operand *operand = &instruction.operands[operand_index];
         if (operand->type == Operand_Type_RIP_Relative) {
           s64 start_address = (s64) buffer->memory;
-          s64 end_address = start_address + buffer->capacity;
-          assert(operand->imm64 >= start_address && operand->imm64 <= end_address);
           s64 next_instruction_address = start_address + buffer->occupied + sizeof(s32);
 
-          s32 displacement = (s32)(operand->imm64 - next_instruction_address);
+          s64 diff = operand->imm64 - next_instruction_address;
+          assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
+          s32 displacement = (s32)(diff);
 
           buffer_append_s32(buffer, displacement);
         }  else if (operand->type == Operand_Type_Memory_Indirect) {

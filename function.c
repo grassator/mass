@@ -25,6 +25,16 @@ push_instruction(
   array_push(builder->instructions, instruction);
 }
 
+bool
+is_memory_operand(
+  Operand *operand
+) {
+  return (
+    operand->type == Operand_Type_Memory_Indirect ||
+    operand->type == Operand_Type_RIP_Relative
+  );
+}
+
 void
 move_value(
   Function_Builder *builder,
@@ -34,6 +44,14 @@ move_value(
   // TODO figure out more type checking
   u32 a_size = descriptor_byte_size(a->descriptor);
   u32 b_size = descriptor_byte_size(b->descriptor);
+
+  if (is_memory_operand(&a->operand) && is_memory_operand(&b->operand)) {
+    Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
+    move_value(builder, reg_a, b);
+    move_value(builder, a, reg_a);
+    return;
+  }
+
 //
 //
   //if (a_size != b_size) {
@@ -92,7 +110,8 @@ move_value(
 }
 
 Function_Builder
-fn_begin(Value **result, Buffer *buffer) {
+fn_begin(Value **result, Program *program) {
+  Buffer *buffer = &program->function_buffer;
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
@@ -704,7 +723,11 @@ make_or(
 
 #define Function(_id_) \
   Value *_id_ = 0; \
-  for (Function_Builder builder_ = fn_begin(&_id_, &function_buffer); !fn_is_frozen(&builder_); fn_end(&builder_))
+  for (\
+    Function_Builder builder_ = fn_begin(&_id_, program_);\
+    !fn_is_frozen(&builder_);\
+    fn_end(&builder_)\
+  )
 
 #define Return(_value_) \
   fn_return(&builder_, _value_)

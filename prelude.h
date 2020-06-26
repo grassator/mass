@@ -65,6 +65,12 @@ buffer_reset(
   Buffer *buffer
 );
 
+Buffer
+make_buffer(
+  u64 capacity,
+  s32 permission_flags
+);
+
 #define buffer_allocate(_buffer_, _type_) \
   (_type_ *)buffer_allocate_size((_buffer_), sizeof(_type_))
 

@@ -3,6 +3,7 @@
 #include "bdd-for-c.h"
 
 #include "prelude.c"
+#include "pe32.c"
 #include "value.c"
 #include "instruction.c"
 #include "encoding.c"
@@ -10,10 +11,9 @@
 
 #endif
 
-Buffer function_buffer;
-
 Value *
 make_identity(
+  Program *program_,
   Descriptor *type
 ) {
   Function(id) {
@@ -25,6 +25,7 @@ make_identity(
 
 Value *
 make_add_two(
+  Program *program_,
   Descriptor *type
 ) {
   Function(addtwo) {
@@ -33,19 +34,32 @@ make_add_two(
   }
   return addtwo;
 }
+
 spec("function") {
+
+  static Program test_program;
+  static Program *program_;
 
   before() {
     temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   }
 
   before_each() {
-    function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE);
+    test_program = (Program) {
+      .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
+      .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
+    };
+    program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
 
   after_each() {
-    free_buffer(&function_buffer);
+    free_buffer(&test_program.function_buffer);
+    free_buffer(&test_program.data_buffer);
+  }
+
+  it("should write out an executable") {
+    write_executable();
   }
 
   it("should support short-curciting &&") {
@@ -121,9 +135,6 @@ spec("function") {
       Return(Plus(x, y));
     }
 
-    DWORD previous;
-    VirtualProtect(function_buffer.memory, function_buffer.capacity, PAGE_EXECUTE, &previous);
-
     fn_type_void_to_s64 sizeof_s64 = value_as_function(sizeof_s64_value, fn_type_void_to_s64);
     check(sizeof_s64() == 8);
 
@@ -132,9 +143,9 @@ spec("function") {
   }
 
   it("should support parametric polymorphism") {
-    Value *id_s64 = make_identity(&descriptor_s64);
-    Value *id_s32 = make_identity(&descriptor_s32);
-    Value *addtwo_s64 = make_add_two(&descriptor_s64);
+    Value *id_s64 = make_identity(program_, &descriptor_s64);
+    Value *id_s32 = make_identity(program_, &descriptor_s32);
+    Value *addtwo_s64 = make_add_two(program_, &descriptor_s64);
     Function(check) {
       Call(id_s64, value_from_s64(0));
       Call(id_s32, value_from_s32(0));
@@ -374,15 +385,17 @@ spec("function") {
     fn_type_opaque GetStdHandle_from_dll = (fn_type_opaque)GetProcAddress(kernel32, "GetStdHandle");
     check(GetStdHandle_from_dll);
 
-    buffer_append_s64(&function_buffer, (s64)GetStdHandle_from_dll);
+    Value *GetStdHandle_value = c_function_value(
+      "s64 GetStdHandle(s32)",
+      (fn_type_opaque) GetStdHandle
+    );
 
-    Value *GetStdHandle_value = c_function_value("s64 GetStdHandle(s32)", (fn_type_opaque) puts);
-    GetStdHandle_value->operand = (Operand) {
-      .type = Operand_Type_RIP_Relative,
-      .byte_size = descriptor_byte_size(&descriptor_s64),
-      .imm64 = (s64) function_buffer.memory,
-    };
-
+    Value *global = value_global(program_, descriptor_pointer_to(GetStdHandle_value->descriptor));
+    {
+      check(global->operand.type == Operand_Type_RIP_Relative);
+      fn_type_opaque *address = (fn_type_opaque *)global->operand.imm64;
+      *address = GetStdHandle_from_dll;
+    }
     Function(checker_value) {
       Return(Call(GetStdHandle_value, value_from_s32(STD_INPUT_HANDLE)));
     }

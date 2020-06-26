@@ -3,3 +3,4 @@
 build/
 cmake-build-debug/
 cmake-build-release/
+minimal.exe

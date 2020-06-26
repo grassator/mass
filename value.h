@@ -197,6 +197,11 @@ typedef struct {
 typedef array_type(Instruction) Array_Instruction;
 
 typedef struct {
+  Buffer function_buffer;
+  Buffer data_buffer;
+} Program;
+
+typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   u8 next_argument_index;

@@ -201,7 +201,7 @@ print_operand(
       break;
     }
     case Operand_Type_RIP_Relative: {
-      printf("[rip + xxx]");
+      printf("rip_to(0x%016llx)", operand->imm64);
       break;
     }
     case Operand_Type_Label_32: {
@@ -402,6 +402,26 @@ value_register_for_descriptor(
       .type = Operand_Type_Register,
       .reg = reg,
       .byte_size = byte_size,
+    },
+  };
+  return result;
+}
+
+Value *
+value_global(
+  Program *program,
+  Descriptor *descriptor
+) {
+  u32 byte_size = descriptor_byte_size(descriptor);
+  void *address = buffer_allocate_size(&program->data_buffer, byte_size);
+
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = descriptor,
+    .operand = {
+      .type = Operand_Type_RIP_Relative,
+      .byte_size = byte_size,
+      .imm64 = (s64) address,
     },
   };
   return result;
