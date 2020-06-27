@@ -78,7 +78,7 @@ void write_executable() {
     .SizeOfStackCommit = 0x1000,
     .SizeOfHeapReserve = 0x100000,
     .SizeOfHeapCommit = 0x1000,
-    .NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES, // TODO think about shrinking this if possible
+    .NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
     .DataDirectory = {
       {0}, // Export
       {.VirtualAddress = 0x20F8, .Size = 0x28}, // Import FIXME calculate this address and size
@@ -95,7 +95,7 @@ void write_executable() {
       {0}, // Load Config
       {0}, // Bound Import
 
-      {.VirtualAddress = 0x2000, .Size = 0x10}, // IAT (Import Address Table)  FIXME calculate this address and size
+      {.VirtualAddress = 0x2000, .Size = 0x10}, // IAT (Import Address Table)  FIXME calculate this
       {0}, // Delay Import
       {0}, // CLR
       {0}, // Reserved
@@ -142,6 +142,99 @@ void write_executable() {
 
   // NULL header telling that the list is done
   *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = (IMAGE_SECTION_HEADER){0};
+
+  // .text segment
+  assert(exe_buffer.occupied < text_section_header->PointerToRawData);
+  exe_buffer.occupied = text_section_header->PointerToRawData;
+
+  buffer_append_s8(&exe_buffer, 0x48); // sub rsp 28
+  buffer_append_s8(&exe_buffer, 0x83);
+  buffer_append_s8(&exe_buffer, 0xEC);
+  buffer_append_s8(&exe_buffer, 0x28);
+  buffer_append_s8(&exe_buffer, 0xB9);
+  buffer_append_s8(&exe_buffer, 0x2A);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+
+  buffer_append_s8(&exe_buffer, 0xFF); // call
+  buffer_append_s8(&exe_buffer, 0x15);
+  buffer_append_s8(&exe_buffer, 0xF1);
+  buffer_append_s8(&exe_buffer, 0x0F);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+
+  buffer_append_s8(&exe_buffer, 0xCC); // int3
+
+  // .rdata segment
+  exe_buffer.occupied = rdata_section_header->PointerToRawData;
+  s32 iat_rva = 0x2130; // FIXME calculate this
+  buffer_append_s32(&exe_buffer, iat_rva);
+
+
+  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x10; // FIXME do not hardcode this
+  s8 debug_bytes[] = {
+    0x00, 0x00, 0x00, 0x00, 0x56, 0x8E, 0xF4, 0x5E, 0x00, 0x00,
+    0x00, 0x00, 0x0D, 0x00, 0x00, 0x00, 0xC4, 0x00, 0x00, 0x00,
+    0x2C, 0x20, 0x00, 0x00, 0x2C, 0x06, 0x00, 0x00
+  };
+  assert(static_array_size(debug_bytes) == 0x1C);
+  for (s32 i = 0; i < static_array_size(debug_bytes); ++i) {
+    buffer_append_s8(&exe_buffer, debug_bytes[i]);
+  }
+
+  // .idata?
+  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0xF8;
+
+  IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
+    buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
+  *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
+    .OriginalFirstThunk = 0x2120,
+    .Name = 0x213E,
+    .FirstThunk = 0x2000,
+  };
+
+  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x120;
+  IMAGE_THUNK_DATA64 *image_thunk =
+    buffer_allocate(&exe_buffer, IMAGE_THUNK_DATA64);
+  *image_thunk = (IMAGE_THUNK_DATA64) {0x2130};
+
+  {
+    exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x130;
+    buffer_append_s16(&exe_buffer, 0x0164); // TODO set to zero
+    s8 function_name[] = "ExitProcess";
+
+    s32 aligned_function_name_size = align(static_array_size(function_name), 2);
+    memcpy(
+      buffer_allocate_size(&exe_buffer, aligned_function_name_size),
+      function_name,
+      static_array_size(function_name)
+    );
+  }
+
+  {
+    exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x13E;
+    s8 library_name[] = "KERNEL32.DLL";
+
+    s32 aligned_name_size = align(static_array_size(library_name), 2);
+    memcpy(
+      buffer_allocate_size(&exe_buffer, aligned_name_size),
+      library_name,
+      static_array_size(library_name)
+    );
+  }
+
+  // .pdata segment
+  exe_buffer.occupied = pdata_section_header->PointerToRawData;
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x10);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x10);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0xF0);
+  buffer_append_s8(&exe_buffer, 0x20);
 
   /////////
 
