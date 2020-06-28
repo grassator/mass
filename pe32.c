@@ -60,7 +60,7 @@ void write_executable() {
 
       {0}, // Security
       {0}, // Relocation
-      {.VirtualAddress = 0x2010, .Size = 0x1C}, // Debug FIXME will take a while to implement
+      {0}, // Debug
       {0}, // Architecture
 
       {0}, // Global PTR
@@ -131,18 +131,7 @@ void write_executable() {
   exe_buffer.occupied = rdata_section_header->PointerToRawData;
   s32 iat_rva = 0x2130; // FIXME calculate this
   buffer_append_s32(&exe_buffer, iat_rva);
-
-
-  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x10; // FIXME do not hardcode this
-  s8 debug_bytes[] = {
-    0x00, 0x00, 0x00, 0x00, 0x56, 0x8E, 0xF4, 0x5E, 0x00, 0x00,
-    0x00, 0x00, 0x0D, 0x00, 0x00, 0x00, 0xC4, 0x00, 0x00, 0x00,
-    0x2C, 0x20, 0x00, 0x00, 0x2C, 0x06, 0x00, 0x00
-  };
-  assert(static_array_size(debug_bytes) == 0x1C);
-  for (s32 i = 0; i < static_array_size(debug_bytes); ++i) {
-    buffer_append_s8(&exe_buffer, debug_bytes[i]);
-  }
+  // FIXME add empty entry
 
   // .idata?
   exe_buffer.occupied = rdata_section_header->PointerToRawData + 0xF8;
