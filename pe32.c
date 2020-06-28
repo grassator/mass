@@ -15,7 +15,7 @@ void write_executable() {
 
   *file_header = (IMAGE_FILE_HEADER) {
     .Machine = IMAGE_FILE_MACHINE_AMD64,
-    .NumberOfSections = 3,
+    .NumberOfSections = 2,
     .TimeDateStamp = 0x5EF48E56, // FIXME generate ourselves
     .SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64),
     .Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE,
@@ -56,7 +56,7 @@ void write_executable() {
       {0}, // Export
       {.VirtualAddress = 0x20F8, .Size = 0x28}, // Import FIXME calculate this address and size
       {0}, // Resource
-      {.VirtualAddress = 0x3000, .Size = 0x0C}, // Exception FIXME remove exception info??
+      {0}, // Exception
 
       {0}, // Security
       {0}, // Relocation
@@ -100,18 +100,6 @@ void write_executable() {
     .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
   };
   section_offset += rdata_section_header->SizeOfRawData;
-
-  // .pdata section
-  IMAGE_SECTION_HEADER *pdata_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
-  *pdata_section_header = (IMAGE_SECTION_HEADER) {
-    .Name = ".pdata",
-    .Misc = 0x0C, // FIXME size of global data in bytes
-    .VirtualAddress = 0x3000, // FIXME calculate this
-    .SizeOfRawData = 0x200, // FIXME calculate this
-    .PointerToRawData = section_offset,
-    .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
-  };
-  section_offset += pdata_section_header->SizeOfRawData;
 
   // NULL header telling that the list is done
   *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = (IMAGE_SECTION_HEADER){0};
@@ -196,22 +184,8 @@ void write_executable() {
       static_array_size(library_name)
     );
   }
-
-  // .pdata segment
-  exe_buffer.occupied = pdata_section_header->PointerToRawData;
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x10);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x10);
-  buffer_append_s8(&exe_buffer, 0x10);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0xF0);
-  buffer_append_s8(&exe_buffer, 0x20);
-
   exe_buffer.occupied =
-    pdata_section_header->PointerToRawData + pdata_section_header->SizeOfRawData;
+    rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
 
   /////////
 
