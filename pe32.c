@@ -23,24 +23,41 @@ void write_executable() {
 
   IMAGE_OPTIONAL_HEADER64 *optional_header = buffer_allocate(&exe_buffer, IMAGE_OPTIONAL_HEADER64);
 
+  enum {
+    EXPORT_DIRECTORY_INDEX,
+    IMPORT_DIRECTORY_INDEX,
+    RESOURCE_DIRECTORY_INDEX,
+    EXCEPTION_DIRECTORY_INDEX,
+    SECURITY_DIRECTORY_INDEX,
+    RELOCATION_DIRECTORY_INDEX,
+    DEBUG_DIRECTORY_INDEX,
+    ARCHITECTURE_DIRECTORY_INDEX,
+    GLOBAL_PTR_DIRECTORY_INDEX,
+    TLS_DIRECTORY_INDEX,
+    LOAD_CONFIG_DIRECTORY_INDEX,
+    BOUND_IMPORT_DIRECTORY_INDEX,
+    IAT_DIRECTORY_INDEX,
+    DELAY_IMPORT_DIRECTORY_INDEX,
+    CLR_DIRECTORY_INDEX,
+  };
+
+
+
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
-    .MajorLinkerVersion = 0x0E, // FIXME remove or replace once initial implementation is done
-    .MinorLinkerVersion = 0x1A, // FIXME remove or replace once initial implementation is done
     .SizeOfCode = 0x200, // FIXME calculate based on the amount of machine code
     .SizeOfInitializedData = 0x400, // FIXME calculate based on the amount of global data
-    .SizeOfUninitializedData = 0, // FIXME figure out difference between initialed and uninitialized
     .AddressOfEntryPoint = 0x1000, // FIXME resolve to the entry point in the machine code
     .BaseOfCode = 0x1000, // FIXME resolve to the right section containing code
-    .ImageBase = 0x0000000140000000, // TODO figure out if we should change this
+    .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
     .SectionAlignment = 0x1000,
     .FileAlignment = 0x200,
     .MajorOperatingSystemVersion = 6, // FIXME figure out if can be not hard coded
     .MinorOperatingSystemVersion = 0,
     .MajorSubsystemVersion = 6, // FIXME figure out if can be not hard coded
     .MinorSubsystemVersion = 0,
-    .SizeOfImage = 0x4000, // FIXME calculate based on the sizes of the sections
-    .SizeOfHeaders = 0x400, // FIXME calculate correctly (as described in MSDN)
+    .SizeOfImage = 0x3000, // FIXME calculate based on the sizes of the sections
+    .SizeOfHeaders = 0,
     .Subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI, // TODO allow user to specify this
     .DllCharacteristics =
       IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
@@ -52,30 +69,8 @@ void write_executable() {
     .SizeOfHeapReserve = 0x100000,
     .SizeOfHeapCommit = 0x1000,
     .NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
-    .DataDirectory = {
-      {0}, // Export
-      {.VirtualAddress = 0x20F8, .Size = 0x28}, // Import FIXME calculate this address and size
-      {0}, // Resource
-      {0}, // Exception
-
-      {0}, // Security
-      {0}, // Relocation
-      {0}, // Debug
-      {0}, // Architecture
-
-      {0}, // Global PTR
-      {0}, // TLS
-      {0}, // Load Config
-      {0}, // Bound Import
-
-      {.VirtualAddress = 0x2000, .Size = 0x10}, // IAT (Import Address Table)  FIXME calculate this
-      {0}, // Delay Import
-      {0}, // CLR
-      {0}, // Reserved
-    },
+    .DataDirectory = {0},
   };
-
-  u32 section_offset = optional_header->SizeOfHeaders;
 
   // .text section
   IMAGE_SECTION_HEADER *text_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
@@ -84,10 +79,9 @@ void write_executable() {
     .Misc = 0x10, // FIXME size of machine code in bytes
     .VirtualAddress = optional_header->BaseOfCode,
     .SizeOfRawData = optional_header->SizeOfCode,
-    .PointerToRawData = section_offset,
+    .PointerToRawData = 0,
     .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
   };
-  section_offset += text_section_header->SizeOfRawData;
 
   // .rdata section
   IMAGE_SECTION_HEADER *rdata_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
@@ -96,16 +90,27 @@ void write_executable() {
     .Misc = 0x14C, // FIXME size of machine code in bytes
     .VirtualAddress = 0x2000, // FIXME calculate this
     .SizeOfRawData = 0x200, // FIXME calculate this
-    .PointerToRawData = section_offset,
+    .PointerToRawData = 0,
     .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
   };
-  section_offset += rdata_section_header->SizeOfRawData;
 
   // NULL header telling that the list is done
   *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = (IMAGE_SECTION_HEADER){0};
 
+  optional_header->SizeOfHeaders = align((s32)exe_buffer.occupied, optional_header->FileAlignment);
+  exe_buffer.occupied = optional_header->SizeOfHeaders;
+
+  IMAGE_SECTION_HEADER *sections[] = {
+    text_section_header,
+    rdata_section_header,
+  };
+  s32 section_offset = optional_header->SizeOfHeaders;
+  for (u32 i = 0; i < static_array_size(sections); ++i) {
+    sections[i]->PointerToRawData = section_offset;
+    section_offset += sections[i]->SizeOfRawData;
+  }
+
   // .text segment
-  assert(exe_buffer.occupied < text_section_header->PointerToRawData);
   exe_buffer.occupied = text_section_header->PointerToRawData;
 
   buffer_append_s8(&exe_buffer, 0x48); // sub rsp 28
@@ -128,30 +133,74 @@ void write_executable() {
   buffer_append_s8(&exe_buffer, 0xCC); // int3
 
   // .rdata segment
-  exe_buffer.occupied = rdata_section_header->PointerToRawData;
-  s32 iat_rva = 0x2130; // FIXME calculate this
-  buffer_append_s32(&exe_buffer, iat_rva);
-  // FIXME add empty entry
 
-  // .idata?
-  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0xF8;
+  const char *functions[] = {"ExitProcess"};
+
+  struct Import {
+    const char *library_name;
+    const char **functions;
+    s32 function_count;
+    // FIXME add patch locations
+  } kernel32 = {
+    .library_name = "kernel32.dll",
+    .functions = functions,
+    .function_count = static_array_size(functions),
+  };
+
+  (void)kernel32;
+
+  #define file_offset_to_rva(_section_header_)\
+    ((s32)exe_buffer.occupied - \
+     (_section_header_)->PointerToRawData + \
+     (_section_header_)->VirtualAddress)
+
+  exe_buffer.occupied = rdata_section_header->PointerToRawData;
+
+
+  // IAT
+  s32 iat_rva = file_offset_to_rva(rdata_section_header);
+  s64 *ExitProcess_name_rva = buffer_allocate(&exe_buffer, s64);
+  buffer_append_s64(&exe_buffer, 0);
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress = iat_rva;
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
+    (s32)(exe_buffer.occupied - rdata_section_header->PointerToRawData);
+
+  // Library Names
+  s32 kernel32_name_rva = file_offset_to_rva(rdata_section_header);
+  {
+    s8 library_name[] = "KERNEL32.DLL";
+    s32 aligned_name_size = align(static_array_size(library_name), 2);
+    memcpy(
+      buffer_allocate_size(&exe_buffer, aligned_name_size),
+      library_name,
+      static_array_size(library_name)
+    );
+  }
+
+  // Import Directory
+  s32 import_directory_rva = file_offset_to_rva(rdata_section_header);
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress = import_directory_rva;
 
   IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
     buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
-  *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
-    .OriginalFirstThunk = 0x2120,
-    .Name = 0x213E,
-    .FirstThunk = 0x2000,
-  };
 
-  exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x120;
-  IMAGE_THUNK_DATA64 *image_thunk =
-    buffer_allocate(&exe_buffer, IMAGE_THUNK_DATA64);
-  *image_thunk = (IMAGE_THUNK_DATA64) {0x2130};
+  s32 image_thunk_rva = file_offset_to_rva(rdata_section_header);
+
+  *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
+    .OriginalFirstThunk = image_thunk_rva,
+    .Name = kernel32_name_rva,
+    .FirstThunk = iat_rva,
+  };
+  s64 *image_thunk = buffer_allocate(&exe_buffer, s64);
+  buffer_append_s64(&exe_buffer, 0);
 
   {
-    exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x130;
-    buffer_append_s16(&exe_buffer, 0x0164); // TODO set to zero
+    s32 import_name_rva = file_offset_to_rva(rdata_section_header);
+
+    *ExitProcess_name_rva = import_name_rva;
+    *image_thunk = import_name_rva;
+
+    buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
     s8 function_name[] = "ExitProcess";
 
     s32 aligned_function_name_size = align(static_array_size(function_name), 2);
@@ -161,18 +210,9 @@ void write_executable() {
       static_array_size(function_name)
     );
   }
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
+    file_offset_to_rva(rdata_section_header) - import_directory_rva;
 
-  {
-    exe_buffer.occupied = rdata_section_header->PointerToRawData + 0x13E;
-    s8 library_name[] = "KERNEL32.DLL";
-
-    s32 aligned_name_size = align(static_array_size(library_name), 2);
-    memcpy(
-      buffer_allocate_size(&exe_buffer, aligned_name_size),
-      library_name,
-      static_array_size(library_name)
-    );
-  }
   exe_buffer.occupied =
     rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
 
