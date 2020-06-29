@@ -1,6 +1,19 @@
 #include "prelude.h"
 #include "assert.h"
 
+typedef struct {
+  const char *name;
+  u32 rva;
+} Import_Name_To_Rva;
+
+typedef struct {
+  Import_Name_To_Rva dll;
+  Import_Name_To_Rva *functions;
+  u32 iat_rva;
+  u32 image_thunk_rva;
+  s32 function_count;
+} Import_Library;
+
 void write_executable() {
   Buffer exe_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   IMAGE_DOS_HEADER *dos_header = buffer_allocate(&exe_buffer, IMAGE_DOS_HEADER);
@@ -40,8 +53,6 @@ void write_executable() {
     DELAY_IMPORT_DIRECTORY_INDEX,
     CLR_DIRECTORY_INDEX,
   };
-
-
 
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
@@ -110,6 +121,11 @@ void write_executable() {
     section_offset += sections[i]->SizeOfRawData;
   }
 
+  #define file_offset_to_rva(_section_header_)\
+    ((s32)exe_buffer.occupied - \
+     (_section_header_)->PointerToRawData + \
+     (_section_header_)->VirtualAddress)
+
   // .text segment
   exe_buffer.occupied = text_section_header->PointerToRawData;
 
@@ -117,63 +133,120 @@ void write_executable() {
   buffer_append_s8(&exe_buffer, 0x83);
   buffer_append_s8(&exe_buffer, 0xEC);
   buffer_append_s8(&exe_buffer, 0x28);
-  buffer_append_s8(&exe_buffer, 0xB9);
+
+  buffer_append_s8(&exe_buffer, 0xB9); // mov rcx, 42
   buffer_append_s8(&exe_buffer, 0x2A);
   buffer_append_s8(&exe_buffer, 0x00);
   buffer_append_s8(&exe_buffer, 0x00);
   buffer_append_s8(&exe_buffer, 0x00);
 
-  buffer_append_s8(&exe_buffer, 0xFF); // call
+  buffer_append_s8(&exe_buffer, 0xFF); // call ExitProcess
   buffer_append_s8(&exe_buffer, 0x15);
-  buffer_append_s8(&exe_buffer, 0xF1);
-  buffer_append_s8(&exe_buffer, 0x0F);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x00);
+  s32 *ExitProcess_rip_relative_address = buffer_allocate(&exe_buffer, s32);
+  s32 ExitProcess_call_rva = file_offset_to_rva(text_section_header);
 
   buffer_append_s8(&exe_buffer, 0xCC); // int3
 
+
   // .rdata segment
+  Import_Name_To_Rva kernel32_functions[] = {
+    // @MachineCodePatch
+    {.name = "ExitProcess", .rva = 0xCCCCCCCC},
 
-  const char *functions[] = {"ExitProcess"};
-
-  struct Import {
-    const char *library_name;
-    const char **functions;
-    s32 function_count;
-    // FIXME add patch locations
-  } kernel32 = {
-    .library_name = "kernel32.dll",
-    .functions = functions,
-    .function_count = static_array_size(functions),
+    {.name = "GetStdHandle", .rva = 0xCCCCCCCC},
+    {.name = "ReadConsoleA", .rva = 0xCCCCCCCC},
   };
 
-  (void)kernel32;
+  Import_Name_To_Rva user32_functions[] = {
+    {.name = "ShowWindow", .rva = 0xCCCCCCCC},
+  };
 
-  #define file_offset_to_rva(_section_header_)\
-    ((s32)exe_buffer.occupied - \
-     (_section_header_)->PointerToRawData + \
-     (_section_header_)->VirtualAddress)
-
-  exe_buffer.occupied = rdata_section_header->PointerToRawData;
+  Import_Library import_libraries[] = {
+    {
+      .dll = {.name = "kernel32.dll", .rva = 0xCCCCCCCC},
+      .iat_rva = 0xCCCCCCCC,
+      .image_thunk_rva = 0xCCCCCCCC,
+      .functions = kernel32_functions,
+      .function_count = static_array_size(kernel32_functions),
+    },
+    {
+      .dll = {.name = "user32.dll", .rva = 0xCCCCCCCC},
+      .iat_rva = 0xCCCCCCCC,
+      .image_thunk_rva = 0xCCCCCCCC,
+      .functions = user32_functions,
+      .function_count = static_array_size(user32_functions),
+    },
+  };
 
 
   // IAT
-  s32 iat_rva = file_offset_to_rva(rdata_section_header);
-  s64 *ExitProcess_name_rva = buffer_allocate(&exe_buffer, s64);
-  buffer_append_s64(&exe_buffer, 0);
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress = iat_rva;
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
+  exe_buffer.occupied = rdata_section_header->PointerToRawData;
+
+  for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
+    Import_Library *lib = &import_libraries[i];
+    for (s32 i = 0; i < lib->function_count; ++i) {
+      lib->functions[i].rva = file_offset_to_rva(rdata_section_header);
+      buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
+      size_t name_size = strlen(lib->functions[i].name) + 1;
+      s32 aligned_name_size = align((s32)name_size, 2);
+      memcpy(
+        buffer_allocate_size(&exe_buffer, aligned_name_size),
+        lib->functions[i].name,
+        name_size
+      );
+    }
+  }
+
+  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
+    file_offset_to_rva(rdata_section_header);
+  for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
+    Import_Library *lib = &import_libraries[i];
+    lib->iat_rva = file_offset_to_rva(rdata_section_header);
+
+    // FIXME
+    // FIXME
+    // FIXME
+    // FIXME
+    // TODO try to put .rdata section before the .text section to avoid this patch @MachineCodePatch
+    if (i == 0) {
+      *ExitProcess_rip_relative_address = lib->iat_rva - ExitProcess_call_rva;
+    }
+
+    for (s32 i = 0; i < lib->function_count; ++i) {
+      buffer_append_u64(&exe_buffer, lib->functions[i].rva);
+    }
+    // End of IAT list
+    buffer_append_u64(&exe_buffer, 0);
+  }
+  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
     (s32)(exe_buffer.occupied - rdata_section_header->PointerToRawData);
 
+
+  // Image thunks
+  for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
+    Import_Library *lib = &import_libraries[i];
+    lib->image_thunk_rva = file_offset_to_rva(rdata_section_header);
+
+    for (s32 i = 0; i < lib->function_count; ++i) {
+      buffer_append_u64(&exe_buffer, lib->functions[i].rva);
+    }
+    // End of IAT list
+    buffer_append_u64(&exe_buffer, 0);
+  }
+
+  buffer_append_s64(&exe_buffer, 0);
+
   // Library Names
-  s32 kernel32_name_rva = file_offset_to_rva(rdata_section_header);
-  {
-    s8 library_name[] = "KERNEL32.DLL";
-    s32 aligned_name_size = align(static_array_size(library_name), 2);
+
+  for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
+    Import_Library *lib = &import_libraries[i];
+    lib->dll.rva = file_offset_to_rva(rdata_section_header);
+    size_t name_size = strlen(lib->dll.name) + 1;
+    s32 aligned_name_size = align((s32)name_size, 2);
     memcpy(
       buffer_allocate_size(&exe_buffer, aligned_name_size),
-      library_name,
-      static_array_size(library_name)
+      lib->dll.name,
+      name_size
     );
   }
 
@@ -181,37 +254,23 @@ void write_executable() {
   s32 import_directory_rva = file_offset_to_rva(rdata_section_header);
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress = import_directory_rva;
 
-  IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
-    buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
+  for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
+    Import_Library *lib = &import_libraries[i];
 
-  s32 image_thunk_rva = file_offset_to_rva(rdata_section_header);
-
-  *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
-    .OriginalFirstThunk = image_thunk_rva,
-    .Name = kernel32_name_rva,
-    .FirstThunk = iat_rva,
-  };
-  s64 *image_thunk = buffer_allocate(&exe_buffer, s64);
-  buffer_append_s64(&exe_buffer, 0);
-
-  {
-    s32 import_name_rva = file_offset_to_rva(rdata_section_header);
-
-    *ExitProcess_name_rva = import_name_rva;
-    *image_thunk = import_name_rva;
-
-    buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
-    s8 function_name[] = "ExitProcess";
-
-    s32 aligned_function_name_size = align(static_array_size(function_name), 2);
-    memcpy(
-      buffer_allocate_size(&exe_buffer, aligned_function_name_size),
-      function_name,
-      static_array_size(function_name)
-    );
+    IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
+      buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
+    *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
+      .OriginalFirstThunk = lib->image_thunk_rva,
+      .Name = lib->dll.rva,
+      .FirstThunk = lib->iat_rva,
+    };
   }
+
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
     file_offset_to_rva(rdata_section_header) - import_directory_rva;
+
+  // End of IMAGE_IMPORT_DESCRIPTOR list
+  *buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
   exe_buffer.occupied =
     rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
