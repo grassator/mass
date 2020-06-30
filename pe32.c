@@ -3,7 +3,8 @@
 
 typedef struct {
   const char *name;
-  u32 rva;
+  u32 name_rva;
+  u32 ptr_rva;
 } Import_Name_To_Rva;
 
 typedef struct {
@@ -57,9 +58,9 @@ void write_executable() {
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
     .SizeOfCode = 0x200, // FIXME calculate based on the amount of machine code
-    .SizeOfInitializedData = 0x400, // FIXME calculate based on the amount of global data
-    .AddressOfEntryPoint = 0x1000, // FIXME resolve to the entry point in the machine code
-    .BaseOfCode = 0x1000, // FIXME resolve to the right section containing code
+    .SizeOfInitializedData = 0x200, // FIXME calculate based on the amount of global data
+    .AddressOfEntryPoint = 0x2000, // FIXME resolve to the entry point in the machine code
+    .BaseOfCode = 0x2000, // FIXME resolve to the right section containing code
     .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
     .SectionAlignment = 0x1000,
     .FileAlignment = 0x200,
@@ -83,6 +84,17 @@ void write_executable() {
     .DataDirectory = {0},
   };
 
+  // .rdata section
+  IMAGE_SECTION_HEADER *rdata_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
+  *rdata_section_header = (IMAGE_SECTION_HEADER) {
+    .Name = ".rdata",
+    .Misc = 0x14C, // FIXME size of machine code in bytes
+    .VirtualAddress = 0x1000, // FIXME calculate this
+    .SizeOfRawData = 0x200, // FIXME calculate this
+    .PointerToRawData = 0,
+    .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
+  };
+
   // .text section
   IMAGE_SECTION_HEADER *text_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
   *text_section_header = (IMAGE_SECTION_HEADER) {
@@ -94,17 +106,6 @@ void write_executable() {
     .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
   };
 
-  // .rdata section
-  IMAGE_SECTION_HEADER *rdata_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
-  *rdata_section_header = (IMAGE_SECTION_HEADER) {
-    .Name = ".rdata",
-    .Misc = 0x14C, // FIXME size of machine code in bytes
-    .VirtualAddress = 0x2000, // FIXME calculate this
-    .SizeOfRawData = 0x200, // FIXME calculate this
-    .PointerToRawData = 0,
-    .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
-  };
-
   // NULL header telling that the list is done
   *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = (IMAGE_SECTION_HEADER){0};
 
@@ -112,8 +113,8 @@ void write_executable() {
   exe_buffer.occupied = optional_header->SizeOfHeaders;
 
   IMAGE_SECTION_HEADER *sections[] = {
-    text_section_header,
     rdata_section_header,
+    text_section_header,
   };
   s32 section_offset = optional_header->SizeOfHeaders;
   for (u32 i = 0; i < static_array_size(sections); ++i) {
@@ -126,51 +127,30 @@ void write_executable() {
      (_section_header_)->PointerToRawData + \
      (_section_header_)->VirtualAddress)
 
-  // .text segment
-  exe_buffer.occupied = text_section_header->PointerToRawData;
-
-  buffer_append_s8(&exe_buffer, 0x48); // sub rsp 28
-  buffer_append_s8(&exe_buffer, 0x83);
-  buffer_append_s8(&exe_buffer, 0xEC);
-  buffer_append_s8(&exe_buffer, 0x28);
-
-  buffer_append_s8(&exe_buffer, 0xB9); // mov rcx, 42
-  buffer_append_s8(&exe_buffer, 0x2A);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x00);
-  buffer_append_s8(&exe_buffer, 0x00);
-
-  buffer_append_s8(&exe_buffer, 0xFF); // call ExitProcess
-  buffer_append_s8(&exe_buffer, 0x15);
-  s32 *ExitProcess_rip_relative_address = buffer_allocate(&exe_buffer, s32);
-  s32 ExitProcess_call_rva = file_offset_to_rva(text_section_header);
-
-  buffer_append_s8(&exe_buffer, 0xCC); // int3
-
 
   // .rdata segment
   Import_Name_To_Rva kernel32_functions[] = {
     // @MachineCodePatch
-    {.name = "ExitProcess", .rva = 0xCCCCCCCC},
+    {.name = "ExitProcess", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
 
-    {.name = "GetStdHandle", .rva = 0xCCCCCCCC},
-    {.name = "ReadConsoleA", .rva = 0xCCCCCCCC},
+    {.name = "GetStdHandle", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
+    {.name = "ReadConsoleA", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
   };
 
   Import_Name_To_Rva user32_functions[] = {
-    {.name = "ShowWindow", .rva = 0xCCCCCCCC},
+    {.name = "ShowWindow", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
   };
 
   Import_Library import_libraries[] = {
     {
-      .dll = {.name = "kernel32.dll", .rva = 0xCCCCCCCC},
+      .dll = {.name = "kernel32.dll", .name_rva = 0xCCCCCCCC},
       .iat_rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
       .functions = kernel32_functions,
       .function_count = static_array_size(kernel32_functions),
     },
     {
-      .dll = {.name = "user32.dll", .rva = 0xCCCCCCCC},
+      .dll = {.name = "user32.dll", .name_rva = 0xCCCCCCCC},
       .iat_rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
       .functions = user32_functions,
@@ -185,7 +165,7 @@ void write_executable() {
   for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
     Import_Library *lib = &import_libraries[i];
     for (s32 i = 0; i < lib->function_count; ++i) {
-      lib->functions[i].rva = file_offset_to_rva(rdata_section_header);
+      lib->functions[i].name_rva = file_offset_to_rva(rdata_section_header);
       buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
       size_t name_size = strlen(lib->functions[i].name) + 1;
       s32 aligned_name_size = align((s32)name_size, 2);
@@ -202,18 +182,10 @@ void write_executable() {
   for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
     Import_Library *lib = &import_libraries[i];
     lib->iat_rva = file_offset_to_rva(rdata_section_header);
-
-    // FIXME
-    // FIXME
-    // FIXME
-    // FIXME
-    // TODO try to put .rdata section before the .text section to avoid this patch @MachineCodePatch
-    if (i == 0) {
-      *ExitProcess_rip_relative_address = lib->iat_rva - ExitProcess_call_rva;
-    }
-
     for (s32 i = 0; i < lib->function_count; ++i) {
-      buffer_append_u64(&exe_buffer, lib->functions[i].rva);
+      Import_Name_To_Rva *fn = &lib->functions[i];
+      fn->ptr_rva = file_offset_to_rva(rdata_section_header);
+      buffer_append_u64(&exe_buffer, fn->name_rva);
     }
     // End of IAT list
     buffer_append_u64(&exe_buffer, 0);
@@ -228,7 +200,7 @@ void write_executable() {
     lib->image_thunk_rva = file_offset_to_rva(rdata_section_header);
 
     for (s32 i = 0; i < lib->function_count; ++i) {
-      buffer_append_u64(&exe_buffer, lib->functions[i].rva);
+      buffer_append_u64(&exe_buffer, lib->functions[i].name_rva);
     }
     // End of IAT list
     buffer_append_u64(&exe_buffer, 0);
@@ -240,7 +212,7 @@ void write_executable() {
 
   for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
     Import_Library *lib = &import_libraries[i];
-    lib->dll.rva = file_offset_to_rva(rdata_section_header);
+    lib->dll.name_rva = file_offset_to_rva(rdata_section_header);
     size_t name_size = strlen(lib->dll.name) + 1;
     s32 aligned_name_size = align((s32)name_size, 2);
     memcpy(
@@ -261,7 +233,7 @@ void write_executable() {
       buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
     *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
       .OriginalFirstThunk = lib->image_thunk_rva,
-      .Name = lib->dll.rva,
+      .Name = lib->dll.name_rva,
       .FirstThunk = lib->iat_rva,
     };
   }
@@ -274,6 +246,48 @@ void write_executable() {
 
   exe_buffer.occupied =
     rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
+
+  // .text segment
+  exe_buffer.occupied = text_section_header->PointerToRawData;
+
+  buffer_append_s8(&exe_buffer, 0x48); // sub rsp 28
+  buffer_append_s8(&exe_buffer, 0x83);
+  buffer_append_s8(&exe_buffer, 0xEC);
+  buffer_append_s8(&exe_buffer, 0x28);
+
+  buffer_append_s8(&exe_buffer, 0xB9); // mov rcx, 42
+  buffer_append_s8(&exe_buffer, 0x2A);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+  buffer_append_s8(&exe_buffer, 0x00);
+
+  buffer_append_s8(&exe_buffer, 0xFF); // call ExitProcess
+  buffer_append_s8(&exe_buffer, 0x15);
+  {
+    s32 *ExitProcess_rip_relative_address = buffer_allocate(&exe_buffer, s32);
+    s32 ExitProcess_call_rva = file_offset_to_rva(text_section_header);
+
+    bool match_found = false;
+    for (u64 i = 0; !match_found && i < static_array_size(import_libraries); ++i) {
+      Import_Library *lib = &import_libraries[i];
+      if (strcmp(lib->dll.name, "kernel32.dll") != 0) continue;
+
+      for (s32 i = 0; i < lib->function_count; ++i) {
+        Import_Name_To_Rva *fn = &lib->functions[i];
+        if (strcmp(fn->name, "ExitProcess") == 0) {
+          *ExitProcess_rip_relative_address = fn->ptr_rva - ExitProcess_call_rva;
+          match_found = true;
+          break;
+        }
+      }
+    }
+    assert(match_found);
+  }
+
+  buffer_append_s8(&exe_buffer, 0xCC); // int3
+
+  exe_buffer.occupied =
+    text_section_header->PointerToRawData + text_section_header->SizeOfRawData;
 
   /////////
 
