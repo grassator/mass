@@ -18,12 +18,19 @@ reserve_stack(
 }
 
 inline void
-push_instruction(
+push_instruction_internal(
+  const char *filename,
+  u32 line_number,
   Function_Builder *builder,
   Instruction instruction
 ) {
+  instruction.filename = filename;
+  instruction.line_number = line_number;
   array_push(builder->instructions, instruction);
 }
+
+#define push_instruction(...)\
+  push_instruction_internal(__FILE__, __LINE__, __VA_ARGS__)
 
 bool
 is_memory_operand(
@@ -95,8 +102,8 @@ move_value(
   }
 
   if ((
-    b->operand.type == Operand_Type_Immediate_64 &&
-    a->operand.type != Operand_Type_Register
+    a->operand.type != Operand_Type_Register &&
+    b->operand.type == Operand_Type_Immediate_64
   ) || (
     a->operand.type == Operand_Type_Memory_Indirect &&
     b->operand.type == Operand_Type_Memory_Indirect
@@ -122,6 +129,7 @@ fn_begin(Value **result, Program *program) {
     },
   };
   Function_Builder builder = {
+    .program = program,
     .stack_reserve = 0,
     .buffer = buffer,
     .epilog_label = make_label(),
@@ -197,6 +205,8 @@ fn_end(
 
   encode_instruction(builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
   encode_instruction(builder, (Instruction) {ret, {0}});
+  // FIXME add encoding
+  //buffer_append_s8(&exe_buffer, 0xCC); // int3
 
   fn_freeze(builder);
   array_free(builder->instructions);

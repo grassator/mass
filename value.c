@@ -204,6 +204,10 @@ print_operand(
       printf("rip_to(0x%016llx)", operand->imm64);
       break;
     }
+    case Operand_Type_RIP_Relative_Import: {
+      printf("rip_import(%s:%s)", operand->import.library_name, operand->import.symbol_name);
+      break;
+    }
     case Operand_Type_Label_32: {
       printf("rel....UNIMPLEMENTED");
       break;

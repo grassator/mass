@@ -86,6 +86,12 @@ encode_instruction(
         continue;
       }
       if (
+        operand->type == Operand_Type_RIP_Relative_Import &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      ) {
+        continue;
+      }
+      if (
         operand->type == Operand_Type_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
@@ -93,6 +99,12 @@ encode_instruction(
       }
       if (
         operand->type == Operand_Type_RIP_Relative &&
+        operand_encoding->type == Operand_Encoding_Type_Memory
+      ) {
+        continue;
+      }
+      if (
+        operand->type == Operand_Type_RIP_Relative_Import &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
@@ -169,7 +181,10 @@ encode_instruction(
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         needs_mod_r_m = true;
-        if (operand->type == Operand_Type_RIP_Relative) {
+        if (
+          operand->type == Operand_Type_RIP_Relative ||
+          operand->type == Operand_Type_RIP_Relative_Import
+        ) {
           r_m = 0b101;
           mod = 0;
         } else if (operand->type == Operand_Type_Register) {
@@ -226,7 +241,34 @@ encode_instruction(
     if (needs_mod_r_m && mod != MOD_Register) {
       for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
         Operand *operand = &instruction.operands[operand_index];
-        if (operand->type == Operand_Type_RIP_Relative) {
+        if (operand->type == Operand_Type_RIP_Relative_Import) {
+          Program *program = builder->program;
+          s64 next_instruction_address =
+            program->code_base_rva +
+            (buffer->occupied - program->code_base_file_offset) +
+            sizeof(s32);
+
+          bool match_found = false;
+          for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+            Import_Library *lib = array_get(program->import_libraries, i);
+            if (strcmp(lib->dll.name, operand->import.library_name) != 0) continue;
+
+            for (s32 i = 0; i < array_count(lib->functions); ++i) {
+              Import_Name_To_Rva *fn = array_get(lib->functions, i);
+              if (strcmp(fn->name, operand->import.symbol_name) == 0) {
+                s64 diff = fn->iat_rva - next_instruction_address;
+                //assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
+                s32 displacement = (s32)(diff);
+
+                buffer_append_s32(buffer, displacement);
+
+                match_found = true;
+                break;
+              }
+            }
+          }
+          assert(match_found);
+        } else if (operand->type == Operand_Type_RIP_Relative) {
           s64 start_address = (s64) buffer->memory;
           s64 next_instruction_address = start_address + buffer->occupied + sizeof(s32);
 
@@ -235,7 +277,7 @@ encode_instruction(
           s32 displacement = (s32)(diff);
 
           buffer_append_s32(buffer, displacement);
-        }  else if (operand->type == Operand_Type_Memory_Indirect) {
+        } else if (operand->type == Operand_Type_Memory_Indirect) {
           s32 displacement = operand->indirect.displacement;
 
 
@@ -295,6 +337,7 @@ encode_instruction(
     }
     return;
   }
+  printf("at %s:%u\n", instruction.filename, instruction.line_number);
   printf("%s", instruction.mnemonic.name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction.operands[operand_index];

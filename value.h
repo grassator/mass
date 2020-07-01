@@ -10,6 +10,7 @@ typedef enum {
   Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
   Operand_Type_RIP_Relative,
+  Operand_Type_RIP_Relative_Import,
   Operand_Type_Label_32,
 } Operand_Type;
 
@@ -50,6 +51,25 @@ typedef struct {
 } Label;
 
 typedef struct {
+  const char *name;
+  u32 name_rva;
+  u32 iat_rva;
+} Import_Name_To_Rva;
+typedef array_type(Import_Name_To_Rva) Array_Import_Name_To_Rva;
+
+typedef struct {
+  Import_Name_To_Rva dll;
+  Array_Import_Name_To_Rva functions;
+  u32 image_thunk_rva;
+} Import_Library;
+typedef array_type(Import_Library) Array_Import_Library;
+
+typedef struct {
+  const char *library_name;
+  const char *symbol_name;
+} Operand_RIP_Relative_Import;
+
+typedef struct {
   Operand_Type type;
   u32 byte_size;
   union {
@@ -59,6 +79,7 @@ typedef struct {
     s64 imm64;
     Label *label32;
     Operand_Memory_Indirect indirect;
+    Operand_RIP_Relative_Import import;
   };
 } Operand;
 
@@ -193,13 +214,12 @@ typedef struct {
   X64_Mnemonic mnemonic;
   Operand operands[3];
   Label *maybe_label;
+  const char *filename;
+  u32 line_number;
 } Instruction;
 typedef array_type(Instruction) Array_Instruction;
 
-typedef struct {
-  Buffer function_buffer;
-  Buffer data_buffer;
-} Program;
+typedef struct _Program Program;
 
 typedef struct {
   s32 stack_reserve;
@@ -213,8 +233,18 @@ typedef struct {
   Array_Instruction instructions;
 
   Descriptor *descriptor;
+  Program *program;
 
   Value **result;
 } Function_Builder;
+
+typedef struct _Program {
+  Buffer function_buffer;
+  Buffer data_buffer;
+  Array_Import_Library import_libraries;
+  Function_Builder *entry_point;
+  s32 code_base_rva;
+  s32 code_base_file_offset;
+} Program;
 
 #endif VALUE_H

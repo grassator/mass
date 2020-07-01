@@ -59,7 +59,45 @@ spec("function") {
   }
 
   it("should write out an executable") {
-    write_executable();
+    Array_Import_Name_To_Rva kernel32_functions = array_alloc(Array_Import_Name_To_Rva, 16);
+    array_push(kernel32_functions, (Import_Name_To_Rva) {
+      .name = "ExitProcess",
+      .name_rva = 0xCCCCCCCC,
+      .iat_rva = 0xCCCCCCCC
+    });
+
+    Program program = {
+      .import_libraries = array_alloc(Array_Import_Library, 16),
+    };
+    array_push(program.import_libraries, (Import_Library) {
+      .dll = {
+        .name = "kernel32.dll",
+        .name_rva = 0xCCCCCCCC,
+        .iat_rva = 0xCCCCCCCC
+      },
+      .image_thunk_rva = 0xCCCCCCCC,
+      .functions = kernel32_functions,
+    });
+
+    Value *result = 0;
+    Function_Builder builder_ = fn_begin(&result, &program);
+    program.entry_point = &builder_;
+
+    Value *ExitProcess_value = c_function_value("s64 ExitProcess(s32)", 0);
+    ExitProcess_value->operand = (Operand) {
+      .type = Operand_Type_RIP_Relative_Import,
+      .byte_size = 8,
+      .import = {
+        .symbol_name = "ExitProcess",
+        .library_name = "kernel32.dll"
+      },
+    };
+
+    Return(Call(ExitProcess_value, value_from_s32(123)));
+
+    write_executable(&program);
+    array_free(kernel32_functions);
+    array_free(program.import_libraries);
   }
 
   it("should support short-curciting &&") {
