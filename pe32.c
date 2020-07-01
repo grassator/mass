@@ -10,7 +10,6 @@ typedef struct {
 typedef struct {
   Import_Name_To_Rva dll;
   Import_Name_To_Rva *functions;
-  u32 iat_rva;
   u32 image_thunk_rva;
   s32 function_count;
 } Import_Library;
@@ -143,15 +142,13 @@ void write_executable() {
 
   Import_Library import_libraries[] = {
     {
-      .dll = {.name = "kernel32.dll", .name_rva = 0xCCCCCCCC},
-      .iat_rva = 0xCCCCCCCC,
+      .dll = {.name = "kernel32.dll", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
       .image_thunk_rva = 0xCCCCCCCC,
       .functions = kernel32_functions,
       .function_count = static_array_size(kernel32_functions),
     },
     {
-      .dll = {.name = "user32.dll", .name_rva = 0xCCCCCCCC},
-      .iat_rva = 0xCCCCCCCC,
+      .dll = {.name = "user32.dll", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
       .image_thunk_rva = 0xCCCCCCCC,
       .functions = user32_functions,
       .function_count = static_array_size(user32_functions),
@@ -181,7 +178,7 @@ void write_executable() {
     file_offset_to_rva(rdata_section_header);
   for (u64 i = 0; i < static_array_size(import_libraries); ++i) {
     Import_Library *lib = &import_libraries[i];
-    lib->iat_rva = file_offset_to_rva(rdata_section_header);
+    lib->dll.iat_rva = file_offset_to_rva(rdata_section_header);
     for (s32 i = 0; i < lib->function_count; ++i) {
       Import_Name_To_Rva *fn = &lib->functions[i];
       fn->iat_rva = file_offset_to_rva(rdata_section_header);
@@ -234,7 +231,7 @@ void write_executable() {
     *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
       .OriginalFirstThunk = lib->image_thunk_rva,
       .Name = lib->dll.name_rva,
-      .FirstThunk = lib->iat_rva,
+      .FirstThunk = lib->dll.iat_rva,
     };
   }
 
