@@ -4,7 +4,7 @@
 typedef struct {
   const char *name;
   u32 name_rva;
-  u32 ptr_rva;
+  u32 iat_rva;
 } Import_Name_To_Rva;
 
 typedef struct {
@@ -131,14 +131,14 @@ void write_executable() {
   // .rdata segment
   Import_Name_To_Rva kernel32_functions[] = {
     // @MachineCodePatch
-    {.name = "ExitProcess", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
+    {.name = "ExitProcess", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
 
-    {.name = "GetStdHandle", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
-    {.name = "ReadConsoleA", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
+    {.name = "GetStdHandle", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
+    {.name = "ReadConsoleA", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
   };
 
   Import_Name_To_Rva user32_functions[] = {
-    {.name = "ShowWindow", .name_rva = 0xCCCCCCCC, .ptr_rva = 0xCCCCCCCC},
+    {.name = "ShowWindow", .name_rva = 0xCCCCCCCC, .iat_rva = 0xCCCCCCCC},
   };
 
   Import_Library import_libraries[] = {
@@ -184,7 +184,7 @@ void write_executable() {
     lib->iat_rva = file_offset_to_rva(rdata_section_header);
     for (s32 i = 0; i < lib->function_count; ++i) {
       Import_Name_To_Rva *fn = &lib->functions[i];
-      fn->ptr_rva = file_offset_to_rva(rdata_section_header);
+      fn->iat_rva = file_offset_to_rva(rdata_section_header);
       buffer_append_u64(&exe_buffer, fn->name_rva);
     }
     // End of IAT list
@@ -275,7 +275,7 @@ void write_executable() {
       for (s32 i = 0; i < lib->function_count; ++i) {
         Import_Name_To_Rva *fn = &lib->functions[i];
         if (strcmp(fn->name, "ExitProcess") == 0) {
-          *ExitProcess_rip_relative_address = fn->ptr_rva - ExitProcess_call_rva;
+          *ExitProcess_rip_relative_address = fn->iat_rva - ExitProcess_call_rva;
           match_found = true;
           break;
         }
