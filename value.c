@@ -574,23 +574,17 @@ c_function_return_value(
   return 0;
 }
 
-Value *
-c_function_value(
-  const char *forward_declaration,
-  fn_type_opaque fn
+Descriptor *
+c_function_descriptor(
+  const char *forward_declaration
 ) {
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {0},
   };
-  Value *result = temp_allocate(Value);
-  *result = (const Value) {
-    .descriptor = descriptor,
-    .operand = imm64((s64) fn),
-  };
 
-  result->descriptor->function.returns = c_function_return_value(forward_declaration);
+  descriptor->function.returns = c_function_return_value(forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;
@@ -613,9 +607,145 @@ c_function_value(
     // FIXME should not use a hardcoded register here
     arg->operand = rcx;
 
-    result->descriptor->function.argument_list = arg;
-    result->descriptor->function.argument_count = 1;
+    descriptor->function.argument_list = arg;
+    descriptor->function.argument_count = 1;
   }
 
+  return descriptor;
+}
+
+Value *
+c_function_value(
+  const char *forward_declaration,
+  fn_type_opaque fn
+) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = c_function_descriptor(forward_declaration),
+    .operand = imm64((s64) fn),
+  };
   return result;
 }
+
+void
+program_free(
+  Program *program
+) {
+  for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *library = array_get(program->import_libraries, i);
+    array_free(library->symbols);
+  }
+  array_free(program->import_libraries);
+  free(program);
+}
+
+Operand
+import_symbol(
+  Program *program,
+  const char *library_name,
+  const char *symbol_name
+) {
+  Import_Library *library = 0;
+
+  for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    // FIXME Use case-insensitive compare
+    if (strcmp(lib->dll.name, library_name) == 0) {
+      library = lib;
+    }
+  }
+  if (!library) {
+    library = array_push(program->import_libraries, (Import_Library) {
+      .dll = {
+        .name = library_name,
+        .name_rva = 0xCCCCCCCC,
+        .iat_rva = 0xCCCCCCCC
+      },
+      .image_thunk_rva = 0xCCCCCCCC,
+      .symbols = array_alloc(Array_Import_Name_To_Rva, 16),
+    });
+  }
+
+  Import_Name_To_Rva *symbol = 0;
+  for (s32 i = 0; i < array_count(library->symbols); ++i) {
+    Import_Name_To_Rva *it = array_get(library->symbols, i);
+    if (strcmp(it->name, symbol_name) == 0) {
+      symbol = it;
+    }
+  }
+
+  if (!symbol) {
+    symbol = array_push(library->symbols, (Import_Name_To_Rva) {
+      .name = symbol_name,
+      .name_rva = 0xCCCCCCCC,
+      .iat_rva = 0xCCCCCCCC
+    });
+  }
+
+  return (Operand) {
+    .type = Operand_Type_RIP_Relative_Import,
+    .byte_size = 8, // Size of the pointer
+    .import = {
+      .library_name = library_name,
+      .symbol_name = symbol_name
+    },
+  };
+}
+
+Value *
+c_function_import(
+  Program *program,
+  const char *library_name,
+  const char *forward_declaration
+) {
+  char *symbol_name_end = strchr(forward_declaration, '(');
+  assert(symbol_name_end);
+  char *symbol_name_start = symbol_name_end;
+  while (symbol_name_start != forward_declaration && !isspace(*symbol_name_start)) {
+    --symbol_name_start;
+  }
+  ++symbol_name_start;
+  u64 length = symbol_name_end - symbol_name_start;
+  char *symbol_name = temp_allocate_array(s8, length + 1);
+  memcpy(symbol_name, symbol_name_start, length);
+  symbol_name[length] = 0;
+
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = c_function_descriptor(forward_declaration),
+    .operand = import_symbol(program, library_name, symbol_name),
+  };
+  return result;
+}
+
+Import_Name_To_Rva *
+program_find_import(
+  const Program *program,
+  const char *library_name,
+  const char *symbol_name
+) {
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    if (strcmp(lib->dll.name, library_name) != 0) continue;
+
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      if (strcmp(symbol->name, symbol_name) == 0) {
+        return symbol;
+      }
+    }
+  }
+  return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+

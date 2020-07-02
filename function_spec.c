@@ -48,56 +48,35 @@ spec("function") {
     test_program = (Program) {
       .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
       .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
+      .import_libraries = array_alloc(Array_Import_Library, 16),
     };
+    // FIXME make sure that this fits into s32
+    test_program.code_base_rva =
+      (s32)(test_program.function_buffer.memory - test_program.data_buffer.memory);
     program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
 
   after_each() {
+    array_free(test_program.import_libraries);
     free_buffer(&test_program.function_buffer);
     free_buffer(&test_program.data_buffer);
   }
 
   it("should write out an executable") {
-    Array_Import_Name_To_Rva kernel32_functions = array_alloc(Array_Import_Name_To_Rva, 16);
-    array_push(kernel32_functions, (Import_Name_To_Rva) {
-      .name = "ExitProcess",
-      .name_rva = 0xCCCCCCCC,
-      .iat_rva = 0xCCCCCCCC
-    });
-
-    Program program = {
+    Program *program = malloc(sizeof(Program));
+    *program = (Program) {
       .import_libraries = array_alloc(Array_Import_Library, 16),
     };
-    array_push(program.import_libraries, (Import_Library) {
-      .dll = {
-        .name = "kernel32.dll",
-        .name_rva = 0xCCCCCCCC,
-        .iat_rva = 0xCCCCCCCC
-      },
-      .image_thunk_rva = 0xCCCCCCCC,
-      .functions = kernel32_functions,
-    });
-
     Value *result = 0;
-    Function_Builder builder_ = fn_begin(&result, &program);
-    program.entry_point = &builder_;
+    Function_Builder builder_ = fn_begin(&result, program);
+    program->entry_point = &builder_;
 
-    Value *ExitProcess_value = c_function_value("s64 ExitProcess(s32)", 0);
-    ExitProcess_value->operand = (Operand) {
-      .type = Operand_Type_RIP_Relative_Import,
-      .byte_size = 8,
-      .import = {
-        .symbol_name = "ExitProcess",
-        .library_name = "kernel32.dll"
-      },
-    };
+    Value *ExitProcess_value = c_function_import(program, "kernel32.dll", "s64 ExitProcess(s32)");
+    Return(Call(ExitProcess_value, value_from_s32(42)));
 
-    Return(Call(ExitProcess_value, value_from_s32(123)));
-
-    write_executable(&program);
-    array_free(kernel32_functions);
-    array_free(program.import_libraries);
+    write_executable(program);
+    program_free(program);
   }
 
   it("should support short-curciting &&") {
@@ -394,10 +373,10 @@ spec("function") {
   }
 
   it("should parse c function forward declarations") {
-    c_function_value("void fn_void()", 0);
-    c_function_value("void fn_int(int)", 0);
-    Value *explicit_void_arg = c_function_value("void fn_void(void)", 0);
-    check(explicit_void_arg->descriptor->function.argument_count == 0);
+    c_function_descriptor("void fn_void()");
+    c_function_descriptor("void fn_int(int)");
+    Descriptor *descriptor = c_function_descriptor("void fn_void(void)");
+    check(descriptor->function.argument_count == 0);
   }
 
   it("should be able to call puts() to say 'Hello, world!'") {
@@ -418,22 +397,33 @@ spec("function") {
   }
 
   it("should be able to call imported function") {
-    HINSTANCE kernel32 = LoadLibraryA("Kernel32.dll");
-    check(kernel32);
-    fn_type_opaque GetStdHandle_from_dll = (fn_type_opaque)GetProcAddress(kernel32, "GetStdHandle");
-    check(GetStdHandle_from_dll);
-
-    Value *GetStdHandle_value = c_function_value(
-      "s64 GetStdHandle(s32)",
-      (fn_type_opaque) GetStdHandle
+    Value *GetStdHandle_value = c_function_import(
+      program_,
+      "kernel32.dll",
+      "s64 GetStdHandle(s32)"
     );
 
+    // TODO extract into a function
+    HINSTANCE kernel32 = LoadLibraryA(GetStdHandle_value->operand.import.library_name);
+    check(kernel32);
+    fn_type_opaque GetStdHandle_from_dll =
+      (fn_type_opaque)GetProcAddress(kernel32, GetStdHandle_value->operand.import.symbol_name);
+    check(GetStdHandle_from_dll);
+
     Value *global = value_global(program_, descriptor_pointer_to(GetStdHandle_value->descriptor));
-    {
-      check(global->operand.type == Operand_Type_RIP_Relative);
-      fn_type_opaque *address = (fn_type_opaque *)global->operand.imm64;
-      *address = GetStdHandle_from_dll;
-    }
+
+    fn_type_opaque *address = (fn_type_opaque *)global->operand.imm64;
+    *address = GetStdHandle_from_dll;
+
+    Import_Name_To_Rva *import = program_find_import(
+      program_,
+      GetStdHandle_value->operand.import.library_name,
+      GetStdHandle_value->operand.import.symbol_name
+    );
+    check(import);
+    // FIXME make sure it fits into s32
+    import->iat_rva = (s32)(((s8 *)address) - program_->data_buffer.memory);
+
     Function(checker_value) {
       Return(Call(GetStdHandle_value, value_from_s32(STD_INPUT_HANDLE)));
     }

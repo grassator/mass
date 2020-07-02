@@ -243,7 +243,7 @@ encode_instruction(
         Operand *operand = &instruction.operands[operand_index];
         if (operand->type == Operand_Type_RIP_Relative_Import) {
           Program *program = builder->program;
-          s64 next_instruction_address =
+          s64 next_instruction_rva =
             program->code_base_rva +
             (buffer->occupied - program->code_base_file_offset) +
             sizeof(s32);
@@ -253,10 +253,10 @@ encode_instruction(
             Import_Library *lib = array_get(program->import_libraries, i);
             if (strcmp(lib->dll.name, operand->import.library_name) != 0) continue;
 
-            for (s32 i = 0; i < array_count(lib->functions); ++i) {
-              Import_Name_To_Rva *fn = array_get(lib->functions, i);
+            for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+              Import_Name_To_Rva *fn = array_get(lib->symbols, i);
               if (strcmp(fn->name, operand->import.symbol_name) == 0) {
-                s64 diff = fn->iat_rva - next_instruction_address;
+                s64 diff = fn->iat_rva - next_instruction_rva;
                 //assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
                 s32 displacement = (s32)(diff);
 

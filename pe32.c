@@ -129,8 +129,8 @@ void write_executable(
 
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    for (s32 i = 0; i < array_count(lib->functions); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->functions, i);
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
       fn->name_rva = file_offset_to_rva(rdata_section_header);
       buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
       size_t name_size = strlen(fn->name) + 1;
@@ -148,8 +148,8 @@ void write_executable(
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
     lib->dll.iat_rva = file_offset_to_rva(rdata_section_header);
-    for (s32 i = 0; i < array_count(lib->functions); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->functions, i);
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
       fn->iat_rva = file_offset_to_rva(rdata_section_header);
       buffer_append_u64(&exe_buffer, fn->name_rva);
     }
@@ -165,8 +165,8 @@ void write_executable(
     Import_Library *lib = array_get(program->import_libraries, i);
     lib->image_thunk_rva = file_offset_to_rva(rdata_section_header);
 
-    for (s32 i = 0; i < array_count(lib->functions); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->functions, i);
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
       buffer_append_u64(&exe_buffer, fn->name_rva);
     }
     // End of IAT list

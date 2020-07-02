@@ -59,7 +59,7 @@ typedef array_type(Import_Name_To_Rva) Array_Import_Name_To_Rva;
 
 typedef struct {
   Import_Name_To_Rva dll;
-  Array_Import_Name_To_Rva functions;
+  Array_Import_Name_To_Rva symbols;
   u32 image_thunk_rva;
 } Import_Library;
 typedef array_type(Import_Library) Array_Import_Library;
