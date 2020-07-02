@@ -143,7 +143,7 @@ dynamic_array_increase_capacity(
 );
 
 inline void
-dynamic_array_ensure_capacity(
+dynamic_array_ensure_capacity_internal(
   Dynamic_Array_Internal **internal,
   size_t item_size,
   size_t extra_item_count
@@ -163,11 +163,17 @@ dynamic_array_ensure_capacity(
 #define array_free(_array_)\
   free((_array_).array)
 
+#define dynamic_array_ensure_capacity(_array_, _count_)\
+  dynamic_array_ensure_capacity_internal(\
+    &((_array_).internal), sizeof((_array_).array->items[0]), (_count_) \
+  )
+
 #define array_push(_array_, ...)\
-  do {\
-    dynamic_array_ensure_capacity(&((_array_).internal), sizeof((_array_).array->items[0]), 1);\
-    (*(_array_).array->next_free++ = (##__VA_ARGS__));\
-  } while(0)
+  (\
+    (dynamic_array_ensure_capacity(_array_, 1)),\
+    (*(_array_).array->next_free = (__VA_ARGS__)),\
+    ((_array_).array->next_free++)\
+  )
 
 #define array_capacity(_array_)\
   (((_array_).internal->after_last - (_array_).internal->items) / sizeof((_array_).array->items[0]))
