@@ -316,15 +316,28 @@ imm64(
   };
 }
 
+inline bool
+fits_into_s8(
+  s64 value
+) {
+  return value >= -(1 << 7) && value <= (1 << 7) - 1;
+}
+
+inline bool
+fits_into_s32(
+  s64 value
+) {
+  return value >= -(1ll << 31) && value <= (1ll << 31) - 1;
+}
+
 inline Operand
 imm_auto(
   s64 value
 ) {
-  u64 unsigned_value = value;
-  if (unsigned_value <= 0xFF) {
+  if (fits_into_s8(value)) {
     return imm8((s8) value);
   }
-  if (unsigned_value <= 0xFFFFFFFF) {
+  if (fits_into_s32(value)) {
     return imm32((s32) value);
   }
   return imm64(value);
