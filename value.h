@@ -226,8 +226,8 @@ typedef struct {
   u32 max_call_parameters_stack_size;
   u8 next_argument_index;
   Buffer *buffer;
-  u8 *code;
 
+  Label *prolog_label;
   Label *epilog_label;
 
   Array_Instruction instructions;
@@ -237,12 +237,14 @@ typedef struct {
 
   Value **result;
 } Function_Builder;
+typedef array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct _Program {
   Buffer function_buffer;
   Buffer data_buffer;
   Array_Import_Library import_libraries;
   Function_Builder *entry_point;
+  Array_Function_Builder functions;
   s32 code_base_rva;
   s32 code_base_file_offset;
 } Program;

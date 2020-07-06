@@ -3,7 +3,7 @@
 #include "value.h"
 
 void
-fn_end(
+fn_encode(
   Function_Builder *builder
 );
 
@@ -220,7 +220,7 @@ void write_executable(
   program->code_base_file_offset = text_section_header->PointerToRawData;
   program->code_base_rva = text_section_header->VirtualAddress;
   program->entry_point->buffer = &exe_buffer;
-  fn_end(program->entry_point);
+  fn_encode(program->entry_point);
 
   exe_buffer.occupied =
     text_section_header->PointerToRawData + text_section_header->SizeOfRawData;

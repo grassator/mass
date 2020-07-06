@@ -116,7 +116,7 @@ move_value(
   }
 }
 
-Function_Builder
+Function_Builder *
 fn_begin(Value **result, Program *program) {
   Buffer *buffer = &program->function_buffer;
   Descriptor *descriptor = temp_allocate(Descriptor);
@@ -128,22 +128,21 @@ fn_begin(Value **result, Program *program) {
       .returns = 0,
     },
   };
-  Function_Builder builder = {
+  Function_Builder *builder = array_push(program->functions, (Function_Builder){
     .program = program,
     .stack_reserve = 0,
     .buffer = buffer,
+    .prolog_label = make_label(),
     .epilog_label = make_label(),
     .descriptor = descriptor,
     .result = result,
-    .code = buffer->memory + buffer->occupied,
     .instructions = array_alloc(Array_Instruction, 32),
-  };
+  });
+
   Value *fn_value = temp_allocate(Value);
-  Label *label = make_label();
-  label->target = builder.code;
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(label),
+    .operand = label32(builder->prolog_label),
   };
   *result = fn_value;
 
@@ -191,6 +190,15 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = align(builder->stack_reserve, 16) + alignment;
+
+  fn_freeze(builder);
+}
+
+void
+fn_encode(
+  Function_Builder *builder
+) {
+  encode_instruction(builder, (Instruction) {.maybe_label = builder->prolog_label});
   encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
 
   for (
@@ -207,9 +215,20 @@ fn_end(
   encode_instruction(builder, (Instruction) {ret, {0}});
   // FIXME add encoding
   //buffer_append_s8(&exe_buffer, 0xCC); // int3
-
-  fn_freeze(builder);
   array_free(builder->instructions);
+}
+
+void
+program_end(
+  Program *program
+) {
+  for (
+    Function_Builder *builder = array_begin(program->functions);
+    builder != array_end(program->functions);
+    ++builder
+  ) {
+    fn_encode(builder);
+  }
 }
 
 Value *
@@ -492,15 +511,15 @@ divide(
   return temp;
 }
 
-#define Plus(_a_, _b_) plus(&builder_, _a_, _b_)
-#define Minus(_a_, _b_) minus(&builder_, _a_, _b_)
-#define Multiply(_a_, _b_) multiply(&builder_, _a_, _b_)
-#define Divide(_a_, _b_) divide(&builder_, _a_, _b_)
+#define Plus(_a_, _b_) plus(builder_, _a_, _b_)
+#define Minus(_a_, _b_) minus(builder_, _a_, _b_)
+#define Multiply(_a_, _b_) multiply(builder_, _a_, _b_)
+#define Divide(_a_, _b_) divide(builder_, _a_, _b_)
 
 #define SizeOfDescriptor(_descriptor_) value_from_s32(descriptor_byte_size(_descriptor_))
 #define SizeOf(_value_) value_byte_size(_value_)
 
-#define ReflectDescriptor (_descriptor_) fn_reflect(&builder_, _descriptor_)
+#define ReflectDescriptor (_descriptor_) fn_reflect(builder_, _descriptor_)
 
 #define IfBuilder(_builder_, _value_) \
   for (\
@@ -508,34 +527,34 @@ divide(
     !(dummy__++); \
      push_instruction(_builder_, (Instruction) {.maybe_label = label__})\
   )
-#define If(_value_) IfBuilder(&builder_, _value_)
+#define If(_value_) IfBuilder(builder_, _value_)
 
 #define Match\
   for (\
     Label *match_end_label__ = make_label(), *dummy__ = 0; \
     !(dummy__++); \
-    push_instruction(&builder_, (Instruction) {.maybe_label = match_end_label__})\
+    push_instruction(builder_, (Instruction) {.maybe_label = match_end_label__})\
   )
 #define Case(_value_)\
   for (\
-    Label *label__ = make_if(&builder_, _value_), *dummy__ = 0; \
+    Label *label__ = make_if(builder_, _value_), *dummy__ = 0; \
     !(dummy__++); \
-    push_instruction(&builder_, (Instruction) {jmp, {label32(match_end_label__), 0, 0}}),\
-    push_instruction(&builder_, (Instruction) {.maybe_label = label__})\
+    push_instruction(builder_, (Instruction) {jmp, {label32(match_end_label__), 0, 0}}),\
+    push_instruction(builder_, (Instruction) {.maybe_label = label__})\
   )
 #define CaseAny
 
 #define Loop \
   for ( \
-    Loop_Builder loop_builder_ = loop_start(&builder_); \
+    Loop_Builder loop_builder_ = loop_start(builder_); \
     !loop_builder_.done; \
-    loop_end(&builder_, &loop_builder_) \
+    loop_end(builder_, &loop_builder_) \
   )
 
 #define Continue \
-  push_instruction(&builder_, (Instruction) {jmp, {label32(loop_builder_.label_start), 0, 0}})
+  push_instruction(builder_, (Instruction) {jmp, {label32(loop_builder_.label_start), 0, 0}})
 #define Break \
-  push_instruction(&builder_, (Instruction) {jmp, {label32(loop_builder_.label_end), 0, 0}})
+  push_instruction(builder_, (Instruction) {jmp, {label32(loop_builder_.label_end), 0, 0}})
 
 typedef enum {
   Compare_Equal = 1,
@@ -585,10 +604,10 @@ compare(
   return result;
 }
 
-#define NotEq(_a_, _b_) compare(&builder_, Compare_Not_Equal, (_a_), (_b_))
-#define Eq(_a_, _b_) compare(&builder_, Compare_Equal, (_a_), (_b_))
-#define Less(_a_, _b_) compare(&builder_, Compare_Less, (_a_), (_b_))
-#define Greater(_a_, _b_) compare(&builder_, Compare_Greater, (_a_), (_b_))
+#define NotEq(_a_, _b_) compare(builder_, Compare_Not_Equal, (_a_), (_b_))
+#define Eq(_a_, _b_) compare(builder_, Compare_Equal, (_a_), (_b_))
+#define Less(_a_, _b_) compare(builder_, Compare_Less, (_a_), (_b_))
+#define Greater(_a_, _b_) compare(builder_, Compare_Greater, (_a_), (_b_))
 
 Value *
 value_pointer_to(
@@ -734,24 +753,24 @@ make_or(
 #define Function(_id_) \
   Value *_id_ = 0; \
   for (\
-    Function_Builder builder_ = fn_begin(&_id_, program_);\
-    !fn_is_frozen(&builder_);\
-    fn_end(&builder_)\
+    Function_Builder *builder_ = fn_begin(&_id_, program_);\
+    !fn_is_frozen(builder_);\
+    fn_end(builder_)\
   )
 
 #define Return(_value_) \
-  fn_return(&builder_, _value_)
+  fn_return(builder_, _value_)
 
 #define Arg(_id_, _descriptor_) \
-  Value *_id_ = fn_arg(&builder_, (_descriptor_))
+  Value *_id_ = fn_arg(builder_, (_descriptor_))
 
 #define Arg_s8(_id_) Arg((_id_), &descriptor_s8)
 #define Arg_s32(_id_) Arg((_id_), &descriptor_s32)
 #define Arg_s64(_id_) Arg((_id_), &descriptor_s64)
 
 #define Stack(_id_, _descriptor_, _value_) \
-  Value *_id_ = reserve_stack(&builder_, (_descriptor_)); \
-  move_value(&builder_, _id_, (_value_))
+  Value *_id_ = reserve_stack(builder_, (_descriptor_)); \
+  move_value(builder_, _id_, (_value_))
 
 #define Stack_s32(_id_, _value_) Stack((_id_), &descriptor_s32, _value_)
 #define Stack_s64(_id_, _value_) Stack((_id_), &descriptor_s64, _value_)
@@ -759,14 +778,14 @@ make_or(
 
 #define Call(_target_, ...)\
   call_function_value(\
-    &builder_,\
+    builder_,\
     (_target_),\
     (Value **)((Value *[]){0, ##__VA_ARGS__}) + 1, \
     static_array_size(((Value *[]){0, ##__VA_ARGS__})) - 1 \
   )
 
-#define And(_a_, _b_) make_and(&builder_, (_a_), (_b_))
-#define Or(_a_, _b_) make_or(&builder_, (_a_), (_b_))
+#define And(_a_, _b_) make_and(builder_, (_a_), (_b_))
+#define Or(_a_, _b_) make_or(builder_, (_a_), (_b_))
 
 
 

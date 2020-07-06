@@ -222,6 +222,7 @@ create_is_character_in_set_checker_fn(
 
     Return(value_from_s8(0));
   }
+  program_end(program_);
 
   return value_as_function(checker, fn_type_s32_to_s8);
 }
@@ -240,12 +241,14 @@ spec("mass") {
     test_program = (Program) {
       .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
       .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
+      .functions = array_alloc(Array_Function_Builder, 16),
     };
     program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
 
   after_each() {
+    array_free(test_program.functions);
     free_buffer(&test_program.function_buffer);
     free_buffer(&test_program.data_buffer);
   }
@@ -294,6 +297,7 @@ spec("mass") {
       Value *x = struct_get_field(test_result, "x");
       Return(x);
     }
+    program_end(program_);
 
     fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
     check(checker() == 42);
@@ -316,6 +320,7 @@ spec("mass") {
     Function(checker_value) {
       Return(Plus(global_a, global_b));
     }
+    program_end(program_);
     fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
     check(checker() == 42);
   }
@@ -341,10 +346,11 @@ spec("mass") {
     Descriptor *point_struct_descriptor = struct_end(&struct_builder);
 
     Function(field_count) {
-      Value *overload = fn_reflect(&builder_, point_struct_descriptor);
+      Value *overload = fn_reflect(builder_, point_struct_descriptor);
       Stack(struct_, &descriptor_struct_reflection, overload);
       Return(struct_get_field(struct_, "field_count"));
     }
+    program_end(program_);
     s32 count = value_as_function(field_count, fn_type_void_to_s32)();
     check(count == 2);
   }
@@ -383,13 +389,14 @@ spec("mass") {
     Function(with_default_value) {
       Arg(option_value, descriptor_pointer_to(&option_s64_descriptor));
       Arg_s64(default_value);
-      Value *some = maybe_cast_to_tag(&builder_, "Some", option_value);
+      Value *some = maybe_cast_to_tag(builder_, "Some", option_value);
       If(some) {
         Value *value = struct_get_field(some, "value");
         Return(value);
       }
       Return(default_value);
     }
+    program_end(program_);
 
     fn_type_voidp_s64_to_s64 with_default =
       value_as_function(with_default_value, fn_type_voidp_s64_to_s64);
@@ -462,6 +469,7 @@ spec("mass") {
         struct_get_field(size_struct, "height")
       ));
     }
+    program_end(program_);
 
     struct { s32 width; s32 height; s32 dummy; } size = { 10, 42 };
     s32 result = value_as_function(area, fn_type_voidp_to_s32)(&size);
@@ -501,7 +509,7 @@ spec("mass") {
         }
 
         Value *reg_a = value_register_for_descriptor(Register_A, temp->descriptor);
-        move_value(&builder_, reg_a, temp);
+        move_value(builder_, reg_a, temp);
 
         Operand pointer = {
           .type = Operand_Type_Memory_Indirect,
@@ -511,13 +519,14 @@ spec("mass") {
             .displacement = 0,
           }
         };
-        push_instruction(&builder_, (Instruction) {inc, {pointer, 0, 0}});
-        push_instruction(&builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
+        push_instruction(builder_, (Instruction) {inc, {pointer, 0, 0}});
+        push_instruction(builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
 
-        push_instruction(&builder_, (Instruction) {inc, {index->operand, 0, 0}});
+        push_instruction(builder_, (Instruction) {inc, {index->operand, 0, 0}});
       }
 
     }
+    program_end(program_);
     value_as_function(increment, fn_type_s32p_to_void)(array);
 
     check(array[0] == 2);
