@@ -46,14 +46,10 @@ spec("function") {
 
   before_each() {
     test_program = (Program) {
-      .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
       .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
       .import_libraries = array_alloc(Array_Import_Library, 16),
       .functions = array_alloc(Array_Function_Builder, 16),
     };
-    // FIXME make sure that this fits into s32
-    test_program.code_base_rva =
-      (s32)(test_program.function_buffer.memory - test_program.data_buffer.memory);
     program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
@@ -61,7 +57,6 @@ spec("function") {
   after_each() {
     array_free(test_program.import_libraries);
     array_free(test_program.functions);
-    free_buffer(&test_program.function_buffer);
     free_buffer(&test_program.data_buffer);
   }
 

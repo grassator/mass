@@ -324,6 +324,13 @@ fits_into_s8(
 }
 
 inline bool
+fits_into_s16(
+  s64 value
+) {
+  return value >= -(1 << 15) && value <= (1 << 15) - 1;
+}
+
+inline bool
 fits_into_s32(
   s64 value
 ) {

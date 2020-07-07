@@ -239,17 +239,16 @@ spec("mass") {
 
   before_each() {
     test_program = (Program) {
-      .function_buffer = make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE),
       .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
       .functions = array_alloc(Array_Function_Builder, 16),
     };
+    // make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE)
     program_ = &test_program;
     buffer_reset(&temp_buffer);
   }
 
   after_each() {
     array_free(test_program.functions);
-    free_buffer(&test_program.function_buffer);
     free_buffer(&test_program.data_buffer);
   }
 

@@ -24,11 +24,10 @@ typedef enum {
 
 void
 encode_instruction(
+  Buffer *buffer,
   Function_Builder *builder,
   Instruction instruction
 ) {
-  Buffer *buffer = builder->buffer;
-
   if (instruction.maybe_label) {
     Label *label = instruction.maybe_label;
     assert(!label->target);
@@ -273,7 +272,7 @@ encode_instruction(
           s64 next_instruction_address = start_address + buffer->occupied + sizeof(s32);
 
           s64 diff = operand->imm64 - next_instruction_address;
-          assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
+          assert(fits_into_s32(diff));
           s32 displacement = (s32)(diff);
 
           buffer_append_s32(buffer, displacement);

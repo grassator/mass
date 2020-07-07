@@ -152,6 +152,7 @@ typedef struct Value {
   Operand operand;
 } Value;
 
+
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
@@ -225,7 +226,6 @@ typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   u8 next_argument_index;
-  Buffer *buffer;
 
   Label *prolog_label;
   Label *epilog_label;
@@ -240,7 +240,6 @@ typedef struct {
 typedef array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct _Program {
-  Buffer function_buffer;
   Buffer data_buffer;
   Array_Import_Library import_libraries;
   Function_Builder *entry_point;
@@ -248,5 +247,10 @@ typedef struct _Program {
   s32 code_base_rva;
   s32 code_base_file_offset;
 } Program;
+
+typedef struct {
+  Buffer code_buffer;
+  Buffer data_buffer;
+} Jit_Program;
 
 #endif VALUE_H

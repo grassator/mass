@@ -4,6 +4,7 @@
 
 void
 fn_encode(
+  Buffer *buffer,
   Function_Builder *builder
 );
 
@@ -219,8 +220,7 @@ void write_executable(
 
   program->code_base_file_offset = text_section_header->PointerToRawData;
   program->code_base_rva = text_section_header->VirtualAddress;
-  program->entry_point->buffer = &exe_buffer;
-  fn_encode(program->entry_point);
+  fn_encode(&exe_buffer, program->entry_point);
 
   exe_buffer.occupied =
     text_section_header->PointerToRawData + text_section_header->SizeOfRawData;
@@ -249,4 +249,6 @@ void write_executable(
   );
 
   CloseHandle(file);
+
+  free_buffer(&exe_buffer);
 }

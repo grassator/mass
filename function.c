@@ -118,7 +118,6 @@ move_value(
 
 Function_Builder *
 fn_begin(Value **result, Program *program) {
-  Buffer *buffer = &program->function_buffer;
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
@@ -131,7 +130,6 @@ fn_begin(Value **result, Program *program) {
   Function_Builder *builder = array_push(program->functions, (Function_Builder){
     .program = program,
     .stack_reserve = 0,
-    .buffer = buffer,
     .prolog_label = make_label(),
     .epilog_label = make_label(),
     .descriptor = descriptor,
@@ -196,39 +194,66 @@ fn_end(
 
 void
 fn_encode(
+  Buffer *buffer,
   Function_Builder *builder
 ) {
-  encode_instruction(builder, (Instruction) {.maybe_label = builder->prolog_label});
-  encode_instruction(builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->prolog_label});
+  encode_instruction(buffer, builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
 
   for (
     Instruction *instruction = array_begin(builder->instructions);
     instruction != array_end(builder->instructions);
     ++instruction
   ) {
-    encode_instruction(builder, *instruction);
+    encode_instruction(buffer, builder, *instruction);
   }
 
-  encode_instruction(builder, (Instruction) {.maybe_label = builder->epilog_label});
+  encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->epilog_label});
 
-  encode_instruction(builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
-  encode_instruction(builder, (Instruction) {ret, {0}});
+  encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, (Instruction) {ret, {0}});
   // FIXME add encoding
   //buffer_append_s8(&exe_buffer, 0xCC); // int3
   array_free(builder->instructions);
 }
 
-void
-program_end(
+u64
+estimate_max_code_size_in_bytes(
   Program *program
 ) {
+  u64 total_instruction_count = 0;
   for (
     Function_Builder *builder = array_begin(program->functions);
     builder != array_end(program->functions);
     ++builder
   ) {
-    fn_encode(builder);
+    total_instruction_count += array_count(builder->instructions);
   }
+  // TODO this should architecture-dependent
+  const u64 max_bytes_per_instruction = 15;
+  return total_instruction_count * max_bytes_per_instruction;
+}
+
+Jit_Program
+program_end(
+  Program *program
+) {
+  u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
+  Jit_Program result = {
+    .code_buffer = make_buffer(code_buffer_size, PAGE_EXECUTE_READWRITE),
+    .data_buffer = program->data_buffer,
+  };
+  s64 diff = result.code_buffer.memory - program->data_buffer.memory;
+  assert(fits_into_s32(diff));
+  program->code_base_rva = (s32)(diff);
+  for (
+    Function_Builder *builder = array_begin(program->functions);
+    builder != array_end(program->functions);
+    ++builder
+  ) {
+    fn_encode(&result.code_buffer, builder);
+  }
+  return result;
 }
 
 Value *
