@@ -1,6 +1,7 @@
 #include "prelude.h"
 #include "assert.h"
 #include "value.h"
+#include <time.h>
 
 void
 fn_encode(
@@ -11,6 +12,7 @@ fn_encode(
 void write_executable(
   Program *program
 ) {
+  // TODO this should be dynamically sized or correctly estimated
   Buffer exe_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   IMAGE_DOS_HEADER *dos_header = buffer_allocate(&exe_buffer, IMAGE_DOS_HEADER);
 
@@ -25,7 +27,7 @@ void write_executable(
   *file_header = (IMAGE_FILE_HEADER) {
     .Machine = IMAGE_FILE_MACHINE_AMD64,
     .NumberOfSections = 2,
-    .TimeDateStamp = 0x5EF48E56, // FIXME generate ourselves
+    .TimeDateStamp = (DWORD)time(0),
     .SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64),
     .Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE,
   };
