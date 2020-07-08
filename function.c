@@ -217,23 +217,6 @@ fn_encode(
   array_free(builder->instructions);
 }
 
-u64
-estimate_max_code_size_in_bytes(
-  Program *program
-) {
-  u64 total_instruction_count = 0;
-  for (
-    Function_Builder *builder = array_begin(program->functions);
-    builder != array_end(program->functions);
-    ++builder
-  ) {
-    total_instruction_count += array_count(builder->instructions);
-  }
-  // TODO this should architecture-dependent
-  const u64 max_bytes_per_instruction = 15;
-  return total_instruction_count * max_bytes_per_instruction;
-}
-
 Jit_Program
 program_end(
   Program *program
@@ -703,9 +686,11 @@ call_function_overload(
   }
 
   if (return_size <= 8) {
-    Value *result = reserve_stack(builder, descriptor->returns->descriptor);
-    move_value(builder, result, descriptor->returns);
-    return result;
+    if (return_size != 0) {
+      Value *result = reserve_stack(builder, descriptor->returns->descriptor);
+      move_value(builder, result, descriptor->returns);
+      return result;
+    }
   }
 
   return descriptor->returns;

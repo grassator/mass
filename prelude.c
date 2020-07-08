@@ -9,6 +9,14 @@ align(
   return (s32)(ceil((double)number / alignment) * alignment);
 }
 
+u64
+align_u64(
+  u64 number,
+  u64 alignment
+) {
+  return (u64)(ceil((double)number / alignment) * alignment);
+}
+
 Buffer
 make_buffer(
   u64 capacity,

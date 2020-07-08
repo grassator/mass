@@ -43,6 +43,12 @@ align(
   s32 alignment
 );
 
+u64
+align_u64(
+  u64 number,
+  u64 alignment
+);
+
 typedef struct {
   u8 *memory;
   u64 occupied;

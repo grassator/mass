@@ -3,6 +3,11 @@
 #include "value.h"
 #include <time.h>
 
+#define PE32_FILE_ALIGNMENT 0x200
+#define PE32_SECTION_ALIGNMENT 0x1000
+
+#define PE32_MIN_WINDOWS_VERSION_VISTA 6
+
 void
 fn_encode(
   Buffer *buffer,
@@ -12,6 +17,61 @@ fn_encode(
 void write_executable(
   Program *program
 ) {
+  u64 max_code_size = estimate_max_code_size_in_bytes(program);
+  max_code_size = align_u64(max_code_size, PE32_FILE_ALIGNMENT);
+
+  assert(fits_into_s32(max_code_size));
+  s32 max_code_size_s32 = (s32)max_code_size;
+
+  // Sections
+  IMAGE_SECTION_HEADER sections[] = {
+    {
+      .Name = ".rdata",
+      .Misc = { .VirtualSize = 0x6c }, // FIXME size of data in bytes
+      .VirtualAddress = 0,
+      .SizeOfRawData = 0x200, // FIXME calculate this
+      .PointerToRawData = 0,
+      .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
+    },
+    {
+      .Name = ".text",
+      .Misc = { .VirtualSize = 0x10 }, // FIXME size of machine code in bytes
+      .VirtualAddress = 0,
+      .SizeOfRawData = max_code_size_s32,
+      .PointerToRawData = 0,
+      .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
+    },
+    {0}
+  };
+
+  IMAGE_SECTION_HEADER *rdata_section_header = &sections[0];
+  IMAGE_SECTION_HEADER *text_section_header = &sections[1];
+
+  s32 file_size_of_headers =
+    sizeof(IMAGE_DOS_HEADER) +
+    sizeof(s32) + // IMAGE_NT_SIGNATURE
+    sizeof(IMAGE_FILE_HEADER) +
+    sizeof(IMAGE_OPTIONAL_HEADER64) +
+    sizeof(sections);
+
+  file_size_of_headers = align(file_size_of_headers, PE32_FILE_ALIGNMENT);
+
+  s32 virtual_size_of_image = 0;
+  {
+    // Update offsets for sections
+    s32 file_section_offset = file_size_of_headers;
+    s32 virtual_section_offset = align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
+    // -1 makes sure we do not write anything in zero-termination element
+    for (u32 i = 0; i < static_array_size(sections) - 1; ++i) {
+      sections[i].PointerToRawData = file_section_offset;
+      file_section_offset += sections[i].SizeOfRawData;
+
+      sections[i].VirtualAddress = virtual_section_offset;
+      virtual_section_offset += align(sections[i].SizeOfRawData, PE32_SECTION_ALIGNMENT);
+    }
+    virtual_size_of_image = virtual_section_offset;
+  }
+
   // TODO this should be dynamically sized or correctly estimated
   Buffer exe_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
   IMAGE_DOS_HEADER *dos_header = buffer_allocate(&exe_buffer, IMAGE_DOS_HEADER);
@@ -26,7 +86,7 @@ void write_executable(
 
   *file_header = (IMAGE_FILE_HEADER) {
     .Machine = IMAGE_FILE_MACHINE_AMD64,
-    .NumberOfSections = 2,
+    .NumberOfSections = static_array_size(sections) - 1,
     .TimeDateStamp = (DWORD)time(0),
     .SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64),
     .Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE,
@@ -54,23 +114,23 @@ void write_executable(
 
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
-    .SizeOfCode = 0x200, // FIXME calculate based on the amount of machine code
-    .SizeOfInitializedData = 0x200, // FIXME calculate based on the amount of global data
-    .AddressOfEntryPoint = 0x2000, // FIXME resolve to the entry point in the machine code
-    .BaseOfCode = 0x2000, // FIXME resolve to the right section containing code
+    .SizeOfCode = text_section_header->SizeOfRawData,
+    .SizeOfInitializedData = rdata_section_header->SizeOfRawData,
+    .AddressOfEntryPoint = 0,
+    .BaseOfCode = text_section_header->VirtualAddress,
     .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
-    .SectionAlignment = 0x1000,
-    .FileAlignment = 0x200,
-    .MajorOperatingSystemVersion = 6, // FIXME figure out if can be not hard coded
+    .SectionAlignment = PE32_SECTION_ALIGNMENT,
+    .FileAlignment = PE32_FILE_ALIGNMENT,
+    .MajorOperatingSystemVersion = PE32_MIN_WINDOWS_VERSION_VISTA,
     .MinorOperatingSystemVersion = 0,
-    .MajorSubsystemVersion = 6, // FIXME figure out if can be not hard coded
+    .MajorSubsystemVersion = PE32_MIN_WINDOWS_VERSION_VISTA,
     .MinorSubsystemVersion = 0,
-    .SizeOfImage = 0x3000, // FIXME calculate based on the sizes of the sections
-    .SizeOfHeaders = 0,
+    .SizeOfImage = virtual_size_of_image,
+    .SizeOfHeaders = file_size_of_headers,
     .Subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI, // TODO allow user to specify this
     .DllCharacteristics =
       IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
-      IMAGE_DLLCHARACTERISTICS_NX_COMPAT | // TODO figure out what NX is
+      IMAGE_DLLCHARACTERISTICS_NX_COMPAT |
       IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE |
       IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
     .SizeOfStackReserve = 0x100000,
@@ -81,42 +141,9 @@ void write_executable(
     .DataDirectory = {0},
   };
 
-  // .rdata section
-  IMAGE_SECTION_HEADER *rdata_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
-  *rdata_section_header = (IMAGE_SECTION_HEADER) {
-    .Name = ".rdata",
-    .Misc = 0x14C, // FIXME size of machine code in bytes
-    .VirtualAddress = 0x1000, // FIXME calculate this
-    .SizeOfRawData = 0x200, // FIXME calculate this
-    .PointerToRawData = 0,
-    .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
-  };
-
-  // .text section
-  IMAGE_SECTION_HEADER *text_section_header = buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER);
-  *text_section_header = (IMAGE_SECTION_HEADER) {
-    .Name = ".text",
-    .Misc = 0x10, // FIXME size of machine code in bytes
-    .VirtualAddress = optional_header->BaseOfCode,
-    .SizeOfRawData = optional_header->SizeOfCode,
-    .PointerToRawData = 0,
-    .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
-  };
-
-  // NULL header telling that the list is done
-  *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = (IMAGE_SECTION_HEADER){0};
-
-  optional_header->SizeOfHeaders = align((s32)exe_buffer.occupied, optional_header->FileAlignment);
-  exe_buffer.occupied = optional_header->SizeOfHeaders;
-
-  IMAGE_SECTION_HEADER *sections[] = {
-    rdata_section_header,
-    text_section_header,
-  };
-  s32 section_offset = optional_header->SizeOfHeaders;
+  // Write out sections
   for (u32 i = 0; i < static_array_size(sections); ++i) {
-    sections[i]->PointerToRawData = section_offset;
-    section_offset += sections[i]->SizeOfRawData;
+    *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = sections[i];
   }
 
   #define file_offset_to_rva(_section_header_)\
@@ -214,6 +241,9 @@ void write_executable(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
+  u64 actual_size_of_rdata = (exe_buffer.occupied - rdata_section_header->PointerToRawData);
+  assert(actual_size_of_rdata == 0x6c);
+
   exe_buffer.occupied =
     rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
 
@@ -222,7 +252,17 @@ void write_executable(
 
   program->code_base_file_offset = text_section_header->PointerToRawData;
   program->code_base_rva = text_section_header->VirtualAddress;
-  fn_encode(&exe_buffer, program->entry_point);
+
+  for (
+    Function_Builder *builder = array_begin(program->functions);
+    builder != array_end(program->functions);
+    ++builder
+  ) {
+    if (builder == program->entry_point) {
+      optional_header->AddressOfEntryPoint = file_offset_to_rva(text_section_header);
+    }
+    fn_encode(&exe_buffer, builder);
+  }
 
   exe_buffer.occupied =
     text_section_header->PointerToRawData + text_section_header->SizeOfRawData;

@@ -63,9 +63,13 @@ spec("function") {
   it("should write out an executable") {
     Value *ExitProcess_value = c_function_import(program_, "kernel32.dll", "s64 ExitProcess(s32)");
 
+    Function(my_exit) {
+      Call(ExitProcess_value, value_from_s32(42));
+    }
+
     Function(main) {
       program_->entry_point = builder_;
-      Return(Call(ExitProcess_value, value_from_s32(42)));
+      Call(my_exit);
     }
     write_executable(program_);
   }

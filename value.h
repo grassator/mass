@@ -253,4 +253,30 @@ typedef struct {
   Buffer data_buffer;
 } Jit_Program;
 
+u64
+estimate_max_code_size_in_bytes(
+  Program *program
+);
+
+inline bool
+fits_into_s8(
+  s64 value
+) {
+  return value >= -(1 << 7) && value <= (1 << 7) - 1;
+}
+
+inline bool
+fits_into_s16(
+  s64 value
+) {
+  return value >= -(1 << 15) && value <= (1 << 15) - 1;
+}
+
+inline bool
+fits_into_s32(
+  s64 value
+) {
+  return value >= -(1ll << 31) && value <= (1ll << 31) - 1;
+}
+
 #endif VALUE_H

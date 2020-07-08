@@ -316,27 +316,6 @@ imm64(
   };
 }
 
-inline bool
-fits_into_s8(
-  s64 value
-) {
-  return value >= -(1 << 7) && value <= (1 << 7) - 1;
-}
-
-inline bool
-fits_into_s16(
-  s64 value
-) {
-  return value >= -(1 << 15) && value <= (1 << 15) - 1;
-}
-
-inline bool
-fits_into_s32(
-  s64 value
-) {
-  return value >= -(1ll << 31) && value <= (1ll << 31) - 1;
-}
-
 inline Operand
 imm_auto(
   s64 value
@@ -758,7 +737,22 @@ program_find_import(
   return 0;
 }
 
-
+u64
+estimate_max_code_size_in_bytes(
+  Program *program
+) {
+  u64 total_instruction_count = 0;
+  for (
+    Function_Builder *builder = array_begin(program->functions);
+    builder != array_end(program->functions);
+    ++builder
+  ) {
+    total_instruction_count += array_count(builder->instructions);
+  }
+  // TODO this should architecture-dependent
+  const u64 max_bytes_per_instruction = 15;
+  return total_instruction_count * max_bytes_per_instruction;
+}
 
 
 
