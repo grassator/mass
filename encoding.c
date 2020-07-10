@@ -242,10 +242,7 @@ encode_instruction(
         Operand *operand = &instruction.operands[operand_index];
         if (operand->type == Operand_Type_RIP_Relative_Import) {
           Program *program = builder->program;
-          s64 next_instruction_rva =
-            program->code_base_rva +
-            (buffer->occupied - program->code_base_file_offset) +
-            sizeof(s32);
+          s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
 
           bool match_found = false;
           for (s64 i = 0; i < array_count(program->import_libraries); ++i) {

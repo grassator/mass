@@ -245,7 +245,6 @@ typedef struct _Program {
   Function_Builder *entry_point;
   Array_Function_Builder functions;
   s32 code_base_rva;
-  s32 code_base_file_offset;
 } Program;
 
 typedef struct {

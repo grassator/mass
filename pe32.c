@@ -7,7 +7,6 @@
 #define PE32_SECTION_ALIGNMENT 0x1000
 #define PE32_MIN_WINDOWS_VERSION_VISTA 6
 
-
 enum {
   EXPORT_DIRECTORY_INDEX,
   IMPORT_DIRECTORY_INDEX,
@@ -47,9 +46,43 @@ encode_rdata_section(
 ) {
   #define get_rva() (s32)(header->VirtualAddress + buffer->occupied)
 
+  u64 expected_encoded_size = 0;
+
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    // Aligned to 2 bytes c string of library name
+    expected_encoded_size += align((s32)strlen(lib->dll.name) + 1, 2);
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      {
+        // Ordinal Hint, value not required
+        expected_encoded_size += sizeof(s16);
+        // Aligned to 2 bytes c string of symbol name
+        expected_encoded_size += align((s32)strlen(symbol->name) + 1, 2);
+      }
+      {
+        // IAT placeholder for symbol pointer
+        expected_encoded_size += sizeof(u64);
+      }
+      {
+        // Image Thunk
+        expected_encoded_size += sizeof(u64);
+      }
+      {
+        // Import Directory
+        expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
+      }
+    }
+    // IAT zero-termination
+    expected_encoded_size += sizeof(u64);
+    // Import Directory zero-termination
+    expected_encoded_size += sizeof(u64);
+    // Image Thunk zero-termination
+    expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
+  }
+
   Encoded_Rdata_Section result = {
-    // FIXME dynamically resize the buffer
-    .buffer = make_buffer(1024 * 1024, PAGE_READWRITE),
+    .buffer = make_buffer(expected_encoded_size, PAGE_READWRITE),
   };
 
   Buffer *buffer = &result.buffer;
@@ -97,10 +130,7 @@ encode_rdata_section(
     buffer_append_u64(buffer, 0);
   }
 
-  buffer_append_s64(buffer, 0);
-
   // Library Names
-
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
     lib->dll.name_rva = get_rva();
@@ -132,23 +162,58 @@ encode_rdata_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *buffer_allocate(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
+  assert(buffer->occupied == expected_encoded_size);
+
+  assert(fits_into_s32(buffer->occupied));
   header->Misc.VirtualSize = (s32)buffer->occupied;
   header->SizeOfRawData = (s32)align_u64(buffer->occupied, PE32_FILE_ALIGNMENT);
 
   return result;
+}
+
+typedef struct {
+  Buffer buffer;
+  s32 entry_point_rva;
+} Encoded_Text_Section;
+
+Encoded_Text_Section
+encode_text_section(
+  Program *program,
+  IMAGE_SECTION_HEADER *header
+) {
+  u64 max_code_size = estimate_max_code_size_in_bytes(program);
+  max_code_size = align_u64(max_code_size, PE32_FILE_ALIGNMENT);
+
+  Encoded_Text_Section result = {
+    .buffer = make_buffer(max_code_size, PAGE_READWRITE),
+  };
+  Buffer *buffer = &result.buffer;
+
+  program->code_base_rva = header->VirtualAddress;
+
+  for (
+    Function_Builder *builder = array_begin(program->functions);
+    builder != array_end(program->functions);
+    ++builder
+  ) {
+    if (builder == program->entry_point) {
+      result.entry_point_rva = get_rva();
+    }
+    fn_encode(&result.buffer, builder);
+  }
+
+  assert(fits_into_s32(buffer->occupied));
+  header->Misc.VirtualSize = (s32)buffer->occupied;
+  header->SizeOfRawData = (s32)align_u64(buffer->occupied, PE32_FILE_ALIGNMENT);
+
   #undef get_rva
+  return result;
 }
 
 void
 write_executable(
   Program *program
 ) {
-  u64 max_code_size = estimate_max_code_size_in_bytes(program);
-  max_code_size = align_u64(max_code_size, PE32_FILE_ALIGNMENT);
-
-  assert(fits_into_s32(max_code_size));
-  s32 max_code_size_s32 = (s32)max_code_size;
-
   // Sections
   IMAGE_SECTION_HEADER sections[] = {
     {
@@ -161,17 +226,14 @@ write_executable(
     },
     {
       .Name = ".text",
-      .Misc = { .VirtualSize = 0x10 }, // FIXME size of machine code in bytes
+      .Misc = {0},
       .VirtualAddress = 0,
-      .SizeOfRawData = max_code_size_s32,
+      .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
     },
     {0}
   };
-
-  IMAGE_SECTION_HEADER *rdata_section_header = &sections[0];
-  IMAGE_SECTION_HEADER *text_section_header = &sections[1];
 
   s32 file_size_of_headers =
     sizeof(IMAGE_DOS_HEADER) +
@@ -183,31 +245,37 @@ write_executable(
   file_size_of_headers = align(file_size_of_headers, PE32_FILE_ALIGNMENT);
   s32 virtual_size_of_headers = align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
 
+  // Prepare .rdata section
+  IMAGE_SECTION_HEADER *rdata_section_header = &sections[0];
+  rdata_section_header->PointerToRawData = file_size_of_headers;
   rdata_section_header->VirtualAddress = virtual_size_of_headers;
   Encoded_Rdata_Section encoded_rdata_section = encode_rdata_section(
     program, rdata_section_header
   );
   Buffer rdata_section_buffer = encoded_rdata_section.buffer;
 
-  s32 virtual_size_of_image = 0;
-  {
-    // Update offsets for sections
-    s32 file_section_offset = file_size_of_headers;
-    s32 virtual_section_offset = virtual_size_of_headers;
+  // Prepare .text section
+  IMAGE_SECTION_HEADER *text_section_header = &sections[1];
+  text_section_header->PointerToRawData =
+    rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
+  text_section_header->VirtualAddress =
+    rdata_section_header->VirtualAddress +
+    align(rdata_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
+  Encoded_Text_Section encoded_text_section = encode_text_section(
+    program, text_section_header
+  );
+  Buffer text_section_buffer = encoded_text_section.buffer;
 
-    // -1 makes sure we do not write anything in zero-termination element
-    for (u32 i = 0; i < static_array_size(sections) - 1; ++i) {
-      sections[i].PointerToRawData = file_section_offset;
-      file_section_offset += sections[i].SizeOfRawData;
+  // Calculate total size of image in memory once loaded
+  s32 virtual_size_of_image =
+    text_section_header->VirtualAddress +
+    align(text_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
 
-      sections[i].VirtualAddress = virtual_section_offset;
-      virtual_section_offset += align(sections[i].SizeOfRawData, PE32_SECTION_ALIGNMENT);
-    }
-    virtual_size_of_image = virtual_section_offset;
-  }
-
-  // TODO this should be dynamically sized or correctly estimated
-  Buffer exe_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
+  u64 max_exe_buffer =
+    file_size_of_headers +
+    rdata_section_header->SizeOfRawData +
+    text_section_header->SizeOfRawData;
+  Buffer exe_buffer = make_buffer(max_exe_buffer, PAGE_READWRITE);
   IMAGE_DOS_HEADER *dos_header = buffer_allocate(&exe_buffer, IMAGE_DOS_HEADER);
 
   *dos_header = (IMAGE_DOS_HEADER) {
@@ -231,8 +299,8 @@ write_executable(
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
     .SizeOfCode = text_section_header->SizeOfRawData,
-    .SizeOfInitializedData = 0,
-    .AddressOfEntryPoint = 0,
+    .SizeOfInitializedData = rdata_section_header->SizeOfRawData,
+    .AddressOfEntryPoint = encoded_text_section.entry_point_rva,
     .BaseOfCode = text_section_header->VirtualAddress,
     .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
     .SectionAlignment = PE32_SECTION_ALIGNMENT,
@@ -264,47 +332,23 @@ write_executable(
     encoded_rdata_section.import_directory_rva;
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
     encoded_rdata_section.import_directory_size;
-  optional_header->SizeOfInitializedData = (s32)encoded_rdata_section.buffer.occupied;
 
   // Write out sections
   for (u32 i = 0; i < static_array_size(sections); ++i) {
     *buffer_allocate(&exe_buffer, IMAGE_SECTION_HEADER) = sections[i];
   }
 
-  #define file_offset_to_rva(_section_header_)\
-    ((s32)exe_buffer.occupied - \
-     (_section_header_)->PointerToRawData + \
-     (_section_header_)->VirtualAddress)
-
-
   // .rdata segment
   exe_buffer.occupied = rdata_section_header->PointerToRawData;
   s8 *rdata_memory = buffer_allocate_size(&exe_buffer, rdata_section_buffer.occupied);
   memcpy(rdata_memory, rdata_section_buffer.memory, rdata_section_buffer.occupied);
-
-  u64 actual_size_of_rdata = (exe_buffer.occupied - rdata_section_header->PointerToRawData);
-  assert(actual_size_of_rdata == 0x6c);
-
   exe_buffer.occupied =
     rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
 
   // .text segment
   exe_buffer.occupied = text_section_header->PointerToRawData;
-
-  program->code_base_file_offset = text_section_header->PointerToRawData;
-  program->code_base_rva = text_section_header->VirtualAddress;
-
-  for (
-    Function_Builder *builder = array_begin(program->functions);
-    builder != array_end(program->functions);
-    ++builder
-  ) {
-    if (builder == program->entry_point) {
-      optional_header->AddressOfEntryPoint = file_offset_to_rva(text_section_header);
-    }
-    fn_encode(&exe_buffer, builder);
-  }
-
+  s8 *code_memory = buffer_allocate_size(&exe_buffer, text_section_buffer.occupied);
+  memcpy(code_memory, text_section_buffer.memory, text_section_buffer.occupied);
   exe_buffer.occupied =
     text_section_header->PointerToRawData + text_section_header->SizeOfRawData;
 
@@ -333,6 +377,7 @@ write_executable(
 
   CloseHandle(file);
 
+  free_buffer(&text_section_buffer);
   free_buffer(&rdata_section_buffer);
   free_buffer(&exe_buffer);
 }
