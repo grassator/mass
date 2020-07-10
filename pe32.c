@@ -5,8 +5,26 @@
 
 #define PE32_FILE_ALIGNMENT 0x200
 #define PE32_SECTION_ALIGNMENT 0x1000
-
 #define PE32_MIN_WINDOWS_VERSION_VISTA 6
+
+
+enum {
+  EXPORT_DIRECTORY_INDEX,
+  IMPORT_DIRECTORY_INDEX,
+  RESOURCE_DIRECTORY_INDEX,
+  EXCEPTION_DIRECTORY_INDEX,
+  SECURITY_DIRECTORY_INDEX,
+  RELOCATION_DIRECTORY_INDEX,
+  DEBUG_DIRECTORY_INDEX,
+  ARCHITECTURE_DIRECTORY_INDEX,
+  GLOBAL_PTR_DIRECTORY_INDEX,
+  TLS_DIRECTORY_INDEX,
+  LOAD_CONFIG_DIRECTORY_INDEX,
+  BOUND_IMPORT_DIRECTORY_INDEX,
+  IAT_DIRECTORY_INDEX,
+  DELAY_IMPORT_DIRECTORY_INDEX,
+  CLR_DIRECTORY_INDEX,
+};
 
 void
 fn_encode(
@@ -14,7 +32,115 @@ fn_encode(
   Function_Builder *builder
 );
 
-void write_executable(
+typedef struct {
+  Buffer buffer;
+  s32 iat_rva;
+  s32 iat_size;
+  s32 import_directory_rva;
+  s32 import_directory_size;
+} Encoded_Rdata_Section;
+
+Encoded_Rdata_Section
+encode_rdata_section(
+  Program * program,
+  IMAGE_SECTION_HEADER *header
+) {
+  #define get_rva() (s32)(header->VirtualAddress + buffer->occupied)
+
+  Encoded_Rdata_Section result = {
+    // FIXME dynamically resize the buffer
+    .buffer = make_buffer(1024 * 1024, PAGE_READWRITE),
+  };
+
+  Buffer *buffer = &result.buffer;
+
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      symbol->name_rva = get_rva();
+      buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
+      size_t name_size = strlen(symbol->name) + 1;
+      s32 aligned_name_size = align((s32)name_size, 2);
+      memcpy(
+        buffer_allocate_size(buffer, aligned_name_size),
+        symbol->name,
+        name_size
+      );
+    }
+  }
+
+  result.iat_rva = get_rva();
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    lib->dll.iat_rva = get_rva();
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
+      fn->iat_rva = get_rva();
+      buffer_append_u64(buffer, fn->name_rva);
+    }
+    // End of IAT list
+    buffer_append_u64(buffer, 0);
+  }
+  result.iat_size = (s32)buffer->occupied;
+
+  // Image thunks
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    lib->image_thunk_rva = get_rva();
+
+    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
+      buffer_append_u64(buffer, fn->name_rva);
+    }
+    // End of IAT list
+    buffer_append_u64(buffer, 0);
+  }
+
+  buffer_append_s64(buffer, 0);
+
+  // Library Names
+
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+    lib->dll.name_rva = get_rva();
+    size_t name_size = strlen(lib->dll.name) + 1;
+    s32 aligned_name_size = align((s32)name_size, 2);
+    memcpy(
+      buffer_allocate_size(buffer, aligned_name_size),
+      lib->dll.name,
+      name_size
+    );
+  }
+
+  // Import Directory
+  result.import_directory_rva = get_rva();
+
+  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+    Import_Library *lib = array_get(program->import_libraries, i);
+
+    IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
+      buffer_allocate(buffer, IMAGE_IMPORT_DESCRIPTOR);
+    *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
+      .OriginalFirstThunk = lib->image_thunk_rva,
+      .Name = lib->dll.name_rva,
+      .FirstThunk = lib->dll.iat_rva,
+    };
+  }
+  result.import_directory_size = get_rva() - result.import_directory_rva;
+
+  // End of IMAGE_IMPORT_DESCRIPTOR list
+  *buffer_allocate(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
+
+  header->Misc.VirtualSize = (s32)buffer->occupied;
+  header->SizeOfRawData = (s32)align_u64(buffer->occupied, PE32_FILE_ALIGNMENT);
+
+  return result;
+  #undef get_rva
+}
+
+void
+write_executable(
   Program *program
 ) {
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
@@ -27,9 +153,9 @@ void write_executable(
   IMAGE_SECTION_HEADER sections[] = {
     {
       .Name = ".rdata",
-      .Misc = { .VirtualSize = 0x6c }, // FIXME size of data in bytes
+      .Misc = {0},
       .VirtualAddress = 0,
-      .SizeOfRawData = 0x200, // FIXME calculate this
+      .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
     },
@@ -55,12 +181,20 @@ void write_executable(
     sizeof(sections);
 
   file_size_of_headers = align(file_size_of_headers, PE32_FILE_ALIGNMENT);
+  s32 virtual_size_of_headers = align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
+
+  rdata_section_header->VirtualAddress = virtual_size_of_headers;
+  Encoded_Rdata_Section encoded_rdata_section = encode_rdata_section(
+    program, rdata_section_header
+  );
+  Buffer rdata_section_buffer = encoded_rdata_section.buffer;
 
   s32 virtual_size_of_image = 0;
   {
     // Update offsets for sections
     s32 file_section_offset = file_size_of_headers;
-    s32 virtual_section_offset = align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
+    s32 virtual_section_offset = virtual_size_of_headers;
+
     // -1 makes sure we do not write anything in zero-termination element
     for (u32 i = 0; i < static_array_size(sections) - 1; ++i) {
       sections[i].PointerToRawData = file_section_offset;
@@ -94,28 +228,10 @@ void write_executable(
 
   IMAGE_OPTIONAL_HEADER64 *optional_header = buffer_allocate(&exe_buffer, IMAGE_OPTIONAL_HEADER64);
 
-  enum {
-    EXPORT_DIRECTORY_INDEX,
-    IMPORT_DIRECTORY_INDEX,
-    RESOURCE_DIRECTORY_INDEX,
-    EXCEPTION_DIRECTORY_INDEX,
-    SECURITY_DIRECTORY_INDEX,
-    RELOCATION_DIRECTORY_INDEX,
-    DEBUG_DIRECTORY_INDEX,
-    ARCHITECTURE_DIRECTORY_INDEX,
-    GLOBAL_PTR_DIRECTORY_INDEX,
-    TLS_DIRECTORY_INDEX,
-    LOAD_CONFIG_DIRECTORY_INDEX,
-    BOUND_IMPORT_DIRECTORY_INDEX,
-    IAT_DIRECTORY_INDEX,
-    DELAY_IMPORT_DIRECTORY_INDEX,
-    CLR_DIRECTORY_INDEX,
-  };
-
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
     .SizeOfCode = text_section_header->SizeOfRawData,
-    .SizeOfInitializedData = rdata_section_header->SizeOfRawData,
+    .SizeOfInitializedData = 0,
     .AddressOfEntryPoint = 0,
     .BaseOfCode = text_section_header->VirtualAddress,
     .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
@@ -140,6 +256,15 @@ void write_executable(
     .NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
     .DataDirectory = {0},
   };
+  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
+    encoded_rdata_section.iat_rva;
+  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
+    encoded_rdata_section.iat_size;
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress =
+    encoded_rdata_section.import_directory_rva;
+  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
+    encoded_rdata_section.import_directory_size;
+  optional_header->SizeOfInitializedData = (s32)encoded_rdata_section.buffer.occupied;
 
   // Write out sections
   for (u32 i = 0; i < static_array_size(sections); ++i) {
@@ -153,93 +278,9 @@ void write_executable(
 
 
   // .rdata segment
-
-  // IAT
   exe_buffer.occupied = rdata_section_header->PointerToRawData;
-
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
-    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
-      fn->name_rva = file_offset_to_rva(rdata_section_header);
-      buffer_append_s16(&exe_buffer, 0); // Ordinal Hint, value not required
-      size_t name_size = strlen(fn->name) + 1;
-      s32 aligned_name_size = align((s32)name_size, 2);
-      memcpy(
-        buffer_allocate_size(&exe_buffer, aligned_name_size),
-        fn->name,
-        name_size
-      );
-    }
-  }
-
-  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
-    file_offset_to_rva(rdata_section_header);
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
-    lib->dll.iat_rva = file_offset_to_rva(rdata_section_header);
-    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
-      fn->iat_rva = file_offset_to_rva(rdata_section_header);
-      buffer_append_u64(&exe_buffer, fn->name_rva);
-    }
-    // End of IAT list
-    buffer_append_u64(&exe_buffer, 0);
-  }
-  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
-    (s32)(exe_buffer.occupied - rdata_section_header->PointerToRawData);
-
-
-  // Image thunks
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
-    lib->image_thunk_rva = file_offset_to_rva(rdata_section_header);
-
-    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
-      buffer_append_u64(&exe_buffer, fn->name_rva);
-    }
-    // End of IAT list
-    buffer_append_u64(&exe_buffer, 0);
-  }
-
-  buffer_append_s64(&exe_buffer, 0);
-
-  // Library Names
-
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
-    lib->dll.name_rva = file_offset_to_rva(rdata_section_header);
-    size_t name_size = strlen(lib->dll.name) + 1;
-    s32 aligned_name_size = align((s32)name_size, 2);
-    memcpy(
-      buffer_allocate_size(&exe_buffer, aligned_name_size),
-      lib->dll.name,
-      name_size
-    );
-  }
-
-  // Import Directory
-  s32 import_directory_rva = file_offset_to_rva(rdata_section_header);
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress = import_directory_rva;
-
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
-
-    IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
-      buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR);
-    *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
-      .OriginalFirstThunk = lib->image_thunk_rva,
-      .Name = lib->dll.name_rva,
-      .FirstThunk = lib->dll.iat_rva,
-    };
-  }
-
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
-    file_offset_to_rva(rdata_section_header) - import_directory_rva;
-
-  // End of IMAGE_IMPORT_DESCRIPTOR list
-  *buffer_allocate(&exe_buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
+  s8 *rdata_memory = buffer_allocate_size(&exe_buffer, rdata_section_buffer.occupied);
+  memcpy(rdata_memory, rdata_section_buffer.memory, rdata_section_buffer.occupied);
 
   u64 actual_size_of_rdata = (exe_buffer.occupied - rdata_section_header->PointerToRawData);
   assert(actual_size_of_rdata == 0x6c);
@@ -292,5 +333,6 @@ void write_executable(
 
   CloseHandle(file);
 
+  free_buffer(&rdata_section_buffer);
   free_buffer(&exe_buffer);
 }
