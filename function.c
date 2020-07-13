@@ -59,25 +59,21 @@ move_value(
     return;
   }
 
-//
-//
-  //if (a_size != b_size) {
-    //if (b->operand.type == Operand_Type_Memory_Indirect || )
-    //if (!(
-      //b->operand.type == Operand_Type_Immediate_32 &&
-      //a_size == 8
-    //)) {
-      //assert(!"Mismatched operand size when moving");
-    //}
-  //}
-  if ((
-    b_size == 1 && (a_size >= 2 && a_size <= 8)
-  )) {
-    assert(a->operand.type == Operand_Type_Register);
-
-    // TODO deal with unsigned numbers
-    push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
-    return;
+  if (a_size != b_size) {
+    if (
+      a->operand.type == Operand_Type_Register &&
+      b_size < a_size &&
+      a_size <= 4
+    ) {
+      // TODO deal with unsigned numbers
+      push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
+      return;
+    } else if (!(
+      b->operand.type == Operand_Type_Immediate_32 &&
+      a_size == 8
+    )) {
+      assert(!"Mismatched operand size when moving");
+    }
   }
 
   if (
