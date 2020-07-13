@@ -74,13 +74,9 @@ move_value(
     b_size == 1 && (a_size >= 2 && a_size <= 8)
   )) {
     assert(a->operand.type == Operand_Type_Register);
-    Value *zero = value_from_s64(0);
-    zero->descriptor = a->descriptor;
 
-    move_value(builder, a, zero);
-    push_instruction(builder, (Instruction) {mov, {a->operand, b->operand, 0}});
-    // FIXME use movsx
-    //push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
+    // TODO deal with unsigned numbers
+    push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
     return;
   }
 

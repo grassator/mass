@@ -68,6 +68,23 @@ const X64_Mnemonic mov = {
   .encoding_count = static_array_size(mov_encoding_list),
 };
 
+
+////////////////////////////////////////////////////////////////////////////////
+// movsx
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding movsx_encoding_list[] = {
+  encoding(0x0FBE, _r, r32, r_m8),
+  encoding(0x0FBE, _r, r64, r_m8),
+  encoding(0x0FBF, _r, r32, r_m16),
+  encoding(0x0FBF, _r, r64, r_m16),
+};
+
+const X64_Mnemonic movsx = {
+  .name = "movsx",
+  .encoding_list = (const Instruction_Encoding *)movsx_encoding_list,
+  .encoding_count = static_array_size(movsx_encoding_list),
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 // lea
 ////////////////////////////////////////////////////////////////////////////////
