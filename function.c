@@ -211,8 +211,7 @@ fn_encode(
 
   encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
   encode_instruction(buffer, builder, (Instruction) {ret, {0}});
-  // FIXME add encoding
-  //buffer_append_s8(&exe_buffer, 0xCC); // int3
+  encode_instruction(buffer, builder, (Instruction) {int3, {0}});
   array_free(builder->instructions);
 }
 
@@ -680,7 +679,6 @@ call_function_value(
     if (argument_count != descriptor->argument_count) continue;
     bool match = true;
     for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
-      // FIXME @Overloads
       Value *arg = argument_list[arg_index];
       if(!same_value_type(&descriptor->argument_list[arg_index], arg)) {
         match = false;
