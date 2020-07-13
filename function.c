@@ -418,7 +418,6 @@ multiply(
   reg_a = value_register_for_descriptor(Register_A, x->descriptor);
   move_value(builder, reg_a, x);
 
-  // TODO check operand sizes
   push_instruction(builder, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
   Value *temp = reserve_stack(builder, x->descriptor);
@@ -540,6 +539,8 @@ compare(
   Value *a,
   Value *b
 ) {
+  assert(same_value_type(a, b));
+  assert(a->descriptor->type == Descriptor_Type_Integer);
   Value *temp_b = reserve_stack(builder, b->descriptor);
   move_value(builder, temp_b, b);
 
