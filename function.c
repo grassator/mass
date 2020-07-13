@@ -547,7 +547,6 @@ compare(
   Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
   move_value(builder, reg_a, a);
 
-  // TODO check that types are comparable
   push_instruction(builder, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
   Value *result = reserve_stack(builder, &descriptor_s8);
 

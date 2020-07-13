@@ -727,8 +727,7 @@ import_symbol(
 
   for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    // FIXME Use case-insensitive compare
-    if (strcmp(lib->dll.name, library_name) == 0) {
+    if (_stricmp(lib->dll.name, library_name) == 0) {
       library = lib;
     }
   }
