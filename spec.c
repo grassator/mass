@@ -306,13 +306,14 @@ spec("mass") {
     Value *global_a = value_global(program_, &descriptor_s32);
     {
       check(global_a->operand.type == Operand_Type_RIP_Relative);
-      s32 *address = (s32 *)global_a->operand.imm64;
+
+      s32 *address = rip_value_pointer(program_, global_a);
       *address = 32;
     }
     Value *global_b = value_global(program_, &descriptor_s32);
     {
       check(global_b->operand.type == Operand_Type_RIP_Relative);
-      s32 *address = (s32 *)global_b->operand.imm64;
+      s32 *address = rip_value_pointer(program_, global_b);
       *address = 10;
     }
 
@@ -419,6 +420,10 @@ spec("mass") {
 
   it("should say that (s64 *) is not the same as (s32 *)") {
     check(!same_type(descriptor_pointer_to(&descriptor_s32), descriptor_pointer_to(&descriptor_s64)));
+  }
+
+  it("should say that (s64 *) is not the same as (void *)") {
+    check(same_type(descriptor_pointer_to(&descriptor_s64), descriptor_pointer_to(&descriptor_void)));
   }
 
   it("should say that (s64[2]) is not the same as (s32[2])") {

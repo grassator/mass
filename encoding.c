@@ -265,10 +265,11 @@ encode_instruction(
           }
           assert(match_found);
         } else if (operand->type == Operand_Type_RIP_Relative) {
-          s64 start_address = (s64) buffer->memory;
-          s64 next_instruction_address = start_address + buffer->occupied + sizeof(s32);
+          Program *program = builder->program;
+          s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
 
-          s64 diff = operand->imm64 - next_instruction_address;
+          s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
+          s64 diff = operand_rva - next_instruction_rva;
           assert(fits_into_s32(diff));
           s32 displacement = (s32)(diff);
 

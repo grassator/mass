@@ -16,6 +16,12 @@ same_type(
         b->pointer_to->type == Descriptor_Type_Fixed_Size_Array &&
         same_type(b->pointer_to->array.item, a->pointer_to)
       ) return true;
+      if (
+        a->pointer_to->type == Descriptor_Type_Void ||
+        b->pointer_to->type == Descriptor_Type_Void
+      ) {
+        return true;
+      }
       return same_type(a->pointer_to, b->pointer_to);
     }
     case Descriptor_Type_Fixed_Size_Array: {
@@ -201,6 +207,7 @@ print_operand(
       break;
     }
     case Operand_Type_RIP_Relative: {
+      // FIXME calculate with offsets
       printf("rip_to(0x%016llx)", operand->imm64);
       break;
     }
@@ -410,13 +417,23 @@ value_register_for_descriptor(
   return result;
 }
 
+void *
+rip_value_pointer(
+  Program *program,
+  Value *value
+) {
+  assert(value->operand.type == Operand_Type_RIP_Relative);
+  return program->data_buffer.memory + value->operand.rip_offset_in_data;
+}
+
 Value *
 value_global(
   Program *program,
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  void *address = buffer_allocate_size(&program->data_buffer, byte_size);
+  s8 *address = buffer_allocate_size(&program->data_buffer, byte_size);
+  s64 offset_in_data_section = address - program->data_buffer.memory;
 
   Value *result = temp_allocate(Value);
   *result = (Value) {
@@ -424,10 +441,30 @@ value_global(
     .operand = {
       .type = Operand_Type_RIP_Relative,
       .byte_size = byte_size,
-      .imm64 = (s64) address,
+      .rip_offset_in_data = (s64) offset_in_data_section,
     },
   };
   return result;
+}
+
+Value *
+value_global_c_string(
+  Program *program,
+  const char *string
+) {
+  s32 length = (s32)strlen(string) + 1;
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  *descriptor = (Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = &descriptor_s8,
+      .length = length,
+    },
+  };
+
+  Value *string_value = value_global(program, descriptor);
+  memcpy(rip_value_pointer(program, string_value), string, length);
+  return string_value;
 }
 
 Descriptor *
@@ -481,6 +518,47 @@ memory_range_equal_to_c_string(
   s64 string_length = strlen(string);
   if (string_length != length) return false;
   return memcmp(memory_range_start, string, string_length) == 0;
+}
+
+Value *
+value_for_argument_index(
+  Descriptor_Function *function,
+  Descriptor *arg_descriptor,
+  s32 argument_index
+) {
+  u32 byte_size = descriptor_byte_size(arg_descriptor);
+  assert(byte_size <= 8);
+  switch (argument_index) {
+    case 0: {
+      function->argument_list[0] = *value_register_for_descriptor(Register_C, arg_descriptor);
+      break;
+    }
+    case 1: {
+      function->argument_list[1] = *value_register_for_descriptor(Register_D, arg_descriptor);
+      break;
+    }
+    case 2: {
+      function->argument_list[2] = *value_register_for_descriptor(Register_R8, arg_descriptor);
+      break;
+    }
+    case 3: {
+      function->argument_list[3] = *value_register_for_descriptor(Register_R9, arg_descriptor);
+      break;
+    }
+    default: {
+      // @Volatile @StackPatch
+      s32 offset = argument_index * 8;
+      Operand operand = stack(offset, byte_size);
+
+      function->argument_list[argument_index] = (const Value) {
+        .descriptor = arg_descriptor,
+        .operand = operand,
+      };
+      break;
+    }
+  }
+  function->argument_count++;
+  return &function->argument_list[argument_index];
 }
 
 Descriptor *
@@ -580,7 +658,11 @@ c_function_descriptor(
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
-    .function = {0},
+    .function = {
+      .argument_list = temp_allocate_array(Value, 16),
+      .argument_count = 0,
+      .returns = 0,
+    },
   };
 
   descriptor->function.returns = c_function_return_value(forward_declaration);
@@ -590,24 +672,22 @@ c_function_descriptor(
 
   char *start = ch;
   Descriptor *argument_descriptor = 0;
-  for (; *ch; ++ch) {
+  for (s32 argument_index = 0; *ch; ++ch) {
     if (*ch == ',' || *ch == ')') {
       if (start != ch) {
         argument_descriptor = parse_c_type(start, ch);
+
+        // support for foo(void) fn signature
+        if (argument_index == 0 && argument_descriptor->type == Descriptor_Type_Void) {
+          assert(*ch == ')');
+          break;
+        }
+        value_for_argument_index(&descriptor->function, argument_descriptor, argument_index);
+        ++argument_index;
         assert(argument_descriptor);
       }
       start = ch + 1;
     }
-  }
-
-  if (argument_descriptor && argument_descriptor->type != Descriptor_Type_Void) {
-    Value *arg = temp_allocate(Value);
-    arg->descriptor = argument_descriptor;
-    // FIXME should not use a hardcoded register here
-    arg->operand = rcx;
-
-    descriptor->function.argument_list = arg;
-    descriptor->function.argument_count = 1;
   }
 
   return descriptor;

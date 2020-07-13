@@ -151,7 +151,6 @@ Descriptor *
 fn_update_result(
   Function_Builder *builder
 ) {
-  builder->descriptor->function.argument_count = builder->next_argument_index;
   return (*builder->result)->descriptor;
 }
 
@@ -226,9 +225,11 @@ program_end(
     .code_buffer = make_buffer(code_buffer_size, PAGE_EXECUTE_READWRITE),
     .data_buffer = program->data_buffer,
   };
-  s64 diff = result.code_buffer.memory - program->data_buffer.memory;
-  assert(fits_into_s32(diff));
-  program->code_base_rva = (s32)(diff);
+  //s64 diff = result.code_buffer.memory - program->data_buffer.memory;
+  //assert(fits_into_s32(diff));
+  //program->code_base_rva = (s32)(diff);
+  program->code_base_rva = (s64)result.code_buffer.memory;
+  program->data_base_rva = (s64)program->data_buffer.memory;
   for (
     Function_Builder *builder = array_begin(program->functions);
     builder != array_end(program->functions);
@@ -245,42 +246,12 @@ fn_arg(
   Descriptor *descriptor
 ) {
   assert(!fn_is_frozen(builder));
-  u32 byte_size = descriptor_byte_size(descriptor);
-  assert(byte_size <= 8);
-  Descriptor_Function *function = &builder->descriptor->function;
   s32 argument_index = builder->next_argument_index;
   builder->next_argument_index++;
-  switch (argument_index) {
-    case 0: {
-      function->argument_list[0] = *value_register_for_descriptor(Register_C, descriptor);
-      break;
-    }
-    case 1: {
-      function->argument_list[1] = *value_register_for_descriptor(Register_D, descriptor);
-      break;
-    }
-    case 2: {
-      function->argument_list[2] = *value_register_for_descriptor(Register_R8, descriptor);
-      break;
-    }
-    case 3: {
-      function->argument_list[3] = *value_register_for_descriptor(Register_R9, descriptor);
-      break;
-    }
-    default: {
-      // @Volatile @StackPatch
-      s32 offset = argument_index * 8;
-      Operand operand = stack(offset, byte_size);
-
-      function->argument_list[argument_index] = (const Value) {
-        .descriptor = descriptor,
-        .operand = operand,
-      };
-      break;
-    }
-  }
+  Descriptor_Function *function = &builder->descriptor->function;
+  Value *result = value_for_argument_index(function, descriptor, argument_index);
   fn_update_result(builder);
-  return &function->argument_list[argument_index];
+  return result;
 }
 
 void
@@ -704,8 +675,9 @@ call_function_value(
   s64 argument_count
 ) {
   assert(to_call);
-  while (to_call) {
+  for (;to_call; to_call = to_call->descriptor->function.next_overload) {
     Descriptor_Function *descriptor = &to_call->descriptor->function;
+    if (argument_count != descriptor->argument_count) continue;
     bool match = true;
     for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
       // FIXME @Overloads
@@ -718,7 +690,6 @@ call_function_value(
     if (match) {
       return call_function_overload(builder, to_call, argument_list, argument_count);
     }
-    to_call = descriptor->next_overload;
   }
   assert(!"No matching overload found");
   return 0;

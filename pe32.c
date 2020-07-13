@@ -47,6 +47,7 @@ encode_rdata_section(
   #define get_rva() (s32)(header->VirtualAddress + buffer->occupied)
 
   u64 expected_encoded_size = 0;
+  program->data_base_rva = header->VirtualAddress;
 
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
@@ -81,11 +82,17 @@ encode_rdata_section(
     expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
   }
 
+  u64 global_data_size = align_u64(program->data_buffer.occupied, 16);
+  expected_encoded_size += global_data_size;
+
   Encoded_Rdata_Section result = {
     .buffer = make_buffer(expected_encoded_size, PAGE_READWRITE),
   };
 
   Buffer *buffer = &result.buffer;
+
+  void *global_data = buffer_allocate_size(buffer, global_data_size);
+  memcpy(global_data, program->data_buffer.memory, program->data_buffer.occupied);
 
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
@@ -162,7 +169,8 @@ encode_rdata_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *buffer_allocate(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
-  assert(buffer->occupied == expected_encoded_size);
+  // TODO check the math
+  assert(buffer->occupied <= expected_encoded_size);
 
   assert(fits_into_s32(buffer->occupied));
   header->Misc.VirtualSize = (s32)buffer->occupied;
@@ -212,6 +220,7 @@ encode_text_section(
 
 void
 write_executable(
+  wchar_t *file_path,
   Program *program
 ) {
   // Sections
@@ -355,7 +364,7 @@ write_executable(
   /////////
 
   HANDLE file = CreateFile(
-    L"build\\test.exe",    // name of the write
+    file_path,    // name of the write
     GENERIC_WRITE,         // open for writing
     0,                     // do not share
     0,                     // default security

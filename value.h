@@ -79,6 +79,7 @@ typedef struct {
     s64 imm64;
     Label *label32;
     Operand_Memory_Indirect indirect;
+    s64 rip_offset_in_data;
     Operand_RIP_Relative_Import import;
   };
 } Operand;
@@ -244,7 +245,8 @@ typedef struct _Program {
   Array_Import_Library import_libraries;
   Function_Builder *entry_point;
   Array_Function_Builder functions;
-  s32 code_base_rva;
+  s64 code_base_rva;
+  s64 data_base_rva;
 } Program;
 
 typedef struct {
