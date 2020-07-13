@@ -207,8 +207,7 @@ print_operand(
       break;
     }
     case Operand_Type_RIP_Relative: {
-      // FIXME calculate with offsets
-      printf("rip_to(0x%016llx)", operand->imm64);
+      printf("[.rdata + 0x%08llx]", operand->rip_offset_in_data);
       break;
     }
     case Operand_Type_RIP_Relative_Import: {

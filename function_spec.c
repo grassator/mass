@@ -84,7 +84,6 @@ spec("function") {
       "s32 WriteFile(s64, void *, s32, void *, s64)"
     );
 
-
     Function(main) {
       program_->entry_point = builder_;
       Value *handle = Call(GetStdHandle_value, STD_OUTPUT_HANDLE_value);
