@@ -52,9 +52,9 @@ encode_rdata_section(
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
     // Aligned to 2 bytes c string of library name
-    expected_encoded_size += align((s32)strlen(lib->dll.name) + 1, 2);
+    expected_encoded_size += align((s32)strlen(lib->name) + 1, 2);
     for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      Import_Symbol *symbol = array_get(lib->symbols, i);
       {
         // Ordinal Hint, value not required
         expected_encoded_size += sizeof(s16);
@@ -97,7 +97,7 @@ encode_rdata_section(
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
     for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      Import_Symbol *symbol = array_get(lib->symbols, i);
       symbol->name_rva = get_rva();
       buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
       size_t name_size = strlen(symbol->name) + 1;
@@ -113,10 +113,10 @@ encode_rdata_section(
   result.iat_rva = get_rva();
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    lib->dll.iat_rva = get_rva();
+    lib->rva = get_rva();
     for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
-      fn->iat_rva = get_rva();
+      Import_Symbol *fn = array_get(lib->symbols, i);
+      fn->offset_in_data = get_rva() - header->VirtualAddress;
       buffer_append_u64(buffer, fn->name_rva);
     }
     // End of IAT list
@@ -130,7 +130,7 @@ encode_rdata_section(
     lib->image_thunk_rva = get_rva();
 
     for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *fn = array_get(lib->symbols, i);
+      Import_Symbol *fn = array_get(lib->symbols, i);
       buffer_append_u64(buffer, fn->name_rva);
     }
     // End of IAT list
@@ -140,12 +140,12 @@ encode_rdata_section(
   // Library Names
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    lib->dll.name_rva = get_rva();
-    size_t name_size = strlen(lib->dll.name) + 1;
+    lib->name_rva = get_rva();
+    size_t name_size = strlen(lib->name) + 1;
     s32 aligned_name_size = align((s32)name_size, 2);
     memcpy(
       buffer_allocate_size(buffer, aligned_name_size),
-      lib->dll.name,
+      lib->name,
       name_size
     );
   }
@@ -160,8 +160,8 @@ encode_rdata_section(
       buffer_allocate(buffer, IMAGE_IMPORT_DESCRIPTOR);
     *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
       .OriginalFirstThunk = lib->image_thunk_rva,
-      .Name = lib->dll.name_rva,
-      .FirstThunk = lib->dll.iat_rva,
+      .Name = lib->name_rva,
+      .FirstThunk = lib->rva,
     };
   }
   result.import_directory_size = get_rva() - result.import_directory_rva;

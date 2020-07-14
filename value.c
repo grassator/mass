@@ -727,35 +727,33 @@ import_symbol(
 
   for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    if (_stricmp(lib->dll.name, library_name) == 0) {
+    if (_stricmp(lib->name, library_name) == 0) {
       library = lib;
     }
   }
   if (!library) {
     library = array_push(program->import_libraries, (Import_Library) {
-      .dll = {
-        .name = library_name,
-        .name_rva = 0xCCCCCCCC,
-        .iat_rva = 0xCCCCCCCC
-      },
+      .name = library_name,
+      .name_rva = 0xCCCCCCCC,
+      .rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
-      .symbols = array_alloc(Array_Import_Name_To_Rva, 16),
+      .symbols = array_alloc(Array_Import_Symbol, 16),
     });
   }
 
-  Import_Name_To_Rva *symbol = 0;
+  Import_Symbol *symbol = 0;
   for (s32 i = 0; i < array_count(library->symbols); ++i) {
-    Import_Name_To_Rva *it = array_get(library->symbols, i);
+    Import_Symbol *it = array_get(library->symbols, i);
     if (strcmp(it->name, symbol_name) == 0) {
       symbol = it;
     }
   }
 
   if (!symbol) {
-    symbol = array_push(library->symbols, (Import_Name_To_Rva) {
+    symbol = array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .name_rva = 0xCCCCCCCC,
-      .iat_rva = 0xCCCCCCCC
+      .offset_in_data = 0
     });
   }
 
@@ -795,7 +793,7 @@ c_function_import(
   return result;
 }
 
-Import_Name_To_Rva *
+Import_Symbol *
 program_find_import(
   const Program *program,
   const char *library_name,
@@ -803,10 +801,10 @@ program_find_import(
 ) {
   for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
     Import_Library *lib = array_get(program->import_libraries, i);
-    if (strcmp(lib->dll.name, library_name) != 0) continue;
+    if (strcmp(lib->name, library_name) != 0) continue;
 
     for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Name_To_Rva *symbol = array_get(lib->symbols, i);
+      Import_Symbol *symbol = array_get(lib->symbols, i);
       if (strcmp(symbol->name, symbol_name) == 0) {
         return symbol;
       }

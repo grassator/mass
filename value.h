@@ -53,13 +53,15 @@ typedef struct {
 typedef struct {
   const char *name;
   u32 name_rva;
-  u32 iat_rva;
-} Import_Name_To_Rva;
-typedef array_type(Import_Name_To_Rva) Array_Import_Name_To_Rva;
+  u32 offset_in_data;
+} Import_Symbol;
+typedef array_type(Import_Symbol) Array_Import_Symbol;
 
 typedef struct {
-  Import_Name_To_Rva dll;
-  Array_Import_Name_To_Rva symbols;
+  const char *name;
+  u32 name_rva;
+  u32 rva;
+  Array_Import_Symbol symbols;
   u32 image_thunk_rva;
 } Import_Library;
 typedef array_type(Import_Library) Array_Import_Library;

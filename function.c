@@ -216,11 +216,30 @@ program_end(
     .code_buffer = make_buffer(code_buffer_size, PAGE_EXECUTE_READWRITE),
     .data_buffer = program->data_buffer,
   };
-  //s64 diff = result.code_buffer.memory - program->data_buffer.memory;
-  //assert(fits_into_s32(diff));
-  //program->code_base_rva = (s32)(diff);
   program->code_base_rva = (s64)result.code_buffer.memory;
   program->data_base_rva = (s64)program->data_buffer.memory;
+
+  if (program->import_libraries.array) {
+    for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
+      Import_Library *lib = array_get(program->import_libraries, i);
+      HINSTANCE dll_handle = LoadLibraryA(lib->name);
+      assert(dll_handle);
+
+      for (s32 i = 0; i < array_count(lib->symbols); ++i) {
+        Import_Symbol *fn = array_get(lib->symbols, i);
+
+        fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, fn->name);
+        assert(fn_address);
+        s64 offset = program->data_buffer.occupied;
+        fn_type_opaque *rip_target =
+          buffer_allocate_size(&program->data_buffer, sizeof(fn_type_opaque));
+        *rip_target = fn_address;
+        assert(fits_into_s32(offset));
+        fn->offset_in_data = (s32)(offset);
+      }
+    }
+  }
+
   for (
     Function_Builder *builder = array_begin(program->functions);
     builder != array_end(program->functions);

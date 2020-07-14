@@ -247,12 +247,12 @@ encode_instruction(
           bool match_found = false;
           for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
             Import_Library *lib = array_get(program->import_libraries, i);
-            if (strcmp(lib->dll.name, operand->import.library_name) != 0) continue;
+            if (strcmp(lib->name, operand->import.library_name) != 0) continue;
 
             for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-              Import_Name_To_Rva *fn = array_get(lib->symbols, i);
+              Import_Symbol *fn = array_get(lib->symbols, i);
               if (strcmp(fn->name, operand->import.symbol_name) == 0) {
-                s64 diff = fn->iat_rva - next_instruction_rva;
+                s64 diff = program->data_base_rva + fn->offset_in_data - next_instruction_rva;
                 //assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
                 s32 displacement = (s32)(diff);
 

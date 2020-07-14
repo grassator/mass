@@ -438,43 +438,20 @@ spec("function") {
     value_as_function(hello, fn_type_void_to_void)();
   }
 
-  // FIXME
-  //it("should be able to call imported function") {
-    //Value *GetStdHandle_value = c_function_import(
-      //program_,
-      //"kernel32.dll",
-      //"s64 GetStdHandle(s32)"
-    //);
-//
-    //// TODO extract into a function
-    //HINSTANCE kernel32 = LoadLibraryA(GetStdHandle_value->operand.import.library_name);
-    //check(kernel32);
-    //fn_type_opaque GetStdHandle_from_dll =
-      //(fn_type_opaque)GetProcAddress(kernel32, GetStdHandle_value->operand.import.symbol_name);
-    //check(GetStdHandle_from_dll);
-//
-    //Value *global = value_global(program_, descriptor_pointer_to(GetStdHandle_value->descriptor));
-//
-    //fn_type_opaque *address = (fn_type_opaque *)rip_value_pointer(program_, global);
-    //*address = GetStdHandle_from_dll;
-//
-    //Import_Name_To_Rva *import = program_find_import(
-      //program_,
-      //GetStdHandle_value->operand.import.library_name,
-      //GetStdHandle_value->operand.import.symbol_name
-    //);
-    //check(import);
-    //assert(fits_into_s32(global->operand.rip_offset_in_data));
-    //// FIXME
-    //import->iat_rva = (s32)(global->operand.rip_offset_in_data);
-//
-    //Function(checker_value) {
-      //Return(Call(GetStdHandle_value, value_from_s32(STD_INPUT_HANDLE)));
-    //}
-    //program_end(program_);
-    //HANDLE actual = (HANDLE) value_as_function(checker_value, fn_type_void_to_s64)();
-    //check(actual == GetStdHandle(STD_INPUT_HANDLE));
-  //}
+  it("should be able to call imported function") {
+    Value *GetStdHandle_value = c_function_import(
+      program_,
+      "kernel32.dll",
+      "s64 GetStdHandle(s32)"
+    );
+
+    Function(checker_value) {
+      Return(Call(GetStdHandle_value, value_from_s32(STD_INPUT_HANDLE)));
+    }
+    program_end(program_);
+    HANDLE actual = (HANDLE) value_as_function(checker_value, fn_type_void_to_s64)();
+    check(actual == GetStdHandle(STD_INPUT_HANDLE));
+  }
 
   it("should be able to call puts() to say 'Hi!'") {
     Value *puts_value = c_function_value("int puts(const char*)", (fn_type_opaque) puts);
