@@ -239,6 +239,7 @@ spec("spec") {
     };
     program_ = &test_program;
     temp_buffer = bucket_buffer_make();
+    temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 
   after_each() {
@@ -274,7 +275,7 @@ spec("spec") {
     *c_test_fn_descriptor = (Descriptor){
       .type = Descriptor_Type_Function,
       .function = {
-        .arguments = dyn_array_make(Array_Value_Ptr, 1),
+        .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 1),
         .returns = return_overload,
         .frozen = false,
       },

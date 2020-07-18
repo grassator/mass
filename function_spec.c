@@ -47,6 +47,7 @@ spec("function") {
     };
     program_ = &test_program;
     temp_buffer = bucket_buffer_make();
+    temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 
   after_each() {

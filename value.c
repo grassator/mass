@@ -279,7 +279,7 @@ inline Label*
 make_label() {
   Label *label = temp_allocate(Label);
   *label = (Label) {
-    .locations = dyn_array_make(Array_Label_Location, 16),
+    .locations = dyn_array_make_with_allocator(temp_allocator, Array_Label_Location, 16),
   };
   return label;
 }
@@ -668,7 +668,7 @@ c_function_descriptor(
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make(Array_Value_Ptr, 16),
+      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16),
       .returns = 0,
     },
   };
@@ -747,7 +747,7 @@ import_symbol(
       .name_rva = 0xCCCCCCCC,
       .rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
-      .symbols = dyn_array_make(Array_Import_Symbol, 16),
+      .symbols = dyn_array_make_with_allocator(temp_allocator, Array_Import_Symbol, 16),
     });
   }
 

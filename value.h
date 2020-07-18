@@ -277,6 +277,7 @@ typedef struct {
 } Jit_Program;
 
 Bucket_Buffer temp_buffer;
+Allocator *temp_allocator;
 
 #define temp_allocate(_type_)\
   bucket_buffer_allocate(temp_buffer, _type_)

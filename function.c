@@ -114,7 +114,7 @@ fn_begin(Value **result, Program *program) {
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make(Array_Value_Ptr, 16),
+      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16),
       .returns = 0,
     },
   };
@@ -677,7 +677,7 @@ call_function_value(
   ...
 ) {
   assert(to_call);
-  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, 16);
+  Array_Value_Ptr arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16);
   {
     va_list va_values;
     va_start(va_values, to_call);
