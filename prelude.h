@@ -1802,7 +1802,7 @@ hash_map_make_internal(
     .allocator = allocator,
     .capacity_power_of_2 = capacity_power_of_2,
     .capacity = capacity,
-    .hash_mask = (s32)(capacity - 1),
+    .hash_mask = u64_to_s32(capacity - 1),
     .occupied = 0,
     .entries = allocator_allocate_bytes(allocator, entries_byte_size, entry_byte_size),
   };
@@ -1865,7 +1865,7 @@ hash_map_resize(
   map->capacity_power_of_2++;
   map->capacity = 1llu << map->capacity_power_of_2;
   map->occupied = 0;
-  map->hash_mask = (s32)(map->capacity - 1);
+  map->hash_mask = u64_to_s32(map->capacity - 1);
   s8 *entries = map->entries;
   u64 entries_byte_size = entry_byte_size * map->capacity;
   map->entries = allocator_allocate_bytes(map->allocator, entries_byte_size, entry_byte_size);

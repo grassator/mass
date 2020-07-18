@@ -38,7 +38,7 @@ same_type(
       if (a->function.argument_count != b->function.argument_count) {
         return false;
       }
-      for (s64 i = 0; i < a->function.argument_count; ++i) {
+      for (u64 i = 0; i < a->function.argument_count; ++i) {
         if (!same_type(
           a->function.argument_list[i].descriptor,
           b->function.argument_list[i].descriptor)

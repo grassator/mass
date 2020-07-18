@@ -400,7 +400,7 @@ spec("function") {
         value_from_s64(30),
         value_from_s64(40),
         value_from_s32(50),
-        value_from_s64(60),
+        value_from_s64(60)
       ));
     }
     program_end(program_);

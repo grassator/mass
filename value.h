@@ -124,7 +124,7 @@ struct Value;
 
 typedef struct Descriptor_Function {
   struct Value *argument_list;
-  s64 argument_count;
+  u64 argument_count;
 
   struct Value *returns;
   bool frozen;
@@ -173,6 +173,8 @@ typedef struct Value {
   Descriptor *descriptor;
   Operand operand;
 } Value;
+
+typedef dyn_array_type(Value *) Array_Value_Ptr;
 
 
 u32

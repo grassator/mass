@@ -44,7 +44,7 @@ encode_rdata_section(
   Program * program,
   IMAGE_SECTION_HEADER *header
 ) {
-  #define get_rva() (s32)(header->VirtualAddress + buffer->occupied)
+  #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
   u64 expected_encoded_size = 0;
   program->data_base_rva = header->VirtualAddress;

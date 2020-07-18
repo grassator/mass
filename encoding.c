@@ -250,10 +250,7 @@ encode_instruction(
               Import_Symbol *fn = dyn_array_get(lib->symbols, i);
               if (strcmp(fn->name, operand->import.symbol_name) == 0) {
                 s64 diff = program->data_base_rva + fn->offset_in_data - next_instruction_rva;
-                //assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
-                s32 displacement = (s32)(diff);
-
-                fixed_buffer_append_s32(buffer, displacement);
+                fixed_buffer_append_s32(buffer, s64_to_s32(diff));
 
                 match_found = true;
                 break;
@@ -267,12 +264,9 @@ encode_instruction(
 
           s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
           s64 diff = operand_rva - next_instruction_rva;
-          s32 displacement = s64_to_s32(diff);
-
-          fixed_buffer_append_s32(buffer, displacement);
+          fixed_buffer_append_s32(buffer, s64_to_s32(diff));
         } else if (operand->type == Operand_Type_Memory_Indirect) {
           s32 displacement = operand->indirect.displacement;
-
 
           if (encoding_stack_operand) {
             // Negative diplacement is used to encode local variables
@@ -280,7 +274,7 @@ encode_instruction(
               displacement += builder->stack_reserve;
             } else
             // Positive values larger than max_call_parameters_stack_size
-            if (displacement >= (s32)builder->max_call_parameters_stack_size) {
+            if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
               // Return address will be pushed on the stack by the caller
               // and we need to account for that
               s32 return_address_size = 8;
@@ -290,7 +284,7 @@ encode_instruction(
           if (mod == MOD_Displacement_s32) {
             fixed_buffer_append_s32(buffer, displacement);
           } else if (mod == MOD_Displacement_s8) {
-            fixed_buffer_append_s8(buffer, (s8)displacement);
+            fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
           } else {
             assert(mod == MOD_Displacement_0);
           }
@@ -307,7 +301,7 @@ encode_instruction(
       if (operand->type == Operand_Type_Label_32) {
         if (operand->label32->target) {
           u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
-          s32 diff = (s32)(operand->label32->target - from);
+          s32 diff = s64_to_s32(operand->label32->target - from);
           assert(diff < 0);
           fixed_buffer_append_s32(buffer, diff);
         } else {

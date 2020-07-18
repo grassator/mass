@@ -620,23 +620,23 @@ Value *
 call_function_overload(
   Function_Builder *builder,
   Value *to_call,
-  Value **argument_list,
-  s64 argument_count
+  Array_Value_Ptr arguments
 ) {
   assert(to_call->descriptor->type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->function;
-  assert(descriptor->argument_count == argument_count);
+  assert(descriptor->argument_count == dyn_array_length(arguments));
 
   fn_ensure_frozen(descriptor);
 
-  for (s64 i = 0; i < argument_count; ++i) {
-    assert(same_value_type(&descriptor->argument_list[i], argument_list[i]));
-    move_value(builder, &descriptor->argument_list[i], argument_list[i]);
+  for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
+    Value *arg = *dyn_array_get(arguments, i);
+    assert(same_value_type(&descriptor->argument_list[i], arg));
+    move_value(builder, &descriptor->argument_list[i], arg);
   }
 
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
-  u32 parameters_stack_size = (u32)max(4, argument_count) * 8;
+  u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
   // FIXME support this for fns that accept arguments
   u32 return_size = descriptor_byte_size(descriptor->returns->descriptor);
@@ -648,10 +648,10 @@ call_function_overload(
     push_instruction(builder, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}});
   }
 
-  builder->max_call_parameters_stack_size = max(
+  builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
     builder->max_call_parameters_stack_size,
     parameters_stack_size
-  );
+  ));
 
   if (to_call->operand.type == Operand_Type_Label_32) {
     push_instruction(builder, (Instruction) {call, {to_call->operand, 0, 0}});
@@ -676,25 +676,36 @@ Value *
 call_function_value(
   Function_Builder *builder,
   Value *to_call,
-  Value **argument_list,
-  s64 argument_count
+  ...
 ) {
   assert(to_call);
+  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, 16);
+  {
+    va_list va_values;
+    va_start(va_values, to_call);
+    for(;;) {
+      Value *arg = va_arg(va_values, Value *);
+      if (!arg) break;
+      dyn_array_push(arguments, arg);
+    }
+  }
+  u64 argument_count = dyn_array_length(arguments);
   for (;to_call; to_call = to_call->descriptor->function.next_overload) {
     Descriptor_Function *descriptor = &to_call->descriptor->function;
     if (argument_count != descriptor->argument_count) continue;
     bool match = true;
-    for (s64 arg_index = 0; arg_index < argument_count; ++arg_index) {
-      Value *arg = argument_list[arg_index];
+    for (u64 arg_index = 0; arg_index < argument_count; ++arg_index) {
+      Value *arg = *dyn_array_get(arguments, arg_index);
       if(!same_value_type(&descriptor->argument_list[arg_index], arg)) {
         match = false;
         break;
       }
     }
     if (match) {
-      return call_function_overload(builder, to_call, argument_list, argument_count);
+      return call_function_overload(builder, to_call, arguments);
     }
   }
+  dyn_array_destroy(arguments);
   assert(!"No matching overload found");
   return 0;
 }
@@ -760,13 +771,12 @@ make_or(
 #define Stack_s32(_id_, _value_) Stack((_id_), &descriptor_s32, _value_)
 #define Stack_s64(_id_, _value_) Stack((_id_), &descriptor_s64, _value_)
 
-
-#define Call(_target_, ...)\
+// FIXME use null-terminated list
+#define Call(...)\
   call_function_value(\
     builder_,\
-    (_target_),\
-    (Value **)((Value *[]){0, ##__VA_ARGS__}) + 1, \
-    countof(((Value *[]){0, ##__VA_ARGS__})) - 1 \
+    __VA_ARGS__,\
+    0\
   )
 
 #define And(_a_, _b_) make_and(builder_, (_a_), (_b_))
