@@ -412,7 +412,7 @@ spec("function") {
     c_function_descriptor("void fn_void()");
     c_function_descriptor("void fn_int(int)");
     Descriptor *descriptor = c_function_descriptor("void fn_void(void)");
-    check(descriptor->function.argument_count == 0);
+    check(dyn_array_length(descriptor->function.arguments) == 0);
   }
 
   it("should be able to call puts() to say 'Hello, world!'") {

@@ -227,7 +227,7 @@ create_is_character_in_set_checker_fn(
 }
 
 
-spec("mass") {
+spec("spec") {
 
   static Program test_program;
   static Program *program_;
@@ -274,8 +274,7 @@ spec("mass") {
     *c_test_fn_descriptor = (Descriptor){
       .type = Descriptor_Type_Function,
       .function = {
-        .argument_list = 0,
-        .argument_count = 0,
+        .arguments = dyn_array_make(Array_Value_Ptr, 1),
         .returns = return_overload,
         .frozen = false,
       },

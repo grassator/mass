@@ -1,5 +1,11 @@
 #include "value.h"
 
+inline bool
+same_value_type(
+  Value *a,
+  Value *b
+);
+
 bool
 same_type(
   Descriptor *a,
@@ -35,14 +41,14 @@ same_type(
       if (!same_type(a->function.returns->descriptor, b->function.returns->descriptor)) {
         return false;
       }
-      if (a->function.argument_count != b->function.argument_count) {
+      if (dyn_array_length(a->function.arguments) != dyn_array_length(b->function.arguments)) {
         return false;
       }
-      for (u64 i = 0; i < a->function.argument_count; ++i) {
-        if (!same_type(
-          a->function.argument_list[i].descriptor,
-          b->function.argument_list[i].descriptor)
-        ) {
+      for (u64 i = 0; i < dyn_array_length(a->function.arguments); ++i) {
+        if (!same_value_type(
+          *dyn_array_get(a->function.arguments, i),
+          *dyn_array_get(b->function.arguments, i)
+        )) {
           return false;
         }
       }
@@ -520,44 +526,48 @@ memory_range_equal_to_c_string(
 }
 
 Value *
-value_for_argument_index(
+function_push_argument(
   Descriptor_Function *function,
-  Descriptor *arg_descriptor,
-  s32 argument_index
+  Descriptor *arg_descriptor
 ) {
   u32 byte_size = descriptor_byte_size(arg_descriptor);
   assert(byte_size <= 8);
-  switch (argument_index) {
+  switch (dyn_array_length(function->arguments)) {
     case 0: {
-      function->argument_list[0] = *value_register_for_descriptor(Register_C, arg_descriptor);
-      break;
+      return *dyn_array_push(
+        function->arguments,
+        value_register_for_descriptor(Register_C, arg_descriptor)
+      );
     }
     case 1: {
-      function->argument_list[1] = *value_register_for_descriptor(Register_D, arg_descriptor);
-      break;
+      return *dyn_array_push(
+        function->arguments,
+        value_register_for_descriptor(Register_D, arg_descriptor)
+      );
     }
     case 2: {
-      function->argument_list[2] = *value_register_for_descriptor(Register_R8, arg_descriptor);
-      break;
+      return *dyn_array_push(
+        function->arguments,
+        value_register_for_descriptor(Register_R8, arg_descriptor)
+      );
     }
     case 3: {
-      function->argument_list[3] = *value_register_for_descriptor(Register_R9, arg_descriptor);
-      break;
+      return *dyn_array_push(
+        function->arguments,
+        value_register_for_descriptor(Register_R9, arg_descriptor)
+      );
     }
     default: {
-      // @Volatile @StackPatch
-      s32 offset = argument_index * 8;
+      s32 offset = u64_to_s32(dyn_array_length(function->arguments) * 8);
       Operand operand = stack(offset, byte_size);
-
-      function->argument_list[argument_index] = (const Value) {
+      Value *value = temp_allocate(Value);
+      *value = (Value) {
         .descriptor = arg_descriptor,
         .operand = operand,
       };
-      break;
+      return *dyn_array_push(function->arguments, value);
     }
   }
-  function->argument_count++;
-  return &function->argument_list[argument_index];
 }
 
 Descriptor *
@@ -658,8 +668,7 @@ c_function_descriptor(
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .argument_list = temp_allocate_array(Value, 16),
-      .argument_count = 0,
+      .arguments = dyn_array_make(Array_Value_Ptr, 16),
       .returns = 0,
     },
   };
@@ -671,18 +680,19 @@ c_function_descriptor(
 
   char *start = ch;
   Descriptor *argument_descriptor = 0;
-  for (s32 argument_index = 0; *ch; ++ch) {
+  for (; *ch; ++ch) {
     if (*ch == ',' || *ch == ')') {
       if (start != ch) {
         argument_descriptor = parse_c_type(start, ch);
-
         // support for foo(void) fn signature
-        if (argument_index == 0 && argument_descriptor->type == Descriptor_Type_Void) {
+        if (
+          dyn_array_length(descriptor->function.arguments) == 0 &&
+          argument_descriptor->type == Descriptor_Type_Void
+        ) {
           assert(*ch == ')');
           break;
         }
-        value_for_argument_index(&descriptor->function, argument_descriptor, argument_index);
-        ++argument_index;
+        function_push_argument(&descriptor->function, argument_descriptor);
         assert(argument_descriptor);
       }
       start = ch + 1;

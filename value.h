@@ -110,6 +110,16 @@ operand_type_string(
   Operand_Type type
 );
 
+struct Descriptor;
+
+typedef struct Value {
+  struct Descriptor *descriptor;
+  Operand operand;
+} Value;
+
+typedef dyn_array_type(Value) Array_Value;
+typedef dyn_array_type(Value *) Array_Value_Ptr;
+
 typedef enum {
   Descriptor_Type_Void,
   Descriptor_Type_Integer,
@@ -120,15 +130,12 @@ typedef enum {
   Descriptor_Type_Tagged_Union,
 } Descriptor_Type;
 
-struct Value;
-
 typedef struct Descriptor_Function {
-  struct Value *argument_list;
-  u64 argument_count;
+  Array_Value_Ptr arguments;
 
-  struct Value *returns;
+  Value *returns;
   bool frozen;
-  struct Value *next_overload;
+  Value *next_overload;
 } Descriptor_Function;
 
 typedef struct {
@@ -168,13 +175,6 @@ typedef struct Descriptor {
     struct Descriptor *pointer_to;
   };
 } Descriptor;
-
-typedef struct Value {
-  Descriptor *descriptor;
-  Operand operand;
-} Value;
-
-typedef dyn_array_type(Value *) Array_Value_Ptr;
 
 
 u32
@@ -249,7 +249,6 @@ typedef struct _Program Program;
 typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
-  u8 next_argument_index;
 
   Label *prolog_label;
   Label *epilog_label;

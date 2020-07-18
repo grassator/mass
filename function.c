@@ -114,8 +114,7 @@ fn_begin(Value **result, Program *program) {
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .argument_list = temp_allocate_array(Value, 16),
-      .argument_count = 0,
+      .arguments = dyn_array_make(Array_Value_Ptr, 16),
       .returns = 0,
     },
   };
@@ -251,10 +250,8 @@ fn_arg(
   Descriptor *descriptor
 ) {
   assert(!fn_is_frozen(builder));
-  s32 argument_index = builder->next_argument_index;
-  builder->next_argument_index++;
   Descriptor_Function *function = &builder->descriptor->function;
-  Value *result = value_for_argument_index(function, descriptor, argument_index);
+  Value *result = function_push_argument(function, descriptor);
   fn_update_result(builder);
   return result;
 }
@@ -624,14 +621,15 @@ call_function_overload(
 ) {
   assert(to_call->descriptor->type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->function;
-  assert(descriptor->argument_count == dyn_array_length(arguments));
+  assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
 
   fn_ensure_frozen(descriptor);
 
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
-    Value *arg = *dyn_array_get(arguments, i);
-    assert(same_value_type(&descriptor->argument_list[i], arg));
-    move_value(builder, &descriptor->argument_list[i], arg);
+    Value *actual_arg = *dyn_array_get(arguments, i);
+    Value *expected_arg = *dyn_array_get(descriptor->arguments, i);
+    assert(same_value_type(expected_arg, actual_arg));
+    move_value(builder, expected_arg, actual_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -689,14 +687,14 @@ call_function_value(
       dyn_array_push(arguments, arg);
     }
   }
-  u64 argument_count = dyn_array_length(arguments);
   for (;to_call; to_call = to_call->descriptor->function.next_overload) {
     Descriptor_Function *descriptor = &to_call->descriptor->function;
-    if (argument_count != descriptor->argument_count) continue;
+    if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
     bool match = true;
-    for (u64 arg_index = 0; arg_index < argument_count; ++arg_index) {
-      Value *arg = *dyn_array_get(arguments, arg_index);
-      if(!same_value_type(&descriptor->argument_list[arg_index], arg)) {
+    for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
+      Value *actual_arg = *dyn_array_get(arguments, arg_index);
+      Value *expected_arg = *dyn_array_get(descriptor->arguments, arg_index);
+      if(!same_value_type(actual_arg, expected_arg)) {
         match = false;
         break;
       }
