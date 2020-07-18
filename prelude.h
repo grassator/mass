@@ -1522,6 +1522,9 @@ fixed_buffer_allocate_bytes(
 #define fixed_buffer_allocate_unaligned(_buffer_, _type_)\
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
+#define fixed_buffer_allocate_array(_buffer_, _type_, _count_)\
+  ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), sizeof(_type_)))
+
 #define fixed_buffer_allocate(_buffer_, _type_)\
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), sizeof(_type_)))
 
@@ -1667,10 +1670,11 @@ bucket_buffer_allocate_bytes(
 ) {
   Bucket_Buffer_Bucket *bucket = handle.bucket->last_bucket;
 
-  u64 aligned_occupied = alignment == 1
-    ? bucket->occupied
-    : u64_align(bucket->occupied, alignment);
-  byte_size = u64_align(byte_size, alignment);
+  u64 aligned_occupied = bucket->occupied;
+  if (alignment != 1) {
+    aligned_occupied = u64_align(aligned_occupied, alignment);
+    byte_size = u64_align(byte_size, alignment);
+  }
 
   if (bucket->capacity - aligned_occupied < byte_size) {
     u64 capacity = handle.bucket->capacity;
@@ -1699,11 +1703,12 @@ bucket_buffer_allocator_allocate(
   u64 alignment
 ) {
   return bucket_buffer_allocate_bytes(
-    (Bucket_Buffer){handle.raw},
+    (Bucket_Buffer){.bucket = handle.raw},
     size_in_bytes,
     alignment
   );
 }
+
 inline void
 bucket_buffer_allocator_deallocate(
   Allocator_Handle handle,
@@ -1728,14 +1733,14 @@ bucket_buffer_allocator_reallocate(
 
 Allocator *
 bucket_buffer_create_allocator(
-  const Bucket_Buffer handle
+  const Bucket_Buffer buffer
 ) {
-  Allocator *result = bucket_buffer_allocate(handle, Allocator);
+  Allocator *result = bucket_buffer_allocate(buffer, Allocator);
   Allocator temp = {
     .allocate = bucket_buffer_allocator_allocate,
     .reallocate = bucket_buffer_allocator_reallocate,
     .deallocate = bucket_buffer_allocator_deallocate,
-    .handle = {handle.bucket},
+    .handle = {buffer.bucket},
   };
   memcpy(result, &temp, sizeof(Allocator));
   return result;

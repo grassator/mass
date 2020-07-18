@@ -276,14 +276,14 @@ typedef struct {
   Fixed_Buffer *data_buffer;
 } Jit_Program;
 
-Bucket_Buffer temp_buffer;
+Fixed_Buffer *temp_buffer;
 Allocator *temp_allocator;
 
 #define temp_allocate(_type_)\
-  bucket_buffer_allocate(temp_buffer, _type_)
+  fixed_buffer_allocate(temp_buffer, _type_)
 
 #define temp_allocate_array(_type_, _count_)\
-  bucket_buffer_allocate_array(temp_buffer, _type_, _count_)
+  fixed_buffer_allocate_array(temp_buffer, _type_, _count_)
 
 u64
 estimate_max_code_size_in_bytes(

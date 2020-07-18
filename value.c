@@ -668,7 +668,7 @@ c_function_descriptor(
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16),
+      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 8),
       .returns = 0,
     },
   };
@@ -747,7 +747,7 @@ import_symbol(
       .name_rva = 0xCCCCCCCC,
       .rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
-      .symbols = dyn_array_make_with_allocator(temp_allocator, Array_Import_Symbol, 16),
+      .symbols = dyn_array_make_with_allocator(temp_allocator, Array_Import_Symbol, 4),
     });
   }
 

@@ -114,7 +114,7 @@ fn_begin(Value **result, Program *program) {
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16),
+      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 8),
       .returns = 0,
     },
   };
@@ -125,7 +125,7 @@ fn_begin(Value **result, Program *program) {
     .epilog_label = make_label(),
     .descriptor = descriptor,
     .result = result,
-    .instructions = dyn_array_make(Array_Instruction, 32),
+    .instructions = dyn_array_make_with_allocator(temp_allocator, Array_Instruction, 32),
   });
 
   Value *fn_value = temp_allocate(Value);
