@@ -26,7 +26,7 @@ push_instruction_internal(
 ) {
   instruction.filename = filename;
   instruction.line_number = line_number;
-  array_push(builder->instructions, instruction);
+  dyn_array_push(builder->instructions, instruction);
 }
 
 #define push_instruction(...)\
@@ -119,14 +119,14 @@ fn_begin(Value **result, Program *program) {
       .returns = 0,
     },
   };
-  Function_Builder *builder = array_push(program->functions, (Function_Builder){
+  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .program = program,
     .stack_reserve = 0,
     .prolog_label = make_label(),
     .epilog_label = make_label(),
     .descriptor = descriptor,
     .result = result,
-    .instructions = array_alloc(Array_Instruction, 32),
+    .instructions = dyn_array_make(Array_Instruction, 32),
   });
 
   Value *fn_value = temp_allocate(Value);
@@ -178,33 +178,29 @@ fn_end(
 ) {
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
-  builder->stack_reserve = align(builder->stack_reserve, 16) + alignment;
+  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
 
   fn_freeze(builder);
 }
 
 void
 fn_encode(
-  Buffer *buffer,
+  Fixed_Buffer *buffer,
   Function_Builder *builder
 ) {
   encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->prolog_label});
   encode_instruction(buffer, builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
 
-  for (
-    Instruction *instruction = array_begin(builder->instructions);
-    instruction != array_end(builder->instructions);
-    ++instruction
-  ) {
+  for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->instructions, i);
     encode_instruction(buffer, builder, *instruction);
   }
 
   encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->epilog_label});
-
   encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
   encode_instruction(buffer, builder, (Instruction) {ret, {0}});
   encode_instruction(buffer, builder, (Instruction) {int3, {0}});
-  array_free(builder->instructions);
+  dyn_array_destroy(builder->instructions);
 }
 
 Jit_Program
@@ -213,40 +209,40 @@ program_end(
 ) {
   u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
   Jit_Program result = {
-    .code_buffer = make_buffer(code_buffer_size, PAGE_EXECUTE_READWRITE),
+    .code_buffer = fixed_buffer_make(&allocator_system, code_buffer_size),
     .data_buffer = program->data_buffer,
   };
-  program->code_base_rva = (s64)result.code_buffer.memory;
-  program->data_base_rva = (s64)program->data_buffer.memory;
+  program->code_base_rva = (s64)result.code_buffer->memory;
+  program->data_base_rva = (s64)program->data_buffer->memory;
 
-  if (program->import_libraries.array) {
-    for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-      Import_Library *lib = array_get(program->import_libraries, i);
+  if (dyn_array_is_initialized(program->import_libraries)) {
+    for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+      Import_Library *lib = dyn_array_get(program->import_libraries, i);
       HINSTANCE dll_handle = LoadLibraryA(lib->name);
       assert(dll_handle);
 
-      for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-        Import_Symbol *fn = array_get(lib->symbols, i);
+      for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
+        Import_Symbol *fn = dyn_array_get(lib->symbols, i);
 
         fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, fn->name);
         assert(fn_address);
-        s64 offset = program->data_buffer.occupied;
-        fn_type_opaque *rip_target =
-          buffer_allocate_size(&program->data_buffer, sizeof(fn_type_opaque));
+        s64 offset = program->data_buffer->occupied;
+        fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
         *rip_target = fn_address;
         assert(fits_into_s32(offset));
         fn->offset_in_data = (s32)(offset);
       }
     }
   }
-
-  for (
-    Function_Builder *builder = array_begin(program->functions);
-    builder != array_end(program->functions);
-    ++builder
-  ) {
-    fn_encode(&result.code_buffer, builder);
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    fn_encode(result.code_buffer, builder);
   }
+
+  // Making code executable
+  DWORD dummy = 0;
+  VirtualProtect(result.code_buffer, code_buffer_size, PAGE_EXECUTE_READ, &dummy);
+
   return result;
 }
 
@@ -771,7 +767,7 @@ make_or(
     builder_,\
     (_target_),\
     (Value **)((Value *[]){0, ##__VA_ARGS__}) + 1, \
-    static_array_size(((Value *[]){0, ##__VA_ARGS__})) - 1 \
+    countof(((Value *[]){0, ##__VA_ARGS__})) - 1 \
   )
 
 #define And(_a_, _b_) make_and(builder_, (_a_), (_b_))

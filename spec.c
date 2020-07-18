@@ -2,7 +2,6 @@
 #include "windows.h"
 #include <stdio.h>
 
-#include "prelude.c"
 #include "value.c"
 #include "instruction.c"
 #include "encoding.c"
@@ -45,8 +44,8 @@ struct_add_field(
 ) {
   Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
 
-  u32 size = descriptor_byte_size(descriptor);
-  builder->offset = align(builder->offset, size);
+  s32 size = descriptor_byte_size(descriptor);
+  builder->offset = s32_align(builder->offset, size);
 
   builder_field->struct_field.name = name;
   builder_field->struct_field.descriptor = descriptor;
@@ -233,23 +232,19 @@ spec("mass") {
   static Program test_program;
   static Program *program_;
 
-  before() {
-    temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
-  }
-
   before_each() {
     test_program = (Program) {
-      .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
-      .functions = array_alloc(Array_Function_Builder, 16),
+      .data_buffer = fixed_buffer_make(&allocator_system, 128 * 1024),
+      .functions = dyn_array_make(Array_Function_Builder, 16),
     };
-    // make_buffer(128 * 1024, PAGE_EXECUTE_READWRITE)
     program_ = &test_program;
-    buffer_reset(&temp_buffer);
+    temp_buffer = bucket_buffer_make();
   }
 
   after_each() {
-    array_free(test_program.functions);
-    free_buffer(&test_program.data_buffer);
+    bucket_buffer_destroy(temp_buffer);
+    dyn_array_destroy(test_program.functions);
+    fixed_buffer_destroy(test_program.data_buffer);
   }
 
   it("should have a way to create a function to checks if a character is one of the provided set") {
@@ -373,7 +368,7 @@ spec("mass") {
       {
         .name = "Some",
         .field_list = some_fields,
-        .field_count = static_array_size(some_fields),
+        .field_count = countof(some_fields),
       },
     };
 
@@ -381,7 +376,7 @@ spec("mass") {
       .type = Descriptor_Type_Tagged_Union,
       .tagged_union = {
         .struct_list = constructors,
-        .struct_count = static_array_size(constructors),
+        .struct_count = countof(constructors),
       },
     };
 

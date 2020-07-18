@@ -24,7 +24,7 @@ typedef enum {
 
 void
 encode_instruction(
-  Buffer *buffer,
+  Fixed_Buffer *buffer,
   Function_Builder *builder,
   Instruction instruction
 ) {
@@ -33,14 +33,12 @@ encode_instruction(
     assert(!label->target);
     label->target = buffer->memory + buffer->occupied;
 
-    for (
-      Label_Location *label_location = array_begin(label->locations);
-      label_location != array_end(label->locations);
-      ++label_location
-    ) {
-      s32 diff = (s32)(label->target - label_location->from_offset);
+    for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
+      Label_Location *label_location = dyn_array_get(label->locations, i);
+      s64 diff = (label->target - label_location->from_offset);
+      assert(fits_into_s32(diff));
       assert(diff >= 0);
-      *label_location->patch_target = diff;
+      *label_location->patch_target = (s32)diff;
     }
     return;
   }
@@ -215,13 +213,13 @@ encode_instruction(
     }
 
     if (rex_byte) {
-      buffer_append_u8(buffer, rex_byte);
+      fixed_buffer_append_u8(buffer, rex_byte);
     }
 
     if (op_code[0]) {
-      buffer_append_u8(buffer, op_code[0]);
+      fixed_buffer_append_u8(buffer, op_code[0]);
     }
-    buffer_append_u8(buffer, op_code[1]);
+    fixed_buffer_append_u8(buffer, op_code[1]);
 
     if (needs_mod_r_m) {
       u8 mod_r_m = (
@@ -229,11 +227,11 @@ encode_instruction(
         ((reg_or_op_code & 0b111) << 3) |
         ((r_m & 0b111))
       );
-      buffer_append_u8(buffer, mod_r_m);
+      fixed_buffer_append_u8(buffer, mod_r_m);
     }
 
     if (needs_sib) {
-      buffer_append_u8(buffer, sib_byte);
+      fixed_buffer_append_u8(buffer, sib_byte);
     }
 
     // Write out displacement
@@ -245,18 +243,18 @@ encode_instruction(
           s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
 
           bool match_found = false;
-          for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-            Import_Library *lib = array_get(program->import_libraries, i);
+          for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+            Import_Library *lib = dyn_array_get(program->import_libraries, i);
             if (strcmp(lib->name, operand->import.library_name) != 0) continue;
 
-            for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-              Import_Symbol *fn = array_get(lib->symbols, i);
+            for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
+              Import_Symbol *fn = dyn_array_get(lib->symbols, i);
               if (strcmp(fn->name, operand->import.symbol_name) == 0) {
                 s64 diff = program->data_base_rva + fn->offset_in_data - next_instruction_rva;
                 //assert(diff <= (s32)0x7FFFFFFF && diff >= (s32)0xFFFFFFFF);
                 s32 displacement = (s32)(diff);
 
-                buffer_append_s32(buffer, displacement);
+                fixed_buffer_append_s32(buffer, displacement);
 
                 match_found = true;
                 break;
@@ -273,7 +271,7 @@ encode_instruction(
           assert(fits_into_s32(diff));
           s32 displacement = (s32)(diff);
 
-          buffer_append_s32(buffer, displacement);
+          fixed_buffer_append_s32(buffer, displacement);
         } else if (operand->type == Operand_Type_Memory_Indirect) {
           s32 displacement = operand->indirect.displacement;
 
@@ -292,9 +290,9 @@ encode_instruction(
             }
           }
           if (mod == MOD_Displacement_s32) {
-            buffer_append_s32(buffer, displacement);
+            fixed_buffer_append_s32(buffer, displacement);
           } else if (mod == MOD_Displacement_s8) {
-            buffer_append_s8(buffer, (s8)displacement);
+            fixed_buffer_append_s8(buffer, (s8)displacement);
           } else {
             assert(mod == MOD_Displacement_0);
           }
@@ -306,19 +304,19 @@ encode_instruction(
       Operand *operand = &instruction.operands[operand_index];
 
       if (operand->type == Operand_Type_Immediate_8) {
-        buffer_append_s8(buffer, operand->imm8);
+        fixed_buffer_append_s8(buffer, operand->imm8);
       }
       if (operand->type == Operand_Type_Label_32) {
         if (operand->label32->target) {
           u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
           s32 diff = (s32)(operand->label32->target - from);
           assert(diff < 0);
-          buffer_append_s32(buffer, diff);
+          fixed_buffer_append_s32(buffer, diff);
         } else {
           s32 *patch_target = (s32 *)(buffer->memory + buffer->occupied);
-          buffer_append_s32(buffer, 0xCCCCCCCC);
+          fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
 
-          array_push(operand->label32->locations, (Label_Location) {
+          dyn_array_push(operand->label32->locations, (Label_Location) {
             .patch_target = patch_target,
             .from_offset = buffer->memory + buffer->occupied,
           });
@@ -326,10 +324,10 @@ encode_instruction(
 
       }
       if (operand->type == Operand_Type_Immediate_32) {
-        buffer_append_s32(buffer, operand->imm32);
+        fixed_buffer_append_s32(buffer, operand->imm32);
       }
       if (operand->type == Operand_Type_Immediate_64) {
-        buffer_append_s64(buffer, operand->imm64);
+        fixed_buffer_append_s64(buffer, operand->imm64);
       }
     }
     return;
@@ -342,6 +340,5 @@ encode_instruction(
     print_operand(operand);
   }
   printf("\n");
-  // Didn't find any encoding
   assert(!"Did not find acceptable encoding");
 }

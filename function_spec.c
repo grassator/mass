@@ -2,7 +2,6 @@
 
 #include "bdd-for-c.h"
 
-#include "prelude.c"
 #include "pe32.c"
 #include "value.c"
 #include "instruction.c"
@@ -40,24 +39,20 @@ spec("function") {
   static Program test_program;
   static Program *program_;
 
-  before() {
-    temp_buffer = make_buffer(1024 * 1024, PAGE_READWRITE);
-  }
-
   before_each() {
     test_program = (Program) {
-      .data_buffer = make_buffer(128 * 1024, PAGE_READWRITE),
-      .import_libraries = array_alloc(Array_Import_Library, 16),
-      .functions = array_alloc(Array_Function_Builder, 16),
+      .data_buffer = fixed_buffer_make(&allocator_system, 128 * 1024),
+      .import_libraries = dyn_array_make(Array_Import_Library, 16),
+      .functions = dyn_array_make(Array_Function_Builder, 16),
     };
     program_ = &test_program;
-    buffer_reset(&temp_buffer);
+    temp_buffer = bucket_buffer_make();
   }
 
   after_each() {
-    array_free(test_program.import_libraries);
-    array_free(test_program.functions);
-    free_buffer(&test_program.data_buffer);
+    dyn_array_destroy(test_program.import_libraries);
+    dyn_array_destroy(test_program.functions);
+    fixed_buffer_destroy(test_program.data_buffer);
   }
 
   it("should write out an executable that exits with status code 42") {

@@ -84,7 +84,7 @@ struct_byte_size(
       raw_size = field->offset + field_size;
     }
   }
-  return align(raw_size, alignment);
+  return s32_align(raw_size, alignment);
 }
 
 u32
@@ -166,7 +166,7 @@ Descriptor descriptor_struct_reflection = {
   .type = Descriptor_Type_Struct,
   .struct_ = {
     .field_list = struct_reflection_fields,
-    .field_count = static_array_size(struct_reflection_fields),
+    .field_count = countof(struct_reflection_fields),
   },
 };
 
@@ -273,7 +273,7 @@ inline Label*
 make_label() {
   Label *label = temp_allocate(Label);
   *label = (Label) {
-    .locations = array_alloc(Array_Label_Location, 16),
+    .locations = dyn_array_make(Array_Label_Location, 16),
   };
   return label;
 }
@@ -422,7 +422,7 @@ rip_value_pointer(
   Value *value
 ) {
   assert(value->operand.type == Operand_Type_RIP_Relative);
-  return program->data_buffer.memory + value->operand.rip_offset_in_data;
+  return program->data_buffer->memory + value->operand.rip_offset_in_data;
 }
 
 Value *
@@ -431,8 +431,8 @@ value_global(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  s8 *address = buffer_allocate_size(&program->data_buffer, byte_size);
-  s64 offset_in_data_section = address - program->data_buffer.memory;
+  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, sizeof(s8));
+  s64 offset_in_data_section = address - program->data_buffer->memory;
 
   Value *result = temp_allocate(Value);
   *result = (Value) {
@@ -709,11 +709,11 @@ void
 program_free(
   Program *program
 ) {
-  for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *library = array_get(program->import_libraries, i);
-    array_free(library->symbols);
+  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+    Import_Library *library = dyn_array_get(program->import_libraries, i);
+    dyn_array_destroy(library->symbols);
   }
-  array_free(program->import_libraries);
+  dyn_array_destroy(program->import_libraries);
   free(program);
 }
 
@@ -725,32 +725,32 @@ import_symbol(
 ) {
   Import_Library *library = 0;
 
-  for (s32 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
+  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
     if (_stricmp(lib->name, library_name) == 0) {
       library = lib;
     }
   }
   if (!library) {
-    library = array_push(program->import_libraries, (Import_Library) {
+    library = dyn_array_push(program->import_libraries, (Import_Library) {
       .name = library_name,
       .name_rva = 0xCCCCCCCC,
       .rva = 0xCCCCCCCC,
       .image_thunk_rva = 0xCCCCCCCC,
-      .symbols = array_alloc(Array_Import_Symbol, 16),
+      .symbols = dyn_array_make(Array_Import_Symbol, 16),
     });
   }
 
   Import_Symbol *symbol = 0;
-  for (s32 i = 0; i < array_count(library->symbols); ++i) {
-    Import_Symbol *it = array_get(library->symbols, i);
+  for (u64 i = 0; i < dyn_array_length(library->symbols); ++i) {
+    Import_Symbol *it = dyn_array_get(library->symbols, i);
     if (strcmp(it->name, symbol_name) == 0) {
       symbol = it;
     }
   }
 
   if (!symbol) {
-    symbol = array_push(library->symbols, (Import_Symbol) {
+    symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .name_rva = 0xCCCCCCCC,
       .offset_in_data = 0
@@ -799,12 +799,12 @@ program_find_import(
   const char *library_name,
   const char *symbol_name
 ) {
-  for (s64 i = 0; i < array_count(program->import_libraries); ++i) {
-    Import_Library *lib = array_get(program->import_libraries, i);
+  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
     if (strcmp(lib->name, library_name) != 0) continue;
 
-    for (s32 i = 0; i < array_count(lib->symbols); ++i) {
-      Import_Symbol *symbol = array_get(lib->symbols, i);
+    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
       if (strcmp(symbol->name, symbol_name) == 0) {
         return symbol;
       }
@@ -818,12 +818,9 @@ estimate_max_code_size_in_bytes(
   Program *program
 ) {
   u64 total_instruction_count = 0;
-  for (
-    Function_Builder *builder = array_begin(program->functions);
-    builder != array_end(program->functions);
-    ++builder
-  ) {
-    total_instruction_count += array_count(builder->instructions);
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    total_instruction_count += dyn_array_length(builder->instructions);
   }
   // TODO this should architecture-dependent
   const u64 max_bytes_per_instruction = 15;

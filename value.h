@@ -2,6 +2,25 @@
 #define VALUE_H
 #include "prelude.h"
 
+typedef void(*fn_type_opaque)();
+typedef void (*fn_type_void_to_void)(void);
+typedef s32 (*fn_type_void_to_s32)(void);
+typedef s64 (*fn_type_void_to_s64)(void);
+typedef s32 (*fn_type_voidp_to_s32)(void*);
+typedef s64 (*fn_type_voidp_s64_to_s64)(void*, s64);
+typedef s8  (*fn_type_s32_s8_to_s8)(s32, s8);
+typedef void (*fn_type_s32p_to_void)(s32*);
+typedef s8 (*fn_type_s32_to_s8)(s32);
+typedef s32 (*fn_type_s32_to_s32)(s32);
+typedef s32 (*fn_type_s32_s32_to_s32)(s32, s32);
+typedef s64 (*fn_type_s64_to_s64)(s64);
+typedef s64 (*fn_type_s64_s64_to_s64)(s64, s64);
+typedef s64 (*fn_type_s64_s64_s64_to_s64)(s64, s64, s64);
+typedef s64 (*fn_type_s64_s64_s64_s64_s64_to_s64)(s64, s64, s64, s64, s64);
+typedef s64 (*fn_type_s64_s64_s64_s64_s64_s64_to_s64)(s64, s64, s64, s64, s64, s64);
+typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
+
+
 typedef enum {
   Operand_Type_None,
   Operand_Type_Register,
@@ -43,7 +62,7 @@ typedef struct {
   s32 *patch_target;
   u8 *from_offset;
 } Label_Location;
-typedef array_type(Label_Location) Array_Label_Location;
+typedef dyn_array_type(Label_Location) Array_Label_Location;
 
 typedef struct {
   u8 *target;
@@ -55,7 +74,7 @@ typedef struct {
   u32 name_rva;
   u32 offset_in_data;
 } Import_Symbol;
-typedef array_type(Import_Symbol) Array_Import_Symbol;
+typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
 typedef struct {
   const char *name;
@@ -64,7 +83,7 @@ typedef struct {
   Array_Import_Symbol symbols;
   u32 image_thunk_rva;
 } Import_Library;
-typedef array_type(Import_Library) Array_Import_Library;
+typedef dyn_array_type(Import_Library) Array_Import_Library;
 
 typedef struct {
   const char *library_name;
@@ -221,7 +240,7 @@ typedef struct {
   const char *filename;
   u32 line_number;
 } Instruction;
-typedef array_type(Instruction) Array_Instruction;
+typedef dyn_array_type(Instruction) Array_Instruction;
 
 typedef struct _Program Program;
 
@@ -240,10 +259,10 @@ typedef struct {
 
   Value **result;
 } Function_Builder;
-typedef array_type(Function_Builder) Array_Function_Builder;
+typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct _Program {
-  Buffer data_buffer;
+  Fixed_Buffer *data_buffer;
   Array_Import_Library import_libraries;
   Function_Builder *entry_point;
   Array_Function_Builder functions;
@@ -252,9 +271,17 @@ typedef struct _Program {
 } Program;
 
 typedef struct {
-  Buffer code_buffer;
-  Buffer data_buffer;
+  Fixed_Buffer *code_buffer;
+  Fixed_Buffer *data_buffer;
 } Jit_Program;
+
+Bucket_Buffer temp_buffer;
+
+#define temp_allocate(_type_)\
+  bucket_buffer_allocate(temp_buffer, _type_)
+
+#define temp_allocate_array(_type_, _count_)\
+  bucket_buffer_allocate_array(temp_buffer, _type_, _count_)
 
 u64
 estimate_max_code_size_in_bytes(

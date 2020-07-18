@@ -2,7 +2,7 @@
 
 cls
 call build
-build\mass.exe
+build\spec.exe
 build\function_spec.exe
 
 build\test.exe
