@@ -36,9 +36,8 @@ encode_instruction(
     for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
       Label_Location *label_location = dyn_array_get(label->locations, i);
       s64 diff = (label->target - label_location->from_offset);
-      assert(fits_into_s32(diff));
       assert(diff >= 0);
-      *label_location->patch_target = (s32)diff;
+      *label_location->patch_target = s64_to_s32(diff);
     }
     return;
   }
@@ -268,8 +267,7 @@ encode_instruction(
 
           s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
           s64 diff = operand_rva - next_instruction_rva;
-          assert(fits_into_s32(diff));
-          s32 displacement = (s32)(diff);
+          s32 displacement = s64_to_s32(diff);
 
           fixed_buffer_append_s32(buffer, displacement);
         } else if (operand->type == Operand_Type_Memory_Indirect) {

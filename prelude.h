@@ -32,10 +32,34 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-static_assert(sizeof(void *) == sizeof(u64), prelude_only_supports_64_bit_architectures);
+#define u64_max_value UINT64_MAX
+#define u64_min_value 0
+
+#define u32_max_value UINT32_MAX
+#define u32_min_value 0
+
+#define u16_max_value UINT16_MAX
+#define u16_min_value 0
+
+#define u8_max_value UINT8_MAX
+#define u8_min_value 0
+
+#define s64_max_value INT64_MAX
+#define s64_min_value INT64_MIN
+
+#define s32_max_value INT32_MAX
+#define s32_min_value INT32_MIN
+
+#define s16_max_value INT16_MAX
+#define s16_min_value INT16_MIN
+
+#define s8_max_value INT8_MAX
+#define s8_min_value INT8_MIN
 
 typedef float f32;
 typedef double f64;
+
+static_assert(sizeof(void *) == sizeof(u64), prelude_only_supports_64_bit_architectures);
 
 #define PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES\
   PRELUDE_PROCESS_TYPE(s8)\
@@ -61,6 +85,47 @@ typedef double f64;
   PRELUDE_ENUMERATE_FLOAT_TYPES\
   PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES\
   PRELUDE_ENUMERATE_UNSIGNED_INTEGER_TYPES
+
+//////////////////////////////////////////////////////////////////////////////
+// Integer Casts
+//////////////////////////////////////////////////////////////////////////////
+
+#define DEFINE_UNSIGNED_CAST(_source_type_, _target_type_)\
+  inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
+    return value <= _target_type_##_max_value;\
+  }\
+  inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
+    assert(value <= _target_type_##_max_value);\
+    return (_target_type_)value;\
+  }
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  DEFINE_UNSIGNED_CAST(u8, _type_)\
+  DEFINE_UNSIGNED_CAST(u16, _type_)\
+  DEFINE_UNSIGNED_CAST(u32, _type_)\
+  DEFINE_UNSIGNED_CAST(u64, _type_)
+PRELUDE_ENUMERATE_INTEGER_TYPES
+#undef PRELUDE_PROCESS_TYPE
+#undef DEFINE_UNSIGNED_CAST
+
+#define DEFINE_SIGNED_CAST(_source_type_, _target_type_)\
+  inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
+    return value >= _target_type_##_min_value && value <= _target_type_##_max_value;\
+  }\
+  inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
+    assert(value >= _target_type_##_min_value);\
+    assert(value <= _target_type_##_max_value);\
+    return (_target_type_)value;\
+  }
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  DEFINE_SIGNED_CAST(s8, _type_)\
+  DEFINE_SIGNED_CAST(s16, _type_)\
+  DEFINE_SIGNED_CAST(s32, _type_)\
+  DEFINE_SIGNED_CAST(s64, _type_)
+PRELUDE_ENUMERATE_INTEGER_TYPES
+#undef PRELUDE_PROCESS_TYPE
+#undef DEFINE_UNSIGNED_CAST
 
 //////////////////////////////////////////////////////////////////////////////
 // Math

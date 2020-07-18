@@ -326,10 +326,10 @@ inline Operand
 imm_auto(
   s64 value
 ) {
-  if (fits_into_s8(value)) {
+  if (s64_fits_into_s8(value)) {
     return imm8((s8) value);
   }
-  if (fits_into_s32(value)) {
+  if (s64_fits_into_s32(value)) {
     return imm32((s32) value);
   }
   return imm64(value);

@@ -101,8 +101,7 @@ encode_rdata_section(
       symbol->name_rva = get_rva();
       fixed_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
       u64 name_size = strlen(symbol->name) + 1;
-      assert(fits_into_s32(name_size));
-      s32 aligned_name_size = s32_align((s32)name_size, 2);
+      u64 aligned_name_size = u64_align(name_size, 2);
       memcpy(
         fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
         symbol->name,
@@ -142,9 +141,8 @@ encode_rdata_section(
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     lib->name_rva = get_rva();
-    size_t name_size = strlen(lib->name) + 1;
-    assert(fits_into_s32(name_size));
-    s32 aligned_name_size = s32_align((s32)name_size, 2);
+    u64 name_size = strlen(lib->name) + 1;
+    u64 aligned_name_size = u64_align(name_size, 2);
     memcpy(
       fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
       lib->name,
@@ -174,9 +172,8 @@ encode_rdata_section(
   // TODO check the math
   assert(buffer->occupied <= expected_encoded_size);
 
-  assert(fits_into_s32(buffer->occupied));
-  header->Misc.VirtualSize = (s32)buffer->occupied;
-  header->SizeOfRawData = (s32)u64_align(buffer->occupied, PE32_FILE_ALIGNMENT);
+  header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
+  header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
 
   return result;
 }
@@ -209,9 +206,8 @@ encode_text_section(
     fn_encode(result.buffer, builder);
   }
 
-  assert(fits_into_s32(buffer->occupied));
-  header->Misc.VirtualSize = (s32)buffer->occupied;
-  header->SizeOfRawData = (s32)u64_align(buffer->occupied, PE32_FILE_ALIGNMENT);
+  header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
+  header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
 
   #undef get_rva
   return result;

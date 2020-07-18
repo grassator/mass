@@ -229,8 +229,7 @@ program_end(
         s64 offset = program->data_buffer->occupied;
         fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
         *rip_target = fn_address;
-        assert(fits_into_s32(offset));
-        fn->offset_in_data = (s32)(offset);
+        fn->offset_in_data = s64_to_s32(offset);
       }
     }
   }
