@@ -238,12 +238,12 @@ spec("spec") {
       .functions = dyn_array_make(Array_Function_Builder, 4),
     };
     program_ = &test_program;
-    temp_buffer = fixed_buffer_make(&allocator_system, 10 * 1024 * 1024);
-    temp_allocator = fixed_buffer_create_allocator(temp_buffer);
+    temp_buffer = bucket_buffer_make(&allocator_system);
+    temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 
   after_each() {
-    fixed_buffer_destroy(temp_buffer);
+    bucket_buffer_destroy(temp_buffer);
     dyn_array_destroy(test_program.functions);
     fixed_buffer_destroy(test_program.data_buffer);
   }

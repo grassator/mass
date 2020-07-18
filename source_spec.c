@@ -4,12 +4,12 @@
 
 spec("source") {
   before_each() {
-    temp_buffer = fixed_buffer_make(&allocator_system, 10 * 1024 * 1024);
-    temp_allocator = fixed_buffer_create_allocator(temp_buffer);
+    temp_buffer = bucket_buffer_make(&allocator_system);
+    temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 
   after_each() {
-    fixed_buffer_destroy(temp_buffer);
+    bucket_buffer_destroy(temp_buffer);
   }
 
   it("should be able to tokenize an empty string") {
