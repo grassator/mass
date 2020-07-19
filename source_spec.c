@@ -21,6 +21,15 @@ spec("source") {
     check(dyn_array_length(root->children) == 0);
   }
 
+  it("should be able to tokenize a comment") {
+    Slice source = slice_from_string_literal("// foo\n");
+    Token *root = tokenize(source);
+    check(root);
+    check(root->parent == 0);
+    check(root->type == Token_Type_Module);
+    check(dyn_array_length(root->children) == 0);
+  }
+
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_from_string_literal("12 + foo123");
     Token *root = tokenize(source);
@@ -54,8 +63,36 @@ spec("source") {
     check(id->type == Token_Type_Id);
   }
 
-  it("should be able to tokenize complex expressions") {
-    Slice source = slice_from_string_literal("(42 + (foo + 123 + 1423))");
+  it("should be able to tokenize strings") {
+    Slice source = slice_from_string_literal("\"foo 123\"");
+    Token *root = tokenize(source);
+    check(dyn_array_length(root->children) == 1);
+    Token *string = *dyn_array_get(root->children, 0);
+    check(slice_equal(string->source, slice_from_string_literal("\"foo 123\"")));
+  }
+
+  it("should be able to tokenize nested groups with different braces") {
+    Slice source = slice_from_string_literal("{[]}");
+    Token *root = tokenize(source);
+    check(dyn_array_length(root->children) == 1);
+
+    Token *curly = *dyn_array_get(root->children, 0);
+    check(curly->type == Token_Type_Curly);
+    check(dyn_array_length(curly->children) == 1);
+    check(slice_equal(curly->source, slice_from_string_literal("{[]}")));
+
+    Token *square = *dyn_array_get(curly->children, 0);
+    check(square->type == Token_Type_Square);
+    check(dyn_array_length(square->children) == 0);
+    check(slice_equal(square->source, slice_from_string_literal("[]")));
+  }
+
+  it("should be able to tokenize complex input") {
+    Slice source = slice_from_string_literal(
+      "foo :: (x: s8) -> {\n"
+      "  return x + 3;\n"
+      "}"
+    );
     Token *root = tokenize(source);
     check(root);
   }
