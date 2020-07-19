@@ -114,7 +114,7 @@ fn_begin(Value **result, Program *program) {
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 8),
+      .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
       .returns = 0,
     },
   };
@@ -125,7 +125,7 @@ fn_begin(Value **result, Program *program) {
     .epilog_label = make_label(),
     .descriptor = descriptor,
     .result = result,
-    .instructions = dyn_array_make_with_allocator(temp_allocator, Array_Instruction, 32),
+    .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
   });
 
   Value *fn_value = temp_allocate(Value);
@@ -208,7 +208,7 @@ program_end(
 ) {
   u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
   Jit_Program result = {
-    .code_buffer = fixed_buffer_make(&allocator_system, code_buffer_size),
+    .code_buffer = fixed_buffer_make(.allocator = &allocator_system, .capacity = code_buffer_size),
     .data_buffer = program->data_buffer,
   };
   program->code_base_rva = (s64)result.code_buffer->memory;
@@ -677,7 +677,7 @@ call_function_value(
   ...
 ) {
   assert(to_call);
-  Array_Value_Ptr arguments = dyn_array_make_with_allocator(temp_allocator, Array_Value_Ptr, 16);
+  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator);
   {
     va_list va_values;
     va_start(va_values, to_call);

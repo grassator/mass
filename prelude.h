@@ -427,13 +427,19 @@ typedef bucket_array_struct_internal(Bucket_Array_Bucket_Internal) Bucket_Array_
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
+struct Bucket_Array_Make_Options {
+  void *_count_reset;
+  const Allocator *allocator;
+};
+
 inline Bucket_Array_Internal *
 bucket_array_alloc_internal(
-  const Allocator *allocator,
+  struct Bucket_Array_Make_Options *options,
   u64 single_bucket_byte_size,
   u64 item_byte_size,
   u64 initial_bucket_tail_capacity
 ) {
+  const Allocator *allocator = options->allocator;
   u64 allocation_size =
     sizeof(Bucket_Array_Internal) +
     sizeof(Bucket_Array_Bucket_Internal) * initial_bucket_tail_capacity;
@@ -521,18 +527,19 @@ bucket_array_destroy_internal(
     bucket_array_bucket_capacity(_array_)\
   )
 
-#define bucket_array_make_with_allocator(_allocator_, _array_type_)\
+#define bucket_array_make(_array_type_, ...)\
   ((_array_type_) {\
     .internal = bucket_array_alloc_internal(\
-      (_allocator_),\
+      &((struct Bucket_Array_Make_Options){\
+        .allocator = &allocator_default,\
+        ._count_reset = 0,\
+        __VA_ARGS__\
+      }),\
       sizeof(*((_array_type_ *) 0)->typed->bucket_tail[0].items),\
       sizeof((*((_array_type_ *) 0)->typed->bucket_tail[0].items)[0]),\
       BUCKET_ARRAY_INITIAL_TAIL_CAPACITY\
     )\
   })
-
-#define bucket_array_make(_array_type_)\
-  bucket_array_make_with_allocator(&allocator_default, _array_type_)
 
 #define bucket_array_get(_array_, _index_)\
   (&(*(_array_).typed->bucket_tail[\
@@ -613,19 +620,24 @@ dyn_array_realloc_internal(
   return result;
 }
 
+struct Dyn_Array_Make_Options {
+  void *_count_reset;
+  u64 capacity;
+  const Allocator *allocator;
+};
+
 inline Dyn_Array_Internal *
 dyn_array_alloc_internal(
-  const Allocator *allocator,
-  u64 item_byte_size,
-  u64 capacity
+  struct Dyn_Array_Make_Options *options,
+  u64 item_byte_size
 ) {
-  u64 new_allocation_size = sizeof(Dyn_Array_Internal) + item_byte_size * capacity;
+  u64 new_allocation_size = sizeof(Dyn_Array_Internal) + item_byte_size * options->capacity;
   Dyn_Array_Internal *result = allocator_allocate_bytes(
-    allocator, new_allocation_size, item_byte_size
+    options->allocator, new_allocation_size, item_byte_size
   );
   *result = (Dyn_Array_Internal) {
-    .allocator = allocator,
-    .capacity = capacity,
+    .allocator = options->allocator,
+    .capacity = options->capacity,
   };
   return result;
 }
@@ -672,17 +684,18 @@ dyn_array_ensure_capacity(
 #define dyn_array_item_size(_array_type_)\
   sizeof(((_array_type_ *) 0)->data->items[0])
 
-#define dyn_array_make_with_allocator(_allocator_, _array_type_, _count_)\
+#define dyn_array_make(_array_type_, ...)\
   ((_array_type_) {\
     .internal = dyn_array_alloc_internal(\
-      (_allocator_),\
-      dyn_array_item_size(_array_type_),\
-      (_count_)\
+      &(struct Dyn_Array_Make_Options) {\
+        .allocator = &allocator_default,\
+        .capacity = 16,\
+        ._count_reset = 0,\
+        __VA_ARGS__\
+      },\
+      dyn_array_item_size(_array_type_)\
     )\
   })
-
-#define dyn_array_make(_array_type_, _count_)\
-  dyn_array_make_with_allocator(&allocator_default, _array_type_, (_count_))
 
 #define dyn_array_destroy(_array_)\
   allocator_deallocate((_array_).data->allocator, (_array_).data)
@@ -954,17 +967,21 @@ slice_split_by_slice(
   const Slice separator
 ) {
   if (!slice.length) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator, .capacity = 0);
   }
   // In case of zero-length separator return individual bytes as slices
   if (separator.length == 0) {
-    Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, (u32)slice.length);
+    Array_Slice result = dyn_array_make(
+      Array_Slice,
+      .allocator = allocator,
+      .capacity = slice.length
+    );
     for (u64 i = 0; i < slice.length; ++i) {
       dyn_array_push(result, slice_sub_length(slice, i, 1));
     }
     return result;
   }
-  Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, 8);
+  Array_Slice result = dyn_array_make(Array_Slice, .allocator = allocator);
   Slice remaining = slice;
   for(;;) {
     u64 index = slice_index_of(remaining, separator);
@@ -989,9 +1006,9 @@ slice_split_by_length(
   u64 length
 ) {
   if (!slice.length || !length) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator, .capacity = 0);
   }
-  Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, 8);
+  Array_Slice result = dyn_array_make(Array_Slice, .allocator = allocator);
   u64 item_count = slice.length / length + 1;
   for (u64 i = 0; i < item_count; ++i) {
     dyn_array_push(result, slice_sub_length(slice, i * length, length));
@@ -1011,9 +1028,9 @@ slice_split_by_callback_internal(
   bool indexed
 ) {
   if (!slice.length || !callback) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator);
   }
-  Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, 8);
+  Array_Slice result = dyn_array_make(Array_Slice, .allocator = allocator);
   bool previous_is_separator = false;
   u64 prev_index = 0;
   for (u64 index = 0; index < slice.length; ++index) {
@@ -1173,7 +1190,7 @@ c_string_split_by_c_string(
   const char *separator
 ) {
   if (!string || !separator) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator, .capacity = 0);
   }
   return slice_split_by_slice(
     allocator,
@@ -1189,9 +1206,9 @@ c_string_split_by_length(
   u64 length
 ) {
   if (!string || !length) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator, .capacity = 0);
   }
-  Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, 8);
+  Array_Slice result = dyn_array_make(Array_Slice, .allocator = allocator);
   const char *ch = string;
   u64 index = 0;
   while (*ch) {
@@ -1217,9 +1234,9 @@ c_string_split_by_callback_internal(
   bool indexed
 ) {
   if (!string || !callback) {
-    return dyn_array_make_with_allocator(allocator, Array_Slice, 0);
+    return dyn_array_make(Array_Slice, .allocator = allocator, .capacity = 0);
   }
-  Array_Slice result = dyn_array_make_with_allocator(allocator, Array_Slice, 8);
+  Array_Slice result = dyn_array_make(Array_Slice, .allocator = allocator);
   const char *ch = string;
   bool previous_is_separator = false;
   u64 index = 0;
@@ -1479,20 +1496,37 @@ typedef struct {
 // That the first address is aligned to 16 bytes to match malloc
 static_assert_type_alignment(Fixed_Buffer, 16);
 
+struct Fixed_Buffer_Make_Options {
+  void *_count_reset;
+  u64 capacity;
+  const Allocator *allocator;
+};
+
 inline Fixed_Buffer *
-fixed_buffer_make(
-  const Allocator *allocator,
-  u64 capacity
+fixed_buffer_make_internal(
+  struct Fixed_Buffer_Make_Options *options
 ) {
-  u64 allocation_size = sizeof(Fixed_Buffer) + capacity;
-  Fixed_Buffer *buffer = allocator_allocate_bytes(allocator, allocation_size, sizeof(s8));
+  u64 allocation_size = sizeof(Fixed_Buffer) + options->capacity;
+  Fixed_Buffer *buffer = allocator_allocate_bytes(
+    options->allocator,
+    allocation_size,
+    sizeof(Fixed_Buffer)
+  );
   *buffer = (Fixed_Buffer) {
-    .allocator = allocator,
-    .capacity = capacity,
+    .allocator = options->allocator,
+    .capacity = options->capacity,
     .occupied = 0,
   };
   return buffer;
 }
+
+#define fixed_buffer_make(...)\
+  fixed_buffer_make_internal(&(struct Fixed_Buffer_Make_Options) {\
+    .allocator = &allocator_default,\
+    .capacity = 256 - sizeof(Fixed_Buffer),\
+    ._count_reset = 0,\
+    __VA_ARGS__\
+  })
 
 inline void
 fixed_buffer_destroy(
@@ -1607,16 +1641,13 @@ typedef dyn_array_type(Bucket_Buffer_Bucket) Array_Bucket_Buffer_Bucket;
 
 typedef struct {
   const Allocator *allocator;
+  u64 default_bucket_size;
   Array_Bucket_Buffer_Bucket buckets;
 } Bucket_Buffer_Internal;
 
 typedef struct {
   Bucket_Buffer_Internal *internal;
 } Bucket_Buffer;
-
-#ifndef BUCKET_BUFFER_DEFAULT_BUCKET_SIZE
-#define BUCKET_BUFFER_DEFAULT_BUCKET_SIZE 4096
-#endif
 
 inline Bucket_Buffer_Bucket *
 bucket_buffer_push_bucket_internal(
@@ -1630,18 +1661,33 @@ bucket_buffer_push_bucket_internal(
   });
 }
 
+struct Bucket_Buffer_Make_Options {
+  void *_count_reset;
+  u64 bucket_capacity;
+  const Allocator *allocator;
+};
+
 inline const Bucket_Buffer
-bucket_buffer_make(
-  const Allocator *allocator
+bucket_buffer_make_internal(
+  struct Bucket_Buffer_Make_Options *options
 ) {
-  Bucket_Buffer_Internal *internal = allocator_allocate(allocator, Bucket_Buffer_Internal);
+  Bucket_Buffer_Internal *internal = allocator_allocate(options->allocator, Bucket_Buffer_Internal);
   *internal = (Bucket_Buffer_Internal) {
-    .allocator = allocator,
+    .allocator = options->allocator,
     .buckets = dyn_array_make(Array_Bucket_Buffer_Bucket, 16),
+    .default_bucket_size = options->bucket_capacity,
   };
-  bucket_buffer_push_bucket_internal(internal, BUCKET_BUFFER_DEFAULT_BUCKET_SIZE);
+  bucket_buffer_push_bucket_internal(internal, internal->default_bucket_size);
   return (Bucket_Buffer){internal};
 }
+
+#define bucket_buffer_make(...)\
+  bucket_buffer_make_internal(&(struct Bucket_Buffer_Make_Options) {\
+    .allocator = &allocator_default,\
+    .bucket_capacity = 4096,\
+    ._count_reset = 0,\
+    __VA_ARGS__\
+  })
 
 inline void
 bucket_buffer_destroy(
@@ -1668,7 +1714,7 @@ bucket_buffer_allocate_bytes(
   }
 
   if (bucket->capacity < aligned_occupied + byte_size) {
-    u64 capacity = BUCKET_BUFFER_DEFAULT_BUCKET_SIZE;
+    u64 capacity = handle.internal->default_bucket_size;
     if (byte_size > capacity) capacity = byte_size;
     bucket = bucket_buffer_push_bucket_internal(handle.internal, capacity);
   } else {
@@ -1716,7 +1762,7 @@ bucket_buffer_to_fixed_buffer(
 ) {
   Bucket_Buffer_Internal *internal = handle.internal;
   u64 total_occupied = bucket_buffer_total_occupied(handle);
-  Fixed_Buffer *result = fixed_buffer_make(allocator, total_occupied);
+  Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator, .capacity = total_occupied);
   for (u64 i = 0; i < dyn_array_length(internal->buckets); ++i) {
     Bucket_Buffer_Bucket *bucket = dyn_array_get(internal->buckets, i);
     s8 *target = fixed_buffer_allocate_bytes(result, bucket->occupied, 1);
