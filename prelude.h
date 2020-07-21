@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
@@ -304,6 +305,13 @@ allocator_reallocate(
   );
 }
 
+#define allocator_make(_allocator_, _type_, ...)\
+  (_type_ *)memcpy(\
+    allocator_allocate((_allocator_), _type_),\
+    &(_type_){__VA_ARGS__},\
+    sizeof(_type_)\
+  )
+
 //////////////////////////////////////////////////////////////////////////////
 // Range
 //////////////////////////////////////////////////////////////////////////////
@@ -334,51 +342,6 @@ allocator_reallocate(
   }
 PRELUDE_ENUMERATE_INTEGER_TYPES
 #undef PRELUDE_PROCESS_TYPE
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Hash
-//////////////////////////////////////////////////////////////////////////////
-
-inline s32
-hash_u64(
-  u64 value
-) {
-  const u64 prime = 6903248743164425207llu;
-  return (s32)(value * prime);
-}
-
-inline s32
-hash_pointer(
-  void *address
-) {
-  return hash_u64((u64)address);
-}
-
-s32
-hash_bytes(
-  const void *address,
-  u32 size
-) {
-  const s8 *bytes = address;
-  const s8 *end = bytes + size;
-  s32 hash = 7;
-  while (bytes != end) {
-    hash = hash * 31 + *bytes++;
-  }
-  return hash;
-}
-
-s32
-hash_c_string(
-  const char *string
-) {
-  s32 hash = 7;
-  while (*string) {
-    hash = hash * 31 + *string++;
-  }
-  return hash;
-}
 
 //////////////////////////////////////////////////////////////////////////////
 // Bucket_Array
@@ -744,6 +707,13 @@ typedef struct {
 } Slice;
 
 typedef dyn_array_type(Slice) Array_Slice;
+
+inline void
+slice_print(
+  Slice slice
+) {
+  printf("%.*s", u64_to_s32(slice.length), slice.bytes);
+}
 
 typedef struct {
   s64 value;
@@ -1821,103 +1791,94 @@ bucket_buffer_create_allocator(
   return result;
 }
 
+
+//////////////////////////////////////////////////////////////////////////////
+// Hash
+//////////////////////////////////////////////////////////////////////////////
+
+inline s32
+hash_u64(
+  u64 value
+) {
+  const u64 prime = 6903248743164425207llu;
+  return (s32)(value * prime);
+}
+
+inline s32
+hash_pointer(
+  void *address
+) {
+  return hash_u64((u64)address);
+}
+
+s32
+hash_bytes(
+  const void *address,
+  u64 size
+) {
+  const s8 *bytes = address;
+  const s8 *end = bytes + size;
+  s32 hash = 7;
+  while (bytes != end) {
+    hash = hash * 31 + *bytes++;
+  }
+  return hash;
+}
+
+inline s32
+hash_slice(
+  Slice slice
+) {
+  return hash_bytes(slice.bytes, slice.length);
+}
+
+s32
+hash_c_string(
+  const char *string
+) {
+  s32 hash = 7;
+  while (*string) {
+    hash = hash * 31 + *string++;
+  }
+  return hash;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // HashMap
 //////////////////////////////////////////////////////////////////////////////
-
-typedef s32 (*hash_map_hash)(const void *);
-typedef bool (*hash_map_key_equality)(const void *, const void *);
-
-#define hash_map_entry_type(_key_type_, _value_type_)\
-  struct {\
-    Hash_Map_Entry_Bookkeeping bookkeeping;\
-    _value_type_ value;\
-    _key_type_ key;\
-  }
-
-#define hash_map_type_base_fields(_key_type_, _value_type_)\
-  const Allocator *allocator;\
-  s32 (*hash)(_key_type_);\
-  bool (*compare)(_key_type_ *, _key_type_ *);\
-  hash_map_entry_type(_key_type_, _value_type_) *get_result;\
-  s32 hash_mask;\
-  u32 capacity_power_of_2;\
-  u64 capacity;\
-  u64 occupied
 
 typedef struct {
   bool occupied;
   s32 hash;
 } Hash_Map_Entry_Bookkeeping;
 
-typedef struct {
-  hash_map_type_base_fields(const void *, void *);
-  s8 *entries;
-} Hash_Map_Internal;
+#define hash_map_type_internal(_hash_map_type_, _key_type_, _value_type_)\
+  typedef struct _hash_map_type_ _hash_map_type_;\
+  \
+  typedef struct {\
+    _hash_map_type_ *(*make)();\
+    _value_type_ *(*get)(_hash_map_type_ *, _key_type_);\
+    void (*set)(_hash_map_type_ *, _key_type_, _value_type_);\
+    void (*delete)(_hash_map_type_ *, _key_type_);\
+  } _hash_map_type_##__Methods;\
+  \
+  typedef struct _hash_map_type_##__Entry {\
+    Hash_Map_Entry_Bookkeeping bookkeeping;\
+    _key_type_ key;\
+    _value_type_ value;\
+  } _hash_map_type_##__Entry;\
+  \
+  typedef struct _hash_map_type_ {\
+    const _hash_map_type_##__Methods *methods;\
+    const Allocator *allocator;\
+    s32 hash_mask;\
+    u32 capacity_power_of_2;\
+    u64 capacity;\
+    u64 occupied;\
+    _hash_map_type_##__Entry *entries;\
+  } _hash_map_type_;
 
-#define hash_map_type(_key_type_, _value_type_)\
-  union {\
-    struct {\
-      hash_map_type_base_fields(_key_type_, _value_type_);\
-      hash_map_entry_type(_key_type_, _value_type_) *entries;\
-    } typed;\
-    Hash_Map_Internal internal;\
-    s8 (*key_offset_dummy)[offsetof(hash_map_entry_type(_key_type_, _value_type_), key)];\
-  }
-
-static inline void *
-hash_map_make_internal(
-  const Allocator *allocator,
-  u64 entry_byte_size,
-  hash_map_hash hash_fn,
-  hash_map_key_equality comparator
-) {
-  Hash_Map_Internal *map = allocator_allocate(allocator, Hash_Map_Internal);
-  u32 capacity_power_of_2 = 5;
-  u64 capacity = 1llu << capacity_power_of_2;
-  u64 entries_byte_size = entry_byte_size * capacity;
-  *map = (Hash_Map_Internal) {
-    .hash = hash_fn,
-    .compare = comparator,
-    .allocator = allocator,
-    .capacity_power_of_2 = capacity_power_of_2,
-    .capacity = capacity,
-    .hash_mask = u64_to_s32(capacity - 1),
-    .occupied = 0,
-    .entries = allocator_allocate_bytes(allocator, entries_byte_size, entry_byte_size),
-  };
-  memset(map->entries, 0, entries_byte_size);
-  return map;
-}
-
-static inline bool
-hash_map_c_string_equal(
-  const char **a,
-  const char **b
-) {
-  return strcmp(*a, *b) == 0;
-}
-
-#define hash_map_make(_map_type_, _hash_fn_, _comparator_)\
-  hash_map_make_internal(\
-    &allocator_default,\
-    sizeof(((_map_type_ *) 0)->typed.entries[0]) + \
-      /* The line below will be optimized out, but it ensures type safety */\
-      0 * sizeof((_map_type_){\
-        .typed = {.hash = (_hash_fn_), .compare = (_comparator_)}\
-      }),\
-    (hash_map_hash)(_hash_fn_),\
-    (hash_map_key_equality)(_comparator_)\
-  )
-
-#define hash_map_c_string_make(_map_type_)\
-  hash_map_make(_map_type_, hash_c_string, hash_map_c_string_equal)
-
-#define hash_map_destroy(_map_)\
-  do {\
-    allocator_deallocate((_map_)->typed.allocator, (_map_)->typed.entries);\
-    allocator_deallocate((_map_)->typed.allocator, (_map_));\
-  } while(0)
+hash_map_type_internal(Hash_Map_Internal, void *, void *)
 
 static u64
 hash_map_get_insert_index_internal(
@@ -1930,7 +1891,7 @@ hash_map_get_insert_index_internal(
     // Using hash_mask to wrap around in a cheap way
     u64 effective_index = (i + hash_index) & map->hash_mask;
     Hash_Map_Entry_Bookkeeping *bookkeeping =
-      (void *)(map->entries + effective_index * entry_byte_size);
+      (void *)((s8 *)map->entries + effective_index * entry_byte_size);
     if (!bookkeeping->occupied) return effective_index;
   }
   return 0;
@@ -1946,7 +1907,7 @@ hash_map_resize(
   map->capacity = 1llu << map->capacity_power_of_2;
   map->occupied = 0;
   map->hash_mask = u64_to_s32(map->capacity - 1);
-  s8 *entries = map->entries;
+  s8 *entries = (s8 *)map->entries;
   u64 entries_byte_size = entry_byte_size * map->capacity;
   map->entries = allocator_allocate_bytes(map->allocator, entries_byte_size, entry_byte_size);
   memset(map->entries, 0, entries_byte_size);
@@ -1959,90 +1920,132 @@ hash_map_resize(
       u64 insertion_index = hash_map_get_insert_index_internal(
         map, entry_byte_size, old_bookkeeping->hash
       );
-      void *new_entry = (void *)(map->entries + insertion_index * entry_byte_size);
+      void *new_entry = (void *)((s8 *)map->entries + insertion_index * entry_byte_size);
       memcpy(new_entry, old_entry, entry_byte_size);
     }
   }
   allocator_deallocate(map->allocator, entries);
 }
 
-static inline u64
-hash_map_set_internal(
-  Hash_Map_Internal *map,
-  u64 entry_byte_size,
-  s32 hash
-) {
-  // Fast check for 50% occupancy
-  if (((++map->occupied) << 1) > map->capacity) {
-    hash_map_resize(map, entry_byte_size);
-  }
+#define hash_map_template(_hash_map_type_, _key_type_, _value_type_, _key_hash_fn_, _key_equality_fn_)\
+  hash_map_type_internal(_hash_map_type_, _key_type_, _value_type_)\
+  \
+  const _hash_map_type_##__Methods *_hash_map_type_##__methods;\
+  \
+  static inline _hash_map_type_ *\
+  _hash_map_type_##__make(\
+    const Allocator *allocator\
+  ) {\
+    _hash_map_type_ *map = allocator_allocate(allocator, _hash_map_type_);\
+    u32 capacity_power_of_2 = 5;\
+    u64 capacity = 1llu << capacity_power_of_2;\
+    u64 entry_byte_size = sizeof(map->entries[0]);\
+    u64 entry_array_byte_size = entry_byte_size * capacity;\
+    *map = (_hash_map_type_) {\
+      .methods = _hash_map_type_##__methods,\
+      .allocator = allocator,\
+      .capacity_power_of_2 = capacity_power_of_2,\
+      .capacity = capacity,\
+      .hash_mask = u64_to_s32(capacity - 1),\
+      .occupied = 0,\
+      .entries = allocator_allocate_bytes(allocator, entry_array_byte_size, entry_byte_size),\
+    };\
+    memset(map->entries, 0, entry_array_byte_size);\
+    return map;\
+  }\
+  \
+  static inline _hash_map_type_##__Entry *\
+  _hash_map_type_##__get_internal(\
+    _hash_map_type_ *map,\
+    _key_type_ key\
+  ) {\
+    s32 hash = _key_hash_fn_(key);\
+    s32 hash_index = hash & map->hash_mask;\
+    for (u64 i = 0; i < map->capacity; ++i) {\
+      /* Using hash_mask to wrap around in a cheap way */\
+      u64 effective_index = (i + hash_index) & map->hash_mask;\
+      _hash_map_type_##__Entry *entry = &map->entries[effective_index];\
+      /* We are past hash collisions - entry not found */\
+      if (!entry->bookkeeping.occupied) break;\
+      if (entry->bookkeeping.hash != hash) continue;\
+      if (_key_equality_fn_(key, entry->key)) return entry;\
+    }\
+    return 0;\
+  }\
+  \
+  static inline _value_type_ *\
+  _hash_map_type_##__get(\
+    _hash_map_type_ *map,\
+    _key_type_ key\
+  ) {\
+    _hash_map_type_##__Entry *entry = _hash_map_type_##__get_internal(map, key);\
+    return entry ? &entry->value : 0;\
+  }\
+  \
+  static inline void\
+  _hash_map_type_##__delete(\
+    _hash_map_type_ *map,\
+    _key_type_ key\
+  ) {\
+    _hash_map_type_##__Entry *entry = _hash_map_type_##__get_internal(map, key);\
+    if (entry) memset(entry, 0, sizeof(entry));\
+  }\
+  \
+  static inline void\
+  _hash_map_type_##__set(\
+    _hash_map_type_ *map,\
+    _key_type_ key,\
+    _value_type_ value\
+  ) {\
+    u64 entry_size = sizeof(map->entries[0]);\
+    Hash_Map_Internal *internal = (Hash_Map_Internal *)map;\
+    /* Fast check for 50% occupancy */ \
+    if (((++map->occupied) << 1) > map->capacity) {\
+      hash_map_resize(internal, entry_size);\
+    }\
+    s32 hash = _key_hash_fn_(key);\
+    u64 index = hash_map_get_insert_index_internal(internal, entry_size, hash);\
+    map->entries[index] = (_hash_map_type_##__Entry){\
+      .bookkeeping.hash = hash, \
+      .bookkeeping.occupied = true, \
+      .key = key, \
+      .value = value, \
+    };\
+  }\
+  \
+  const _hash_map_type_##__Methods *_hash_map_type_##__methods = &(_hash_map_type_##__Methods){\
+    .make = _hash_map_type_##__make,\
+    .get = _hash_map_type_##__get,\
+    .set = _hash_map_type_##__set,\
+    .delete = _hash_map_type_##__delete,\
+  };\
 
-  u64 insertion_index = hash_map_get_insert_index_internal(map, entry_byte_size, hash);
-  Hash_Map_Entry_Bookkeeping *bookkeeping =
-    (void *)(map->entries + insertion_index * entry_byte_size);
+#define hash_map_c_string_template(_hash_map_type_, _value_type_)\
+  hash_map_template(_hash_map_type_, const char *, _value_type_, hash_c_string, c_string_equal)
 
-  bookkeeping->occupied = true;
-  bookkeeping->hash = hash;
-  return insertion_index;
-}
+#define hash_map_slice_template(_hash_map_type_, _value_type_)\
+  hash_map_template(_hash_map_type_, Slice, _value_type_, hash_slice, slice_equal)
 
-#define hash_map_set(_map_, _key_, _value_)\
+#define hash_map_make(_hash_map_type_)\
+  _hash_map_type_##__make(&allocator_default)
+
+#define hash_map_destroy(_map_)\
   do {\
-    u64 index = hash_map_set_internal(\
-      &(_map_)->internal,\
-      sizeof((_map_)->typed.entries[0]),\
-      (_map_)->typed.hash(_key_)\
-    );\
-    ((_map_)->typed.entries[index].key = (_key_));\
-    ((_map_)->typed.entries[index].value = (_value_));\
-  } while (0)
-
-static void *
-hash_map_get_internal(
-  Hash_Map_Internal *map,
-  const void *key,
-  u64 entry_byte_size,
-  u64 key_offset_in_entry,
-  s32 hash
-) {
-  s32 hash_index = hash & map->hash_mask;
-  for (u64 i = 0; i < map->capacity; ++i) {
-    // Using hash_mask to wrap around in a cheap way
-    u64 effective_index = (i + hash_index) & map->hash_mask;
-    s8 *entry = map->entries + effective_index * entry_byte_size;
-    Hash_Map_Entry_Bookkeeping *bookkeeping = (void *)entry;
-    // We are past hash collisions - entry not found
-    if (!bookkeeping->occupied) break;
-    void *payload_key = entry + key_offset_in_entry;
-    if (map->compare(&key, payload_key)) {
-      return entry;
-    }
-  }
-  return 0;
-}
-
-#define hash_map_get_entry_internal(_map_, _key_)\
-  hash_map_get_internal(\
-    &(_map_)->internal,\
-    (_key_),\
-    sizeof((_map_)->typed.entries[0]),\
-    sizeof(*(_map_)->key_offset_dummy),\
-    (_map_)->typed.hash(_key_)\
-  )
-
-#define hash_map_has(_map_, _key_)\
-  (hash_map_get_entry_internal((_map_), (_key_)) != 0)
-
-#define hash_map_delete(_map_, _key_)\
-  (\
-    (_map_)->typed.get_result = hash_map_get_entry_internal((_map_), (_key_)),\
-    ((_map_)->typed.get_result ? ((_map_)->typed.get_result->bookkeeping.occupied = 0) : 0)\
-  )
+    Hash_Map_Internal *internal = (void *)(_map_);\
+    allocator_deallocate(internal->allocator, internal->entries);\
+    allocator_deallocate(internal->allocator, internal);\
+  } while(0)
 
 #define hash_map_get(_map_, _key_)\
-  (\
-    (_map_)->typed.get_result = hash_map_get_entry_internal((_map_), (_key_)),\
-    &(_map_)->typed.get_result->value\
-  )
+  (_map_)->methods->get((_map_), (_key_))
+
+#define hash_map_has(_map_, _key_)\
+  (hash_map_get((_map_), (_key_)) != 0)
+
+#define hash_map_delete(_map_, _key_)\
+  (_map_)->methods->delete((_map_), (_key_))
+
+#define hash_map_set(_map_, _key_, _value_)\
+  (_map_)->methods->set((_map_), (_key_), (_value_))
 
 #endif PRELUDE_H
