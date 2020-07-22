@@ -217,7 +217,7 @@ allocator_default_reallocate(
   return realloc(address, new_size_in_bytes);
 }
 
-const Allocator allocator_default = {
+const Allocator *allocator_default = &(Allocator){
   allocator_default_allocate,
   allocator_default_deallocate,
   allocator_default_reallocate
@@ -257,7 +257,7 @@ allocator_system_reallocate(
   return new_address;
 }
 
-const Allocator allocator_system = {
+const Allocator *allocator_system = &(Allocator){
   allocator_system_allocate,
   allocator_system_deallocate,
   allocator_system_reallocate,
@@ -494,7 +494,7 @@ bucket_array_destroy_internal(
   ((_array_type_) {\
     .internal = bucket_array_alloc_internal(\
       &((struct Bucket_Array_Make_Options){\
-        .allocator = &allocator_default,\
+        .allocator = allocator_default,\
         ._count_reset = 0,\
         __VA_ARGS__\
       }),\
@@ -651,7 +651,7 @@ dyn_array_ensure_capacity(
   ((_array_type_) {\
     .internal = dyn_array_alloc_internal(\
       &(struct Dyn_Array_Make_Options) {\
-        .allocator = &allocator_default,\
+        .allocator = allocator_default,\
         .capacity = 16,\
         ._count_reset = 0,\
         __VA_ARGS__\
@@ -726,8 +726,8 @@ slice_parse_s64(
   Slice slice
 ) {
   Slice_Parse_S64_Result result = {0};
-  s64 integer = 0;
-  s64 multiplier = 1;
+  int integer = 0;
+  int multiplier = 1;
   for (s64 index = slice.length - 1; index >= 0; --index) {
     s8 digit = slice.bytes[index];
     if (digit >= '0' && digit <= '9') {
@@ -1482,6 +1482,7 @@ fixed_buffer_make_internal(
     allocation_size,
     sizeof(Fixed_Buffer)
   );
+  memset(buffer, 0, allocation_size);
   *buffer = (Fixed_Buffer) {
     .allocator = options->allocator,
     .capacity = options->capacity,
@@ -1492,11 +1493,20 @@ fixed_buffer_make_internal(
 
 #define fixed_buffer_make(...)\
   fixed_buffer_make_internal(&(struct Fixed_Buffer_Make_Options) {\
-    .allocator = &allocator_default,\
+    .allocator = allocator_default,\
     .capacity = 256 - sizeof(Fixed_Buffer),\
     ._count_reset = 0,\
     __VA_ARGS__\
   })
+
+inline Fixed_Buffer *
+fixed_buffer_reset(
+  Fixed_Buffer *buffer
+) {
+  memset(buffer->memory, 0, buffer->capacity);
+  buffer->occupied = 0;
+  return buffer;
+}
 
 inline void
 fixed_buffer_destroy(
@@ -1540,13 +1550,34 @@ fixed_buffer_as_slice(
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), sizeof(_type_)))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
+  inline _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
     _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
     *result = value;\
     return result;\
   }
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
+
+inline Slice
+fixed_buffer_append_slice(
+  Fixed_Buffer *buffer,
+  Slice slice
+) {
+  if (!slice.length) return (Slice) {0};
+  void *target = fixed_buffer_allocate_bytes(buffer, slice.length, sizeof(s8));
+  memcpy(target, slice.bytes, slice.length);
+  return (Slice) { .bytes = target, .length = slice.length, };
+}
+
+inline Slice
+fixed_buffer_slice(
+  Fixed_Buffer *buffer,
+  Range_u64 range
+) {
+  u64 from = u64_min(buffer->occupied, range.from);
+  u64 to = u64_min(buffer->occupied, range.to);
+  return (Slice){.bytes = buffer->memory + from, to - from};
+}
 
 inline void *
 fixed_buffer_allocator_allocate(
@@ -1596,6 +1627,49 @@ fixed_buffer_create_allocator(
   memcpy(result, &temp, sizeof(Allocator));
   return result;
 }
+inline s8 *
+fixed_buffer_first_free_byte_address(
+  Fixed_Buffer *buffer
+) {
+  return buffer->memory + buffer->occupied;
+}
+
+inline u64
+fixed_buffer_remaining_capacity(
+  Fixed_Buffer *buffer
+) {
+  return buffer->capacity - buffer->occupied;
+}
+
+inline Slice
+fixed_buffer_wrap_snprintf(
+  Fixed_Buffer *buffer,
+  s32 bytes_written
+) {
+  if (bytes_written < 0) {
+    assert(!"Buffer is too small");
+    return (Slice) {0};
+  }
+  void *bytes = fixed_buffer_first_free_byte_address(buffer);
+  buffer->occupied += bytes_written;
+  return (Slice) { .bytes = bytes, .length = bytes_written, };
+}
+
+#define fixed_buffer_vsprintf(_buffer_, _format_, _va_)\
+  fixed_buffer_wrap_snprintf((_buffer_), vsnprintf(\
+    fixed_buffer_first_free_byte_address((_buffer_)),\
+    fixed_buffer_remaining_capacity(_buffer_),\
+    (_format_),\
+    (_va_)\
+  ))
+
+#define fixed_buffer_sprintf(_buffer_, _format_, ...)\
+  fixed_buffer_wrap_snprintf((_buffer_), snprintf(\
+    fixed_buffer_first_free_byte_address(_buffer_),\
+    fixed_buffer_remaining_capacity(_buffer_),\
+    (_format_), \
+    __VA_ARGS__\
+  ))
 
 //////////////////////////////////////////////////////////////////////////////
 // Bucket Buffer
@@ -1653,7 +1727,7 @@ bucket_buffer_make_internal(
 
 #define bucket_buffer_make(...)\
   bucket_buffer_make_internal(&(struct Bucket_Buffer_Make_Options) {\
-    .allocator = &allocator_default,\
+    .allocator = allocator_default,\
     .bucket_capacity = 4096,\
     ._count_reset = 0,\
     __VA_ARGS__\
@@ -2027,7 +2101,7 @@ hash_map_resize(
   hash_map_template(_hash_map_type_, Slice, _value_type_, hash_slice, slice_equal)
 
 #define hash_map_make(_hash_map_type_)\
-  _hash_map_type_##__make(&allocator_default)
+  _hash_map_type_##__make(allocator_default)
 
 #define hash_map_destroy(_map_)\
   do {\

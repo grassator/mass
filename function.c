@@ -208,7 +208,7 @@ program_end(
 ) {
   u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
   Jit_Program result = {
-    .code_buffer = fixed_buffer_make(.allocator = &allocator_system, .capacity = code_buffer_size),
+    .code_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = code_buffer_size),
     .data_buffer = program->data_buffer,
   };
   program->code_base_rva = (s64)result.code_buffer->memory;

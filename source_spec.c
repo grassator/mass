@@ -4,7 +4,7 @@
 
 spec("source") {
   before_each() {
-    temp_buffer = bucket_buffer_make(.allocator = &allocator_system);
+    temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 

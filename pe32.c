@@ -86,7 +86,7 @@ encode_rdata_section(
   expected_encoded_size += global_data_size;
 
   Encoded_Rdata_Section result = {
-    .buffer = fixed_buffer_make(.allocator = &allocator_system, .capacity = expected_encoded_size),
+    .buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = expected_encoded_size),
   };
 
   Fixed_Buffer *buffer = result.buffer;
@@ -192,7 +192,7 @@ encode_text_section(
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
 
   Encoded_Text_Section result = {
-    .buffer = fixed_buffer_make(.allocator = &allocator_system, .capacity = max_code_size),
+    .buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = max_code_size),
   };
   Fixed_Buffer *buffer = result.buffer;
 
@@ -280,7 +280,7 @@ write_executable(
     rdata_section_header->SizeOfRawData +
     text_section_header->SizeOfRawData;
   Fixed_Buffer *exe_buffer = fixed_buffer_make(
-    .allocator = &allocator_system,
+    .allocator = allocator_system,
     .capacity = max_exe_buffer
   );
   IMAGE_DOS_HEADER *dos_header = fixed_buffer_allocate_unaligned(exe_buffer, IMAGE_DOS_HEADER);

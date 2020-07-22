@@ -41,12 +41,12 @@ spec("function") {
 
   before_each() {
     test_program = (Program) {
-      .data_buffer = fixed_buffer_make(.allocator = &allocator_system, .capacity = 128 * 1024),
+      .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
       .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
       .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
     };
     program_ = &test_program;
-    temp_buffer = bucket_buffer_make(.allocator = &allocator_system);
+    temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_create_allocator(temp_buffer);
   }
 
