@@ -187,6 +187,10 @@ spec("function") {
     }
     write_executable(L"build\\hello_world.exe", program_);
   }
+  it("should suppor empty Function") {
+    Function(checker_value) {}
+    program_end(program_);
+  }
 
   it("should support short-curciting &&") {
     Function(checker_value) {

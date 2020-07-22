@@ -823,6 +823,8 @@ program_find_import(
   return 0;
 }
 
+#define FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT 16
+
 u64
 estimate_max_code_size_in_bytes(
   Program *program
@@ -831,6 +833,7 @@ estimate_max_code_size_in_bytes(
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     total_instruction_count += dyn_array_length(builder->instructions);
+    total_instruction_count += FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT;
   }
   // TODO this should architecture-dependent
   const u64 max_bytes_per_instruction = 15;
