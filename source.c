@@ -22,6 +22,7 @@ typedef struct Token {
   Slice source;
   Array_Token_Ptr children;
 } Token;
+typedef dyn_array_type(Token) Array_Token;
 
 typedef enum {
   Tokenizer_State_Default,

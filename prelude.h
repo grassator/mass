@@ -726,8 +726,8 @@ slice_parse_s64(
   Slice slice
 ) {
   Slice_Parse_S64_Result result = {0};
-  int integer = 0;
-  int multiplier = 1;
+  s64 integer = 0;
+  s64 multiplier = 1;
   for (s64 index = slice.length - 1; index >= 0; --index) {
     s8 digit = slice.bytes[index];
     if (digit >= '0' && digit <= '9') {

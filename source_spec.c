@@ -122,6 +122,6 @@ spec("source") {
     check(error->location.column, 4);
     check(strcmp(error->message, "Unexpected end of file. Expected a closing brace.") == 0);
 
-    print_message_with_location(error->message, &error->location);
+    //print_message_with_location(error->message, &error->location);
   }
 }
