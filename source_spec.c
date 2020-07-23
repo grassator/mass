@@ -1,4 +1,8 @@
 #include "bdd-for-c.h"
+#include "value.c"
+#include "instruction.c"
+#include "encoding.c"
+#include "function.c"
 #include "source.c"
 
 

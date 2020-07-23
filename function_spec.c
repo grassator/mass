@@ -58,20 +58,6 @@ spec("function") {
   }
 
   it("should be able to parse a void -> s64 function") {
-    Array_Token fn_pattern = dyn_array_make(Array_Token);
-    dyn_array_push(fn_pattern, (Token) { .type = Token_Type_Id });
-    dyn_array_push(fn_pattern, (Token) {
-      .type = Token_Type_Operator,
-      .source = slice_from_string_literal("::"),
-    });
-    dyn_array_push(fn_pattern, (Token) { .type = Token_Type_Paren });
-    dyn_array_push(fn_pattern, (Token) {
-      .type = Token_Type_Operator,
-      .source = slice_from_string_literal("->"),
-    });
-    dyn_array_push(fn_pattern, (Token) { .type = Token_Type_Paren });
-    dyn_array_push(fn_pattern, (Token) { .type = Token_Type_Curly });
-
     Slice source = slice_from_string_literal(
       "foo :: () -> (s64) { 42 }"
     );
@@ -81,66 +67,18 @@ spec("function") {
     check(root);
     check(root->type == Token_Type_Module);
 
-    for (u64 source_index = 0; source_index < dyn_array_length(root->children); ++source_index) {
-      Token *source_token = *dyn_array_get(root->children, source_index);
-      Token *pattern_token = dyn_array_get(fn_pattern, source_index);
-      if (pattern_token->type && pattern_token->type != source_token->type) {
-        assert(!"Mismatched pattern");
-      }
-      if (
-        pattern_token->source.length &&
-        !slice_equal(pattern_token->source, source_token->source)
-      ) {
-        assert(!"Mismatched pattern");
-      }
-    }
+    Token_Matcher_State state = {
+      .root = root,
+      .child_index = 0,
+    };
+    Token_Match_Function match_function = token_match_function_definition(&state, program_);
+    check(match_function.match);
 
-    u64 match_index = 0;
-    Slice id = (*dyn_array_get(root->children, match_index))->source;
-    check(slice_equal(id, slice_from_string_literal("foo")));
+    check(slice_equal(match_function.name, slice_from_string_literal("foo")));
 
-    // TODO check return type
-
-    Function(checker_value) {
-      Token *args = *dyn_array_get(root->children, match_index + 2);
-      check(dyn_array_length(args->children) == 0);
-
-      // FIXME do recursive expression matching
-      Token *body = *dyn_array_get(root->children, match_index + 5);
-
-      Value *body_result = 0;
-
-      if (dyn_array_length(body->children) == 1) {
-        Token *expr = *dyn_array_get(body->children, 0);
-        if (expr->type == Token_Type_Integer) {
-          Slice_Parse_S64_Result parse_result = slice_parse_s64(expr->source);
-          assert(parse_result.success);
-          assert(parse_result.value == 42);
-          body_result = value_from_s64(parse_result.value);
-        } else {
-          assert(!"Unexpected value");
-        }
-      } else {
-          assert(!"Expression of more than 1 item are not implemented");
-      }
-
-      // Patterns in precedence order
-      // _*_
-      // _+_
-      // Integer | Paren
-
-      //
-      // 42 + 3 * 2
-      //      _ * _
-      //
-      // 3
-      if (body_result) {
-        Return(body_result);
-      }
-    }
     program_end(program_);
 
-    fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = value_as_function(match_function.value, fn_type_void_to_s64);
     check(checker() == 42);
   }
 

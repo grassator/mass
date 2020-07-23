@@ -177,6 +177,32 @@ typedef struct Descriptor {
 } Descriptor;
 
 
+Descriptor descriptor_s8 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 1 },
+};
+Descriptor descriptor_s16 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 2 },
+};
+Descriptor descriptor_s32 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 4 },
+};
+Descriptor descriptor_s64 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 8 },
+};
+Descriptor descriptor_void = {
+  .type = Descriptor_Type_Void,
+};
+
+Value void_value = {
+  .descriptor = &descriptor_void,
+  .operand = { .type = Operand_Type_None },
+};
+
+
 u32
 descriptor_byte_size(
   const Descriptor *descriptor

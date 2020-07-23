@@ -1,6 +1,6 @@
 #include "prelude.h"
 #include "value.h"
-#include <stdio.h>
+#include "function.h"
 
 typedef enum {
   Token_Type_Id = 1,
@@ -287,4 +287,150 @@ tokenize(
     return (Tokenizer_Result){.type = Tokenizer_Result_Type_Error, .errors = errors};
   }
   return (Tokenizer_Result){.type = Tokenizer_Result_Type_Success, .root = root};
+}
+
+typedef struct {
+  Token *root;
+  u64 child_index;
+} Token_Matcher_State;
+
+Token *
+token_peek(
+  Token_Matcher_State *state,
+  u64 delta
+) {
+  u64 index = state->child_index + delta;
+  if (index >= dyn_array_length(state->root->children)) return 0;
+  return *dyn_array_get(state->root->children, index);
+}
+
+Token *
+token_peek_match(
+  Token_Matcher_State *state,
+  u64 delta,
+  Token *pattern_token
+) {
+  Token *source_token = token_peek(state, delta);
+  if (!source_token) return 0;
+  if (pattern_token->type && pattern_token->type != source_token->type) {
+    return 0;
+  }
+  if (
+    pattern_token->source.length &&
+    !slice_equal(pattern_token->source, source_token->source)
+  ) {
+    return 0;
+  }
+  return source_token;
+}
+
+typedef struct {
+  bool match;
+  Slice name;
+  Value *value;
+} Token_Match_Function;
+
+Descriptor *
+lookup_descriptor_type(
+  Slice name
+) {
+  if (slice_equal(slice_from_string_literal("s64"), name)) {
+    return &descriptor_s64;
+  } else if (slice_equal(slice_from_string_literal("s32"), name)) {
+    return &descriptor_s32;
+  }
+  return 0;
+}
+
+Token_Match_Function
+token_match_function_definition(
+  Token_Matcher_State *state,
+  Program *program_
+) {
+  Token_Match_Function result = {0};
+
+  u64 delta = 0;
+  Token *id = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Id });
+  if (!id) return result;
+
+  Token *colon_colon = token_peek_match(state, delta++, &(Token) {
+    .type = Token_Type_Operator,
+    .source = slice_from_string_literal("::"),
+  });
+  if (!colon_colon) return result;
+
+  Token *args = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Paren });
+  if (!args) return result;
+
+  Token *arrow = token_peek_match(state, delta++, &(Token) {
+    .type = Token_Type_Operator,
+    .source = slice_from_string_literal("->"),
+  });
+  if (!arrow) return result;
+
+  Token *return_types = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Paren });
+  if (!return_types) return result;
+
+  Token *body = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Curly });
+  if (!body) return result;
+
+  result.match = true;
+  result.name = id->source;
+
+  Function(value) {
+    if (dyn_array_length(args->children) != 0) {
+      assert(!"Not implemented");
+    }
+
+    switch (dyn_array_length(return_types->children)) {
+      case 0: {
+        value->descriptor->function.returns = &void_value;
+        break;
+      }
+      case 1: {
+        Token *return_type_token = *dyn_array_get(return_types->children, 0);
+        assert(return_type_token->type == Token_Type_Id);
+        Descriptor *descriptor = lookup_descriptor_type(return_type_token->source);
+        assert(descriptor);
+        fn_return_descriptor(builder_, descriptor);
+        break;
+      }
+      default: {
+        assert(!"Multiple return types are not supported at the moment");
+        break;
+      }
+    }
+    fn_freeze(builder_);
+
+    Value *body_result = 0;
+    if (dyn_array_length(body->children) == 1) {
+      Token *expr = *dyn_array_get(body->children, 0);
+      if (expr->type == Token_Type_Integer) {
+        Slice_Parse_S64_Result parse_result = slice_parse_s64(expr->source);
+        assert(parse_result.success);
+        assert(parse_result.value == 42);
+        body_result = value_from_s64(parse_result.value);
+      } else {
+        assert(!"Unexpected value");
+      }
+    } else {
+        assert(!"Expression of more than 1 item are not implemented");
+    }
+
+    // Patterns in precedence order
+    // _*_
+    // _+_
+    // Integer | Paren
+
+    //
+    // 42 + 3 * 2
+    //      _ * _
+    //
+    // 3
+    if (body_result) {
+      Return(body_result);
+    }
+  }
+  result.value = value;
+  return result;
 }

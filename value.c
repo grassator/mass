@@ -133,26 +133,6 @@ descriptor_byte_size(
   return 0;
 }
 
-Descriptor descriptor_s8 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1 },
-};
-Descriptor descriptor_s16 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2 },
-};
-Descriptor descriptor_s32 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4 },
-};
-Descriptor descriptor_s64 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8 },
-};
-Descriptor descriptor_void = {
-  .type = Descriptor_Type_Void,
-};
-
 
 // @Volatile @Reflection
 typedef struct {
@@ -174,11 +154,6 @@ Descriptor descriptor_struct_reflection = {
     .field_list = struct_reflection_fields,
     .field_count = countof(struct_reflection_fields),
   },
-};
-
-Value void_value = {
-  .descriptor = &descriptor_void,
-  .operand = { .type = Operand_Type_None },
 };
 
 void
