@@ -300,8 +300,7 @@ token_peek(
   u64 delta
 ) {
   u64 index = state->child_index + delta;
-  if (index >= dyn_array_length(state->root->children)) return 0;
-  return *dyn_array_get(state->root->children, index);
+  return *dyn_array_peek(state->root->children, index);
 }
 
 Token *

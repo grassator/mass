@@ -274,11 +274,10 @@ allocator_allocate_bytes(
 }
 
 #define allocator_allocate(_allocator_, _type_)\
-  (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_), sizeof(_type_))
-
+  (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_), _Alignof(_type_))
 
 #define allocator_allocate_array(_allocator_, _type_, _count_)\
-  (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_) * (_count_), sizeof(_type_))
+  (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_) * (_count_), _Alignof(_type_))
 
 inline void
 allocator_deallocate(
@@ -409,7 +408,7 @@ bucket_array_alloc_internal(
   Bucket_Array_Internal *result = allocator_allocate_bytes(
     allocator,
     allocation_size,
-    sizeof(Bucket_Array_Bucket_Internal)
+    u64_max(_Alignof(Bucket_Array_Bucket_Internal), _Alignof(Bucket_Array_Internal))
   );
   *result = (Bucket_Array_Internal) {
     .allocator = allocator,
@@ -626,6 +625,9 @@ dyn_array_bounds_check(
 #define dyn_array_get(_array_, _index_)\
   (&(_array_).data->items[dyn_array_bounds_check(_index_, (_array_).data->length)])
 
+#define dyn_array_peek(_array_, _index_)\
+  (((_index_) < (_array_).data->length) ? (&(_array_).data->items[_index_]) : 0)
+
 #define dyn_array_get_unsafe(_array_, _index_)\
   (&(_array_).data->items[_index_])
 
@@ -663,6 +665,30 @@ dyn_array_ensure_capacity(
 #define dyn_array_destroy(_array_)\
   allocator_deallocate((_array_).data->allocator, (_array_).data)
 
+inline void
+dyn_array_insert_internal(
+  Dyn_Array_Internal **internal,
+  u64 index,
+  u64 item_byte_size
+) {
+  dyn_array_ensure_capacity(internal, item_byte_size);
+  u64 original_length = (*internal)->length;
+  assert(index <= (*internal)->length);
+  ++(*internal)->length;
+  // Basically a push, so no need to memcpy
+  if (index == original_length) return;
+  s8 *source = (*internal)->items + item_byte_size * index;
+  u64 copy_size = (original_length - index) * item_byte_size;
+  memmove(source + item_byte_size, source, copy_size);
+}
+
+#define dyn_array_insert(_array_, _index_, ...)\
+  (\
+    dyn_array_insert_internal(&((_array_).internal), (_index_), sizeof((_array_).data->items[0])),\
+    ((_array_).data->items[_index_] = (__VA_ARGS__)),\
+    &(_array_).data->items[_index_]\
+  )
+
 #define dyn_array_push(_array_, ...)\
   (\
     dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0])),\
@@ -674,17 +700,30 @@ dyn_array_ensure_capacity(
   (dyn_array_length(_array_) > 0 ? &(_array_).data->items[((_array_).data->length--) - 1] : 0)
 
 inline void
+dyn_array_delete_range_internal(
+  Dyn_Array_Internal *internal,
+  u64 item_byte_size,
+  Range_u64 range
+) {
+  assert(range.from <= range.to);
+  assert(range.to <= internal->length);
+  u64 range_length = range_length(range);
+  if (range_length == 0) return;
+  s8 *from_pointer = internal->items + item_byte_size * range.from;
+  s8 *to_pointer = internal->items + item_byte_size * range.to;
+
+  u64 move_size = (item_byte_size * internal->length) - item_byte_size * range.to;
+  memmove(from_pointer, to_pointer, move_size);
+  internal->length -= range_length;
+}
+
+inline void
 dyn_array_delete_internal(
   Dyn_Array_Internal *internal,
   u64 item_byte_size,
   u64 index
 ) {
-  assert(index < internal->length);
-  u64 item_offset = item_byte_size * index;
-  s8 *item_pointer = internal->items + item_offset;
-  u64 move_size = (item_byte_size * internal->length) - item_offset - item_byte_size;
-  memmove(item_pointer, item_pointer + item_byte_size, move_size);
-  internal->length--;
+  dyn_array_delete_range_internal(internal, item_byte_size, (Range_u64){index, index + 1});
 }
 
 #define dyn_array_delete(_array_, _index_)\
@@ -692,6 +731,13 @@ dyn_array_delete_internal(
     (_array_).internal,\
     sizeof((_array_).data->items[0]),\
     (_index_)\
+  )
+
+#define dyn_array_delete_range(_array_, ...)\
+  dyn_array_delete_range_internal(\
+    (_array_).internal,\
+    sizeof((_array_).data->items[0]),\
+    (__VA_ARGS__)\
   )
 
 #define dyn_array_last(_array_)\
@@ -794,7 +840,7 @@ slice_to_c_string(
   const Allocator *allocator,
   Slice slice
 ) {
-  char *result = allocator_allocate_bytes(allocator, slice.length + 1, sizeof(char));
+  char *result = allocator_allocate_bytes(allocator, slice.length + 1, _Alignof(char));
   memcpy(result, slice.bytes, slice.length);
   result[slice.length] = 0;
   return result;
@@ -888,6 +934,71 @@ slice_equal(
 ) {
   if (a.length != b.length) return false;
   return memcmp(a.bytes, b.bytes, a.length) == 0;
+}
+
+const s8 ascii_case_insensitive_map[64] = {
+  0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, // 0x41 == 'A'
+  0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+  0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
+  0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+  0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, // 0x41 == 'A' (transformed from 'a')
+  0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+  0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57,
+  0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f
+};
+
+inline bool
+slice_ascii_case_insensitive_equal_bytes_internal(
+  const s8 *a,
+  const s8 *b,
+  u64 length
+) {
+  for (u64 i = 0; i < length; ++i) {
+    s8 a_char = a[i];
+    s8 b_char = b[i];
+    s8 is_strict_same = a_char == b_char;
+    // Both 'a' and 'A' are above 0x40 which means that if signed compare
+    // with that number is false we are definitely not dealing with letters
+    // Signed compare means that codes above 127 are negative numbers and
+    // are also excluded. This observation allows to shrink lookup table
+    // to just 64 bytes that should fit into 1 cache line on most x64 CPUs
+    s8 a_normalized = ascii_case_insensitive_map[(a_char - 0x40) & 0x3F];
+    s8 b_normalized = ascii_case_insensitive_map[(b_char - 0x40) & 0x3F];
+    s8 is_case_insensitive_same =
+      (a_char > 0x40) & (b_char > 0x40) & (a_normalized == b_normalized);
+    if (!(is_strict_same | is_case_insensitive_same)) return false;
+  }
+  return true;
+}
+
+bool
+slice_ascii_case_insensitive_equal(
+  const Slice a,
+  const Slice b
+) {
+  if (a.length != b.length) return false;
+  u64 *a_blocks = (u64 *)a.bytes;
+  u64 *b_blocks = (u64 *)b.bytes;
+  u64 block_length = a.length / sizeof(u64);
+  // Going in 8 byte blocks for happy case
+  for (u64 i = 0; i < block_length; ++i) {
+    if (a_blocks[i] != b_blocks[i]) {
+      if (!slice_ascii_case_insensitive_equal_bytes_internal(
+        (s8 *)&a_blocks[i],
+        (s8 *)&b_blocks[i],
+        sizeof(u64)
+      )) {
+        return false;
+      }
+    }
+  }
+  u64 remaining_length = a.length % sizeof(u64);
+  u64 remaining_index = a.length - remaining_length;
+  return slice_ascii_case_insensitive_equal_bytes_internal(
+    &a.bytes[remaining_index],
+    &b.bytes[remaining_index],
+    remaining_length
+  );
 }
 
 inline bool
@@ -1480,7 +1591,7 @@ fixed_buffer_make_internal(
   Fixed_Buffer *buffer = allocator_allocate_bytes(
     options->allocator,
     allocation_size,
-    sizeof(Fixed_Buffer)
+    _Alignof(Fixed_Buffer)
   );
   memset(buffer, 0, allocation_size);
   *buffer = (Fixed_Buffer) {
@@ -1499,6 +1610,13 @@ fixed_buffer_make_internal(
     __VA_ARGS__\
   })
 
+
+#define fixed_buffer_stack_make(_capacity_)\
+  &(\
+    (union { Fixed_Buffer buffer; s8 memory[sizeof(Fixed_Buffer) + (_capacity_)]; })\
+    { .buffer = { .capacity = (_capacity_) }}\
+  ).buffer
+
 inline Fixed_Buffer *
 fixed_buffer_reset(
   Fixed_Buffer *buffer
@@ -1512,7 +1630,7 @@ inline void
 fixed_buffer_destroy(
   Fixed_Buffer *buffer
 ) {
-  allocator_deallocate(buffer->allocator, buffer);
+  if (buffer->allocator) allocator_deallocate(buffer->allocator, buffer);
 }
 
 inline void *
@@ -1544,10 +1662,10 @@ fixed_buffer_as_slice(
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
 #define fixed_buffer_allocate_array(_buffer_, _type_, _count_)\
-  ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), sizeof(_type_)))
+  ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), _Alignof(_type_)))
 
 #define fixed_buffer_allocate(_buffer_, _type_)\
-  ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), sizeof(_type_)))
+  ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), _Alignof(_type_)))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   inline _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
@@ -1564,7 +1682,7 @@ fixed_buffer_append_slice(
   Slice slice
 ) {
   if (!slice.length) return (Slice) {0};
-  void *target = fixed_buffer_allocate_bytes(buffer, slice.length, sizeof(s8));
+  void *target = fixed_buffer_allocate_bytes(buffer, slice.length, _Alignof(s8));
   memcpy(target, slice.bytes, slice.length);
   return (Slice) { .bytes = target, .length = slice.length, };
 }
@@ -1701,7 +1819,7 @@ bucket_buffer_push_bucket_internal(
   return dyn_array_push(internal->buckets, (Bucket_Buffer_Bucket) {
     .occupied = 0,
     .capacity = capacity,
-    .memory = allocator_allocate_bytes(internal->allocator, capacity, 1),
+    .memory = allocator_allocate_bytes(internal->allocator, capacity, _Alignof(void *)),
   });
 }
 
@@ -1770,10 +1888,10 @@ bucket_buffer_allocate_bytes(
 }
 
 #define bucket_buffer_allocate(_buffer_, _type_)\
-  ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), sizeof(_type_)))
+  ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), _Alignof(_type_)))
 
 #define bucket_buffer_allocate_array(_buffer_, _type_, _count_)\
-  ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), sizeof(_type_)))
+  ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), _Alignof(_type_)))
 
 inline Slice
 bucket_buffer_append_slice(
