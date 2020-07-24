@@ -333,9 +333,9 @@ Descriptor *
 lookup_descriptor_type(
   Slice name
 ) {
-  if (slice_equal(slice_from_string_literal("s64"), name)) {
+  if (slice_equal(slice_literal("s64"), name)) {
     return &descriptor_s64;
-  } else if (slice_equal(slice_from_string_literal("s32"), name)) {
+  } else if (slice_equal(slice_literal("s32"), name)) {
     return &descriptor_s32;
   }
   return 0;
@@ -354,7 +354,7 @@ token_match_function_definition(
 
   Token *colon_colon = token_peek_match(state, delta++, &(Token) {
     .type = Token_Type_Operator,
-    .source = slice_from_string_literal("::"),
+    .source = slice_literal("::"),
   });
   if (!colon_colon) return result;
 
@@ -363,7 +363,7 @@ token_match_function_definition(
 
   Token *arrow = token_peek_match(state, delta++, &(Token) {
     .type = Token_Type_Operator,
-    .source = slice_from_string_literal("->"),
+    .source = slice_literal("->"),
   });
   if (!arrow) return result;
 

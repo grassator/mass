@@ -58,7 +58,7 @@ spec("function") {
   }
 
   it("should be able to parse a void -> s64 function") {
-    Slice source = slice_from_string_literal(
+    Slice source = slice_literal(
       "foo :: () -> (s64) { 42 }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
@@ -74,7 +74,7 @@ spec("function") {
     Token_Match_Function match_function = token_match_function_definition(&state, program_);
     check(match_function.match);
 
-    check(slice_equal(match_function.name, slice_from_string_literal("foo")));
+    check(slice_equal(match_function.name, slice_literal("foo")));
 
     program_end(program_);
 

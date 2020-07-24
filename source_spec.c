@@ -17,7 +17,7 @@ spec("source") {
   }
 
   it("should be able to tokenize an empty string") {
-    Slice source = slice_from_string_literal("");
+    Slice source = slice_literal("");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
@@ -28,7 +28,7 @@ spec("source") {
   }
 
   it("should be able to tokenize a comment") {
-    Slice source = slice_from_string_literal("// foo\n");
+    Slice source = slice_literal("// foo\n");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
@@ -39,7 +39,7 @@ spec("source") {
   }
 
   it("should be able to tokenize a sum of integers") {
-    Slice source = slice_from_string_literal("12 + foo123");
+    Slice source = slice_literal("12 + foo123");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
@@ -48,19 +48,19 @@ spec("source") {
 
     Token *a_num = *dyn_array_get(root->children, 0);
     check(a_num->type == Token_Type_Integer);
-    check(slice_equal(a_num->source, slice_from_string_literal("12")));
+    check(slice_equal(a_num->source, slice_literal("12")));
 
     Token *plus = *dyn_array_get(root->children, 1);
     check(plus->type == Token_Type_Operator);
-    check(slice_equal(plus->source, slice_from_string_literal("+")));
+    check(slice_equal(plus->source, slice_literal("+")));
 
     Token *id = *dyn_array_get(root->children, 2);
     check(id->type == Token_Type_Id);
-    check(slice_equal(id->source, slice_from_string_literal("foo123")));
+    check(slice_equal(id->source, slice_literal("foo123")));
   }
 
   it("should be able to tokenize groups") {
-    Slice source = slice_from_string_literal("(x)");
+    Slice source = slice_literal("(x)");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
@@ -69,24 +69,24 @@ spec("source") {
     Token *paren = *dyn_array_get(root->children, 0);
     check(paren->type == Token_Type_Paren);
     check(dyn_array_length(paren->children) == 1);
-    check(slice_equal(paren->source, slice_from_string_literal("(x)")));
+    check(slice_equal(paren->source, slice_literal("(x)")));
 
     Token *id = *dyn_array_get(paren->children, 0);
     check(id->type == Token_Type_Id);
   }
 
   it("should be able to tokenize strings") {
-    Slice source = slice_from_string_literal("\"foo 123\"");
+    Slice source = slice_literal("\"foo 123\"");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
     Token *string = *dyn_array_get(root->children, 0);
-    check(slice_equal(string->source, slice_from_string_literal("\"foo 123\"")));
+    check(slice_equal(string->source, slice_literal("\"foo 123\"")));
   }
 
   it("should be able to tokenize nested groups with different braces") {
-    Slice source = slice_from_string_literal("{[]}");
+    Slice source = slice_literal("{[]}");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
@@ -95,16 +95,16 @@ spec("source") {
     Token *curly = *dyn_array_get(root->children, 0);
     check(curly->type == Token_Type_Curly);
     check(dyn_array_length(curly->children) == 1);
-    check(slice_equal(curly->source, slice_from_string_literal("{[]}")));
+    check(slice_equal(curly->source, slice_literal("{[]}")));
 
     Token *square = *dyn_array_get(curly->children, 0);
     check(square->type == Token_Type_Square);
     check(dyn_array_length(square->children) == 0);
-    check(slice_equal(square->source, slice_from_string_literal("[]")));
+    check(slice_equal(square->source, slice_literal("[]")));
   }
 
   it("should be able to tokenize complex input") {
-    Slice source = slice_from_string_literal(
+    Slice source = slice_literal(
       "foo :: (x: s8) -> {\n"
       "  return x + 3;\n"
       "}"
@@ -116,7 +116,7 @@ spec("source") {
   }
 
   it("should report a failure when encountering a brace that is not closed") {
-    Slice source = slice_from_string_literal("(foo");
+    Slice source = slice_literal("(foo");
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);

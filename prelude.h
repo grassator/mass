@@ -613,6 +613,9 @@ dyn_array_alloc_internal(
 #define dyn_array_length(_array_)\
   ((_array_).data->length)
 
+#define dyn_array_raw(_array_)\
+  ((_array_).data->items)
+
 inline u64
 dyn_array_bounds_check(
   u64 index,
@@ -804,8 +807,11 @@ slice_from_c_string(
   };
 }
 
-#define slice_from_string_literal(_literal_)\
-  ((Slice){ .bytes = (_literal_), .length = sizeof(_literal_) - 1, })
+#define slice_literal_fields(_literal_)\
+  { .bytes = (_literal_), .length = sizeof(_literal_) - 1, }
+
+#define slice_literal(_literal_)\
+  ((Slice)slice_literal_fields(_literal_))
 
 inline bool
 slice_starts_with(
