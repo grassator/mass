@@ -329,18 +329,6 @@ typedef struct {
   Value *value;
 } Token_Match_Function;
 
-Descriptor *
-lookup_descriptor_type(
-  Slice name
-) {
-  if (slice_equal(slice_literal("s64"), name)) {
-    return &descriptor_s64;
-  } else if (slice_equal(slice_literal("s32"), name)) {
-    return &descriptor_s32;
-  }
-  return 0;
-}
-
 Token_Match_Function
 token_match_function_definition(
   Token_Matcher_State *state,
@@ -389,7 +377,11 @@ token_match_function_definition(
       case 1: {
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
         assert(return_type_token->type == Token_Type_Id);
-        Descriptor *descriptor = lookup_descriptor_type(return_type_token->source);
+        Value *type_value = scope_lookup(program_->global_scope, return_type_token->source);
+        assert(type_value);
+        assert(type_value->descriptor->type == Descriptor_Type_Type);
+
+        Descriptor *descriptor = type_value->descriptor->type_descriptor;
         assert(descriptor);
         fn_return_descriptor(builder_, descriptor);
         break;

@@ -1,5 +1,40 @@
 #include "value.h"
 
+Scope *
+scope_make(
+  Scope *parent
+) {
+  Scope *scope = temp_allocate(Scope);
+  *scope = (Scope) {
+    .parent = parent,
+    .map = hash_map_make(Scope_Map),
+  };
+  return scope;
+}
+
+Value *
+scope_lookup(
+  Scope *scope,
+  Slice name
+) {
+  while (scope) {
+    Value **result = hash_map_get(scope->map, name);
+    if (result) return *result;
+    scope = scope->parent;
+  }
+  return 0;
+}
+
+void
+scope_define(
+  Scope *scope,
+  Slice name,
+  Value *value
+) {
+  // TODO think about what should happen when trying to redefine existing thing
+  hash_map_set(scope->map, name, value);
+}
+
 inline bool
 same_value_type(
   Value *a,
@@ -58,6 +93,7 @@ same_type(
     case Descriptor_Type_Integer: {
       return descriptor_byte_size(a) == descriptor_byte_size(b);
     }
+    case Descriptor_Type_Type:
     default: {
       assert(!"Unsupported descriptor type");
       return false;
@@ -126,6 +162,7 @@ descriptor_byte_size(
     case Descriptor_Type_Function: {
       return 8;
     }
+    case Descriptor_Type_Type:
     default: {
       assert(!"Unknown Descriptor Type");
     }
@@ -628,6 +665,7 @@ c_function_return_value(
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:
     case Descriptor_Type_Struct:
+    case Descriptor_Type_Type:
     default: {
       assert(!"Unsupported return type");
     }

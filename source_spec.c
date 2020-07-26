@@ -16,6 +16,31 @@ spec("source") {
     bucket_buffer_destroy(temp_buffer);
   }
 
+  // Scope
+  it("should be able to set and lookup values") {
+    Value *test = value_from_s64(42);
+    Scope *root_scope = scope_make(0);
+    scope_define(root_scope, slice_literal("test"), test);
+    check(scope_lookup(root_scope, slice_literal("test")) == test);
+  }
+
+  it("should be able to lookup things from parent scopes") {
+    Value *global = value_from_s64(42);
+    Scope *root_scope = scope_make(0);
+    scope_define(root_scope, slice_literal("global"), global);
+
+    Value *level_1_test = value_from_s64(1);
+    Scope *scope_level_1 = scope_make(root_scope);
+    scope_define(scope_level_1, slice_literal("test"), level_1_test);
+
+    Value *level_2_test = value_from_s64(1);
+    Scope *scope_level_2 = scope_make(scope_level_1);
+    scope_define(scope_level_2, slice_literal("test"), level_2_test);
+
+    check(scope_lookup(scope_level_2, slice_literal("global")) == global);
+  }
+
+  // Tokenizer
   it("should be able to tokenize an empty string") {
     Slice source = slice_literal("");
     Tokenizer_Result result = tokenize("_test_.mass", source);

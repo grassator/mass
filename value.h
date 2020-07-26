@@ -128,6 +128,7 @@ typedef enum {
   Descriptor_Type_Function,
   Descriptor_Type_Struct,
   Descriptor_Type_Tagged_Union,
+  Descriptor_Type_Type
 } Descriptor_Type;
 
 typedef struct Descriptor_Function {
@@ -173,6 +174,7 @@ typedef struct Descriptor {
     Descriptor_Struct struct_;
     Descriptor_Tagged_Union tagged_union;
     struct Descriptor *pointer_to;
+    struct Descriptor *type_descriptor;
   };
 } Descriptor;
 
@@ -288,6 +290,13 @@ typedef struct {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
+hash_map_slice_template(Scope_Map, Value *)
+
+typedef struct Scope {
+  struct Scope *parent;
+  Scope_Map *map;
+} Scope;
+
 typedef struct _Program {
   Fixed_Buffer *data_buffer;
   Array_Import_Library import_libraries;
@@ -295,6 +304,7 @@ typedef struct _Program {
   Array_Function_Builder functions;
   s64 code_base_rva;
   s64 data_base_rva;
+  Scope *global_scope;
 } Program;
 
 typedef struct {
