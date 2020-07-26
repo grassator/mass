@@ -78,7 +78,7 @@ spec("function") {
     bucket_buffer_destroy(temp_buffer);
   }
 
-  it("should be able to parse a void -> s64 function") {
+  it("should be able to parse and run a void -> s64 function") {
     Slice source = slice_literal(
       "foo :: () -> (s64) { 42 }"
     );
@@ -88,19 +88,38 @@ spec("function") {
     check(root);
     check(root->type == Token_Type_Module);
 
-    Token_Matcher_State state = {
-      .root = root,
-      .child_index = 0,
-    };
-    Token_Match_Function match_function = token_match_function_definition(&state, program_);
-    check(match_function.match);
+    Token_Matcher_State state = { .root = root, .child_index = 0 };
+    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
+    check(match_function);
 
-    check(slice_equal(match_function.name, slice_literal("foo")));
+    check(slice_equal(match_function->name, slice_literal("foo")));
 
     program_end(program_);
 
-    fn_type_void_to_s64 checker = value_as_function(match_function.value, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = value_as_function(match_function->value, fn_type_void_to_s64);
     check(checker() == 42);
+  }
+
+  it("should be able to parse and run a s64 -> s64 function") {
+    Slice source = slice_literal(
+      "foo :: (x : s64) -> (s64) { x }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+    Token *root = result.root;
+    check(root);
+    check(root->type == Token_Type_Module);
+
+    Token_Matcher_State state = { .root = root, .child_index = 0 };
+    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
+    check(match_function);
+
+    check(slice_equal(match_function->name, slice_literal("foo")));
+
+    program_end(program_);
+
+    fn_type_s64_to_s64 checker = value_as_function(match_function->value, fn_type_s64_to_s64);
+    check(checker(42) == 42);
   }
 
   it("should write out an executable that exits with status code 42") {

@@ -323,50 +323,79 @@ token_peek_match(
   return source_token;
 }
 
+Descriptor *
+program_lookup_type(
+  Program *program,
+  Slice type_name
+) {
+  Value *type_value = scope_lookup(program->global_scope, type_name);
+  assert(type_value);
+  assert(type_value->descriptor->type == Descriptor_Type_Type);
+  Descriptor *descriptor = type_value->descriptor->type_descriptor;
+  assert(descriptor);
+  return descriptor;
+}
+
 typedef struct {
-  bool match;
+  Slice arg_name;
+  Slice type_name;
+} Token_Match_Arg;
+
+#define Token_Match(_id_, ...)\
+  Token *(_id_) = token_peek_match(state, peek_index++, &(Token) { __VA_ARGS__ });\
+  if (!(_id_)) return 0
+
+#define Token_Match_Operator(_id_, _op_)\
+  Token_Match(_id_, .type = Token_Type_Operator, .source = slice_literal(_op_))
+
+
+Token_Match_Arg *
+token_match_argument(
+  Token_Matcher_State *state,
+  Program *program_
+) {
+  u64 peek_index = 0;
+  Token_Match(arg_id, .type = Token_Type_Id);
+  Token_Match_Operator(arg_colon, ":");
+  Token_Match(arg_type, .type = Token_Type_Id);
+
+  Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
+  *result = (Token_Match_Arg) {
+    .arg_name = arg_id->source,
+    .type_name = arg_type->source,
+  };
+  return result;
+}
+
+typedef struct {
   Slice name;
   Value *value;
 } Token_Match_Function;
 
-Token_Match_Function
+Token_Match_Function *
 token_match_function_definition(
   Token_Matcher_State *state,
   Program *program_
 ) {
-  Token_Match_Function result = {0};
+  u64 peek_index = 0;
 
-  u64 delta = 0;
-  Token *id = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Id });
-  if (!id) return result;
+  Token_Match(id, .type = Token_Type_Id);
+  Token_Match_Operator(colon_colon, "::");
+  Token_Match(args, .type = Token_Type_Paren);
+  Token_Match_Operator(colon_colon, "->");
+  Token_Match(return_types, .type = Token_Type_Paren);
+  Token_Match(body, .type = Token_Type_Curly);
 
-  Token *colon_colon = token_peek_match(state, delta++, &(Token) {
-    .type = Token_Type_Operator,
-    .source = slice_literal("::"),
-  });
-  if (!colon_colon) return result;
-
-  Token *args = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Paren });
-  if (!args) return result;
-
-  Token *arrow = token_peek_match(state, delta++, &(Token) {
-    .type = Token_Type_Operator,
-    .source = slice_literal("->"),
-  });
-  if (!arrow) return result;
-
-  Token *return_types = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Paren });
-  if (!return_types) return result;
-
-  Token *body = token_peek_match(state, delta++, &(Token) { .type = Token_Type_Curly });
-  if (!body) return result;
-
-  result.match = true;
-  result.name = id->source;
+  Scope *function_scope = scope_make(program_->global_scope);
 
   Function(value) {
     if (dyn_array_length(args->children) != 0) {
-      assert(!"Not implemented");
+      Token_Matcher_State args_state = { .root = args };
+      Token_Match_Arg *arg = token_match_argument(&args_state, program_);
+      if (arg) {
+        Arg(arg_value, program_lookup_type(program_, arg->type_name));
+        scope_define(function_scope, arg->arg_name, arg_value);
+      }
     }
 
     switch (dyn_array_length(return_types->children)) {
@@ -377,13 +406,8 @@ token_match_function_definition(
       case 1: {
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
         assert(return_type_token->type == Token_Type_Id);
-        Value *type_value = scope_lookup(program_->global_scope, return_type_token->source);
-        assert(type_value);
-        assert(type_value->descriptor->type == Descriptor_Type_Type);
 
-        Descriptor *descriptor = type_value->descriptor->type_descriptor;
-        assert(descriptor);
-        fn_return_descriptor(builder_, descriptor);
+        fn_return_descriptor(builder_, program_lookup_type(program_, return_type_token->source));
         break;
       }
       default: {
@@ -401,6 +425,10 @@ token_match_function_definition(
         assert(parse_result.success);
         assert(parse_result.value == 42);
         body_result = value_from_s64(parse_result.value);
+      } else if (expr->type == Token_Type_Id) {
+        Value *var = scope_lookup(function_scope, expr->source);
+        assert(var);
+        body_result = var;
       } else {
         assert(!"Unexpected value");
       }
@@ -422,6 +450,11 @@ token_match_function_definition(
       Return(body_result);
     }
   }
-  result.value = value;
-  return result;
+
+  Token_Match_Function *function = temp_allocate(Token_Match_Function);
+  *function = (Token_Match_Function) {
+    .name = id->source,
+    .value = value,
+  };
+  return function;
 }
