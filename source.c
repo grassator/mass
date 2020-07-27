@@ -11,6 +11,7 @@ typedef enum {
   Token_Type_Square,
   Token_Type_Curly,
   Token_Type_Module,
+  Token_Type_Value,
 } Token_Type;
 
 struct Token;
@@ -20,7 +21,10 @@ typedef struct Token {
   struct Token *parent;
   Token_Type type;
   Slice source;
-  Array_Token_Ptr children;
+  union {
+    Array_Token_Ptr children;
+    Value *value;
+  };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
 
@@ -202,6 +206,7 @@ tokenize(
               assert(ch == ']');
               break;
             }
+            case Token_Type_Value:
             case Token_Type_Id:
             case Token_Type_Integer:
             case Token_Type_Operator:
@@ -300,7 +305,9 @@ token_peek(
   u64 delta
 ) {
   u64 index = state->child_index + delta;
-  return *dyn_array_peek(state->root->children, index);
+  Token **peek = dyn_array_peek(state->root->children, index);
+  if (!peek) return 0;
+  return *peek;
 }
 
 Token *
@@ -341,8 +348,11 @@ typedef struct {
   Slice type_name;
 } Token_Match_Arg;
 
-#define Token_Match(_id_, ...)\
+#define Maybe_Token_Match(_id_, ...)\
   Token *(_id_) = token_peek_match(state, peek_index++, &(Token) { __VA_ARGS__ });\
+
+#define Token_Match(_id_, ...)\
+  Maybe_Token_Match(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
@@ -358,6 +368,9 @@ token_match_argument(
   Token_Match(arg_id, .type = Token_Type_Id);
   Token_Match_Operator(arg_colon, ":");
   Token_Match(arg_type, .type = Token_Type_Id);
+  Maybe_Token_Match(comma, .type = Token_Type_Operator, .source = slice_literal(","));
+  if (!comma) peek_index--;
+  state->child_index += peek_index;
 
   Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
   *result = (Token_Match_Arg) {
@@ -365,6 +378,89 @@ token_match_argument(
     .type_name = arg_type->source,
   };
   return result;
+}
+
+Value *
+token_match_expression(
+  Token_Matcher_State *state,
+  Program *program_,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+
+  if (!dyn_array_length(state->root->children)) {
+    return 0;
+  }
+
+  // [Int_Token{42}] -> [Value_Token{Value{42}}]
+  bool did_replace = false;
+  do {
+    did_replace = false;
+    for (u64 i = 0; i < dyn_array_length(state->root->children); ++i) {
+      Token *expr = *dyn_array_get(state->root->children, i);
+      if (expr->type == Token_Type_Integer) {
+        Slice_Parse_S64_Result parse_result = slice_parse_s64(expr->source);
+        assert(parse_result.success);
+        assert(parse_result.value == 42);
+        Token *result_token = temp_allocate(Token);
+        *result_token = (Token){
+          .type = Token_Type_Value,
+          .parent = expr->parent,
+          .source = expr->source,
+          .value = value_from_s64(parse_result.value),
+        };
+        *dyn_array_get(state->root->children, i) = result_token;
+        did_replace |= true;
+        break;
+      } else if (expr->type == Token_Type_Id) {
+        Value *var = scope_lookup(scope, expr->source);
+        Token *result_token = temp_allocate(Token);
+        *result_token = (Token){
+          .type = Token_Type_Value,
+          .parent = expr->parent,
+          .source = expr->source,
+          .value = var,
+        };
+        *dyn_array_get(state->root->children, i) = result_token;
+        did_replace |= true;
+        break;
+      }
+    }
+  } while (did_replace);
+
+  do {
+    did_replace = false;
+    for (u64 i = 0; i < dyn_array_length(state->root->children); ++i) {
+      Token *expr = *dyn_array_get(state->root->children, i);
+      if (
+        (i > 0) && ((i + 1) < dyn_array_length(state->root->children)) &&
+        expr->type == Token_Type_Operator && slice_equal(expr->source, slice_literal("+"))
+      ) {
+        Token *lhs = *dyn_array_get(state->root->children, i - 1);
+        assert(lhs->type == Token_Type_Value);
+        Token *rhs = *dyn_array_get(state->root->children, i + 1);
+        assert(rhs->type == Token_Type_Value);
+
+        Value *result = Plus(lhs->value, rhs->value);
+        Token *result_token = temp_allocate(Token);
+        *result_token = (Token){
+          .type = Token_Type_Value,
+          .parent = expr->parent,
+          .source = expr->source,
+          .value = result,
+        };
+        *dyn_array_get(state->root->children, i - 1) = result_token;
+        dyn_array_delete_range(state->root->children, (Range_u64){i, i + 2});
+        did_replace |= true;
+        break;
+      }
+    }
+  } while (did_replace);
+
+  assert(dyn_array_length(state->root->children) == 1);
+  Token *result = *dyn_array_get(state->root->children, 0);
+  assert(result->type == Token_Type_Value);
+  return result->value;
 }
 
 typedef struct {
@@ -382,7 +478,7 @@ token_match_function_definition(
   Token_Match(id, .type = Token_Type_Id);
   Token_Match_Operator(colon_colon, "::");
   Token_Match(args, .type = Token_Type_Paren);
-  Token_Match_Operator(colon_colon, "->");
+  Token_Match_Operator(arrow, "->");
   Token_Match(return_types, .type = Token_Type_Paren);
   Token_Match(body, .type = Token_Type_Curly);
 
@@ -391,11 +487,17 @@ token_match_function_definition(
   Function(value) {
     if (dyn_array_length(args->children) != 0) {
       Token_Matcher_State args_state = { .root = args };
-      Token_Match_Arg *arg = token_match_argument(&args_state, program_);
-      if (arg) {
-        Arg(arg_value, program_lookup_type(program_, arg->type_name));
-        scope_define(function_scope, arg->arg_name, arg_value);
-      }
+
+      u64 prev_child_index = 0;
+      do {
+        prev_child_index = args_state.child_index;
+        Token_Match_Arg *arg = token_match_argument(&args_state, program_);
+        if (arg) {
+          Arg(arg_value, program_lookup_type(program_, arg->type_name));
+          scope_define(function_scope, arg->arg_name, arg_value);
+        }
+      } while (prev_child_index != args_state.child_index);
+      assert(args_state.child_index == dyn_array_length(args->children));
     }
 
     switch (dyn_array_length(return_types->children)) {
@@ -417,35 +519,11 @@ token_match_function_definition(
     }
     fn_freeze(builder_);
 
-    Value *body_result = 0;
-    if (dyn_array_length(body->children) == 1) {
-      Token *expr = *dyn_array_get(body->children, 0);
-      if (expr->type == Token_Type_Integer) {
-        Slice_Parse_S64_Result parse_result = slice_parse_s64(expr->source);
-        assert(parse_result.success);
-        assert(parse_result.value == 42);
-        body_result = value_from_s64(parse_result.value);
-      } else if (expr->type == Token_Type_Id) {
-        Value *var = scope_lookup(function_scope, expr->source);
-        assert(var);
-        body_result = var;
-      } else {
-        assert(!"Unexpected value");
-      }
-    } else {
-        assert(!"Expression of more than 1 item are not implemented");
-    }
+    Token_Matcher_State body_state = { .root = body };
+    Value *body_result = token_match_expression(
+      &body_state, program_, function_scope, builder_
+    );
 
-    // Patterns in precedence order
-    // _*_
-    // _+_
-    // Integer | Paren
-
-    //
-    // 42 + 3 * 2
-    //      _ * _
-    //
-    // 3
     if (body_result) {
       Return(body_result);
     }

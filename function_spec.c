@@ -122,6 +122,24 @@ spec("function") {
     check(checker(42) == 42);
   }
 
+  it("should be able to parse and run a plus function") {
+    Slice source = slice_literal(
+      "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+    Token *root = result.root;
+
+    Token_Matcher_State state = { .root = root, .child_index = 0 };
+    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
+
+    program_end(program_);
+
+    fn_type_s64_s64_s64_to_s64 checker =
+      value_as_function(match_function->value, fn_type_s64_s64_s64_to_s64);
+    check(checker(30, 10, 2) == 42);
+  }
+
   it("should write out an executable that exits with status code 42") {
     Value *ExitProcess_value = c_function_import(program_, "kernel32.dll", "s64 ExitProcess(s32)");
 
