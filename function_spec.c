@@ -84,19 +84,14 @@ spec("function") {
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
 
-    Token_Matcher_State state = { .root = root, .child_index = 0 };
-    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
-    check(match_function);
-
-    check(slice_equal(match_function->name, slice_literal("foo")));
-
+    token_match_module(result.root, program_);
     program_end(program_);
 
-    fn_type_void_to_s64 checker = value_as_function(match_function->value, fn_type_void_to_s64);
+    Value *foo = scope_lookup(program_->global_scope, slice_literal("foo"));
+    assert(foo);
+
+    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
     check(checker() == 42);
   }
 
@@ -106,19 +101,14 @@ spec("function") {
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
 
-    Token_Matcher_State state = { .root = root, .child_index = 0 };
-    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
-    check(match_function);
-
-    check(slice_equal(match_function->name, slice_literal("foo")));
-
+    token_match_module(result.root, program_);
     program_end(program_);
 
-    fn_type_s64_to_s64 checker = value_as_function(match_function->value, fn_type_s64_to_s64);
+    Value *foo = scope_lookup(program_->global_scope, slice_literal("foo"));
+    assert(foo);
+
+    fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
     check(checker(42) == 42);
   }
 
@@ -128,16 +118,38 @@ spec("function") {
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
 
-    Token_Matcher_State state = { .root = root, .child_index = 0 };
-    Token_Match_Function *match_function = token_match_function_definition(&state, program_);
-
+    token_match_module(result.root, program_);
     program_end(program_);
 
+    Value *plus = scope_lookup(program_->global_scope, slice_literal("plus"));
+    assert(plus);
+
     fn_type_s64_s64_s64_to_s64 checker =
-      value_as_function(match_function->value, fn_type_s64_s64_s64_to_s64);
+      value_as_function(plus, fn_type_s64_s64_s64_to_s64);
     check(checker(30, 10, 2) == 42);
+  }
+
+  it("should be able to parse and run multiple function definitions") {
+    Slice source = slice_literal(
+      "one :: () -> (s64) { 1 }"
+      "two :: () -> (s64) { 2 }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+    program_end(program_);
+
+    Value *one = scope_lookup(program_->global_scope, slice_literal("one"));
+    assert(one);
+
+    check(value_as_function(one, fn_type_void_to_s64)() == 1);
+
+    Value *two = scope_lookup(program_->global_scope, slice_literal("two"));
+    assert(two);
+
+    check(value_as_function(two, fn_type_void_to_s64)() == 2);
   }
 
   it("should write out an executable that exits with status code 42") {
