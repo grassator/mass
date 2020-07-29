@@ -611,22 +611,11 @@ call_function_overload(
 }
 
 Value *
-call_function_value(
+call_function_value_array(
   Function_Builder *builder,
   Value *to_call,
-  ...
+  Array_Value_Ptr arguments
 ) {
-  assert(to_call);
-  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator);
-  {
-    va_list va_values;
-    va_start(va_values, to_call);
-    for(;;) {
-      Value *arg = va_arg(va_values, Value *);
-      if (!arg) break;
-      dyn_array_push(arguments, arg);
-    }
-  }
   for (;to_call; to_call = to_call->descriptor->function.next_overload) {
     Descriptor_Function *descriptor = &to_call->descriptor->function;
     if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
@@ -646,6 +635,26 @@ call_function_value(
   dyn_array_destroy(arguments);
   assert(!"No matching overload found");
   return 0;
+}
+
+Value *
+call_function_value(
+  Function_Builder *builder,
+  Value *to_call,
+  ...
+) {
+  assert(to_call);
+  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator);
+  {
+    va_list va_values;
+    va_start(va_values, to_call);
+    for(;;) {
+      Value *arg = va_arg(va_values, Value *);
+      if (!arg) break;
+      dyn_array_push(arguments, arg);
+    }
+  }
+  return call_function_value_array(builder, to_call, arguments);
 }
 
 Value *

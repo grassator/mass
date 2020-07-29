@@ -12,10 +12,18 @@ typedef enum {
   Token_Type_Curly,
   Token_Type_Module,
   Token_Type_Value,
+  Token_Type_Lazy_Function_Definition,
 } Token_Type;
 
-struct Token;
-typedef dyn_array_type(struct Token *) Array_Token_Ptr;
+typedef struct Token Token;
+typedef dyn_array_type(Token *) Array_Token_Ptr;
+
+typedef struct {
+  Token *args;
+  Token *return_types;
+  Token *body;
+  Program *program;
+} Lazy_Function_Definition;
 
 typedef struct Token {
   struct Token *parent;
@@ -24,6 +32,7 @@ typedef struct Token {
   union {
     Array_Token_Ptr children;
     Value *value;
+    Lazy_Function_Definition lazy_function_definition;
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
@@ -36,6 +45,106 @@ typedef enum {
   Tokenizer_State_String,
   Tokenizer_State_Single_Line_Comment,
 } Tokenizer_State;
+
+typedef enum {
+  Scope_Entry_Type_Value = 1,
+  Scope_Entry_Type_Lazy,
+} Scope_Entry_Type;
+
+typedef struct {
+  Scope_Entry_Type type;
+  union {
+    Value *value;
+    Token *token;
+  };
+} Scope_Entry;
+
+hash_map_slice_template(Scope_Map, Scope_Entry)
+
+typedef struct Scope {
+  struct Scope *parent;
+  Scope_Map *map;
+} Scope;
+
+
+Scope *
+scope_make(
+  Scope *parent
+) {
+  Scope *scope = temp_allocate(Scope);
+  *scope = (Scope) {
+    .parent = parent,
+    .map = hash_map_make(Scope_Map),
+  };
+  return scope;
+}
+
+Scope_Entry *
+scope_lookup(
+  Scope *scope,
+  Slice name
+) {
+  while (scope) {
+    Scope_Entry *result = hash_map_get(scope->map, name);
+    if (result) return result;
+    scope = scope->parent;
+  }
+  return 0;
+}
+
+Value *
+token_force_value(
+  Token *token,
+  Scope *scope
+);
+
+Value *
+scope_lookup_force(
+  Scope *scope,
+  Slice name
+) {
+  Scope_Entry *entry = scope_lookup(scope, name);
+  assert(entry);
+  switch(entry->type) {
+    case Scope_Entry_Type_Value: {
+      return entry->value;
+      break;
+    }
+    case Scope_Entry_Type_Lazy: {
+      return token_force_value(entry->token, scope);
+    }
+  }
+  assert(!"Not reached");
+  return 0;
+}
+
+void
+scope_define_value(
+  Scope *scope,
+  Slice name,
+  Value *value
+) {
+  // TODO think about what should happen when trying to redefine existing thing
+  Scope_Entry entry = {
+    .type = Scope_Entry_Type_Value,
+    .value = value,
+  };
+  hash_map_set(scope->map, name, entry);
+}
+
+void
+scope_define_lazy(
+  Scope *scope,
+  Slice name,
+  Token *token
+) {
+  // TODO think about what should happen when trying to redefine existing thing
+  Scope_Entry entry = {
+    .type = Scope_Entry_Type_Lazy,
+    .token = token,
+  };
+  hash_map_set(scope->map, name, entry);
+}
 
 bool
 code_point_is_operator(
@@ -210,6 +319,7 @@ tokenize(
             case Token_Type_Id:
             case Token_Type_Integer:
             case Token_Type_Operator:
+            case Token_Type_Lazy_Function_Definition:
             case Token_Type_String:
             case Token_Type_Module: {
               assert(!"Internal Tokenizer Error: Unexpected closing char for group");
@@ -335,10 +445,11 @@ program_lookup_type(
   Program *program,
   Slice type_name
 ) {
-  Value *type_value = scope_lookup(program->global_scope, type_name);
-  assert(type_value);
-  assert(type_value->descriptor->type == Descriptor_Type_Type);
-  Descriptor *descriptor = type_value->descriptor->type_descriptor;
+  Scope_Entry *entry = scope_lookup(program->global_scope, type_name);
+  assert(entry);
+  assert(entry->type == Scope_Entry_Type_Value);
+  assert(entry->value->descriptor->type == Descriptor_Type_Type);
+  Descriptor *descriptor = entry->value->descriptor->type_descriptor;
   assert(descriptor);
   return descriptor;
 }
@@ -381,6 +492,11 @@ token_match_argument(
 }
 
 Value *
+token_force_lazy_function_definition(
+  Lazy_Function_Definition *lazy_function_definition
+);
+
+Value *
 token_force_value(
   Token *token,
   Scope *scope
@@ -391,9 +507,11 @@ token_force_value(
     assert(parse_result.success);
     result_value = value_from_s64(parse_result.value);
   } else if (token->type == Token_Type_Id) {
-    result_value = scope_lookup(scope, token->source);
+    result_value = scope_lookup_force(scope, token->source);
   } else if (token->type == Token_Type_Value) {
     result_value = token->value;
+  } else if (token->type == Token_Type_Lazy_Function_Definition) {
+    return token_force_lazy_function_definition(&token->lazy_function_definition);
   } else {
     assert(!"Not implemented");
   }
@@ -401,53 +519,145 @@ token_force_value(
   return result_value;
 }
 
-Value *
-token_match_expression(
-  Token *root,
+Array_Value_Ptr
+token_match_call_arguments(
+  Token *token,
   Scope *scope,
   Function_Builder *builder_
 ) {
-  assert(root->type == Token_Type_Paren || root->type == Token_Type_Curly);
+  // FIXME implement this;
+  assert(dyn_array_length(token->children) == 0);
+  return dyn_array_make(Array_Value_Ptr);
+}
 
-  if (!dyn_array_length(root->children)) {
+Token *
+token_value_make(
+  Token *original,
+  Value *result
+) {
+  Token *result_token = temp_allocate(Token);
+  *result_token = (Token){
+    .type = Token_Type_Value,
+    .parent = original->parent,
+    .source = original->source, // TODO should encompass the whole sub-expression
+    .value = result,
+  };
+  return result_token;
+}
+
+Value *
+token_match_expression(
+  Token *token,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  assert(token->type == Token_Type_Paren || token->type == Token_Type_Curly);
+
+  if (!dyn_array_length(token->children)) {
     return 0;
   }
 
+  // Match Function Calls
+  Token_Matcher_State *state = &(Token_Matcher_State) {.root = token};
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(root->children); ++i) {
-      Token *expr = *dyn_array_get(root->children, i);
-      if (
-        (i > 0) && ((i + 1) < dyn_array_length(root->children)) &&
-        expr->type == Token_Type_Operator && slice_equal(expr->source, slice_literal("+"))
-      ) {
-        Value *lhs = token_force_value(*dyn_array_get(root->children, i - 1), scope);
-        Value *rhs = token_force_value(*dyn_array_get(root->children, i + 1), scope);
+    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
+      state->child_index = i;
+      Token *args_token = token_peek_match(state, 1, &(Token) { .type = Token_Type_Paren, });
+      if (!args_token) continue;
+      Token *maybe_target = token_peek(state, 0);
+      if (maybe_target->type != Token_Type_Id && maybe_target->type != Token_Type_Paren) continue;
 
-        Value *result = Plus(lhs, rhs);
-        Token *result_token = temp_allocate(Token);
-        *result_token = (Token){
-          .type = Token_Type_Value,
-          .parent = expr->parent,
-          .source = expr->source,
-          .value = result,
-        };
-        *dyn_array_get(root->children, i - 1) = result_token;
-        dyn_array_delete_range(root->children, (Range_u64){i, i + 2});
-        did_replace |= true;
-        break;
-      }
+      Value *target = token_force_value(maybe_target, scope);
+      Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder_);
+
+      Value *result = call_function_value_array(builder_, target, args);
+      Token *result_token = token_value_make(args_token, result);
+
+      *dyn_array_get(token->children, i) = result_token;
+      dyn_array_delete(token->children, i + 1);
+      did_replace |= true;
     }
   };
 
-  assert(dyn_array_length(root->children) == 1);
-  return token_force_value(*dyn_array_get(root->children, 0), scope);
+  state = &(Token_Matcher_State) {.root = token};
+  for (bool did_replace = true; did_replace;) {
+    did_replace = false;
+    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
+      state->child_index = i;
+      Token *plus_token = token_peek_match(state, 1, &(Token) {
+        .type = Token_Type_Operator,
+        .source = slice_literal("+"),
+      });
+      if (!plus_token) continue;
+
+      Value *lhs = token_force_value(token_peek(state, 0), scope);
+      Value *rhs = token_force_value(token_peek(state, 2), scope);
+
+      Value *result = Plus(lhs, rhs);
+      Token *result_token = token_value_make(plus_token, result);
+      *dyn_array_get(token->children, i) = result_token;
+      dyn_array_delete_range(token->children, (Range_u64){i + 1, i + 3});
+      did_replace |= true;
+    }
+  };
+
+  assert(dyn_array_length(token->children) == 1);
+  return token_force_value(*dyn_array_get(token->children, 0), scope);
 }
 
-typedef struct {
-  Slice name;
-  Value *value;
-} Token_Match_Function;
+Value *
+token_force_lazy_function_definition(
+  Lazy_Function_Definition *lazy_function_definition
+) {
+  Token *args = lazy_function_definition->args;
+  Token *return_types = lazy_function_definition->return_types;
+  Token *body = lazy_function_definition->body;
+  Program *program_ = lazy_function_definition->program;
+  Scope *function_scope = scope_make(program_->global_scope);
+  Function(value) {
+    if (dyn_array_length(args->children) != 0) {
+      Token_Matcher_State args_state = { .root = args };
+
+      u64 prev_child_index = 0;
+      do {
+        prev_child_index = args_state.child_index;
+        Token_Match_Arg *arg = token_match_argument(&args_state, program_);
+        if (arg) {
+          Arg(arg_value, program_lookup_type(program_, arg->type_name));
+          scope_define_value(function_scope, arg->arg_name, arg_value);
+        }
+      } while (prev_child_index != args_state.child_index);
+      assert(args_state.child_index == dyn_array_length(args->children));
+    }
+
+    switch (dyn_array_length(return_types->children)) {
+      case 0: {
+        value->descriptor->function.returns = &void_value;
+        break;
+      }
+      case 1: {
+        Token *return_type_token = *dyn_array_get(return_types->children, 0);
+        assert(return_type_token->type == Token_Type_Id);
+
+        fn_return_descriptor(builder_, program_lookup_type(program_, return_type_token->source));
+        break;
+      }
+      default: {
+        assert(!"Multiple return types are not supported at the moment");
+        break;
+      }
+    }
+    fn_freeze(builder_);
+
+    Value *body_result = token_match_expression(body, function_scope, builder_);
+
+    if (body_result) {
+      Return(body_result);
+    }
+  }
+  return value;
+}
 
 void
 token_match_module(
@@ -472,61 +682,22 @@ token_match_module(
       Token *args = token_peek_match(state, 0, &(Token) { .type = Token_Type_Paren });
       Token *return_types = token_peek_match(state, 2, &(Token) { .type = Token_Type_Paren });
       Token *body = token_peek_match(state, 3, &(Token) { .type = Token_Type_Curly });
-
       // TODO show proper error to the user
       assert(args);
       assert(return_types);
       assert(body);
 
-      Scope *function_scope = scope_make(program_->global_scope);
-
-      Function(value) {
-        if (dyn_array_length(args->children) != 0) {
-          Token_Matcher_State args_state = { .root = args };
-
-          u64 prev_child_index = 0;
-          do {
-            prev_child_index = args_state.child_index;
-            Token_Match_Arg *arg = token_match_argument(&args_state, program_);
-            if (arg) {
-              Arg(arg_value, program_lookup_type(program_, arg->type_name));
-              scope_define(function_scope, arg->arg_name, arg_value);
-            }
-          } while (prev_child_index != args_state.child_index);
-          assert(args_state.child_index == dyn_array_length(args->children));
-        }
-
-        switch (dyn_array_length(return_types->children)) {
-          case 0: {
-            value->descriptor->function.returns = &void_value;
-            break;
-          }
-          case 1: {
-            Token *return_type_token = *dyn_array_get(return_types->children, 0);
-            assert(return_type_token->type == Token_Type_Id);
-
-            fn_return_descriptor(builder_, program_lookup_type(program_, return_type_token->source));
-            break;
-          }
-          default: {
-            assert(!"Multiple return types are not supported at the moment");
-            break;
-          }
-        }
-        fn_freeze(builder_);
-
-        Value *body_result = token_match_expression(body, function_scope, builder_);
-
-        if (body_result) {
-          Return(body_result);
-        }
-      }
       Token *result_token = temp_allocate(Token);
       *result_token = (Token){
-        .type = Token_Type_Value,
+        .type = Token_Type_Lazy_Function_Definition,
         .parent = token->parent,
         .source = token->source,
-        .value = value,
+        .lazy_function_definition = {
+          .args = args,
+          .return_types = return_types,
+          .body = body,
+          .program = program_,
+        },
       };
 
       *dyn_array_get(token->children, i) = result_token;
@@ -545,13 +716,10 @@ token_match_module(
         .source = slice_literal("::"),
       });
       if (!define) continue;
-
       Token *name = token_peek_match(state, 0, &(Token) { .type = Token_Type_Id });
-      Value *value = token_force_value(
-        token_peek_match(state, 2, &(Token) {0}),
-        program_->global_scope
-      );
-      scope_define(program_->global_scope, name->source, value);
+      Token *value = token_peek(state, 2);
+      assert(value);
+      scope_define_lazy(program_->global_scope, name->source, value);
 
       dyn_array_delete_range(token->children, (Range_u64){i, i + 3});
       did_replace |= true;

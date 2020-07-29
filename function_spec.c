@@ -67,8 +67,8 @@ spec("function") {
     };
     program_ = &test_program;
 
-    scope_define(test_program.global_scope, slice_literal("s64"), type_s64_value);
-    scope_define(test_program.global_scope, slice_literal("s32"), type_s32_value);
+    scope_define_value(test_program.global_scope, slice_literal("s64"), type_s64_value);
+    scope_define_value(test_program.global_scope, slice_literal("s32"), type_s32_value);
   }
 
   after_each() {
@@ -86,10 +86,11 @@ spec("function") {
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
-    program_end(program_);
 
-    Value *foo = scope_lookup(program_->global_scope, slice_literal("foo"));
+    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"));
     assert(foo);
+
+    program_end(program_);
 
     fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
     check(checker() == 42);
@@ -103,10 +104,11 @@ spec("function") {
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
-    program_end(program_);
 
-    Value *foo = scope_lookup(program_->global_scope, slice_literal("foo"));
+    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"));
     assert(foo);
+
+    program_end(program_);
 
     fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
     check(checker(42) == 42);
@@ -120,10 +122,11 @@ spec("function") {
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
-    program_end(program_);
 
-    Value *plus = scope_lookup(program_->global_scope, slice_literal("plus"));
+    Value *plus = scope_lookup_force(program_->global_scope, slice_literal("plus"));
     assert(plus);
+
+    program_end(program_);
 
     fn_type_s64_s64_s64_to_s64 checker =
       value_as_function(plus, fn_type_s64_s64_s64_to_s64);
@@ -132,24 +135,20 @@ spec("function") {
 
   it("should be able to parse and run multiple function definitions") {
     Slice source = slice_literal(
+      "proxy :: () -> (s64) { one() }"
       "one :: () -> (s64) { 1 }"
-      "two :: () -> (s64) { 2 }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
+
+    Value *proxy = scope_lookup_force(program_->global_scope, slice_literal("proxy"));
+    assert(proxy);
+
     program_end(program_);
 
-    Value *one = scope_lookup(program_->global_scope, slice_literal("one"));
-    assert(one);
-
-    check(value_as_function(one, fn_type_void_to_s64)() == 1);
-
-    Value *two = scope_lookup(program_->global_scope, slice_literal("two"));
-    assert(two);
-
-    check(value_as_function(two, fn_type_void_to_s64)() == 2);
+    check(value_as_function(proxy, fn_type_void_to_s64)() == 1);
   }
 
   it("should write out an executable that exits with status code 42") {

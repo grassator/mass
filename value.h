@@ -290,12 +290,7 @@ typedef struct {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
-hash_map_slice_template(Scope_Map, Value *)
-
-typedef struct Scope {
-  struct Scope *parent;
-  Scope_Map *map;
-} Scope;
+typedef struct Scope Scope;
 
 typedef struct _Program {
   Fixed_Buffer *data_buffer;

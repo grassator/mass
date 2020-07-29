@@ -1,40 +1,5 @@
 #include "value.h"
 
-Scope *
-scope_make(
-  Scope *parent
-) {
-  Scope *scope = temp_allocate(Scope);
-  *scope = (Scope) {
-    .parent = parent,
-    .map = hash_map_make(Scope_Map),
-  };
-  return scope;
-}
-
-Value *
-scope_lookup(
-  Scope *scope,
-  Slice name
-) {
-  while (scope) {
-    Value **result = hash_map_get(scope->map, name);
-    if (result) return *result;
-    scope = scope->parent;
-  }
-  return 0;
-}
-
-void
-scope_define(
-  Scope *scope,
-  Slice name,
-  Value *value
-) {
-  // TODO think about what should happen when trying to redefine existing thing
-  hash_map_set(scope->map, name, value);
-}
-
 inline bool
 same_value_type(
   Value *a,

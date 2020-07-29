@@ -178,6 +178,13 @@ value_pointer_to(
 );
 
 Value *
+call_function_value_array(
+  Function_Builder *builder,
+  Value *to_call,
+  Array_Value_Ptr arguments
+);
+
+Value *
 call_function_value(
   Function_Builder *builder,
   Value *to_call,
