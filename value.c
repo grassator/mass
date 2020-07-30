@@ -792,16 +792,16 @@ c_function_import(
 Import_Symbol *
 program_find_import(
   const Program *program,
-  Slice library_name,
-  Slice symbol_name
+  const Slice library_name,
+  const Slice symbol_name
 ) {
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    if (slice_ascii_case_insensitive_equal(lib->name, library_name) != 0) continue;
+    if (!slice_ascii_case_insensitive_equal(lib->name, library_name)) continue;
 
     for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
-      if (slice_equal(symbol->name, symbol_name) == 0) {
+      if (slice_equal(symbol->name, symbol_name)) {
         return symbol;
       }
     }

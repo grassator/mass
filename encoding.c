@@ -240,25 +240,14 @@ encode_instruction(
         if (operand->type == Operand_Type_RIP_Relative_Import) {
           Program *program = builder->program;
           s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
-
-          // FIXME this should use program_find_import
-          bool match_found = false;
-          for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-            Import_Library *lib = dyn_array_get(program->import_libraries, i);
-            if (!slice_equal(lib->name, operand->import.library_name)) continue;
-
-            for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-              Import_Symbol *fn = dyn_array_get(lib->symbols, i);
-              if (slice_equal(fn->name, operand->import.symbol_name)) {
-                s64 diff = program->data_base_rva + fn->offset_in_data - next_instruction_rva;
-                fixed_buffer_append_s32(buffer, s64_to_s32(diff));
-
-                match_found = true;
-                break;
-              }
-            }
-          }
-          assert(match_found);
+          Import_Symbol *symbol = program_find_import(
+            program,
+            operand->import.library_name,
+            operand->import.symbol_name
+          );
+          assert(symbol);
+          s64 diff = program->data_base_rva + symbol->offset_in_data - next_instruction_rva;
+          fixed_buffer_append_s32(buffer, s64_to_s32(diff));
         } else if (operand->type == Operand_Type_RIP_Relative) {
           Program *program = builder->program;
           s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
