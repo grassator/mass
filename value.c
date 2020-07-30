@@ -194,7 +194,11 @@ print_operand(
       break;
     }
     case Operand_Type_RIP_Relative_Import: {
-      printf("rip_import(%s:%s)", operand->import.library_name, operand->import.symbol_name);
+      printf("rip_import(");
+      slice_print(operand->import.library_name);
+      printf(":");
+      slice_print(operand->import.library_name);
+      printf(")");
       break;
     }
     case Operand_Type_Label_32: {
@@ -708,14 +712,14 @@ program_free(
 Operand
 import_symbol(
   Program *program,
-  const char *library_name,
-  const char *symbol_name
+  Slice library_name,
+  Slice symbol_name
 ) {
   Import_Library *library = 0;
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    if (_stricmp(lib->name, library_name) == 0) {
+    if (slice_ascii_case_insensitive_equal(lib->name, library_name)) {
       library = lib;
     }
   }
@@ -732,7 +736,7 @@ import_symbol(
   Import_Symbol *symbol = 0;
   for (u64 i = 0; i < dyn_array_length(library->symbols); ++i) {
     Import_Symbol *it = dyn_array_get(library->symbols, i);
-    if (strcmp(it->name, symbol_name) == 0) {
+    if (slice_equal(it->name, symbol_name)) {
       symbol = it;
     }
   }
@@ -776,7 +780,11 @@ c_function_import(
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = c_function_descriptor(forward_declaration),
-    .operand = import_symbol(program, library_name, symbol_name),
+    .operand = import_symbol(
+      program,
+      slice_from_c_string(library_name),
+      slice_from_c_string(symbol_name)
+    ),
   };
   return result;
 }
@@ -784,16 +792,16 @@ c_function_import(
 Import_Symbol *
 program_find_import(
   const Program *program,
-  const char *library_name,
-  const char *symbol_name
+  Slice library_name,
+  Slice symbol_name
 ) {
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    if (strcmp(lib->name, library_name) != 0) continue;
+    if (slice_ascii_case_insensitive_equal(lib->name, library_name) != 0) continue;
 
     for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
-      if (strcmp(symbol->name, symbol_name) == 0) {
+      if (slice_equal(symbol->name, symbol_name) == 0) {
         return symbol;
       }
     }

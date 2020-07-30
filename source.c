@@ -505,7 +505,8 @@ token_force_value(
   if (token->type == Token_Type_Integer) {
     Slice_Parse_S64_Result parse_result = slice_parse_s64(token->source);
     assert(parse_result.success);
-    result_value = value_from_s64(parse_result.value);
+    // FIXME We should be able to size immediates automatically
+    result_value = value_from_s32((s32)parse_result.value);
   } else if (token->type == Token_Type_Id) {
     result_value = scope_lookup_force(scope, token->source);
   } else if (token->type == Token_Type_Value) {
@@ -525,9 +526,17 @@ token_match_call_arguments(
   Scope *scope,
   Function_Builder *builder_
 ) {
-  // FIXME implement this;
-  assert(dyn_array_length(token->children) == 0);
-  return dyn_array_make(Array_Value_Ptr);
+  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
+  if (dyn_array_length(token->children) == 0) {
+    // Nothing to do
+  } else if (dyn_array_length(token->children) == 1) {
+    Value *value = token_force_value(*dyn_array_get(token->children, 0), scope);
+    dyn_array_push(result, value);
+  } else {
+    // FIXME implement this;
+    assert(!"Not implemented");
+  }
+  return result;
 }
 
 Token *
@@ -650,13 +659,65 @@ token_force_lazy_function_definition(
     }
     fn_freeze(builder_);
 
-    Value *body_result = token_match_expression(body, function_scope, builder_);
-
-    if (body_result) {
-      Return(body_result);
+    // FIXME figure out a better way to distinguish imports
+    if (body->type == Token_Type_Value && !body->value->descriptor) {
+      body->value->descriptor = builder_->descriptor;
+      return body->value;
+    } else {
+      Value *body_result = token_match_expression(body, function_scope, builder_);
+      if (body_result) {
+        Return(body_result);
+      }
     }
   }
   return value;
+}
+
+Slice
+token_string_to_slice(
+  Token *token
+) {
+  assert(token->source.length >= 2);
+  return (Slice) {
+    .bytes = token->source.bytes + 1,
+    .length = token->source.length - 2
+  };
+}
+
+Token *
+token_import_match_arguments(
+  Token *paren,
+  Program *program
+) {
+  assert(paren->type == Token_Type_Paren);
+  Token_Matcher_State *state = &(Token_Matcher_State) {.root = paren };
+
+  Token *library_name_string = token_peek_match(state, 0, &(Token) {
+    .type = Token_Type_String,
+  });
+  assert(library_name_string);
+  Token *comma = token_peek_match(state, 1, &(Token) {
+    .type = Token_Type_Operator,
+    .source = slice_literal(","),
+  });
+  assert(comma);
+  Token *symbol_name_string = token_peek_match(state, 2, &(Token) {
+    .type = Token_Type_String,
+  });
+  assert(symbol_name_string);
+  Slice library_name = token_string_to_slice(library_name_string);
+  Slice symbol_name = token_string_to_slice(symbol_name_string);
+
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = 0,
+    .operand = import_symbol(
+      program,
+      library_name,
+      symbol_name
+    ),
+  };
+  return token_value_make(paren, result);
 }
 
 void
@@ -668,6 +729,29 @@ token_match_module(
   if (!dyn_array_length(token->children)) return;
 
   Token_Matcher_State *state = &(Token_Matcher_State) {.root = token};
+
+  // Matching symbol imports
+  for (bool did_replace = true; did_replace;) {
+    did_replace = false;
+    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
+      state->child_index = i;
+
+      Token *import = token_peek_match(state, 0, &(Token) {
+        .type = Token_Type_Id,
+        .source = slice_literal("import"),
+      });
+      if (!import) continue;
+      Token *args = token_peek_match(state, 1, &(Token) { .type = Token_Type_Paren });
+      if (!args) continue;
+      Token *result_token = token_import_match_arguments(args, program_);
+
+      *dyn_array_get(token->children, i) = result_token;
+      dyn_array_delete(token->children, i + 1);
+      did_replace |= true;
+    }
+  }
+
+
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
     for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
@@ -681,7 +765,7 @@ token_match_module(
 
       Token *args = token_peek_match(state, 0, &(Token) { .type = Token_Type_Paren });
       Token *return_types = token_peek_match(state, 2, &(Token) { .type = Token_Type_Paren });
-      Token *body = token_peek_match(state, 3, &(Token) { .type = Token_Type_Curly });
+      Token *body = token_peek(state, 3);
       // TODO show proper error to the user
       assert(args);
       assert(return_types);

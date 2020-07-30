@@ -70,14 +70,14 @@ typedef struct {
 } Label;
 
 typedef struct {
-  const char *name;
+  Slice name;
   u32 name_rva;
   u32 offset_in_data;
 } Import_Symbol;
 typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
 typedef struct {
-  const char *name;
+  Slice name;
   u32 name_rva;
   u32 rva;
   Array_Import_Symbol symbols;
@@ -86,8 +86,8 @@ typedef struct {
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 
 typedef struct {
-  const char *library_name;
-  const char *symbol_name;
+  Slice library_name;
+  Slice symbol_name;
 } Operand_RIP_Relative_Import;
 
 typedef struct {
@@ -295,7 +295,7 @@ typedef struct Scope Scope;
 typedef struct _Program {
   Fixed_Buffer *data_buffer;
   Array_Import_Library import_libraries;
-  Function_Builder *entry_point;
+  Value *entry_point;
   Array_Function_Builder functions;
   s64 code_base_rva;
   s64 data_base_rva;

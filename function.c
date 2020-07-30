@@ -213,18 +213,20 @@ program_end(
   if (dyn_array_is_initialized(program->import_libraries)) {
     for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
       Import_Library *lib = dyn_array_get(program->import_libraries, i);
-      HINSTANCE dll_handle = LoadLibraryA(lib->name);
+      const char *library_name = slice_to_c_string(temp_allocator, lib->name);
+      HINSTANCE dll_handle = LoadLibraryA(library_name);
       assert(dll_handle);
 
       for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-        Import_Symbol *fn = dyn_array_get(lib->symbols, i);
+        Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
 
-        fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, fn->name);
+        const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
         s64 offset = program->data_buffer->occupied;
         fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
         *rip_target = fn_address;
-        fn->offset_in_data = s64_to_s32(offset);
+        symbol->offset_in_data = s64_to_s32(offset);
       }
     }
   }

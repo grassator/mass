@@ -80,7 +80,7 @@ spec("function") {
 
   it("should be able to parse and run a void -> s64 function") {
     Slice source = slice_literal(
-      "foo :: () -> (s64) { 42 }"
+      "foo :: () -> (s32) { 42 }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
@@ -135,8 +135,8 @@ spec("function") {
 
   it("should be able to parse and run multiple function definitions") {
     Slice source = slice_literal(
-      "proxy :: () -> (s64) { one() }"
-      "one :: () -> (s64) { 1 }"
+      "proxy :: () -> (s32) { one() }"
+      "one :: () -> (s32) { 1 }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
@@ -148,7 +148,23 @@ spec("function") {
 
     program_end(program_);
 
-    check(value_as_function(proxy, fn_type_void_to_s64)() == 1);
+    check(value_as_function(proxy, fn_type_void_to_s32)() == 1);
+  }
+
+  it("should parse and write out an executable that exits with status code 42") {
+    Slice source = slice_literal(
+      // TODO Allow implicit converstion of last statement in a function body to void
+      "main :: () -> (s64) { ExitProcess(42) }"
+      "ExitProcess :: (status : s32) -> (s64) import(\"kernel32.dll\", \"ExitProcess\")"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"));
+
+    write_executable(L"build\\test_parsed.exe", program_);
   }
 
   it("should write out an executable that exits with status code 42") {
@@ -159,7 +175,7 @@ spec("function") {
     }
 
     Function(main) {
-      program_->entry_point = builder_;
+      program_->entry_point = *builder_->result;
       Call(my_exit);
     }
     write_executable(L"build\\test.exe", program_);
@@ -176,7 +192,7 @@ spec("function") {
     );
 
     Function(main) {
-      program_->entry_point = builder_;
+      program_->entry_point = *builder_->result;
       Value *handle = Call(GetStdHandle_value, STD_OUTPUT_HANDLE_value);
       Stack_s32(bytes_written, value_from_s32(0));
       Value *bytes_written_ptr = value_pointer_to(builder_, bytes_written);

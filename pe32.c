@@ -52,14 +52,14 @@ encode_rdata_section(
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     // Aligned to 2 bytes c string of library name
-    expected_encoded_size += u64_align(strlen(lib->name) + 1, 2);
+    expected_encoded_size += u64_align(lib->name.length + 1, 2);
     for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
       {
         // Ordinal Hint, value not required
         expected_encoded_size += sizeof(s16);
         // Aligned to 2 bytes c string of symbol name
-        expected_encoded_size += u64_align(strlen(symbol->name) + 1, 2);
+        expected_encoded_size += u64_align(symbol->name.length + 1, 2);
       }
       {
         // IAT placeholder for symbol pointer
@@ -100,11 +100,11 @@ encode_rdata_section(
       Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
       symbol->name_rva = get_rva();
       fixed_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
-      u64 name_size = strlen(symbol->name) + 1;
-      u64 aligned_name_size = u64_align(name_size, 2);
+      u64 name_size = symbol->name.length;
+      u64 aligned_name_size = u64_align(name_size + 1, 2);
       memcpy(
         fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
-        symbol->name,
+        symbol->name.bytes,
         name_size
       );
     }
@@ -141,11 +141,11 @@ encode_rdata_section(
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     lib->name_rva = get_rva();
-    u64 name_size = strlen(lib->name) + 1;
-    u64 aligned_name_size = u64_align(name_size, 2);
+    u64 name_size = lib->name.length;
+    u64 aligned_name_size = u64_align(name_size + 1, 2);
     memcpy(
       fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
-      lib->name,
+      lib->name.bytes,
       name_size
     );
   }
@@ -200,7 +200,7 @@ encode_text_section(
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder == program->entry_point) {
+    if (*builder->result == program->entry_point) {
       result.entry_point_rva = get_rva();
     }
     fn_encode(result.buffer, builder);
@@ -218,6 +218,7 @@ write_executable(
   wchar_t *file_path,
   Program *program
 ) {
+  assert(program->entry_point);
   // Sections
   IMAGE_SECTION_HEADER sections[] = {
     {

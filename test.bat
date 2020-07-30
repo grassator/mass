@@ -10,6 +10,8 @@ build\source_spec.exe
 if %errorlevel% neq 0 (exit /b %errorlevel%)
 
 build\test.exe
-echo ExitCode: %errorlevel%
+echo ExitCode (Macro): %errorlevel%
+build\test_parsed.exe
+echo ExitCode (Parsed): %errorlevel%
 
 build\hello_world.exe

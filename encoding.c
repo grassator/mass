@@ -241,14 +241,15 @@ encode_instruction(
           Program *program = builder->program;
           s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
 
+          // FIXME this should use program_find_import
           bool match_found = false;
           for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
             Import_Library *lib = dyn_array_get(program->import_libraries, i);
-            if (strcmp(lib->name, operand->import.library_name) != 0) continue;
+            if (!slice_equal(lib->name, operand->import.library_name)) continue;
 
             for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
               Import_Symbol *fn = dyn_array_get(lib->symbols, i);
-              if (strcmp(fn->name, operand->import.symbol_name) == 0) {
+              if (slice_equal(fn->name, operand->import.symbol_name)) {
                 s64 diff = program->data_base_rva + fn->offset_in_data - next_instruction_rva;
                 fixed_buffer_append_s32(buffer, s64_to_s32(diff));
 
