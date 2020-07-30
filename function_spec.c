@@ -57,7 +57,7 @@ spec("function") {
   before_each() {
 
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
-    temp_allocator = bucket_buffer_create_allocator(temp_buffer);
+    temp_allocator = bucket_buffer_allocator_make(temp_buffer);
 
     test_program = (Program) {
       .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),

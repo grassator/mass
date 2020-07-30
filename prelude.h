@@ -176,9 +176,9 @@ typedef struct {
 } Allocator_Handle;
 
 typedef struct {
-  void *(*const allocate)(Allocator_Handle handle, u64 size_in_bytes, u64 alignment);
-  void  (*const deallocate)(Allocator_Handle handle, void *address);
-  void *(*const reallocate)(
+  void *(*allocate)(Allocator_Handle handle, u64 size_in_bytes, u64 alignment);
+  void  (*deallocate)(Allocator_Handle handle, void *address);
+  void *(*reallocate)(
     Allocator_Handle handle,
     void *address,
     u64 old_size_in_bytes,
@@ -813,6 +813,41 @@ slice_from_c_string(
 #define slice_literal(_literal_)\
   ((Slice)slice_literal_fields(_literal_))
 
+inline Slice
+slice_trim_starting_whitespace(
+  Slice slice
+) {
+  u64 start_index = 0;
+  for (;start_index <= slice.length; start_index++) {
+    if (!isspace(slice.bytes[start_index])) break;
+  }
+  return (Slice){
+    .bytes = slice.bytes + start_index,
+    .length = slice.length - start_index,
+  };
+}
+
+inline Slice
+slice_trim_ending_whitespace(
+  Slice slice
+) {
+  u64 end_index = slice.length;
+  for (;end_index != 0; end_index--) {
+    if (!isspace(slice.bytes[end_index - 1])) break;
+  }
+  return (Slice){
+    .bytes = slice.bytes,
+    .length = end_index,
+  };
+}
+
+Slice
+slice_trim_whitespace(
+  Slice slice
+) {
+  return slice_trim_ending_whitespace(slice_trim_starting_whitespace(slice));
+}
+
 inline bool
 slice_starts_with(
   Slice haystack,
@@ -1369,6 +1404,7 @@ c_string_split_by_callback_indexed(
 // Unicode
 //////////////////////////////////////////////////////////////////////////////
 
+
 inline bool
 code_point_is_ascii_letter(
   s32 ch
@@ -1407,9 +1443,179 @@ code_point_is_ascii_space(
   }
 }
 
+// The `utf8_decode` function has following copyright and license
+//
+// Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without restriction,
+// including without limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of the Software,
+// and to permit persons to whom the Software is furnished to do so,
+// subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
+//
+
+#define UTF8_ACCEPT 0
+#define UTF8_REJECT 12
+
+static const u8 utf8_dfa_decode_table[] = {
+  // The first part of the table maps bytes to character classes that
+  // to reduce the size of the transition table and create bitmasks.
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
+   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
+   8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
+  10,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3, 11,6,6,6,5,8,8,8,8,8,8,8,8,8,8,8,
+
+  // The second part is a transition table that maps a combination
+  // of a state of the automaton and a character class to a state.
+   0,12,24,36,60,96,84,12,12,12,48,72, 12,12,12,12,12,12,12,12,12,12,12,12,
+  12, 0,12,12,12,12,12, 0,12, 0,12,12, 12,24,12,12,12,12,12,24,12,24,12,12,
+  12,12,12,12,12,12,12,24,12,12,12,12, 12,24,12,12,12,12,12,12,12,24,12,12,
+  12,12,12,12,12,12,12,36,12,36,12,12, 12,36,12,12,12,12,12,36,12,36,12,12,
+  12,36,12,12,12,12,12,12,12,12,12,12,
+};
+
+inline u32
+utf8_decode(
+  u32* state,
+  u32* code_point,
+  u8 byte
+) {
+  u32 type = utf8_dfa_decode_table[byte];
+
+  *code_point = (*state != UTF8_ACCEPT) ?
+    (byte & 0x3fu) | (*code_point << 6) :
+    (0xff >> type) & (byte);
+
+  *state = utf8_dfa_decode_table[256 + *state + type];
+  return *state;
+}
+
+/// Returns count of code_points in the string.
+/// -1 return value indicates invalid UTF-8 sequence.
+inline s64
+utf8_code_point_length(
+  Slice slice
+) {
+  u32 code_point = 0;
+  s64 count = 0;
+  u32 state = 0;
+
+  for (u64 index = 0; index < slice.length; ++index) {
+    if (!utf8_decode(&state, &code_point, slice.bytes[index])) ++count;
+  }
+
+  if (state != UTF8_ACCEPT) return -1;
+  return count;
+}
+
+inline bool
+utf8_is_ascii_byte(
+  s8 byte
+) {
+  return byte > 0;
+}
+
+inline u64
+utf8_code_point_byte_length(
+  u32 code_point
+) {
+  if (code_point <= 0x7f) return 1;
+  if (code_point <= 0x7ff) return 2;
+  if (code_point <= 0xd7ff) return 3;
+  if (code_point <= 0xdfff || code_point > 0x10ffff) return 0;
+  if (code_point <= 0xffff) return 3;
+  return 4;
+}
+
+/// The worst case here is for ascii bytes which require 1 byte in UTF-8
+/// but require 2 bytes for UTF-16
+inline u64
+utf8_to_utf16_estimate_max_byte_length(
+  Slice slice
+) {
+  return slice.length * 2;
+}
+
+/// The worst case here is for ascii bytes which require 1 byte in UTF-8
+/// but require 4 bytes for UTF-32
+inline u64
+utf8_to_utf32_estimate_max_byte_length(
+  Slice slice
+) {
+  return slice.length * 4;
+}
+
+/// Returns number of *bytes* written
+inline u64
+utf8_to_utf16_raw(
+  Slice utf8,
+  wchar_t *target,
+  u64 target_byte_size
+) {
+  u32 code_point = 0;
+  u32 state = 0;
+
+  u64 target_wide_length = target_byte_size / 2;
+  u64 target_index = 0;
+
+  for (u64 index = 0; index < utf8.length; ++index) {
+    if (utf8_decode(&state, &code_point, utf8.bytes[index])) continue;
+
+    if (code_point <= 0xFFFF) {
+      if (target_index >= target_wide_length) return target_wide_length * 2;
+      target[target_index++] = (wchar_t)code_point;
+    } else {
+      if (target_index + 1 >= target_wide_length) return target_wide_length * 2;
+      target[target_index++] = (wchar_t)(0xD7C0 + (code_point >> 10));
+      target[target_index++] = (wchar_t)(0xDC00 + (code_point & 0x3FF));
+    }
+  }
+
+  return target_index * 2;
+}
+
+static_assert(sizeof(wchar_t) == 2, wchar_t_must_be_16_bit_wide);
+
+inline wchar_t *
+utf8_to_utf16_null_terminated(
+  const Allocator *allocator,
+  Slice utf8
+) {
+  u64 max_byte_length = utf8_to_utf16_estimate_max_byte_length(utf8);
+  // + sizeof(wchar_t) accounts for null termination
+  u64 allocation_size = max_byte_length + sizeof(wchar_t);
+  wchar_t *target = allocator_allocate_bytes(allocator, allocation_size, sizeof(wchar_t));
+  u64 bytes_written = utf8_to_utf16_raw(utf8, target, max_byte_length);
+  u64 end_index = bytes_written / 2;
+  target[end_index] = 0;
+
+  allocator_reallocate(allocator, target, allocation_size, end_index, sizeof(wchar_t));
+
+  return target;
+}
+
+
 //////////////////////////////////////////////////////////////////////////////
 // LPEG
-// Loosly based on ideas presented in a paper:
+// Loosely based on ideas presented in a paper:
 //   A Text Pattern-Matching Tool based on Parsing Expression Grammars
 //   by Roberto Ierusalimschy in 2008
 //////////////////////////////////////////////////////////////////////////////
@@ -1467,7 +1673,7 @@ typedef struct {
     )\
   )
 
-// In both choices and sequences we only go through the loop ones
+// In both choices and sequences we only go through the loop once
 // because of unconditional `lpeg->done = 1` at the end of the loop.
 #define LPEG_CHOICE_SEQUENCE_INTERNAL(_mode_, _initial_success_)\
   LPEG_SAVE_INTERNAL\
@@ -1737,20 +1943,30 @@ fixed_buffer_allocator_reallocate(
   return result;
 }
 
-Allocator *
-fixed_buffer_create_allocator(
-  Fixed_Buffer *buffer
+inline Allocator *
+fixed_buffer_allocator_init(
+  Fixed_Buffer *buffer,
+  Allocator *allocator
 ) {
-  Allocator *result = fixed_buffer_allocate(buffer, Allocator);
-  Allocator temp = {
+  *allocator = (Allocator){
     .allocate = fixed_buffer_allocator_allocate,
     .reallocate = fixed_buffer_allocator_reallocate,
     .deallocate = fixed_buffer_allocator_deallocate,
     .handle = {buffer},
   };
-  memcpy(result, &temp, sizeof(Allocator));
-  return result;
+  return allocator;
 }
+
+inline Allocator *
+fixed_buffer_allocator_make(
+  Fixed_Buffer *buffer
+) {
+  return fixed_buffer_allocator_init(
+    buffer,
+    fixed_buffer_allocate(buffer, Allocator)
+  );
+}
+
 inline s8 *
 fixed_buffer_first_free_byte_address(
   Fixed_Buffer *buffer
@@ -1974,19 +2190,28 @@ bucket_buffer_allocator_reallocate(
   return result;
 }
 
-Allocator *
-bucket_buffer_create_allocator(
-  const Bucket_Buffer buffer
+inline Allocator *
+bucket_buffer_allocator_init(
+  const Bucket_Buffer buffer,
+  Allocator *allocator
 ) {
-  Allocator *result = bucket_buffer_allocate(buffer, Allocator);
-  Allocator temp = {
+  *allocator = (Allocator){
     .allocate = bucket_buffer_allocator_allocate,
     .reallocate = bucket_buffer_allocator_reallocate,
     .deallocate = bucket_buffer_allocator_deallocate,
     .handle = {buffer.internal},
   };
-  memcpy(result, &temp, sizeof(Allocator));
-  return result;
+  return allocator;
+}
+
+inline Allocator *
+bucket_buffer_allocator_make(
+  const Bucket_Buffer buffer
+) {
+  return bucket_buffer_allocator_init(
+    buffer,
+    bucket_buffer_allocate(buffer, Allocator)
+  );
 }
 
 
