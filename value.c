@@ -709,20 +709,52 @@ program_free(
   free(program);
 }
 
-Operand
-import_symbol(
-  Program *program,
-  Slice library_name,
-  Slice symbol_name
+Import_Library *
+program_find_import_library(
+  const Program *program,
+  const Slice library_name
 ) {
-  Import_Library *library = 0;
-
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     if (slice_ascii_case_insensitive_equal(lib->name, library_name)) {
-      library = lib;
+      return lib;
     }
   }
+  return 0;
+}
+
+Import_Symbol *
+import_library_find_symbol(
+  const Import_Library *library,
+  const Slice symbol_name
+) {
+  for (u64 i = 0; i < dyn_array_length(library->symbols); ++i) {
+    Import_Symbol *symbol = dyn_array_get(library->symbols, i);
+    if (slice_equal(symbol->name, symbol_name)) {
+      return symbol;
+    }
+  }
+  return 0;
+}
+
+Import_Symbol *
+program_find_import(
+  const Program *program,
+  const Slice library_name,
+  const Slice symbol_name
+) {
+  Import_Library *lib = program_find_import_library(program, library_name);
+  if (!lib) return 0;
+  return import_library_find_symbol(lib, symbol_name);
+}
+
+Operand
+import_symbol(
+  Program *program,
+  const Slice library_name,
+  const Slice symbol_name
+) {
+  Import_Library *library = program_find_import_library(program, library_name);
   if (!library) {
     library = dyn_array_push(program->import_libraries, (Import_Library) {
       .name = library_name,
@@ -733,13 +765,7 @@ import_symbol(
     });
   }
 
-  Import_Symbol *symbol = 0;
-  for (u64 i = 0; i < dyn_array_length(library->symbols); ++i) {
-    Import_Symbol *it = dyn_array_get(library->symbols, i);
-    if (slice_equal(it->name, symbol_name)) {
-      symbol = it;
-    }
-  }
+  Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
@@ -787,26 +813,6 @@ c_function_import(
     ),
   };
   return result;
-}
-
-Import_Symbol *
-program_find_import(
-  const Program *program,
-  const Slice library_name,
-  const Slice symbol_name
-) {
-  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    if (!slice_ascii_case_insensitive_equal(lib->name, library_name)) continue;
-
-    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
-      if (slice_equal(symbol->name, symbol_name)) {
-        return symbol;
-      }
-    }
-  }
-  return 0;
 }
 
 #define FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT 16
