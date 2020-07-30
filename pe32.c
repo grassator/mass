@@ -200,7 +200,7 @@ encode_text_section(
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (*builder->result == program->entry_point) {
+    if (builder->value == program->entry_point) {
       result.entry_point_rva = get_rva();
     }
     fn_encode(result.buffer, builder);

@@ -175,7 +175,7 @@ spec("function") {
     }
 
     Function(main) {
-      program_->entry_point = *builder_->result;
+      program_->entry_point = builder_->value;
       Call(my_exit);
     }
     write_executable(L"build\\test.exe", program_);
@@ -192,7 +192,7 @@ spec("function") {
     );
 
     Function(main) {
-      program_->entry_point = *builder_->result;
+      program_->entry_point = builder_->value;
       Value *handle = Call(GetStdHandle_value, STD_OUTPUT_HANDLE_value);
       Stack_s32(bytes_written, value_from_s32(0));
       Value *bytes_written_ptr = value_pointer_to(builder_, bytes_written);

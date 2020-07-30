@@ -114,31 +114,24 @@ fn_begin(Value **result, Program *program) {
       .returns = 0,
     },
   };
-  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
-    .program = program,
-    .stack_reserve = 0,
-    .prolog_label = make_label(),
-    .epilog_label = make_label(),
-    .descriptor = descriptor,
-    .result = result,
-    .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
-  });
-
+  Label *prolog_label = make_label();
   Value *fn_value = temp_allocate(Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(builder->prolog_label),
+    .operand = label32(prolog_label),
   };
+  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
+    .program = program,
+    .stack_reserve = 0,
+    .prolog_label = prolog_label,
+    .epilog_label = make_label(),
+    .descriptor = descriptor,
+    .value = fn_value,
+    .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
+  });
   *result = fn_value;
 
   return builder;
-}
-
-Descriptor *
-fn_update_result(
-  Function_Builder *builder
-) {
-  return (*builder->result)->descriptor;
 }
 
 void
@@ -250,7 +243,6 @@ fn_arg(
   assert(!fn_is_frozen(builder));
   Descriptor_Function *function = &builder->descriptor->function;
   Value *result = function_push_argument(function, descriptor);
-  fn_update_result(builder);
   return result;
 }
 
@@ -283,7 +275,6 @@ fn_return(
   }
 
   push_instruction(builder, (Instruction) {jmp, {label32(builder->epilog_label), 0, 0}});
-  fn_update_result(builder);
 }
 
 Label *make_if(

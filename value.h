@@ -286,7 +286,7 @@ typedef struct {
   Descriptor *descriptor;
   Program *program;
 
-  Value **result;
+  Value *value;
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
