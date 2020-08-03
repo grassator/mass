@@ -80,7 +80,7 @@ spec("function") {
 
   it("should be able to parse and run a void -> s64 function") {
     Slice source = slice_literal(
-      "foo :: () -> (s32) { 42 }"
+      "foo :: () -> (s64) { 42 }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);

@@ -74,6 +74,21 @@ same_value_type(
   return same_type(a->descriptor, b->descriptor);
 }
 
+bool
+same_value_type_or_can_implicitly_move_cast(
+  Value *target,
+  Value *source
+) {
+  if (same_value_type(target, source)) return true;
+  if (target->descriptor->type != source->descriptor->type) return false;
+  if (target->descriptor->type == Descriptor_Type_Integer) {
+    if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 u32
 struct_byte_size(
   const Descriptor_Struct *struct_
@@ -372,6 +387,21 @@ value_from_s8(
     .operand = imm8(integer),
   };
   return result;
+}
+
+
+inline Value *
+value_from_signed_immediate(
+  s64 value
+) {
+  if (s64_fits_into_s8(value)) {
+    return value_from_s8((s8) value);
+  }
+  // FIXME add value_from_s16
+  if (s64_fits_into_s32(value)) {
+    return value_from_s32((s32) value);
+  }
+  return value_from_s64(value);
 }
 
 Value *

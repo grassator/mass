@@ -505,8 +505,7 @@ token_force_value(
   if (token->type == Token_Type_Integer) {
     Slice_Parse_S64_Result parse_result = slice_parse_s64(token->source);
     assert(parse_result.success);
-    // FIXME We should be able to size immediates automatically
-    result_value = value_from_s32((s32)parse_result.value);
+    result_value = value_from_signed_immediate(parse_result.value);
   } else if (token->type == Token_Type_Id) {
     result_value = scope_lookup_force(scope, token->source);
   } else if (token->type == Token_Type_Value) {

@@ -41,66 +41,72 @@ is_memory_operand(
 void
 move_value(
   Function_Builder *builder,
-  Value *a,
-  Value *b
+  Value *target,
+  Value *source
 ) {
   // TODO figure out more type checking
-  u32 a_size = descriptor_byte_size(a->descriptor);
-  u32 b_size = descriptor_byte_size(b->descriptor);
+  u32 target_size = descriptor_byte_size(target->descriptor);
+  u32 source_size = descriptor_byte_size(source->descriptor);
 
-  if (is_memory_operand(&a->operand) && is_memory_operand(&b->operand)) {
-    Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
-    move_value(builder, reg_a, b);
-    move_value(builder, a, reg_a);
+  if (is_memory_operand(&target->operand) && is_memory_operand(&source->operand)) {
+    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+    move_value(builder, reg_a, source);
+    move_value(builder, target, reg_a);
     return;
   }
 
-  if (a_size != b_size) {
+  if (target_size != source_size) {
     if (
-      a->operand.type == Operand_Type_Register &&
-      b_size < a_size &&
-      a_size <= 4
+      target->operand.type == Operand_Type_Register &&
+      source_size < target_size
     ) {
-      // TODO deal with unsigned numbers
-      push_instruction(builder, (Instruction) {movsx, {a->operand, b->operand, 0}});
-      return;
-    } else if (!(
-      b->operand.type == Operand_Type_Immediate_32 &&
-      a_size == 8
-    )) {
+      if (source_size == 4) {
+        // Will be handled below
+      } else {
+        // TODO deal with unsigned numbers
+        Value *reg_a = value_register_for_descriptor(Register_A, source->descriptor);
+        push_instruction(builder, (Instruction) {mov, {reg_a->operand, source->operand, 0}});
+        push_instruction(builder, (Instruction) {movsx, {target->operand, reg_a->operand, 0}});
+        return;
+      }
+    } else {
+      print_operand(&target->operand);
+      printf(" ");
+      print_operand(&source->operand);
+      printf("\n");
       assert(!"Mismatched operand size when moving");
     }
   }
 
   if (
-    a->operand.type == Operand_Type_Register &&
+    target->operand.type == Operand_Type_Register &&
     (
-      (b->operand.type == Operand_Type_Immediate_64 && b->operand.imm64 == 0) ||
-      (b->operand.type == Operand_Type_Immediate_32 && b->operand.imm32 == 0) ||
-      (b->operand.type == Operand_Type_Immediate_8  && b->operand.imm8 == 0)
+      (source->operand.type == Operand_Type_Immediate_64 && source->operand.imm64 == 0) ||
+      (source->operand.type == Operand_Type_Immediate_32 && source->operand.imm32 == 0) ||
+      (source->operand.type == Operand_Type_Immediate_8  && source->operand.imm8 == 0)
     )
   ) {
     // This messes up flags register so comparisons need to be aware of this optimization
-    push_instruction(builder, (Instruction) {xor, {a->operand, a->operand, 0}});
+    push_instruction(builder, (Instruction) {xor, {target->operand, target->operand, 0}});
     return;
   }
 
-  if (b->operand.type == Operand_Type_Immediate_64 && ((s32)b->operand.imm64) >= 0) {
-    move_value(builder, a, value_from_s32(b->operand.imm32));
-  }
+  //if (source->operand.type == Operand_Type_Immediate_64 && ((s32)source->operand.imm64) >= 0) {
+    //move_value(builder, target, value_from_s32(source->operand.imm32));
+  //}
 
   if ((
-    a->operand.type != Operand_Type_Register &&
-    b->operand.type == Operand_Type_Immediate_64
+    target->operand.type != Operand_Type_Register &&
+    source->operand.type == Operand_Type_Immediate_64
   ) || (
-    a->operand.type == Operand_Type_Memory_Indirect &&
-    b->operand.type == Operand_Type_Memory_Indirect
+    target->operand.type == Operand_Type_Memory_Indirect &&
+    source->operand.type == Operand_Type_Memory_Indirect
   )) {
-    Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
-    move_value(builder, reg_a, b);
-    move_value(builder, a, reg_a);
+    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+    move_value(builder, reg_a, source);
+    move_value(builder, target, reg_a);
   } else {
-    push_instruction(builder, (Instruction) {mov, {a->operand, b->operand, 0}});
+    push_instruction(builder, (Instruction) {mov, {target->operand, source->operand, 0}});
   }
 }
 
@@ -254,13 +260,7 @@ fn_return_descriptor(
   Function_Return_Type return_type
 ) {
   Descriptor_Function *function = &builder->descriptor->function;
-  if (function->returns) {
-    if (
-      function->returns->descriptor->type == Descriptor_Type_Void &&
-      return_type == Function_Return_Type_Implicit
-    ) return;
-    assert(same_type(function->returns->descriptor, descriptor));
-  } else {
+  if (!function->returns) {
     assert(!fn_is_frozen(builder));
     if (descriptor->type != Descriptor_Type_Void) {
       function->returns = value_register_for_descriptor(Register_A, descriptor);
@@ -277,7 +277,11 @@ fn_return(
   Function_Return_Type return_type
 ) {
   fn_return_descriptor(builder, to_return->descriptor, return_type);
-  if (builder->descriptor->function.returns->descriptor->type != Descriptor_Type_Void) {
+  if (builder->descriptor->function.returns->descriptor->type == Descriptor_Type_Void) {
+    if (to_return->descriptor->type != Descriptor_Type_Void) {
+      assert(return_type == Function_Return_Type_Implicit);
+    }
+  } else {
     move_value(builder, builder->descriptor->function.returns, to_return);
   }
 
@@ -566,10 +570,9 @@ call_function_overload(
   fn_ensure_frozen(descriptor);
 
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
-    Value *actual_arg = *dyn_array_get(arguments, i);
-    Value *expected_arg = *dyn_array_get(descriptor->arguments, i);
-    assert(same_value_type(expected_arg, actual_arg));
-    move_value(builder, expected_arg, actual_arg);
+    Value *source_arg = *dyn_array_get(arguments, i);
+    Value *target_arg = *dyn_array_get(descriptor->arguments, i);
+    move_value(builder, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -621,9 +624,9 @@ call_function_value_array(
     if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
     bool match = true;
     for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
-      Value *actual_arg = *dyn_array_get(arguments, arg_index);
-      Value *expected_arg = *dyn_array_get(descriptor->arguments, arg_index);
-      if(!same_value_type(actual_arg, expected_arg)) {
+      Value *source_arg = *dyn_array_get(arguments, arg_index);
+      Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
+      if(!same_value_type_or_can_implicitly_move_cast(target_arg, source_arg)) {
         match = false;
         break;
       }
