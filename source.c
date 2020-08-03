@@ -649,7 +649,11 @@ token_force_lazy_function_definition(
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
         assert(return_type_token->type == Token_Type_Id);
 
-        fn_return_descriptor(builder_, program_lookup_type(program_, return_type_token->source));
+        fn_return_descriptor(
+          builder_,
+          program_lookup_type(program_, return_type_token->source),
+          Function_Return_Type_Explicit
+        );
         break;
       }
       default: {
@@ -666,7 +670,7 @@ token_force_lazy_function_definition(
     } else {
       Value *body_result = token_match_expression(body, function_scope, builder_);
       if (body_result) {
-        Return(body_result);
+        fn_return(builder_, body_result, Function_Return_Type_Implicit);
       }
     }
   }

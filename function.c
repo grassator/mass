@@ -246,13 +246,19 @@ fn_arg(
   return result;
 }
 
+
 void
 fn_return_descriptor(
   Function_Builder *builder,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Function_Return_Type return_type
 ) {
   Descriptor_Function *function = &builder->descriptor->function;
   if (function->returns) {
+    if (
+      function->returns->descriptor->type == Descriptor_Type_Void &&
+      return_type == Function_Return_Type_Implicit
+    ) return;
     assert(same_type(function->returns->descriptor, descriptor));
   } else {
     assert(!fn_is_frozen(builder));
@@ -267,10 +273,11 @@ fn_return_descriptor(
 void
 fn_return(
   Function_Builder *builder,
-  Value *to_return
+  Value *to_return,
+  Function_Return_Type return_type
 ) {
-  fn_return_descriptor(builder, to_return->descriptor);
-  if (to_return->descriptor->type != Descriptor_Type_Void) {
+  fn_return_descriptor(builder, to_return->descriptor, return_type);
+  if (builder->descriptor->function.returns->descriptor->type != Descriptor_Type_Void) {
     move_value(builder, builder->descriptor->function.returns, to_return);
   }
 

@@ -50,10 +50,16 @@ fn_arg(
   Descriptor *descriptor
 );
 
+typedef enum {
+  Function_Return_Type_Implicit,
+  Function_Return_Type_Explicit,
+} Function_Return_Type;
+
 void
 fn_return(
   Function_Builder *builder,
-  Value *to_return
+  Value *to_return,
+  Function_Return_Type return_type
 );
 
 Label *make_if(
@@ -214,7 +220,7 @@ make_or(
   )
 
 #define Return(_value_) \
-  fn_return(builder_, _value_)
+  fn_return(builder_, _value_, Function_Return_Type_Explicit)
 
 #define Arg(_id_, _descriptor_) \
   Value *_id_ = fn_arg(builder_, (_descriptor_))

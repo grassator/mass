@@ -153,8 +153,7 @@ spec("function") {
 
   it("should parse and write out an executable that exits with status code 42") {
     Slice source = slice_literal(
-      // TODO Allow implicit converstion of last statement in a function body to void
-      "main :: () -> (s64) { ExitProcess(42) }"
+      "main :: () -> () { ExitProcess(42) }"
       "ExitProcess :: (status : s32) -> (s64) import(\"kernel32.dll\", \"ExitProcess\")"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
