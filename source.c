@@ -349,7 +349,7 @@ tokenize(
         break;
       }
       case Tokenizer_State_Id: {
-        if (isalpha(ch) || isdigit(ch)) {
+        if (isalpha(ch) || isdigit(ch) || ch == '_') {
           current_token->source.length++;
         } else {
           push;
