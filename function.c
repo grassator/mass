@@ -43,30 +43,56 @@ move_value(
   Function_Builder *builder,
   Value *target,
   Value *source
+);
+
+bool
+operand_is_immediate(
+  Operand *operand
+) {
+  if (operand->type == Operand_Type_Immediate_8) return true;
+  if (operand->type == Operand_Type_Immediate_32) return true;
+  if (operand->type == Operand_Type_Immediate_64) return true;
+  return false;
+}
+
+Value *
+ensure_register_or_memory(
+  Function_Builder *builder,
+  Value *value
+) {
+  assert(value->operand.type != Operand_Type_None);
+  if (operand_is_immediate(&value->operand)) {
+    Value *result = value_register_for_descriptor(Register_A, value->descriptor);
+    move_value(builder, result, value);
+    return result;
+  }
+  return value;
+}
+
+void
+move_value(
+  Function_Builder *builder,
+  Value *target,
+  Value *source
 ) {
   // TODO figure out more type checking
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
-  if (is_memory_operand(&target->operand) && is_memory_operand(&source->operand)) {
-    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-    move_value(builder, reg_a, source);
-    move_value(builder, target, reg_a);
-    return;
-  }
-
   if (target_size != source_size) {
-    if (
-      target->operand.type == Operand_Type_Register &&
-      source_size < target_size
-    ) {
+    if (source_size < target_size) {
       if (source_size == 4) {
         // Will be handled below
       } else {
         // TODO deal with unsigned numbers
-        Value *reg_a = value_register_for_descriptor(Register_A, source->descriptor);
-        push_instruction(builder, (Instruction) {mov, {reg_a->operand, source->operand, 0}});
-        push_instruction(builder, (Instruction) {movsx, {target->operand, reg_a->operand, 0}});
+        source = ensure_register_or_memory(builder, source);
+        if (target->operand.type == Operand_Type_Register) {
+          push_instruction(builder, (Instruction) {movsx, {target->operand, source->operand, 0}});
+        } else {
+          Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+          push_instruction(builder, (Instruction) {movsx, {reg_a->operand, source->operand, 0}});
+          push_instruction(builder, (Instruction) {mov, {target->operand, reg_a->operand, 0}});
+        }
         return;
       }
     } else {
@@ -76,6 +102,13 @@ move_value(
       printf("\n");
       assert(!"Mismatched operand size when moving");
     }
+  }
+
+  if (is_memory_operand(&target->operand) && is_memory_operand(&source->operand)) {
+    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+    move_value(builder, reg_a, source);
+    move_value(builder, target, reg_a);
+    return;
   }
 
   if (

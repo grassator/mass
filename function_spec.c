@@ -135,7 +135,7 @@ spec("function") {
 
   it("should be able to parse and run multiple function definitions") {
     Slice source = slice_literal(
-      "proxy :: () -> (s32) { plus(1, 2); plus((30 + 10), 2) }"
+      "proxy :: () -> (s32) { plus(1, 2); plus(plus(30, 10), 2) }"
       "plus :: (x : s32, y : s32) -> (s32) { x + y }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
