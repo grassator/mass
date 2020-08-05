@@ -87,7 +87,7 @@ spec("function") {
 
     token_match_module(result.root, program_);
 
-    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"));
+    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
     assert(foo);
 
     program_end(program_);
@@ -105,7 +105,7 @@ spec("function") {
 
     token_match_module(result.root, program_);
 
-    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"));
+    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
     assert(foo);
 
     program_end(program_);
@@ -123,7 +123,7 @@ spec("function") {
 
     token_match_module(result.root, program_);
 
-    Value *plus = scope_lookup_force(program_->global_scope, slice_literal("plus"));
+    Value *plus = scope_lookup_force(program_->global_scope, slice_literal("plus"), 0);
     assert(plus);
 
     program_end(program_);
@@ -135,20 +135,21 @@ spec("function") {
 
   it("should be able to parse and run multiple function definitions") {
     Slice source = slice_literal(
-      "proxy :: () -> (s32) { one() }"
-      "one :: () -> (s32) { 1 }"
+      "proxy :: () -> (s32) { plus(1, 2); plus((30 + 10), 2) }"
+      "plus :: (x : s32, y : s32) -> (s32) { x + y }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
 
-    Value *proxy = scope_lookup_force(program_->global_scope, slice_literal("proxy"));
+    Value *proxy = scope_lookup_force(program_->global_scope, slice_literal("proxy"), 0);
     assert(proxy);
 
     program_end(program_);
 
-    check(value_as_function(proxy, fn_type_void_to_s32)() == 1);
+    s32 answer = value_as_function(proxy, fn_type_void_to_s32)();
+    check(answer == 42);
   }
 
   it("should parse and write out an executable that exits with status code 42") {
@@ -161,7 +162,7 @@ spec("function") {
 
     token_match_module(result.root, program_);
 
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"));
+    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
 
     write_executable(L"build\\test_parsed.exe", program_);
   }

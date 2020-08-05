@@ -154,17 +154,20 @@ const X64_Mnemonic xor = {
 // add
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding add_encoding_list[] = {
+
+  encoding(0x02, _r, r8, r_m8),
   encoding(0x03, _r, r16, r_m16),
   encoding(0x03, _r, r32, r_m32),
   encoding(0x03, _r, r64, r_m64),
 
-  encoding(0x81, _r, r_m16, imm16),
-  encoding(0x81, _r, r_m32, imm32),
-  encoding(0x81, _r, r_m64, imm32),
+  encoding(0x80, _op_code(0), r_m8, imm8),
+  encoding(0x81, _op_code(0), r_m16, imm16),
+  encoding(0x81, _op_code(0), r_m32, imm32),
+  encoding(0x81, _op_code(0), r_m64, imm32),
 
-  encoding(0x83, _r, r_m16, imm8),
-  encoding(0x83, _r, r_m32, imm8),
-  encoding(0x83, _r, r_m64, imm8),
+  encoding(0x83, _op_code(0), r_m16, imm8),
+  encoding(0x83, _op_code(0), r_m32, imm8),
+  encoding(0x83, _op_code(0), r_m64, imm8),
 };
 const X64_Mnemonic add = {
   .name = "add",

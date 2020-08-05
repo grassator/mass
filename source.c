@@ -95,13 +95,15 @@ scope_lookup(
 Value *
 token_force_value(
   Token *token,
-  Scope *scope
+  Scope *scope,
+  Function_Builder *builder
 );
 
 Value *
 scope_lookup_force(
   Scope *scope,
-  Slice name
+  Slice name,
+  Function_Builder *builder
 ) {
   Scope_Entry *entry = scope_lookup(scope, name);
   assert(entry);
@@ -111,7 +113,7 @@ scope_lookup_force(
       break;
     }
     case Scope_Entry_Type_Lazy: {
-      return token_force_value(entry->token, scope);
+      return token_force_value(entry->token, scope, builder);
     }
   }
   assert(!"Not reached");
@@ -405,19 +407,30 @@ tokenize(
 }
 
 typedef struct {
-  Token *root;
-  u64 child_index;
+  Array_Token_Ptr tokens;
+  u64 start_index;
 } Token_Matcher_State;
+typedef dyn_array_type(Token_Matcher_State) Array_Token_Matcher_State;
 
 Token *
 token_peek(
   Token_Matcher_State *state,
   u64 delta
 ) {
-  u64 index = state->child_index + delta;
-  Token **peek = dyn_array_peek(state->root->children, index);
+  u64 index = state->start_index + delta;
+  Token **peek = dyn_array_peek(state->tokens, index);
   if (!peek) return 0;
   return *peek;
+}
+
+bool
+token_match(
+  const Token *source,
+  const Token *pattern
+) {
+  if (pattern->type && pattern->type != source->type) return false;
+  if (pattern->source.length && !slice_equal(pattern->source, source->source)) return false;
+  return true;
 }
 
 Token *
@@ -428,16 +441,29 @@ token_peek_match(
 ) {
   Token *source_token = token_peek(state, delta);
   if (!source_token) return 0;
-  if (pattern_token->type && pattern_token->type != source_token->type) {
-    return 0;
-  }
-  if (
-    pattern_token->source.length &&
-    !slice_equal(pattern_token->source, source_token->source)
-  ) {
-    return 0;
-  }
+  if (!token_match(source_token, pattern_token)) return 0;
   return source_token;
+}
+
+Array_Token_Matcher_State
+token_split(
+  Array_Token_Ptr tokens,
+  const Token *separator
+) {
+  Array_Token_Matcher_State result = dyn_array_make(Array_Token_Matcher_State);
+
+  Array_Token_Ptr sequence = dyn_array_make(Array_Token_Ptr);
+  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
+    Token *token = *dyn_array_get(tokens, i);
+    if (token_match(token, separator)) {
+      dyn_array_push(result, (Token_Matcher_State) { .tokens = sequence });
+      sequence = dyn_array_make(Array_Token_Ptr);
+    } else {
+      dyn_array_push(sequence, token);
+    }
+  }
+  dyn_array_push(result, (Token_Matcher_State) { .tokens = sequence });
+  return result;
 }
 
 Descriptor *
@@ -469,6 +495,9 @@ typedef struct {
 #define Token_Match_Operator(_id_, _op_)\
   Token_Match(_id_, .type = Token_Type_Operator, .source = slice_literal(_op_))
 
+#define Token_Match_End()\
+  assert(peek_index == dyn_array_length(state->tokens))
+
 
 Token_Match_Arg *
 token_match_argument(
@@ -479,9 +508,7 @@ token_match_argument(
   Token_Match(arg_id, .type = Token_Type_Id);
   Token_Match_Operator(arg_colon, ":");
   Token_Match(arg_type, .type = Token_Type_Id);
-  Maybe_Token_Match(comma, .type = Token_Type_Operator, .source = slice_literal(","));
-  if (!comma) peek_index--;
-  state->child_index += peek_index;
+  Token_Match_End();
 
   Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
   *result = (Token_Match_Arg) {
@@ -497,9 +524,17 @@ token_force_lazy_function_definition(
 );
 
 Value *
+token_match_expression(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+);
+
+Value *
 token_force_value(
   Token *token,
-  Scope *scope
+  Scope *scope,
+  Function_Builder *builder
 ) {
   Value *result_value = 0;
   if (token->type == Token_Type_Integer) {
@@ -507,11 +542,15 @@ token_force_value(
     assert(parse_result.success);
     result_value = value_from_signed_immediate(parse_result.value);
   } else if (token->type == Token_Type_Id) {
-    result_value = scope_lookup_force(scope, token->source);
+    result_value = scope_lookup_force(scope, token->source, builder);
   } else if (token->type == Token_Type_Value) {
     result_value = token->value;
   } else if (token->type == Token_Type_Lazy_Function_Definition) {
     return token_force_lazy_function_definition(&token->lazy_function_definition);
+  } else if (token->type == Token_Type_Paren) {
+    assert(builder);
+    Token_Matcher_State state = {.tokens = token->children};
+    return token_match_expression(&state, scope, builder);
   } else {
     assert(!"Not implemented");
   }
@@ -526,14 +565,16 @@ token_match_call_arguments(
   Function_Builder *builder_
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
-  if (dyn_array_length(token->children) == 0) {
-    // Nothing to do
-  } else if (dyn_array_length(token->children) == 1) {
-    Value *value = token_force_value(*dyn_array_get(token->children, 0), scope);
-    dyn_array_push(result, value);
-  } else {
-    // FIXME implement this;
-    assert(!"Not implemented");
+  if (dyn_array_length(token->children) != 0) {
+    Array_Token_Matcher_State argument_states = token_split(token->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(","),
+    });
+    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
+      Token_Matcher_State *state = dyn_array_get(argument_states, i);
+      Value *value = token_match_expression(state, scope, builder_);
+      dyn_array_push(result, value);
+    }
   }
   return result;
 }
@@ -555,63 +596,59 @@ token_value_make(
 
 Value *
 token_match_expression(
-  Token *token,
+  Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
 ) {
-  assert(token->type == Token_Type_Paren || token->type == Token_Type_Curly);
-
-  if (!dyn_array_length(token->children)) {
+  if (!dyn_array_length(state->tokens)) {
     return 0;
   }
 
   // Match Function Calls
-  Token_Matcher_State *state = &(Token_Matcher_State) {.root = token};
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->child_index = i;
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+      state->start_index = i;
       Token *args_token = token_peek_match(state, 1, &(Token) { .type = Token_Type_Paren, });
       if (!args_token) continue;
       Token *maybe_target = token_peek(state, 0);
       if (maybe_target->type != Token_Type_Id && maybe_target->type != Token_Type_Paren) continue;
 
-      Value *target = token_force_value(maybe_target, scope);
+      Value *target = token_force_value(maybe_target, scope, builder_);
       Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder_);
 
       Value *result = call_function_value_array(builder_, target, args);
       Token *result_token = token_value_make(args_token, result);
 
-      *dyn_array_get(token->children, i) = result_token;
-      dyn_array_delete(token->children, i + 1);
+      *dyn_array_get(state->tokens, i) = result_token;
+      dyn_array_delete(state->tokens, i + 1);
       did_replace |= true;
     }
   };
 
-  state = &(Token_Matcher_State) {.root = token};
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->child_index = i;
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+      state->start_index = i;
       Token *plus_token = token_peek_match(state, 1, &(Token) {
         .type = Token_Type_Operator,
         .source = slice_literal("+"),
       });
       if (!plus_token) continue;
 
-      Value *lhs = token_force_value(token_peek(state, 0), scope);
-      Value *rhs = token_force_value(token_peek(state, 2), scope);
+      Value *lhs = token_force_value(token_peek(state, 0), scope, builder_);
+      Value *rhs = token_force_value(token_peek(state, 2), scope, builder_);
 
       Value *result = Plus(lhs, rhs);
       Token *result_token = token_value_make(plus_token, result);
-      *dyn_array_get(token->children, i) = result_token;
-      dyn_array_delete_range(token->children, (Range_u64){i + 1, i + 3});
+      *dyn_array_get(state->tokens, i) = result_token;
+      dyn_array_delete_range(state->tokens, (Range_u64){i + 1, i + 3});
       did_replace |= true;
     }
   };
 
-  assert(dyn_array_length(token->children) == 1);
-  return token_force_value(*dyn_array_get(token->children, 0), scope);
+  assert(dyn_array_length(state->tokens) == 1);
+  return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder_);
 }
 
 Value *
@@ -625,18 +662,17 @@ token_force_lazy_function_definition(
   Scope *function_scope = scope_make(program_->global_scope);
   Function(value) {
     if (dyn_array_length(args->children) != 0) {
-      Token_Matcher_State args_state = { .root = args };
-
-      u64 prev_child_index = 0;
-      do {
-        prev_child_index = args_state.child_index;
-        Token_Match_Arg *arg = token_match_argument(&args_state, program_);
-        if (arg) {
-          Arg(arg_value, program_lookup_type(program_, arg->type_name));
-          scope_define_value(function_scope, arg->arg_name, arg_value);
-        }
-      } while (prev_child_index != args_state.child_index);
-      assert(args_state.child_index == dyn_array_length(args->children));
+      Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
+        .type = Token_Type_Operator,
+        .source = slice_literal(","),
+      });
+      for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
+        Token_Matcher_State *state = dyn_array_get(argument_states, i);
+        Token_Match_Arg *arg = token_match_argument(state, program_);
+        assert(arg);
+        Arg(arg_value, program_lookup_type(program_, arg->type_name));
+        scope_define_value(function_scope, arg->arg_name, arg_value);
+      }
     }
 
     switch (dyn_array_length(return_types->children)) {
@@ -667,7 +703,17 @@ token_force_lazy_function_definition(
       body->value->descriptor = builder_->descriptor;
       return body->value;
     } else {
-      Value *body_result = token_match_expression(body, function_scope, builder_);
+      Value *body_result = 0;
+      if (dyn_array_length(body->children) != 0) {
+        Array_Token_Matcher_State body_statements = token_split(body->children, &(Token){
+          .type = Token_Type_Operator,
+          .source = slice_literal(";"),
+        });
+        for (u64 i = 0; i < dyn_array_length(body_statements); ++i) {
+          Token_Matcher_State *state = dyn_array_get(body_statements, i);
+          body_result = token_match_expression(state, function_scope, builder_);
+        }
+      }
       if (body_result) {
         fn_return(builder_, body_result, Function_Return_Type_Implicit);
       }
@@ -693,7 +739,7 @@ token_import_match_arguments(
   Program *program
 ) {
   assert(paren->type == Token_Type_Paren);
-  Token_Matcher_State *state = &(Token_Matcher_State) {.root = paren };
+  Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = paren->children };
 
   Token *library_name_string = token_peek_match(state, 0, &(Token) {
     .type = Token_Type_String,
@@ -731,13 +777,13 @@ token_match_module(
   assert(token->type == Token_Type_Module);
   if (!dyn_array_length(token->children)) return;
 
-  Token_Matcher_State *state = &(Token_Matcher_State) {.root = token};
+  Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
 
   // Matching symbol imports
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
     for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->child_index = i;
+      state->start_index = i;
 
       Token *import = token_peek_match(state, 0, &(Token) {
         .type = Token_Type_Id,
@@ -758,7 +804,7 @@ token_match_module(
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
     for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->child_index = i;
+      state->start_index = i;
 
       Token *arrow = token_peek_match(state, 1, &(Token) {
         .type = Token_Type_Operator,
@@ -796,7 +842,7 @@ token_match_module(
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
     for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->child_index = i;
+      state->start_index = i;
 
       Token *define = token_peek_match(state, 1, &(Token) {
         .type = Token_Type_Operator,
