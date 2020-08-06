@@ -28,32 +28,12 @@ push_instruction_internal(
   dyn_array_push(builder->instructions, instruction);
 }
 
-bool
-is_memory_operand(
-  Operand *operand
-) {
-  return (
-    operand->type == Operand_Type_Memory_Indirect ||
-    operand->type == Operand_Type_RIP_Relative
-  );
-}
-
 void
 move_value(
   Function_Builder *builder,
   Value *target,
   Value *source
 );
-
-bool
-operand_is_immediate(
-  Operand *operand
-) {
-  if (operand->type == Operand_Type_Immediate_8) return true;
-  if (operand->type == Operand_Type_Immediate_32) return true;
-  if (operand->type == Operand_Type_Immediate_64) return true;
-  return false;
-}
 
 Value *
 ensure_register_or_memory(
@@ -104,7 +84,7 @@ move_value(
     }
   }
 
-  if (is_memory_operand(&target->operand) && is_memory_operand(&source->operand)) {
+  if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
     Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
     move_value(builder, reg_a, source);
     move_value(builder, target, reg_a);

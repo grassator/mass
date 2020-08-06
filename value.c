@@ -353,6 +353,26 @@ stack(
   };
 }
 
+bool
+operand_is_memory(
+  Operand *operand
+) {
+  return (
+    operand->type == Operand_Type_Memory_Indirect ||
+    operand->type == Operand_Type_RIP_Relative
+  );
+}
+
+bool
+operand_is_immediate(
+  Operand *operand
+) {
+  if (operand->type == Operand_Type_Immediate_8) return true;
+  if (operand->type == Operand_Type_Immediate_32) return true;
+  if (operand->type == Operand_Type_Immediate_64) return true;
+  return false;
+}
+
 Value *
 value_from_s64(
   s64 integer
