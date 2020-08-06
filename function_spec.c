@@ -135,7 +135,7 @@ spec("function") {
 
   it("should be able to parse and run multiple function definitions") {
     Slice source = slice_literal(
-      "proxy :: () -> (s32) { plus(1, 2); plus(plus(30, 10), 2) }"
+      "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
       "plus :: (x : s32, y : s32) -> (s32) { x + y }"
     );
     Tokenizer_Result result = tokenize("_test_.mass", source);
@@ -380,6 +380,30 @@ spec("function") {
     program_end(program_);
     s32 result = value_as_function(increment, fn_type_s32_to_s32)(42);
     check(result == 43);
+  }
+
+  it("should correctly handle constant conditions") {
+    Function(checker_value) {
+      If(Eq(value_from_s32(1), value_from_s32(0))) {
+        Return(value_from_s32(0));
+      }
+      If(Eq(value_from_s32(1), value_from_s32(1))) {
+        Return(value_from_s32(1));
+      }
+      Return(value_from_s32(-1));
+
+      for(u64 i = 0; i < dyn_array_length(builder_->instructions); ++i) {
+        Instruction *instruction = dyn_array_get(builder_->instructions, i);
+        if (instruction->mnemonic.name) {
+          check(strcmp(instruction->mnemonic.name, cmp.name) != 0);
+        }
+      }
+    }
+
+    program_end(program_);
+    fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
+    s32 result = checker();
+    check(result == 1);
   }
 
   it("should have a function that returns 0 if arg is zero, 1 otherwise") {

@@ -125,8 +125,8 @@ divide(
 #define IfBuilder(_builder_, _value_) \
   for (\
     Label *label__ = make_if(_builder_, _value_), *dummy__ = 0; \
-    !(dummy__++); \
-     push_instruction(_builder_, (Instruction) {.maybe_label = label__})\
+    label__ && !(dummy__++); \
+    push_instruction(_builder_, (Instruction) {.maybe_label = label__})\
   )
 #define If(_value_) IfBuilder(builder_, _value_)
 

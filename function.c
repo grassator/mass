@@ -305,16 +305,25 @@ Label *make_if(
   Function_Builder *builder,
   Value *value
 ) {
-  Label *label = make_label();
-  u32 byte_size = descriptor_byte_size(value->descriptor);
-  if (byte_size == 4 || byte_size == 8) {
-    push_instruction(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
-  } else if (byte_size == 1) {
-    push_instruction(builder, (Instruction) {cmp, {value->operand, imm8(0), 0}});
-  } else {
-    assert(!"Unsupported value inside `if`");
+  bool is_always_true = false;
+  if(operand_is_immediate(&value->operand)) {
+    s64 imm = operand_immediate_as_s64(&value->operand);
+    if (imm == 0) return 0;
+    is_always_true = true;
   }
-  push_instruction(builder, (Instruction) {jz, {label32(label), 0, 0}});
+
+  Label *label = make_label();
+  if (!is_always_true) {
+    u32 byte_size = descriptor_byte_size(value->descriptor);
+    if (byte_size == 4 || byte_size == 8) {
+      push_instruction(builder, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+    } else if (byte_size == 1) {
+      push_instruction(builder, (Instruction) {cmp, {value->operand, imm8(0), 0}});
+    } else {
+      assert(!"Unsupported value inside `if`");
+    }
+    push_instruction(builder, (Instruction) {jz, {label32(label), 0, 0}});
+  }
   return label;
 }
 
@@ -356,6 +365,17 @@ typedef enum {
   Arithmetic_Operation_Minus,
 } Arithmetic_Operation;
 
+#define maybe_constant_fold(_a_, _b_, _operator_)\
+  do {\
+    Operand *a_operand = &(_a_)->operand;\
+    Operand *b_operand = &(_b_)->operand;\
+    if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {\
+      s64 a_s64 = operand_immediate_as_s64(a_operand);\
+      s64 b_s64 = operand_immediate_as_s64(b_operand);\
+      return value_from_signed_immediate(a_s64 _operator_ b_s64);\
+    }\
+  } while(0)
+
 Value *
 plus_or_minus(
   Arithmetic_Operation operation,
@@ -374,6 +394,16 @@ plus_or_minus(
 
   assert_not_register_ax(a);
   assert_not_register_ax(b);
+
+  switch(operation) {
+    case Arithmetic_Operation_Plus: {
+      maybe_constant_fold(a, b, +);
+      break;
+    }
+    case Arithmetic_Operation_Minus: {
+      maybe_constant_fold(a, b, -);
+    }
+  }
 
   Value *temp_b = reserve_stack(builder, b->descriptor);
   move_value(builder, temp_b, b);
@@ -431,6 +461,8 @@ multiply(
   assert_not_register_ax(x);
   assert_not_register_ax(y);
 
+  maybe_constant_fold(x, y, *);
+
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
   // TODO make the move only for imm value
@@ -463,6 +495,8 @@ divide(
   // TODO type check values
   assert_not_register_ax(a);
   assert_not_register_ax(b);
+
+  maybe_constant_fold(a, b, /);
 
   // Save RDX as it will be used for the remainder
   Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
@@ -514,6 +548,29 @@ compare(
 ) {
   assert(same_value_type(a, b));
   assert(a->descriptor->type == Descriptor_Type_Integer);
+
+  switch(operation) {
+    case Compare_Equal: {
+      maybe_constant_fold(a, b, ==);
+      break;
+    }
+    case Compare_Not_Equal: {
+      maybe_constant_fold(a, b, !=);
+      break;
+    }
+    case Compare_Less: {
+      maybe_constant_fold(a, b, <);
+      break;
+    }
+    case Compare_Greater: {
+      maybe_constant_fold(a, b, >);
+      break;
+    }
+    default: {
+      assert(!"Unsupported comparison");
+    }
+  }
+
   Value *temp_b = reserve_stack(builder, b->descriptor);
   move_value(builder, temp_b, b);
 
