@@ -55,7 +55,7 @@ typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Token *token;
+    Array_Token_Ptr tokens;
   };
 } Scope_Entry;
 
@@ -105,19 +105,57 @@ scope_lookup_force(
   Slice name,
   Function_Builder *builder
 ) {
-  Scope_Entry *entry = scope_lookup(scope, name);
+  Scope_Entry *entry = 0;
+  while (scope) {
+    entry = hash_map_get(scope->map, name);
+    if (entry) break;
+    scope = scope->parent;
+  }
   assert(entry);
+  Value *result = 0;
   switch(entry->type) {
     case Scope_Entry_Type_Value: {
-      return entry->value;
+      result = entry->value;
       break;
     }
     case Scope_Entry_Type_Lazy: {
-      return token_force_value(entry->token, scope, builder);
+      Array_Token_Ptr tokens = entry->tokens;
+      for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
+        Token *token = *dyn_array_get(tokens, i);
+        if (!result) {
+          result = token_force_value(token, scope, builder);
+        } else {
+          assert(result->descriptor->type == Descriptor_Type_Function);
+          Value *overload = token_force_value(token, scope, builder);
+          overload->descriptor->function.next_overload = result;
+          result = overload;
+        }
+      }
+      assert(result);
+      *entry = (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .value = result,
+      };
     }
   }
-  assert(!"Not reached");
-  return 0;
+  // For functions we need to gather up overloads from all parent scopes
+  if (result->descriptor->type == Descriptor_Type_Function) {
+    Value *last = result;
+    Scope *parent = scope;
+    for (;;) {
+      parent = parent->parent;
+      if (!parent) break;
+      if (!hash_map_has(parent->map, name)) continue;
+      Value *overload = scope_lookup_force(parent, name, builder);
+      assert(overload->descriptor->type == Descriptor_Type_Function);
+      while (last->descriptor->function.next_overload) {
+        last = last->descriptor->function.next_overload;
+      }
+      last->descriptor->function.next_overload = overload;
+    };
+  }
+  assert(result);
+  return result;
 }
 
 void
@@ -140,12 +178,17 @@ scope_define_lazy(
   Slice name,
   Token *token
 ) {
-  // TODO think about what should happen when trying to redefine existing thing
-  Scope_Entry entry = {
-    .type = Scope_Entry_Type_Lazy,
-    .token = token,
-  };
-  hash_map_set(scope->map, name, entry);
+  // For overloads with only check current scope and allow multiple overloads
+  // in multiple nested scopes
+  if (!hash_map_has(scope->map, name)) {
+    Scope_Entry entry = {
+      .type = Scope_Entry_Type_Lazy,
+      .tokens = dyn_array_make(Array_Token_Ptr),
+    };
+    hash_map_set(scope->map, name, entry);
+  }
+  Scope_Entry *entry = hash_map_get(scope->map, name);
+  dyn_array_push(entry->tokens, token);
 }
 
 bool
@@ -480,11 +523,6 @@ program_lookup_type(
   return descriptor;
 }
 
-typedef struct {
-  Slice arg_name;
-  Slice type_name;
-} Token_Match_Arg;
-
 #define Maybe_Token_Match(_id_, ...)\
   Token *(_id_) = token_peek_match(state, peek_index++, &(Token) { __VA_ARGS__ });\
 
@@ -498,6 +536,10 @@ typedef struct {
 #define Token_Match_End()\
   assert(peek_index == dyn_array_length(state->tokens))
 
+typedef struct {
+  Slice arg_name;
+  Slice type_name;
+} Token_Match_Arg;
 
 Token_Match_Arg *
 token_match_argument(
@@ -594,6 +636,83 @@ token_value_make(
   return result_token;
 }
 
+bool
+token_rewrite_functions(
+  Token_Matcher_State *state,
+  Program *program_
+) {
+  Token *arrow = token_peek_match(state, 1, &(Token) {
+    .type = Token_Type_Operator,
+    .source = slice_literal("->"),
+  });
+  if (!arrow) return false;
+
+  Token *args = token_peek_match(state, 0, &(Token) { .type = Token_Type_Paren });
+  Token *return_types = token_peek_match(state, 2, &(Token) { .type = Token_Type_Paren });
+  Token *body = token_peek(state, 3);
+  // TODO show proper error to the user
+  assert(args);
+  assert(return_types);
+  assert(body);
+
+  Token *result_token = temp_allocate(Token);
+  *result_token = (Token){
+    .type = Token_Type_Lazy_Function_Definition,
+    .parent = arrow->parent,
+    .source = arrow->source,
+    .lazy_function_definition = {
+      .args = args,
+      .return_types = return_types,
+      .body = body,
+      .program = program_,
+    },
+  };
+
+  u64 i = state->start_index;
+  *dyn_array_get(state->tokens, i) = result_token;
+  dyn_array_delete_range(state->tokens, (Range_u64){i + 1, i + 4});
+  return true;
+}
+
+// FIXME definition should rewrite with a token so that we can do proper
+// checking inside statements and maybe pass it around.
+bool
+token_rewrite_constant_definitions(
+  Token_Matcher_State *state,
+  Program *program_
+) {
+  Token *define = token_peek_match(state, 1, &(Token) {
+    .type = Token_Type_Operator,
+    .source = slice_literal("::"),
+  });
+  if (!define) return false;
+  Token *name = token_peek_match(state, 0, &(Token) { .type = Token_Type_Id });
+  Token *value = token_peek(state, 2);
+  assert(value);
+  scope_define_lazy(program_->global_scope, name->source, value);
+
+  u64 i = state->start_index;
+  dyn_array_delete_range(state->tokens, (Range_u64){i, i + 3});
+  return true;
+}
+
+typedef bool (*token_rewrite_callback)(Token_Matcher_State *, Program *);
+
+void
+token_rewrite(
+  Token_Matcher_State *state,
+  Program *program,
+  token_rewrite_callback callback
+) {
+  start: for (;;) {
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+      state->start_index = i;
+      if (callback(state, program)) goto start;
+    }
+    break;
+  }
+}
+
 Value *
 token_match_expression(
   Token_Matcher_State *state,
@@ -603,6 +722,7 @@ token_match_expression(
   if (!dyn_array_length(state->tokens)) {
     return 0;
   }
+  token_rewrite(state, builder_->program, token_rewrite_functions);
 
   // Match Function Calls
   for (bool did_replace = true; did_replace;) {
@@ -646,9 +766,20 @@ token_match_expression(
       did_replace |= true;
     }
   };
+  token_rewrite(state, builder_->program, token_rewrite_constant_definitions);
 
-  assert(dyn_array_length(state->tokens) == 1);
-  return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder_);
+  switch(dyn_array_length(state->tokens)) {
+    case 0: {
+      return &void_value;
+    }
+    case 1: {
+      return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder_);
+    }
+    default: {
+      assert(!"Could not reduce an expression");
+      return 0;
+    }
+  }
 }
 
 Value *
@@ -782,7 +913,7 @@ token_match_module(
   // Matching symbol imports
   for (bool did_replace = true; did_replace;) {
     did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
       state->start_index = i;
 
       Token *import = token_peek_match(state, 0, &(Token) {
@@ -794,70 +925,13 @@ token_match_module(
       if (!args) continue;
       Token *result_token = token_import_match_arguments(args, program_);
 
-      *dyn_array_get(token->children, i) = result_token;
-      dyn_array_delete(token->children, i + 1);
+      *dyn_array_get(state->tokens, i) = result_token;
+      dyn_array_delete(state->tokens, i + 1);
       did_replace |= true;
     }
   }
+  token_rewrite(state, program_, token_rewrite_functions);
+  token_rewrite(state, program_, token_rewrite_constant_definitions);
 
-
-  for (bool did_replace = true; did_replace;) {
-    did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->start_index = i;
-
-      Token *arrow = token_peek_match(state, 1, &(Token) {
-        .type = Token_Type_Operator,
-        .source = slice_literal("->"),
-      });
-      if (!arrow) continue;
-
-      Token *args = token_peek_match(state, 0, &(Token) { .type = Token_Type_Paren });
-      Token *return_types = token_peek_match(state, 2, &(Token) { .type = Token_Type_Paren });
-      Token *body = token_peek(state, 3);
-      // TODO show proper error to the user
-      assert(args);
-      assert(return_types);
-      assert(body);
-
-      Token *result_token = temp_allocate(Token);
-      *result_token = (Token){
-        .type = Token_Type_Lazy_Function_Definition,
-        .parent = token->parent,
-        .source = token->source,
-        .lazy_function_definition = {
-          .args = args,
-          .return_types = return_types,
-          .body = body,
-          .program = program_,
-        },
-      };
-
-      *dyn_array_get(token->children, i) = result_token;
-      dyn_array_delete_range(token->children, (Range_u64){i + 1, i + 4});
-      did_replace |= true;
-    }
-  };
-
-  for (bool did_replace = true; did_replace;) {
-    did_replace = false;
-    for (u64 i = 0; i < dyn_array_length(token->children); ++i) {
-      state->start_index = i;
-
-      Token *define = token_peek_match(state, 1, &(Token) {
-        .type = Token_Type_Operator,
-        .source = slice_literal("::"),
-      });
-      if (!define) continue;
-      Token *name = token_peek_match(state, 0, &(Token) { .type = Token_Type_Id });
-      Token *value = token_peek(state, 2);
-      assert(value);
-      scope_define_lazy(program_->global_scope, name->source, value);
-
-      dyn_array_delete_range(token->children, (Range_u64){i, i + 3});
-      did_replace |= true;
-    }
-  }
-
-  assert(dyn_array_length(token->children) == 0);
+  assert(dyn_array_length(state->tokens) == 0);
 }

@@ -152,6 +152,72 @@ spec("function") {
     check(answer == 42);
   }
 
+  it("should be able to define a local function") {
+    Slice source = slice_literal(
+      "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker =
+      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
+
+    program_end(program_);
+    s64 answer = value_as_function(checker, fn_type_void_to_s64)();
+    check(answer == 42);
+  }
+
+  it("should be able to parse and run functions with overloads") {
+    Slice source = slice_literal(
+      "size_of :: (x : s32) -> (s64) { 4 }"
+      "size_of :: (x : s64) -> (s64) { 8 }"
+      "checker_s64 :: (x : s64) -> (s64) { size_of(x) }"
+      "checker_s32 :: (x : s32) -> (s64) { size_of(x) }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker_s64 =
+      scope_lookup_force(program_->global_scope, slice_literal("checker_s64"), 0);
+    Value *checker_32 =
+      scope_lookup_force(program_->global_scope, slice_literal("checker_s32"), 0);
+
+    program_end(program_);
+
+    {
+      s64 size = value_as_function(checker_s64, fn_type_s64_to_s64)(0);
+      check(size == 8);
+    }
+
+    {
+      s64 size = value_as_function(checker_32, fn_type_s32_to_s64)(0);
+      check(size == 4);
+    }
+  }
+
+  it("should be able to parse and run functions with local overloads") {
+    Slice source = slice_literal(
+      "size_of :: (x : s32) -> (s64) { 4 }"
+      "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }"
+    );
+    Tokenizer_Result result = tokenize("_test_.mass", source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker =
+      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
+
+    program_end(program_);
+
+    s64 size = value_as_function(checker, fn_type_s32_to_s64)(0);
+    check(size == 4);
+  }
+
   it("should parse and write out an executable that exits with status code 42") {
     Slice source = slice_literal(
       "main :: () -> () { ExitProcess(42) }"

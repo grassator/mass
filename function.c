@@ -61,20 +61,25 @@ move_value(
 
   if (target_size != source_size) {
     if (source_size < target_size) {
-      if (source_size == 4) {
-        // Will be handled below
-      } else {
-        // TODO deal with unsigned numbers
-        source = ensure_register_or_memory(builder, source);
-        if (target->operand.type == Operand_Type_Register) {
-          push_instruction(builder, (Instruction) {movsx, {target->operand, source->operand, 0}});
+      // TODO deal with unsigned numbers
+      source = ensure_register_or_memory(builder, source);
+      if (target->operand.type == Operand_Type_Register) {
+        if (source_size == 4) {
+          Operand adjusted_target = {
+            .type = Operand_Type_Register,
+            .reg = target->operand.reg,
+            .byte_size = 4,
+          };
+          push_instruction(builder, (Instruction) {mov, {adjusted_target, source->operand, 0}});
         } else {
-          Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-          push_instruction(builder, (Instruction) {movsx, {reg_a->operand, source->operand, 0}});
-          push_instruction(builder, (Instruction) {mov, {target->operand, reg_a->operand, 0}});
+          push_instruction(builder, (Instruction) {movsx, {target->operand, source->operand, 0}});
         }
-        return;
+      } else {
+        Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+        push_instruction(builder, (Instruction) {movsx, {reg_a->operand, source->operand, 0}});
+        push_instruction(builder, (Instruction) {mov, {target->operand, reg_a->operand, 0}});
       }
+      return;
     } else {
       print_operand(&target->operand);
       printf(" ");
@@ -683,27 +688,54 @@ call_function_overload(
   return descriptor->returns;
 }
 
+typedef struct {
+  Value *value;
+  s64 score;
+} Overload_Match;
+
+s64
+calculate_arguments_match_score(
+  Descriptor_Function *descriptor,
+  Array_Value_Ptr arguments
+) {
+  enum {
+    Score_Exact = 100000,
+    Score_Cast = 1,
+  };
+  s64 score = 0;
+  for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
+    Value *source_arg = *dyn_array_get(arguments, arg_index);
+    Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
+    if (same_value_type(target_arg, source_arg)) {
+      score += Score_Exact;
+    } else if(same_value_type_or_can_implicitly_move_cast(target_arg, source_arg)) {
+      score += Score_Cast;
+    } else {
+      return -1;
+    }
+  }
+  return score;
+}
+
 Value *
 call_function_value_array(
   Function_Builder *builder,
   Value *to_call,
   Array_Value_Ptr arguments
 ) {
+  Overload_Match match = {.score = -1};
   for (;to_call; to_call = to_call->descriptor->function.next_overload) {
     Descriptor_Function *descriptor = &to_call->descriptor->function;
     if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
-    bool match = true;
-    for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
-      Value *source_arg = *dyn_array_get(arguments, arg_index);
-      Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
-      if(!same_value_type_or_can_implicitly_move_cast(target_arg, source_arg)) {
-        match = false;
-        break;
-      }
+    s64 score = calculate_arguments_match_score(descriptor, arguments);
+    if (score > match.score) {
+      // FIXME think about same scores
+      match.value = to_call;
+      match.score = score;
     }
-    if (match) {
-      return call_function_overload(builder, to_call, arguments);
-    }
+  }
+  if (match.value) {
+    return call_function_overload(builder, match.value, arguments);
   }
   dyn_array_destroy(arguments);
   assert(!"No matching overload found");

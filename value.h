@@ -12,6 +12,7 @@ typedef s8  (*fn_type_s32_s8_to_s8)(s32, s8);
 typedef void (*fn_type_s32p_to_void)(s32*);
 typedef s8 (*fn_type_s32_to_s8)(s32);
 typedef s32 (*fn_type_s32_to_s32)(s32);
+typedef s64 (*fn_type_s32_to_s64)(s32);
 typedef s32 (*fn_type_s32_s32_to_s32)(s32, s32);
 typedef s64 (*fn_type_s64_to_s64)(s64);
 typedef s64 (*fn_type_s64_s64_to_s64)(s64, s64);
