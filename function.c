@@ -501,7 +501,12 @@ divide(
   assert_not_register_ax(a);
   assert_not_register_ax(b);
 
-  maybe_constant_fold(a, b, /);
+  if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
+    s64 divident = operand_immediate_as_s64(&a->operand);
+    s64 divisor = operand_immediate_as_s64(&a->operand);
+    assert(divisor != 0);
+    return value_from_signed_immediate(divident / divisor);
+  }
 
   // Save RDX as it will be used for the remainder
   Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
