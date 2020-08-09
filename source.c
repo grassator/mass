@@ -221,7 +221,7 @@ code_point_is_operator(
 }
 
 typedef struct {
-  const char *filename;
+  Slice filename;
   u64 line;
   u64 column;
 } Source_Location;
@@ -250,12 +250,19 @@ print_message_with_location(
   const char *message,
   Source_Location *location
 ) {
-  printf("%s(%llu:%llu): %s\n", location->filename, location->line, location->column, message);
+  printf(
+    "%.*s(%llu:%llu): %s\n",
+    u64_to_s32(location->filename.length),
+    location->filename.bytes,
+    location->line,
+    location->column,
+    message
+  );
 }
 
 Tokenizer_Result
 tokenize(
-  const char *filename,
+  Slice filename,
   Slice source
 ) {
   Token *root = temp_allocate(Token);

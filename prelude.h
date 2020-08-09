@@ -265,13 +265,31 @@ const Allocator *allocator_system = &(Allocator){
 #endif
 
 inline void *
-allocator_allocate_bytes(
+allocator_allocate_bytes_internal(
   const Allocator *allocator,
   u64 size_in_bytes,
   u64 alignment
 ) {
   return allocator->allocate(allocator->handle, size_in_bytes, alignment);
 }
+
+#ifdef PRELUDE_TRACK_ALLOCATION
+  inline void *
+  allocator_debug_allocate_bytes(
+    const Allocator *allocator,
+    u64 size_in_bytes,
+    u64 alignment,
+    const char *function,
+    const char *file,
+    u64 line
+  );
+
+  #define allocator_allocate_bytes(...)\
+    allocator_debug_allocate_bytes(__VA_ARGS__, __func__, __FILE__, __LINE__)
+#else
+  #define allocator_allocate_bytes(...)\
+    allocator_allocate_bytes_internal(__VA_ARGS__)
+#endif
 
 #define allocator_allocate(_allocator_, _type_)\
   (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_), _Alignof(_type_))
@@ -665,6 +683,28 @@ dyn_array_ensure_capacity(
     )\
   })
 
+Dyn_Array_Internal *
+dyn_array_copy_internal(
+  Dyn_Array_Internal *source,
+  u64 item_byte_size
+) {
+  Dyn_Array_Internal *result = dyn_array_alloc_internal(
+    &(struct Dyn_Array_Make_Options) {
+      .allocator = source->allocator,
+      .capacity = source->capacity,
+    },
+    item_byte_size
+  );
+  result->length = source->length;
+  memcpy(result, source, sizeof(Dyn_Array_Internal) + item_byte_size * source->length);
+  return result;
+}
+
+#define dyn_array_copy(_array_type_, ...)\
+  ((_array_type_) {\
+    .internal = dyn_array_copy_internal((__VA_ARGS__).internal, dyn_array_item_size(_array_type_))\
+  })
+
 #define dyn_array_destroy(_array_)\
   allocator_deallocate((_array_).data->allocator, (_array_).data)
 
@@ -807,11 +847,11 @@ slice_from_c_string(
   };
 }
 
-#define slice_literal_fields(_literal_)\
-  { .bytes = (_literal_), .length = sizeof(_literal_) - 1, }
+#define slice_literal_fields(...)\
+  { .bytes = (__VA_ARGS__), .length = sizeof(__VA_ARGS__) - 1, }
 
-#define slice_literal(_literal_)\
-  ((Slice)slice_literal_fields(_literal_))
+#define slice_literal(...)\
+  ((Slice)slice_literal_fields(__VA_ARGS__))
 
 inline Slice
 slice_trim_starting_whitespace(
@@ -1508,6 +1548,28 @@ utf8_decode(
   return *state;
 }
 
+inline s32
+utf8_next_or_fffd(
+  Slice utf8,
+  u64 *index
+) {
+  u32 state = 0;
+  u32 code_point = 0;
+  for (; *index < utf8.length; (*index) += 1) {
+    if (utf8_decode(&state, &code_point, utf8.bytes[*index])) {
+      if (state == UTF8_REJECT) {
+        code_point = 0xfffd;
+        state = UTF8_ACCEPT;
+      } else {
+        continue;
+      }
+    }
+    (*index) += 1;
+    return code_point;
+  }
+  return -1;
+}
+
 /// Returns count of code_points in the string.
 /// -1 return value indicates invalid UTF-8 sequence.
 inline s64
@@ -1564,20 +1626,20 @@ utf8_to_utf32_estimate_max_byte_length(
 }
 
 /// Returns number of *bytes* written
-inline u64
+/// Replaces invalid utf8 sequences with U+FFFD code point
+u64
 utf8_to_utf16_raw(
   Slice utf8,
   wchar_t *target,
   u64 target_byte_size
 ) {
-  u32 code_point = 0;
-  u32 state = 0;
-
   u64 target_wide_length = target_byte_size / 2;
   u64 target_index = 0;
 
-  for (u64 index = 0; index < utf8.length; ++index) {
-    if (utf8_decode(&state, &code_point, utf8.bytes[index])) continue;
+  u64 index = 0;
+  for (;;) {
+    s32 code_point = utf8_next_or_fffd(utf8, &index);
+    if (code_point == -1) break;
 
     if (code_point <= 0xFFFF) {
       if (target_index >= target_wide_length) return target_wide_length * 2;
@@ -1604,14 +1666,114 @@ utf8_to_utf16_null_terminated(
   u64 allocation_size = max_byte_length + sizeof(wchar_t);
   wchar_t *target = allocator_allocate_bytes(allocator, allocation_size, sizeof(wchar_t));
   u64 bytes_written = utf8_to_utf16_raw(utf8, target, max_byte_length);
-  u64 end_index = bytes_written / 2;
+  u64 end_index = bytes_written / sizeof(wchar_t);
   target[end_index] = 0;
+  u64 actual_size = bytes_written + sizeof(wchar_t);
 
-  allocator_reallocate(allocator, target, allocation_size, end_index, sizeof(wchar_t));
+  if (actual_size != allocation_size) {
+    target = allocator_reallocate(allocator, target, allocation_size, actual_size, sizeof(wchar_t));
+  }
 
   return target;
 }
 
+/// Accepts source (UTF-16) string size in *bytes*
+/// The worst case here is for some asian characters that are 2 bytes in UTF16
+/// but require 3 bytes for UTF-8
+inline u64
+utf16_to_utf8_estimate_max_byte_length(
+  u64 size_in_bytes
+) {
+  return size_in_bytes * 3;
+}
+
+/// Returns number of *bytes* written
+/// Accepts source (UTF-16) string size in *bytes*
+/// Invalid code points and orphaned surrogate pair sides
+/// are replaced with U+FFFD code_point
+u64
+utf16_to_utf8_raw(
+  const wchar_t *source,
+  u64 source_byte_size,
+  s8 *target,
+  u64 target_byte_size
+) {
+  u64 source_wide_length = source_byte_size / 2;
+  u64 target_index = 0;
+
+  for (u64 source_index = 0; source_index < source_wide_length; ++source_index) {
+    u32 code_point = source[source_index];
+    // Surrogate pair
+    if (code_point >= 0xd800 && code_point <= 0xdbff) {
+      ++source_index;
+      if (source_index < source_wide_length) {
+        wchar_t pair = source[source_index];
+        // Valid pair
+        if (pair >= 0xdc00 && pair <= 0xdfff) {
+          code_point = (code_point - 0xd800) * 0x400 + (pair - 0xdc00) + 0x10000;
+        } else {
+          code_point = 0xfffd;
+        }
+      } else {
+        // Orphaned surrogate pair at the end of the string
+        code_point = 0xfffd;
+      }
+    }
+
+    if (code_point <= 0x7f) {
+      if (target_index >= target_byte_size) return target_byte_size;
+      target[target_index] = (s8) code_point;
+      target_index += 1;
+    } else if (code_point <= 0x7ff) {
+      if (target_index + 1 >= target_byte_size) return target_byte_size;
+      target[target_index + 0] = (s8) (((code_point >> 6) & 0x1f) | 0xc0);
+      target[target_index + 1] = (s8) (((code_point >> 0) & 0x3f) | 0x80);
+      target_index += 2;
+    } else if (code_point <= 0xffff) {
+      if (target_index + 2 >= target_byte_size) return target_byte_size;
+      target[target_index + 0] = (s8) (((code_point >> 12) & 0x0f) | 0xd0);
+      target[target_index + 1] = (s8) (((code_point >>  6) & 0x3f) | 0x80);
+      target[target_index + 2] = (s8) (((code_point >>  0) & 0x3f) | 0x80);
+      target_index += 3;
+    } else {
+      if (target_index + 3 >= target_byte_size) return target_byte_size;
+      target[target_index + 0] = (s8) (((code_point >> 18) & 0x07) | 0xf0);
+      target[target_index + 1] = (s8) (((code_point >> 12) & 0x3f) | 0x80);
+      target[target_index + 2] = (s8) (((code_point >>  6) & 0x3f) | 0x80);
+      target[target_index + 3] = (s8) (((code_point >>  0) & 0x3f) | 0x80);
+      target_index += 4;
+    }
+  }
+
+  return target_index;
+}
+
+Slice
+utf16_to_utf8(
+  const Allocator *allocator,
+  const wchar_t *source,
+  u64 source_byte_size
+) {
+  u64 max_byte_length = utf16_to_utf8_estimate_max_byte_length(source_byte_size);
+  s8 *target = allocator_allocate_bytes(allocator, max_byte_length, sizeof(s8));
+  u64 bytes_written = utf16_to_utf8_raw(source, source_byte_size, target, max_byte_length);
+
+  target = allocator_reallocate(allocator, target, max_byte_length, bytes_written, sizeof(s8));
+
+  return (Slice) {
+    .bytes = target,
+    .length = bytes_written
+  };
+}
+
+Slice
+utf16_null_terminated_to_utf8(
+  const Allocator *allocator,
+  const wchar_t *source
+) {
+  u64 source_byte_size = wcslen(source) * sizeof(wchar_t);
+  return utf16_to_utf8(allocator, source, source_byte_size);
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // LPEG
@@ -1781,7 +1943,7 @@ typedef struct {
   const Allocator *allocator;
   u64 capacity;
   u64 occupied;
-  u64 _padding;
+  void *last_allocation;
   s8 memory[];
 } Fixed_Buffer;
 
@@ -1810,6 +1972,7 @@ fixed_buffer_make_internal(
     .allocator = options->allocator,
     .capacity = options->capacity,
     .occupied = 0,
+    .last_allocation = 0,
   };
   return buffer;
 }
@@ -1860,6 +2023,7 @@ fixed_buffer_allocate_bytes(
   buffer->occupied = aligned_occupied;
   void *result = buffer->memory + buffer->occupied;
   buffer->occupied += byte_size;
+  buffer->last_allocation = result;
   return result;
 }
 
@@ -1937,6 +2101,12 @@ fixed_buffer_allocator_reallocate(
   u64 new_size_in_bytes,
   u64 alignment
 ) {
+  Fixed_Buffer *buffer = (Fixed_Buffer *)handle.raw;
+    if (address == buffer->last_allocation) {
+    buffer->occupied = (s8 *)address - buffer->memory;
+    return fixed_buffer_allocate_bytes(buffer, new_size_in_bytes, alignment);
+  }
+
   void *result = fixed_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
   fixed_buffer_allocator_deallocate(handle, address);
@@ -2470,5 +2640,45 @@ hash_map_resize(
 
 #define hash_map_set(_map_, _key_, _value_)\
   (_map_)->methods->set((_map_), (_key_), (_value_))
+
+////////////////////////////////////////////////////////////////////
+// Debug
+////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  const Allocator *allocator;
+  u64 size_in_bytes;
+  u64 alignment;
+  const char *function;
+  const char *file;
+  u64 line;
+  void *result;
+} Prelude_Allocation_Info;
+typedef dyn_array_type(Prelude_Allocation_Info) Array_Prelude_Allocation_Info;
+
+#ifdef PRELUDE_TRACK_ALLOCATION
+  inline void *
+  allocator_debug_allocate_bytes(
+    const Allocator *allocator,
+    u64 size_in_bytes,
+    u64 alignment,
+    const char *function,
+    const char *file,
+    u64 line
+  ) {
+    void *result = allocator_allocate_bytes_internal(allocator, size_in_bytes, alignment);
+    Prelude_Allocation_Info *info = &(Prelude_Allocation_Info) {
+      .allocator = allocator,
+      .size_in_bytes = size_in_bytes,
+      .alignment = alignment,
+      .function = function,
+      .file = file,
+      .line = line,
+      .result = result,
+    };
+    PRELUDE_TRACK_ALLOCATION(info);
+    return result;
+  }
+#endif
 
 #endif PRELUDE_H

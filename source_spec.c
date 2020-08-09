@@ -7,6 +7,7 @@
 
 
 spec("source") {
+  static Slice test_file_name = slice_literal_fields("_test_.mass");
   before_each() {
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
@@ -47,7 +48,7 @@ spec("source") {
   // Tokenizer
   it("should be able to tokenize an empty string") {
     Slice source = slice_literal("");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -58,7 +59,7 @@ spec("source") {
 
   it("should be able to tokenize a comment") {
     Slice source = slice_literal("// foo\n");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -69,7 +70,7 @@ spec("source") {
 
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 3);
@@ -90,7 +91,7 @@ spec("source") {
 
   it("should be able to tokenize groups") {
     Slice source = slice_literal("(x)");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -106,7 +107,7 @@ spec("source") {
 
   it("should be able to tokenize strings") {
     Slice source = slice_literal("\"foo 123\"");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -116,7 +117,7 @@ spec("source") {
 
   it("should be able to tokenize nested groups with different braces") {
     Slice source = slice_literal("{[]}");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -138,7 +139,7 @@ spec("source") {
       "  return x + 3;\n"
       "}"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -146,11 +147,11 @@ spec("source") {
 
   it("should report a failure when encountering a brace that is not closed") {
     Slice source = slice_literal("(foo");
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Tokenizer_Error *error = dyn_array_get(result.errors, 0);
-    check(strcmp(error->location.filename, "_test_.mass") == 0);
+    check(slice_equal(error->location.filename, test_file_name) == 0);
     check(error->location.line, 1);
     check(error->location.column, 4);
     check(strcmp(error->message, "Unexpected end of file. Expected a closing brace.") == 0);

@@ -205,6 +205,21 @@ Value void_value = {
   .operand = { .type = Operand_Type_None },
 };
 
+Value *type_s64_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_s64,
+  },
+  .operand = {.type = Operand_Type_None },
+};
+Value *type_s32_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_s32,
+  },
+  .operand = {.type = Operand_Type_None },
+};
+
 
 u32
 descriptor_byte_size(

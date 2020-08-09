@@ -35,24 +35,10 @@ make_add_two(
   return addtwo;
 }
 
-Value *type_s64_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s64,
-  },
-  .operand = {.type = Operand_Type_None },
-};
-Value *type_s32_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s32,
-  },
-  .operand = {.type = Operand_Type_None },
-};
-
 spec("function") {
   static Program test_program;
   static Program *program_;
+  static Slice test_file_name = slice_literal_fields("_test_.mass");
 
   before_each() {
 
@@ -82,7 +68,7 @@ spec("function") {
     Slice source = slice_literal(
       "foo :: () -> (s64) { 42 }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -100,7 +86,7 @@ spec("function") {
     Slice source = slice_literal(
       "foo :: (x : s64) -> (s64) { x }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -118,7 +104,7 @@ spec("function") {
     Slice source = slice_literal(
       "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -138,7 +124,7 @@ spec("function") {
       "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
       "plus :: (x : s32, y : s32) -> (s32) { x + y }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -156,7 +142,7 @@ spec("function") {
     Slice source = slice_literal(
       "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -176,7 +162,7 @@ spec("function") {
       "checker_s64 :: (x : s64) -> (s64) { size_of(x) }"
       "checker_s32 :: (x : s32) -> (s64) { size_of(x) }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -204,7 +190,7 @@ spec("function") {
       "size_of :: (x : s32) -> (s64) { 4 }"
       "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -223,7 +209,7 @@ spec("function") {
       "main :: () -> () { ExitProcess(42) }"
       "ExitProcess :: (status : s32) -> (s64) import(\"kernel32.dll\", \"ExitProcess\")"
     );
-    Tokenizer_Result result = tokenize("_test_.mass", source);
+    Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
