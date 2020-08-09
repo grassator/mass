@@ -752,6 +752,7 @@ token_rewrite_dll_imports(
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("import"));
   Token_Match(args, .type = Token_Type_Paren);
   Token *result_token = token_import_match_arguments(args, program);
+  assert(result_token);
 
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
