@@ -219,6 +219,13 @@ Value *type_s32_value = &(Value) {
   },
   .operand = {.type = Operand_Type_None },
 };
+Value *type_s8_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_s8,
+  },
+  .operand = {.type = Operand_Type_None },
+};
 
 
 u32

@@ -766,6 +766,67 @@ token_rewrite_dll_imports(
 }
 
 bool
+token_rewrite_definitions(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id);
+  Token_Match_Operator(define, ":");
+  Token_Match(type, .type = Token_Type_Id);
+  Descriptor *descriptor = program_lookup_type(builder_->program, type->source);
+  Value *var = reserve_stack(builder_, descriptor);
+  scope_define_value(scope, name->source, var);
+
+  // FIXME definition should rewrite with a token so that we can do proper
+  // checking inside statements and maybe pass it around.
+  token_replace_tokens_in_state(state, 3, 0);
+  return true;
+}
+
+bool
+token_rewrite_definition_and_assignment_statements(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id);
+  Token_Match_Operator(define, ":=");
+  Token_Match(token_value, 0);
+  Value *value = token_force_value(token_value, scope, builder_);
+  Stack(var, value->descriptor, value);
+  scope_define_value(scope, name->source, var);
+
+  // FIXME definition should rewrite with a token so that we can do proper
+  // checking inside statements and maybe pass it around.
+  token_replace_tokens_in_state(state, 3, 0);
+  return true;
+}
+
+bool
+token_rewrite_assignments(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id);
+  Token_Match_Operator(define, "=");
+  Token_Match(token_value, 0);
+
+  Value *value = token_force_value(token_value, scope, builder_);
+  Value *target = scope_lookup_force(scope, name->source, builder_);
+  move_value(builder_, target,  value);
+
+  // FIXME definition should rewrite with a token so that we can do proper
+  // checking inside statements and maybe pass it around.
+  token_replace_tokens_in_state(state, 3, 0);
+  return true;
+}
+
+bool
 token_rewrite_function_calls(
   Token_Matcher_State *state,
   Scope *scope,
@@ -850,6 +911,9 @@ token_match_expression(
   token_rewrite(state, builder->program, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
+  token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
+  token_rewrite_expression(state, scope, builder, token_rewrite_assignments);
+  token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
   token_rewrite(state, builder->program, token_rewrite_constant_definitions);
 
   switch(dyn_array_length(state->tokens)) {

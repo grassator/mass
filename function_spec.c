@@ -55,6 +55,7 @@ spec("function") {
 
     scope_define_value(test_program.global_scope, slice_literal("s64"), type_s64_value);
     scope_define_value(test_program.global_scope, slice_literal("s32"), type_s32_value);
+    scope_define_value(test_program.global_scope, slice_literal("s8"), type_s8_value);
   }
 
   after_each() {
@@ -98,6 +99,24 @@ spec("function") {
 
     fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
     check(checker(42) == 42);
+  }
+
+  it("should be able to define, assign and lookup an s64 variable on the stack") {
+    Slice source = slice_literal(
+      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
+    assert(foo);
+
+    program_end(program_);
+
+    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+    check(checker() == 42);
   }
 
   it("should be able to parse and run a plus function") {
