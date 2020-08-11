@@ -6,6 +6,7 @@ typedef void(*fn_type_opaque)();
 typedef void (*fn_type_void_to_void)(void);
 typedef s32 (*fn_type_void_to_s32)(void);
 typedef s64 (*fn_type_void_to_s64)(void);
+typedef const char *(*fn_type_void_to_const_charp)(void);
 typedef s32 (*fn_type_voidp_to_s32)(void*);
 typedef s64 (*fn_type_voidp_s64_to_s64)(void*, s64);
 typedef s8  (*fn_type_s32_s8_to_s8)(s32, s8);
@@ -227,7 +228,6 @@ Value *type_s8_value = &(Value) {
   .operand = {.type = Operand_Type_None },
 };
 
-
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
@@ -332,6 +332,12 @@ typedef struct {
 
 Bucket_Buffer temp_buffer;
 Allocator *temp_allocator;
+
+Value *
+value_global_c_string(
+  Program *program,
+  const char *string
+);
 
 #define temp_allocate(_type_)\
   bucket_buffer_allocate(temp_buffer, _type_)

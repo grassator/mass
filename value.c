@@ -494,6 +494,30 @@ value_global(
   return result;
 }
 
+
+// TODO refactor common parts with the one below
+Value *
+value_global_c_string_from_slice(
+  Program *program,
+  Slice slice
+) {
+  s32 length = (s32)slice.length + 1;
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  *descriptor = (Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = &descriptor_s8,
+      .length = length,
+    },
+  };
+
+  Value *string_value = value_global(program, descriptor);
+  s8 *memory = rip_value_pointer(program, string_value);
+  memcpy(memory, slice.bytes, slice.length);
+  memory[length - 1] = 0;
+  return string_value;
+}
+
 Value *
 value_global_c_string(
   Program *program,

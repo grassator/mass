@@ -545,8 +545,47 @@ program_lookup_type(
 
 typedef struct {
   Slice arg_name;
-  Slice type_name;
+  Descriptor *type_descriptor;
 } Token_Match_Arg;
+
+Descriptor *
+token_force_type(
+  Program *program_,
+  Token *token
+) {
+  Descriptor *descriptor = 0;
+  switch (token->type) {
+    case Token_Type_Id: {
+      descriptor = program_lookup_type(program_, token->source);
+      break;
+    }
+    case Token_Type_Square: {
+      assert(dyn_array_length(token->children) == 1);
+      Token *child = *dyn_array_get(token->children, 0);
+      // FIXME should be recursive
+      assert(child->type == Token_Type_Id);
+      descriptor = temp_allocate(Descriptor);
+      *descriptor = (Descriptor) {
+        .type = Descriptor_Type_Pointer,
+        .pointer_to = program_lookup_type(program_, child->source),
+      };
+      break;
+    }
+    case Token_Type_Integer:
+    case Token_Type_Operator:
+    case Token_Type_String:
+    case Token_Type_Paren:
+    case Token_Type_Curly:
+    case Token_Type_Module:
+    case Token_Type_Value:
+    case Token_Type_Lazy_Function_Definition:
+    default: {
+      assert(!"Not implemented");
+      break;
+    }
+  }
+  return descriptor;
+}
 
 Token_Match_Arg *
 token_match_argument(
@@ -556,13 +595,13 @@ token_match_argument(
   u64 peek_index = 0;
   Token_Match(arg_id, .type = Token_Type_Id);
   Token_Match_Operator(arg_colon, ":");
-  Token_Match(arg_type, .type = Token_Type_Id);
+  Token_Match(arg_type, 0);
   Token_Match_End();
 
   Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
   *result = (Token_Match_Arg) {
     .arg_name = arg_id->source,
-    .type_name = arg_type->source,
+    .type_descriptor = token_force_type(program_, arg_type),
   };
   return result;
 }
@@ -579,6 +618,18 @@ token_match_expression(
   Function_Builder *builder_
 );
 
+Slice
+token_string_to_slice(
+  Token *token
+) {
+  assert(token->type == Token_Type_String);
+  assert(token->source.length >= 2);
+  return (Slice) {
+    .bytes = token->source.bytes + 1,
+    .length = token->source.length - 2
+  };
+}
+
 Value *
 token_force_value(
   Token *token,
@@ -590,6 +641,11 @@ token_force_value(
     Slice_Parse_S64_Result parse_result = slice_parse_s64(token->source);
     assert(parse_result.success);
     result_value = value_from_signed_immediate(parse_result.value);
+  } else if (token->type == Token_Type_String) {
+    Slice string = token_string_to_slice(token);
+    result_value = value_pointer_to(
+      builder, value_global_c_string_from_slice(builder->program, string)
+    );
   } else if (token->type == Token_Type_Id) {
     result_value = scope_lookup_force(scope, token->source, builder);
   } else if (token->type == Token_Type_Value) {
@@ -703,17 +759,6 @@ token_rewrite_constant_definitions(
   return true;
 }
 
-Slice
-token_string_to_slice(
-  Token *token
-) {
-  assert(token->source.length >= 2);
-  return (Slice) {
-    .bytes = token->source.bytes + 1,
-    .length = token->source.length - 2
-  };
-}
-
 Token *
 token_import_match_arguments(
   Token *paren,
@@ -762,6 +807,31 @@ token_rewrite_dll_imports(
   assert(result_token);
 
   token_replace_tokens_in_state(state, 2, result_token);
+  return true;
+}
+
+bool
+token_rewrite_negative_literal(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  // FIXME distinguish unary and binary minus
+  Token_Match_Operator(define, "-");
+  Token_Match(integer, .type = Token_Type_Integer);
+  Value *result = token_force_value(integer, scope, builder_);
+  if (result->operand.type == Operand_Type_Immediate_8) {
+    result->operand.imm8 = -result->operand.imm8;
+  } else if (result->operand.type == Operand_Type_Immediate_32) {
+    result->operand.imm32 = -result->operand.imm32;
+  } else if (result->operand.type == Operand_Type_Immediate_64) {
+    result->operand.imm64 = -result->operand.imm64;
+  } else {
+    assert(!"Internal error, expected an immediate");
+  }
+
+  token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
   return true;
 }
 
@@ -909,6 +979,7 @@ token_match_expression(
     return 0;
   }
   token_rewrite(state, builder->program, token_rewrite_functions);
+  token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
@@ -949,7 +1020,7 @@ token_force_lazy_function_definition(
         Token_Matcher_State *state = dyn_array_get(argument_states, i);
         Token_Match_Arg *arg = token_match_argument(state, program_);
         assert(arg);
-        Arg(arg_value, program_lookup_type(program_, arg->type_name));
+        Arg(arg_value, arg->type_descriptor);
         scope_define_value(function_scope, arg->arg_name, arg_value);
       }
     }
@@ -961,11 +1032,9 @@ token_force_lazy_function_definition(
       }
       case 1: {
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
-        assert(return_type_token->type == Token_Type_Id);
-
         fn_return_descriptor(
           builder_,
-          program_lookup_type(program_, return_type_token->source),
+          token_force_type(program_, return_type_token),
           Function_Return_Type_Explicit
         );
         break;
