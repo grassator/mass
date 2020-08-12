@@ -308,7 +308,9 @@ spec("function") {
       Value *handle = Call(GetStdHandle_value, STD_OUTPUT_HANDLE_value);
       Stack_s32(bytes_written, value_from_s32(0));
       Value *bytes_written_ptr = value_pointer_to(builder_, bytes_written);
-      Value *message_bytes = value_global_c_string(program_, "Hello, world!");
+      Value *message_bytes = value_global_c_string_from_slice(
+        program_, slice_literal("Hello, world!")
+      );
       Value *message_ptr = value_pointer_to(builder_, message_bytes);
       Call(
         WriteFile_value,
