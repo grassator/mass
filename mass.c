@@ -12,15 +12,37 @@
     return -1;\
   } while (0)
 
+typedef enum {
+  Mass_Cli_Mode_Compile,
+  Mass_Cli_Mode_Run,
+} Mass_Cli_Mode;
+
+s32
+mass_cli_print_usage() {
+  printf("Mass Compiler\n");
+  printf("Usage:\n");
+  printf("  mass [--run] source_code.mass\n");
+  return -1;
+}
+
 int wmain(s32 argc, wchar_t **argv) {
-  if (argc != 2) {
-    printf("Mass Compiler\n");
-    printf("Usage:\n");
-    printf("  mass source_code.mass\n");
-    return 0;
+  if (argc < 2) {
+    return mass_cli_print_usage();
   }
 
-  wchar_t *file_path = argv[1];
+  Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
+  wchar_t *file_path = 0;
+  for (s32 i = 1; i < argc; ++i) {
+    if (wcscmp(argv[i], L"--run") == 0) {
+      mode = Mass_Cli_Mode_Run;
+    } else {
+      if (file_path) {
+        return mass_cli_print_usage();
+      } else {
+        file_path = argv[i];
+      }
+    }
+  }
 
   HANDLE file_handle = CreateFileW(
     file_path,
@@ -52,15 +74,7 @@ int wmain(s32 argc, wchar_t **argv) {
   temp_buffer = bucket_buffer_make(.allocator = allocator_system);
   temp_allocator = bucket_buffer_allocator_make(temp_buffer);
 
-  Program *program = &(Program) {
-    .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
-    .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
-    .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
-    .global_scope = scope_make(0),
-  };
-
-  scope_define_value(program->global_scope, slice_literal("s64"), type_s64_value);
-  scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
+  Program *program = program_init(&(Program) {0});
 
   Tokenizer_Result result = tokenize(utf8_file_path, source);
   if (result.type != Tokenizer_Result_Type_Success) {
@@ -74,6 +88,19 @@ int wmain(s32 argc, wchar_t **argv) {
   token_match_module(result.root, program);
 
   program->entry_point = scope_lookup_force(program->global_scope, slice_literal("main"), 0);
-  write_executable(L"build\\test_cli.exe", program);
+
+  switch(mode) {
+    case Mass_Cli_Mode_Compile: {
+      // TODO generate correct file name
+      write_executable(L"build\\test_cli.exe", program);
+      break;
+    }
+    case Mass_Cli_Mode_Run: {
+      program_end(program);
+      value_as_function(program->entry_point, fn_type_void_to_void)();
+      ExitProcess(0);
+      break;
+    }
+  }
   return 0;
 }

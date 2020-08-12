@@ -240,10 +240,10 @@ program_end(
         const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
-        s64 offset = program->data_buffer->occupied;
         fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
         *rip_target = fn_address;
-        symbol->offset_in_data = s64_to_s32(offset);
+        s64 offset_in_data_section = (s8 *)rip_target - program->data_buffer->memory;
+        symbol->offset_in_data = s64_to_s32(offset_in_data_section);
       }
     }
   }

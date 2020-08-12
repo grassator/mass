@@ -67,6 +67,16 @@ same_type(
   }
 }
 
+u32
+descriptor_alignment(
+  Descriptor *descriptor
+) {
+  if (descriptor->type == Descriptor_Type_Fixed_Size_Array) {
+    return descriptor_alignment(descriptor->array.item);
+  }
+  return descriptor_byte_size(descriptor);
+}
+
 inline bool
 same_value_type(
   Value *a,
@@ -100,11 +110,12 @@ struct_byte_size(
   u32 raw_size = 0;
   for (s32 i = 0; i < count; ++i) {
     Descriptor_Struct_Field *field = &struct_->field_list[i];
-    u32 field_size = descriptor_byte_size(field->descriptor);
-    alignment = max(alignment, field_size);
+    u32 field_alignment = descriptor_alignment(field->descriptor);
+    alignment = max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
+    u32 field_size_with_alignment = max(field_alignment, descriptor_byte_size(field->descriptor));
     if (is_last_field) {
-      raw_size = field->offset + field_size;
+      raw_size = field->offset + field_size_with_alignment;
     }
   }
   return s32_align(raw_size, alignment);
@@ -480,7 +491,8 @@ value_global(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, sizeof(s8));
+  u32 alignment = descriptor_alignment(descriptor);
+  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
   s64 offset_in_data_section = address - program->data_buffer->memory;
 
   Value *result = temp_allocate(Value);
