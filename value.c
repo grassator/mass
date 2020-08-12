@@ -1,4 +1,5 @@
 #include "value.h"
+#include "source.h"
 
 inline bool
 same_value_type(
@@ -760,8 +761,25 @@ c_function_value(
   return result;
 }
 
+Program *
+program_init(
+  Program *program
+) {
+  *program = (Program) {
+    .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
+    .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
+    .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
+    .global_scope = scope_make(0),
+  };
+
+  scope_define_value(program->global_scope, slice_literal("s64"), type_s64_value);
+  scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
+  scope_define_value(program->global_scope, slice_literal("s8"), type_s8_value);
+  return program;
+};
+
 void
-program_free(
+program_deinit(
   Program *program
 ) {
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
@@ -769,7 +787,6 @@ program_free(
     dyn_array_destroy(library->symbols);
   }
   dyn_array_destroy(program->import_libraries);
-  free(program);
 }
 
 Import_Library *

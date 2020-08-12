@@ -36,32 +36,18 @@ make_add_two(
 }
 
 spec("function") {
-  static Program test_program;
-  static Program *program_;
+  static Program test_program = {0};
+  static Program *program_ = &test_program;
   static Slice test_file_name = slice_literal_fields("_test_.mass");
 
   before_each() {
-
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
-
-    test_program = (Program) {
-      .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
-      .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
-      .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
-      .global_scope = scope_make(0),
-    };
-    program_ = &test_program;
-
-    scope_define_value(test_program.global_scope, slice_literal("s64"), type_s64_value);
-    scope_define_value(test_program.global_scope, slice_literal("s32"), type_s32_value);
-    scope_define_value(test_program.global_scope, slice_literal("s8"), type_s8_value);
+    program_init(program_);
   }
 
   after_each() {
-    dyn_array_destroy(test_program.import_libraries);
-    dyn_array_destroy(test_program.functions);
-    fixed_buffer_destroy(test_program.data_buffer);
+    program_deinit(program_);
     bucket_buffer_destroy(temp_buffer);
   }
 

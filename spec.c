@@ -6,6 +6,7 @@
 #include "instruction.c"
 #include "encoding.c"
 #include "function.c"
+#include "source.c"
 
 Value *
 fn_reflect(
@@ -229,23 +230,18 @@ create_is_character_in_set_checker_fn(
 
 spec("spec") {
 
-  static Program test_program;
-  static Program *program_;
+  static Program test_program = {0};
+  static Program *program_ = &test_program;
 
   before_each() {
-    test_program = (Program) {
-      .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
-      .functions = dyn_array_make(Array_Function_Builder, 4),
-    };
-    program_ = &test_program;
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
+    program_init(program_);
   }
 
   after_each() {
+    program_deinit(program_);
     bucket_buffer_destroy(temp_buffer);
-    dyn_array_destroy(test_program.functions);
-    fixed_buffer_destroy(test_program.data_buffer);
   }
 
   it("should have a way to create a function to checks if a character is one of the provided set") {
