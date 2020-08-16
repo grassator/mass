@@ -190,6 +190,48 @@ spec("function") {
     }
   }
 
+  it("should be able to have an explicit return") {
+    Slice source = slice_literal(
+      "checker :: (x : s32) -> (s32) {"
+        "return x"
+      "}"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker =
+      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
+
+    program_end(program_);
+
+    s32 actual = value_as_function(checker, fn_type_s32_to_s32)(42);
+    check(actual == 42);
+  }
+
+  it("should be able to parse and run if statement") {
+    Slice source = slice_literal(
+      "is_positive :: (x : s32) -> (s8) {"
+        "if x < 0 { return 0 };"
+        "1"
+      "}"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *is_positive =
+      scope_lookup_force(program_->global_scope, slice_literal("is_positive"), 0);
+
+    program_end(program_);
+
+    fn_type_s32_to_s8 is_positive_fn = value_as_function(is_positive, fn_type_s32_to_s8);
+    check(is_positive_fn(42) == 1);
+    check(is_positive_fn(-2) == 0);
+  }
+
   it("should be able to parse and run functions with local overloads") {
     Slice source = slice_literal(
       "size_of :: (x : s32) -> (s64) { 4 }"
@@ -311,7 +353,7 @@ spec("function") {
     write_executable(L"build\\hello_world.exe", program_);
   }
 
-  it("should suppor empty Function") {
+  it("should support an empty Function") {
     Function(checker_value) {}
     program_end(program_);
   }

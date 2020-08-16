@@ -746,6 +746,65 @@ token_rewrite_dll_imports(
   return true;
 }
 
+Value *
+token_parse_block(
+  Token *block,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  // TODO push an extra scope
+  assert(block->type == Token_Type_Curly);
+  Value *block_result = 0;
+  if (dyn_array_length(block->children) != 0) {
+    Array_Token_Matcher_State block_statements = token_split(block->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(";"),
+    });
+    for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
+      Token_Matcher_State *state = dyn_array_get(block_statements, i);
+      block_result = token_match_expression(state, scope, builder_);
+    }
+  }
+  return block_result;
+}
+
+bool
+token_rewrite_statement_if(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
+  Token_Match(condition, 0);
+  Token_Match(body, .type = Token_Type_Curly);
+  Token_Match_End();
+
+  If(token_force_value(condition, scope, builder_)) {
+    (void)token_parse_block(body, scope, builder_);
+  }
+
+  token_replace_tokens_in_state(state, 3, 0);
+  return true;
+}
+
+bool
+token_rewrite_explicit_return(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
+  Token_Match(to_return, 0);
+  Token_Match_End();
+  Value *result = token_force_value(to_return, scope, builder_);
+  Return(result);
+
+  token_replace_tokens_in_state(state, 2, 0);
+  return true;
+}
+
 bool
 token_rewrite_negative_literal(
   Token_Matcher_State *state,
@@ -870,6 +929,25 @@ token_rewrite_plus(
   return true;
 }
 
+bool
+token_rewrite_less_than(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(plus_token, "<");
+  Token_Match(rhs, 0);
+
+  Value *value = Less(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
+  return true;
+}
+
 typedef bool (*token_rewrite_callback)(Token_Matcher_State *, Program *);
 
 void
@@ -918,10 +996,7 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
-  token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
-  token_rewrite_expression(state, scope, builder, token_rewrite_assignments);
-  token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
-  token_rewrite(state, builder->program, token_rewrite_constant_definitions);
+  token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
@@ -931,7 +1006,16 @@ token_match_expression(
       return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder);
     }
     default: {
-      assert(!"Could not reduce an expression");
+      // Statement handling
+      token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
+      token_rewrite_expression(state, scope, builder, token_rewrite_assignments);
+      token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
+      token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
+      token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
+      token_rewrite(state, builder->program, token_rewrite_constant_definitions);
+      if (dyn_array_length(state->tokens)) {
+        assert(!"Could not reduce an expression");
+      }
       return 0;
     }
   }
@@ -987,17 +1071,7 @@ token_force_lazy_function_definition(
       body->value->descriptor = builder_->descriptor;
       return body->value;
     } else {
-      Value *body_result = 0;
-      if (dyn_array_length(body->children) != 0) {
-        Array_Token_Matcher_State body_statements = token_split(body->children, &(Token){
-          .type = Token_Type_Operator,
-          .source = slice_literal(";"),
-        });
-        for (u64 i = 0; i < dyn_array_length(body_statements); ++i) {
-          Token_Matcher_State *state = dyn_array_get(body_statements, i);
-          body_result = token_match_expression(state, function_scope, builder_);
-        }
-      }
+      Value *body_result = token_parse_block(body, function_scope, builder_);
       if (body_result) {
         fn_return(builder_, body_result, Function_Return_Type_Implicit);
       }

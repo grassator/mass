@@ -556,8 +556,8 @@ compare(
   Value *a,
   Value *b
 ) {
-  assert(same_value_type(a, b));
   assert(a->descriptor->type == Descriptor_Type_Integer);
+  assert(b->descriptor->type == Descriptor_Type_Integer);
 
   switch(operation) {
     case Compare_Equal: {
@@ -581,10 +581,15 @@ compare(
     }
   }
 
-  Value *temp_b = reserve_stack(builder, b->descriptor);
+  Descriptor *larger_descriptor =
+    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
+    ? a->descriptor
+    : b->descriptor;
+
+  Value *temp_b = reserve_stack(builder, larger_descriptor);
   move_value(builder, temp_b, b);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
   move_value(builder, reg_a, a);
 
   push_instruction(builder, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
