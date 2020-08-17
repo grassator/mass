@@ -232,6 +232,35 @@ spec("function") {
     check(is_positive_fn(-2) == 0);
   }
 
+  it("should be able to parse and run a program with labels and goto") {
+    Slice source = slice_literal(
+      "sum_up_to :: (x : s32) -> (s32) {"
+        "sum : s32;"
+        "sum = 0;"
+        "loop : label;"
+        "if x < 0 { return sum };"
+        "sum = sum + x;"
+        "x = x + (-1);"
+        "goto loop;"
+      "}"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *sum_up_to =
+      scope_lookup_force(program_->global_scope, slice_literal("sum_up_to"), 0);
+
+    program_end(program_);
+
+    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
+    check(sum_up_to_fn(0) == 0);
+    check(sum_up_to_fn(1) == 1);
+    check(sum_up_to_fn(2) == 3);
+    check(sum_up_to_fn(3) == 6);
+  }
+
   it("should be able to parse and run functions with local overloads") {
     Slice source = slice_literal(
       "size_of :: (x : s32) -> (s64) { 4 }"

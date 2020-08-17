@@ -388,12 +388,13 @@ plus_or_minus(
   Value *a,
   Value *b
 ) {
+
   if (!(
     a->descriptor->type == Descriptor_Type_Pointer &&
     b->descriptor->type == Descriptor_Type_Integer &&
     b->descriptor->integer.byte_size == 8
   )) {
-    assert(same_value_type(a, b));
+    assert(same_value_type_or_can_implicitly_move_cast(a, b));
     assert(a->descriptor->type == Descriptor_Type_Integer);
   }
 
@@ -410,10 +411,15 @@ plus_or_minus(
     }
   }
 
-  Value *temp_b = reserve_stack(builder, b->descriptor);
+  Descriptor *larger_descriptor =
+    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
+    ? a->descriptor
+    : b->descriptor;
+
+  Value *temp_b = reserve_stack(builder, larger_descriptor);
   move_value(builder, temp_b, b);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
+  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
   move_value(builder, reg_a, a);
 
   switch(operation) {

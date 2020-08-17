@@ -47,6 +47,11 @@ scope_lookup_force(
     if (entry) break;
     scope = scope->parent;
   }
+  if (!entry) {
+    printf("Could not resolve identifier: ");
+    slice_print(name);
+    printf("\n");
+  }
   assert(entry);
   Value *result = 0;
   switch(entry->type) {
@@ -789,6 +794,26 @@ token_rewrite_statement_if(
 }
 
 bool
+token_rewrite_goto(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
+  Token_Match(label_name, .type = Token_Type_Id);
+  Token_Match_End();
+  Value *value = scope_lookup_force(scope, label_name->source, builder_);
+  assert(value->descriptor->type == Descriptor_Type_Void);
+  assert(value->operand.type == Operand_Type_Label_32);
+
+  push_instruction(builder_, (Instruction) {jmp, {value->operand, 0, 0}});
+
+  token_replace_tokens_in_state(state, 2, 0);
+  return true;
+}
+
+bool
 token_rewrite_explicit_return(
   Token_Matcher_State *state,
   Scope *scope,
@@ -839,13 +864,19 @@ token_rewrite_definitions(
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
   Token_Match_Operator(define, ":");
-  Token_Match(type, .type = Token_Type_Id);
-  Descriptor *descriptor = program_lookup_type(builder_->program, type->source);
-  Value *var = reserve_stack(builder_, descriptor);
-  scope_define_value(scope, name->source, var);
+  Token_Match(type, 0);
+  Value *value = 0;
+  if (type->type == Token_Type_Id) {
+    Descriptor *descriptor = program_lookup_type(builder_->program, type->source);
+    value = reserve_stack(builder_, descriptor);
+  } else {
+    value = token_force_value(type, scope, builder_);
+    assert(value->descriptor->type == Descriptor_Type_Void);
+    assert(value->operand.type == Operand_Type_Label_32);
+    push_instruction(builder_, (Instruction) { .maybe_label = value->operand.label32 });
+  }
+  scope_define_value(scope, name->source, value);
 
-  // FIXME definition should rewrite with a token so that we can do proper
-  // checking inside statements and maybe pass it around.
   token_replace_tokens_in_state(state, 3, 0);
   return true;
 }
@@ -930,6 +961,24 @@ token_rewrite_plus(
 }
 
 bool
+token_rewrite_label(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
+
+  Value *value = temp_allocate(Value);
+  *value = (Value) {
+    .descriptor = &descriptor_void,
+    .operand = label32(make_label()),
+  };
+  token_replace_tokens_in_state(state, 1, token_value_make(keyword, value));
+  return true;
+}
+
+bool
 token_rewrite_less_than(
   Token_Matcher_State *state,
   Scope *scope,
@@ -997,6 +1046,7 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
+  token_rewrite_expression(state, scope, builder, token_rewrite_label);
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
@@ -1012,8 +1062,13 @@ token_match_expression(
       token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
       token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
       token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
+      token_rewrite_expression(state, scope, builder, token_rewrite_goto);
       token_rewrite(state, builder->program, token_rewrite_constant_definitions);
       if (dyn_array_length(state->tokens)) {
+        Token *token = *dyn_array_get(state->tokens, 0);
+        printf("Could not reduce an expression: \n");
+        slice_print(token->source);
+        printf("\n");
         assert(!"Could not reduce an expression");
       }
       return 0;
