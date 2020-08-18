@@ -458,11 +458,11 @@ token_split(
 }
 
 Descriptor *
-program_lookup_type(
-  Program *program,
+scope_lookup_type(
+  Scope *scope,
   Slice type_name
 ) {
-  Scope_Entry *entry = scope_lookup(program->global_scope, type_name);
+  Scope_Entry *entry = scope_lookup(scope, type_name);
   assert(entry);
   assert(entry->type == Scope_Entry_Type_Value);
   assert(entry->value->descriptor->type == Descriptor_Type_Type);
@@ -491,13 +491,13 @@ typedef struct {
 
 Descriptor *
 token_force_type(
-  Program *program_,
+  Scope *scope,
   Token *token
 ) {
   Descriptor *descriptor = 0;
   switch (token->type) {
     case Token_Type_Id: {
-      descriptor = program_lookup_type(program_, token->source);
+      descriptor = scope_lookup_type(scope, token->source);
       break;
     }
     case Token_Type_Square: {
@@ -508,7 +508,7 @@ token_force_type(
       descriptor = temp_allocate(Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
-        .pointer_to = program_lookup_type(program_, child->source),
+        .pointer_to = scope_lookup_type(scope, child->source),
       };
       break;
     }
@@ -528,10 +528,56 @@ token_force_type(
   return descriptor;
 }
 
+typedef Array_Token_Ptr (*token_pattern_callback)(
+  Array_Token_Ptr match,
+  Scope *scope,
+  Function_Builder *builder_
+);
+
+
+bool
+token_rewrite_pattern(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  Array_Token_Ptr pattern,
+  token_pattern_callback callback
+) {
+  u64 pattern_length = dyn_array_length(pattern);
+  assert(pattern_length);
+  for (u64 i = 0; i < pattern_length; ++i) {
+    Token *token = token_peek_match(state, i, *dyn_array_get(pattern, i));
+    if (!token) return false;
+  }
+  Array_Token_Ptr match = dyn_array_make(Array_Token_Ptr, .capacity = pattern_length);
+  for (u64 i = 0; i < pattern_length; ++i) {
+    Token *token = token_peek(state, i);
+    dyn_array_push(match, token);
+  }
+  Array_Token_Ptr replacement = callback(match, scope, builder);
+
+  u64 replacement_length = dyn_array_length(replacement);
+  // FIXME support replacing with more tokens
+  assert(replacement_length <= pattern_length);
+  u64 from = state->start_index + replacement_length;
+  u64 deletion_length = pattern_length - replacement_length;
+  dyn_array_delete_range(state->tokens, (Range_u64){from, from + deletion_length});
+
+  for (u64 i = 0; i < replacement_length; ++i) {
+    Token *token = *dyn_array_get(replacement, i);
+    *dyn_array_get(state->tokens, state->start_index + i) = token;
+  }
+
+  dyn_array_destroy(match);
+
+  return true;
+}
+
 Token_Match_Arg *
 token_match_argument(
   Token_Matcher_State *state,
-  Program *program_
+  Scope *scope,
+  Function_Builder *builder_
 ) {
   u64 peek_index = 0;
   Token_Match(arg_id, .type = Token_Type_Id);
@@ -542,7 +588,7 @@ token_match_argument(
   Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
   *result = (Token_Match_Arg) {
     .arg_name = arg_id->source,
-    .type_descriptor = token_force_type(program_, arg_type),
+    .type_descriptor = token_force_type(scope, arg_type),
   };
   return result;
 }
@@ -655,44 +701,66 @@ token_replace_tokens_in_state(
   dyn_array_delete_range(state->tokens, (Range_u64){from, from + length});
 }
 
-bool
-token_rewrite_functions(
-  Token_Matcher_State *state,
-  Program *program
+Array_Token_Ptr
+token_rewrite_functions_pattern_callback(
+  Array_Token_Ptr match,
+  Scope *scope,
+  Function_Builder *builder_
 ) {
-  u64 peek_index = 0;
-  Token_Match(args, .type = Token_Type_Paren);
-  Token_Match_Operator(arrow, "->");
-  Token_Match(return_types, .type = Token_Type_Paren);
-  Token_Match(body, 0);
+  Token *args = *dyn_array_get(match, 0);
+  Token *return_types = *dyn_array_get(match, 2);
+  Token *body = *dyn_array_get(match, 3);
 
   Token *result_token = temp_allocate(Token);
   *result_token = (Token) {
     .type = Token_Type_Lazy_Function_Definition,
-    .parent = arrow->parent,
-    .source = arrow->source,
+    .parent = body->parent,
+    .source = body->source,
     .lazy_function_definition = {
       .args = args,
       .return_types = return_types,
       .body = body,
-      .program = program,
+      .program = builder_->program,
     },
   };
+  dyn_array_clear(match);
+  dyn_array_push(match, result_token);
+  return match;
+}
 
-  token_replace_tokens_in_state(state, 4, result_token);
-  return true;
+bool
+token_rewrite_functions(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  static Array_Token_Ptr pattern = {0};
+  if (!dyn_array_is_initialized(pattern)) {
+    pattern = dyn_array_make(Array_Token_Ptr);
+    static Token args = { .type = Token_Type_Paren };
+    dyn_array_push(pattern, &args);
+    static Token arrow = { .type = Token_Type_Operator, .source = slice_literal_fields("->") };
+    dyn_array_push(pattern, &arrow);
+    static Token return_types = { .type = Token_Type_Paren };
+    dyn_array_push(pattern, &return_types);
+    static Token body = {0};
+    dyn_array_push(pattern, &body);
+  }
+
+  return token_rewrite_pattern(state, scope, builder_, pattern, token_rewrite_functions_pattern_callback);
 }
 
 bool
 token_rewrite_constant_definitions(
   Token_Matcher_State *state,
-  Program *program
+  Scope *scope,
+  Function_Builder *builder_
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
   Token_Match_Operator(define, "::");
   Token_Match(value, 0);
-  scope_define_lazy(program->global_scope, name->source, value);
+  scope_define_lazy(scope, name->source, value);
 
   // FIXME definition should rewrite with a token so that we can do proper
   // checking inside statements and maybe pass it around.
@@ -739,12 +807,13 @@ token_import_match_arguments(
 bool
 token_rewrite_dll_imports(
   Token_Matcher_State *state,
-  Program *program
+  Scope *scope,
+  Function_Builder *builder_
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("import"));
   Token_Match(args, .type = Token_Type_Paren);
-  Token *result_token = token_import_match_arguments(args, program);
+  Token *result_token = token_import_match_arguments(args, builder_->program);
   assert(result_token);
 
   token_replace_tokens_in_state(state, 2, result_token);
@@ -867,7 +936,7 @@ token_rewrite_definitions(
   Token_Match(type, 0);
   Value *value = 0;
   if (type->type == Token_Type_Id) {
-    Descriptor *descriptor = program_lookup_type(builder_->program, type->source);
+    Descriptor *descriptor = scope_lookup_type(scope, type->source);
     value = reserve_stack(builder_, descriptor);
   } else {
     value = token_force_value(type, scope, builder_);
@@ -997,23 +1066,6 @@ token_rewrite_less_than(
   return true;
 }
 
-typedef bool (*token_rewrite_callback)(Token_Matcher_State *, Program *);
-
-void
-token_rewrite(
-  Token_Matcher_State *state,
-  Program *program,
-  token_rewrite_callback callback
-) {
-  start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-      state->start_index = i;
-      if (callback(state, program)) goto start;
-    }
-    break;
-  }
-}
-
 typedef bool (*token_rewrite_expression_callback)(Token_Matcher_State *, Scope *, Function_Builder *);
 
 void
@@ -1041,7 +1093,7 @@ token_match_expression(
   if (!dyn_array_length(state->tokens)) {
     return 0;
   }
-  token_rewrite(state, builder->program, token_rewrite_functions);
+  token_rewrite_expression(state, scope, builder, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
@@ -1063,7 +1115,7 @@ token_match_expression(
       token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
       token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
       token_rewrite_expression(state, scope, builder, token_rewrite_goto);
-      token_rewrite(state, builder->program, token_rewrite_constant_definitions);
+      token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);
       if (dyn_array_length(state->tokens)) {
         Token *token = *dyn_array_get(state->tokens, 0);
         printf("Could not reduce an expression: \n");
@@ -1093,7 +1145,7 @@ token_force_lazy_function_definition(
       });
       for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
         Token_Matcher_State *state = dyn_array_get(argument_states, i);
-        Token_Match_Arg *arg = token_match_argument(state, program_);
+        Token_Match_Arg *arg = token_match_argument(state, function_scope, builder_);
         assert(arg);
         Arg(arg_value, arg->type_descriptor);
         scope_define_value(function_scope, arg->arg_name, arg_value);
@@ -1109,7 +1161,7 @@ token_force_lazy_function_definition(
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
         fn_return_descriptor(
           builder_,
-          token_force_type(program_, return_type_token),
+          token_force_type(function_scope, return_type_token),
           Function_Return_Type_Explicit
         );
         break;
@@ -1138,16 +1190,17 @@ token_force_lazy_function_definition(
 void
 token_match_module(
   Token *token,
-  Program *program_
+  Program *program
 ) {
   assert(token->type == Token_Type_Module);
   if (!dyn_array_length(token->children)) return;
 
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
+  Function_Builder global_builder = { .program = program };
 
-  token_rewrite(state, program_, token_rewrite_dll_imports);
-  token_rewrite(state, program_, token_rewrite_functions);
-  token_rewrite(state, program_, token_rewrite_constant_definitions);
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_dll_imports);
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_functions);
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_constant_definitions);
 
   assert(dyn_array_length(state->tokens) == 0);
 }
