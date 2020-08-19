@@ -62,9 +62,17 @@ typedef struct {
 
 hash_map_slice_template(Scope_Map, Scope_Entry)
 
+typedef struct {
+  Array_Token_Ptr pattern;
+  Array_Token_Ptr replacement;
+  Array_Slice pattern_names;
+} Macro;
+typedef dyn_array_type(Macro *) Array_Macro_Ptr;
+
 typedef struct Scope {
   struct Scope *parent;
   Scope_Map *map;
+  Array_Macro_Ptr macros;
 } Scope;
 
 Scope *

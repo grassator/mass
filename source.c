@@ -145,6 +145,7 @@ code_point_is_operator(
     case '%':
     case '^':
     case '&':
+    case '$':
     case '*':
     case '/':
     case ':':
@@ -274,7 +275,7 @@ tokenize(
         if (isdigit(ch)) {
           start_token(Token_Type_Integer);
           state = Tokenizer_State_Integer;
-        } else if (isalpha(ch)) {
+        } else if (isalpha(ch) || ch == '_') {
           start_token(Token_Type_Id);
           state = Tokenizer_State_Id;
         } else if(ch == '/' && peek == '/') {
@@ -534,28 +535,31 @@ typedef Array_Token_Ptr (*token_pattern_callback)(
   Function_Builder *builder_
 );
 
-
-bool
-token_rewrite_pattern(
+Array_Token_Ptr
+token_match_pattern(
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  Array_Token_Ptr pattern,
-  token_pattern_callback callback
+  Array_Token_Ptr pattern
 ) {
   u64 pattern_length = dyn_array_length(pattern);
   assert(pattern_length);
   for (u64 i = 0; i < pattern_length; ++i) {
     Token *token = token_peek_match(state, i, *dyn_array_get(pattern, i));
-    if (!token) return false;
+    if (!token) return (Array_Token_Ptr){0};
   }
   Array_Token_Ptr match = dyn_array_make(Array_Token_Ptr, .capacity = pattern_length);
   for (u64 i = 0; i < pattern_length; ++i) {
     Token *token = token_peek(state, i);
     dyn_array_push(match, token);
   }
-  Array_Token_Ptr replacement = callback(match, scope, builder);
+  return match;
+}
 
+void
+token_replace_length_with_tokens(
+  Token_Matcher_State *state,
+  u64 pattern_length,
+  Array_Token_Ptr replacement
+) {
   u64 replacement_length = dyn_array_length(replacement);
   // FIXME support replacing with more tokens
   assert(replacement_length <= pattern_length);
@@ -567,10 +571,51 @@ token_rewrite_pattern(
     Token *token = *dyn_array_get(replacement, i);
     *dyn_array_get(state->tokens, state->start_index + i) = token;
   }
+}
 
+bool
+token_rewrite_pattern(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  Array_Token_Ptr pattern,
+  token_pattern_callback callback
+) {
+  Array_Token_Ptr match = token_match_pattern(state, pattern);
+  if (!dyn_array_is_initialized(match)) return false;
+  Array_Token_Ptr replacement = callback(match, scope, builder);
+  token_replace_length_with_tokens(state, dyn_array_length(pattern), replacement);
   dyn_array_destroy(match);
-
   return true;
+}
+
+void
+token_rewrite_macros(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  for (;scope; scope = scope->parent) {
+    if (!dyn_array_is_initialized(scope->macros)) continue;
+    for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
+      Macro *macro = *dyn_array_get(scope->macros, macro_index);
+      start: for (;;) {
+        for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+          state->start_index = i;
+          Array_Token_Ptr match = token_match_pattern(state, macro->pattern);
+          if (dyn_array_is_initialized(match)) {
+            // TODO do capture expansion
+            token_replace_length_with_tokens(
+              state, dyn_array_length(macro->pattern), macro->replacement
+            );
+            dyn_array_destroy(match);
+            goto start;
+          }
+        }
+        break;
+      }
+    }
+  }
 }
 
 Token_Match_Arg *
@@ -748,6 +793,58 @@ token_rewrite_functions(
   }
 
   return token_rewrite_pattern(state, scope, builder_, pattern, token_rewrite_functions_pattern_callback);
+}
+
+void
+scope_add_macro(
+  Scope *scope,
+  Macro *macro
+) {
+  if (!dyn_array_is_initialized(scope->macros)) {
+    scope->macros = dyn_array_make(Array_Macro_Ptr);
+  }
+  dyn_array_push(scope->macros, macro);
+}
+
+bool
+token_rewrite_macro_definitions(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("macro"));
+  Token_Match(pattern_token, .type = Token_Type_Paren);
+  Token_Match(replacement_token, .type = Token_Type_Paren);
+  token_replace_tokens_in_state(state, 3, 0);
+
+  Array_Token_Ptr pattern = dyn_array_make(Array_Token_Ptr);
+  Array_Slice pattern_names = dyn_array_make(Array_Slice);
+
+  for (u64 i = 0; i < dyn_array_length(pattern_token->children); ++i) {
+    Token *token = *dyn_array_get(pattern_token->children, i);
+    if (token->type == Token_Type_Id && slice_starts_with(token->source, slice_literal("_"))) {
+      Slice name = slice_sub(token->source, 1, token->source.length);
+      dyn_array_push(pattern_names, name);
+      Token *item = temp_allocate(Token);
+      *item = (Token){0};
+      dyn_array_push(pattern, item);
+    } else {
+      dyn_array_push(pattern_names, (Slice){0});
+      dyn_array_push(pattern, token);
+    }
+  }
+
+  Macro *macro = temp_allocate(Macro);
+  *macro = (Macro){
+    .pattern = pattern,
+    .pattern_names = pattern_names,
+    .replacement = replacement_token->children,
+  };
+
+  scope_add_macro(scope, macro);
+
+  return true;
 }
 
 bool
@@ -1093,6 +1190,8 @@ token_match_expression(
   if (!dyn_array_length(state->tokens)) {
     return 0;
   }
+  token_rewrite_macros(state, scope, builder);
+
   token_rewrite_expression(state, scope, builder, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
@@ -1198,6 +1297,7 @@ token_match_module(
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
   Function_Builder global_builder = { .program = program };
 
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_macro_definitions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_dll_imports);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_functions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_constant_definitions);

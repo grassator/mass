@@ -261,6 +261,26 @@ spec("function") {
     check(sum_up_to_fn(3) == 6);
   }
 
+  it("should be able to define and use a macro") {
+    Slice source = slice_literal(
+      //"macro (negative _x) (-x)"
+      "macro (the answer) (42)"
+      "checker :: () -> (s32) { the answer }"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker =
+      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
+
+    program_end(program_);
+
+    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
+    check(checker_fn() == 42);
+  }
+
   it("should be able to parse and run functions with local overloads") {
     Slice source = slice_literal(
       "size_of :: (x : s32) -> (s64) { 4 }"
