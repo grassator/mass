@@ -553,23 +553,13 @@ token_match_pattern(
   return match;
 }
 
-void
+inline void
 token_replace_length_with_tokens(
   Token_Matcher_State *state,
   u64 pattern_length,
   Array_Token_Ptr replacement
 ) {
-  u64 replacement_length = dyn_array_length(replacement);
-  // FIXME support replacing with more tokens
-  assert(replacement_length <= pattern_length);
-  u64 from = state->start_index + replacement_length;
-  u64 deletion_length = pattern_length - replacement_length;
-  dyn_array_delete_range(state->tokens, (Range_u64){from, from + deletion_length});
-
-  for (u64 i = 0; i < replacement_length; ++i) {
-    Token *token = *dyn_array_get(replacement, i);
-    *dyn_array_get(state->tokens, state->start_index + i) = token;
-  }
+  dyn_array_splice(state->tokens, state->start_index, pattern_length, replacement);
 }
 
 bool
