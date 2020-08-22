@@ -578,6 +578,108 @@ token_rewrite_pattern(
   return true;
 }
 
+Array_Token_Ptr
+token_clone_token_array_deep(
+  Array_Token_Ptr source
+) {
+  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
+  for (u64 i = 0; i < dyn_array_length(source); ++i) {
+    Token *token = *dyn_array_get(source, i);
+    Token *copy = temp_allocate(Token);
+    *copy = *token;
+    switch (token->type) {
+      case Token_Type_Integer:
+      case Token_Type_Operator:
+      case Token_Type_String:
+      case Token_Type_Id: {
+        // Nothing to do
+        break;
+      }
+      case Token_Type_Square:
+      case Token_Type_Paren:
+      case Token_Type_Curly:
+      case Token_Type_Module: {
+        copy->children = token_clone_token_array_deep(token->children);
+        break;
+      }
+      case Token_Type_Value:
+      case Token_Type_Lazy_Function_Definition: {
+        assert(!"Not reached");
+        break;
+      }
+    }
+    dyn_array_push(result, token);
+  }
+  return result;
+}
+
+Array_Token_Ptr
+token_apply_macro_replacements(
+  Macro_Replacement_Map *map,
+  Array_Token_Ptr source
+) {
+  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
+  for (u64 i = 0; i < dyn_array_length(source); ++i) {
+    Token *token = *dyn_array_get(source, i);
+    Token *copy = temp_allocate(Token);
+    *copy = *token;
+    switch (token->type) {
+      case Token_Type_Id: {
+        Slice name = token->source;
+        Token **replacement_ptr = hash_map_get(map, name);
+        if (replacement_ptr) {
+          *copy = **replacement_ptr;
+        }
+        break;
+      }
+      case Token_Type_Integer:
+      case Token_Type_Operator:
+      case Token_Type_String: {
+        // Nothing to do
+        break;
+      }
+      case Token_Type_Square:
+      case Token_Type_Paren:
+      case Token_Type_Curly:
+      case Token_Type_Module: {
+        copy->children = token_apply_macro_replacements(map, token->children);
+        break;
+      }
+      case Token_Type_Value:
+      case Token_Type_Lazy_Function_Definition: {
+        assert(!"Not reached");
+        break;
+      }
+    }
+    dyn_array_push(result, copy);
+  }
+  return result;
+}
+
+void
+token_rewrite_macro_match(
+  Token_Matcher_State *state,
+  Macro *macro,
+  Array_Token_Ptr match
+) {
+  Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
+  assert(dyn_array_length(macro->pattern_names) == dyn_array_length(match));
+  for (u64 i = 0; i < dyn_array_length(macro->pattern_names); ++i) {
+    Slice *name = dyn_array_get(macro->pattern_names, i);
+    if (name->length) {
+      hash_map_set(map, *name, *dyn_array_get(match, i));
+    }
+  }
+  Array_Token_Ptr replacement = token_apply_macro_replacements(map, macro->replacement);
+  token_replace_length_with_tokens(
+    state,
+    dyn_array_length(macro->pattern),
+    replacement
+  );
+  dyn_array_destroy(match);
+  hash_map_destroy(map);
+}
+
 void
 token_rewrite_macros(
   Token_Matcher_State *state,
@@ -593,11 +695,7 @@ token_rewrite_macros(
           state->start_index = i;
           Array_Token_Ptr match = token_match_pattern(state, macro->pattern);
           if (dyn_array_is_initialized(match)) {
-            // TODO do capture expansion
-            token_replace_length_with_tokens(
-              state, dyn_array_length(macro->pattern), macro->replacement
-            );
-            dyn_array_destroy(match);
+            token_rewrite_macro_match(state, macro, match);
             goto start;
           }
         }
@@ -677,6 +775,9 @@ token_force_value(
     assert(builder);
     Token_Matcher_State state = {.tokens = token->children};
     return token_match_expression(&state, scope, builder);
+  } else if (token->type == Token_Type_Curly) {
+    assert(builder);
+    return token_parse_block(token, scope, builder);
   } else {
     assert(!"Not implemented");
   }
@@ -794,6 +895,8 @@ scope_add_macro(
   }
   dyn_array_push(scope->macros, macro);
 }
+
+
 
 bool
 token_rewrite_macro_definitions(
@@ -936,7 +1039,7 @@ token_rewrite_statement_if(
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
-  Token_Match(condition, 0);
+  Token_Match(condition, .type = Token_Type_Paren);
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
@@ -1152,6 +1255,25 @@ token_rewrite_less_than(
   return true;
 }
 
+bool
+token_rewrite_greater_than(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(plus_token, ">");
+  Token_Match(rhs, 0);
+
+  Value *value = Greater(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
+  return true;
+}
+
 typedef bool (*token_rewrite_expression_callback)(Token_Matcher_State *, Scope *, Function_Builder *);
 
 void
@@ -1180,12 +1302,14 @@ token_match_expression(
     return 0;
   }
   token_rewrite_macros(state, scope, builder);
+  token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
 
   token_rewrite_expression(state, scope, builder, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
+  token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);
   token_rewrite_expression(state, scope, builder, token_rewrite_label);
 
   switch(dyn_array_length(state->tokens)) {
@@ -1201,7 +1325,6 @@ token_match_expression(
       token_rewrite_expression(state, scope, builder, token_rewrite_assignments);
       token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
       token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
-      token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
       token_rewrite_expression(state, scope, builder, token_rewrite_goto);
       token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);
       if (dyn_array_length(state->tokens)) {

@@ -213,7 +213,7 @@ spec("function") {
   it("should be able to parse and run if statement") {
     Slice source = slice_literal(
       "is_positive :: (x : s32) -> (s8) {"
-        "if x < 0 { return 0 };"
+        "if (x < 0) { return 0 };"
         "1"
       "}"
     );
@@ -238,7 +238,7 @@ spec("function") {
         "sum : s32;"
         "sum = 0;"
         "loop : label;"
-        "if x < 0 { return sum };"
+        "if (x < 0) { return sum };"
         "sum = sum + x;"
         "x = x + (-1);"
         "goto loop;"
@@ -261,9 +261,8 @@ spec("function") {
     check(sum_up_to_fn(3) == 6);
   }
 
-  it("should be able to define and use a macro") {
+  it("should be able to define and use a macro without a capture") {
     Slice source = slice_literal(
-      //"macro (negative _x) (-x)"
       "macro (the answer) (42)"
       "checker :: () -> (s32) { the answer }"
     );
@@ -279,6 +278,61 @@ spec("function") {
 
     fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
     check(checker_fn() == 42);
+  }
+
+  it("should be able to define and use a macro with a capture") {
+    Slice source = slice_literal(
+      "macro (negative _x) (- x)"
+      "checker :: () -> (s32) { negative 42 }"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *checker =
+      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
+
+    program_end(program_);
+
+    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
+    check(checker_fn() == -42);
+  }
+
+  it("should be able to define and use a macro for while loop") {
+    Slice source = slice_literal(
+      "macro (while _condition _body) ({"
+        "loop : label;"
+        "if condition {"
+          "body;"
+          "goto loop;"
+        "}"
+      "})"
+      "sum_up_to :: (x : s32) -> (s32) {"
+        "sum : s32;"
+        "sum = 0;"
+        "while (x > 0) {"
+          "sum = sum + x;"
+          "x = x + (-1);"
+        "};"
+        "return sum"
+      "}"
+    );
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+
+    token_match_module(result.root, program_);
+
+    Value *sum_up_to =
+      scope_lookup_force(program_->global_scope, slice_literal("sum_up_to"), 0);
+
+    program_end(program_);
+
+    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
+    check(sum_up_to_fn(0) == 0);
+    check(sum_up_to_fn(1) == 1);
+    check(sum_up_to_fn(2) == 3);
+    check(sum_up_to_fn(3) == 6);
   }
 
   it("should be able to parse and run functions with local overloads") {

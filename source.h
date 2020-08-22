@@ -61,6 +61,7 @@ typedef struct {
 } Scope_Entry;
 
 hash_map_slice_template(Scope_Map, Scope_Entry)
+hash_map_slice_template(Macro_Replacement_Map, Token *)
 
 typedef struct {
   Array_Token_Ptr pattern;
@@ -85,6 +86,13 @@ scope_define_value(
   Scope *scope,
   Slice name,
   Value *value
+);
+
+Value *
+token_parse_block(
+  Token *block,
+  Scope *scope,
+  Function_Builder *builder_
 );
 
 #endif SOURCE_H
