@@ -552,7 +552,6 @@ bucket_array_destroy_internal(
 // Array
 //////////////////////////////////////////////////////////////////////////////
 
-
 #define dyn_array_struct(_type_) \
   struct { \
     const Allocator *allocator;\
@@ -658,10 +657,11 @@ dyn_array_bounds_check(
 inline void
 dyn_array_ensure_capacity(
   Dyn_Array_Internal **internal,
-  u64 item_byte_size
+  u64 item_byte_size,
+  u64 extra
 ) {
-  if ((*internal)->length + 1 <= (*internal)->capacity) return;
-  u64 new_capacity = (*internal)->capacity + ((*internal)->capacity >> 1);
+  if ((*internal)->length + extra <= (*internal)->capacity) return;
+  u64 new_capacity = (*internal)->capacity + u64_max((*internal)->capacity >> 1, extra);
   *internal = dyn_array_realloc_internal(
     *internal, (*internal)->length, item_byte_size, new_capacity
   );
@@ -683,58 +683,106 @@ dyn_array_ensure_capacity(
     )\
   })
 
-Dyn_Array_Internal *
+inline Dyn_Array_Internal *
+dyn_array_sub_internal(
+  Dyn_Array_Internal *source,
+  u64 item_byte_size,
+  Range_u64 range
+) {
+  assert(range.from < source->length);
+  assert(range.to <= source->length);
+  assert(range.from <= range.to);
+  Dyn_Array_Internal *result = dyn_array_alloc_internal(
+    &(struct Dyn_Array_Make_Options) {
+      .allocator = source->allocator,
+      .capacity = u64_max(range_length(range), 2),
+    },
+    item_byte_size
+  );
+  result->length = range_length(range);
+  s8 *source_memory = (s8 *)source->items + item_byte_size * range.from;
+  memcpy(result->items, source_memory, item_byte_size * result->length);
+  return result;
+}
+
+inline Dyn_Array_Internal *
 dyn_array_copy_internal(
   Dyn_Array_Internal *source,
   u64 item_byte_size
 ) {
-  Dyn_Array_Internal *result = dyn_array_alloc_internal(
-    &(struct Dyn_Array_Make_Options) {
-      .allocator = source->allocator,
-      .capacity = source->capacity,
-    },
-    item_byte_size
-  );
-  result->length = source->length;
-  memcpy(result, source, sizeof(Dyn_Array_Internal) + item_byte_size * source->length);
-  return result;
+  return dyn_array_sub_internal(source, item_byte_size, (Range_u64){0, source->length});
 }
 
-#define dyn_array_copy(_array_type_, ...)\
+#define dyn_array_copy(_array_type_, _array_)\
   ((_array_type_) {\
-    .internal = dyn_array_copy_internal((__VA_ARGS__).internal, dyn_array_item_size(_array_type_))\
+    .internal = dyn_array_copy_internal(\
+      (_array_).internal,\
+      dyn_array_item_size(_array_type_)\
+    )\
+  })
+
+#define dyn_array_sub(_array_type_, _array_, ...)\
+  ((_array_type_) {\
+    .internal = dyn_array_sub_internal(\
+      (_array_).internal,\
+      dyn_array_item_size(_array_type_),\
+      (__VA_ARGS__)\
+    )\
   })
 
 #define dyn_array_destroy(_array_)\
   allocator_deallocate((_array_).data->allocator, (_array_).data)
 
-inline void
+inline void *
 dyn_array_insert_internal(
   Dyn_Array_Internal **internal,
   u64 index,
+  u64 length,
   u64 item_byte_size
 ) {
-  dyn_array_ensure_capacity(internal, item_byte_size);
+  dyn_array_ensure_capacity(internal, item_byte_size, length);
   u64 original_length = (*internal)->length;
   assert(index <= (*internal)->length);
-  ++(*internal)->length;
-  // Basically a push, so no need to memcpy
-  if (index == original_length) return;
+  (*internal)->length += length;
   s8 *source = (*internal)->items + item_byte_size * index;
-  u64 copy_size = (original_length - index) * item_byte_size;
-  memmove(source + item_byte_size, source, copy_size);
+  // No need to memmove for a inserting at the end (same as push)
+  if (index < original_length) {
+    u64 copy_size = (original_length - index) * item_byte_size;
+    memmove(source + item_byte_size * length, source, copy_size);
+  }
+  return source;
 }
 
 #define dyn_array_insert(_array_, _index_, ...)\
   (\
-    dyn_array_insert_internal(&((_array_).internal), (_index_), sizeof((_array_).data->items[0])),\
+    dyn_array_insert_internal(&((_array_).internal), (_index_), 1, sizeof((_array_).data->items[0])),\
     ((_array_).data->items[_index_] = (__VA_ARGS__)),\
     &(_array_).data->items[_index_]\
   )
 
+#define dyn_array_splice(_array_, _index_, _length_, _to_splice_)\
+  do { \
+    u64 _splice_index = _index_; \
+    u64 _insert_length = dyn_array_length(_to_splice_); \
+    s64 _diff = (s64)_insert_length - (_length_); \
+    if (_diff < 0) { \
+      dyn_array_delete_range(\
+        _array_, (Range_u64){_splice_index, _splice_index - _diff}\
+      ); \
+    } else if (_diff > 0) { \
+      dyn_array_insert_internal(\
+        &((_array_).internal), _splice_index, _diff, sizeof((_array_).data->items[0])\
+      ); \
+    } \
+    /* do not use memmove to ensure type safety */ \
+    for (u64 j = 0; j < _insert_length; ++j) { \
+      (_array_).data->items[_splice_index + j] = (_to_splice_).data->items[j]; \
+    } \
+  } while(0);
+
 #define dyn_array_push(_array_, ...)\
   (\
-    dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0])),\
+    dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
     ((_array_).data->items[(_array_).data->length] = (__VA_ARGS__)),\
     &(_array_).data->items[(_array_).data->length++]\
   )
@@ -785,6 +833,11 @@ dyn_array_delete_internal(
 
 #define dyn_array_last(_array_)\
   (dyn_array_length(_array_) > 0 ? &(_array_).data->items[(_array_).data->length - 1] : 0)
+
+#define dyn_array_split(_result_, _array_, ...)\
+  do {\
+    \
+  } while(0)
 
 //////////////////////////////////////////////////////////////////////////////
 // Slice
@@ -1454,9 +1507,18 @@ code_point_is_ascii_letter(
 
 inline bool
 code_point_is_digit(
-  s32 ch
+  s32 code_point
 ) {
-  return (ch >= '0' && ch <= '9');
+  return (code_point >= '0' && code_point <= '9');
+}
+
+inline bool
+code_point_is_hex_digit(
+  s32 code_point
+) {
+  return code_point_is_digit(code_point) ||
+    (code_point >= 'a' && code_point <= 'f') ||
+    (code_point >= 'A' && code_point <= 'F');
 }
 
 inline bool
@@ -2404,6 +2466,16 @@ hash_pointer(
   return hash_u64((u64)address);
 }
 
+static const s32 hash_byte_start = 7;
+
+inline s32
+hash_byte(
+  s32 previous,
+  s8 byte
+) {
+  return previous * 31 + byte;
+}
+
 s32
 hash_bytes(
   const void *address,
@@ -2411,10 +2483,8 @@ hash_bytes(
 ) {
   const s8 *bytes = address;
   const s8 *end = bytes + size;
-  s32 hash = 7;
-  while (bytes != end) {
-    hash = hash * 31 + *bytes++;
-  }
+  s32 hash = hash_byte_start;
+  while (bytes != end) hash = hash_byte(hash, *bytes++);
   return hash;
 }
 
@@ -2429,10 +2499,8 @@ s32
 hash_c_string(
   const char *string
 ) {
-  s32 hash = 7;
-  while (*string) {
-    hash = hash * 31 + *string++;
-  }
+  s32 hash = hash_byte_start;
+  while (*string) hash = hash_byte(hash, *string++);
   return hash;
 }
 
@@ -2453,10 +2521,17 @@ typedef struct {
     _value_type_ *(*get)(_hash_map_type_ *, _key_type_);\
     void (*set)(_hash_map_type_ *, _key_type_, _value_type_);\
     void (*delete)(_hash_map_type_ *, _key_type_);\
+    _value_type_ *(*get_by_hash)(_hash_map_type_ *, s32, _key_type_);\
+    void (*set_by_hash)(_hash_map_type_ *, s32, _key_type_, _value_type_);\
+    void (*delete_by_hash)(_hash_map_type_ *, s32, _key_type_);\
   } _hash_map_type_##__Methods;\
   \
   typedef struct _hash_map_type_##__Entry {\
-    Hash_Map_Entry_Bookkeeping bookkeeping;\
+    /* Needs to be synced with Hash_Map_Entry_Bookkeeping and is provided for convinence */\
+    union {\
+      bool occupied;\
+      Hash_Map_Entry_Bookkeeping bookkeeping;\
+    };\
     _key_type_ key;\
     _value_type_ value;\
   } _hash_map_type_##__Entry;\
@@ -2548,11 +2623,11 @@ hash_map_resize(
   }\
   \
   static inline _hash_map_type_##__Entry *\
-  _hash_map_type_##__get_internal(\
+  _hash_map_type_##__get_by_hash_internal(\
     _hash_map_type_ *map,\
+    s32 hash,\
     _key_type_ key\
   ) {\
-    s32 hash = _key_hash_fn_(key);\
     s32 hash_index = hash & map->hash_mask;\
     for (u64 i = 0; i < map->capacity; ++i) {\
       /* Using hash_mask to wrap around in a cheap way */\
@@ -2567,12 +2642,32 @@ hash_map_resize(
   }\
   \
   static inline _value_type_ *\
+  _hash_map_type_##__get_by_hash(\
+    _hash_map_type_ *map,\
+    s32 hash,\
+    _key_type_ key\
+  ) {\
+    _hash_map_type_##__Entry *entry =\
+      _hash_map_type_##__get_by_hash_internal(map, _key_hash_fn_(key), key);\
+    return entry ? &entry->value : 0;\
+  }\
+  \
+  static inline _value_type_ *\
   _hash_map_type_##__get(\
     _hash_map_type_ *map,\
     _key_type_ key\
   ) {\
-    _hash_map_type_##__Entry *entry = _hash_map_type_##__get_internal(map, key);\
-    return entry ? &entry->value : 0;\
+    return _hash_map_type_##__get_by_hash(map, _key_hash_fn_(key), key);\
+  }\
+  \
+  static inline void\
+  _hash_map_type_##__delete_by_hash(\
+    _hash_map_type_ *map,\
+    s32 hash,\
+    _key_type_ key\
+  ) {\
+    _hash_map_type_##__Entry *entry = _hash_map_type_##__get_by_hash_internal(map, hash, key);\
+    if (entry) memset(entry, 0, sizeof(entry));\
   }\
   \
   static inline void\
@@ -2580,13 +2675,13 @@ hash_map_resize(
     _hash_map_type_ *map,\
     _key_type_ key\
   ) {\
-    _hash_map_type_##__Entry *entry = _hash_map_type_##__get_internal(map, key);\
-    if (entry) memset(entry, 0, sizeof(entry));\
+    _hash_map_type_##__delete_by_hash(map, _key_hash_fn_(key), key);\
   }\
   \
   static inline void\
-  _hash_map_type_##__set(\
+  _hash_map_type_##__set_by_hash(\
     _hash_map_type_ *map,\
+    s32 hash,\
     _key_type_ key,\
     _value_type_ value\
   ) {\
@@ -2596,7 +2691,6 @@ hash_map_resize(
     if (((++map->occupied) << 1) > map->capacity) {\
       hash_map_resize(internal, entry_size);\
     }\
-    s32 hash = _key_hash_fn_(key);\
     u64 index = hash_map_get_insert_index_internal(internal, entry_size, hash);\
     map->entries[index] = (_hash_map_type_##__Entry){\
       .bookkeeping.hash = hash, \
@@ -2605,12 +2699,23 @@ hash_map_resize(
       .value = value, \
     };\
   }\
+  static inline void\
+  _hash_map_type_##__set(\
+    _hash_map_type_ *map,\
+    _key_type_ key,\
+    _value_type_ value\
+  ) {\
+    _hash_map_type_##__set_by_hash(map, _key_hash_fn_(key), key, value);\
+  }\
   \
   const _hash_map_type_##__Methods *_hash_map_type_##__methods = &(_hash_map_type_##__Methods){\
     .make = _hash_map_type_##__make,\
     .get = _hash_map_type_##__get,\
     .set = _hash_map_type_##__set,\
     .delete = _hash_map_type_##__delete,\
+    .get_by_hash = _hash_map_type_##__get_by_hash,\
+    .set_by_hash = _hash_map_type_##__set_by_hash,\
+    .delete_by_hash = _hash_map_type_##__delete_by_hash,\
   };\
 
 #define hash_map_c_string_template(_hash_map_type_, _value_type_)\
@@ -2632,14 +2737,26 @@ hash_map_resize(
 #define hash_map_get(_map_, _key_)\
   (_map_)->methods->get((_map_), (_key_))
 
+#define hash_map_get_by_hash(_map_, _hash_, _key_)\
+  (_map_)->methods->get_by_hash((_map_), _hash_, (_key_))
+
 #define hash_map_has(_map_, _key_)\
   (hash_map_get((_map_), (_key_)) != 0)
+
+#define hash_map_has_by_hash(_map_, _hash_, _key_)\
+  (hash_map_get_by_hash((_map_), (_hash_), (_key_)) != 0)
 
 #define hash_map_delete(_map_, _key_)\
   (_map_)->methods->delete((_map_), (_key_))
 
+#define hash_map_delete_by_hash(_map_, _hash_, _key_)\
+  (_map_)->methods->delete((_map_), (_hash_), (_key_))
+
 #define hash_map_set(_map_, _key_, _value_)\
   (_map_)->methods->set((_map_), (_key_), (_value_))
+
+#define hash_map_set_by_hash(_map_, _hash_, _key_, _value_)\
+  (_map_)->methods->set_by_hash((_map_), (_hash_), (_key_), (_value_))
 
 ////////////////////////////////////////////////////////////////////
 // Debug

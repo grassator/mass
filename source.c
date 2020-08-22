@@ -2,7 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-
 Scope *
 scope_make(
   Scope *parent
