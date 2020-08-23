@@ -1,0 +1,7 @@
+macro (while _condition _body) ({
+  loop : label;
+  if condition {
+    body;
+    goto loop;
+  }
+})

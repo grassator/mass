@@ -1416,3 +1416,76 @@ token_match_module(
 
   assert(dyn_array_length(state->tokens) == 0);
 }
+
+bool
+program_import_file(
+  Program *program,
+  Slice file_path
+) {
+  Slice extension = slice_literal(".mass");
+  if (!slice_ends_with(file_path, extension)) {
+    Fixed_Buffer *buffer = fixed_buffer_make(
+      .allocator = temp_allocator,
+      .capacity = file_path.length + extension.length
+    );
+    fixed_buffer_append_slice(buffer, file_path);
+    fixed_buffer_append_slice(buffer, extension);
+    file_path = fixed_buffer_as_slice(buffer);
+  }
+  wchar_t *file_path_utf16 = utf8_to_utf16_null_terminated(allocator_system, file_path);
+
+  HANDLE file_handle = CreateFileW(
+    file_path_utf16,
+    GENERIC_READ,
+    FILE_SHARE_READ,
+    0,
+    OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL,
+    0
+  );
+  allocator_deallocate(allocator_system, file_path_utf16);
+  if (!file_handle) {
+    printf("Error: could not open specified file");
+    goto handle_error;
+  }
+
+  s32 buffer_size = GetFileSize(file_handle, 0);
+  Fixed_Buffer *buffer = fixed_buffer_make(
+    .allocator = allocator_system,
+    .capacity = s32_to_u64(buffer_size),
+  );
+  s32 bytes_read = 0;
+  BOOL is_success = ReadFile(file_handle, buffer->memory, buffer_size, &bytes_read, 0);
+  if (!is_success)  {
+    printf("Error: could not read specified file");
+    goto handle_error;
+  }
+
+  buffer->occupied = s32_to_u64(bytes_read);
+
+  Slice source = fixed_buffer_as_slice(buffer);
+
+  temp_buffer = bucket_buffer_make(.allocator = allocator_system);
+  temp_allocator = bucket_buffer_allocator_make(temp_buffer);
+
+  Tokenizer_Result result = tokenize(file_path, source);
+  if (result.type != Tokenizer_Result_Type_Success) {
+    for (u64 i = 0; i < dyn_array_length(result.errors); ++i) {
+      Tokenizer_Error *error = dyn_array_get(result.errors, i);
+      print_message_with_location(error->message, &error->location);
+    }
+    return false;
+  }
+
+  token_match_module(result.root, program);
+  return true;
+
+  handle_error:
+  CloseHandle(file_handle);
+  file_handle = 0;
+  return false;
+}
+
+
+
+

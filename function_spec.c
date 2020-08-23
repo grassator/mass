@@ -300,14 +300,8 @@ spec("function") {
   }
 
   it("should be able to define and use a macro for while loop") {
+    program_import_file(program_, slice_literal("lib\\prelude"));
     Slice source = slice_literal(
-      "macro (while _condition _body) ({"
-        "loop : label;"
-        "if condition {"
-          "body;"
-          "goto loop;"
-        "}"
-      "})"
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
         "sum = 0;"
