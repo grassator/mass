@@ -2047,7 +2047,6 @@ fixed_buffer_make_internal(
     __VA_ARGS__\
   })
 
-
 #define fixed_buffer_stack_make(_capacity_)\
   &(\
     (union { Fixed_Buffer buffer; s8 memory[sizeof(Fixed_Buffer) + (_capacity_)]; })\
@@ -2242,6 +2241,87 @@ fixed_buffer_wrap_snprintf(
     (_format_), \
     __VA_ARGS__\
   ))
+
+typedef enum  {
+  File_Read_Error_None,
+  File_Read_Error_Failed_To_Open,
+  File_Read_Error_Failed_To_Read,
+} File_Read_Error;
+
+struct Fixed_Buffer_From_File_Options {
+  void *_count_reset;
+  const Allocator *allocator;
+  File_Read_Error *error;
+  bool null_terminate;
+};
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+static_assert(false, reading_whole_file_is_not_implemented_on_nix_systems);
+#endif
+
+static Fixed_Buffer *
+fixed_buffer_from_file_internal(
+  Slice file_path,
+  struct Fixed_Buffer_From_File_Options *options
+) {
+  // Allows to not check for null when reporting
+  static File_Read_Error dummy_error = File_Read_Error_None;
+  if (!options->error) options->error = &dummy_error;
+
+#ifdef _WIN32
+  wchar_t *file_path_utf16 = utf8_to_utf16_null_terminated(allocator_default, file_path);
+
+  HANDLE file_handle = CreateFileW(
+    file_path_utf16,
+    GENERIC_READ,
+    FILE_SHARE_READ,
+    0,
+    OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL,
+    0
+  );
+  allocator_deallocate(allocator_default, file_path_utf16);
+  Fixed_Buffer *buffer = 0;
+  if (!file_handle) {
+    *options->error = File_Read_Error_Failed_To_Open;
+    goto handle_error;
+  }
+
+  s32 buffer_size = GetFileSize(file_handle, 0);
+  if (options->null_terminate) buffer_size++;
+  buffer = fixed_buffer_make(
+    .allocator = allocator_system,
+    .capacity = s32_to_u64(buffer_size),
+  );
+  s32 bytes_read = 0;
+  BOOL is_success = ReadFile(file_handle, buffer->memory, buffer_size, &bytes_read, 0);
+  if (!is_success || bytes_read != buffer_size)  {
+    *options->error = File_Read_Error_Failed_To_Read;
+    goto handle_error;
+  }
+  buffer->occupied = s32_to_u64(bytes_read);
+  if (options->null_terminate) fixed_buffer_append_u8(buffer, 0);
+  return buffer;
+
+  handle_error: {
+    if (file_handle) CloseHandle(file_handle);
+    if (buffer) fixed_buffer_destroy(buffer);
+    return 0;
+  }
+#else
+  assert(!"Not implemented");
+#endif
+}
+
+#define fixed_buffer_from_file(_path_, ...)\
+  fixed_buffer_from_file_internal((_path_), &(struct Fixed_Buffer_From_File_Options) {\
+    .allocator = allocator_default,\
+    .error = 0,\
+    ._count_reset = 0,\
+    __VA_ARGS__\
+  })
 
 //////////////////////////////////////////////////////////////////////////////
 // Bucket Buffer

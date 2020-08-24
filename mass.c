@@ -23,6 +23,9 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_usage();
   }
 
+  temp_buffer = bucket_buffer_make(.allocator = allocator_system);
+  temp_allocator = bucket_buffer_allocator_make(temp_buffer);
+
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
   char *file_path = 0;
   for (s32 i = 1; i < argc; ++i) {
