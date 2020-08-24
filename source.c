@@ -1114,6 +1114,116 @@ token_rewrite_negative_literal(
 }
 
 bool
+token_rewrite_pointer_to(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match_Operator(define, "&");
+  Token_Match(value_token, 0);
+
+  Value *result = value_pointer_to(builder_, token_force_value(value_token, scope, builder_));
+  token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
+  return true;
+}
+
+bool
+token_rewrite_set_array_item(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(id, .type = Token_Type_Id, .source = slice_literal("set_array_item"));
+  Token_Match(value_token, .type = Token_Type_Paren);
+
+  Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder_);
+  assert(dyn_array_length(args) == 3);
+  // TODO check for array type
+  Value *array = *dyn_array_get(args, 0);
+  Value *index_value = *dyn_array_get(args, 1);
+  Value *value = *dyn_array_get(args, 2);
+
+  Descriptor *item_descriptor = array->descriptor->pointer_to->array.item;
+  u32 item_byte_size = descriptor_byte_size(item_descriptor);
+
+  Value *reg_a = value_register_for_descriptor(Register_A, array->descriptor);
+  move_value(builder_, reg_a, array);
+
+  // FIXME allow bigger than byte
+  assert(index_value->operand.type == Operand_Type_Immediate_8);
+  //assert(operand_is_immediate(&integer->operand));
+  s8 index = index_value->operand.imm8;
+
+  Value *target_value = temp_allocate(Value);
+  *target_value = (Value){
+    .descriptor = item_descriptor,
+    .operand = {
+      .type = Operand_Type_Memory_Indirect,
+      .byte_size = item_byte_size,
+      .indirect = (Operand_Memory_Indirect) {
+        .reg = rax.reg,
+        .displacement = index * item_byte_size,
+      }
+    }
+  };
+  move_value(builder_, target_value, value);
+
+  token_replace_tokens_in_state(state, 2, 0);
+  return true;
+}
+
+Label *
+token_match_label(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
+  Token_Match_End();
+
+  return make_label();
+}
+
+Descriptor *
+token_match_fixed_array_type(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(type, .type = Token_Type_Id);
+  Token_Match(square_braces, .type = Token_Type_Square);
+
+  Descriptor *descriptor = scope_lookup_type(scope, type->source);
+
+  // FIXME allow any constant expression here
+  assert(dyn_array_length(square_braces->children) == 1);
+  Token *size_token = *dyn_array_get(square_braces->children, 0);
+  assert(size_token->type == Token_Type_Integer);
+  Value *integer = token_force_value(size_token, scope, builder_);
+
+  // FIXME allow bigger than byte
+  assert(integer->operand.type == Operand_Type_Immediate_8);
+  //assert(operand_is_immediate(&integer->operand));
+  s8 length = integer->operand.imm8;
+
+  // TODO extract into a helper
+  Descriptor *array_descriptor = temp_allocate(Descriptor);
+  *array_descriptor = (Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = descriptor,
+      .length = length,
+    },
+  };
+
+  return array_descriptor;
+}
+
+bool
 token_rewrite_definitions(
   Token_Matcher_State *state,
   Scope *scope,
@@ -1122,20 +1232,37 @@ token_rewrite_definitions(
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
   Token_Match_Operator(define, ":");
-  Token_Match(type, 0);
-  Value *value = 0;
-  if (type->type == Token_Type_Id) {
-    Descriptor *descriptor = scope_lookup_type(scope, type->source);
-    value = reserve_stack(builder_, descriptor);
-  } else {
-    value = token_force_value(type, scope, builder_);
-    assert(value->descriptor->type == Descriptor_Type_Void);
-    assert(value->operand.type == Operand_Type_Label_32);
-    push_instruction(builder_, (Instruction) { .maybe_label = value->operand.label32 });
+
+  u64 start_index = state->start_index + peek_index;
+  Array_Token_Ptr rest = dyn_array_sub(
+    Array_Token_Ptr, state->tokens, (Range_u64){start_index, dyn_array_length(state->tokens)}
+  );
+  Token_Matcher_State rest_state = {.tokens = rest};
+  state->tokens.data->length = state->start_index;
+
+  Label *label = token_match_label(&rest_state, scope, builder_);
+  if (label) {
+    push_instruction(builder_, (Instruction) { .maybe_label = label });
+    Value *value = temp_allocate(Value);
+    *value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = label32(label),
+    };
+    scope_define_value(scope, name->source, value);
+    return true;
   }
+
+  Descriptor *descriptor = token_match_fixed_array_type(&rest_state, scope, builder_);
+  if (!descriptor) {
+    assert(dyn_array_length(rest) == 1);
+    Token *type = *dyn_array_get(rest, 0);
+    assert(type->type == Token_Type_Id);
+    descriptor = scope_lookup_type(scope, type->source);
+  }
+
+  Value *value = reserve_stack(builder_, descriptor);
   scope_define_value(scope, name->source, value);
 
-  token_replace_tokens_in_state(state, 3, 0);
   return true;
 }
 
@@ -1217,25 +1344,6 @@ token_rewrite_plus(
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
 }
-
-bool
-token_rewrite_label(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
-) {
-  u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
-
-  Value *value = temp_allocate(Value);
-  *value = (Value) {
-    .descriptor = &descriptor_void,
-    .operand = label32(make_label()),
-  };
-  token_replace_tokens_in_state(state, 1, token_value_make(keyword, value));
-  return true;
-}
-
 bool
 token_rewrite_less_than(
   Token_Matcher_State *state,
@@ -1303,14 +1411,17 @@ token_match_expression(
   }
   token_rewrite_macros(state, scope, builder);
   token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
+  token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
+  token_rewrite_expression(state, scope, builder, token_rewrite_set_array_item);
+
 
   token_rewrite_expression(state, scope, builder, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
+  token_rewrite_expression(state, scope, builder, token_rewrite_pointer_to);
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
   token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);
-  token_rewrite_expression(state, scope, builder, token_rewrite_label);
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
@@ -1323,7 +1434,6 @@ token_match_expression(
       // Statement handling
       token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
       token_rewrite_expression(state, scope, builder, token_rewrite_assignments);
-      token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
       token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
       token_rewrite_expression(state, scope, builder, token_rewrite_goto);
       token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);

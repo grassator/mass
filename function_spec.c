@@ -301,6 +301,18 @@ spec("function") {
 
   it("should be able to define and use a macro for while loop") {
     program_import_file(program_, slice_literal("lib\\prelude"));
+    program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
+
+    Value *fizz_buzz =
+      scope_lookup_force(program_->global_scope, slice_literal("fizz_buzz"), 0);
+
+    program_end(program_);
+
+    value_as_function(fizz_buzz, fn_type_void_to_void)();
+  }
+
+  it("should be able to define and use a macro for while loop") {
+    program_import_file(program_, slice_literal("lib\\prelude"));
     Slice source = slice_literal(
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
