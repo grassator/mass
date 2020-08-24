@@ -223,7 +223,7 @@ const Allocator *allocator_default = &(Allocator){
   allocator_default_reallocate
 };
 
-#ifdef PRELUDE_WIN32
+#ifdef _WIN32
 #include <windows.h>
 inline void *
 allocator_system_allocate(
