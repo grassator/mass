@@ -1140,10 +1140,12 @@ token_rewrite_set_array_item(
 
   Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder_);
   assert(dyn_array_length(args) == 3);
-  // TODO check for array type
   Value *array = *dyn_array_get(args, 0);
   Value *index_value = *dyn_array_get(args, 1);
   Value *value = *dyn_array_get(args, 2);
+
+  assert(array->descriptor->type == Descriptor_Type_Pointer);
+  assert(array->descriptor->pointer_to->type == Descriptor_Type_Fixed_Size_Array);
 
   Descriptor *item_descriptor = array->descriptor->pointer_to->array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
@@ -1151,10 +1153,7 @@ token_rewrite_set_array_item(
   Value *reg_a = value_register_for_descriptor(Register_A, array->descriptor);
   move_value(builder_, reg_a, array);
 
-  // FIXME allow bigger than byte
-  assert(index_value->operand.type == Operand_Type_Immediate_8);
-  //assert(operand_is_immediate(&integer->operand));
-  s8 index = index_value->operand.imm8;
+  s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
 
   Value *target_value = temp_allocate(Value);
   *target_value = (Value){
@@ -1205,10 +1204,7 @@ token_match_fixed_array_type(
   assert(size_token->type == Token_Type_Integer);
   Value *integer = token_force_value(size_token, scope, builder_);
 
-  // FIXME allow bigger than byte
-  assert(integer->operand.type == Operand_Type_Immediate_8);
-  //assert(operand_is_immediate(&integer->operand));
-  s8 length = integer->operand.imm8;
+  u32 length = s64_to_u32(operand_immediate_as_s64(&integer->operand));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = temp_allocate(Descriptor);

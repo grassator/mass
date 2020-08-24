@@ -11,9 +11,9 @@ fizz_buzz :: () -> () {
   set_array_item(&buffer, 0, zero_code);
   set_array_item(&buffer, 1, zero_code + 1);
   set_array_item(&buffer, 2, zero_code + 2);
-  i := 0;
-  while (i < 10) {
-    i = i + 1;
-    WriteFile(GetStdHandle(-11), &buffer, 3, 0, 0);
-  }
+  //i := 0;
+  //while (i < 10) {
+    //i = i + 1;
+  //}
+  WriteFile(GetStdHandle(-11), &buffer, 3, 0, 0);
 }
