@@ -1194,17 +1194,15 @@ token_match_fixed_array_type(
 ) {
   u64 peek_index = 0;
   Token_Match(type, .type = Token_Type_Id);
-  Token_Match(square_braces, .type = Token_Type_Square);
+  Token_Match(square_brace, .type = Token_Type_Square);
 
   Descriptor *descriptor = scope_lookup_type(scope, type->source);
 
-  // FIXME allow any constant expression here
-  assert(dyn_array_length(square_braces->children) == 1);
-  Token *size_token = *dyn_array_get(square_braces->children, 0);
-  assert(size_token->type == Token_Type_Integer);
-  Value *integer = token_force_value(size_token, scope, builder_);
-
-  u32 length = s64_to_u32(operand_immediate_as_s64(&integer->operand));
+  Token_Matcher_State size_state = {.tokens = square_brace->children};
+  Value *size_value = token_match_expression(&size_state, scope, builder_);
+  assert(size_value->descriptor->type == Descriptor_Type_Integer);
+  assert(operand_is_immediate(&size_value->operand));
+  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = temp_allocate(Descriptor);
