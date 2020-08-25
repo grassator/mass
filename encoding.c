@@ -104,6 +104,18 @@ encode_instruction(
       ) {
         continue;
       }
+      if (
+        operand->type == Operand_Type_Sib &&
+        operand_encoding->type == Operand_Encoding_Type_Memory
+      ) {
+        continue;
+      }
+      if (
+        operand->type == Operand_Type_Sib &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      ) {
+        continue;
+      }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
         Operand_Size encoding_size = operand_encoding->size;
         if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
@@ -183,18 +195,40 @@ encode_instruction(
           }
           mod = MOD_Register;
         } else {
+          // TODO use smaller displacement if we can
           mod = MOD_Displacement_s32;
-          assert(operand->type == Operand_Type_Memory_Indirect);
-          r_m = operand->indirect.reg;
-          if (r_m == rsp.reg) {
-            encoding_stack_operand = true;
+          if (operand->type == Operand_Type_Memory_Indirect) {
+            // TODO check if we need to add REX_X here
+            if (operand->indirect.reg == rsp.reg) {
+              r_m = R_M_SIB;
+              encoding_stack_operand = true;
+              needs_sib = true;
+              sib_byte = (
+                (SIB_Scale_1 << 6) |
+                (r_m << 3) |
+                (r_m)
+              );
+            } else {
+              r_m = operand->indirect.reg;
+            }
+          } else if (operand->type == Operand_Type_Sib) {
             needs_sib = true;
-            // FIXME support proper SIB for non-rsp registers
+            r_m = R_M_SIB;
+
+            if (operand->sib.index & 0b1000) {
+              rex_byte |= REX_X;
+            }
+            // TODO reconsider how stack offsets are handled
+            if (operand->sib.base == rsp.reg) {
+              encoding_stack_operand = true;
+            }
             sib_byte = (
-              (SIB_Scale_1 << 6) |
-              (r_m << 3) |
-              (r_m)
+              ((operand->sib.scale & 0b11) << 6) |
+              ((operand->sib.index & 0b111) << 3) |
+              ((operand->sib.base & 0b111) << 0)
             );
+          } else {
+            assert(!"Unsupported operand type");
           }
         }
       }
@@ -248,8 +282,13 @@ encode_instruction(
           s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
           s64 diff = operand_rva - next_instruction_rva;
           fixed_buffer_append_s32(buffer, s64_to_s32(diff));
-        } else if (operand->type == Operand_Type_Memory_Indirect) {
-          s32 displacement = operand->indirect.displacement;
+        } else if (
+          operand->type == Operand_Type_Memory_Indirect ||
+          operand->type == Operand_Type_Sib
+        ) {
+          s32 displacement = operand->type == Operand_Type_Memory_Indirect
+            ? operand->indirect.displacement
+            : operand->sib.displacement;
 
           if (encoding_stack_operand) {
             // Negative diplacement is used to encode local variables

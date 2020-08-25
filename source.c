@@ -1146,25 +1146,60 @@ token_rewrite_set_array_item(
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
-  s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
-
   Descriptor *item_descriptor = array->descriptor->array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
-  Value *target_value = temp_allocate(Value);
-  *target_value = (Value){
-    .descriptor = item_descriptor,
-    .operand = {
-      .type = Operand_Type_Memory_Indirect,
-      .byte_size = item_byte_size,
-      .indirect = (Operand_Memory_Indirect) {
-        .reg = array->operand.indirect.reg,
-        .displacement = array->operand.indirect.displacement + index * item_byte_size,
-      }
+  //if (operand_is_immediate(&index_value->operand)) {
+    //s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+//
+    //Value *target_value = temp_allocate(Value);
+    //*target_value = (Value){
+      //.descriptor = item_descriptor,
+      //.operand = {
+        //.type = Operand_Type_Memory_Indirect,
+        //.byte_size = item_byte_size,
+        //.indirect = (Operand_Memory_Indirect) {
+          //.reg = array->operand.indirect.reg,
+          //.displacement = array->operand.indirect.displacement + index * item_byte_size,
+        //}
+      //}
+    //};
+//
+    //move_value(builder_, target_value, value);
+  //} else
+  if(
+    item_byte_size == 1 ||
+    item_byte_size == 2 ||
+    item_byte_size == 4 ||
+    item_byte_size == 8
+  ) {
+    SIB_Scale scale = SIB_Scale_1;
+    if (item_byte_size == 2) {
+      scale = SIB_Scale_2;
+    } else if (item_byte_size == 4) {
+      scale = SIB_Scale_4;
+    } else if (item_byte_size == 8) {
+      scale = SIB_Scale_8;
     }
-  };
-
-  move_value(builder_, target_value, value);
+    Value *index_value_in_register = ensure_register(builder_, index_value, Register_R10);
+    Value *target_value = temp_allocate(Value);
+    *target_value = (Value){
+      .descriptor = item_descriptor,
+      .operand = {
+        .type = Operand_Type_Sib,
+        .byte_size = item_byte_size,
+        .sib = (Operand_Sib) {
+          .scale = scale,
+          .index = index_value_in_register->operand.reg,
+          .base = array->operand.indirect.reg,
+          .displacement = array->operand.indirect.displacement,
+        }
+      }
+    };
+    move_value(builder_, target_value, value);
+  } else {
+    assert(!"Not implemented");
+  }
 
   token_replace_tokens_in_state(state, 2, 0);
   return true;

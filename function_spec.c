@@ -308,7 +308,8 @@ spec("function") {
 
     program_end(program_);
 
-    value_as_function(fizz_buzz, fn_type_void_to_void)();
+    fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
+    checker();
   }
 
   it("should be able to define and use a macro for while loop") {

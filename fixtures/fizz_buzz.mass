@@ -8,13 +8,10 @@ fizz_buzz :: () -> () {
   zero_code :: 48;
   // FIXME should be something like this
   //buffer[0] = zero_code;
-  set_array_item(buffer, 0, zero_code);
-  set_array_item(buffer, 1, zero_code + 1);
-  set_array_item(buffer, 2, zero_code + 2);
   i := 0;
   while (i < 10) {
-    set_array_item(buffer, 0, zero_code + i);
+    set_array_item(buffer, i, zero_code + i);
     i = i + 1;
   };
-  WriteFile(GetStdHandle(-11), &buffer, 3, 0, 0);
+  WriteFile(GetStdHandle(-11), &buffer, i, 0, 0);
 }

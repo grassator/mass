@@ -383,7 +383,8 @@ operand_is_memory(
 ) {
   return (
     operand->type == Operand_Type_Memory_Indirect ||
-    operand->type == Operand_Type_RIP_Relative
+    operand->type == Operand_Type_RIP_Relative ||
+    operand->type == Operand_Type_Sib
   );
 }
 

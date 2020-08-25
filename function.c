@@ -49,6 +49,21 @@ ensure_register_or_memory(
   return value;
 }
 
+Value *
+ensure_register(
+  Function_Builder *builder,
+  Value *value,
+  Register reg
+) {
+  assert(value->operand.type != Operand_Type_None);
+  if (value->operand.type != Operand_Type_Register) {
+    Value *result = value_register_for_descriptor(reg, value->descriptor);
+    move_value(builder, result, value);
+    return result;
+  }
+  return value;
+}
+
 void
 move_value(
   Function_Builder *builder,
@@ -117,8 +132,8 @@ move_value(
     target->operand.type != Operand_Type_Register &&
     source->operand.type == Operand_Type_Immediate_64
   ) || (
-    target->operand.type == Operand_Type_Memory_Indirect &&
-    source->operand.type == Operand_Type_Memory_Indirect
+    operand_is_memory(&target->operand) &&
+    operand_is_memory(&source->operand)
   )) {
     Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
     move_value(builder, reg_a, source);
