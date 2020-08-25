@@ -1143,17 +1143,13 @@ token_rewrite_set_array_item(
   Value *array = *dyn_array_get(args, 0);
   Value *index_value = *dyn_array_get(args, 1);
   Value *value = *dyn_array_get(args, 2);
-
-  assert(array->descriptor->type == Descriptor_Type_Pointer);
-  assert(array->descriptor->pointer_to->type == Descriptor_Type_Fixed_Size_Array);
-
-  Descriptor *item_descriptor = array->descriptor->pointer_to->array.item;
-  u32 item_byte_size = descriptor_byte_size(item_descriptor);
-
-  Value *reg_a = value_register_for_descriptor(Register_A, array->descriptor);
-  move_value(builder_, reg_a, array);
+  assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
+  assert(array->operand.type == Operand_Type_Memory_Indirect);
 
   s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+
+  Descriptor *item_descriptor = array->descriptor->array.item;
+  u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
   Value *target_value = temp_allocate(Value);
   *target_value = (Value){
@@ -1162,11 +1158,12 @@ token_rewrite_set_array_item(
       .type = Operand_Type_Memory_Indirect,
       .byte_size = item_byte_size,
       .indirect = (Operand_Memory_Indirect) {
-        .reg = rax.reg,
-        .displacement = index * item_byte_size,
+        .reg = array->operand.indirect.reg,
+        .displacement = array->operand.indirect.displacement + index * item_byte_size,
       }
     }
   };
+
   move_value(builder_, target_value, value);
 
   token_replace_tokens_in_state(state, 2, 0);
