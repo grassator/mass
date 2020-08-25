@@ -1,13 +1,6 @@
 #include "value.h"
 
 typedef enum {
-  SIB_Scale_1 = 0b00,
-  SIB_Scale_2 = 0b01,
-  SIB_Scale_4 = 0b10,
-  SIB_Scale_8 = 0b11,
-} SIB_Scale;
-
-typedef enum {
   MOD_Displacement_0   = 0b00,
   MOD_Displacement_s8  = 0b01,
   MOD_Displacement_s32 = 0b10,

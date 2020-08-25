@@ -30,6 +30,7 @@ typedef enum {
   Operand_Type_Immediate_32,
   Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
+  Operand_Type_Sib,
   Operand_Type_RIP_Relative,
   Operand_Type_RIP_Relative_Import,
   Operand_Type_Label_32,
@@ -60,6 +61,20 @@ typedef struct {
   Register reg;
   s32 displacement;
 } Operand_Memory_Indirect;
+
+typedef enum {
+  SIB_Scale_1 = 0b00,
+  SIB_Scale_2 = 0b01,
+  SIB_Scale_4 = 0b10,
+  SIB_Scale_8 = 0b11,
+} SIB_Scale;
+
+typedef struct {
+  SIB_Scale scale;
+  Register index;
+  Register base;
+  s32 displacement;
+} Operand_Sib;
 
 typedef struct {
   s32 *patch_target;
@@ -103,6 +118,7 @@ typedef struct {
     s64 imm64;
     Label *label32;
     Operand_Memory_Indirect indirect;
+    Operand_Sib sib;
     s64 rip_offset_in_data;
     Operand_RIP_Relative_Import import;
   };

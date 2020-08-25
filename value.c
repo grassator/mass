@@ -211,6 +211,7 @@ print_operand(
       printf("imm64(0x%016llx)", operand->imm64);
       break;
     }
+    case Operand_Type_Sib:
     case Operand_Type_Memory_Indirect: {
       u32 bits = operand->byte_size * 8;
       printf("m%d", bits);
