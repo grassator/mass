@@ -246,41 +246,41 @@ const Operand reg_name = { \
   .reg = (reg_index), \
 };
 
-define_register(rax, 0, 8); // 0b0000
-define_register(rcx, 1, 8);
-define_register(rdx, 2, 8);
-define_register(rbx, 3, 8);
-define_register(rsp, 4, 8);
-define_register(rbp, 5, 8);
-define_register(rsi, 6, 8);
-define_register(rdi, 7, 8);
+define_register(rax, 0b0000, 8);
+define_register(rcx, 0b0001, 8);
+define_register(rdx, 0b0010, 8);
+define_register(rbx, 0b0011, 8);
+define_register(rsp, 0b0100, 8);
+define_register(rbp, 0b0101, 8);
+define_register(rsi, 0b0110, 8);
+define_register(rdi, 0b0111, 8);
 
-define_register(eax, 0, 4);
-define_register(ecx, 1, 4);
-define_register(edx, 2, 4);
-define_register(ebx, 3, 4);
-define_register(esp, 4, 4);
-define_register(ebp, 5, 4);
-define_register(esi, 6, 4);
-define_register(edi, 7, 4);
+define_register(eax, 0b0000, 4);
+define_register(ecx, 0b0001, 4);
+define_register(edx, 0b0010, 4);
+define_register(ebx, 0b0011, 4);
+define_register(esp, 0b0100, 4);
+define_register(ebp, 0b0101, 4);
+define_register(esi, 0b0110, 4);
+define_register(edi, 0b0111, 4);
 
-define_register(r8,  8, 8);
-define_register(r9,  9, 8);
-define_register(r10, 10, 8);
-define_register(r11, 11, 8);
-define_register(r12, 12, 8);
-define_register(r13, 13, 8);
-define_register(r14, 14, 8);
-define_register(r15, 15, 8);
+define_register(r8,  0b1000, 8);
+define_register(r9,  0b1001, 8);
+define_register(r10, 0b1010, 8);
+define_register(r11, 0b1011, 8);
+define_register(r12, 0b1100, 8);
+define_register(r13, 0b1101, 8);
+define_register(r14, 0b1110, 8);
+define_register(r15, 0b1111, 8);
 
-define_register(r8d,  8, 4);
-define_register(r9d,  9, 4);
-define_register(r10d, 10, 4);
-define_register(r11d, 11, 4);
-define_register(r12d, 12, 4);
-define_register(r13d, 13, 4);
-define_register(r14d, 14, 4);
-define_register(r15d, 15, 4);
+define_register(r8d,  0b1000, 4);
+define_register(r9d,  0b1001, 4);
+define_register(r10d, 0b1010, 4);
+define_register(r11d, 0b1011, 4);
+define_register(r12d, 0b1100, 4);
+define_register(r13d, 0b1101, 4);
+define_register(r14d, 0b1110, 4);
+define_register(r15d, 0b1111, 4);
 #undef define_register
 
 inline Label*
