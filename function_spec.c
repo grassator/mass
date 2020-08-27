@@ -299,7 +299,7 @@ spec("function") {
     check(checker_fn() == -42);
   }
 
-  it("should be able to define and use a macro for while loop") {
+  it("should be able to run fizz buzz") {
     program_import_file(program_, slice_literal("lib\\prelude"));
     program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
 

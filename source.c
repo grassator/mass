@@ -1015,8 +1015,8 @@ token_parse_block(
   Scope *scope,
   Function_Builder *builder_
 ) {
-  // TODO push an extra scope
   assert(block->type == Token_Type_Curly);
+  Scope *block_scope = scope_make(scope);
   Value *block_result = 0;
   if (dyn_array_length(block->children) != 0) {
     Array_Token_Matcher_State block_statements = token_split(block->children, &(Token){
@@ -1025,7 +1025,7 @@ token_parse_block(
     });
     for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
       Token_Matcher_State *state = dyn_array_get(block_statements, i);
-      block_result = token_match_expression(state, scope, builder_);
+      block_result = token_match_expression(state, block_scope, builder_);
     }
   }
   return block_result;
@@ -1149,25 +1149,24 @@ token_rewrite_set_array_item(
   Descriptor *item_descriptor = array->descriptor->array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
-  //if (operand_is_immediate(&index_value->operand)) {
-    //s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
-//
-    //Value *target_value = temp_allocate(Value);
-    //*target_value = (Value){
-      //.descriptor = item_descriptor,
-      //.operand = {
-        //.type = Operand_Type_Memory_Indirect,
-        //.byte_size = item_byte_size,
-        //.indirect = (Operand_Memory_Indirect) {
-          //.reg = array->operand.indirect.reg,
-          //.displacement = array->operand.indirect.displacement + index * item_byte_size,
-        //}
-      //}
-    //};
-//
-    //move_value(builder_, target_value, value);
-  //} else
-  if(
+  if (operand_is_immediate(&index_value->operand)) {
+    s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+
+    Value *target_value = temp_allocate(Value);
+    *target_value = (Value){
+      .descriptor = item_descriptor,
+      .operand = {
+        .type = Operand_Type_Memory_Indirect,
+        .byte_size = item_byte_size,
+        .indirect = (Operand_Memory_Indirect) {
+          .reg = array->operand.indirect.reg,
+          .displacement = array->operand.indirect.displacement + index * item_byte_size,
+        }
+      }
+    };
+
+    move_value(builder_, target_value, value);
+  } else if(
     item_byte_size == 1 ||
     item_byte_size == 2 ||
     item_byte_size == 4 ||
@@ -1202,6 +1201,47 @@ token_rewrite_set_array_item(
   }
 
   token_replace_tokens_in_state(state, 2, 0);
+  return true;
+}
+
+bool
+token_rewrite_cast(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(cast, .type = Token_Type_Id, .source = slice_literal("cast"));
+  Token_Match(value_token, .type = Token_Type_Paren);
+
+  Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder_);
+  assert(dyn_array_length(args) == 2);
+  Value *type = *dyn_array_get(args, 0);
+  Value *value = *dyn_array_get(args, 1);
+  assert(type->descriptor->type == Descriptor_Type_Type);
+
+  Descriptor *cast_to_descriptor = type->descriptor->type_descriptor;
+  assert(cast_to_descriptor->type == Descriptor_Type_Integer);
+  assert(value->descriptor->type == cast_to_descriptor->type);
+
+  u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
+  u32 original_byte_size = descriptor_byte_size(value->descriptor);
+  Value *result = value;
+  if (cast_to_byte_size != original_byte_size) {
+    result = temp_allocate(Value);
+    if (cast_to_byte_size < original_byte_size) {
+      *result = (Value) {
+        .descriptor = cast_to_descriptor,
+        .operand = value->operand,
+      };
+      result->operand.byte_size = cast_to_byte_size;
+    } else if (cast_to_byte_size > original_byte_size) {
+      result = reserve_stack(builder_, cast_to_descriptor);
+      move_value(builder_, result, value);
+    }
+  }
+
+  token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
   return true;
 }
 
@@ -1370,6 +1410,46 @@ token_rewrite_plus(
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
 }
+
+
+bool
+token_rewrite_divide(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(operator, "/");
+  Token_Match(rhs, 0);
+
+  Value *value = Divide(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  return true;
+}
+
+bool
+token_rewrite_remainder(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(operator, "%");
+  Token_Match(rhs, 0);
+
+  Value *value = Remainder(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  return true;
+}
+
 bool
 token_rewrite_less_than(
   Token_Matcher_State *state,
@@ -1439,12 +1519,16 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
   token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
   token_rewrite_expression(state, scope, builder, token_rewrite_set_array_item);
+  token_rewrite_expression(state, scope, builder, token_rewrite_cast);
 
 
   token_rewrite_expression(state, scope, builder, token_rewrite_functions);
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_pointer_to);
+  token_rewrite_expression(state, scope, builder, token_rewrite_divide);
+  token_rewrite_expression(state, scope, builder, token_rewrite_remainder);
+
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
   token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);

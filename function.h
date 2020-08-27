@@ -112,10 +112,18 @@ divide(
   Value *b
 );
 
+Value *
+remainder(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+);
+
 #define Plus(_a_, _b_) plus(builder_, _a_, _b_)
 #define Minus(_a_, _b_) minus(builder_, _a_, _b_)
 #define Multiply(_a_, _b_) multiply(builder_, _a_, _b_)
 #define Divide(_a_, _b_) divide(builder_, _a_, _b_)
+#define Remainder(_a_, _b_) remainder(builder_, _a_, _b_)
 
 #define SizeOfDescriptor(_descriptor_) value_from_s32(descriptor_byte_size(_descriptor_))
 #define SizeOf(_value_) value_byte_size(_value_)

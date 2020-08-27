@@ -509,13 +509,19 @@ multiply(
   return temp;
 }
 
+typedef enum {
+  Divide_Operation_Divide,
+  Divide_Operation_Remainder,
+} Divide_Operation;
+
 Value *
-divide(
+divide_or_remainder(
+  Divide_Operation operation,
   Function_Builder *builder,
   Value *a,
   Value *b
 ) {
-  assert(same_value_type(a, b));
+  assert(same_value_type_or_can_implicitly_move_cast(a, b));
   assert(a->descriptor->type == Descriptor_Type_Integer);
 
   // TODO type check values
@@ -535,40 +541,71 @@ divide(
   Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
   move_value(builder, rdx_temp, reg_rdx);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
-  move_value(builder, reg_a, a);
+  Descriptor *larger_descriptor =
+    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
+    ? a->descriptor
+    : b->descriptor;
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(builder, b->descriptor);
+  Value *divisor = reserve_stack(builder, larger_descriptor);
   move_value(builder, divisor, b);
 
-  switch (descriptor_byte_size(a->descriptor)) {
-    case 8: {
-      push_instruction(builder, (Instruction) {cqo, {0}});
-      break;
-    }
-    case 4: {
-      push_instruction(builder, (Instruction) {cdq, {0}});
-      break;
-    }
-    case 2: {
-      push_instruction(builder, (Instruction) {cwd, {0}});
-      break;
-    }
-    default: {
-      assert(!"Unsupported byte size when dividing");
+  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
+  {
+    move_value(builder, reg_a, a);
+
+    switch (descriptor_byte_size(larger_descriptor)) {
+      case 8: {
+        push_instruction(builder, (Instruction) {cqo, {0}});
+        break;
+      }
+      case 4: {
+        push_instruction(builder, (Instruction) {cdq, {0}});
+        break;
+      }
+      case 2: {
+        push_instruction(builder, (Instruction) {cwd, {0}});
+        break;
+      }
+      default: {
+        assert(!"Unsupported byte size when dividing");
+      }
     }
   }
   push_instruction(builder, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
-  Value *temp = reserve_stack(builder, a->descriptor);
-  move_value(builder, temp, reg_a);
+
+  Value *result = reserve_stack(builder, larger_descriptor);
+  if (operation == Divide_Operation_Divide) {
+    move_value(builder, result, reg_a);
+  } else {
+    move_value(builder, result, value_register_for_descriptor(Register_D, larger_descriptor));
+  }
 
   // Restore RDX
   move_value(builder, reg_rdx, rdx_temp);
 
-  return temp;
+  return result;
 }
+
+Value *
+divide(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  return divide_or_remainder(Divide_Operation_Divide, builder, a, b);
+}
+
+Value *
+remainder(
+  Function_Builder *builder,
+  Value *a,
+  Value *b
+) {
+  return divide_or_remainder(Divide_Operation_Remainder, builder, a, b);
+}
+
 
 Value *
 compare(
