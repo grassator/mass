@@ -27,28 +27,40 @@ int main(s32 argc, char **argv) {
   temp_allocator = bucket_buffer_allocator_make(temp_buffer);
 
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
-  char *file_path = 0;
+  char *raw_file_path = 0;
   for (s32 i = 1; i < argc; ++i) {
     if (strcmp(argv[i], "--run") == 0) {
       mode = Mass_Cli_Mode_Run;
     } else {
-      if (file_path) {
+      if (raw_file_path) {
         return mass_cli_print_usage();
       } else {
-        file_path = argv[i];
+        raw_file_path = argv[i];
       }
     }
   }
 
+  Slice file_path = slice_from_c_string(raw_file_path);
   Program *program = program_init(&(Program) {0});
-  program_import_file(program, slice_from_c_string(file_path));
+  program_import_file(program, slice_literal("lib\\prelude"));
+  program_import_file(program, file_path);
+
 
   program->entry_point = scope_lookup_force(program->global_scope, slice_literal("main"), 0);
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
-      // TODO generate correct file name
-      write_executable(L"build\\test_cli.exe", program);
+      Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("\\"));
+      Slice base_name = *dyn_array_pop(parts);
+      Fixed_Buffer *buffer = fixed_buffer_make();
+      fixed_buffer_append_slice(buffer, slice_literal("build\\"));
+      fixed_buffer_append_slice(buffer, base_name);
+      fixed_buffer_append_slice(buffer, slice_literal(".exe"));
+      wchar_t *exe_path_wide = utf8_to_utf16_null_terminated(
+        allocator_default,
+        fixed_buffer_as_slice(buffer)
+      );
+      write_executable(exe_path_wide, program);
       break;
     }
     case Mass_Cli_Mode_Run: {
