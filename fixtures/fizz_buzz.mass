@@ -36,22 +36,27 @@ print :: (integer : s32) -> () {
 }
 
 fizz_buzz :: () -> () {
-  print(0);
-  //i := 1;
-  //stdout_handle := GetStdHandle(-11);
-  //while (i < 101) {
-    //print_number := 1;
-    ////if (i % 3) {
-      ////print_number = 0;
-      ////WriteFile(stdout_handle, "fizz", 4, 0, 0);
-    ////};
-    ////if (i % 5) {
-      ////print_number = 0;
-      ////WriteFile(stdout_handle, "buzz", 4, 0, 0);
-    ////};
-    ////if (print_number) {
-    //print(i);
-    //i := i + 1;
-    ////};
-  //};
+  i := 0;
+  stdout_handle := GetStdHandle(-11);
+  while (i < 100) {
+    i = i + 1;
+    print_number := 1;
+    if (i % 3 == 0) {
+      print_number = 0;
+      WriteFile(stdout_handle, "fizz", 4, 0, 0);
+    };
+    if (i % 5 == 0) {
+      print_number = 0;
+      WriteFile(stdout_handle, "buzz", 4, 0, 0);
+    };
+    if (print_number) {
+      print(i);
+    };
+    WriteFile(stdout_handle, " ", 1, 0, 0);
+  };
+}
+
+main :: () -> () {
+  fizz_buzz();
+  ExitProcess(0);
 }

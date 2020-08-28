@@ -567,6 +567,10 @@ divide_or_remainder(
         push_instruction(builder, (Instruction) {cwd, {0}});
         break;
       }
+      case 1: {
+        // No need to sign extend in D register
+        break;
+      }
       default: {
         assert(!"Unsupported byte size when dividing");
       }
@@ -579,7 +583,11 @@ divide_or_remainder(
   if (operation == Divide_Operation_Divide) {
     move_value(builder, result, reg_a);
   } else {
-    move_value(builder, result, value_register_for_descriptor(Register_D, larger_descriptor));
+    if (descriptor_byte_size(larger_descriptor) == 1) {
+      move_value(builder, result, value_register_for_descriptor(Register_AH, larger_descriptor));
+    } else {
+      move_value(builder, result, value_register_for_descriptor(Register_D, larger_descriptor));
+    }
   }
 
   // Restore RDX

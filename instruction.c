@@ -226,6 +226,7 @@ const X64_Mnemonic imul = {
 // idiv
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding idiv_encoding_list[] = {
+  encoding(0xF6, _op_code(7), r_m8),
   encoding(0xF7, _op_code(7), r_m16),
   encoding(0xF7, _op_code(7), r_m32),
   encoding(0xF7, _op_code(7), r_m64),

@@ -41,10 +41,18 @@ typedef enum {
   Register_C   = 0b0001,
   Register_D   = 0b0010,
   Register_B   = 0b0011,
+
+  Register_AH  = 0b0100,
   Register_SP  = 0b0100,
   R_M_SIB      = 0b0100,
+
+  Register_CH  = 0b0100,
   Register_BP  = 0b0101,
+
+  Register_DH  = 0b0100,
   Register_SI  = 0b0110,
+
+  Register_BH  = 0b0100,
   Register_DI  = 0b0111,
 
   Register_R8  = 0b1000,
