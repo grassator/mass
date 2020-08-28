@@ -6,6 +6,7 @@ WriteFile :: (status : s64, buffer : [s8], size : s32, bytes_written : s64, over
 print :: (integer : s32) -> () {
   buffer : s8[64];
   zero_code :: 48;
+  minus_code :: 45;
   // FIXME should be something like this
   //buffer[0] = zero_code;
   temp := integer;
@@ -14,19 +15,28 @@ print :: (integer : s32) -> () {
     temp = temp / 10;
     count = count + 1;
   };
-  index := count;
-  while (index) {
-    index = index + (-1);
+  if (count == 0) {
+    count = 1;
+  };
+  start_index := 0;
+  index := 0;
+  if (integer < 0) {
+    start_index = 1;
+    set_array_item(buffer, 0, minus_code);
+    integer = cast(s32, 0) - integer;
+  };
+  while (index < count) {
+    index = index + 1;
     digit_s32 := integer % 10;
     digit := cast(s8, digit_s32);
-    set_array_item(buffer, index, zero_code + digit);
+    set_array_item(buffer, start_index + count - index, zero_code + digit);
     integer = integer / 10;
   };
-  WriteFile(GetStdHandle(-11), &buffer, count, 0, 0);
+  WriteFile(GetStdHandle(-11), &buffer, start_index + count, 0, 0);
 }
 
 fizz_buzz :: () -> () {
-  print(42);
+  print(0);
   //i := 1;
   //stdout_handle := GetStdHandle(-11);
   //while (i < 101) {

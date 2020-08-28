@@ -179,14 +179,17 @@ const X64_Mnemonic add = {
 // sub
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding sub_encoding_list[] = {
+  encoding(0x2A, _r, r8, r_m8),
   encoding(0x2B, _r, r16, r_m16),
   encoding(0x2B, _r, r32, r_m32),
   encoding(0x2B, _r, r64, r_m64),
 
+  encoding(0x28, _r, r_m8, r8),
   encoding(0x29, _r, r_m16, r16),
   encoding(0x29, _r, r_m32, r32),
   encoding(0x29, _r, r_m64, r64),
 
+  encoding(0x80, _op_code(5), r_m8, imm8),
   encoding(0x81, _op_code(5), r_m16, imm16),
   encoding(0x81, _op_code(5), r_m32, imm32),
   encoding(0x81, _op_code(5), r_m64, imm32),

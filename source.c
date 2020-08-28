@@ -1095,7 +1095,7 @@ token_rewrite_negative_literal(
   Function_Builder *builder_
 ) {
   u64 peek_index = 0;
-  // FIXME distinguish unary and binary minus
+  // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
   Token_Match(integer, .type = Token_Type_Integer);
   Value *result = token_force_value(integer, scope, builder_);
@@ -1411,6 +1411,25 @@ token_rewrite_plus(
   return true;
 }
 
+bool
+token_rewrite_minus(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(plus_token, "-");
+  Token_Match(rhs, 0);
+
+  Value *value = Minus(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
+  return true;
+}
+
 
 bool
 token_rewrite_divide(
@@ -1447,6 +1466,25 @@ token_rewrite_remainder(
     token_force_value(rhs, scope, builder_)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  return true;
+}
+
+bool
+token_rewrite_equals(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match_Operator(plus_token, "==");
+  Token_Match(rhs, 0);
+
+  Value *value = Eq(
+    token_force_value(lhs, scope, builder_),
+    token_force_value(rhs, scope, builder_)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
 }
 
@@ -1530,6 +1568,9 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_remainder);
 
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
+  token_rewrite_expression(state, scope, builder, token_rewrite_minus);
+
+  token_rewrite_expression(state, scope, builder, token_rewrite_equals);
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
   token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);
 
