@@ -58,6 +58,13 @@ encode_instruction(
       }
       if (
         operand->type == Operand_Type_Register &&
+        operand->reg == Register_A &&
+        operand_encoding->type == Operand_Encoding_Type_Register_A
+      ) {
+        continue;
+      }
+      if (
+        operand->type == Operand_Type_Register &&
         operand_encoding->type == Operand_Encoding_Type_Register
       ) {
         continue;

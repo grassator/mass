@@ -894,4 +894,16 @@ spec("function") {
     check(f(3) == 2);
     //check(f(6) == 8);
   }
+
+  it("should be able to encode instructions with implicit A register argument") {
+    Function(check) {
+      Value *result = value_register_for_descriptor(Register_A, &descriptor_s32);
+      move_value(builder_, result, value_from_s32(40));
+      push_instruction(builder_, (Instruction) {add, {result->operand, imm32(2), 0}});
+      Return(result);
+    }
+    program_end(program_);
+    fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
+    check(f() == 42);
+  }
 }

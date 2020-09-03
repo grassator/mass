@@ -7,6 +7,12 @@
   .extension_type = Instruction_Extension_Type_Op_Code,\
   .op_code_extension = (_extension_ & 0b111),
 
+
+#define r_al  { Operand_Encoding_Type_Register_A, Operand_Size_8 }
+#define r_ax  { Operand_Encoding_Type_Register_A, Operand_Size_16 }
+#define r_eax { Operand_Encoding_Type_Register_A, Operand_Size_32 }
+#define r_rax { Operand_Encoding_Type_Register_A, Operand_Size_64 }
+
 #define r8  { Operand_Encoding_Type_Register, Operand_Size_8 }
 #define r16 { Operand_Encoding_Type_Register, Operand_Size_16 }
 #define r32 { Operand_Encoding_Type_Register, Operand_Size_32 }
@@ -139,6 +145,11 @@ const X64_Mnemonic inc = {
 // xor
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding xor_encoding_list[] = {
+  encoding(0x34, none, r_al, imm8),
+  encoding(0x35, none, r_ax, imm16),
+  encoding(0x35, none, r_eax, imm32),
+  encoding(0x35, none, r_rax, imm32),
+
   encoding(0x32, _r, r8, r_m8),
   encoding(0x33, _r, r16, r_m16),
   encoding(0x33, _r, r32, r_m32),
@@ -154,6 +165,10 @@ const X64_Mnemonic xor = {
 // add
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding add_encoding_list[] = {
+  encoding(0x04, none, r_al, imm8),
+  encoding(0x05, none, r_ax, imm16),
+  encoding(0x05, none, r_eax, imm32),
+  encoding(0x05, none, r_rax, imm32),
 
   encoding(0x02, _r, r8, r_m8),
   encoding(0x03, _r, r16, r_m16),
@@ -179,6 +194,11 @@ const X64_Mnemonic add = {
 // sub
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding sub_encoding_list[] = {
+  encoding(0x2C, none, r_al, imm8),
+  encoding(0x2D, none, r_ax, imm16),
+  encoding(0x2D, none, r_eax, imm32),
+  encoding(0x2D, none, r_rax, imm32),
+
   encoding(0x2A, _r, r8, r_m8),
   encoding(0x2B, _r, r16, r_m16),
   encoding(0x2B, _r, r32, r_m32),
@@ -293,6 +313,11 @@ const X64_Mnemonic call = {
 // cmp
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding cmp_encoding_list[] = {
+  encoding(0x3C, none, r_al, imm8),
+  encoding(0x3D, none, r_ax, imm16),
+  encoding(0x3D, none, r_eax, imm32),
+  encoding(0x3D, none, r_rax, imm32),
+
   encoding(0x80, _op_code(7), r_m8, imm8),
   encoding(0x81, _op_code(7), r_m16, imm16),
   encoding(0x81, _op_code(7), r_m32, imm32),
@@ -413,6 +438,11 @@ const X64_Mnemonic jmp = {
 #undef _r
 #undef plus_r
 #undef _op_code
+
+#undef r_al
+#undef r_ax
+#undef r_eax
+#undef r_rax
 
 #undef r8
 #undef r16

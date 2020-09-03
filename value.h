@@ -280,6 +280,7 @@ typedef enum {
 typedef enum {
   Operand_Encoding_Type_None,
   Operand_Encoding_Type_Register,
+  Operand_Encoding_Type_Register_A,
   Operand_Encoding_Type_Register_Memory,
   Operand_Encoding_Type_Memory,
   Operand_Encoding_Type_Immediate,
