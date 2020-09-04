@@ -104,12 +104,12 @@ u32
 struct_byte_size(
   const Descriptor_Struct *struct_
 ) {
-  s64 count = struct_->field_count;
+  s64 count = dyn_array_length(struct_->fields);
   assert(count);
   u32 alignment = 0;
   u32 raw_size = 0;
   for (s32 i = 0; i < count; ++i) {
-    Descriptor_Struct_Field *field = &struct_->field_list[i];
+    Descriptor_Struct_Field *field = dyn_array_get(struct_->fields, i);
     u32 field_alignment = descriptor_alignment(field->descriptor);
     alignment = max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
@@ -161,29 +161,6 @@ descriptor_byte_size(
   }
   return 0;
 }
-
-
-// @Volatile @Reflection
-typedef struct {
-  s32 field_count;
-} Descriptor_Struct_Reflection;
-
-// @Volatile @Reflection
-Descriptor_Struct_Field struct_reflection_fields[] = {
-  {
-    .name = "field_count",
-    .offset = 0,
-    .descriptor = &descriptor_s32,
-  }
-};
-
-Descriptor descriptor_struct_reflection = {
-  .type = Descriptor_Type_Struct,
-  .struct_ = {
-    .field_list = struct_reflection_fields,
-    .field_count = countof(struct_reflection_fields),
-  },
-};
 
 void
 print_operand(
@@ -364,6 +341,41 @@ stack(
       .displacement = offset,
     }
   };
+}
+
+Descriptor *
+descriptor_struct_make() {
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  *descriptor = (Descriptor) {
+    .type = Descriptor_Type_Struct,
+    .struct_ = {
+      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+    }
+  };
+  return descriptor;
+}
+
+void
+descriptor_struct_add_field(
+  Descriptor *struct_descriptor,
+  Descriptor *field_descriptor,
+  Slice field_name
+) {
+  u32 offset = 0;
+  for (u64 i = 0; i < dyn_array_length(struct_descriptor->struct_.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(struct_descriptor->struct_.fields, i);
+    u32 size = descriptor_byte_size(field->descriptor);
+    offset = u32_align(offset, size);
+    offset += size;
+  }
+
+  u32 size = descriptor_byte_size(field_descriptor);
+  offset = u32_align(offset, size);
+  dyn_array_push(struct_descriptor->struct_.fields, (Descriptor_Struct_Field) {
+    .name = field_name,
+    .descriptor = field_descriptor,
+    .offset = offset,
+  });
 }
 
 s64

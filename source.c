@@ -896,8 +896,6 @@ scope_add_macro(
   dyn_array_push(scope->macros, macro);
 }
 
-
-
 bool
 token_rewrite_macro_definitions(
   Token_Matcher_State *state,
@@ -935,6 +933,112 @@ token_rewrite_macro_definitions(
   };
 
   scope_add_macro(scope, macro);
+
+  return true;
+}
+
+Descriptor *
+token_match_fixed_array_type(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(type, .type = Token_Type_Id);
+  Token_Match(square_brace, .type = Token_Type_Square);
+
+  Descriptor *descriptor = scope_lookup_type(scope, type->source);
+
+  Token_Matcher_State size_state = {.tokens = square_brace->children};
+  Value *size_value = token_match_expression(&size_state, scope, builder_);
+  assert(size_value->descriptor->type == Descriptor_Type_Integer);
+  assert(operand_is_immediate(&size_value->operand));
+  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
+
+  // TODO extract into a helper
+  Descriptor *array_descriptor = temp_allocate(Descriptor);
+  *array_descriptor = (Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = descriptor,
+      .length = length,
+    },
+  };
+
+  return array_descriptor;
+}
+
+bool
+token_match_struct_field(
+  Descriptor *struct_descriptor,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id);
+  Token_Match_Operator(define, ":");
+
+  u64 start_index = state->start_index + peek_index;
+  Array_Token_Ptr rest = dyn_array_sub(
+    Array_Token_Ptr, state->tokens, (Range_u64){start_index, dyn_array_length(state->tokens)}
+  );
+  Token_Matcher_State rest_state = {.tokens = rest};
+  state->tokens.data->length = state->start_index;
+
+  Descriptor *descriptor = token_match_fixed_array_type(&rest_state, scope, builder_);
+  if (!descriptor) {
+    assert(dyn_array_length(rest) == 1);
+    Token *type = *dyn_array_get(rest, 0);
+    assert(type->type == Token_Type_Id);
+    descriptor = scope_lookup_type(scope, type->source);
+  }
+
+  descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
+  return true;
+}
+
+bool
+token_rewrite_struct_definitions(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("struct"));
+  Token_Match(body, .type = Token_Type_Curly);
+
+  Value *result = temp_allocate(Value);
+  Descriptor *struct_descriptor = temp_allocate(Descriptor);
+  *struct_descriptor = (Descriptor) {
+    .type = Descriptor_Type_Struct,
+    .struct_ = {
+      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+    },
+  };
+
+  if (dyn_array_length(body->children) != 0) {
+    Array_Token_Matcher_State definitions = token_split(body->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(";"),
+    });
+    for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
+      Token_Matcher_State *field_state = dyn_array_get(definitions, i);
+      token_match_struct_field(struct_descriptor, field_state, scope, builder_);
+    }
+  }
+
+  Descriptor *value_descriptor = temp_allocate(Descriptor);
+  *value_descriptor = (Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = struct_descriptor,
+  };
+  *result = (Value) {
+    .descriptor = value_descriptor,
+    .operand = {.type = Operand_Type_None },
+  };
+
+  token_replace_tokens_in_state(state, 2, token_value_make(body, result));
 
   return true;
 }
@@ -1256,37 +1360,6 @@ token_match_label(
   Token_Match_End();
 
   return make_label();
-}
-
-Descriptor *
-token_match_fixed_array_type(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
-) {
-  u64 peek_index = 0;
-  Token_Match(type, .type = Token_Type_Id);
-  Token_Match(square_brace, .type = Token_Type_Square);
-
-  Descriptor *descriptor = scope_lookup_type(scope, type->source);
-
-  Token_Matcher_State size_state = {.tokens = square_brace->children};
-  Value *size_value = token_match_expression(&size_state, scope, builder_);
-  assert(size_value->descriptor->type == Descriptor_Type_Integer);
-  assert(operand_is_immediate(&size_value->operand));
-  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
-
-  // TODO extract into a helper
-  Descriptor *array_descriptor = temp_allocate(Descriptor);
-  *array_descriptor = (Descriptor) {
-    .type = Descriptor_Type_Fixed_Size_Array,
-    .array = {
-      .item = descriptor,
-      .length = length,
-    },
-  };
-
-  return array_descriptor;
 }
 
 bool
@@ -1670,6 +1743,7 @@ token_match_module(
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
   Function_Builder global_builder = { .program = program };
 
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_struct_definitions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_macro_definitions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_dll_imports);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_functions);

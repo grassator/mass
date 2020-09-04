@@ -67,6 +67,17 @@ Label *make_if(
   Value *value
 );
 
+typedef struct Struct_Builder_Field {
+  Descriptor_Struct_Field struct_field;
+  struct Struct_Builder_Field *next;
+} Struct_Builder_Field;
+
+typedef struct {
+  u32 offset;
+  u32 field_count;
+  Struct_Builder_Field *field_list;
+} Struct_Builder;
+
 typedef struct {
   bool done;
   Label *label_start;

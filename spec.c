@@ -9,85 +9,6 @@
 #include "source.c"
 
 Value *
-fn_reflect(
-  Function_Builder *builder,
-  Descriptor *descriptor
-) {
-  Value *result = reserve_stack(builder, &descriptor_struct_reflection);
-  // FIXME support all types
-  assert(descriptor->type == Descriptor_Type_Struct);
-  // FIXME support generic allocation of structs on the stack
-  move_value(builder, result, value_from_s32(descriptor->struct_.field_count));
-  return result;
-}
-
-typedef struct Struct_Builder_Field {
-  Descriptor_Struct_Field struct_field;
-  struct Struct_Builder_Field *next;
-} Struct_Builder_Field;
-
-typedef struct {
-  u32 offset;
-  u32 field_count;
-  Struct_Builder_Field *field_list;
-} Struct_Builder;
-
-Struct_Builder
-struct_begin() {
-  return (const Struct_Builder) {0};
-}
-
-Descriptor_Struct_Field *
-struct_add_field(
-  Struct_Builder *builder,
-  Descriptor *descriptor,
-  const char *name
-) {
-  Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
-
-  s32 size = descriptor_byte_size(descriptor);
-  builder->offset = s32_align(builder->offset, size);
-
-  builder_field->struct_field.name = name;
-  builder_field->struct_field.descriptor = descriptor;
-  builder_field->struct_field.offset = builder->offset;
-
-  builder_field->next = builder->field_list;
-  builder->field_list = builder_field;
-
-  builder->offset += size;
-  builder->field_count++;
-
-  return &builder_field->struct_field;
-}
-
-Descriptor *
-struct_end(
-  Struct_Builder *builder
-) {
-  assert(builder->field_count);
-
-  Descriptor *result = temp_allocate(Descriptor);
-  Descriptor_Struct_Field *field_list = temp_allocate_array(
-    Descriptor_Struct_Field, builder->field_count
-  );
-
-  Struct_Builder_Field *field = builder->field_list;
-  u64 index = builder->field_count - 1;
-  while (field) {
-    field_list[index--] = field->struct_field;
-    field = field->next;
-  }
-  result->type = Descriptor_Type_Struct;
-  result->struct_ = (const Descriptor_Struct) {
-    .field_list = field_list,
-    .field_count = builder->field_count,
-  };
-
-  return result;
-}
-
-Value *
 ensure_memory(
   Value *value
 ) {
@@ -112,14 +33,14 @@ ensure_memory(
 Value *
 struct_get_field(
   Value *raw_value,
-  const char *name
+  Slice name
 ) {
   Value *struct_value = ensure_memory(raw_value);
   Descriptor *descriptor = struct_value->descriptor;
   assert(descriptor->type == Descriptor_Type_Struct);
-  for (s32 i = 0; i < descriptor->struct_.field_count; ++i) {
-    Descriptor_Struct_Field *field = &descriptor->struct_.field_list[i];
-    if (strcmp(field->name, name) == 0) {
+  for (u64 i = 0; i < dyn_array_length(descriptor->struct_.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(descriptor->struct_.fields, i);
+    if (slice_equal(name, field->name)) {
       Value *result = temp_allocate(Value);
       Operand operand = struct_value->operand;
       // FIXME support more operands
@@ -142,7 +63,7 @@ struct_get_field(
 Value *
 maybe_cast_to_tag(
   Function_Builder *builder,
-  const char *name,
+  Slice name,
   Value *value
 ) {
   assert(value->descriptor->type == Descriptor_Type_Pointer);
@@ -166,7 +87,7 @@ maybe_cast_to_tag(
   s64 count = descriptor->tagged_union.struct_count;
   for (s32 i = 0; i < count; ++i) {
     Descriptor_Struct *struct_ = &descriptor->tagged_union.struct_list[i];
-    if (strcmp(struct_->name, name) == 0) {
+    if (slice_equal(name, struct_->name)) {
 
       Descriptor *constructor_descriptor = temp_allocate(Descriptor);
       *constructor_descriptor = (const Descriptor) {
@@ -256,10 +177,9 @@ spec("spec") {
   }
 
   it("should support returning structs larger than 64 bits on the stack") {
-    Struct_Builder struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s64, "x");
-    struct_add_field(&struct_builder, &descriptor_s64, "y");
-    Descriptor *point_struct_descriptor = struct_end(&struct_builder);
+    Descriptor *point_struct_descriptor = descriptor_struct_make();
+    descriptor_struct_add_field(point_struct_descriptor, &descriptor_s64, slice_literal("x"));
+    descriptor_struct_add_field(point_struct_descriptor, &descriptor_s64, slice_literal("y"));
 
     Value *return_overload = temp_allocate(Value);
     *return_overload = (Value) {
@@ -284,7 +204,7 @@ spec("spec") {
 
     Function(checker_value) {
       Value *test_result = Call(c_test_fn_value);
-      Value *x = struct_get_field(test_result, "x");
+      Value *x = struct_get_field(test_result, slice_literal("x"));
       Return(x);
     }
     program_end(program_);
@@ -330,41 +250,22 @@ spec("spec") {
     check(sizeof_s32->operand.imm32 == 4);
   }
 
-  it("should support reflection on structs") {
-    Struct_Builder struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s32, "x");
-    struct_add_field(&struct_builder, &descriptor_s32, "y");
-    Descriptor *point_struct_descriptor = struct_end(&struct_builder);
-
-    Function(field_count) {
-      Value *overload = fn_reflect(builder_, point_struct_descriptor);
-      Stack(struct_, &descriptor_struct_reflection, overload);
-      Return(struct_get_field(struct_, "field_count"));
-    }
-    program_end(program_);
-    s32 count = value_as_function(field_count, fn_type_void_to_s32)();
-    check(count == 2);
-  }
-
   it("should support tagged unions") {
-    Descriptor_Struct_Field some_fields[] = {
-      {
-        .name = "value",
-        .descriptor = &descriptor_s64,
-        .offset = 0,
-      },
-    };
+    Array_Descriptor_Struct_Field some_fields = dyn_array_make(Array_Descriptor_Struct_Field);
+    dyn_array_push(some_fields, (Descriptor_Struct_Field) {
+      .name = slice_literal("value"),
+      .descriptor = &descriptor_s64,
+      .offset = 0,
+    });
 
     Descriptor_Struct constructors[] = {
       {
-        .name = "None",
-        .field_list = 0,
-        .field_count = 0,
+        .name = slice_literal("None"),
+        .fields = dyn_array_make(Array_Descriptor_Struct_Field),
       },
       {
-        .name = "Some",
-        .field_list = some_fields,
-        .field_count = countof(some_fields),
+        .name = slice_literal("Some"),
+        .fields = some_fields,
       },
     };
 
@@ -380,9 +281,9 @@ spec("spec") {
     Function(with_default_value) {
       Arg(option_value, descriptor_pointer_to(&option_s64_descriptor));
       Arg_s64(default_value);
-      Value *some = maybe_cast_to_tag(builder_, "Some", option_value);
+      Value *some = maybe_cast_to_tag(builder_, slice_literal("Some"), option_value);
       If(some) {
-        Value *value = struct_get_field(some, "value");
+        Value *value = struct_get_field(some, slice_literal("value"));
         Return(value);
       }
       Return(default_value);
@@ -432,13 +333,11 @@ spec("spec") {
   }
 
   it("should say that structs are different if their descriptors are different pointers") {
-    Struct_Builder struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s32, "x");
-    Descriptor *a = struct_end(&struct_builder);
+    Descriptor *a = descriptor_struct_make();
+    descriptor_struct_add_field(a, &descriptor_s32, slice_literal("x"));
 
-    struct_builder = struct_begin();
-    struct_add_field(&struct_builder, &descriptor_s32, "x");
-    Descriptor *b = struct_end(&struct_builder);
+    Descriptor *b = descriptor_struct_make();
+    descriptor_struct_add_field(b, &descriptor_s32, slice_literal("x"));
 
     check(same_type(a, a));
     check(!same_type(a, b));
@@ -447,21 +346,18 @@ spec("spec") {
   it("should support structs") {
     // struct Size { s8 width; s32 height; };
 
-    Struct_Builder struct_builder = struct_begin();
-
-    struct_add_field(&struct_builder, &descriptor_s32, "width");
-    struct_add_field(&struct_builder, &descriptor_s32, "height");
-    struct_add_field(&struct_builder, &descriptor_s32, "dummy");
-
-    Descriptor *size_struct_descriptor = struct_end(&struct_builder);
+    Descriptor *size_struct_descriptor = descriptor_struct_make();
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("width"));
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("height"));
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("dummy"));
 
     Descriptor *size_struct_pointer_descriptor = descriptor_pointer_to(size_struct_descriptor);
 
     Function(area) {
       Arg(size_struct, size_struct_pointer_descriptor);
       Return(Multiply(
-        struct_get_field(size_struct, "width"),
-        struct_get_field(size_struct, "height")
+        struct_get_field(size_struct, slice_literal("width")),
+        struct_get_field(size_struct, slice_literal("height"))
       ));
     }
     program_end(program_);

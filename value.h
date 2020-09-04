@@ -167,15 +167,15 @@ typedef struct Descriptor_Function {
 } Descriptor_Function;
 
 typedef struct {
-  const char *name;
+  Slice name;
   struct Descriptor *descriptor;
   s32 offset;
 } Descriptor_Struct_Field;
+typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
 typedef struct {
-  const char *name;
-  Descriptor_Struct_Field *field_list;
-  s32 field_count;
+  Slice name;
+  Array_Descriptor_Struct_Field fields;
 } Descriptor_Struct;
 
 typedef struct {

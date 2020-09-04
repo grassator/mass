@@ -28,6 +28,61 @@ push_instruction_internal(
   dyn_array_push(builder->instructions, instruction);
 }
 
+//Struct_Builder
+//struct_begin() {
+  //return (const Struct_Builder) {0};
+//}
+//
+//Descriptor_Struct_Field *
+//struct_add_field(
+  //Struct_Builder *builder,
+  //Descriptor *descriptor,
+  //const char *name
+//) {
+  //Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
+//
+  //s32 size = descriptor_byte_size(descriptor);
+  //builder->offset = s32_align(builder->offset, size);
+//
+  //builder_field->struct_field.name = name;
+  //builder_field->struct_field.descriptor = descriptor;
+  //builder_field->struct_field.offset = builder->offset;
+//
+  //builder_field->next = builder->field_list;
+  //builder->field_list = builder_field;
+//
+  //builder->offset += size;
+  //builder->field_count++;
+//
+  //return &builder_field->struct_field;
+//}
+//
+//Descriptor *
+//struct_end(
+  //Struct_Builder *builder
+//) {
+  //assert(builder->field_count);
+//
+  //Descriptor *result = temp_allocate(Descriptor);
+  //Descriptor_Struct_Field *field_list = temp_allocate_array(
+    //Descriptor_Struct_Field, builder->field_count
+  //);
+//
+  //Struct_Builder_Field *field = builder->field_list;
+  //u64 index = builder->field_count - 1;
+  //while (field) {
+    //field_list[index--] = field->struct_field;
+    //field = field->next;
+  //}
+  //result->type = Descriptor_Type_Struct;
+  //result->struct_ = (const Descriptor_Struct) {
+    //.field_list = field_list,
+    //.field_count = builder->field_count,
+  //};
+//
+  //return result;
+//}
+//
 void
 move_value(
   Function_Builder *builder,

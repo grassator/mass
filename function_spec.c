@@ -312,6 +312,20 @@ spec("function") {
     checker();
   }
 
+  it("should be able to parse struct definitions") {
+    program_import_file(program_, slice_literal("lib\\prelude"));
+    program_import_file(program_, slice_literal("fixtures\\struct"));
+
+    Value *main =
+      scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+
+    program_end(program_);
+    (void)main;
+//
+    //fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
+    //checker();
+  }
+
   it("should be able to define and use a macro for while loop") {
     program_import_file(program_, slice_literal("lib\\prelude"));
     Slice source = slice_literal(
