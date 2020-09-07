@@ -28,61 +28,6 @@ push_instruction_internal(
   dyn_array_push(builder->instructions, instruction);
 }
 
-//Struct_Builder
-//struct_begin() {
-  //return (const Struct_Builder) {0};
-//}
-//
-//Descriptor_Struct_Field *
-//struct_add_field(
-  //Struct_Builder *builder,
-  //Descriptor *descriptor,
-  //const char *name
-//) {
-  //Struct_Builder_Field *builder_field = temp_allocate(Struct_Builder_Field);
-//
-  //s32 size = descriptor_byte_size(descriptor);
-  //builder->offset = s32_align(builder->offset, size);
-//
-  //builder_field->struct_field.name = name;
-  //builder_field->struct_field.descriptor = descriptor;
-  //builder_field->struct_field.offset = builder->offset;
-//
-  //builder_field->next = builder->field_list;
-  //builder->field_list = builder_field;
-//
-  //builder->offset += size;
-  //builder->field_count++;
-//
-  //return &builder_field->struct_field;
-//}
-//
-//Descriptor *
-//struct_end(
-  //Struct_Builder *builder
-//) {
-  //assert(builder->field_count);
-//
-  //Descriptor *result = temp_allocate(Descriptor);
-  //Descriptor_Struct_Field *field_list = temp_allocate_array(
-    //Descriptor_Struct_Field, builder->field_count
-  //);
-//
-  //Struct_Builder_Field *field = builder->field_list;
-  //u64 index = builder->field_count - 1;
-  //while (field) {
-    //field_list[index--] = field->struct_field;
-    //field = field->next;
-  //}
-  //result->type = Descriptor_Type_Struct;
-  //result->struct_ = (const Descriptor_Struct) {
-    //.field_list = field_list,
-    //.field_count = builder->field_count,
-  //};
-//
-  //return result;
-//}
-//
 void
 move_value(
   Function_Builder *builder,
@@ -929,7 +874,56 @@ make_or(
   return result;
 }
 
+Value *
+ensure_memory(
+  Value *value
+) {
+  Operand operand = value->operand;
+  if (operand.type == Operand_Type_Memory_Indirect) return value;
+  Value *result = temp_allocate(Value);
+  if (value->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
+  if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
+  *result = (const Value) {
+    .descriptor = value->descriptor->pointer_to,
+    .operand = {
+      .type = Operand_Type_Memory_Indirect,
+      .indirect = {
+        .reg = value->operand.reg,
+        .displacement = 0,
+      },
+    },
+  };
+  return result;
+}
 
+Value *
+struct_get_field(
+  Value *raw_value,
+  Slice name
+) {
+  Value *struct_value = ensure_memory(raw_value);
+  Descriptor *descriptor = struct_value->descriptor;
+  assert(descriptor->type == Descriptor_Type_Struct);
+  for (u64 i = 0; i < dyn_array_length(descriptor->struct_.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(descriptor->struct_.fields, i);
+    if (slice_equal(name, field->name)) {
+      Value *result = temp_allocate(Value);
+      Operand operand = struct_value->operand;
+      // FIXME support more operands
+      assert(operand.type == Operand_Type_Memory_Indirect);
+      operand.byte_size = descriptor_byte_size(field->descriptor);
+      operand.indirect.displacement += field->offset;
+      *result = (const Value) {
+        .descriptor = field->descriptor,
+        .operand = operand,
+      };
+      return result;
+    }
+  }
+
+  assert(!"Could not find a field with specified name");
+  return 0;
+}
 
 
 

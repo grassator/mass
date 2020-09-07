@@ -8,57 +8,6 @@
 #include "function.c"
 #include "source.c"
 
-Value *
-ensure_memory(
-  Value *value
-) {
-  Operand operand = value->operand;
-  if (operand.type == Operand_Type_Memory_Indirect) return value;
-  Value *result = temp_allocate(Value);
-  if (value->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
-  if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
-  *result = (const Value) {
-    .descriptor = value->descriptor->pointer_to,
-    .operand = {
-      .type = Operand_Type_Memory_Indirect,
-      .indirect = {
-        .reg = value->operand.reg,
-        .displacement = 0,
-      },
-    },
-  };
-  return result;
-}
-
-Value *
-struct_get_field(
-  Value *raw_value,
-  Slice name
-) {
-  Value *struct_value = ensure_memory(raw_value);
-  Descriptor *descriptor = struct_value->descriptor;
-  assert(descriptor->type == Descriptor_Type_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->struct_.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(descriptor->struct_.fields, i);
-    if (slice_equal(name, field->name)) {
-      Value *result = temp_allocate(Value);
-      Operand operand = struct_value->operand;
-      // FIXME support more operands
-      assert(operand.type == Operand_Type_Memory_Indirect);
-      operand.byte_size = descriptor_byte_size(field->descriptor);
-      operand.indirect.displacement += field->offset;
-      *result = (const Value) {
-        .descriptor = field->descriptor,
-        .operand = operand,
-      };
-      return result;
-    }
-  }
-
-  assert(!"Could not find a field with specified name");
-  return 0;
-}
-
 
 Value *
 maybe_cast_to_tag(

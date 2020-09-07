@@ -5,6 +5,9 @@ Point :: struct {
   y : s32;
 }
 
-main :: () -> () {
-  ExitProcess(0)
+check :: () -> (s32) {
+  p : Point;
+  p.x = 20;
+  p.y = 22;
+  return p.x + p.y
 }
