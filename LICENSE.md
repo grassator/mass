@@ -1,18 +1,3 @@
-# Mass (Meta Assembly) Language
-
-A lot of the code for this repository is developed live on my
-"[Compiler Programming in C](https://www.youtube.com/playlist?list=PLvdK1vRmp8wMzH4w_8sQ30NKU3Bt4Cc-M)"
-series of videos on YouTube.
-
-## Build
-
-The code has been tested with MSVC 14.0+ compiler but should work with CLang or GCC with minor
-mofidications, although it is only designed to work on Windows at this moment. To build the code
-open up MSVC Command Prompt and run `build.bat` in the repository folder. Tests can be executed
-by running `test.bat`.
-
-## License
-
 Copyright (c) 2020 Dmitriy Kubyskin (unless noted otherwise in the code).
 
 Permission is hereby granted, free of charge, to any person
