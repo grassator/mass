@@ -35,6 +35,15 @@ make_add_two(
   return addtwo;
 }
 
+#define test_program_inline_source(_source_, _fn_value_id_)\
+  Slice source = slice_literal(_source_);\
+  Tokenizer_Result result = tokenize(test_file_name, source);\
+  check(result.type == Tokenizer_Result_Type_Success);\
+  token_match_module(result.root, program_);\
+  Value *_fn_value_id_ = scope_lookup_force(program_->global_scope, slice_literal(#_fn_value_id_), 0);\
+  check(_fn_value_id_);\
+  program_end(program_)
+
 spec("function") {
   static Program test_program = {0};
   static Program *program_ = &test_program;
@@ -52,110 +61,51 @@ spec("function") {
   }
 
   it("should be able to parse and run a void -> s64 function") {
-    Slice source = slice_literal(
-      "foo :: () -> (s64) { 42 }"
-    );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
-    assert(foo);
-
-    program_end(program_);
-
+    test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
     fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
     check(checker() == 42);
   }
 
   it("should be able to parse and run a s64 -> s64 function") {
-    Slice source = slice_literal(
-      "foo :: (x : s64) -> (s64) { x }"
-    );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
-    assert(foo);
-
-    program_end(program_);
-
+    test_program_inline_source("foo :: (x : s64) -> (s64) { x }", foo);
     fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
     check(checker(42) == 42);
   }
 
   it("should be able to define, assign and lookup an s64 variable on the stack") {
-    Slice source = slice_literal(
-      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
+    test_program_inline_source(
+      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
+      foo
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *foo = scope_lookup_force(program_->global_scope, slice_literal("foo"), 0);
-    assert(foo);
-
-    program_end(program_);
-
     fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
     check(checker() == 42);
   }
 
-  it("should be able to parse and run a plus function") {
-    Slice source = slice_literal(
-      "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
+  it("should be able to parse and run a triple plus function") {
+    test_program_inline_source(
+      "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }",
+      plus
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *plus = scope_lookup_force(program_->global_scope, slice_literal("plus"), 0);
-    assert(plus);
-
-    program_end(program_);
-
     fn_type_s64_s64_s64_to_s64 checker =
       value_as_function(plus, fn_type_s64_s64_s64_to_s64);
     check(checker(30, 10, 2) == 42);
   }
 
   it("should be able to parse and run multiple function definitions") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
-      "plus :: (x : s32, y : s32) -> (s32) { x + y }"
+      "plus :: (x : s32, y : s32) -> (s32) { x + y }",
+      proxy
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *proxy = scope_lookup_force(program_->global_scope, slice_literal("proxy"), 0);
-    assert(proxy);
-
-    program_end(program_);
-
     s32 answer = value_as_function(proxy, fn_type_void_to_s32)();
     check(answer == 42);
   }
 
   it("should be able to define a local function") {
-    Slice source = slice_literal(
-      "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }"
+    test_program_inline_source(
+      "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
     s64 answer = value_as_function(checker, fn_type_void_to_s64)();
     check(answer == 42);
   }
@@ -191,49 +141,29 @@ spec("function") {
   }
 
   it("should be able to have an explicit return") {
-    Slice source = slice_literal(
-      "checker :: (x : s32) -> (s32) {"
-        "return x"
-      "}"
+    test_program_inline_source(
+      "checker :: (x : s32) -> (s32) { return x }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
-
     s32 actual = value_as_function(checker, fn_type_s32_to_s32)(42);
     check(actual == 42);
   }
 
   it("should be able to parse and run if statement") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "is_positive :: (x : s32) -> (s8) {"
         "if (x < 0) { return 0 };"
         "1"
-      "}"
+      "}",
+      is_positive
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *is_positive =
-      scope_lookup_force(program_->global_scope, slice_literal("is_positive"), 0);
-
-    program_end(program_);
-
     fn_type_s32_to_s8 is_positive_fn = value_as_function(is_positive, fn_type_s32_to_s8);
     check(is_positive_fn(42) == 1);
     check(is_positive_fn(-2) == 0);
   }
 
   it("should be able to parse and run a program with labels and goto") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
         "sum = 0;"
@@ -242,18 +172,9 @@ spec("function") {
         "sum = sum + x;"
         "x = x + (-1);"
         "goto loop;"
-      "}"
+      "}",
+      sum_up_to
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *sum_up_to =
-      scope_lookup_force(program_->global_scope, slice_literal("sum_up_to"), 0);
-
-    program_end(program_);
-
     fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
     check(sum_up_to_fn(0) == 0);
     check(sum_up_to_fn(1) == 1);
@@ -262,39 +183,21 @@ spec("function") {
   }
 
   it("should be able to define and use a macro without a capture") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "macro (the answer) (42)"
-      "checker :: () -> (s32) { the answer }"
+      "checker :: () -> (s32) { the answer }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
-
     fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
     check(checker_fn() == 42);
   }
 
   it("should be able to define and use a macro with a capture") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "macro (negative _x) (- x)"
-      "checker :: () -> (s32) { negative 42 }"
+      "checker :: () -> (s32) { negative 42 }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
-
     fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
     check(checker_fn() == -42);
   }
@@ -327,7 +230,7 @@ spec("function") {
 
   it("should be able to define and use a macro for while loop") {
     program_import_file(program_, slice_literal("lib\\prelude"));
-    Slice source = slice_literal(
+    test_program_inline_source(
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
         "sum = 0;"
@@ -336,18 +239,9 @@ spec("function") {
           "x = x + (-1);"
         "};"
         "return sum"
-      "}"
+      "}",
+      sum_up_to
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *sum_up_to =
-      scope_lookup_force(program_->global_scope, slice_literal("sum_up_to"), 0);
-
-    program_end(program_);
-
     fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
     check(sum_up_to_fn(0) == 0);
     check(sum_up_to_fn(1) == 1);
@@ -356,38 +250,20 @@ spec("function") {
   }
 
   it("should be able to parse and run functions with local overloads") {
-    Slice source = slice_literal(
+    test_program_inline_source(
       "size_of :: (x : s32) -> (s64) { 4 }"
-      "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }"
+      "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
-
     s64 size = value_as_function(checker, fn_type_s32_to_s64)(0);
     check(size == 4);
   }
 
   it("should parse and return c compatible strings") {
-    Slice source = slice_literal(
-      "checker :: () -> ([s8]) { \"test\" }"
+    test_program_inline_source(
+      "checker :: () -> ([s8]) { \"test\" }",
+      checker
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    Value *checker =
-      scope_lookup_force(program_->global_scope, slice_literal("checker"), 0);
-
-    program_end(program_);
-
     const char *string = value_as_function(checker, fn_type_void_to_const_charp)();
     check(strcmp(string, "test") == 0);
   }
@@ -905,7 +781,7 @@ spec("function") {
     check(f(1) == 1);
     check(f(2) == 1);
     check(f(3) == 2);
-    //check(f(6) == 8);
+    check(f(6) == 8);
   }
 
   it("should be able to encode instructions with implicit A register argument") {
