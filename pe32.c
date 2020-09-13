@@ -49,36 +49,34 @@ encode_rdata_section(
   u64 expected_encoded_size = 0;
   program->data_base_rva = header->VirtualAddress;
 
-  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    // Aligned to 2 bytes c string of library name
-    expected_encoded_size += u64_align(lib->name.length + 1, 2);
-    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
-      {
-        // Ordinal Hint, value not required
-        expected_encoded_size += sizeof(s16);
-        // Aligned to 2 bytes c string of symbol name
-        expected_encoded_size += u64_align(symbol->name.length + 1, 2);
+  {
+    // Volatile: This code estimates encoded size based on the code below
+    //           and needs to be modified accordingly
+    for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+      Import_Library *lib = dyn_array_get(program->import_libraries, i);
+      // Library names
+      u64 aligned_name_size = u64_align(lib->name.length + 1, 2);
+      expected_encoded_size += aligned_name_size;
+
+      expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
+
+      for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
+        Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
+        expected_encoded_size += sizeof(s16); // Ordinal Hint
+
+        // Symbol names
+        u64 aligned_name_size = u64_align(symbol->name.length + 1, 2);
+        expected_encoded_size += aligned_name_size;
+
+        expected_encoded_size += sizeof(u64); // IAT
+        expected_encoded_size += sizeof(u64); // Image thunk
       }
-      {
-        // IAT placeholder for symbol pointer
-        expected_encoded_size += sizeof(u64);
-      }
-      {
-        // Image Thunk
-        expected_encoded_size += sizeof(u64);
-      }
-      {
-        // Import Directory
-        expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
-      }
+
+      expected_encoded_size += sizeof(u64); // End of IAT list
+      expected_encoded_size += sizeof(u64); // End of Image thunk list
     }
-    // IAT zero-termination
-    expected_encoded_size += sizeof(u64);
-    // Import Directory zero-termination
-    expected_encoded_size += sizeof(u64);
-    // Image Thunk zero-termination
+
+    // End of IMAGE_IMPORT_DESCRIPTOR list
     expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
   }
 
@@ -111,6 +109,7 @@ encode_rdata_section(
   }
 
   result.iat_rva = get_rva();
+  // IAT list
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     lib->rva = get_rva();
@@ -119,7 +118,7 @@ encode_rdata_section(
       fn->offset_in_data = get_rva() - header->VirtualAddress;
       fixed_buffer_append_u64(buffer, fn->name_rva);
     }
-    // End of IAT list
+
     fixed_buffer_append_u64(buffer, 0);
   }
   result.iat_size = (s32)buffer->occupied;
@@ -133,7 +132,7 @@ encode_rdata_section(
       Import_Symbol *fn = dyn_array_get(lib->symbols, i);
       fixed_buffer_append_u64(buffer, fn->name_rva);
     }
-    // End of IAT list
+    // End of Image thunks list
     fixed_buffer_append_u64(buffer, 0);
   }
 
@@ -169,8 +168,7 @@ encode_rdata_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *fixed_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
-  // TODO check the math
-  assert(buffer->occupied <= expected_encoded_size);
+  assert(buffer->occupied == expected_encoded_size);
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
