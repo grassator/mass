@@ -12,9 +12,18 @@ typedef enum {
 
 s32
 mass_cli_print_usage() {
-  printf("Mass Compiler\n");
-  printf("Usage:\n");
-  printf("  mass [--run] source_code.mass\n");
+  puts(
+    "Mass Compiler v0.0.1\n"
+    "Usage:\n"
+    "  mass [flags] source_code.mass\n\n"
+    "Flags:\n"
+    "  --run              Run code in JIT mode\n"
+    "  --binary-format    [pe32:cli, pe32:gui]\n"
+    "    Set output binary executable format;"
+    #ifdef _WIN32
+    " defaults to pe32:cli"
+    #endif
+  );
   return -1;
 }
 
@@ -26,16 +35,31 @@ int main(s32 argc, char **argv) {
   temp_buffer = bucket_buffer_make(.allocator = allocator_system);
   temp_allocator = bucket_buffer_allocator_make(temp_buffer);
 
+  Executable_Type win32_executable_type = Executable_Type_Cli;
+
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
-  char *raw_file_path = 0;
+  const char *raw_file_path = 0;
   for (s32 i = 1; i < argc; ++i) {
-    if (strcmp(argv[i], "--run") == 0) {
+    const char *arg = argv[i];
+    if (strcmp(arg, "--run") == 0) {
       mode = Mass_Cli_Mode_Run;
+    } else if (strcmp(arg, "--binary-format") == 0) {
+      if (++i >= argc) {
+        return mass_cli_print_usage();
+      }
+      const char *format = argv[i];
+      if (strcmp(format, "pe32:gui") == 0) {
+        win32_executable_type = Executable_Type_Gui;
+      } else if (strcmp(format, "pe32:cli") == 0) {
+        win32_executable_type = Executable_Type_Cli;
+      } else {
+        return mass_cli_print_usage();
+      }
     } else {
       if (raw_file_path) {
         return mass_cli_print_usage();
       } else {
-        raw_file_path = argv[i];
+        raw_file_path = arg;
       }
     }
   }
@@ -59,7 +83,7 @@ int main(s32 argc, char **argv) {
         allocator_default,
         fixed_buffer_as_slice(buffer)
       );
-      write_executable(exe_path_wide, program, Executable_Type_Cli);
+      write_executable(exe_path_wide, program, win32_executable_type);
       break;
     }
     case Mass_Cli_Mode_Run: {
