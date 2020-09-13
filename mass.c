@@ -45,7 +45,6 @@ int main(s32 argc, char **argv) {
   program_import_file(program, slice_literal("lib\\prelude"));
   program_import_file(program, file_path);
 
-
   program->entry_point = scope_lookup_force(program->global_scope, slice_literal("main"), 0);
 
   switch(mode) {
@@ -60,7 +59,7 @@ int main(s32 argc, char **argv) {
         allocator_default,
         fixed_buffer_as_slice(buffer)
       );
-      write_executable(exe_path_wide, program);
+      write_executable(exe_path_wide, program, Executable_Type_Cli);
       break;
     }
     case Mass_Cli_Mode_Run: {

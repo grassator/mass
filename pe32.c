@@ -211,10 +211,16 @@ encode_text_section(
   return result;
 }
 
+typedef enum {
+  Executable_Type_Gui,
+  Executable_Type_Cli,
+} Executable_Type;
+
 void
 write_executable(
   wchar_t *file_path,
-  Program *program
+  Program *program,
+  Executable_Type executable_type
 ) {
   assert(program->entry_point);
   // Sections
@@ -319,7 +325,10 @@ write_executable(
     .MinorSubsystemVersion = 0,
     .SizeOfImage = virtual_size_of_image,
     .SizeOfHeaders = file_size_of_headers,
-    .Subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI, // TODO allow user to specify this
+    .Subsystem =
+      executable_type == Executable_Type_Cli
+        ? IMAGE_SUBSYSTEM_WINDOWS_CUI
+        : IMAGE_SUBSYSTEM_WINDOWS_GUI,
     .DllCharacteristics =
       IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
       IMAGE_DLLCHARACTERISTICS_NX_COMPAT |

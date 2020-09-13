@@ -280,14 +280,14 @@ spec("function") {
 
     program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
 
-    write_executable(L"build\\test_parsed.exe", program_);
+    write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
   }
 
   it("should parse and write an executable that prints Hello, world!") {
     program_import_file(program_, slice_literal("fixtures\\hello_world"));
     program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
 
-    write_executable(L"build\\parsed_hello_world.exe", program_);
+    write_executable(L"build\\parsed_hello_world.exe", program_, Executable_Type_Cli);
   }
 
   it("should write out an executable that exits with status code 42") {
@@ -301,7 +301,7 @@ spec("function") {
       program_->entry_point = builder_->value;
       Call(my_exit);
     }
-    write_executable(L"build\\test.exe", program_);
+    write_executable(L"build\\test.exe", program_, Executable_Type_Cli);
   }
 
   it("should write out an executable that prints Hello, world!") {
@@ -333,7 +333,7 @@ spec("function") {
       );
       Call(ExitProcess_value, value_from_s32(0));
     }
-    write_executable(L"build\\hello_world.exe", program_);
+    write_executable(L"build\\hello_world.exe", program_, Executable_Type_Cli);
   }
 
   it("should support an empty Function") {
