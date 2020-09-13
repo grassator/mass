@@ -284,23 +284,7 @@ spec("function") {
   }
 
   it("should parse and write an executable that prints Hello, world!") {
-    Slice source = slice_literal(
-      "ExitProcess :: (status : s32) -> (s64) import(\"kernel32.dll\", \"ExitProcess\")"
-      "GetStdHandle :: (status : s32) -> (s64) import(\"kernel32.dll\", \"GetStdHandle\")"
-      "WriteFile :: "
-        // TODO bytes_written should be [s32] but we also need a nullptr or similar
-        "(status : s64, buffer : [s8], size : s32, bytes_written : s64, overlapped : s64) "
-        "-> (s64) import(\"kernel32.dll\", \"WriteFile\")"
-      "main :: () -> () {"
-        "WriteFile(GetStdHandle(-11), \"Hello, World!\", 13, 0, 0);"
-        "ExitProcess(0)"
-      "}"
-    );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
+    program_import_file(program_, slice_literal("fixtures\\hello_world"));
     program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
 
     write_executable(L"build\\parsed_hello_world.exe", program_);

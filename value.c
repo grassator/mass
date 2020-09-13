@@ -77,29 +77,6 @@ descriptor_alignment(
   return descriptor_byte_size(descriptor);
 }
 
-inline bool
-same_value_type(
-  Value *a,
-  Value *b
-) {
-  return same_type(a->descriptor, b->descriptor);
-}
-
-bool
-same_value_type_or_can_implicitly_move_cast(
-  Value *target,
-  Value *source
-) {
-  if (same_value_type(target, source)) return true;
-  if (target->descriptor->type != source->descriptor->type) return false;
-  if (target->descriptor->type == Descriptor_Type_Integer) {
-    if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 u32
 struct_byte_size(
   const Descriptor_Struct *struct_
@@ -938,6 +915,37 @@ estimate_max_code_size_in_bytes(
   return total_instruction_count * max_bytes_per_instruction;
 }
 
+inline bool
+same_value_type(
+  Value *a,
+  Value *b
+) {
+  return same_type(a->descriptor, b->descriptor);
+}
+
+bool
+same_value_type_or_can_implicitly_move_cast(
+  Value *target,
+  Value *source
+) {
+  if (same_value_type(target, source)) return true;
+  // Allow literal `0` to be cast to a pointer
+  if (
+    target->descriptor->type == Descriptor_Type_Pointer &&
+    source->descriptor->type == Descriptor_Type_Integer &&
+    operand_is_immediate(&source->operand) &&
+    operand_immediate_as_s64(&source->operand) == 0
+  ) {
+    return true;
+  }
+  if (target->descriptor->type != source->descriptor->type) return false;
+  if (target->descriptor->type == Descriptor_Type_Integer) {
+    if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 
 
