@@ -271,7 +271,7 @@ spec("function") {
   it("should parse and write out an executable that exits with status code 42") {
     Slice source = slice_literal(
       "main :: () -> () { ExitProcess(42) }"
-      "ExitProcess :: (status : s32) -> (s64) import(\"kernel32.dll\", \"ExitProcess\")"
+      "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
     );
     Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);

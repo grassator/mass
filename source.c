@@ -1100,13 +1100,13 @@ token_import_match_arguments(
 }
 
 bool
-token_rewrite_dll_imports(
+token_rewrite_external_import(
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("import"));
+  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("external"));
   Token_Match(args, .type = Token_Type_Paren);
   Token *result_token = token_import_match_arguments(args, builder_->program);
   assert(result_token);
@@ -1780,7 +1780,7 @@ token_match_module(
 
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_struct_definitions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_macro_definitions);
-  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_dll_imports);
+  token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_external_import);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_functions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_constant_definitions);
 
