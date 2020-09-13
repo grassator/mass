@@ -495,7 +495,6 @@ spec("function") {
 
   it("should create function increments s32 value passed to it") {
     Function(increment) {
-      // TODO add a check that all argument are defined before stack variables
       Arg_s32(x);
 
       Stack_s32(one, value_from_s32(1));
