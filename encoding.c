@@ -44,7 +44,7 @@ encode_instruction(
       Operand *operand = &instruction.operands[operand_index];
 
       if (operand_encoding->size != Operand_Size_Any) {
-        if (operand->byte_size != (u32)operand_encoding->size) {
+        if (operand->byte_size != s32_to_u32(operand_encoding->size)) {
           match = false;
           break;
         }
@@ -152,6 +152,7 @@ encode_instruction(
     bool needs_mod_r_m = false;
     u8 reg_or_op_code = 0;
     u8 rex_byte = 0;
+    bool needs_16_bit_prefix = false;
     u8 r_m = 0;
     u8 mod = MOD_Register;
     u8 op_code[2] = { encoding->op_code[0], encoding->op_code[1] };
@@ -163,6 +164,10 @@ encode_instruction(
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
+
+      if (operand->byte_size == 2) {
+        needs_16_bit_prefix = true;
+      }
 
       if (operand->byte_size == 8) {
         rex_byte |= REX_W;
@@ -247,6 +252,10 @@ encode_instruction(
 
     if (rex_byte) {
       fixed_buffer_append_u8(buffer, rex_byte);
+    }
+
+    if (needs_16_bit_prefix) {
+      fixed_buffer_append_u8(buffer, 0x66);
     }
 
     if (op_code[0]) {

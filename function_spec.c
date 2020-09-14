@@ -268,6 +268,15 @@ spec("function") {
     check(strcmp(string, "test") == 0);
   }
 
+  it("should parse and correctly deal with 16 bit values") {
+    test_program_inline_source(
+      "add_one :: (x : s16) -> (s16) { x + 1 }",
+      add_one
+    );
+    fn_type_s16_to_s16 checker = value_as_function(add_one, fn_type_s16_to_s16);
+    check(checker(8) == 9);
+  }
+
   it("should parse and write out an executable that exits with status code 42") {
     Slice source = slice_literal(
       "main :: () -> () { ExitProcess(42) }"

@@ -79,6 +79,7 @@ const X64_Mnemonic mov = {
 // movsx
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding movsx_encoding_list[] = {
+  encoding(0x0FBE, _r, r16, r_m8),
   encoding(0x0FBE, _r, r32, r_m8),
   encoding(0x0FBE, _r, r64, r_m8),
   encoding(0x0FBF, _r, r32, r_m16),

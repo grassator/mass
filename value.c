@@ -157,6 +157,10 @@ print_operand(
       printf("imm8(0x%02x)", operand->imm8);
       break;
     }
+    case Operand_Type_Immediate_16: {
+      printf("imm16(0x%04x)", operand->imm16);
+      break;
+    }
     case Operand_Type_Immediate_32: {
       printf("imm32(0x%08x)", operand->imm32);
       break;
@@ -266,6 +270,17 @@ imm8(
     .type = Operand_Type_Immediate_8,
     .byte_size = 1,
     .imm8 = value
+  };
+}
+
+inline Operand
+imm16(
+  s16 value
+) {
+  return (const Operand) {
+    .type = Operand_Type_Immediate_16,
+    .byte_size = 2,
+    .imm16 = value
   };
 }
 
@@ -382,6 +397,7 @@ operand_is_immediate(
   Operand *operand
 ) {
   if (operand->type == Operand_Type_Immediate_8) return true;
+  if (operand->type == Operand_Type_Immediate_16) return true;
   if (operand->type == Operand_Type_Immediate_32) return true;
   if (operand->type == Operand_Type_Immediate_64) return true;
   return false;
@@ -412,6 +428,18 @@ value_from_s32(
 }
 
 Value *
+value_from_s16(
+  s16 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (const Value) {
+    .descriptor = &descriptor_s16,
+    .operand = imm16(integer),
+  };
+  return result;
+}
+
+Value *
 value_from_s8(
   s8 integer
 ) {
@@ -423,7 +451,6 @@ value_from_s8(
   return result;
 }
 
-
 inline Value *
 value_from_signed_immediate(
   s64 value
@@ -431,7 +458,9 @@ value_from_signed_immediate(
   if (s64_fits_into_s8(value)) {
     return value_from_s8((s8) value);
   }
-  // FIXME add value_from_s16
+  if (s64_fits_into_s16(value)) {
+    return value_from_s16((s16) value);
+  }
   if (s64_fits_into_s32(value)) {
     return value_from_s32((s32) value);
   }
@@ -777,6 +806,7 @@ program_init(
 
   scope_define_value(program->global_scope, slice_literal("s64"), type_s64_value);
   scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
+  scope_define_value(program->global_scope, slice_literal("s16"), type_s16_value);
   scope_define_value(program->global_scope, slice_literal("s8"), type_s8_value);
   return program;
 };

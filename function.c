@@ -116,6 +116,7 @@ move_value(
     (
       (source->operand.type == Operand_Type_Immediate_64 && source->operand.imm64 == 0) ||
       (source->operand.type == Operand_Type_Immediate_32 && source->operand.imm32 == 0) ||
+      (source->operand.type == Operand_Type_Immediate_16 && source->operand.imm16 == 0) ||
       (source->operand.type == Operand_Type_Immediate_8  && source->operand.imm8 == 0)
     )
   ) {

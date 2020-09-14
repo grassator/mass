@@ -7,6 +7,7 @@ typedef void (*fn_type_void_to_void)(void);
 typedef s32 (*fn_type_void_to_s32)(void);
 typedef s64 (*fn_type_void_to_s64)(void);
 typedef const char *(*fn_type_void_to_const_charp)(void);
+typedef s16 (*fn_type_s16_to_s16)(s16);
 typedef s32 (*fn_type_voidp_to_s32)(void*);
 typedef s64 (*fn_type_voidp_s64_to_s64)(void*, s64);
 typedef s8  (*fn_type_s32_s8_to_s8)(s32, s8);
@@ -27,6 +28,7 @@ typedef enum {
   Operand_Type_None,
   Operand_Type_Register,
   Operand_Type_Immediate_8,
+  Operand_Type_Immediate_16,
   Operand_Type_Immediate_32,
   Operand_Type_Immediate_64,
   Operand_Type_Memory_Indirect,
@@ -122,6 +124,7 @@ typedef struct {
   union {
     Register reg;
     s8 imm8;
+    s16 imm16;
     s32 imm32;
     s64 imm64;
     Label *label32;
@@ -242,6 +245,13 @@ Value *type_s32_value = &(Value) {
   .descriptor = &(Descriptor) {
     .type = Descriptor_Type_Type,
     .type_descriptor = &descriptor_s32,
+  },
+  .operand = {.type = Operand_Type_None },
+};
+Value *type_s16_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_s16,
   },
   .operand = {.type = Operand_Type_None },
 };
