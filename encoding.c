@@ -332,10 +332,6 @@ encode_instruction(
     // Write out immediate operand(s?)
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
-
-      if (operand->type == Operand_Type_Immediate_8) {
-        fixed_buffer_append_s8(buffer, operand->imm8);
-      }
       if (operand->type == Operand_Type_Label_32) {
         if (operand->label32->target) {
           u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
@@ -352,11 +348,13 @@ encode_instruction(
           });
         }
 
-      }
-      if (operand->type == Operand_Type_Immediate_32) {
+      } else if (operand->type == Operand_Type_Immediate_8) {
+        fixed_buffer_append_s8(buffer, operand->imm8);
+      } else if (operand->type == Operand_Type_Immediate_16) {
+        fixed_buffer_append_s16(buffer, operand->imm16);
+      } else if (operand->type == Operand_Type_Immediate_32) {
         fixed_buffer_append_s32(buffer, operand->imm32);
-      }
-      if (operand->type == Operand_Type_Immediate_64) {
+      } else if (operand->type == Operand_Type_Immediate_64) {
         fixed_buffer_append_s64(buffer, operand->imm64);
       }
     }
