@@ -135,6 +135,12 @@ encode_instruction(
           continue;
         }
         if (
+          operand->type == Operand_Type_Immediate_16 &&
+          encoding_size == Operand_Size_16
+        ) {
+          continue;
+        }
+        if (
           operand->type == Operand_Type_Immediate_32 &&
           encoding_size == Operand_Size_32
         ) {
