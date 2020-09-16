@@ -216,7 +216,13 @@ encode_instruction(
         needs_16_bit_prefix = true;
       }
 
-      if (operand->byte_size == 8) {
+      if (
+        operand->byte_size == 8 &&
+        !(
+          operand_encoding->type == Operand_Encoding_Type_Xmm ||
+          operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+        )
+      ) {
         rex_byte |= REX_W;
       }
 
