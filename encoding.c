@@ -161,7 +161,12 @@ encode_instruction(
     bool needs_16_bit_prefix = false;
     u8 r_m = 0;
     u8 mod = MOD_Register;
-    u8 op_code[2] = { encoding->op_code[0], encoding->op_code[1] };
+    u8 op_code[4] = {
+      encoding->op_code[0],
+      encoding->op_code[1],
+      encoding->op_code[2],
+      encoding->op_code[3],
+    };
     bool needs_sib = false;
     u8 sib_byte = 0;
 
@@ -182,7 +187,7 @@ encode_instruction(
       if (operand->type == Operand_Type_Register) {
         if (operand_encoding->type == Operand_Encoding_Type_Register) {
           if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
-            op_code[1] += operand->reg & 0b111;
+            op_code[3] += operand->reg & 0b111;
             if (operand->reg & 0b1000) {
               rex_byte |= REX_B;
             }
@@ -267,7 +272,13 @@ encode_instruction(
     if (op_code[0]) {
       fixed_buffer_append_u8(buffer, op_code[0]);
     }
-    fixed_buffer_append_u8(buffer, op_code[1]);
+    if (op_code[1]) {
+      fixed_buffer_append_u8(buffer, op_code[1]);
+    }
+    if (op_code[2]) {
+      fixed_buffer_append_u8(buffer, op_code[2]);
+    }
+    fixed_buffer_append_u8(buffer, op_code[3]);
 
     if (needs_mod_r_m) {
       u8 mod_r_m = (

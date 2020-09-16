@@ -310,7 +310,7 @@ typedef struct {
 } Operand_Encoding;
 
 typedef struct {
-  u8 op_code[2];
+  u8 op_code[4];
   Instruction_Extension_Type extension_type;
   u8 op_code_extension;
   Operand_Encoding operands[3];

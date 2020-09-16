@@ -38,7 +38,12 @@
 
 #define encoding(_op_code_u16_, _extension_type_, ...)\
   {\
-    .op_code = { ((_op_code_u16_) >> 8) & 0xFFu, (_op_code_u16_) & 0xFFu },\
+    .op_code = {\
+      ((_op_code_u16_) >> 24) & 0xFFu,\
+      ((_op_code_u16_) >> 16) & 0xFFu,\
+      ((_op_code_u16_) >> 8) & 0xFFu,\
+      (_op_code_u16_) & 0xFFu\
+    },\
     _extension_type_\
     .operands = { encoding_operands(__VA_ARGS__) },\
   }
