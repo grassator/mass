@@ -795,12 +795,16 @@ spec("function") {
         .reg = Register_Xmm0,
         .byte_size = 4,
       };
-      Operand xmm1 = {
-        .type = Operand_Type_Xmm,
-        .reg = Register_Xmm1,
-        .byte_size = 4,
-      };
-      push_instruction(builder_, (Instruction) {movss, {xmm0, xmm1, 0}});
+      //Operand xmm1 = {
+        //.type = Operand_Type_Xmm,
+        //.reg = Register_Xmm1,
+        //.byte_size = 4,
+      //};
+      f32 f = 42.0f;
+      s32 f32_as_s32 = *(s32 *)(void *)&f;
+      Stack_s32(test_f32, value_from_s32(f32_as_s32));
+      //push_instruction(builder_, (Instruction) {addss, {xmm0, xmm1, 0}});
+      push_instruction(builder_, (Instruction) {movss, {xmm0, test_f32->operand, 0}});
       Return(value_from_s32(42));
     }
     program_end(program_);
