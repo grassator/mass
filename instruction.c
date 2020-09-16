@@ -36,6 +36,8 @@
 
 #define xmm32 { Operand_Encoding_Type_Xmm, Operand_Size_32 }
 #define xmm_m32 { Operand_Encoding_Type_Xmm_Memory, Operand_Size_32 }
+#define xmm64 { Operand_Encoding_Type_Xmm, Operand_Size_64 }
+#define xmm_m64 { Operand_Encoding_Type_Xmm_Memory, Operand_Size_64 }
 
 #define encoding_operands(...) __VA_ARGS__
 
@@ -100,7 +102,6 @@ const X64_Mnemonic movsx = {
   .encoding_count = countof(movsx_encoding_list),
 };
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // movss
 ////////////////////////////////////////////////////////////////////////////////
@@ -112,6 +113,20 @@ const Instruction_Encoding movss_encoding_list[] = {
 const X64_Mnemonic movss = {
   .name = "movss",
   .encoding_list = (const Instruction_Encoding *)movss_encoding_list,
+  .encoding_count = countof(movss_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// movsd
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding movsd_encoding_list[] = {
+  encoding(0xF20F10, _r, xmm64, xmm_m64),
+  encoding(0xF20F11, _r, xmm_m64, xmm64),
+};
+
+const X64_Mnemonic movsd = {
+  .name = "movss",
+  .encoding_list = (const Instruction_Encoding *)movsd_encoding_list,
   .encoding_count = countof(movss_encoding_list),
 };
 
@@ -502,6 +517,9 @@ const X64_Mnemonic jmp = {
 #undef imm64
 
 #undef xmm32
+#undef xmm_m32
+#undef xmm64
+#undef xmm_m64
 
 #undef encoding_operands
 

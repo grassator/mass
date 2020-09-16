@@ -802,4 +802,18 @@ spec("function") {
     s32 result = f();
     check(result == 42);
   }
+
+  it("should be able to encode loading and storing f64 values") {
+    Function(check) {
+      f64 f = 42.0;
+      s64 f64_as_s64 = *(s64 *)(void *)&f;
+      Stack_s64(test_f64, value_from_s64(f64_as_s64));
+      push_instruction(builder_, (Instruction) {movsd, {xmm0_64, test_f64->operand, 0}});
+      Return(value_from_s32(42));
+    }
+    program_end(program_);
+    fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
+    s32 result = f();
+    check(result == 42);
+  }
 }
