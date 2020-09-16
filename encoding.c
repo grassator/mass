@@ -15,6 +15,25 @@ typedef enum {
   REX_B = 0b01000001, // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
 } REX_BYTE;
 
+s32
+adjust_stack_displacement(
+  Function_Builder *builder,
+  s32 displacement
+) {
+  // Negative diplacement is used to encode local variables
+  if (displacement < 0) {
+    displacement += builder->stack_reserve;
+  } else
+  // Positive values larger than max_call_parameters_stack_size
+  if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
+    // Return address will be pushed on the stack by the caller
+    // and we need to account for that
+    s32 return_address_size = 8;
+    displacement += builder->stack_reserve + return_address_size;
+  }
+  return displacement;
+}
+
 void
 encode_instruction(
   Fixed_Buffer *buffer,
@@ -187,8 +206,7 @@ encode_instruction(
     };
     bool needs_sib = false;
     u8 sib_byte = 0;
-
-    bool encoding_stack_operand = false;
+    s32 displacement = 0;
 
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       Operand *operand = &instruction.operands[operand_index];
@@ -240,7 +258,6 @@ encode_instruction(
           r_m = 0b101;
           mod = 0;
         } else if (operand->type == Operand_Type_Register) {
-          // TODO mask the register
           r_m = operand->reg;
           if (operand->reg & 0b1000) {
             rex_byte |= REX_B;
@@ -250,13 +267,11 @@ encode_instruction(
           r_m = operand->reg;
           mod = MOD_Register;
         } else {
-          // TODO use smaller displacement if we can
-          mod = MOD_Displacement_s32;
           if (operand->type == Operand_Type_Memory_Indirect) {
-            // TODO check if we need to add REX_X here
+            displacement = operand->indirect.displacement;
             if (operand->indirect.reg == rsp.reg) {
               r_m = R_M_SIB;
-              encoding_stack_operand = true;
+              displacement = adjust_stack_displacement(builder, displacement);
               needs_sib = true;
               sib_byte = (
                 (SIB_Scale_1 << 6) |
@@ -267,15 +282,15 @@ encode_instruction(
               r_m = operand->indirect.reg;
             }
           } else if (operand->type == Operand_Type_Sib) {
+            displacement = operand->sib.displacement;
             needs_sib = true;
             r_m = R_M_SIB;
 
             if (operand->sib.index & 0b1000) {
               rex_byte |= REX_X;
             }
-            // TODO reconsider how stack offsets are handled
             if (operand->sib.base == rsp.reg) {
-              encoding_stack_operand = true;
+              displacement = adjust_stack_displacement(builder, displacement);
             }
             sib_byte = (
               ((operand->sib.scale & 0b11) << 6) |
@@ -284,6 +299,13 @@ encode_instruction(
             );
           } else {
             assert(!"Unsupported operand type");
+          }
+          if (displacement == 0) {
+            mod = MOD_Displacement_0;
+          } else if (s32_fits_into_s8(displacement)) {
+            mod = MOD_Displacement_s8;
+          } else {
+            mod = MOD_Displacement_s32;
           }
         }
       }
@@ -351,23 +373,6 @@ encode_instruction(
           operand->type == Operand_Type_Memory_Indirect ||
           operand->type == Operand_Type_Sib
         ) {
-          s32 displacement = operand->type == Operand_Type_Memory_Indirect
-            ? operand->indirect.displacement
-            : operand->sib.displacement;
-
-          if (encoding_stack_operand) {
-            // Negative diplacement is used to encode local variables
-            if (displacement < 0) {
-              displacement += builder->stack_reserve;
-            } else
-            // Positive values larger than max_call_parameters_stack_size
-            if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
-              // Return address will be pushed on the stack by the caller
-              // and we need to account for that
-              s32 return_address_size = 8;
-              displacement += builder->stack_reserve + return_address_size;
-            }
-          }
           if (mod == MOD_Displacement_s32) {
             fixed_buffer_append_s32(buffer, displacement);
           } else if (mod == MOD_Displacement_s8) {
