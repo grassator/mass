@@ -153,6 +153,11 @@ print_operand(
       printf("r%d", bits);
       break;
     }
+    case Operand_Type_Xmm: {
+      u32 bits = operand->byte_size * 8;
+      printf("xmm%d", bits);
+      break;
+    }
     case Operand_Type_Immediate_8: {
       printf("imm8(0x%02x)", operand->imm8);
       break;

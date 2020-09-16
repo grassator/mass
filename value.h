@@ -27,6 +27,7 @@ typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 typedef enum {
   Operand_Type_None,
   Operand_Type_Register,
+  Operand_Type_Xmm,
   Operand_Type_Immediate_8,
   Operand_Type_Immediate_16,
   Operand_Type_Immediate_32,
@@ -65,6 +66,15 @@ typedef enum {
   Register_R13 = 0b1101,
   Register_R14 = 0b1110,
   Register_R15 = 0b1111,
+
+  Register_Xmm0 = 0b000,
+  Register_Xmm1 = 0b001,
+  Register_Xmm2 = 0b010,
+  Register_Xmm3 = 0b011,
+  Register_Xmm4 = 0b100,
+  Register_Xmm5 = 0b101,
+  Register_Xmm6 = 0b110,
+  Register_Xmm7 = 0b111,
 } Register;
 
 typedef struct {
@@ -292,6 +302,8 @@ typedef enum {
   Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_A,
   Operand_Encoding_Type_Register_Memory,
+  Operand_Encoding_Type_Xmm,
+  Operand_Encoding_Type_Xmm_Memory,
   Operand_Encoding_Type_Memory,
   Operand_Encoding_Type_Immediate,
 } Operand_Encoding_Type;

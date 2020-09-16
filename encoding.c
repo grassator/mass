@@ -123,6 +123,24 @@ encode_instruction(
       ) {
         continue;
       }
+      if (
+        operand->type == Operand_Type_Xmm &&
+        operand_encoding->type == Operand_Encoding_Type_Xmm
+      ) {
+        continue;
+      }
+      if (
+        operand->type == Operand_Type_Xmm &&
+        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+      ) {
+        continue;
+      }
+      if (
+        operand->type == Operand_Type_Memory_Indirect &&
+        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+      ) {
+        continue;
+      }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
         Operand_Size encoding_size = operand_encoding->size;
         if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
@@ -200,9 +218,19 @@ encode_instruction(
           }
         }
       }
+
+      if (
+        operand->type == Operand_Type_Xmm &&
+        operand_encoding->type == Operand_Encoding_Type_Xmm &&
+        encoding->extension_type == Instruction_Extension_Type_Register
+      ) {
+        reg_or_op_code = operand->reg;
+      }
+
       if(
         operand_encoding->type == Operand_Encoding_Type_Memory ||
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory ||
+        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         needs_mod_r_m = true;
         if (
@@ -212,10 +240,14 @@ encode_instruction(
           r_m = 0b101;
           mod = 0;
         } else if (operand->type == Operand_Type_Register) {
+          // TODO mask the register
           r_m = operand->reg;
           if (operand->reg & 0b1000) {
             rex_byte |= REX_B;
           }
+          mod = MOD_Register;
+        } else if (operand->type == Operand_Type_Xmm) {
+          r_m = operand->reg;
           mod = MOD_Register;
         } else {
           // TODO use smaller displacement if we can

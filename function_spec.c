@@ -787,4 +787,25 @@ spec("function") {
     fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
     check(f() == 42);
   }
+
+  it("should be able to encode loading and storing f32 values") {
+    Function(check) {
+      Operand xmm0 = {
+        .type = Operand_Type_Xmm,
+        .reg = Register_Xmm0,
+        .byte_size = 4,
+      };
+      Operand xmm1 = {
+        .type = Operand_Type_Xmm,
+        .reg = Register_Xmm1,
+        .byte_size = 4,
+      };
+      push_instruction(builder_, (Instruction) {movss, {xmm0, xmm1, 0}});
+      Return(value_from_s32(42));
+    }
+    program_end(program_);
+    fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
+    s32 result = f();
+    check(result == 42);
+  }
 }
