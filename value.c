@@ -247,6 +247,27 @@ define_register(r14d, 0b1110, 4);
 define_register(r15d, 0b1111, 4);
 #undef define_register
 
+#define define_xmm_register(reg_name, reg_index) \
+const Operand reg_name##_32 = { \
+  .type = Operand_Type_Xmm, \
+  .byte_size = 4, \
+  .reg = (reg_index), \
+};\
+const Operand reg_name##_64 = { \
+  .type = Operand_Type_Xmm, \
+  .byte_size = 8, \
+  .reg = (reg_index), \
+};
+define_xmm_register(xmm0, 0b000);
+define_xmm_register(xmm1, 0b001);
+define_xmm_register(xmm2, 0b010);
+define_xmm_register(xmm3, 0b011);
+define_xmm_register(xmm4, 0b100);
+define_xmm_register(xmm5, 0b101);
+define_xmm_register(xmm6, 0b110);
+define_xmm_register(xmm7, 0b111);
+#undef define_xmm_register
+
 inline Label*
 make_label() {
   Label *label = temp_allocate(Label);
