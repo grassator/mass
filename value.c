@@ -436,11 +436,22 @@ operand_is_immediate(
 }
 
 Value *
+value_from_f64(
+  Program *program,
+  f32 float_value
+) {
+  Value *result = value_global(program, &descriptor_f64);
+  f64 *memory = rip_value_pointer(program, result);
+  *memory = float_value;
+  return result;
+}
+
+Value *
 value_from_f32(
   Program *program,
   f32 float_value
 ) {
-  Value *result = value_global(program, &descriptor_s32);
+  Value *result = value_global(program, &descriptor_f32);
   f32 *memory = rip_value_pointer(program, result);
   *memory = float_value;
   return result;
