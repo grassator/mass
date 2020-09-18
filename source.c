@@ -759,9 +759,10 @@ token_force_value(
 ) {
   Value *result_value = 0;
   if (token->type == Token_Type_Integer) {
-    Slice_Parse_S64_Result parse_result = slice_parse_s64(token->source);
-    assert(parse_result.success);
-    result_value = value_from_signed_immediate(parse_result.value);
+    bool ok = false;
+    s64 number = slice_parse_s64(token->source, &ok);
+    assert(ok);
+    result_value = value_from_signed_immediate(number);
   } else if (token->type == Token_Type_String) {
     Slice string = token_string_to_slice(token);
     result_value = value_pointer_to(

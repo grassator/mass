@@ -16,7 +16,6 @@
 #define static_assert(_condition_, _message_)\
   struct _message_ { int _message_ : !!(_condition_); }
 
-
 #define static_assert_type_alignment(_type_, _alignment_)\
   static_assert(\
     sizeof(_type_) % (_alignment_) == 0,\
@@ -689,7 +688,7 @@ dyn_array_sub_internal(
   u64 item_byte_size,
   Range_u64 range
 ) {
-  assert(range.from < source->length);
+  assert(source->length == 0 || range.from < source->length);
   assert(range.to <= source->length);
   assert(range.from <= range.to);
   Dyn_Array_Internal *result = dyn_array_alloc_internal(
@@ -857,19 +856,16 @@ slice_print(
   printf("%.*s", u64_to_s32(slice.length), slice.bytes);
 }
 
-typedef struct {
-  s64 value;
-  bool success;
-} Slice_Parse_S64_Result;
-
 /// Input slice is expected to just contain the number without any surrounding whitespace.
-Slice_Parse_S64_Result
+s64
 slice_parse_s64(
-  Slice slice
+  Slice slice,
+  bool *ok
 ) {
-  Slice_Parse_S64_Result result = {0};
-  int integer = 0;
-  int multiplier = 1;
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+  s64 integer = 0;
+  s64 multiplier = 1;
   for (s64 index = slice.length - 1; index >= 0; --index) {
     s8 digit = slice.bytes[index];
     if (digit >= '0' && digit <= '9') {
@@ -877,16 +873,16 @@ slice_parse_s64(
       multiplier *= 10;
     } else if (digit == '-') {
       if (index != 0) {
-        return result;
+        *ok = false;
+        return 0;
       }
       integer = -integer;
     } else {
-      return result;
+      *ok = false;
+      return 0;
     }
   }
-  result.value = integer;
-  result.success = true;
-  return result;
+  return integer;
 }
 
 inline Slice
@@ -1285,6 +1281,84 @@ slice_split_by_callback_indexed(
   return slice_split_by_callback_internal(
     allocator, slice, callback, true
   );
+}
+
+Slice
+slice_dirname(
+  Slice path
+) {
+  u64 last_slash = 0;
+  for (u64 i = 0; i < path.length; ++i) {
+    if (path.bytes[i] == '\\' || path.bytes[i] == '/') last_slash = i;
+  }
+  return slice_sub(path, 0, last_slash);
+}
+
+Slice
+slice_basename(
+  Slice path
+) {
+  u64 after_last_slash = 0;
+  for (u64 i = 0; i < path.length; ++i) {
+    if (path.bytes[i] == '\\' || path.bytes[i] == '/') after_last_slash = i + 1;
+  }
+  return slice_sub(path, after_last_slash, path.length);
+}
+
+#ifdef _WIN32
+static const s8 system_path_separator = '\\';
+#else
+static const s8 system_path_separator = '/';
+#endif
+
+Slice
+slice_normalize_path(
+  const Allocator *allocator,
+  Slice path
+) {
+  u64 after_last_slash = 0;
+  u64 available_segments = 0;
+  s8 *buffer = allocator_allocate_bytes(allocator, path.length, sizeof(s8));
+  s64 buffer_length = 0;
+
+  static const Slice dot = slice_literal_fields(".");
+  static const Slice dotdot = slice_literal_fields("..");
+  for (u64 i = 0; i < path.length; ++i) {
+    if (path.bytes[i] == '\\' || path.bytes[i] == '/') {
+      Slice segment = slice_sub(path, after_last_slash, i);
+      after_last_slash = i + 1;
+      if (slice_equal(segment, dot)) continue;
+
+      if (slice_equal(segment, dotdot)) {
+        if (available_segments) {
+          available_segments -= 1;
+
+          // Find the start of last segment
+          s64 last_slash = 0;
+          for (last_slash = buffer_length - 2; last_slash >= 0; --last_slash) {
+            if (buffer[last_slash] == system_path_separator) break;
+          }
+          buffer_length = last_slash + 1;
+          continue;
+        }
+      } else {
+        available_segments += 1;
+      }
+
+      memcpy(buffer + buffer_length, segment.bytes, segment.length);
+      buffer_length += segment.length;
+      buffer[buffer_length] = system_path_separator;
+      buffer_length += 1;
+    }
+  }
+
+  // Copy last segment
+  Slice segment = slice_sub(path, after_last_slash, path.length);
+  memcpy(buffer + buffer_length, segment.bytes, segment.length);
+  buffer_length += segment.length;
+
+  buffer = allocator_reallocate(allocator, buffer, path.length, buffer_length, sizeof(s8));
+  return (Slice){buffer, buffer_length};
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2054,7 +2128,7 @@ fixed_buffer_make_internal(
   ).buffer
 
 inline Fixed_Buffer *
-fixed_buffer_reset(
+fixed_buffer_zero(
   Fixed_Buffer *buffer
 ) {
   memset(buffer->memory, 0, buffer->capacity);
@@ -2284,7 +2358,7 @@ fixed_buffer_from_file_internal(
   );
   allocator_deallocate(allocator_default, file_path_utf16);
   Fixed_Buffer *buffer = 0;
-  if (!file_handle) {
+  if (file_handle == INVALID_HANDLE_VALUE) {
     *options->error = File_Read_Error_Failed_To_Open;
     goto handle_error;
   }
@@ -2426,6 +2500,9 @@ bucket_buffer_allocate_bytes(
 
 #define bucket_buffer_allocate_array(_buffer_, _type_, _count_)\
   ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), _Alignof(_type_)))
+
+#define bucket_buffer_allocate_unaligned(_buffer_, _type_)\
+  ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
 inline Slice
 bucket_buffer_append_slice(
@@ -2837,6 +2914,51 @@ hash_map_resize(
 
 #define hash_map_set_by_hash(_map_, _hash_, _key_, _value_)\
   (_map_)->methods->set_by_hash((_map_), (_hash_), (_key_), (_value_))
+
+////////////////////////////////////////////////////////////////////
+// Threads
+////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  void *native_handle;
+} Thread;
+
+typedef void (*Thread_Proc)(void *);
+
+#ifdef _WIN32
+struct Win32_Thread_Proc_And_Data {
+  Thread_Proc proc;
+  void *data;
+};
+
+DWORD
+thread_make_win32_wrapper_proc(
+  struct Win32_Thread_Proc_And_Data *raw_proc_and_data
+) {
+  Thread_Proc proc = raw_proc_and_data->proc;
+  void *data = raw_proc_and_data->data;
+  allocator_deallocate(allocator_system, raw_proc_and_data);
+  proc(data);
+  ExitThread(0);
+}
+
+Thread
+thread_make(Thread_Proc proc, void *data) {
+  struct Win32_Thread_Proc_And_Data *proc_and_data =
+    allocator_allocate(allocator_system, struct Win32_Thread_Proc_And_Data);
+  proc_and_data->proc = proc;
+  proc_and_data->data = data;
+  HANDLE handle = CreateThread(0, 0, thread_make_win32_wrapper_proc, proc_and_data, 0, &(DWORD){0});
+  return (Thread){.native_handle = handle};
+}
+
+void
+thread_join(Thread thread) {
+  WaitForSingleObject(thread.native_handle, INFINITE);
+}
+#else
+static_assert(false, TODO_implement_thread_wrappers)
+#endif
 
 ////////////////////////////////////////////////////////////////////
 // Debug
