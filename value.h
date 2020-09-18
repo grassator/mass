@@ -4,6 +4,7 @@
 
 typedef void(*fn_type_opaque)();
 typedef void (*fn_type_void_to_void)(void);
+typedef f32 (*fn_type_void_to_f32)(void);
 typedef s32 (*fn_type_void_to_s32)(void);
 typedef s64 (*fn_type_void_to_s64)(void);
 typedef const char *(*fn_type_void_to_const_charp)(void);

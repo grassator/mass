@@ -160,6 +160,12 @@ encode_instruction(
       ) {
         continue;
       }
+      if (
+        operand->type == Operand_Type_RIP_Relative &&
+        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+      ) {
+        continue;
+      }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
         Operand_Size encoding_size = operand_encoding->size;
         if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {

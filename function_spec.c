@@ -788,11 +788,21 @@ spec("function") {
     check(f() == 42);
   }
 
+  it("should be able to return an f32 value") {
+    Function(check) {
+      Return(value_from_f32(program_, 42.0f));
+    }
+    program_end(program_);
+    fn_type_void_to_f32 f = value_as_function(check, fn_type_void_to_f32);
+    f32 result = f();
+    check(result == 42.0f);
+  }
+
   it("should be able to encode loading and storing f32 values") {
     Function(check) {
       Stack(test_f32, &descriptor_f32, value_from_f32(program_, 42.0f));
       //push_instruction(builder_, (Instruction) {addss, {xmm0_32, xmm1_32, 0}});
-      push_instruction(builder_, (Instruction) {movss, {xmm0_32, test_f32->operand, 0}});
+      //push_instruction(builder_, (Instruction) {movss, {xmm0_32, test_f32->operand, 0}});
       Return(value_from_s32(42));
     }
     program_end(program_);

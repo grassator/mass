@@ -82,7 +82,14 @@ move_value(
       target->operand.type == Operand_Type_Xmm ||
       source->operand.type == Operand_Type_Xmm
     ) {
-      assert(!"TODO");
+      if (target_size == 4) {
+        push_instruction(builder, (Instruction) {movss, {target->operand, source->operand, 0}});
+      } else if (target_size == 8) {
+        push_instruction(builder, (Instruction) {movsd, {target->operand, source->operand, 0}});
+      } else {
+        assert(!"Not reached");
+      }
+      return;
     } else {
       assert(operand_is_memory(&target->operand));
       assert(operand_is_memory(&source->operand));
@@ -347,7 +354,12 @@ fn_return_descriptor(
   if (!function->returns) {
     assert(!fn_is_frozen(builder));
     if (descriptor->type != Descriptor_Type_Void) {
-      function->returns = value_register_for_descriptor(Register_A, descriptor);
+      // TODO handle 16 bit non-float return values are returned in XMM0
+      if (descriptor->type == Descriptor_Type_Float) {
+        function->returns = value_register_for_descriptor(Register_Xmm0, descriptor);
+      } else {
+        function->returns = value_register_for_descriptor(Register_A, descriptor);
+      }
     } else {
       function->returns = &void_value;
     }
