@@ -163,6 +163,7 @@ typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef enum {
   Descriptor_Type_Void,
   Descriptor_Type_Integer,
+  Descriptor_Type_Float,
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
@@ -205,10 +206,15 @@ typedef struct {
   u32 byte_size;
 } Descriptor_Integer;
 
+typedef struct {
+  u32 byte_size;
+} Descriptor_Float;
+
 typedef struct Descriptor {
   Descriptor_Type type;
   union {
     Descriptor_Integer integer;
+    Descriptor_Float float_;
     Descriptor_Function function;
     Descriptor_Fixed_Size_Array array;
     Descriptor_Struct struct_;
@@ -237,6 +243,14 @@ Descriptor descriptor_s64 = {
 };
 Descriptor descriptor_void = {
   .type = Descriptor_Type_Void,
+};
+Descriptor descriptor_f32 = {
+  .type = { Descriptor_Type_Float },
+  .integer = { .byte_size = 4 },
+};
+Descriptor descriptor_f64 = {
+  .type = { Descriptor_Type_Float },
+  .integer = { .byte_size = 8 },
 };
 
 Value void_value = {
@@ -269,6 +283,21 @@ Value *type_s8_value = &(Value) {
   .descriptor = &(Descriptor) {
     .type = Descriptor_Type_Type,
     .type_descriptor = &descriptor_s8,
+  },
+  .operand = {.type = Operand_Type_None },
+};
+
+Value *type_f64_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_f64,
+  },
+  .operand = {.type = Operand_Type_None },
+};
+Value *type_f32_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .type = Descriptor_Type_Type,
+    .type_descriptor = &descriptor_f32,
   },
   .operand = {.type = Operand_Type_None },
 };
@@ -382,9 +411,21 @@ Bucket_Buffer temp_buffer;
 Allocator *temp_allocator;
 
 Value *
+value_global(
+  Program *program,
+  Descriptor *descriptor
+);
+
+Value *
 value_global_c_string(
   Program *program,
   const char *string
+);
+
+void *
+rip_value_pointer(
+  Program *program,
+  Value *value
 );
 
 #define temp_allocate(_type_)\

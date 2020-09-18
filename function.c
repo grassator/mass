@@ -70,9 +70,43 @@ move_value(
   Value *target,
   Value *source
 ) {
-  // TODO figure out more type checking
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
+
+  if (
+    target->descriptor->type == Descriptor_Type_Float ||
+    source->descriptor->type == Descriptor_Type_Float
+  ) {
+    assert(target_size == source_size);
+    if (
+      target->operand.type == Operand_Type_Xmm ||
+      source->operand.type == Operand_Type_Xmm
+    ) {
+      assert(!"TODO");
+    } else {
+      assert(operand_is_memory(&target->operand));
+      assert(operand_is_memory(&source->operand));
+      // In memory treat them as bytes to be moved around
+      Value target_float_bytes = {
+        .descriptor = &(Descriptor) {
+          .type = Descriptor_Type_Integer,
+          .integer.byte_size = target->descriptor->float_.byte_size,
+        },
+        .operand = target->operand,
+      };
+      Value source_float_bytes = {
+        .descriptor = &(Descriptor) {
+          .type = Descriptor_Type_Integer,
+          .integer.byte_size = source->descriptor->float_.byte_size,
+        },
+        .operand = source->operand,
+      };
+      move_value(builder, &target_float_bytes, &source_float_bytes);
+      return;
+    }
+  }
+
+  // TODO figure out more type checking
 
   if (target_size != source_size) {
     if (source_size < target_size) {

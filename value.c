@@ -59,6 +59,9 @@ same_type(
     case Descriptor_Type_Integer: {
       return descriptor_byte_size(a) == descriptor_byte_size(b);
     }
+    case Descriptor_Type_Float: {
+      return descriptor_byte_size(a) == descriptor_byte_size(b);
+    }
     case Descriptor_Type_Type:
     default: {
       assert(!"Unsupported descriptor type");
@@ -120,6 +123,9 @@ descriptor_byte_size(
     }
     case Descriptor_Type_Struct: {
       return struct_byte_size(&descriptor->struct_);
+    }
+    case Descriptor_Type_Float: {
+      return descriptor->float_.byte_size;
     }
     case Descriptor_Type_Integer: {
       return descriptor->integer.byte_size;
@@ -427,6 +433,17 @@ operand_is_immediate(
   if (operand->type == Operand_Type_Immediate_32) return true;
   if (operand->type == Operand_Type_Immediate_64) return true;
   return false;
+}
+
+Value *
+value_from_f32(
+  Program *program,
+  f32 float_value
+) {
+  Value *result = value_global(program, &descriptor_s32);
+  f32 *memory = rip_value_pointer(program, result);
+  *memory = float_value;
+  return result;
 }
 
 Value *
@@ -752,6 +769,9 @@ c_function_return_value(
     case Descriptor_Type_Pointer: {
       Value *return_value = value_register_for_descriptor(Register_A, descriptor);
       return return_value;
+    }
+    case Descriptor_Type_Float: {
+      assert(!"TODO");
     }
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:

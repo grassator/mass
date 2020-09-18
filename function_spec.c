@@ -790,9 +790,7 @@ spec("function") {
 
   it("should be able to encode loading and storing f32 values") {
     Function(check) {
-      f32 f = 42.0f;
-      s32 f32_as_s32 = *(s32 *)(void *)&f;
-      Stack_s32(test_f32, value_from_s32(f32_as_s32));
+      Stack(test_f32, &descriptor_f32, value_from_f32(program_, 42.0f));
       //push_instruction(builder_, (Instruction) {addss, {xmm0_32, xmm1_32, 0}});
       push_instruction(builder_, (Instruction) {movss, {xmm0_32, test_f32->operand, 0}});
       Return(value_from_s32(42));
