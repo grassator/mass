@@ -93,22 +93,9 @@ move_value(
     } else {
       assert(operand_is_memory(&target->operand));
       assert(operand_is_memory(&source->operand));
-      // In memory treat them as bytes to be moved around
-      Value target_float_bytes = {
-        .descriptor = &(Descriptor) {
-          .type = Descriptor_Type_Integer,
-          .integer.byte_size = target->descriptor->float_.byte_size,
-        },
-        .operand = target->operand,
-      };
-      Value source_float_bytes = {
-        .descriptor = &(Descriptor) {
-          .type = Descriptor_Type_Integer,
-          .integer.byte_size = source->descriptor->float_.byte_size,
-        },
-        .operand = source->operand,
-      };
-      move_value(builder, &target_float_bytes, &source_float_bytes);
+      Value *reg_xmm0 = value_register_for_descriptor(Register_Xmm0, target->descriptor);
+      move_value(builder, reg_xmm0, source);
+      move_value(builder, target, reg_xmm0);
       return;
     }
   }
