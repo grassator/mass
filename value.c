@@ -669,28 +669,28 @@ function_push_argument(
   assert(byte_size <= 8);
   switch (dyn_array_length(function->arguments)) {
     case 0: {
-      return *dyn_array_push(
-        function->arguments,
-        value_register_for_descriptor(Register_C, arg_descriptor)
-      );
+      Value *value = arg_descriptor->type == Descriptor_Type_Float
+        ? value_register_for_descriptor(Register_Xmm0, arg_descriptor)
+        : value_register_for_descriptor(Register_C, arg_descriptor);
+      return *dyn_array_push(function->arguments, value);
     }
     case 1: {
-      return *dyn_array_push(
-        function->arguments,
-        value_register_for_descriptor(Register_D, arg_descriptor)
-      );
+      Value *value = arg_descriptor->type == Descriptor_Type_Float
+        ? value_register_for_descriptor(Register_Xmm1, arg_descriptor)
+        : value_register_for_descriptor(Register_D, arg_descriptor);
+      return *dyn_array_push(function->arguments, value);
     }
     case 2: {
-      return *dyn_array_push(
-        function->arguments,
-        value_register_for_descriptor(Register_R8, arg_descriptor)
-      );
+      Value *value = arg_descriptor->type == Descriptor_Type_Float
+        ? value_register_for_descriptor(Register_Xmm2, arg_descriptor)
+        : value_register_for_descriptor(Register_R8, arg_descriptor);
+      return *dyn_array_push(function->arguments, value);
     }
     case 3: {
-      return *dyn_array_push(
-        function->arguments,
-        value_register_for_descriptor(Register_R9, arg_descriptor)
-      );
+      Value *value = arg_descriptor->type == Descriptor_Type_Float
+        ? value_register_for_descriptor(Register_Xmm3, arg_descriptor)
+        : value_register_for_descriptor(Register_R9, arg_descriptor);
+      return *dyn_array_push(function->arguments, value);
     }
     default: {
       s32 offset = u64_to_s32(dyn_array_length(function->arguments) * 8);
@@ -865,6 +865,8 @@ program_init(
     .global_scope = scope_make(0),
   };
 
+  scope_define_value(program->global_scope, slice_literal("f64"), type_f64_value);
+  scope_define_value(program->global_scope, slice_literal("f32"), type_f32_value);
   scope_define_value(program->global_scope, slice_literal("s64"), type_s64_value);
   scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
   scope_define_value(program->global_scope, slice_literal("s16"), type_s16_value);

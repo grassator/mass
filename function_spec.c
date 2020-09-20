@@ -798,28 +798,14 @@ spec("function") {
     check(result == 42.0f);
   }
 
-  it("should be able to encode loading and storing f32 values") {
+  it("should be able to have a f32 identity function") {
     Function(check) {
-      Stack(test_f32, &descriptor_f32, value_from_f32(program_, 42.0f));
-      //push_instruction(builder_, (Instruction) {addss, {xmm0_32, xmm1_32, 0}});
-      //push_instruction(builder_, (Instruction) {movss, {xmm0_32, test_f32->operand, 0}});
-      Return(value_from_s32(42));
+      Arg(arg, &descriptor_f32);
+      Return(arg);
     }
     program_end(program_);
-    fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
-    s32 result = f();
-    check(result == 42);
-  }
-
-  it("should be able to encode loading and storing f64 values") {
-    Function(check) {
-      Stack(test_f64, &descriptor_f64, value_from_f64(program_, 42.0));
-      push_instruction(builder_, (Instruction) {movsd, {xmm0_64, test_f64->operand, 0}});
-      Return(value_from_s32(42));
-    }
-    program_end(program_);
-    fn_type_void_to_s32 f = value_as_function(check, fn_type_void_to_s32);
-    s32 result = f();
-    check(result == 42);
+    fn_type_f32_to_f32 f = value_as_function(check, fn_type_f32_to_f32);
+    f32 result = f(42.0f);
+    check(result == 42.0f);
   }
 }
