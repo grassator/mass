@@ -78,6 +78,7 @@ move_value(
     source->descriptor->type == Descriptor_Type_Float
   ) {
     assert(target_size == source_size);
+    assert(target->descriptor->type == source->descriptor->type);
     if (
       target->operand.type == Operand_Type_Xmm ||
       source->operand.type == Operand_Type_Xmm
