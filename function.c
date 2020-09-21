@@ -93,9 +93,10 @@ move_value(
     } else {
       assert(operand_is_memory(&target->operand));
       assert(operand_is_memory(&source->operand));
-      Value *reg_xmm0 = value_register_for_descriptor(Register_Xmm0, target->descriptor);
-      move_value(builder, reg_xmm0, source);
-      move_value(builder, target, reg_xmm0);
+      // Using xmm4 as it is volatile and not used in function arguments
+      Value *reg_xmm4 = value_register_for_descriptor(Register_Xmm4, target->descriptor);
+      move_value(builder, reg_xmm4, source);
+      move_value(builder, target, reg_xmm4);
       return;
     }
   }
