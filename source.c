@@ -47,11 +47,8 @@ scope_lookup_force(
     scope = scope->parent;
   }
   if (!entry) {
-    printf("Could not resolve identifier: ");
-    slice_print(name);
-    printf("\n");
+    return 0;
   }
-  assert(entry);
   Value *result = 0;
   switch(entry->type) {
     case Scope_Entry_Type_Value: {
@@ -71,7 +68,7 @@ scope_lookup_force(
           result = overload;
         }
       }
-      assert(result);
+      if (!result) return 0;
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -87,6 +84,7 @@ scope_lookup_force(
       if (!parent) break;
       if (!hash_map_has(parent->map, name)) continue;
       Value *overload = scope_lookup_force(parent, name, builder);
+      assert(overload);
       assert(overload->descriptor->type == Descriptor_Type_Function);
       while (last->descriptor->function.next_overload) {
         last = last->descriptor->function.next_overload;
@@ -94,7 +92,6 @@ scope_lookup_force(
       last->descriptor->function.next_overload = overload;
     };
   }
-  assert(result);
   return result;
 }
 
@@ -162,43 +159,19 @@ code_point_is_operator(
   }
 }
 
-typedef struct {
-  Slice filename;
-  u64 line;
-  u64 column;
-} Source_Location;
-
-typedef struct {
-  const char *message;
-  Source_Location location;
-} Tokenizer_Error;
-typedef dyn_array_type(Tokenizer_Error) Array_Tokenizer_Error;
-
-typedef enum {
-  Tokenizer_Result_Type_Error,
-  Tokenizer_Result_Type_Success,
-} Tokenizer_Result_Type;
-
-typedef struct {
-  Tokenizer_Result_Type type;
-  union {
-    Token *root;
-    Array_Tokenizer_Error errors;
-  };
-} Tokenizer_Result;
-
 void
 print_message_with_location(
-  const char *message,
+  Slice message,
   Source_Location *location
 ) {
   printf(
-    "%.*s(%llu:%llu): %s\n",
+    "%.*s(%llu:%llu): %.*s\n",
     u64_to_s32(location->filename.length),
     location->filename.bytes,
     location->line,
     location->column,
-    message
+    u64_to_s32(message.length),
+    message.bytes
   );
 }
 
@@ -217,7 +190,7 @@ tokenize(
   Token *current_token = 0;
   Token *parent = root;
 
-  Array_Tokenizer_Error errors = dyn_array_make(Array_Tokenizer_Error);
+  Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
 
 #define start_token(_type_)\
   do {\
@@ -229,6 +202,11 @@ tokenize(
         .bytes = &source.bytes[i],\
         .length = 1,\
       },\
+      .location = {\
+        .filename = filename,\
+        .line = line,\
+        .column = column,\
+      }\
     };\
   } while(0)
 
@@ -240,8 +218,8 @@ tokenize(
   } while(0)
 
 #define push_error(_message_)\
-  dyn_array_push(errors, (Tokenizer_Error) {\
-    .message = (_message_),\
+  dyn_array_push(errors, (Parse_Error) {\
+    .message = slice_literal(_message_),\
     .location = {\
       .filename = filename,\
       .line = line,\
@@ -465,6 +443,7 @@ scope_lookup_type(
   Function_Builder *builder
 ) {
   Value *value = scope_lookup_force(scope, type_name, builder);
+  if (!value) return 0;
   assert(value->descriptor->type == Descriptor_Type_Type);
   Descriptor *descriptor = value->descriptor->type_descriptor;
   assert(descriptor);
@@ -499,6 +478,16 @@ token_force_type(
   switch (token->type) {
     case Token_Type_Id: {
       descriptor = scope_lookup_type(scope, token->source, builder);
+      if (!descriptor) {
+        Fixed_Buffer *error_buffer = fixed_buffer_make(.capacity = 4096);
+        fixed_buffer_append_slice(error_buffer, slice_literal("Could not find type "));
+        fixed_buffer_append_slice(error_buffer, token->source);
+        dyn_array_push(builder->program->errors, (Parse_Error) {
+          .message = fixed_buffer_as_slice(error_buffer),
+          .location = token->location,
+        });
+        return 0;
+      }
       break;
     }
     case Token_Type_Square: {
@@ -719,9 +708,10 @@ token_match_argument(
   Token_Match_End();
 
   Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
+  Descriptor *descriptor = token_force_type(scope, arg_type, builder_);
   *result = (Token_Match_Arg) {
     .arg_name = arg_id->source,
-    .type_descriptor = token_force_type(scope, arg_type, builder_),
+    .type_descriptor = descriptor,
   };
   return result;
 }
@@ -784,7 +774,6 @@ token_force_value(
   } else {
     assert(!"Not implemented");
   }
-  assert(result_value);
   return result_value;
 }
 
@@ -1728,6 +1717,7 @@ token_force_lazy_function_definition(
         Token_Matcher_State *state = dyn_array_get(argument_states, i);
         Token_Match_Arg *arg = token_match_argument(state, function_scope, builder_);
         assert(arg);
+        if (!arg->type_descriptor) return 0;
         Arg(arg_value, arg->type_descriptor);
         scope_define_value(function_scope, arg->arg_name, arg_value);
       }
@@ -1740,11 +1730,9 @@ token_force_lazy_function_definition(
       }
       case 1: {
         Token *return_type_token = *dyn_array_get(return_types->children, 0);
-        fn_return_descriptor(
-          builder_,
-          token_force_type(function_scope, return_type_token, builder),
-          Function_Return_Type_Explicit
-        );
+        Descriptor *descriptor = token_force_type(function_scope, return_type_token, builder);
+        if (!descriptor) return 0;
+        fn_return_descriptor(builder_, descriptor, Function_Return_Type_Explicit);
         break;
       }
       default: {
@@ -1788,7 +1776,24 @@ token_match_module(
   assert(dyn_array_length(state->tokens) == 0);
 }
 
-bool
+Parse_Result
+program_parse(
+  Program *program,
+  Slice file_path,
+  Slice source
+) {
+  Tokenizer_Result tokenizer_result = tokenize(file_path, source);
+  if (tokenizer_result.type != Tokenizer_Result_Type_Success) {
+    return (Parse_Result) {
+      .type = Parse_Result_Type_Error,
+      .errors = tokenizer_result.errors,
+    };
+  }
+  token_match_module(tokenizer_result.root, program);
+  return (Parse_Result) {.type = Parse_Result_Type_Success};
+}
+
+Parse_Result
 program_import_file(
   Program *program,
   Slice file_path
@@ -1804,22 +1809,22 @@ program_import_file(
     file_path = fixed_buffer_as_slice(buffer);
   }
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
-  if (!buffer) return false;
+  if (!buffer) {
+    Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
+    dyn_array_push(errors, (Parse_Error) {
+      .message = slice_literal("Unable to open the file"),
+      .location = {
+        .filename = file_path,
+      },
+    });
+    return (Parse_Result) {
+      .type = Parse_Result_Type_Error,
+      .errors = errors,
+    };
+  }
   Slice source = fixed_buffer_as_slice(buffer);
 
-  Tokenizer_Result result = tokenize(file_path, source);
-  if (result.type != Tokenizer_Result_Type_Success) {
-    for (u64 i = 0; i < dyn_array_length(result.errors); ++i) {
-      Tokenizer_Error *error = dyn_array_get(result.errors, i);
-      print_message_with_location(error->message, &error->location);
-    }
-    return false;
-  }
-
-  token_match_module(result.root, program);
-  return true;
+  return program_parse(program, file_path, source);
 }
-
-
 
 

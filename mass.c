@@ -27,6 +27,17 @@ mass_cli_print_usage() {
   return -1;
 }
 
+s32
+mass_cli_print_errors(
+  Array_Parse_Error errors
+) {
+  for (u64 i = 0; i < dyn_array_length(errors); ++i) {
+    Parse_Error *error = dyn_array_get(errors, i);
+    print_message_with_location(error->message, &error->location);
+  }
+  return -1;
+}
+
 int main(s32 argc, char **argv) {
   if (argc < 2) {
     return mass_cli_print_usage();
@@ -66,10 +77,13 @@ int main(s32 argc, char **argv) {
 
   Slice file_path = slice_from_c_string(raw_file_path);
   Program *program = program_init(&(Program) {0});
-  program_import_file(program, slice_literal("lib\\prelude"));
-  program_import_file(program, file_path);
+  Parse_Result result = program_import_file(program, slice_literal("lib\\prelude"));
+  if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
+  result = program_import_file(program, file_path);
+  if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
 
   program->entry_point = scope_lookup_force(program->global_scope, slice_literal("main"), 0);
+  if (dyn_array_length(program->errors)) return mass_cli_print_errors(program->errors);
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {

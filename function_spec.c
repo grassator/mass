@@ -292,6 +292,19 @@ spec("function") {
     write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
   }
 
+  it("should report a user-understandable error when encountering unknown type") {
+    Slice source = slice_literal(
+      "main :: (x : s33) -> () { }"
+    );
+    Parse_Result result = program_parse(program_, test_file_name, source);
+    check(result.type == Parse_Result_Type_Success);
+    Value *main = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+    check(!main);
+    check(dyn_array_length(program_->errors));
+    Parse_Error *error = dyn_array_get(program_->errors, 0);
+    check(slice_equal(slice_literal("Could not find type s33"), error->message));
+  }
+
   it("should parse and write an executable that prints Hello, world!") {
     program_import_file(program_, slice_literal("fixtures\\hello_world"));
     program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);

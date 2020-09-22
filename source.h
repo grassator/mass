@@ -30,6 +30,7 @@ typedef struct Token {
   struct Token *parent;
   Token_Type type;
   Slice source;
+  Source_Location location;
   union {
     Array_Token_Ptr children;
     Value *value;

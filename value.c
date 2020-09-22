@@ -862,6 +862,7 @@ program_init(
     .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
+    .errors = dyn_array_make(Array_Parse_Error, .capacity = 16),
     .global_scope = scope_make(0),
   };
 

@@ -395,6 +395,44 @@ typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct Scope Scope;
 
+
+typedef struct {
+  Slice filename;
+  u64 line;
+  u64 column;
+} Source_Location;
+
+typedef struct {
+  Slice message;
+  Source_Location location;
+} Parse_Error;
+typedef dyn_array_type(Parse_Error) Array_Parse_Error;
+
+typedef enum {
+  Tokenizer_Result_Type_Error,
+  Tokenizer_Result_Type_Success,
+} Tokenizer_Result_Type;
+
+typedef struct Token Token;
+
+typedef struct {
+  Tokenizer_Result_Type type;
+  union {
+    Token *root;
+    Array_Parse_Error errors;
+  };
+} Tokenizer_Result;
+
+typedef enum {
+  Parse_Result_Type_Success,
+  Parse_Result_Type_Error,
+} Parse_Result_Type;
+
+typedef struct {
+  Parse_Result_Type type;
+  Array_Parse_Error errors;
+} Parse_Result;
+
 typedef struct _Program {
   Fixed_Buffer *data_buffer;
   Array_Import_Library import_libraries;
@@ -403,6 +441,7 @@ typedef struct _Program {
   s64 code_base_rva;
   s64 data_base_rva;
   Scope *global_scope;
+  Array_Parse_Error errors;
 } Program;
 
 typedef struct {
