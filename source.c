@@ -62,7 +62,9 @@ scope_lookup_force(
         if (!result) {
           result = token_force_value(token, scope, builder);
         } else {
-          assert(result->descriptor->type == Descriptor_Type_Function);
+          if (result->descriptor->type != Descriptor_Type_Function) {
+            panic("Only functions should be lazy values");
+          }
           Value *overload = token_force_value(token, scope, builder);
           overload->descriptor->function.next_overload = result;
           result = overload;
@@ -84,8 +86,10 @@ scope_lookup_force(
       if (!parent) break;
       if (!hash_map_has(parent->map, name)) continue;
       Value *overload = scope_lookup_force(parent, name, builder);
-      assert(overload);
-      assert(overload->descriptor->type == Descriptor_Type_Function);
+      if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
+      if (overload->descriptor->type != Descriptor_Type_Function) {
+        panic("There should only be function overloads");
+      }
       while (last->descriptor->function.next_overload) {
         last = last->descriptor->function.next_overload;
       }
@@ -296,7 +300,7 @@ tokenize(
             case Token_Type_Lazy_Function_Definition:
             case Token_Type_String:
             case Token_Type_Module: {
-              assert(!"Internal Tokenizer Error: Unexpected closing char for group");
+              panic("Tokenizer: unexpected closing char for group");
               break;
             }
           }
@@ -452,7 +456,6 @@ scope_lookup_type(
   if (!value) return 0;
   assert(value->descriptor->type == Descriptor_Type_Type);
   Descriptor *descriptor = value->descriptor->type_descriptor;
-  assert(descriptor);
   return descriptor;
 }
 
@@ -467,7 +470,7 @@ scope_lookup_type(
   Token_Match(_id_, .type = Token_Type_Operator, .source = slice_literal(_op_))
 
 #define Token_Match_End()\
-  assert(peek_index == dyn_array_length(state->tokens))
+  if(peek_index != dyn_array_length(state->tokens)) return 0
 
 typedef struct {
   Slice arg_name;
@@ -485,22 +488,27 @@ token_force_type(
     case Token_Type_Id: {
       descriptor = scope_lookup_type(scope, token->source, builder);
       if (!descriptor) {
-        Fixed_Buffer *error_buffer = fixed_buffer_make(.capacity = 4096);
-        fixed_buffer_append_slice(error_buffer, slice_literal("Could not find type "));
-        fixed_buffer_append_slice(error_buffer, token->source);
-        dyn_array_push(builder->program->errors, (Parse_Error) {
-          .message = fixed_buffer_as_slice(error_buffer),
-          .location = token->location,
-        });
+        program_error_builder(builder->program, token->location) {
+          program_error_append_literal("Could not find type ");
+          program_error_append_slice(token->source);
+        }
         return 0;
       }
       break;
     }
     case Token_Type_Square: {
-      assert(dyn_array_length(token->children) == 1);
+      if (dyn_array_length(token->children) != 1) {
+        program_push_error_from_slice(
+          builder->program,
+          token->location,
+          slice_literal("Pointer type must have a single type inside")
+        );
+        return 0;
+      }
       Token *child = *dyn_array_get(token->children, 0);
-      // FIXME should be recursive
-      assert(child->type == Token_Type_Id);
+      if (child->type != Token_Type_Id) {
+        panic("TODO: should be recursive");
+      }
       descriptor = temp_allocate(Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
@@ -517,7 +525,7 @@ token_force_type(
     case Token_Type_Value:
     case Token_Type_Lazy_Function_Definition:
     default: {
-      assert(!"Not implemented");
+      panic("TODO");
       break;
     }
   }
@@ -536,7 +544,7 @@ token_match_pattern(
   Array_Token_Ptr pattern
 ) {
   u64 pattern_length = dyn_array_length(pattern);
-  assert(pattern_length);
+  if (!pattern_length) panic("Zero-length pattern does not make sense");
   for (u64 i = 0; i < pattern_length; ++i) {
     Token *token = token_peek_match(state, i, *dyn_array_get(pattern, i));
     if (!token) return (Array_Token_Ptr){0};
@@ -600,7 +608,7 @@ token_clone_token_array_deep(
       }
       case Token_Type_Value:
       case Token_Type_Lazy_Function_Definition: {
-        assert(!"Not reached");
+        panic("Macro definitions should not contain semi-resolved tokens");
         break;
       }
     }
@@ -643,7 +651,7 @@ token_apply_macro_replacements(
       }
       case Token_Type_Value:
       case Token_Type_Lazy_Function_Definition: {
-        assert(!"Not reached");
+        panic("Macro definitions should not contain semi-resolved tokens");
         break;
       }
     }
@@ -659,7 +667,9 @@ token_rewrite_macro_match(
   Array_Token_Ptr match
 ) {
   Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
-  assert(dyn_array_length(macro->pattern_names) == dyn_array_length(match));
+  if (dyn_array_length(macro->pattern_names) != dyn_array_length(match)) {
+    panic("Should not have chosen the macro if pattern length do not match");
+  }
   for (u64 i = 0; i < dyn_array_length(macro->pattern_names); ++i) {
     Slice *name = dyn_array_get(macro->pattern_names, i);
     if (name->length) {
@@ -739,8 +749,12 @@ Slice
 token_string_to_slice(
   Token *token
 ) {
-  assert(token->type == Token_Type_String);
-  assert(token->source.length >= 2);
+  if (token->type != Token_Type_String) {
+    panic("Caller is expected to only use this on string tokens");
+  }
+  if (token->source.length <= 2) {
+    panic("Tokenizer (or somebody else) managed to produce a string without quotes");
+  }
   return (Slice) {
     .bytes = token->source.bytes + 1,
     .length = token->source.length - 2
@@ -753,34 +767,44 @@ token_force_value(
   Scope *scope,
   Function_Builder *builder
 ) {
-  Value *result_value = 0;
-  if (token->type == Token_Type_Integer) {
-    bool ok = false;
-    s64 number = slice_parse_s64(token->source, &ok);
-    assert(ok);
-    result_value = value_from_signed_immediate(number);
-  } else if (token->type == Token_Type_String) {
-    Slice string = token_string_to_slice(token);
-    result_value = value_pointer_to(
-      builder, value_global_c_string_from_slice(builder->program, string)
-    );
-  } else if (token->type == Token_Type_Id) {
-    result_value = scope_lookup_force(scope, token->source, builder);
-  } else if (token->type == Token_Type_Value) {
-    result_value = token->value;
-  } else if (token->type == Token_Type_Lazy_Function_Definition) {
-    return token_force_lazy_function_definition(&token->lazy_function_definition, builder);
-  } else if (token->type == Token_Type_Paren) {
-    assert(builder);
-    Token_Matcher_State state = {.tokens = token->children};
-    return token_match_expression(&state, scope, builder);
-  } else if (token->type == Token_Type_Curly) {
-    assert(builder);
-    return token_parse_block(token, scope, builder);
-  } else {
-    assert(!"Not implemented");
+  switch(token->type) {
+    case Token_Type_Integer: {
+      bool ok = false;
+      s64 number = slice_parse_s64(token->source, &ok);
+      assert(ok);
+      return value_from_signed_immediate(number);
+    }
+    case Token_Type_String: {
+      Slice string = token_string_to_slice(token);
+      return value_pointer_to(builder, value_global_c_string_from_slice(builder->program, string));
+    }
+    case Token_Type_Id: {
+      return scope_lookup_force(scope, token->source, builder);
+    }
+    case Token_Type_Value: {
+      return token->value;
+    }
+    case Token_Type_Lazy_Function_Definition: {
+      return token_force_lazy_function_definition(&token->lazy_function_definition, builder);
+    }
+    case Token_Type_Paren: {
+      if (!builder) panic("Caller should only force (...) in a builder context");
+      Token_Matcher_State state = {.tokens = token->children};
+      return token_match_expression(&state, scope, builder);
+    }
+    case Token_Type_Curly: {
+      if (!builder) panic("Caller should only force {...} in a builder context");
+      return token_parse_block(token, scope, builder);
+    }
+    case Token_Type_Module:
+    case Token_Type_Square:
+    case Token_Type_Operator: {
+      panic("TODO");
+      return 0;
+    }
   }
-  return result_value;
+  panic("Not reached");
+  return 0;
 }
 
 Array_Value_Ptr

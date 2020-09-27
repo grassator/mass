@@ -886,6 +886,27 @@ program_deinit(
   dyn_array_destroy(program->import_libraries);
 }
 
+void
+program_push_error_from_slice(
+  Program *program,
+  Source_Location location,
+  Slice message
+) {
+  dyn_array_push(program->errors, (Parse_Error) { message,  location });
+}
+
+void
+program_push_error_from_bucket_buffer(
+  Program *program,
+  Source_Location location,
+  Bucket_Buffer buffer
+) {
+  Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(temp_allocator, buffer);
+  Slice message = fixed_buffer_as_slice(message_buffer);
+  program_push_error_from_slice(program, location, message);
+  bucket_buffer_destroy(buffer);
+}
+
 Import_Library *
 program_find_import_library(
   const Program *program,

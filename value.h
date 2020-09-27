@@ -481,4 +481,31 @@ estimate_max_code_size_in_bytes(
   Program *program
 );
 
+void
+program_push_error_from_bucket_buffer(
+  Program *program,
+  Source_Location location,
+  Bucket_Buffer buffer
+);
+
+void
+program_push_error_from_slice(
+  Program *program,
+  Source_Location location,
+  Slice message
+);
+
+#define program_error_builder(_program_, _location_)\
+  for(\
+    Bucket_Buffer _buffer = bucket_buffer_make(.allocator = allocator_system);\
+    _buffer.internal;\
+    program_push_error_from_bucket_buffer((_program_), (_location_), _buffer),\
+    _buffer.internal = 0\
+  )
+#define program_error_append_slice(_slice_)\
+  bucket_buffer_append_slice(_buffer, (_slice_))
+
+#define program_error_append_literal(_message_)\
+  program_error_append_slice(slice_literal(_message_))
+
 #endif VALUE_H

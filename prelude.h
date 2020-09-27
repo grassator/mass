@@ -22,6 +22,8 @@
     _type_##__expected_to_be_aligned_to__##_alignment_\
   );
 
+#define panic(_message_) assert(!(_message_))
+
 typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
@@ -168,6 +170,30 @@ typedef union {
   color_rgba(_r_, _g_, _b_, 0xff)
 
 //////////////////////////////////////////////////////////////////////////////
+// Memory
+//////////////////////////////////////////////////////////////////////////////
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+s32
+memory_page_size() {
+  static s32 size = -1;
+  if (size == -1) {
+    #ifdef _WIN32
+    SYSTEM_INFO system_info;
+    GetSystemInfo(&system_info);
+    size = system_info.dwPageSize;
+    #else
+    size = sysconf(_SC_PAGESIZE);
+    #endif
+  }
+  return size;
+}
+
+//////////////////////////////////////////////////////////////////////////////
 // Allocator
 //////////////////////////////////////////////////////////////////////////////
 typedef struct {
@@ -223,7 +249,6 @@ const Allocator *allocator_default = &(Allocator){
 };
 
 #ifdef _WIN32
-#include <windows.h>
 inline void *
 allocator_system_allocate(
   Allocator_Handle handle,
@@ -906,8 +931,9 @@ inline Slice
 slice_trim_starting_whitespace(
   Slice slice
 ) {
+  if (!slice.length) return slice;
   u64 start_index = 0;
-  for (;start_index <= slice.length; start_index++) {
+  for (;start_index < slice.length; start_index++) {
     if (!isspace(slice.bytes[start_index])) break;
   }
   return (Slice){
@@ -920,6 +946,7 @@ inline Slice
 slice_trim_ending_whitespace(
   Slice slice
 ) {
+  if (!slice.length) return slice;
   u64 end_index = slice.length;
   for (;end_index != 0; end_index--) {
     if (!isspace(slice.bytes[end_index - 1])) break;
@@ -1359,6 +1386,55 @@ slice_normalize_path(
 
   buffer = allocator_reallocate(allocator, buffer, path.length, buffer_length, sizeof(s8));
   return (Slice){buffer, buffer_length};
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Hex
+//////////////////////////////////////////////////////////////////////////////
+
+s8
+hex_parse_digit(
+  s8 byte,
+  bool *ok
+) {
+  *ok = true;
+  if (byte >= '0' && byte <= '9') return byte - '0';
+  if (byte >= 'a' && byte <= 'f') return byte - 'a' + 10;
+  if (byte >= 'A' && byte <= 'F') return byte - 'A' + 10;
+  *ok = false;
+  return 0;
+}
+
+Color_Rgba_8
+hex_parse_color_digits(
+  Slice color,
+  bool *ok
+) {
+  s8 digits[8] = {0, 0, 0, 0, 0, 0, 0xf, 0xf};
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+
+  if (color.length == 3 || color.length == 4) {
+    digits[0] = digits[1] = hex_parse_digit(color.bytes[0], ok);
+    if (*ok) digits[2] = digits[3] = hex_parse_digit(color.bytes[1], ok);
+    if (*ok) digits[4] = digits[5] = hex_parse_digit(color.bytes[2], ok);
+    if (*ok && color.length == 4) {
+      digits[6] = digits[7] = hex_parse_digit(color.bytes[3], ok);
+    }
+  } else if (color.length == 6 || color.length == 8) {
+    for (u64 i = 0; *ok && i < color.length; ++i) {
+      digits[i] = hex_parse_digit(color.bytes[i], ok);
+    }
+  } else {
+    *ok = false;
+  }
+  if (!*ok) return (Color_Rgba_8){0};
+  return (Color_Rgba_8) {
+    .r = (digits[0] << 4) | digits[1],
+    .g = (digits[2] << 4) | digits[3],
+    .b = (digits[4] << 4) | digits[5],
+    .a = (digits[6] << 4) | digits[7],
+  };
 }
 
 //////////////////////////////////////////////////////////////////////////////

@@ -35,12 +35,15 @@ make_add_two(
   return addtwo;
 }
 
-#define test_program_inline_source(_source_, _fn_value_id_)\
+#define test_program_inline_source_base(_source_, _fn_value_id_)\
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(test_file_name, source);\
   check(result.type == Tokenizer_Result_Type_Success);\
   token_match_module(result.root, program_);\
-  Value *_fn_value_id_ = scope_lookup_force(program_->global_scope, slice_literal(#_fn_value_id_), 0);\
+  Value *_fn_value_id_ = scope_lookup_force(program_->global_scope, slice_literal(#_fn_value_id_), 0)
+
+#define test_program_inline_source(_source_, _fn_value_id_)\
+  test_program_inline_source_base(_source_, _fn_value_id_);\
   check(_fn_value_id_);\
   program_end(program_)
 
@@ -301,6 +304,14 @@ spec("function") {
     check(dyn_array_length(program_->errors));
     Parse_Error *error = dyn_array_get(program_->errors, 0);
     check(slice_equal(slice_literal("Could not find type s33"), error->message));
+  }
+
+  it("should report a user-understandable error when encountering invalid pointer type") {
+    test_program_inline_source_base("main :: (status : [s32 s32]) -> () {}", main);
+    check(!main);
+    check(dyn_array_length(program_->errors));
+    Parse_Error *error = dyn_array_get(program_->errors, 0);
+    check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
   }
 
   it("should parse and write an executable that prints Hello, world!") {
