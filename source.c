@@ -1270,7 +1270,7 @@ token_rewrite_negative_literal(
   } else if (result->operand.type == Operand_Type_Immediate_64) {
     result->operand.imm64 = -result->operand.imm64;
   } else {
-    assert(!"Internal error, expected an immediate");
+    panic("Internal error, expected an immediate");
   }
 
   token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
@@ -1361,7 +1361,7 @@ token_rewrite_set_array_item(
     };
     move_value(builder_, target_value, value);
   } else {
-    assert(!"Not implemented");
+    panic("TODO");
   }
 
   token_replace_tokens_in_state(state, 2, 0);
@@ -1587,10 +1587,21 @@ token_rewrite_assignments(
   Token_Matcher_State lhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, (Range_u64){ 0, lhs_end })};
 
   token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_struct_field);
-  assert(dyn_array_length(lhs_state.tokens) == 1);
-  Token *token = *dyn_array_get(lhs_state.tokens, 0);
-  Value *target = token_force_value(token, scope, builder_);
-  move_value(builder_, target, value);
+  if (!dyn_array_length(lhs_state.tokens)) {
+    panic("Left hand side is checked to be non-empty when matched so something went wrong");
+  }
+  if (dyn_array_length(lhs_state.tokens) == 1) {
+    Token *token = *dyn_array_get(lhs_state.tokens, 0);
+    Value *target = token_force_value(token, scope, builder_);
+    move_value(builder_, target, value);
+  } else {
+    Token *first_token = *dyn_array_get(lhs_state.tokens, 0);
+    program_push_error_from_slice(
+      builder_->program,
+      first_token->location,
+      slice_literal("Could not parse the target of the assignment")
+    );
+  }
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
   return true;
@@ -1795,10 +1806,11 @@ token_match_expression(
       token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);
       if (dyn_array_length(state->tokens)) {
         Token *token = *dyn_array_get(state->tokens, 0);
-        printf("Could not reduce an expression: \n");
-        slice_print(token->source);
-        printf("\n");
-        assert(!"Could not reduce an expression");
+        program_push_error_from_slice(
+          builder->program,
+          token->location,
+          slice_literal("Could not parse the expression")
+        );
       }
       return 0;
     }
@@ -1843,7 +1855,7 @@ token_force_lazy_function_definition(
         break;
       }
       default: {
-        assert(!"Multiple return types are not supported at the moment");
+        panic("Multiple return types are not supported at the moment");
         break;
       }
     }
@@ -1869,7 +1881,9 @@ token_match_module(
   Token *token,
   Program *program
 ) {
-  assert(token->type == Token_Type_Module);
+  if (token->type != Token_Type_Module) {
+    panic("Caller must provide a value known to be a module");
+  }
   if (!dyn_array_length(token->children)) return true;
 
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
