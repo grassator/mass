@@ -711,25 +711,56 @@ token_rewrite_macros(
   }
 }
 
+Descriptor *
+token_match_fixed_array_type(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+);
+
+Descriptor *
+token_match_type(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  Descriptor *descriptor = token_match_fixed_array_type(state, scope, builder);
+  if (descriptor) return descriptor;
+  u64 length = dyn_array_length(state->tokens);
+  if (!length) panic("Caller must not call token_match_type with empty token list");
+  Token *token = *dyn_array_get(state->tokens, 0);
+  if (length > 1) {
+    program_push_error_from_slice(
+      builder->program,
+      token->location,
+      slice_literal("Can not resolve type")
+    );
+    return 0;
+  }
+  return token_force_type(scope, token, builder);
+}
+
 Token_Match_Arg *
 token_match_argument(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
-  Token_Match(arg_id, .type = Token_Type_Id);
-  Token_Match_Operator(arg_colon, ":");
-  Token_Match(arg_type, 0);
-  Token_Match_End();
+  Token_Match(name, .type = Token_Type_Id);
+  Token_Match_Operator(define, ":");
 
-  Token_Match_Arg *result = temp_allocate(Token_Match_Arg);
-  Descriptor *descriptor = token_force_type(scope, arg_type, builder_);
-  *result = (Token_Match_Arg) {
-    .arg_name = arg_id->source,
-    .type_descriptor = descriptor,
-  };
-  return result;
+  u64 start_index = state->start_index + peek_index;
+  Array_Token_Ptr rest = dyn_array_sub(
+    Array_Token_Ptr, state->tokens, (Range_u64){start_index, dyn_array_length(state->tokens)}
+  );
+  Token_Matcher_State rest_state = {.tokens = rest};
+  state->tokens.data->length = state->start_index;
+  Descriptor *type_descriptor = token_match_type(&rest_state, scope, builder);
+  if (!type_descriptor) return 0;
+  Token_Match_Arg *arg = temp_allocate(Token_Match_Arg);
+  *arg = (Token_Match_Arg){name->source, type_descriptor};
+  return arg;
 }
 
 Value *
@@ -957,37 +988,6 @@ token_rewrite_macro_definitions(
   scope_add_macro(scope, macro);
 
   return true;
-}
-
-Descriptor *
-token_match_fixed_array_type(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
-) {
-  u64 peek_index = 0;
-  Token_Match(type, .type = Token_Type_Id);
-  Token_Match(square_brace, .type = Token_Type_Square);
-
-  Descriptor *descriptor = scope_lookup_type(scope, type->source, builder_);
-
-  Token_Matcher_State size_state = {.tokens = square_brace->children};
-  Value *size_value = token_match_expression(&size_state, scope, builder_);
-  assert(size_value->descriptor->type == Descriptor_Type_Integer);
-  assert(operand_is_immediate(&size_value->operand));
-  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
-
-  // TODO extract into a helper
-  Descriptor *array_descriptor = temp_allocate(Descriptor);
-  *array_descriptor = (Descriptor) {
-    .type = Descriptor_Type_Fixed_Size_Array,
-    .array = {
-      .item = descriptor,
-      .length = length,
-    },
-  };
-
-  return array_descriptor;
 }
 
 bool
@@ -1330,6 +1330,51 @@ token_rewrite_set_array_item(
   return true;
 }
 
+Descriptor *
+token_match_fixed_array_type(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder_
+) {
+  u64 peek_index = 0;
+  Token_Match(type, .type = Token_Type_Id);
+  Token_Match(square_brace, .type = Token_Type_Square);
+
+  Descriptor *descriptor = scope_lookup_type(scope, type->source, builder_);
+
+  Token_Matcher_State size_state = {.tokens = square_brace->children};
+  Value *size_value = token_match_expression(&size_state, scope, builder_);
+  if (!size_value) return 0;
+  if (size_value->descriptor->type != Descriptor_Type_Integer) {
+    program_push_error_from_slice(
+      builder_->program,
+      square_brace->location,
+      slice_literal("Fixed size array size is not an integer")
+    );
+    return 0;
+  }
+  if (!operand_is_immediate(&size_value->operand)) {
+    program_push_error_from_slice(
+      builder_->program,
+      square_brace->location,
+      slice_literal("Fixed size array size must be known at compile time")
+    );
+    return 0;
+  }
+  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
+
+  // TODO extract into a helper
+  Descriptor *array_descriptor = temp_allocate(Descriptor);
+  *array_descriptor = (Descriptor) {
+    .type = Descriptor_Type_Fixed_Size_Array,
+    .array = {
+      .item = descriptor,
+      .length = length,
+    },
+  };
+  return array_descriptor;
+}
+
 bool
 token_rewrite_cast(
   Token_Matcher_State *state,
@@ -1390,6 +1435,7 @@ token_rewrite_definitions(
   Scope *scope,
   Function_Builder *builder_
 ) {
+  // TODO consider merging with argument matching
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
   Token_Match_Operator(define, ":");
@@ -1413,13 +1459,7 @@ token_rewrite_definitions(
     return true;
   }
 
-  Descriptor *descriptor = token_match_fixed_array_type(&rest_state, scope, builder_);
-  if (!descriptor) {
-    assert(dyn_array_length(rest) == 1);
-    Token *type = *dyn_array_get(rest, 0);
-    assert(type->type == Token_Type_Id);
-    descriptor = scope_lookup_type(scope, type->source, builder_);
-  }
+  Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
 
   Value *value = reserve_stack(builder_, descriptor);
   scope_define_value(scope, name->source, value);
@@ -1746,8 +1786,7 @@ token_force_lazy_function_definition(
       for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
         Token_Matcher_State *state = dyn_array_get(argument_states, i);
         Token_Match_Arg *arg = token_match_argument(state, function_scope, builder_);
-        assert(arg);
-        if (!arg->type_descriptor) return 0;
+        if (!arg) return 0;
         Arg(arg_value, arg->type_descriptor);
         scope_define_value(function_scope, arg->arg_name, arg_value);
       }

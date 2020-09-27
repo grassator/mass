@@ -295,23 +295,31 @@ spec("function") {
     write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
   }
 
-  it("should report a user-understandable error when encountering unknown type") {
-    Parse_Result result =
-      program_import_file(program_, slice_literal("fixtures\\error_unknown_type"));
-    check(result.type == Parse_Result_Type_Success);
-    Value *main = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
-    check(!main);
-    check(dyn_array_length(program_->errors));
-    Parse_Error *error = dyn_array_get(program_->errors, 0);
-    check(slice_equal(slice_literal("Could not find type s33"), error->message));
-  }
-
-  it("should report a user-understandable error when encountering invalid pointer type") {
-    test_program_inline_source_base("main :: (status : [s32 s32]) -> () {}", main);
-    check(!main);
-    check(dyn_array_length(program_->errors));
-    Parse_Error *error = dyn_array_get(program_->errors, 0);
-    check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
+  describe("User Error") {
+    it("should be reported when encountering invalid pointer type") {
+      test_program_inline_source_base("main :: (status : [s32 s32]) -> () {}", main);
+      check(!main);
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
+    }
+    it("should be reported when non-integer size for fixed array type") {
+      test_program_inline_source_base("main :: (status : s32[s32]) -> () {}", main);
+      check(!main);
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("Fixed size array size is not an integer"), error->message));
+    }
+    it("should be reported when encountering unknown type") {
+      Parse_Result result =
+        program_import_file(program_, slice_literal("fixtures\\error_unknown_type"));
+      check(result.type == Parse_Result_Type_Success);
+      Value *main = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+      check(!main);
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("Could not find type s33"), error->message));
+    }
   }
 
   it("should parse and write an executable that prints Hello, world!") {
