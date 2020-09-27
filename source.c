@@ -844,7 +844,7 @@ token_force_value(
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
-      return token_parse_block(token, scope, builder);
+      return token_parse_block(token->children, scope, builder);
     }
     case Token_Type_Module:
     case Token_Type_Square:
@@ -1167,15 +1167,14 @@ token_rewrite_external_import(
 
 Value *
 token_parse_block(
-  Token *block,
+  Array_Token_Ptr children,
   Scope *scope,
   Function_Builder *builder_
 ) {
-  assert(block->type == Token_Type_Curly);
   Scope *block_scope = scope_make(scope);
   Value *block_result = 0;
-  if (dyn_array_length(block->children) != 0) {
-    Array_Token_Matcher_State block_statements = token_split(block->children, &(Token){
+  if (dyn_array_length(children) != 0) {
+    Array_Token_Matcher_State block_statements = token_split(children, &(Token){
       .type = Token_Type_Operator,
       .source = slice_literal(";"),
     });
@@ -1200,7 +1199,7 @@ token_rewrite_statement_if(
   Token_Match_End();
 
   If(token_force_value(condition, scope, builder_)) {
-    (void)token_parse_block(body, scope, builder_);
+    (void)token_parse_block(body->children, scope, builder_);
   }
 
   token_replace_tokens_in_state(state, 3, 0);
@@ -1218,10 +1217,19 @@ token_rewrite_goto(
   Token_Match(label_name, .type = Token_Type_Id);
   Token_Match_End();
   Value *value = scope_lookup_force(scope, label_name->source, builder_);
-  assert(value->descriptor->type == Descriptor_Type_Void);
-  assert(value->operand.type == Operand_Type_Label_32);
-
-  push_instruction(builder_, (Instruction) {jmp, {value->operand, 0, 0}});
+  if (value) {
+    if (
+      value->descriptor->type == Descriptor_Type_Void &&
+      value->operand.type == Operand_Type_Label_32
+    ) {
+      push_instruction(builder_, (Instruction) {jmp, {value->operand, 0, 0}});
+    } else {
+      program_error_builder(builder_->program, label_name->location) {
+        program_error_append_slice(label_name->source);
+        program_error_append_literal(" is not a label");
+      }
+    }
+  }
 
   token_replace_tokens_in_state(state, 2, 0);
   return true;
@@ -1847,7 +1855,7 @@ token_force_lazy_function_definition(
       body->value->descriptor = builder_->descriptor;
       return body->value;
     } else {
-      Value *body_result = token_parse_block(body, function_scope, builder_);
+      Value *body_result = token_parse_block(body->children, function_scope, builder_);
       if (body_result) {
         fn_return(builder_, body_result, Function_Return_Type_Implicit);
       }

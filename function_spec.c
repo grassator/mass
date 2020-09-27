@@ -312,6 +312,15 @@ spec("function") {
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
     }
+    it("should be wrong type of label identifier") {
+      test_program_inline_source_base(
+        "main :: (status: s32) -> () { x : s32; goto x; }", main
+      );
+      check(main)
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("x is not a label"), error->message));
+    }
     it("should be reported when non-type id is being used as type") {
       test_program_inline_source_base(
         "foo :: () -> () {}"
