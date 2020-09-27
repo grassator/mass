@@ -815,7 +815,13 @@ token_force_value(
     case Token_Type_Integer: {
       bool ok = false;
       s64 number = slice_parse_s64(token->source, &ok);
-      assert(ok);
+      if (!ok) {
+        program_error_builder(builder->program, token->location) {
+          program_error_append_literal("Invalid integer literal: ");
+          program_error_append_slice(token->source);
+        }
+        return 0;
+      }
       return value_from_signed_immediate(number);
     }
     case Token_Type_String: {
@@ -1021,14 +1027,8 @@ token_match_struct_field(
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
 
-  Descriptor *descriptor = token_match_fixed_array_type(&rest_state, scope, builder_);
-  if (!descriptor) {
-    assert(dyn_array_length(rest) == 1);
-    Token *type = *dyn_array_get(rest, 0);
-    assert(type->type == Token_Type_Id);
-    descriptor = scope_lookup_type(scope, type->location, type->source, builder_);
-  }
-
+  Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
+  if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
 }
@@ -1098,25 +1098,41 @@ token_rewrite_constant_definitions(
 
 Token *
 token_import_match_arguments(
-  Token *paren,
+  Source_Location location,
+  Token_Matcher_State *state,
   Program *program
 ) {
-  assert(paren->type == Token_Type_Paren);
-  Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = paren->children };
-
   Token *library_name_string = token_peek_match(state, 0, &(Token) {
     .type = Token_Type_String,
   });
-  assert(library_name_string);
+  if (!library_name_string) {
+    program_push_error_from_slice(
+      program, location,
+      slice_literal("First argument to external() must be a literal string")
+    );
+    return 0;
+  }
   Token *comma = token_peek_match(state, 1, &(Token) {
     .type = Token_Type_Operator,
     .source = slice_literal(","),
   });
-  assert(comma);
+  if (!comma) {
+    program_push_error_from_slice(
+      program, location,
+      slice_literal("external(\"library_name\", \"symbol_name\") requires two arguments")
+    );
+    return 0;
+  }
   Token *symbol_name_string = token_peek_match(state, 2, &(Token) {
     .type = Token_Type_String,
   });
-  assert(symbol_name_string);
+  if (!symbol_name_string) {
+    program_push_error_from_slice(
+      program, location,
+      slice_literal("Second argument to external() must be a literal string")
+    );
+    return 0;
+  }
   Slice library_name = token_string_to_slice(library_name_string);
   Slice symbol_name = token_string_to_slice(symbol_name_string);
 
@@ -1129,7 +1145,7 @@ token_import_match_arguments(
       symbol_name
     ),
   };
-  return token_value_make(paren, result);
+  return token_value_make(library_name_string, result);
 }
 
 bool
@@ -1141,8 +1157,9 @@ token_rewrite_external_import(
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("external"));
   Token_Match(args, .type = Token_Type_Paren);
-  Token *result_token = token_import_match_arguments(args, builder_->program);
-  assert(result_token);
+  Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
+  Token *result_token = token_import_match_arguments(args->location, args_state, builder_->program);
+  if (!result_token) result_token = token_value_make(args, 0);
 
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
@@ -1824,8 +1841,9 @@ token_force_lazy_function_definition(
     }
     fn_freeze(builder_);
 
-    // FIXME figure out a better way to distinguish imports
-    if (body->type == Token_Type_Value && !body->value->descriptor) {
+    //// FIXME figure out a better way to distinguish imports
+    if (body->type == Token_Type_Value) {
+      if(!body->value) return 0;
       body->value->descriptor = builder_->descriptor;
       return body->value;
     } else {
@@ -1838,13 +1856,13 @@ token_force_lazy_function_definition(
   return value;
 }
 
-void
+bool
 token_match_module(
   Token *token,
   Program *program
 ) {
   assert(token->type == Token_Type_Module);
-  if (!dyn_array_length(token->children)) return;
+  if (!dyn_array_length(token->children)) return true;
 
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
   Function_Builder global_builder = { .program = program };
@@ -1855,7 +1873,7 @@ token_match_module(
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_functions);
   token_rewrite_expression(state, program->global_scope, &global_builder, token_rewrite_constant_definitions);
 
-  assert(dyn_array_length(state->tokens) == 0);
+  return dyn_array_length(state->tokens) == 0;
 }
 
 Parse_Result
@@ -1871,8 +1889,12 @@ program_parse(
       .errors = tokenizer_result.errors,
     };
   }
-  token_match_module(tokenizer_result.root, program);
-  return (Parse_Result) {.type = Parse_Result_Type_Success};
+  ;
+  return (Parse_Result) {
+    .type = token_match_module(tokenizer_result.root, program)
+      ? Parse_Result_Type_Success
+      : Parse_Result_Type_Error
+  };
 }
 
 Parse_Result
