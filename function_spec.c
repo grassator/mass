@@ -297,18 +297,39 @@ spec("function") {
 
   describe("User Error") {
     it("should be reported when encountering invalid pointer type") {
-      test_program_inline_source_base("main :: (status : [s32 s32]) -> () {}", main);
+      test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
       check(!main);
       check(dyn_array_length(program_->errors));
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
     }
     it("should be reported when non-integer size for fixed array type") {
-      test_program_inline_source_base("main :: (status : s32[s32]) -> () {}", main);
+      test_program_inline_source_base("main :: (arg : s32[s32]) -> () {}", main);
       check(!main);
       check(dyn_array_length(program_->errors));
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Fixed size array size is not an integer"), error->message));
+    }
+    it("should be reported when non-type id is being used as type") {
+      test_program_inline_source_base(
+        "foo :: () -> () {}"
+        "main :: (arg : foo) -> () {}",
+        main
+      );
+      check(!main);
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("foo is not a type"), error->message));
+    }
+    it("should be reported when non-type token is being used as type") {
+      test_program_inline_source_base(
+        "main :: (arg : 42) -> () {}",
+        main
+      );
+      check(!main);
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("42 is not a type"), error->message));
     }
     it("should be reported when encountering unknown type") {
       Parse_Result result =

@@ -449,12 +449,19 @@ token_split(
 Descriptor *
 scope_lookup_type(
   Scope *scope,
+  Source_Location location,
   Slice type_name,
   Function_Builder *builder
 ) {
   Value *value = scope_lookup_force(scope, type_name, builder);
   if (!value) return 0;
-  assert(value->descriptor->type == Descriptor_Type_Type);
+  if (value->descriptor->type != Descriptor_Type_Type) {
+    program_error_builder(builder->program, location) {
+      program_error_append_slice(type_name);
+      program_error_append_literal(" is not a type");
+    }
+    return 0;
+  }
   Descriptor *descriptor = value->descriptor->type_descriptor;
   return descriptor;
 }
@@ -486,7 +493,7 @@ token_force_type(
   Descriptor *descriptor = 0;
   switch (token->type) {
     case Token_Type_Id: {
-      descriptor = scope_lookup_type(scope, token->source, builder);
+      descriptor = scope_lookup_type(scope, token->location, token->source, builder);
       if (!descriptor) {
         program_error_builder(builder->program, token->location) {
           program_error_append_literal("Could not find type ");
@@ -512,11 +519,17 @@ token_force_type(
       descriptor = temp_allocate(Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
-        .pointer_to = scope_lookup_type(scope, child->source, builder),
+        .pointer_to = scope_lookup_type(scope, child->location, child->source, builder),
       };
       break;
     }
-    case Token_Type_Integer:
+    case Token_Type_Integer: {
+      program_error_builder(builder->program, token->location) {
+        program_error_append_slice(token->source);
+        program_error_append_literal(" is not a type");
+      }
+      return 0;
+    }
     case Token_Type_Operator:
     case Token_Type_String:
     case Token_Type_Paren:
@@ -1013,7 +1026,7 @@ token_match_struct_field(
     assert(dyn_array_length(rest) == 1);
     Token *type = *dyn_array_get(rest, 0);
     assert(type->type == Token_Type_Id);
-    descriptor = scope_lookup_type(scope, type->source, builder_);
+    descriptor = scope_lookup_type(scope, type->location, type->source, builder_);
   }
 
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
@@ -1340,7 +1353,7 @@ token_match_fixed_array_type(
   Token_Match(type, .type = Token_Type_Id);
   Token_Match(square_brace, .type = Token_Type_Square);
 
-  Descriptor *descriptor = scope_lookup_type(scope, type->source, builder_);
+  Descriptor *descriptor = scope_lookup_type(scope, type->location, type->source, builder_);
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
   Value *size_value = token_match_expression(&size_state, scope, builder_);
