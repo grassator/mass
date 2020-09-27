@@ -151,13 +151,22 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
-    // FIXME
-    //check(slice_equal(error->location.filename, test_file_name) == 0);
+    check(slice_equal(error->location.filename, test_file_name));
     check(error->location.line, 1);
     check(error->location.column, 4);
     check(slice_equal(error->message, slice_literal("Unexpected end of file. Expected a closing brace.")));
+  }
 
-    //print_message_with_location(error->message, &error->location);
+  it("should report a failure when encountering a mismatched brace that") {
+    Slice source = slice_literal("(foo}");
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Error);
+    check(dyn_array_length(result.errors) == 1);
+    Parse_Error *error = dyn_array_get(result.errors, 0);
+    check(slice_equal(error->location.filename, test_file_name));
+    check(error->location.line, 1);
+    check(error->location.column, 4);
+    check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
   }
 
   it("should be able to tokenize complex input") {

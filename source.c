@@ -274,17 +274,19 @@ tokenize(
           dyn_array_push(parent->children, current_token);
           parent = current_token;
         } else if (ch == ')' || ch == '}' || ch == ']') {
+          s8 expected_paren = 0;
+
           switch (parent->type) {
             case Token_Type_Paren: {
-              assert(ch == ')');
+              expected_paren = ')';
               break;
             }
             case Token_Type_Curly: {
-              assert(ch == '}');
+              expected_paren = '}';
               break;
             }
             case Token_Type_Square: {
-              assert(ch == ']');
+              expected_paren = ']';
               break;
             }
             case Token_Type_Value:
@@ -297,6 +299,10 @@ tokenize(
               assert(!"Internal Tokenizer Error: Unexpected closing char for group");
               break;
             }
+          }
+          if (ch != expected_paren) {
+            push_error("Mismatched closing brace");
+            goto end;
           }
           parent->source.length = &source.bytes[i] - parent->source.bytes + 1;
           parent = parent->parent;
