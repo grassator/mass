@@ -1190,7 +1190,7 @@ bool
 token_rewrite_statement_if(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
@@ -1198,9 +1198,9 @@ token_rewrite_statement_if(
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
-  If(token_force_value(condition, scope, builder_)) {
-    (void)token_parse_block(body->children, scope, builder_);
-  }
+  Label *else_label = make_if(builder, token_force_value(condition, scope, builder));
+  (void)token_parse_block(body->children, scope, builder);
+  push_instruction(builder, (Instruction) {.maybe_label = else_label});
 
   token_replace_tokens_in_state(state, 3, 0);
   return true;
@@ -1239,14 +1239,14 @@ bool
 token_rewrite_explicit_return(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
   Token_Match(to_return, 0);
   Token_Match_End();
-  Value *result = token_force_value(to_return, scope, builder_);
-  Return(result);
+  Value *result = token_force_value(to_return, scope, builder);
+  fn_return(builder, result, Function_Return_Type_Explicit);
 
   token_replace_tokens_in_state(state, 2, 0);
   return true;
@@ -1509,15 +1509,16 @@ bool
 token_rewrite_definition_and_assignment_statements(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
   Token_Match_Operator(define, ":=");
   Token_Match(token_value, 0);
-  Value *value = token_force_value(token_value, scope, builder_);
-  Stack(var, value->descriptor, value);
-  scope_define_value(scope, name->source, var);
+  Value *value = token_force_value(token_value, scope, builder);
+  Value *on_stack = reserve_stack(builder, value->descriptor);
+  move_value(builder, on_stack, value);
+  scope_define_value(scope, name->source, on_stack);
 
   // FIXME definition should rewrite with a token so that we can do proper
   // checking inside statements and maybe pass it around.
@@ -1630,16 +1631,17 @@ bool
 token_rewrite_plus(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(plus_token, "+");
   Token_Match(rhs, 0);
 
-  Value *value = Plus(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = plus(
+    builder,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
@@ -1649,16 +1651,17 @@ bool
 token_rewrite_minus(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(plus_token, "-");
   Token_Match(rhs, 0);
 
-  Value *value = Minus(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = minus(
+    builder,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
@@ -1669,16 +1672,17 @@ bool
 token_rewrite_divide(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(operator, "/");
   Token_Match(rhs, 0);
 
-  Value *value = Divide(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = divide(
+    builder,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
   return true;
@@ -1688,16 +1692,17 @@ bool
 token_rewrite_remainder(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(operator, "%");
   Token_Match(rhs, 0);
 
-  Value *value = Remainder(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = remainder(
+    builder,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
   return true;
@@ -1707,16 +1712,17 @@ bool
 token_rewrite_equals(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(plus_token, "==");
   Token_Match(rhs, 0);
 
-  Value *value = Eq(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = compare(
+    builder, Compare_Equal,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
@@ -1726,16 +1732,17 @@ bool
 token_rewrite_less_than(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(plus_token, "<");
   Token_Match(rhs, 0);
 
-  Value *value = Less(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = compare(
+    builder, Compare_Less,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
@@ -1745,16 +1752,17 @@ bool
 token_rewrite_greater_than(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
   Token_Match_Operator(plus_token, ">");
   Token_Match(rhs, 0);
 
-  Value *value = Greater(
-    token_force_value(lhs, scope, builder_),
-    token_force_value(rhs, scope, builder_)
+  Value *value = compare(
+    builder, Compare_Greater,
+    token_force_value(lhs, scope, builder),
+    token_force_value(rhs, scope, builder)
   );
   token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
   return true;
@@ -1820,59 +1828,63 @@ token_match_expression(
 Value *
 token_force_lazy_function_definition(
   Lazy_Function_Definition *lazy_function_definition,
-  Function_Builder *builder
+  Function_Builder *outer_builder
 ) {
   Token *args = lazy_function_definition->args;
   Token *return_types = lazy_function_definition->return_types;
   Token *body = lazy_function_definition->body;
-  Program *program_ = lazy_function_definition->program;
-  Scope *function_scope = scope_make(program_->global_scope);
-  Function(value) {
-    if (dyn_array_length(args->children) != 0) {
-      Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
-        .type = Token_Type_Operator,
-        .source = slice_literal(","),
-      });
-      for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
-        Token_Matcher_State *state = dyn_array_get(argument_states, i);
-        Token_Match_Arg *arg = token_match_argument(state, function_scope, builder_);
-        if (!arg) return 0;
-        Arg(arg_value, arg->type_descriptor);
-        scope_define_value(function_scope, arg->arg_name, arg_value);
-      }
-    }
+  Program *program = lazy_function_definition->program;
+  Scope *function_scope = scope_make(program->global_scope);
 
-    switch (dyn_array_length(return_types->children)) {
-      case 0: {
-        value->descriptor->function.returns = &void_value;
-        break;
-      }
-      case 1: {
-        Token *return_type_token = *dyn_array_get(return_types->children, 0);
-        Descriptor *descriptor = token_force_type(function_scope, return_type_token, builder);
-        if (!descriptor) return 0;
-        fn_return_descriptor(builder_, descriptor, Function_Return_Type_Explicit);
-        break;
-      }
-      default: {
-        panic("Multiple return types are not supported at the moment");
-        break;
-      }
-    }
-    fn_freeze(builder_);
+  Value *value = 0;
+  Function_Builder *builder = fn_begin(&value, program);
 
-    //// FIXME figure out a better way to distinguish imports
-    if (body->type == Token_Type_Value) {
-      if(!body->value) return 0;
-      body->value->descriptor = builder_->descriptor;
-      return body->value;
-    } else {
-      Value *body_result = token_parse_block(body->children, function_scope, builder_);
-      if (body_result) {
-        fn_return(builder_, body_result, Function_Return_Type_Implicit);
-      }
+  if (dyn_array_length(args->children) != 0) {
+    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(","),
+    });
+    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
+      Token_Matcher_State *state = dyn_array_get(argument_states, i);
+      Token_Match_Arg *arg = token_match_argument(state, function_scope, builder);
+      if (!arg) return 0;
+      Value *arg_value = fn_arg(builder, arg->type_descriptor);
+      scope_define_value(function_scope, arg->arg_name, arg_value);
     }
   }
+
+  switch (dyn_array_length(return_types->children)) {
+    case 0: {
+      value->descriptor->function.returns = &void_value;
+      break;
+    }
+    case 1: {
+      Token *return_type_token = *dyn_array_get(return_types->children, 0);
+      Descriptor *descriptor = token_force_type(function_scope, return_type_token, builder);
+      if (!descriptor) return 0;
+      fn_return_descriptor(builder, descriptor, Function_Return_Type_Explicit);
+      break;
+    }
+    default: {
+      panic("Multiple return types are not supported at the moment");
+      break;
+    }
+  }
+  fn_freeze(builder);
+
+  // FIXME figure out a better way to distinguish imports
+  if (body->type == Token_Type_Value) {
+    if(!body->value) return 0;
+    body->value->descriptor = builder->descriptor;
+    return body->value;
+  } else {
+    Value *body_result = token_parse_block(body->children, function_scope, builder);
+    if (body_result) {
+      fn_return(builder, body_result, Function_Return_Type_Implicit);
+    }
+  }
+
+  fn_end(builder);
   return value;
 }
 

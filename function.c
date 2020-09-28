@@ -898,11 +898,15 @@ make_and(
 ) {
   Value *result = reserve_stack(builder, &descriptor_s8);
   Label *label = make_label();
-  IfBuilder(builder, a) {
+
+  Label *else_label = make_if(builder, a);
+  {
     Value *rhs = compare(builder, Compare_Not_Equal, b, value_from_s8(0));
     move_value(builder, result, rhs);
     push_instruction(builder, (Instruction) {jmp, {label32(label), 0, 0}});
   }
+  push_instruction(builder, (Instruction) {.maybe_label = else_label});
+
   move_value(builder, result, value_from_s8(0));
   push_instruction(builder, (Instruction) {.maybe_label = label});
   return result;
@@ -916,11 +920,15 @@ make_or(
 ) {
   Value *result = reserve_stack(builder, &descriptor_s8);
   Label *label = make_label();
-  IfBuilder(builder, compare(builder, Compare_Equal, b, value_from_s8(0))) {
+
+  Label *else_label = make_if(builder, compare(builder, Compare_Equal, a, value_from_s8(0)));
+  {
     Value *rhs = compare(builder, Compare_Not_Equal, b, value_from_s8(0));
     move_value(builder, result, rhs);
     push_instruction(builder, (Instruction) {jmp, {label32(label), 0, 0}});
   }
+  push_instruction(builder, (Instruction) {.maybe_label = else_label});
+
   move_value(builder, result, value_from_s8(1));
   push_instruction(builder, (Instruction) {.maybe_label = label});
   return result;

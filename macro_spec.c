@@ -1,6 +1,6 @@
-#ifndef MACRO_DEBUG
-
 #include "bdd-for-c.h"
+#include "windows.h"
+#include <stdio.h>
 
 #include "pe32.c"
 #include "value.c"
@@ -8,8 +8,7 @@
 #include "encoding.c"
 #include "function.c"
 #include "source.c"
-
-#endif
+#include "macro.h"
 
 Value *
 make_identity(
@@ -35,22 +34,99 @@ make_add_two(
   return addtwo;
 }
 
-#define test_program_inline_source_base(_source_, _fn_value_id_)\
-  Slice source = slice_literal(_source_);\
-  Tokenizer_Result result = tokenize(test_file_name, source);\
-  check(result.type == Tokenizer_Result_Type_Success);\
-  token_match_module(result.root, program_);\
-  Value *_fn_value_id_ = scope_lookup_force(program_->global_scope, slice_literal(#_fn_value_id_), 0)
+Value *
+maybe_cast_to_tag(
+  Function_Builder *builder,
+  Slice name,
+  Value *value
+) {
+  assert(value->descriptor->type == Descriptor_Type_Pointer);
+  Descriptor *descriptor = value->descriptor->pointer_to;
 
-#define test_program_inline_source(_source_, _fn_value_id_)\
-  test_program_inline_source_base(_source_, _fn_value_id_);\
-  check(_fn_value_id_);\
-  program_end(program_)
+  // FIXME
+  assert(value->operand.type == Operand_Type_Register);
+  Value *tag_value = temp_allocate(Value);
+  *tag_value = (const Value) {
+    .descriptor = &descriptor_s64,
+    .operand = {
+      .type = Operand_Type_Memory_Indirect,
+      .byte_size = descriptor_byte_size(&descriptor_s64),
+      .indirect = {
+        .reg = value->operand.reg,
+        .displacement = 0,
+      },
+    },
+  };
 
-spec("function") {
+  s64 count = descriptor->tagged_union.struct_count;
+  for (s32 i = 0; i < count; ++i) {
+    Descriptor_Struct *struct_ = &descriptor->tagged_union.struct_list[i];
+    if (slice_equal(name, struct_->name)) {
+
+      Descriptor *constructor_descriptor = temp_allocate(Descriptor);
+      *constructor_descriptor = (const Descriptor) {
+        .type = Descriptor_Type_Struct,
+        .struct_ = *struct_,
+      };
+      Descriptor *pointer_descriptor = descriptor_pointer_to(constructor_descriptor);
+      Value *result_value = temp_allocate(Value);
+      *result_value = (const Value) {
+        .descriptor = pointer_descriptor,
+        .operand = rbx,
+      };
+
+      move_value(builder, result_value, value_from_s64(0));
+
+      Value *comparison = compare(builder, Compare_Equal, tag_value, value_from_s64(i));
+      IfBuilder(builder, comparison) {
+        move_value(builder, result_value, value);
+        Value *sum = plus(builder, result_value, value_from_s64(sizeof(s64)));
+        move_value(builder, result_value, sum);
+      }
+      return result_value;
+    }
+  }
+  assert(!"Could not find specified name in the tagged union");
+  return 0;
+}
+
+typedef struct {
+  int64_t x;
+  int64_t y;
+} Point;
+
+Point test() {
+  return (Point){42, 84};
+}
+
+fn_type_s32_to_s8
+create_is_character_in_set_checker_fn(
+  Program *program_,
+  const char *characters
+) {
+  assert(characters);
+
+  Function(checker) {
+    Arg_s32(character);
+
+    for (const char *ch = characters; *ch; ++ch) {
+      If(Eq(character, value_from_s32(*ch))) {
+        Return(value_from_s8(1));
+      }
+    }
+
+    Return(value_from_s8(0));
+  }
+  program_end(program_);
+
+  return value_as_function(checker, fn_type_s32_to_s8);
+}
+
+
+spec("spec") {
+
   static Program test_program = {0};
   static Program *program_ = &test_program;
-  static Slice test_file_name = slice_literal_fields("_test_.mass");
 
   before_each() {
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
@@ -63,300 +139,264 @@ spec("function") {
     bucket_buffer_destroy(temp_buffer);
   }
 
-  it("should be able to parse and run a void -> s64 function") {
-    test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
-    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+  it("should have a way to create a function to checks if a character is one of the provided set") {
+    fn_type_s32_to_s8 is_whitespace = create_is_character_in_set_checker_fn(program_, " \n\r\t");
+    check(is_whitespace(' '));
+    check(is_whitespace('\r'));
+    check(is_whitespace('\n'));
+    check(is_whitespace('\t'));
+    check(!is_whitespace('a'));
+    check(!is_whitespace('2'));
+    check(!is_whitespace('-'));
+  }
+
+  it("should support returning structs larger than 64 bits on the stack") {
+    Descriptor *point_struct_descriptor = descriptor_struct_make();
+    descriptor_struct_add_field(point_struct_descriptor, &descriptor_s64, slice_literal("x"));
+    descriptor_struct_add_field(point_struct_descriptor, &descriptor_s64, slice_literal("y"));
+
+    Value *return_overload = temp_allocate(Value);
+    *return_overload = (Value) {
+      .descriptor = point_struct_descriptor,
+      .operand = stack(0, descriptor_byte_size(point_struct_descriptor)),
+    };
+
+    Descriptor *c_test_fn_descriptor = temp_allocate(Descriptor);
+    *c_test_fn_descriptor = (Descriptor){
+      .type = Descriptor_Type_Function,
+      .function = {
+        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
+        .returns = return_overload,
+        .frozen = false,
+      },
+    };
+    Value *c_test_fn_value = temp_allocate(Value);
+    *c_test_fn_value = (Value) {
+      .descriptor = c_test_fn_descriptor,
+      .operand = imm64((s64)test),
+    };
+
+    Function(checker_value) {
+      Value *test_result = Call(c_test_fn_value);
+      Value *x = struct_get_field(test_result, slice_literal("x"));
+      Return(x);
+    }
+    program_end(program_);
+
+    fn_type_void_to_s64 checker = value_as_function(checker_value, fn_type_void_to_s64);
     check(checker() == 42);
   }
 
-  it("should be able to parse and run a s64 -> s64 function") {
-    test_program_inline_source("foo :: (x : s64) -> (s64) { x }", foo);
-    fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
-    check(checker(42) == 42);
-  }
+  it("should support RIP-relative addressing") {
+    Value *global_a = value_global(program_, &descriptor_s32);
+    {
+      check(global_a->operand.type == Operand_Type_RIP_Relative);
 
-  it("should be able to define, assign and lookup an s64 variable on the stack") {
-    test_program_inline_source(
-      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
-      foo
-    );
-    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+      s32 *address = rip_value_pointer(program_, global_a);
+      *address = 32;
+    }
+    Value *global_b = value_global(program_, &descriptor_s32);
+    {
+      check(global_b->operand.type == Operand_Type_RIP_Relative);
+      s32 *address = rip_value_pointer(program_, global_b);
+      *address = 10;
+    }
+
+    Function(checker_value) {
+      Return(Plus(global_a, global_b));
+    }
+    program_end(program_);
+    fn_type_void_to_s32 checker = value_as_function(checker_value, fn_type_void_to_s32);
     check(checker() == 42);
   }
 
-  it("should be able to parse and run a triple plus function") {
-    test_program_inline_source(
-      "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }",
-      plus
-    );
-    fn_type_s64_s64_s64_to_s64 checker =
-      value_as_function(plus, fn_type_s64_s64_s64_to_s64);
-    check(checker(30, 10, 2) == 42);
+  it("should support sizeof operator on values") {
+    Value *sizeof_s32 = SizeOf(value_from_s32(0));
+    check(sizeof_s32);
+    check(sizeof_s32->operand.type == Operand_Type_Immediate_32);
+    check(sizeof_s32->operand.imm32 == 4);
   }
 
-  it("should be able to parse and run multiple function definitions") {
-    test_program_inline_source(
-      "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
-      "plus :: (x : s32, y : s32) -> (s32) { x + y }",
-      proxy
-    );
-    s32 answer = value_as_function(proxy, fn_type_void_to_s32)();
-    check(answer == 42);
+  it("should support sizeof operator on descriptors") {
+    Value *sizeof_s32 = SizeOfDescriptor(&descriptor_s32);
+    check(sizeof_s32);
+    check(sizeof_s32->operand.type == Operand_Type_Immediate_32);
+    check(sizeof_s32->operand.imm32 == 4);
   }
 
-  it("should be able to define a local function") {
-    test_program_inline_source(
-      "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
-      checker
-    );
-    s64 answer = value_as_function(checker, fn_type_void_to_s64)();
-    check(answer == 42);
-  }
+  it("should support tagged unions") {
+    Array_Descriptor_Struct_Field some_fields = dyn_array_make(Array_Descriptor_Struct_Field);
+    dyn_array_push(some_fields, (Descriptor_Struct_Field) {
+      .name = slice_literal("value"),
+      .descriptor = &descriptor_s64,
+      .offset = 0,
+    });
 
-  it("should be able to parse and run functions with overloads") {
-    Slice source = slice_literal(
-      "size_of :: (x : s32) -> (s64) { 4 }"
-      "size_of :: (x : s64) -> (s64) { 8 }"
-      "checker_s64 :: (x : s64) -> (s64) { size_of(x) }"
-      "checker_s32 :: (x : s32) -> (s64) { size_of(x) }"
-    );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
+    Descriptor_Struct constructors[] = {
+      {
+        .name = slice_literal("None"),
+        .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+      },
+      {
+        .name = slice_literal("Some"),
+        .fields = some_fields,
+      },
+    };
 
-    token_match_module(result.root, program_);
+    Descriptor option_s64_descriptor = {
+      .type = Descriptor_Type_Tagged_Union,
+      .tagged_union = {
+        .struct_list = constructors,
+        .struct_count = countof(constructors),
+      },
+    };
 
-    Value *checker_s64 =
-      scope_lookup_force(program_->global_scope, slice_literal("checker_s64"), 0);
-    Value *checker_32 =
-      scope_lookup_force(program_->global_scope, slice_literal("checker_s32"), 0);
 
+    Function(with_default_value) {
+      Arg(option_value, descriptor_pointer_to(&option_s64_descriptor));
+      Arg_s64(default_value);
+      Value *some = maybe_cast_to_tag(builder_, slice_literal("Some"), option_value);
+      If(some) {
+        Value *value = struct_get_field(some, slice_literal("value"));
+        Return(value);
+      }
+      Return(default_value);
+    }
     program_end(program_);
 
-    {
-      s64 size = value_as_function(checker_s64, fn_type_s64_to_s64)(0);
-      check(size == 8);
+    fn_type_voidp_s64_to_s64 with_default =
+      value_as_function(with_default_value, fn_type_voidp_s64_to_s64);
+    struct { s64 tag; s64 maybe_value; } test_none = {0};
+    struct { s64 tag; s64 maybe_value; } test_some = {1, 21};
+    check(with_default(&test_none, 42) == 42);
+    check(with_default(&test_some, 42) == 21);
+  }
+
+  it("should say that the types are the same for integers of the same size") {
+    check(same_type(&descriptor_s32, &descriptor_s32));
+  }
+
+  it("should say that the types are not the same for integers of different sizes") {
+    check(!same_type(&descriptor_s64, &descriptor_s32));
+  }
+
+  it("should say that pointer and a s64 are different types") {
+    check(!same_type(&descriptor_s64, descriptor_pointer_to(&descriptor_s64)));
+  }
+
+  it("should say that (s64 *) is not the same as (s32 *)") {
+    check(!same_type(descriptor_pointer_to(&descriptor_s32), descriptor_pointer_to(&descriptor_s64)));
+  }
+
+  it("should say that (s64 *) is not the same as (void *)") {
+    check(same_type(descriptor_pointer_to(&descriptor_s64), descriptor_pointer_to(&descriptor_void)));
+  }
+
+  it("should say that (s64[2]) is not the same as (s32[2])") {
+    check(!same_type(
+      descriptor_array_of(&descriptor_s32, 2),
+      descriptor_array_of(&descriptor_s64, 2)
+    ));
+  }
+
+  it("should say that (s64[10]) is not the same as (s64[2])") {
+    check(!same_type(
+      descriptor_array_of(&descriptor_s64, 10),
+      descriptor_array_of(&descriptor_s64, 2)
+    ));
+  }
+
+  it("should say that structs are different if their descriptors are different pointers") {
+    Descriptor *a = descriptor_struct_make();
+    descriptor_struct_add_field(a, &descriptor_s32, slice_literal("x"));
+
+    Descriptor *b = descriptor_struct_make();
+    descriptor_struct_add_field(b, &descriptor_s32, slice_literal("x"));
+
+    check(same_type(a, a));
+    check(!same_type(a, b));
+  }
+
+  it("should support structs") {
+    // struct Size { s8 width; s32 height; };
+
+    Descriptor *size_struct_descriptor = descriptor_struct_make();
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("width"));
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("height"));
+    descriptor_struct_add_field(size_struct_descriptor, &descriptor_s32, slice_literal("dummy"));
+
+    Descriptor *size_struct_pointer_descriptor = descriptor_pointer_to(size_struct_descriptor);
+
+    Function(area) {
+      Arg(size_struct, size_struct_pointer_descriptor);
+      Return(Multiply(
+        struct_get_field(size_struct, slice_literal("width")),
+        struct_get_field(size_struct, slice_literal("height"))
+      ));
     }
-
-    {
-      s64 size = value_as_function(checker_32, fn_type_s32_to_s64)(0);
-      check(size == 4);
-    }
-  }
-
-  it("should be able to have an explicit return") {
-    test_program_inline_source(
-      "checker :: (x : s32) -> (s32) { return x }",
-      checker
-    );
-    s32 actual = value_as_function(checker, fn_type_s32_to_s32)(42);
-    check(actual == 42);
-  }
-
-  it("should be able to parse and run if statement") {
-    test_program_inline_source(
-      "is_positive :: (x : s32) -> (s8) {"
-        "if (x < 0) { return 0 };"
-        "1"
-      "}",
-      is_positive
-    );
-    fn_type_s32_to_s8 is_positive_fn = value_as_function(is_positive, fn_type_s32_to_s8);
-    check(is_positive_fn(42) == 1);
-    check(is_positive_fn(-2) == 0);
-  }
-
-  it("should be able to parse and run a program with labels and goto") {
-    test_program_inline_source(
-      "sum_up_to :: (x : s32) -> (s32) {"
-        "sum : s32;"
-        "sum = 0;"
-        "loop : label;"
-        "if (x < 0) { return sum };"
-        "sum = sum + x;"
-        "x = x + (-1);"
-        "goto loop;"
-      "}",
-      sum_up_to
-    );
-    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
-    check(sum_up_to_fn(0) == 0);
-    check(sum_up_to_fn(1) == 1);
-    check(sum_up_to_fn(2) == 3);
-    check(sum_up_to_fn(3) == 6);
-  }
-
-  it("should be able to define and use a macro without a capture") {
-    test_program_inline_source(
-      "macro (the answer) (42)"
-      "checker :: () -> (s32) { the answer }",
-      checker
-    );
-    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
-    check(checker_fn() == 42);
-  }
-
-  it("should be able to define and use a macro with a capture") {
-    test_program_inline_source(
-      "macro (negative _x) (- x)"
-      "checker :: () -> (s32) { negative 42 }",
-      checker
-    );
-    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
-    check(checker_fn() == -42);
-  }
-
-  it("should be able to run fizz buzz") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
-    program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
-
-    Value *fizz_buzz =
-      scope_lookup_force(program_->global_scope, slice_literal("fizz_buzz"), 0);
-
     program_end(program_);
 
-    fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
-    checker();
+    struct { s32 width; s32 height; s32 dummy; } size = { 10, 42 };
+    s32 result = value_as_function(area, fn_type_voidp_to_s32)(&size);
+    check(result == 420);
+    check(sizeof(size) == descriptor_byte_size(size_struct_descriptor));
   }
 
-  it("should be able to parse struct definitions") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
-    program_import_file(program_, slice_literal("fixtures\\struct"));
+  it("should add 1 to all numbers in an array") {
+    s32 array[] = {1, 2, 3};
 
-    Value *check_value =
-      scope_lookup_force(program_->global_scope, slice_literal("check"), 0);
+    Descriptor array_descriptor = {
+      .type = Descriptor_Type_Fixed_Size_Array,
+      .array = {
+        .item = &descriptor_s32,
+        .length = 3,
+      },
+    };
 
+    Descriptor array_pointer_descriptor = {
+      .type = Descriptor_Type_Pointer,
+      .pointer_to = &array_descriptor,
+    };
+
+    Function(increment) {
+      Arg(arr, &array_pointer_descriptor);
+
+      Stack_s32(index, value_from_s32(0));
+
+      Stack(temp, &array_pointer_descriptor, arr);
+
+      u32 item_byte_size = descriptor_byte_size(array_pointer_descriptor.pointer_to->array.item);
+      Loop {
+        // TODO check that the descriptor in indeed an array
+        s32 length = (s32)array_pointer_descriptor.pointer_to->array.length;
+        If(Greater(index, value_from_s32(length))) {
+          Break;
+        }
+
+        Value *reg_a = value_register_for_descriptor(Register_A, temp->descriptor);
+        move_value(builder_, reg_a, temp);
+
+        Operand pointer = {
+          .type = Operand_Type_Memory_Indirect,
+          .byte_size = item_byte_size,
+          .indirect = (const Operand_Memory_Indirect) {
+            .reg = rax.reg,
+            .displacement = 0,
+          }
+        };
+        push_instruction(builder_, (Instruction) {inc, {pointer, 0, 0}});
+        push_instruction(builder_, (Instruction) {add, {temp->operand, imm32(item_byte_size), 0}});
+
+        push_instruction(builder_, (Instruction) {inc, {index->operand, 0, 0}});
+      }
+
+    }
     program_end(program_);
+    value_as_function(increment, fn_type_s32p_to_void)(array);
 
-    fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
-    assert(checker() == 42);
-  }
-
-  it("should be able to define and use a macro for while loop") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
-    test_program_inline_source(
-      "sum_up_to :: (x : s32) -> (s32) {"
-        "sum : s32;"
-        "sum = 0;"
-        "while (x > 0) {"
-          "sum = sum + x;"
-          "x = x + (-1);"
-        "};"
-        "return sum"
-      "}",
-      sum_up_to
-    );
-    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
-    check(sum_up_to_fn(0) == 0);
-    check(sum_up_to_fn(1) == 1);
-    check(sum_up_to_fn(2) == 3);
-    check(sum_up_to_fn(3) == 6);
-  }
-
-  it("should be able to parse and run functions with local overloads") {
-    test_program_inline_source(
-      "size_of :: (x : s32) -> (s64) { 4 }"
-      "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
-      checker
-    );
-    s64 size = value_as_function(checker, fn_type_s32_to_s64)(0);
-    check(size == 4);
-  }
-
-  it("should parse and return c compatible strings") {
-    test_program_inline_source(
-      "checker :: () -> ([s8]) { \"test\" }",
-      checker
-    );
-    const char *string = value_as_function(checker, fn_type_void_to_const_charp)();
-    check(strcmp(string, "test") == 0);
-  }
-
-  it("should parse and correctly deal with 16 bit values") {
-    test_program_inline_source(
-      "add_one :: (x : s16) -> (s16) { x + 1 }",
-      add_one
-    );
-    fn_type_s16_to_s16 checker = value_as_function(add_one, fn_type_s16_to_s16);
-    check(checker(8) == 9);
-  }
-
-  it("should parse and write out an executable that exits with status code 42") {
-    Slice source = slice_literal(
-      "main :: () -> () { ExitProcess(42) }"
-      "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
-    );
-    Tokenizer_Result result = tokenize(test_file_name, source);
-    check(result.type == Tokenizer_Result_Type_Success);
-
-    token_match_module(result.root, program_);
-
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
-
-    write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
-  }
-
-  describe("User Error") {
-    it("should be reported when encountering invalid pointer type") {
-      test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
-      check(!main);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
-    }
-    it("should be report wrong argument type to external()") {
-      test_program_inline_source_base(
-        "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", exit
-      );
-      check(!exit);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
-    }
-    it("should be wrong type of label identifier") {
-      test_program_inline_source_base(
-        "main :: (status: s32) -> () { x : s32; goto x; }", main
-      );
-      check(main)
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("x is not a label"), error->message));
-    }
-    it("should be reported when non-type id is being used as type") {
-      test_program_inline_source_base(
-        "foo :: () -> () {}"
-        "main :: (arg : foo) -> () {}", main
-      );
-      check(!main);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("foo is not a type"), error->message));
-    }
-    it("should be reported when non-type token is being used as type") {
-      test_program_inline_source_base(
-        "main :: (arg : 42) -> () {}", main
-      );
-      check(!main);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("42 is not a type"), error->message));
-    }
-    it("should be reported when encountering unknown type") {
-      Parse_Result result =
-        program_import_file(program_, slice_literal("fixtures\\error_unknown_type"));
-      check(result.type == Parse_Result_Type_Success);
-      Value *main = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
-      check(!main);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("Could not find type s33"), error->message));
-    }
-  }
-
-  it("should parse and write an executable that prints Hello, world!") {
-    program_import_file(program_, slice_literal("fixtures\\hello_world"));
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
-
-    write_executable(L"build\\parsed_hello_world.exe", program_, Executable_Type_Cli);
+    check(array[0] == 2);
+    check(array[1] == 3);
+    check(array[2] == 4);
   }
 
   it("should write out an executable that exits with status code 42") {
@@ -410,7 +450,7 @@ spec("function") {
     program_end(program_);
   }
 
-  it("should support short-curciting &&") {
+  it("should support short-curcuiting &&") {
     Function(checker_value) {
       Arg_s32(number);
       Arg_s8(condition);
@@ -426,7 +466,7 @@ spec("function") {
     check(checker(32, true));
   }
 
-  it("should support short-curciting ||") {
+  it("should support short-curcuiting ||") {
     Function(checker_value) {
       Arg_s32(number);
       Arg_s8(condition);
@@ -438,8 +478,9 @@ spec("function") {
 
     fn_type_s32_s8_to_s8 checker = value_as_function(checker_value, fn_type_s32_s8_to_s8);
     check(checker(52, true));
-    check(!checker(32, false));
+    check(checker(false, 32));
     check(checker(32, true));
+    check(!checker(52, false));
   }
 
   it("should support multi-way case block") {
