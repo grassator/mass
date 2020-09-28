@@ -1487,24 +1487,23 @@ token_rewrite_definitions(
     Array_Token_Ptr, state->tokens, (Range_u64){start_index, dyn_array_length(state->tokens)}
   );
   Token_Matcher_State rest_state = {.tokens = rest};
-  state->tokens.data->length = state->start_index;
+  u64 size_to_replace = dyn_array_length(state->tokens) - state->start_index;
 
   Label *label = token_match_label(&rest_state, scope, builder_);
+  Value *value = 0;
   if (label) {
     push_instruction(builder_, (Instruction) { .maybe_label = label });
-    Value *value = temp_allocate(Value);
+    value = temp_allocate(Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
       .operand = label32(label),
     };
-    scope_define_value(scope, name->source, value);
-    return true;
+  } else {
+    Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
+    value = reserve_stack(builder_, descriptor);
   }
-
-  Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
-
-  Value *value = reserve_stack(builder_, descriptor);
   scope_define_value(scope, name->source, value);
+  token_replace_tokens_in_state(state, size_to_replace, token_value_make(name, value));
 
   return true;
 }
@@ -1592,6 +1591,7 @@ token_rewrite_assignments(
   Token_Matcher_State lhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, (Range_u64){ 0, lhs_end })};
 
   token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_struct_field);
+  token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_definitions);
   if (!dyn_array_length(lhs_state.tokens)) {
     panic("Left hand side is checked to be non-empty when matched so something went wrong");
   }
@@ -1783,7 +1783,6 @@ token_match_expression(
   }
   token_rewrite_macros(state, scope, builder);
   token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
-  token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
   token_rewrite_expression(state, scope, builder, token_rewrite_set_array_item);
   token_rewrite_expression(state, scope, builder, token_rewrite_cast);
 
@@ -1802,6 +1801,14 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_less_than);
   token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);
 
+  // Statement handling
+  token_rewrite_assignments(state, scope, builder);
+  token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
+  token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
+  token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
+  token_rewrite_expression(state, scope, builder, token_rewrite_goto);
+  token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);
+
   switch(dyn_array_length(state->tokens)) {
     case 0: {
       return &void_value;
@@ -1810,20 +1817,12 @@ token_match_expression(
       return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder);
     }
     default: {
-      // Statement handling
-      token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
-      token_rewrite_assignments(state, scope, builder);
-      token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);
-      token_rewrite_expression(state, scope, builder, token_rewrite_goto);
-      token_rewrite_expression(state, scope, builder, token_rewrite_constant_definitions);
-      if (dyn_array_length(state->tokens)) {
-        Token *token = *dyn_array_get(state->tokens, 0);
-        program_push_error_from_slice(
-          builder->program,
-          token->location,
-          slice_literal("Could not parse the expression")
-        );
-      }
+      Token *token = *dyn_array_get(state->tokens, 0);
+      program_push_error_from_slice(
+        builder->program,
+        token->location,
+        slice_literal("Could not parse the expression")
+      );
       return 0;
     }
   }
@@ -1883,7 +1882,7 @@ token_force_lazy_function_definition(
     return body->value;
   } else {
     Value *body_result = token_parse_block(body->children, function_scope, builder);
-    if (body_result) {
+    if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
       fn_return(builder, body_result, Function_Return_Type_Implicit);
     }
   }

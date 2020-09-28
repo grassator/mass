@@ -17,7 +17,13 @@
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
   check(_fn_value_id_);\
-  program_end(program_)
+  program_end(program_);\
+  for (u64 i = 0; i < dyn_array_length(program_->errors); ++i) {\
+    Parse_Error *error = dyn_array_get(program_->errors, i);\
+    print_message_with_location(error->message, &error->location);\
+  }\
+  check(!dyn_array_length(program_->errors))
+
 
 spec("source") {
   static Program test_program = {0};
@@ -299,6 +305,18 @@ spec("source") {
     fn_type_s32_to_s8 is_positive_fn = value_as_function(is_positive, fn_type_s32_to_s8);
     check(is_positive_fn(42) == 1);
     check(is_positive_fn(-2) == 0);
+  }
+
+  it("should be able to parse typed definition and assignment in the same statement") {
+    test_program_inline_source(
+      "test_fn :: () -> (s32) {"
+        "result : s32 = 42;"
+        "result"
+      "}",
+      test_fn
+    );
+    fn_type_void_to_s32 checker = value_as_function(test_fn, fn_type_void_to_s32);
+    check(checker() == 42);
   }
 
   it("should be able to parse and run a program with labels and goto") {
