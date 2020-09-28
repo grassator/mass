@@ -1296,82 +1296,6 @@ token_rewrite_pointer_to(
   return true;
 }
 
-bool
-token_rewrite_set_array_item(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
-) {
-  u64 peek_index = 0;
-  Token_Match(id, .type = Token_Type_Id, .source = slice_literal("set_array_item"));
-  Token_Match(value_token, .type = Token_Type_Paren);
-
-  Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder_);
-  assert(dyn_array_length(args) == 3);
-  Value *array = *dyn_array_get(args, 0);
-  Value *index_value = *dyn_array_get(args, 1);
-  Value *value = *dyn_array_get(args, 2);
-  assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
-  assert(array->operand.type == Operand_Type_Memory_Indirect);
-
-  Descriptor *item_descriptor = array->descriptor->array.item;
-  u32 item_byte_size = descriptor_byte_size(item_descriptor);
-
-  if (operand_is_immediate(&index_value->operand)) {
-    s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
-
-    Value *target_value = temp_allocate(Value);
-    *target_value = (Value){
-      .descriptor = item_descriptor,
-      .operand = {
-        .type = Operand_Type_Memory_Indirect,
-        .byte_size = item_byte_size,
-        .indirect = (Operand_Memory_Indirect) {
-          .reg = array->operand.indirect.reg,
-          .displacement = array->operand.indirect.displacement + index * item_byte_size,
-        }
-      }
-    };
-
-    move_value(builder_, target_value, value);
-  } else if(
-    item_byte_size == 1 ||
-    item_byte_size == 2 ||
-    item_byte_size == 4 ||
-    item_byte_size == 8
-  ) {
-    SIB_Scale scale = SIB_Scale_1;
-    if (item_byte_size == 2) {
-      scale = SIB_Scale_2;
-    } else if (item_byte_size == 4) {
-      scale = SIB_Scale_4;
-    } else if (item_byte_size == 8) {
-      scale = SIB_Scale_8;
-    }
-    Value *index_value_in_register = ensure_register(builder_, index_value, Register_R10);
-    Value *target_value = temp_allocate(Value);
-    *target_value = (Value){
-      .descriptor = item_descriptor,
-      .operand = {
-        .type = Operand_Type_Sib,
-        .byte_size = item_byte_size,
-        .sib = (Operand_Sib) {
-          .scale = scale,
-          .index = index_value_in_register->operand.reg,
-          .base = array->operand.indirect.reg,
-          .displacement = array->operand.indirect.displacement,
-        }
-      }
-    };
-    move_value(builder_, target_value, value);
-  } else {
-    panic("TODO");
-  }
-
-  token_replace_tokens_in_state(state, 2, 0);
-  return true;
-}
-
 Descriptor *
 token_match_fixed_array_type(
   Token_Matcher_State *state,
@@ -1530,6 +1454,76 @@ token_rewrite_definition_and_assignment_statements(
 }
 
 bool
+token_rewrite_array_index(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  Token_Match(target_token, 0);
+  Token_Match(brackets, .type = Token_Type_Square);
+
+  Value *array = token_force_value(target_token, scope, builder);
+  Token_Matcher_State *index_state = &(Token_Matcher_State) {brackets->children};
+  Value *index_value = token_match_expression(index_state, scope, builder);
+  assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
+  assert(array->operand.type == Operand_Type_Memory_Indirect);
+
+  Descriptor *item_descriptor = array->descriptor->array.item;
+  u32 item_byte_size = descriptor_byte_size(item_descriptor);
+
+  Value *result = temp_allocate(Value);
+  if (operand_is_immediate(&index_value->operand)) {
+    s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+    *result = (Value){
+      .descriptor = item_descriptor,
+      .operand = {
+        .type = Operand_Type_Memory_Indirect,
+        .byte_size = item_byte_size,
+        .indirect = (Operand_Memory_Indirect) {
+          .reg = array->operand.indirect.reg,
+          .displacement = array->operand.indirect.displacement + index * item_byte_size,
+        }
+      }
+    };
+
+  } else if(
+    item_byte_size == 1 ||
+    item_byte_size == 2 ||
+    item_byte_size == 4 ||
+    item_byte_size == 8
+  ) {
+    SIB_Scale scale = SIB_Scale_1;
+    if (item_byte_size == 2) {
+      scale = SIB_Scale_2;
+    } else if (item_byte_size == 4) {
+      scale = SIB_Scale_4;
+    } else if (item_byte_size == 8) {
+      scale = SIB_Scale_8;
+    }
+    Value *index_value_in_register = ensure_register(builder, index_value, Register_R10);
+    *result = (Value){
+      .descriptor = item_descriptor,
+      .operand = {
+        .type = Operand_Type_Sib,
+        .byte_size = item_byte_size,
+        .sib = (Operand_Sib) {
+          .scale = scale,
+          .index = index_value_in_register->operand.reg,
+          .base = array->operand.indirect.reg,
+          .displacement = array->operand.indirect.displacement,
+        }
+      }
+    };
+  } else {
+    panic("TODO");
+  }
+
+  token_replace_tokens_in_state(state, 2, token_value_make(target_token, result));
+  return true;
+}
+
+bool
 token_rewrite_struct_field(
   Token_Matcher_State *state,
   Scope *scope,
@@ -1566,7 +1560,7 @@ token_rewrite_expression(
 }
 
 bool
-token_rewrite_assignments(
+token_rewrite_assignment(
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
@@ -1590,6 +1584,7 @@ token_rewrite_assignments(
 
   Token_Matcher_State lhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, (Range_u64){ 0, lhs_end })};
 
+  token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_array_index);
   token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_struct_field);
   token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_definitions);
   if (!dyn_array_length(lhs_state.tokens)) {
@@ -1783,7 +1778,6 @@ token_match_expression(
   }
   token_rewrite_macros(state, scope, builder);
   token_rewrite_expression(state, scope, builder, token_rewrite_statement_if);
-  token_rewrite_expression(state, scope, builder, token_rewrite_set_array_item);
   token_rewrite_expression(state, scope, builder, token_rewrite_cast);
 
   token_rewrite_expression(state, scope, builder, token_rewrite_struct_field);
@@ -1802,7 +1796,7 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_greater_than);
 
   // Statement handling
-  token_rewrite_assignments(state, scope, builder);
+  token_rewrite_assignment(state, scope, builder);
   token_rewrite_expression(state, scope, builder, token_rewrite_definition_and_assignment_statements);
   token_rewrite_expression(state, scope, builder, token_rewrite_definitions);
   token_rewrite_expression(state, scope, builder, token_rewrite_explicit_return);

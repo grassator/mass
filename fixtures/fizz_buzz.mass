@@ -7,8 +7,6 @@ print :: (integer : s32) -> () {
   buffer : s8[64];
   zero_code :: 48;
   minus_code :: 45;
-  // FIXME should be something like this
-  //buffer[0] = zero_code;
   temp := integer;
   count := 0;
   while (temp) {
@@ -22,14 +20,14 @@ print :: (integer : s32) -> () {
   index := 0;
   if (integer < 0) {
     start_index = 1;
-    set_array_item(buffer, 0, minus_code);
+    buffer[0] = minus_code;
     integer = cast(s32, 0) - integer;
   };
   while (index < count) {
     index = index + 1;
     digit_s32 := integer % 10;
     digit := cast(s8, digit_s32);
-    set_array_item(buffer, start_index + count - index, zero_code + digit);
+    buffer[start_index + count - index] = zero_code + digit;
     integer = integer / 10;
   };
   WriteFile(GetStdHandle(-11), &buffer, start_index + count, 0, 0);
