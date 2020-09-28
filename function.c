@@ -6,6 +6,7 @@ reserve_stack(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
+  fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
   Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = temp_allocate(Value);
