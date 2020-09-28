@@ -621,7 +621,7 @@ divide_or_remainder(
         break;
       }
       case 1: {
-        // No need to sign extend in D register
+        push_instruction(builder, (Instruction) {cwb, {0}});
         break;
       }
       default: {

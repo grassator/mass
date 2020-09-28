@@ -311,7 +311,7 @@ const X64_Mnemonic idiv = {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// cwd/cdq/cqo
+// cwb/cwd/cdq/cqo
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding cqo_encoding_list[] = {
   encoding(0x4899, none, 0),
@@ -340,6 +340,16 @@ const X64_Mnemonic cwd = {
   .name = "cwd",
   .encoding_list = (const Instruction_Encoding *)cwd_encoding_list,
   .encoding_count = countof(cwd_encoding_list),
+};
+
+const Instruction_Encoding cwb_encoding_list[] = {
+  encoding(0x98, none, 0),
+};
+
+const X64_Mnemonic cwb = {
+  .name = "cwb",
+  .encoding_list = (const Instruction_Encoding *)cwb_encoding_list,
+  .encoding_count = countof(cwb_encoding_list),
 };
 
 
