@@ -826,7 +826,8 @@ token_force_value(
     }
     case Token_Type_String: {
       Slice string = token_string_to_slice(token);
-      return value_pointer_to(builder, value_global_c_string_from_slice(builder->program, string));
+      Value *string_bytes = value_global_c_string_from_slice(builder->program, string);
+      return value_pointer_to(builder, string_bytes);
     }
     case Token_Type_Id: {
       return scope_lookup_force(scope, token->source, builder);
