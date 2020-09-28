@@ -886,6 +886,50 @@ program_deinit(
   dyn_array_destroy(program->import_libraries);
 }
 
+Jit_Program
+program_end(
+  Program *program
+) {
+  u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
+  Jit_Program result = {
+    .code_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = code_buffer_size),
+    .data_buffer = program->data_buffer,
+  };
+  program->code_base_rva = (s64)result.code_buffer->memory;
+  program->data_base_rva = (s64)program->data_buffer->memory;
+
+  if (dyn_array_is_initialized(program->import_libraries)) {
+    for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+      Import_Library *lib = dyn_array_get(program->import_libraries, i);
+      const char *library_name = slice_to_c_string(temp_allocator, lib->name);
+      HINSTANCE dll_handle = LoadLibraryA(library_name);
+      assert(dll_handle);
+
+      for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
+        Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
+
+        const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, symbol_name);
+        assert(fn_address);
+        fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
+        *rip_target = fn_address;
+        s64 offset_in_data_section = (s8 *)rip_target - program->data_buffer->memory;
+        symbol->offset_in_data = s64_to_s32(offset_in_data_section);
+      }
+    }
+  }
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    fn_encode(result.code_buffer, builder);
+  }
+
+  // Making code executable
+  DWORD dummy = 0;
+  VirtualProtect(result.code_buffer, code_buffer_size, PAGE_EXECUTE_READ, &dummy);
+
+  return result;
+}
+
 void
 program_push_error_from_slice(
   Program *program,
