@@ -342,13 +342,17 @@ spec("source") {
   }
 
   it("should be able to run fizz buzz") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
-    program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
+    Parse_Result result = program_import_file(program_, slice_literal("lib\\prelude"));
+    check(result.type == Parse_Result_Type_Success);
+    result = program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
+    check(result.type == Parse_Result_Type_Success);
 
     Value *fizz_buzz =
       scope_lookup_force(program_->global_scope, slice_literal("fizz_buzz"), 0);
+    check(fizz_buzz);
 
     program_end(program_);
+    check(!dyn_array_length(program_->errors))
 
     fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
     checker();
@@ -364,7 +368,7 @@ spec("source") {
     program_end(program_);
 
     fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
-    assert(checker() == 42);
+    check(checker() == 42);
   }
 
   it("should be able to define and use a macro for while loop") {
@@ -431,6 +435,13 @@ spec("source") {
     write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
   }
 
+  it("should parse and write an executable that prints Hello, world!") {
+    program_import_file(program_, slice_literal("fixtures\\hello_world"));
+    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+
+    write_executable(L"build\\parsed_hello_world.exe", program_, Executable_Type_Cli);
+  }
+
   describe("User Error") {
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
@@ -486,12 +497,5 @@ spec("source") {
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
     }
-  }
-
-  it("should parse and write an executable that prints Hello, world!") {
-    program_import_file(program_, slice_literal("fixtures\\hello_world"));
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
-
-    write_executable(L"build\\parsed_hello_world.exe", program_, Executable_Type_Cli);
   }
 }

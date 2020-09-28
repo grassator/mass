@@ -6,6 +6,7 @@ reserve_stack(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
+  fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
   Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = temp_allocate(Value);
@@ -620,7 +621,7 @@ divide_or_remainder(
         break;
       }
       case 1: {
-        // No need to sign extend in D register
+        push_instruction(builder, (Instruction) {cwb, {0}});
         break;
       }
       default: {
@@ -751,7 +752,15 @@ value_pointer_to(
   Descriptor *result_descriptor = descriptor_pointer_to(value->descriptor);
 
   Value *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
-  push_instruction(builder, (Instruction) {lea, {reg_a->operand, value->operand, 0}});
+  Operand source_operand = value->operand;
+
+  // TODO rethink operand sizing
+  // We need to manually adjust the size here because even if we loading one byte
+  // the right side is treated as an opaque address and does not participate in
+  // instruction encoding.
+  source_operand.byte_size = descriptor_byte_size(result_descriptor);
+
+  push_instruction(builder, (Instruction) {lea, {reg_a->operand, source_operand, 0}});
 
   Value *result = reserve_stack(builder, result_descriptor);
   move_value(builder, result, reg_a);

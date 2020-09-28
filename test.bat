@@ -2,14 +2,16 @@
 
 cls
 call build
-build\macro_spec.exe
 if %errorlevel% neq 0 (exit /b %errorlevel%)
 build\source_spec.exe
 if %errorlevel% neq 0 (exit /b %errorlevel%)
+build\macro_spec.exe
+if %errorlevel% neq 0 (exit /b %errorlevel%)
 
 build\test.exe
-echo ExitCode (Macro): %errorlevel%
+if %errorlevel% neq 42 (exit /b %errorlevel%)
 build\test_parsed.exe
-echo ExitCode (Parsed): %errorlevel%
+if %errorlevel% neq 42 (exit /b %errorlevel%)
 
 build\hello_world.exe
+if %errorlevel% neq 0 (exit /b %errorlevel%)

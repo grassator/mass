@@ -826,7 +826,8 @@ token_force_value(
     }
     case Token_Type_String: {
       Slice string = token_string_to_slice(token);
-      return value_pointer_to(builder, value_global_c_string_from_slice(builder->program, string));
+      Value *string_bytes = value_global_c_string_from_slice(builder->program, string);
+      return value_pointer_to(builder, string_bytes);
     }
     case Token_Type_Id: {
       return scope_lookup_force(scope, token->source, builder);
@@ -1198,9 +1199,12 @@ token_rewrite_statement_if(
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
-  Label *else_label = make_if(builder, token_force_value(condition, scope, builder));
-  (void)token_parse_block(body->children, scope, builder);
-  push_instruction(builder, (Instruction) {.maybe_label = else_label});
+  Value *value = token_force_value(condition, scope, builder);
+  if (value) {
+    Label *else_label = make_if(builder, value);
+    (void)token_parse_block(body->children, scope, builder);
+    push_instruction(builder, (Instruction) {.maybe_label = else_label});
+  }
 
   token_replace_tokens_in_state(state, 3, 0);
   return true;
@@ -1788,9 +1792,9 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, token_rewrite_pointer_to);
+
   token_rewrite_expression(state, scope, builder, token_rewrite_divide);
   token_rewrite_expression(state, scope, builder, token_rewrite_remainder);
-
   token_rewrite_expression(state, scope, builder, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, token_rewrite_minus);
 
@@ -1931,20 +1935,52 @@ program_parse(
   };
 }
 
+Fixed_Buffer *
+win32_absolute_path(
+  Slice raw_path
+) {
+  Slice result_path = raw_path;
+  bool is_relative_path = raw_path.length < 2 || raw_path.bytes[1] != ':';
+
+  Fixed_Buffer *sys_buffer = 0;
+  if (is_relative_path) {
+    sys_buffer = fixed_buffer_make(
+      .allocator = allocator_system,
+      .capacity = 10 * 1024
+    );
+    s32 current_dir_size = GetCurrentDirectory(0, 0) * sizeof(wchar_t);
+    sys_buffer->occupied =
+      GetCurrentDirectory(current_dir_size, (wchar_t *)sys_buffer->memory) * sizeof(wchar_t);
+    fixed_buffer_append_s16(sys_buffer, L'\\');
+    Allocator *convert_allocator = fixed_buffer_allocator_init(sys_buffer, &(Allocator){0});
+    utf8_to_utf16_null_terminated(convert_allocator, raw_path);
+    wchar_t *wide_string = (wchar_t *)sys_buffer->memory;
+    result_path = utf16_null_terminated_to_utf8(temp_allocator, wide_string);
+  }
+  Fixed_Buffer *result_buffer = fixed_buffer_make(
+    .allocator = allocator_system,
+    .capacity = result_path.length + 1024
+  );
+
+  fixed_buffer_append_slice(result_buffer, result_path);
+
+  if (sys_buffer) fixed_buffer_destroy(sys_buffer);
+  return result_buffer;
+}
+
+#define STRINGIFY(x) #x
+
 Parse_Result
 program_import_file(
   Program *program,
   Slice file_path
 ) {
   Slice extension = slice_literal(".mass");
-  if (!slice_ends_with(file_path, extension)) {
-    Fixed_Buffer *buffer = fixed_buffer_make(
-      .allocator = temp_allocator,
-      .capacity = file_path.length + extension.length
-    );
-    fixed_buffer_append_slice(buffer, file_path);
-    fixed_buffer_append_slice(buffer, extension);
-    file_path = fixed_buffer_as_slice(buffer);
+  Fixed_Buffer *absolute_path = win32_absolute_path(file_path);
+
+  if (!slice_ends_with(fixed_buffer_as_slice(absolute_path), extension)) {
+    fixed_buffer_append_slice(absolute_path, extension);
+    file_path = fixed_buffer_as_slice(absolute_path);
   }
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {

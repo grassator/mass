@@ -36,7 +36,8 @@ print :: (integer : s32) -> () {
 }
 
 fizz_buzz :: () -> () {
-  i := 0;
+  i : s32;
+  i = 0;
   stdout_handle := GetStdHandle(-11);
   while (i < 100) {
     i = i + 1;

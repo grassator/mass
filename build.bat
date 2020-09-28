@@ -1,4 +1,3 @@
-
 @echo off
 
 if not defined DevEnvDir (
