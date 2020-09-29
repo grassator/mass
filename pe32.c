@@ -1,6 +1,7 @@
 #include "prelude.h"
 #include "assert.h"
 #include "value.h"
+#include "function.h"
 #include <time.h>
 
 #define PE32_FILE_ALIGNMENT 0x200
@@ -24,12 +25,6 @@ enum {
   DELAY_IMPORT_DIRECTORY_INDEX,
   CLR_DIRECTORY_INDEX,
 };
-
-void
-fn_encode(
-  Fixed_Buffer *buffer,
-  Function_Builder *builder
-);
 
 typedef struct {
   Fixed_Buffer *buffer;
@@ -201,7 +196,7 @@ encode_text_section(
     if (builder->value == program->entry_point) {
       result.entry_point_rva = get_rva();
     }
-    fn_encode(result.buffer, builder);
+    fn_encode(result.buffer, builder, 0);
   }
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);

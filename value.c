@@ -918,14 +918,29 @@ program_end(
       }
     }
   }
+
+  Array_RUNTIME_FUNCTION function_exception_info = dyn_array_make(
+    Array_RUNTIME_FUNCTION,
+    .allocator = allocator_system,
+    .capacity = dyn_array_length(program->functions),
+  );
+
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(result.code_buffer, builder);
+    fn_encode(result.code_buffer, builder, &function_exception_info);
   }
 
   // Making code executable
   DWORD dummy = 0;
   VirtualProtect(result.code_buffer, code_buffer_size, PAGE_EXECUTE_READ, &dummy);
+
+  if (!RtlAddFunctionTable(
+    dyn_array_raw(function_exception_info),
+    u64_to_u32(dyn_array_length(function_exception_info)),
+    (s64) result.code_buffer->memory
+  )) {
+    panic("Could not add function table definition");
+  }
 
   return result;
 }
@@ -1058,6 +1073,7 @@ c_function_import(
 }
 
 #define FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT 16
+#define FUNCTION_UNWIND_INFO_MAX_SIZE (sizeof(UNWIND_INFO) + sizeof(UNWIND_CODE) * 8)
 
 u64
 estimate_max_code_size_in_bytes(
@@ -1069,9 +1085,9 @@ estimate_max_code_size_in_bytes(
     total_instruction_count += dyn_array_length(builder->instructions);
     total_instruction_count += FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT;
   }
-  // TODO this should architecture-dependent
+  // TODO this should be architecture-dependent
   const u64 max_bytes_per_instruction = 15;
-  return total_instruction_count * max_bytes_per_instruction;
+  return total_instruction_count * max_bytes_per_instruction + FUNCTION_UNWIND_INFO_MAX_SIZE;
 }
 
 inline bool

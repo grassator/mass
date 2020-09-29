@@ -377,6 +377,46 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 
 typedef struct _Program Program;
 
+// https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=vs-2019#unwind-data-definitions-in-c
+typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
+
+typedef enum _UNWIND_OP_CODES {
+  UWOP_PUSH_NONVOL = 0, /* info == register number */
+  UWOP_ALLOC_LARGE,     /* no info, alloc size in next 2 slots */
+  UWOP_ALLOC_SMALL,     /* info == size of allocation / 8 - 1 */
+  UWOP_SET_FPREG,       /* no info, FP = RSP + UNWIND_INFO.FPRegOffset*16 */
+  UWOP_SAVE_NONVOL,     /* info == register number, offset in next slot */
+  UWOP_SAVE_NONVOL_FAR, /* info == register number, offset in next 2 slots */
+  UWOP_SAVE_XMM128 = 8, /* info == XMM reg number, offset in next slot */
+  UWOP_SAVE_XMM128_FAR, /* info == XMM reg number, offset in next 2 slots */
+  UWOP_PUSH_MACHFRAME   /* info == 0: no error-code, 1: error-code */
+} UNWIND_CODE_OPS;
+
+typedef union _UNWIND_CODE {
+  struct {
+    u8 CodeOffset;
+    u8 UnwindOp : 4;
+    u8 OpInfo   : 4;
+  };
+  u16 FrameOffset;
+  u16 DataForPreviousCode;
+} UNWIND_CODE, *PUNWIND_CODE;
+
+typedef struct _UNWIND_INFO {
+  u8 Version       : 3;
+  u8 Flags         : 5;
+  u8 SizeOfProlog;
+  u8 CountOfCodes;
+  u8 FrameRegister : 4;
+  u8 FrameOffset   : 4;
+  UNWIND_CODE UnwindCode[];
+/*  union {
+*       OPTIONAL u32 ExceptionHandler;
+*       OPTIONAL u32 FunctionEntry;
+*   };
+*   OPTIONAL u32 ExceptionData[]; */
+} UNWIND_INFO, *PUNWIND_INFO;
+
 typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;

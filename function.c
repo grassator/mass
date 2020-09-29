@@ -259,12 +259,16 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
 void
 fn_encode(
   Fixed_Buffer *buffer,
-  Function_Builder *builder
+  Function_Builder *builder,
+  Array_RUNTIME_FUNCTION *function_exception_info
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
 
+  u32 fn_start_rva = u64_to_u32(buffer->occupied);
   encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->prolog_label});
   encode_instruction(buffer, builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
+  u32 stack_allocation_offset_in_prolog = u64_to_u32(buffer->occupied) - fn_start_rva;
+  u32 size_of_prolog = u64_to_u32(buffer->occupied) - fn_start_rva;
 
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
@@ -273,8 +277,63 @@ fn_encode(
 
   encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->epilog_label});
   encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
+
   encode_instruction(buffer, builder, (Instruction) {ret, {0}});
+  u32 fn_end_rva = u64_to_u32(buffer->occupied);
+
   encode_instruction(buffer, builder, (Instruction) {int3, {0}});
+
+  if (function_exception_info) {
+    // Ideally we should *not* allocate unwind info in executable segment,
+    // but because we need a positive RVA this is the easiest setup for now
+    UNWIND_INFO *unwind_info = fixed_buffer_allocate_bytes(
+      buffer,
+      // FIXME :RegisterAllocation when we save non volatile registers they need to
+      //       be added to the UnwindCode array
+      sizeof(UNWIND_INFO) + sizeof(UNWIND_CODE) * 2,
+      sizeof(DWORD)
+    );
+    *unwind_info = (UNWIND_INFO) {
+      .Version = 1,
+      .Flags = 0,
+      .SizeOfProlog = u32_to_u8(size_of_prolog),
+      .CountOfCodes = 0,
+      .FrameRegister = 0,
+      .FrameOffset = 0,
+    };
+    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - buffer->memory);
+
+    if (builder->stack_reserve) {
+      assert(builder->stack_reserve >= 8);
+      assert(builder->stack_reserve % 8 == 0);
+      if (builder->stack_reserve <= 128) {
+        unwind_info->CountOfCodes = 1;
+        unwind_info->UnwindCode[0] = (UNWIND_CODE){
+          .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
+          .UnwindOp = UWOP_ALLOC_SMALL,
+          .OpInfo = (builder->stack_reserve - 8) / 8,
+        };
+      } else {
+        unwind_info->CountOfCodes = 2;
+        unwind_info->UnwindCode[0] = (UNWIND_CODE){
+          .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
+          .UnwindOp = UWOP_ALLOC_LARGE,
+          .OpInfo = 0,
+        };
+        unwind_info->UnwindCode[1] = (UNWIND_CODE){
+          .DataForPreviousCode = u32_to_u16(builder->stack_reserve / 8),
+        };
+        // TODO support 512k + allocations
+      }
+    }
+
+    dyn_array_push(*function_exception_info, (RUNTIME_FUNCTION) {
+      .BeginAddress = fn_start_rva,
+      .EndAddress = fn_end_rva,
+      .UnwindData = unwind_data_rva,
+    });
+  }
+
   dyn_array_destroy(builder->instructions);
 }
 

@@ -205,6 +205,23 @@ spec("source") {
     check(root);
   }
 
+  it("should be unwind stack on hardware exception") {
+    test_program_inline_source(
+      "inner :: (x : s32) -> (s32) { x / x }"
+      "foo :: (x : s32) -> (s32) { inner(x) }",
+      foo
+    );
+    fn_type_s32_to_s32 checker = value_as_function(foo, fn_type_s32_to_s32);
+    volatile bool caught_exception = false;
+    __try {
+      checker(0);
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER) {
+      caught_exception = true;
+    }
+    check(caught_exception);
+  }
+
   it("should be able to parse and run a void -> s64 function") {
     test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
     fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
