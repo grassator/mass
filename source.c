@@ -448,6 +448,7 @@ token_split(
 
 Descriptor *
 scope_lookup_type(
+  Program *program,
   Scope *scope,
   Source_Location location,
   Slice type_name,
@@ -456,7 +457,7 @@ scope_lookup_type(
   Value *value = scope_lookup_force(scope, type_name, builder);
   if (!value) return 0;
   if (value->descriptor->type != Descriptor_Type_Type) {
-    program_error_builder(builder->program, location) {
+    program_error_builder(program, location) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
@@ -486,6 +487,7 @@ typedef struct {
 
 Descriptor *
 token_force_type(
+  Program *program,
   Scope *scope,
   Token *token,
   Function_Builder *builder
@@ -493,9 +495,9 @@ token_force_type(
   Descriptor *descriptor = 0;
   switch (token->type) {
     case Token_Type_Id: {
-      descriptor = scope_lookup_type(scope, token->location, token->source, builder);
+      descriptor = scope_lookup_type(program, scope, token->location, token->source, builder);
       if (!descriptor) {
-        program_error_builder(builder->program, token->location) {
+        program_error_builder(program, token->location) {
           program_error_append_literal("Could not find type ");
           program_error_append_slice(token->source);
         }
@@ -506,7 +508,7 @@ token_force_type(
     case Token_Type_Square: {
       if (dyn_array_length(token->children) != 1) {
         program_push_error_from_slice(
-          builder->program,
+          program,
           token->location,
           slice_literal("Pointer type must have a single type inside")
         );
@@ -519,12 +521,12 @@ token_force_type(
       descriptor = temp_allocate(Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
-        .pointer_to = scope_lookup_type(scope, child->location, child->source, builder),
+        .pointer_to = scope_lookup_type(program, scope, child->location, child->source, builder),
       };
       break;
     }
     case Token_Type_Integer: {
-      program_error_builder(builder->program, token->location) {
+      program_error_builder(program, token->location) {
         program_error_append_slice(token->source);
         program_error_append_literal(" is not a type");
       }
@@ -733,6 +735,7 @@ token_match_fixed_array_type(
 
 Descriptor *
 token_match_type(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -744,17 +747,18 @@ token_match_type(
   Token *token = *dyn_array_get(state->tokens, 0);
   if (length > 1) {
     program_push_error_from_slice(
-      builder->program,
+      program,
       token->location,
       slice_literal("Can not resolve type")
     );
     return 0;
   }
-  return token_force_type(scope, token, builder);
+  return token_force_type(program, scope, token, builder);
 }
 
 Token_Match_Arg *
 token_match_argument(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -769,7 +773,7 @@ token_match_argument(
   );
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
-  Descriptor *type_descriptor = token_match_type(&rest_state, scope, builder);
+  Descriptor *type_descriptor = token_match_type(program, &rest_state, scope, builder);
   if (!type_descriptor) return 0;
   Token_Match_Arg *arg = temp_allocate(Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
@@ -784,6 +788,7 @@ token_force_lazy_function_definition(
 
 Value *
 token_match_expression(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
@@ -841,7 +846,7 @@ token_force_value(
     case Token_Type_Paren: {
       if (!builder) panic("Caller should only force (...) in a builder context");
       Token_Matcher_State state = {.tokens = token->children};
-      return token_match_expression(&state, scope, builder);
+      return token_match_expression(builder->program, &state, scope, builder);
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
@@ -862,7 +867,7 @@ Array_Value_Ptr
 token_match_call_arguments(
   Token *token,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (dyn_array_length(token->children) != 0) {
@@ -872,7 +877,7 @@ token_match_call_arguments(
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      Value *value = token_match_expression(state, scope, builder_);
+      Value *value = token_match_expression(builder->program, state, scope, builder);
       dyn_array_push(result, value);
     }
   }
@@ -942,7 +947,7 @@ token_rewrite_functions(
   Scope *scope,
   Function_Builder *builder_
 ) {
-  static Array_Token_Ptr pattern = {0};
+  Array_Token_Ptr pattern = {0};
   if (!dyn_array_is_initialized(pattern)) {
     pattern = dyn_array_make(Array_Token_Ptr);
     static Token args = { .type = Token_Type_Paren };
@@ -1028,7 +1033,7 @@ token_match_struct_field(
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
 
-  Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
+  Descriptor *descriptor = token_match_type(builder_->program, &rest_state, scope, builder_);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
@@ -1170,7 +1175,7 @@ Value *
 token_parse_block(
   Array_Token_Ptr children,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   Scope *block_scope = scope_make(scope);
   Value *block_result = 0;
@@ -1181,7 +1186,7 @@ token_parse_block(
     });
     for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
       Token_Matcher_State *state = dyn_array_get(block_statements, i);
-      block_result = token_match_expression(state, block_scope, builder_);
+      block_result = token_match_expression(builder->program, state, block_scope, builder);
     }
   }
   return block_result;
@@ -1300,20 +1305,21 @@ Descriptor *
 token_match_fixed_array_type(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(type, .type = Token_Type_Id);
   Token_Match(square_brace, .type = Token_Type_Square);
 
-  Descriptor *descriptor = scope_lookup_type(scope, type->location, type->source, builder_);
+  Descriptor *descriptor =
+    scope_lookup_type(builder->program, scope, type->location, type->source, builder);
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
-  Value *size_value = token_match_expression(&size_state, scope, builder_);
+  Value *size_value = token_match_expression(builder->program, &size_state, scope, builder);
   if (!size_value) return 0;
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
-      builder_->program,
+      builder->program,
       square_brace->location,
       slice_literal("Fixed size array size is not an integer")
     );
@@ -1321,7 +1327,7 @@ token_match_fixed_array_type(
   }
   if (!operand_is_immediate(&size_value->operand)) {
     program_push_error_from_slice(
-      builder_->program,
+      builder->program,
       square_brace->location,
       slice_literal("Fixed size array size must be known at compile time")
     );
@@ -1423,7 +1429,7 @@ token_rewrite_definitions(
       .operand = label32(label),
     };
   } else {
-    Descriptor *descriptor = token_match_type(&rest_state, scope, builder_);
+    Descriptor *descriptor = token_match_type(builder_->program, &rest_state, scope, builder_);
     value = reserve_stack(builder_, descriptor);
   }
   scope_define_value(scope, name->source, value);
@@ -1465,7 +1471,7 @@ token_rewrite_array_index(
 
   Value *array = token_force_value(target_token, scope, builder);
   Token_Matcher_State *index_state = &(Token_Matcher_State) {brackets->children};
-  Value *index_value = token_match_expression(index_state, scope, builder);
+  Value *index_value = token_match_expression(builder->program, index_state, scope, builder);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
@@ -1563,7 +1569,7 @@ bool
 token_rewrite_assignment(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   state->start_index = 0;
   u64 lhs_end = 0;
@@ -1580,24 +1586,24 @@ token_rewrite_assignment(
 
   Range_u64 rhs_range = { rhs_start, dyn_array_length(state->tokens) };
   Token_Matcher_State rhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, rhs_range)};
-  Value *value = token_match_expression(&rhs_state, scope, builder_);
+  Value *value = token_match_expression(builder->program, &rhs_state, scope, builder);
 
   Token_Matcher_State lhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, (Range_u64){ 0, lhs_end })};
 
-  token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_array_index);
-  token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_struct_field);
-  token_rewrite_expression(&lhs_state, scope, builder_, token_rewrite_definitions);
+  token_rewrite_expression(&lhs_state, scope, builder, token_rewrite_array_index);
+  token_rewrite_expression(&lhs_state, scope, builder, token_rewrite_struct_field);
+  token_rewrite_expression(&lhs_state, scope, builder, token_rewrite_definitions);
   if (!dyn_array_length(lhs_state.tokens)) {
     panic("Left hand side is checked to be non-empty when matched so something went wrong");
   }
   if (dyn_array_length(lhs_state.tokens) == 1) {
     Token *token = *dyn_array_get(lhs_state.tokens, 0);
-    Value *target = token_force_value(token, scope, builder_);
-    move_value(builder_, target, value);
+    Value *target = token_force_value(token, scope, builder);
+    move_value(builder, target, value);
   } else {
     Token *first_token = *dyn_array_get(lhs_state.tokens, 0);
     program_push_error_from_slice(
-      builder_->program,
+      builder->program,
       first_token->location,
       slice_literal("Could not parse the target of the assignment")
     );
@@ -1769,6 +1775,7 @@ token_rewrite_greater_than(
 
 Value *
 token_match_expression(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1813,9 +1820,7 @@ token_match_expression(
     default: {
       Token *token = *dyn_array_get(state->tokens, 0);
       program_push_error_from_slice(
-        builder->program,
-        token->location,
-        slice_literal("Could not parse the expression")
+        program, token->location, slice_literal("Could not parse the expression")
       );
       return 0;
     }
@@ -1834,7 +1839,25 @@ token_force_lazy_function_definition(
   Scope *function_scope = scope_make(program->global_scope);
 
   Value *value = 0;
-  Function_Builder *builder = fn_begin(&value, program);
+  Function_Builder *builder = 0;
+  // TODO think about a better way to distinguish imports
+  bool is_external = body->type == Token_Type_Value;
+  Descriptor *descriptor = 0;
+
+  if (is_external) {
+    if(!body->value) return 0;
+    descriptor = temp_allocate(Descriptor);
+    *descriptor = (Descriptor) {
+      .type = Descriptor_Type_Function,
+      .function = {
+        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
+        .returns = 0,
+      },
+    };
+  } else {
+    builder = fn_begin(&value, program);
+    descriptor = builder->descriptor;
+  }
 
   if (dyn_array_length(args->children) != 0) {
     Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
@@ -1843,23 +1866,26 @@ token_force_lazy_function_definition(
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      Token_Match_Arg *arg = token_match_argument(state, function_scope, builder);
+      Token_Match_Arg *arg = token_match_argument(program, state, function_scope, outer_builder);
       if (!arg) return 0;
-      Value *arg_value = fn_arg(builder, arg->type_descriptor);
+      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
       scope_define_value(function_scope, arg->arg_name, arg_value);
     }
   }
 
   switch (dyn_array_length(return_types->children)) {
     case 0: {
-      value->descriptor->function.returns = &void_value;
+      descriptor->function.returns = &void_value;
       break;
     }
     case 1: {
       Token *return_type_token = *dyn_array_get(return_types->children, 0);
-      Descriptor *descriptor = token_force_type(function_scope, return_type_token, builder);
-      if (!descriptor) return 0;
-      fn_return_descriptor(builder, descriptor, Function_Return_Type_Explicit);
+      Descriptor *return_descriptor =
+        token_force_type(program, function_scope, return_type_token, outer_builder);
+      if (!return_descriptor) return 0;
+      function_return_descriptor(
+        &descriptor->function, return_descriptor, Function_Return_Type_Explicit
+      );
       break;
     }
     default: {
@@ -1867,18 +1893,17 @@ token_force_lazy_function_definition(
       break;
     }
   }
+
+  if (is_external) {
+    body->value->descriptor = descriptor;
+    return body->value;
+  }
+
   fn_freeze(builder);
 
-  // FIXME figure out a better way to distinguish imports
-  if (body->type == Token_Type_Value) {
-    if(!body->value) return 0;
-    body->value->descriptor = builder->descriptor;
-    return body->value;
-  } else {
-    Value *body_result = token_parse_block(body->children, function_scope, builder);
-    if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
-      fn_return(builder, body_result, Function_Return_Type_Implicit);
-    }
+  Value *body_result = token_parse_block(body->children, function_scope, builder);
+  if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
+    fn_return(builder, body_result, Function_Return_Type_Implicit);
   }
 
   fn_end(builder);

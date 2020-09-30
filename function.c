@@ -176,7 +176,10 @@ move_value(
 }
 
 Function_Builder *
-fn_begin(Value **result, Program *program) {
+fn_begin(
+  Value **result,
+  Program *program
+) {
   Descriptor *descriptor = temp_allocate(Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
@@ -342,16 +345,13 @@ fn_arg(
   return result;
 }
 
-
 void
-fn_return_descriptor(
-  Function_Builder *builder,
+function_return_descriptor(
+  Descriptor_Function *function,
   Descriptor *descriptor,
   Function_Return_Type return_type
 ) {
-  Descriptor_Function *function = &builder->descriptor->function;
   if (!function->returns) {
-    assert(!fn_is_frozen(builder));
     if (descriptor->type != Descriptor_Type_Void) {
       // TODO handle 16 bit non-float return values are returned in XMM0
       if (descriptor->type == Descriptor_Type_Float) {
@@ -371,7 +371,7 @@ fn_return(
   Value *to_return,
   Function_Return_Type return_type
 ) {
-  fn_return_descriptor(builder, to_return->descriptor, return_type);
+  function_return_descriptor(&builder->descriptor->function, to_return->descriptor, return_type);
   if (builder->descriptor->function.returns->descriptor->type == Descriptor_Type_Void) {
     if (to_return->descriptor->type != Descriptor_Type_Void) {
       assert(return_type == Function_Return_Type_Implicit);
