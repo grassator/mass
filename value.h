@@ -378,8 +378,6 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct _Program Program;
 
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=vs-2019#unwind-data-definitions-in-c
-typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
-
 typedef enum _UNWIND_OP_CODES {
   UWOP_PUSH_NONVOL = 0, /* info == register number */
   UWOP_ALLOC_LARGE,     /* no info, alloc size in next 2 slots */
@@ -392,7 +390,7 @@ typedef enum _UNWIND_OP_CODES {
   UWOP_PUSH_MACHFRAME   /* info == 0: no error-code, 1: error-code */
 } UNWIND_CODE_OPS;
 
-typedef union _UNWIND_CODE {
+typedef union {
   struct {
     u8 CodeOffset;
     u8 UnwindOp : 4;
@@ -400,22 +398,23 @@ typedef union _UNWIND_CODE {
   };
   u16 FrameOffset;
   u16 DataForPreviousCode;
-} UNWIND_CODE, *PUNWIND_CODE;
+} UNWIND_CODE;
 
-typedef struct _UNWIND_INFO {
+typedef struct {
   u8 Version       : 3;
   u8 Flags         : 5;
   u8 SizeOfProlog;
   u8 CountOfCodes;
   u8 FrameRegister : 4;
   u8 FrameOffset   : 4;
-  UNWIND_CODE UnwindCode[];
+  // :RegisterAllocation need to add more reserved space for UnwindCode
+  UNWIND_CODE UnwindCode[2];
 /*  union {
 *       OPTIONAL u32 ExceptionHandler;
 *       OPTIONAL u32 FunctionEntry;
 *   };
 *   OPTIONAL u32 ExceptionData[]; */
-} UNWIND_INFO, *PUNWIND_INFO;
+} UNWIND_INFO;
 
 typedef struct {
   s32 stack_reserve;
@@ -518,6 +517,11 @@ rip_value_pointer(
 
 u64
 estimate_max_code_size_in_bytes(
+  Program *program
+);
+
+Fixed_Buffer *
+program_end(
   Program *program
 );
 

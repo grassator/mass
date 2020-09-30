@@ -196,7 +196,7 @@ encode_text_section(
     if (builder->value == program->entry_point) {
       result.entry_point_rva = get_rva();
     }
-    fn_encode(result.buffer, builder, 0);
+    fn_encode(result.buffer, builder, 0, 0);
   }
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);

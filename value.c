@@ -886,18 +886,10 @@ program_deinit(
   dyn_array_destroy(program->import_libraries);
 }
 
-Jit_Program
+Fixed_Buffer *
 program_end(
   Program *program
 ) {
-  u64 code_buffer_size = estimate_max_code_size_in_bytes(program);
-  Jit_Program result = {
-    .code_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = code_buffer_size),
-    .data_buffer = program->data_buffer,
-  };
-  program->code_base_rva = (s64)result.code_buffer->memory;
-  program->data_base_rva = (s64)program->data_buffer->memory;
-
   if (dyn_array_is_initialized(program->import_libraries)) {
     for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
       Import_Library *lib = dyn_array_get(program->import_libraries, i);
@@ -911,38 +903,65 @@ program_end(
         const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque fn_address = (fn_type_opaque)GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
+        symbol->offset_in_data = u64_to_s32(program->data_buffer->occupied);
         fn_type_opaque *rip_target = fixed_buffer_allocate(program->data_buffer, fn_type_opaque);
         *rip_target = fn_address;
-        s64 offset_in_data_section = (s8 *)rip_target - program->data_buffer->memory;
-        symbol->offset_in_data = s64_to_s32(offset_in_data_section);
       }
     }
   }
 
-  Array_RUNTIME_FUNCTION function_exception_info = dyn_array_make(
-    Array_RUNTIME_FUNCTION,
+  u64 code_segment_size = estimate_max_code_size_in_bytes(program);
+  u64 function_count = dyn_array_length(program->functions);
+  u64 global_data_size = u64_align(program->data_buffer->occupied, 16);
+  u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
+  u64 data_segment_size = global_data_size + unwind_info_size;
+  u64 program_size = data_segment_size + code_segment_size;
+
+  // Making a contiguous buffer holding both data and memory to ensure
+  Fixed_Buffer *result_buffer = fixed_buffer_make(
     .allocator = allocator_system,
-    .capacity = dyn_array_length(program->functions),
+    .capacity = program_size,
   );
 
-  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+  { // Copying and repointing the data segment into contiguous buffer
+    fixed_buffer_append_slice(result_buffer, fixed_buffer_as_slice(program->data_buffer));
+    // TODO rename to temp_data_buffer and turn it into a bucket buffer
+    fixed_buffer_destroy(program->data_buffer);
+    // Nobody should be trying to read or write to this temp buffer after compilation
+    program->data_buffer = 0;
+  }
+
+  // Since we are writing to the same buffer both data segment and code segment,
+  // and there is no weird file vs virtual address stuff going on like in PE32,
+  // we can just use natural offsets and ignore the base RVA
+  program->data_base_rva = 0;
+  program->code_base_rva = 0;
+
+  UNWIND_INFO *unwind_info_array = fixed_buffer_allocate_bytes(
+    result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
+  );
+
+  s8 *code_memory = result_buffer->memory + result_buffer->occupied;
+
+  RUNTIME_FUNCTION *fn_exception_info = allocator_allocate_array(
+    allocator_system, RUNTIME_FUNCTION, function_count
+  );
+
+  for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(result.code_buffer, builder, &function_exception_info);
+    fn_encode(result_buffer, builder, &fn_exception_info[i], &unwind_info_array[i]);
   }
 
   // Making code executable
-  DWORD dummy = 0;
-  VirtualProtect(result.code_buffer, code_buffer_size, PAGE_EXECUTE_READ, &dummy);
+  VirtualProtect(code_memory, code_segment_size, PAGE_EXECUTE_READ, &(DWORD){0});
 
   if (!RtlAddFunctionTable(
-    dyn_array_raw(function_exception_info),
-    u64_to_u32(dyn_array_length(function_exception_info)),
-    (s64) result.code_buffer->memory
+    fn_exception_info, u64_to_u32(function_count), (s64) result_buffer->memory
   )) {
     panic("Could not add function table definition");
   }
 
-  return result;
+  return result_buffer;
 }
 
 void
@@ -1073,7 +1092,6 @@ c_function_import(
 }
 
 #define FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT 16
-#define FUNCTION_UNWIND_INFO_MAX_SIZE (sizeof(UNWIND_INFO) + sizeof(UNWIND_CODE) * 8)
 
 u64
 estimate_max_code_size_in_bytes(
@@ -1087,7 +1105,7 @@ estimate_max_code_size_in_bytes(
   }
   // TODO this should be architecture-dependent
   const u64 max_bytes_per_instruction = 15;
-  return total_instruction_count * max_bytes_per_instruction + FUNCTION_UNWIND_INFO_MAX_SIZE;
+  return total_instruction_count * max_bytes_per_instruction;
 }
 
 inline bool

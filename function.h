@@ -43,12 +43,8 @@ void
 fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
-  Array_RUNTIME_FUNCTION *function_exception_info
-);
-
-Jit_Program
-program_end(
-  Program *program
+  RUNTIME_FUNCTION *function_exception_info,
+  UNWIND_INFO *unwind_info
 );
 
 Value *

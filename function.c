@@ -260,7 +260,8 @@ void
 fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
-  Array_RUNTIME_FUNCTION *function_exception_info
+  RUNTIME_FUNCTION *function_exception_info,
+  UNWIND_INFO *unwind_info
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
 
@@ -283,16 +284,10 @@ fn_encode(
 
   encode_instruction(buffer, builder, (Instruction) {int3, {0}});
 
-  if (function_exception_info) {
-    // Ideally we should *not* allocate unwind info in executable segment,
-    // but because we need a positive RVA this is the easiest setup for now
-    UNWIND_INFO *unwind_info = fixed_buffer_allocate_bytes(
-      buffer,
-      // FIXME :RegisterAllocation when we save non volatile registers they need to
-      //       be added to the UnwindCode array
-      sizeof(UNWIND_INFO) + sizeof(UNWIND_CODE) * 2,
-      sizeof(DWORD)
-    );
+  if (function_exception_info || unwind_info) {
+    // Make sure either both or none are provided
+    assert(unwind_info);
+    assert(function_exception_info);
     *unwind_info = (UNWIND_INFO) {
       .Version = 1,
       .Flags = 0,
@@ -326,12 +321,11 @@ fn_encode(
         // TODO support 512k + allocations
       }
     }
-
-    dyn_array_push(*function_exception_info, (RUNTIME_FUNCTION) {
+    *function_exception_info = (RUNTIME_FUNCTION) {
       .BeginAddress = fn_start_rva,
       .EndAddress = fn_end_rva,
       .UnwindData = unwind_data_rva,
-    });
+    };
   }
 
   dyn_array_destroy(builder->instructions);
