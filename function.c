@@ -264,15 +264,18 @@ fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
   RUNTIME_FUNCTION *function_exception_info,
-  UNWIND_INFO *unwind_info
+  UNWIND_INFO *unwind_info,
+  u32 unwind_data_rva
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
 
-  u32 fn_start_rva = u64_to_u32(buffer->occupied);
+  s64 code_base_rva = builder->program->code_base_rva;
+  u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->prolog_label});
   encode_instruction(buffer, builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
-  u32 stack_allocation_offset_in_prolog = u64_to_u32(buffer->occupied) - fn_start_rva;
-  u32 size_of_prolog = u64_to_u32(buffer->occupied) - fn_start_rva;
+  u32 stack_allocation_offset_in_prolog =
+    u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
+  u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
 
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
@@ -283,7 +286,7 @@ fn_encode(
   encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
 
   encode_instruction(buffer, builder, (Instruction) {ret, {0}});
-  u32 fn_end_rva = u64_to_u32(buffer->occupied);
+  u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
   encode_instruction(buffer, builder, (Instruction) {int3, {0}});
 
@@ -299,7 +302,6 @@ fn_encode(
       .FrameRegister = 0,
       .FrameOffset = 0,
     };
-    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - buffer->memory);
 
     if (builder->stack_reserve) {
       assert(builder->stack_reserve >= 8);

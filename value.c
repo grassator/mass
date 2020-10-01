@@ -949,7 +949,9 @@ program_end(
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(result_buffer, builder, &fn_exception_info[i], &unwind_info_array[i]);
+    UNWIND_INFO *unwind_info = &unwind_info_array[i];
+    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
+    fn_encode(result_buffer, builder, &fn_exception_info[i], unwind_info, unwind_data_rva);
   }
 
   // Making code executable

@@ -44,7 +44,8 @@ fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
   RUNTIME_FUNCTION *function_exception_info,
-  UNWIND_INFO *unwind_info
+  UNWIND_INFO *unwind_info,
+  u32 unwind_data_rva
 );
 
 Value *

@@ -32,6 +32,11 @@ typedef struct {
   s32 iat_size;
   s32 import_directory_rva;
   s32 import_directory_size;
+  s32 exception_directory_rva;
+  s32 exception_directory_size;
+  s32 unwind_info_base_rva;
+  RUNTIME_FUNCTION *runtime_function_array;
+  UNWIND_INFO *unwind_info_array;
 } Encoded_Rdata_Section;
 
 Encoded_Rdata_Section
@@ -73,6 +78,15 @@ encode_rdata_section(
 
     // End of IMAGE_IMPORT_DESCRIPTOR list
     expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
+
+    // Exception Directory Entry
+    expected_encoded_size += sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
+
+    // :UnwindInfoAlignment Unwind Info must be DWORD aligned
+    expected_encoded_size = u64_align(expected_encoded_size, sizeof(DWORD));
+
+    // Unwind Info
+    expected_encoded_size += sizeof(UNWIND_INFO) * dyn_array_length(program->functions);
   }
 
   u64 global_data_size = u64_align(program->data_buffer->occupied, 16);
@@ -163,6 +177,22 @@ encode_rdata_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *fixed_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
+  // Exception Directory
+
+  result.exception_directory_rva = get_rva();
+  result.runtime_function_array = fixed_buffer_allocate_bytes(
+    buffer, sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions), sizeof(s8)
+  );
+  result.exception_directory_size = get_rva() - result.exception_directory_rva;
+
+  // :UnwindInfoAlignment Unwind Info must be DWORD aligned
+  buffer->occupied = u64_align(buffer->occupied, sizeof(DWORD));
+
+  result.unwind_info_base_rva = get_rva();
+  result.unwind_info_array = fixed_buffer_allocate_bytes(
+    buffer, sizeof(UNWIND_INFO) * dyn_array_length(program->functions), sizeof(s8)
+  );
+
   assert(buffer->occupied == expected_encoded_size);
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
@@ -179,7 +209,8 @@ typedef struct {
 Encoded_Text_Section
 encode_text_section(
   Program *program,
-  IMAGE_SECTION_HEADER *header
+  IMAGE_SECTION_HEADER *header,
+  Encoded_Rdata_Section *encoded_rdata_section
 ) {
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
@@ -196,7 +227,10 @@ encode_text_section(
     if (builder->value == program->entry_point) {
       result.entry_point_rva = get_rva();
     }
-    fn_encode(result.buffer, builder, 0, 0);
+    RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
+    UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
+    u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
+    fn_encode(result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
   }
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
@@ -266,7 +300,7 @@ write_executable(
     rdata_section_header->VirtualAddress +
     s32_align(rdata_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
   Encoded_Text_Section encoded_text_section = encode_text_section(
-    program, text_section_header
+    program, text_section_header, &encoded_rdata_section
   );
   Fixed_Buffer *text_section_buffer = encoded_text_section.buffer;
 
@@ -340,10 +374,16 @@ write_executable(
     encoded_rdata_section.iat_rva;
   optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
     encoded_rdata_section.iat_size;
+
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress =
     encoded_rdata_section.import_directory_rva;
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
     encoded_rdata_section.import_directory_size;
+
+  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
+    encoded_rdata_section.exception_directory_rva;
+  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].Size =
+    encoded_rdata_section.exception_directory_size;
 
   // Write out sections
   for (u32 i = 0; i < countof(sections); ++i) {
