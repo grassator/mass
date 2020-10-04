@@ -1,4 +1,5 @@
 #include "value.h"
+#include "function.h"
 #include "source.h"
 
 inline bool

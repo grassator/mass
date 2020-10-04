@@ -1216,9 +1216,9 @@ token_rewrite_statement_if(
 
   Value *value = token_force_value(condition, scope, builder, target);
   if (value) {
-    Label *else_label = make_if(builder, value);
+    Label *else_label = make_if(&builder->instructions, value);
     (void)token_parse_block(body->children, scope, builder, target);
-    push_instruction(builder, (Instruction) {.maybe_label = else_label});
+    push_instruction(&builder->instructions, (Instruction) {.maybe_label = else_label});
   }
 
   token_replace_tokens_in_state(state, 3, 0);
@@ -1241,7 +1241,7 @@ token_rewrite_goto(
       value->descriptor->type == Descriptor_Type_Void &&
       value->operand.type == Operand_Type_Label_32
     ) {
-      push_instruction(builder, (Instruction) {jmp, {value->operand, 0, 0}});
+      push_instruction(&builder->instructions, (Instruction) {jmp, {value->operand, 0, 0}});
     } else {
       program_error_builder(builder->program, label_name->location) {
         program_error_append_slice(label_name->source);
@@ -1395,7 +1395,7 @@ token_rewrite_cast(
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       result = reserve_stack(builder, cast_to_descriptor);
-      move_value(builder, result, value);
+      move_value(&builder->instructions, result, value);
     }
   }
 
@@ -1437,7 +1437,7 @@ token_rewrite_definitions(
   Label *label = token_match_label(&rest_state, scope, builder);
   Value *value = 0;
   if (label) {
-    push_instruction(builder, (Instruction) { .maybe_label = label });
+    push_instruction(&builder->instructions, (Instruction) { .maybe_label = label });
     value = temp_allocate(Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -1466,7 +1466,7 @@ token_rewrite_definition_and_assignment_statements(
   Token_Match(token_value, 0);
   Value *value = token_force_value(token_value, scope, builder, target);
   Value *on_stack = reserve_stack(builder, value->descriptor);
-  move_value(builder, on_stack, value);
+  move_value(&builder->instructions, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
 
   // FIXME definition should rewrite with a token so that we can do proper
@@ -1524,7 +1524,8 @@ token_rewrite_array_index(
     } else if (item_byte_size == 8) {
       scale = SIB_Scale_8;
     }
-    Value *index_value_in_register = ensure_register(builder, index_value, Register_R10);
+    Value *index_value_in_register =
+      ensure_register(&builder->instructions, index_value, Register_R10);
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
@@ -1648,7 +1649,7 @@ token_rewrite_assignment(
   Value *value =  token_match_expression(builder->program, &rhs_state, scope, builder, target);
   // FIXME hack for :TargetValue
   if (value->descriptor->type != Descriptor_Type_Void) {
-    move_value(builder, target, value);
+    move_value(&builder->instructions, target, value);
   }
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
@@ -1691,7 +1692,7 @@ token_rewrite_plus(
   Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
   //Value *temp = reserve_stack(builder, lhs_value->descriptor);
   Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  plus(builder, temp, lhs_value, rhs_value);
+  plus(&builder->instructions, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
   return true;
 }
@@ -1711,7 +1712,7 @@ token_rewrite_minus(
   Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
   Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
   Value *temp = reserve_stack(builder, lhs_value->descriptor);
-  minus(builder, temp, lhs_value, rhs_value);
+  minus(&builder->instructions, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
   return true;
 }
