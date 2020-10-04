@@ -209,6 +209,11 @@ const Instruction_Encoding add_encoding_list[] = {
   encoding(0x05, none, r_eax, imm32),
   encoding(0x05, none, r_rax, imm32),
 
+  encoding(0x00, _r, r_m8, r8),
+  encoding(0x01, _r, r_m16, r16),
+  encoding(0x01, _r, r_m32, r32),
+  encoding(0x01, _r, r_m64, r64),
+
   encoding(0x02, _r, r8, r_m8),
   encoding(0x03, _r, r16, r_m16),
   encoding(0x03, _r, r32, r_m32),

@@ -16,6 +16,7 @@ typedef s64 (*fn_type_voidp_s64_to_s64)(void*, s64);
 typedef s8  (*fn_type_s32_s8_to_s8)(s32, s8);
 typedef void (*fn_type_s32p_to_void)(s32*);
 typedef s8 (*fn_type_s32_to_s8)(s32);
+typedef s8 (*fn_type_void_to_s8)();
 typedef s32 (*fn_type_s32_to_s32)(s32);
 typedef s64 (*fn_type_s32_to_s64)(s32);
 typedef s32 (*fn_type_s32_s32_to_s32)(s32, s32);
@@ -29,6 +30,7 @@ typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 
 typedef enum {
   Operand_Type_None,
+  Operand_Type_Any,
   Operand_Type_Register,
   Operand_Type_Xmm,
   Operand_Type_Immediate_8,
@@ -48,18 +50,18 @@ typedef enum {
   Register_D   = 0b0010,
   Register_B   = 0b0011,
 
-  Register_AH  = 0b0100,
   Register_SP  = 0b0100,
+  Register_AH  = 0b0100,
   R_M_SIB      = 0b0100,
 
-  Register_CH  = 0b0100,
   Register_BP  = 0b0101,
+  Register_CH  = 0b0100,
 
-  Register_DH  = 0b0100,
   Register_SI  = 0b0110,
+  Register_DH  = 0b0100,
 
-  Register_BH  = 0b0100,
   Register_DI  = 0b0111,
+  Register_BH  = 0b0100,
 
   Register_R8  = 0b1000,
   Register_R9  = 0b1001,
@@ -165,6 +167,7 @@ typedef dyn_array_type(Value *) Array_Value_Ptr;
 
 typedef enum {
   Descriptor_Type_Void,
+  Descriptor_Type_Any,
   Descriptor_Type_Integer,
   Descriptor_Type_Float,
   Descriptor_Type_Pointer,
@@ -246,6 +249,9 @@ Descriptor descriptor_s64 = {
 };
 Descriptor descriptor_void = {
   .type = Descriptor_Type_Void,
+};
+Descriptor descriptor_any = {
+  .type = Descriptor_Type_Any,
 };
 Descriptor descriptor_f32 = {
   .type = { Descriptor_Type_Float },

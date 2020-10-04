@@ -14,16 +14,16 @@ inline void
 push_instruction_internal(
   const char *filename,
   u32 line_number,
-  Function_Builder *builder,
+  Array_Instruction *instructions,
   Instruction instruction
 );
 
-#define push_instruction(...)\
-  push_instruction_internal(__FILE__, __LINE__, __VA_ARGS__)
+#define push_instruction(_array_ptr_, ...)\
+  push_instruction_internal(__FILE__, __LINE__, _array_ptr_, __VA_ARGS__)
 
 void
 move_value(
-  Function_Builder *builder,
+  Array_Instruction *instructions,
   Value *a,
   Value *b
 );
@@ -67,7 +67,7 @@ fn_return(
 );
 
 Label *make_if(
-  Function_Builder *builder,
+  Array_Instruction *instructions,
   Value *value
 );
 
@@ -90,25 +90,27 @@ typedef struct {
 
 Loop_Builder
 loop_start(
-  Function_Builder *builder
+  Array_Instruction *instructions
 );
 
 void
 loop_end(
-  Function_Builder *builder,
+  Array_Instruction *instructions,
   Loop_Builder *loop
 );
 
-Value *
+void
 plus(
-  Function_Builder *builder,
+  Array_Instruction *instructions,
+  Value *result_value,
   Value *a,
   Value *b
 );
 
-Value *
+void
 minus(
-  Function_Builder *builder,
+  Array_Instruction *instructions,
+  Value *result_value,
   Value *a,
   Value *b
 );
