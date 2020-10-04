@@ -436,6 +436,26 @@ operand_is_immediate(
   return false;
 }
 
+bool
+operand_equal(
+  const Operand *a,
+  const Operand *b
+) {
+  return memcmp(a, b, sizeof(Operand)) == 0;
+}
+
+bool
+instruction_equal(
+  const Instruction *a,
+  const Instruction *b
+) {
+  return (
+    memcmp(&a->mnemonic, &b->mnemonic, sizeof(X64_Mnemonic)) == 0 &&
+    memcmp(a->operands, b->operands, sizeof(a->operands)) == 0
+  );
+}
+
+
 Value *
 value_from_f64(
   Program *program,

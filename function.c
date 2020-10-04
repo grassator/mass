@@ -66,7 +66,7 @@ move_value(
   Value *source
 ) {
   if (target == source) return;
-  if (memcmp(&target->operand, &source->operand, sizeof(Operand)) == 0) return;
+  if (operand_equal(&target->operand, &source->operand)) return;
 
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
@@ -476,67 +476,48 @@ plus_or_minus(
     assert(a->descriptor->type == Descriptor_Type_Integer);
   }
 
+  if (operand_is_immediate(&a->operand) && operand_is_immediate(&b->operand)) {
+    s64 a_s64 = operand_immediate_as_s64(&a->operand);
+    s64 b_s64 = operand_immediate_as_s64(&b->operand);
+    s64 folded = 0;
+    switch(operation) {
+      case Arithmetic_Operation_Plus: folded = a_s64 + b_s64; break;
+      case Arithmetic_Operation_Minus: folded = a_s64 - b_s64; break;
+    }
+    move_value(instructions, result_value, value_from_signed_immediate(folded));
+    return;
+  }
+
+  X64_Mnemonic mnemonic = {0};
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      Operand *a_operand = &a->operand;
-      Operand *b_operand = &b->operand;
-      if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {
-        s64 a_s64 = operand_immediate_as_s64(a_operand);
-        s64 b_s64 = operand_immediate_as_s64(b_operand);
-        move_value(instructions, result_value, value_from_signed_immediate(a_s64 + b_s64));
-        return;
+      mnemonic = add;
+      // Addition is commutative (a + b == b + a)
+      // so we can swap operands and save one instruction
+      if (operand_equal(&result_value->operand, &b->operand)) {
+        Value *swap_temp = a;
+        a = b;
+        b = swap_temp;
       }
       break;
     }
     case Arithmetic_Operation_Minus: {
-      Operand *a_operand = &a->operand;
-      Operand *b_operand = &b->operand;
-      if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {
-        s64 a_s64 = operand_immediate_as_s64(a_operand);
-        s64 b_s64 = operand_immediate_as_s64(b_operand);
-        move_value(instructions, result_value, value_from_signed_immediate(a_s64 - b_s64));
-        return;
-      }
-    }
-  }
-
-  if (operand_is_memory(&result_value->operand)) {
-    if (operand_is_memory(&a->operand) && operand_is_memory(&b->operand)) {
-      Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
-      plus_or_minus(operation, instructions, reg_a, a, b);
-      move_value(instructions, result_value, reg_a);
-      return;
-    } else {
-      // TODO check if result_value is actually one of the operands
-      // a = a + x
-    }
-  }
-  move_value(instructions, result_value, a);
-
-  //Descriptor *larger_descriptor =
-    //descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
-    //? a->descriptor
-    //: b->descriptor;
-//
-  //Value *temp_b = reserve_stack(builder, larger_descriptor);
-  //move_value(builder, temp_b, b);
-//
-  //Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
-  //move_value(builder, reg_a, a);
-
-  switch(operation) {
-    case Arithmetic_Operation_Plus: {
-      push_instruction(instructions, (Instruction) {add, {result_value->operand, b->operand, 0}});
+      mnemonic = sub;
       break;
     }
-    case Arithmetic_Operation_Minus: {
-      push_instruction(instructions, (Instruction) {sub, {result_value->operand, b->operand, 0}});
-      break;
-    }
-    default: {
-      assert(!"Unknown arithmetic operation");
-    }
   }
+
+  bool can_reuse_result_as_temp = (
+    !operand_is_memory(&result_value->operand) &&
+    !operand_equal(&result_value->operand, &b->operand)
+  );
+  Value *temp = can_reuse_result_as_temp
+    ? result_value
+    : value_register_for_descriptor(Register_R11, a->descriptor); // TODO register allocation
+
+  move_value(instructions, temp, a);
+  push_instruction(instructions, (Instruction) {mnemonic, {temp->operand, b->operand}});
+  move_value(instructions, result_value, temp);
 }
 
 void
