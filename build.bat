@@ -14,9 +14,6 @@ set FLAGS=/Od /std:c++latest /nologo /WX /FC /Zo /Zi^
   /wd4255 /wd4505 /wd4201 /wd4668 /wd4820 /wd5045 /wd4100 /wd4214^
   /D UNICODE /D _UNICODE
 
-cl %FLAGS% ..\macro_spec.c
-if %errorlevel% neq 0 (goto Fail)
-
 cl %FLAGS% ..\source_spec.c
 if %errorlevel% neq 0 (goto Fail)
 

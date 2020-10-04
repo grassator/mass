@@ -5,8 +5,6 @@ call build
 if %errorlevel% neq 0 (exit /b %errorlevel%)
 build\source_spec.exe
 if %errorlevel% neq 0 (exit /b %errorlevel%)
-build\macro_spec.exe
-if %errorlevel% neq 0 (exit /b %errorlevel%)
 
 build\test.exe
 if %errorlevel% neq 42 (exit /b %errorlevel%)
