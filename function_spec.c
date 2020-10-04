@@ -35,6 +35,23 @@ spec("function") {
       move_value(&instructions, reg_a1, reg_a2);
       check(dyn_array_length(instructions) == 0);
     }
+    it("should set the descriptor of `source` type if `target` is Any but still copy") {
+      Value *reg_a = &(Value){ .descriptor = &descriptor_any, .operand = al };
+      Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
+      move_value(&instructions, reg_a, reg_b);
+      check(reg_a->descriptor == reg_b->descriptor);
+      check(dyn_array_length(instructions) == 1);
+    }
+    it("should just set the operand of `target` to be the same as operand of `source`") {
+      Value *reg_a = &(Value){
+        .descriptor = &descriptor_s8,
+        .operand = { .type = Operand_Type_Any },
+      };
+      Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
+      move_value(&instructions, reg_a, reg_b);
+      check(operand_equal(&reg_a->operand, &reg_b->operand));
+      check(dyn_array_length(instructions) == 0);
+    }
   }
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {

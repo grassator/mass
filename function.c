@@ -68,6 +68,14 @@ move_value(
   if (target == source) return;
   if (operand_equal(&target->operand, &source->operand)) return;
 
+  if (target->descriptor->type == Descriptor_Type_Any) {
+    target->descriptor = source->descriptor;
+  }
+  if (target->operand.type == Operand_Type_Any) {
+    target->operand = source->operand;
+    return;
+  }
+
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
@@ -508,7 +516,7 @@ plus_or_minus(
   }
 
   bool can_reuse_result_as_temp = (
-    !operand_is_memory(&result_value->operand) &&
+    result_value->operand.type == Operand_Type_Register &&
     !operand_equal(&result_value->operand, &b->operand)
   );
   Value *temp = can_reuse_result_as_temp

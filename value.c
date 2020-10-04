@@ -63,6 +63,7 @@ same_type(
     case Descriptor_Type_Float: {
       return descriptor_byte_size(a) == descriptor_byte_size(b);
     }
+    case Descriptor_Type_Any:
     case Descriptor_Type_Type:
     default: {
       assert(!"Unsupported descriptor type");
@@ -138,6 +139,7 @@ descriptor_byte_size(
     case Descriptor_Type_Function: {
       return 8;
     }
+    case Descriptor_Type_Any:
     case Descriptor_Type_Type:
     default: {
       assert(!"Unknown Descriptor Type");
@@ -153,6 +155,10 @@ print_operand(
   switch (operand->type) {
     case Operand_Type_None: {
       printf("_");
+      break;
+    }
+    case Operand_Type_Any: {
+      printf("any");
       break;
     }
     case Operand_Type_Register: {
@@ -216,6 +222,7 @@ const Operand reg_name = { \
   .byte_size = (reg_byte_size), \
   .reg = (reg_index), \
 };
+define_register(al, 0b0000, 1);
 
 define_register(rax, 0b0000, 8);
 define_register(rcx, 0b0001, 8);
@@ -455,6 +462,15 @@ instruction_equal(
   );
 }
 
+Value *
+value_any() {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = &descriptor_any,
+    .operand = {.type = Operand_Type_Any},
+  };
+  return result;
+}
 
 Value *
 value_from_f64(
@@ -809,6 +825,7 @@ c_function_return_value(
     case Descriptor_Type_Float: {
       assert(!"TODO");
     }
+    case Descriptor_Type_Any:
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:
     case Descriptor_Type_Struct:

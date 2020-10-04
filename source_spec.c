@@ -253,6 +253,16 @@ spec("source") {
     check(checker(30, 10, 2) == 42);
   }
 
+  it("should be able to parse and run a sum passed to another function as an argument") {
+    test_program_inline_source(
+      "id :: (ignored : s64, x : s64) -> (s64) { x }"
+      "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }",
+      plus
+    );
+    fn_type_void_to_s64 checker = value_as_function(plus, fn_type_void_to_s64);
+    check(checker() == 42);
+  }
+
   it("should be able to parse and run multiple function definitions") {
     test_program_inline_source(
       "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
@@ -376,7 +386,7 @@ spec("source") {
     check(checker_fn() == -42);
   }
 
-  xit("should be able to run fizz buzz") {
+  it("should be able to run fizz buzz") {
     Parse_Result result = program_import_file(program_, slice_literal("lib\\prelude"));
     check(result.type == Parse_Result_Type_Success);
     result = program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));

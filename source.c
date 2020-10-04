@@ -874,8 +874,7 @@ Array_Value_Ptr
 token_match_call_arguments(
   Token *token,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (dyn_array_length(token->children) != 0) {
@@ -883,10 +882,22 @@ token_match_call_arguments(
       .type = Token_Type_Operator,
       .source = slice_literal(","),
     });
+    // TODO :TargetValue
+    // There is an interesting conundrum here that we need to know the types of the
+    // arguments for overload resolution, but then we need the exact function definition
+    // to know the result_value definition to do the evaluation. Proper solution would
+    // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
+    // target value that can be anything that will behave like type inference and is
+    // needed regardless for something like x := (...)
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      Value *value = token_match_expression(builder->program, state, scope, builder, target);
-      dyn_array_push(result, value);
+      Value *result_value = value_any();
+      Value *value = token_match_expression(builder->program, state, scope, builder, result_value);
+      // FIXME Hack for :TargetValue
+      if (value->descriptor->type != Descriptor_Type_Void) {
+        move_value(&builder->instructions, result_value, value);
+      }
+      dyn_array_push(result, result_value);
     }
   }
   return result;
@@ -1365,14 +1376,13 @@ bool
 token_rewrite_cast(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(cast, .type = Token_Type_Id, .source = slice_literal("cast"));
   Token_Match(value_token, .type = Token_Type_Paren);
 
-  Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder, target);
+  Array_Value_Ptr args = token_match_call_arguments(value_token, scope, builder);
   assert(dyn_array_length(args) == 2);
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
@@ -1669,7 +1679,7 @@ token_rewrite_function_calls(
   if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
 
   Value *target = token_force_value(target_token, scope, builder, result_value);
-  Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder, result_value);
+  Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder);
 
   Value *return_value = call_function_value_array(builder, target, args);
   token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
@@ -1840,7 +1850,7 @@ token_match_expression(
   token_rewrite_assignment(state, scope, builder);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_statement_if);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_cast);
+  token_rewrite_statement(state, scope, builder, token_rewrite_cast);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_struct_field);
   token_rewrite_statement(state, scope, builder, token_rewrite_functions);
