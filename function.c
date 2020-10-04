@@ -65,6 +65,9 @@ move_value(
   Value *target,
   Value *source
 ) {
+  if (target == source) return;
+  if (memcmp(&target->operand, &source->operand, sizeof(Operand)) == 0) return;
+
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
