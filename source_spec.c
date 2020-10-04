@@ -236,10 +236,10 @@ spec("source") {
 
   it("should be able to define, assign and lookup an s64 variable on the stack") {
     test_program_inline_source(
-      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
+      "foo :: () -> (s8) { y : s8; y = 10; x := 21; x = 32; x + y }",
       foo
     );
-    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+    fn_type_void_to_s8 checker = value_as_function(foo, fn_type_void_to_s8);
     check(checker() == 42);
   }
 
@@ -376,7 +376,7 @@ spec("source") {
     check(checker_fn() == -42);
   }
 
-  it("should be able to run fizz buzz") {
+  xit("should be able to run fizz buzz") {
     Parse_Result result = program_import_file(program_, slice_literal("lib\\prelude"));
     check(result.type == Parse_Result_Type_Success);
     result = program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
@@ -474,7 +474,7 @@ spec("source") {
     program_import_file(program_, slice_literal("fixtures\\hello_world"));
     program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
 
-    write_executable(L"build\\parsed_hello_world.exe", program_, Executable_Type_Cli);
+    write_executable(L"build\\hello_world.exe", program_, Executable_Type_Cli);
   }
 
   describe("User Error") {

@@ -460,14 +460,14 @@ typedef enum {
     }\
   } while(0)
 
-Value *
+void
 plus_or_minus(
   Arithmetic_Operation operation,
   Function_Builder *builder,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
-
   if (!(
     a->descriptor->type == Descriptor_Type_Pointer &&
     b->descriptor->type == Descriptor_Type_Integer &&
@@ -477,66 +477,87 @@ plus_or_minus(
     assert(a->descriptor->type == Descriptor_Type_Integer);
   }
 
-  assert_not_register_ax(a);
-  assert_not_register_ax(b);
-
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      maybe_constant_fold(a, b, +);
+      Operand *a_operand = &a->operand;
+      Operand *b_operand = &b->operand;
+      if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {
+        s64 a_s64 = operand_immediate_as_s64(a_operand);
+        s64 b_s64 = operand_immediate_as_s64(b_operand);
+        move_value(builder, result_value, value_from_signed_immediate(a_s64 + b_s64));
+        return;
+      }
       break;
     }
     case Arithmetic_Operation_Minus: {
-      maybe_constant_fold(a, b, -);
+      Operand *a_operand = &a->operand;
+      Operand *b_operand = &b->operand;
+      if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {
+        s64 a_s64 = operand_immediate_as_s64(a_operand);
+        s64 b_s64 = operand_immediate_as_s64(b_operand);
+        move_value(builder, result_value, value_from_signed_immediate(a_s64 - b_s64));
+        return;
+      }
     }
   }
 
-  Descriptor *larger_descriptor =
-    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
-    ? a->descriptor
-    : b->descriptor;
+  if (operand_is_memory(&result_value->operand)) {
+    if (operand_is_memory(&a->operand) && operand_is_memory(&b->operand)) {
+      Value *reg_a = value_register_for_descriptor(Register_A, a->descriptor);
+      plus_or_minus(operation, builder, reg_a, a, b);
+      move_value(builder, result_value, reg_a);
+      return;
+    } else {
+      // TODO check if result_value is actually one of the operands
+      // a = a + x
+    }
+  }
+  move_value(builder, result_value, a);
 
-  Value *temp_b = reserve_stack(builder, larger_descriptor);
-  move_value(builder, temp_b, b);
-
-  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
-  move_value(builder, reg_a, a);
+  //Descriptor *larger_descriptor =
+    //descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
+    //? a->descriptor
+    //: b->descriptor;
+//
+  //Value *temp_b = reserve_stack(builder, larger_descriptor);
+  //move_value(builder, temp_b, b);
+//
+  //Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
+  //move_value(builder, reg_a, a);
 
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      push_instruction(builder, (Instruction) {add, {reg_a->operand, temp_b->operand, 0}});
+      push_instruction(builder, (Instruction) {add, {result_value->operand, b->operand, 0}});
       break;
     }
     case Arithmetic_Operation_Minus: {
-      push_instruction(builder, (Instruction) {sub, {reg_a->operand, temp_b->operand, 0}});
+      push_instruction(builder, (Instruction) {sub, {result_value->operand, b->operand, 0}});
       break;
     }
     default: {
       assert(!"Unknown arithmetic operation");
     }
   }
-
-  Value *temp = reserve_stack(builder, a->descriptor);
-  move_value(builder, temp, reg_a);
-
-  return temp;
 }
 
-Value *
+void
 plus(
   Function_Builder *builder,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
-  return plus_or_minus(Arithmetic_Operation_Plus, builder, a, b);
+  plus_or_minus(Arithmetic_Operation_Plus, builder, result_value, a, b);
 }
 
-Value *
+void
 minus(
   Function_Builder *builder,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
-  return plus_or_minus(Arithmetic_Operation_Minus, builder, a, b);
+  plus_or_minus(Arithmetic_Operation_Minus, builder, result_value, a, b);
 }
 
 Value *

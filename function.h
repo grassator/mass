@@ -99,16 +99,18 @@ loop_end(
   Loop_Builder *loop
 );
 
-Value *
+void
 plus(
   Function_Builder *builder,
+  Value *result_value,
   Value *a,
   Value *b
 );
 
-Value *
+void
 minus(
   Function_Builder *builder,
+  Value *result_value,
   Value *a,
   Value *b
 );
