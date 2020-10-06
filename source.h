@@ -5,6 +5,7 @@
 
 typedef enum {
   Token_Type_Id = 1,
+  Token_Type_Newline,
   Token_Type_Integer,
   Token_Type_Operator,
   Token_Type_String,

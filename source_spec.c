@@ -92,6 +92,20 @@ spec("source") {
     check(dyn_array_length(root->children) == 0);
   }
 
+  it("should be able to turn newlines into tokens") {
+    Slice source = slice_literal("\n");
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+    Token *root = result.root;
+    check(root);
+    check(root->parent == 0);
+    check(root->type == Token_Type_Module);
+    check(dyn_array_length(root->children) == 1);
+    Token *newline = *dyn_array_get(root->children, 0);
+    check(newline->type == Token_Type_Newline);
+    check(slice_equal(newline->source, slice_literal("\n")));
+  }
+
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
     Tokenizer_Result result = tokenize(test_file_name, source);

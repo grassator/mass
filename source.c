@@ -254,8 +254,12 @@ tokenize(
 
     retry: switch(state) {
       case Tokenizer_State_Default: {
-        if (isspace(ch)) continue;
-        if (isdigit(ch)) {
+        if (ch == '\n') {
+          start_token(Token_Type_Newline);
+          push;
+        } else if (isspace(ch)) {
+          continue;
+        } else if (isdigit(ch)) {
           start_token(Token_Type_Integer);
           state = Tokenizer_State_Integer;
         } else if (isalpha(ch) || ch == '_') {
@@ -294,6 +298,7 @@ tokenize(
               expected_paren = ']';
               break;
             }
+            case Token_Type_Newline:
             case Token_Type_Value:
             case Token_Type_Id:
             case Token_Type_Integer:
@@ -535,6 +540,14 @@ token_force_type(
       }
       return 0;
     }
+    case Token_Type_Newline: {
+      program_push_error_from_slice(
+        builder->program,
+        token->location,
+        slice_literal("Unexpected newline token")
+      );
+      return 0;
+    }
     case Token_Type_Operator:
     case Token_Type_String:
     case Token_Type_Paren:
@@ -610,6 +623,7 @@ token_clone_token_array_deep(
     Token *copy = temp_allocate(Token);
     *copy = *token;
     switch (token->type) {
+      case Token_Type_Newline:
       case Token_Type_Integer:
       case Token_Type_Operator:
       case Token_Type_String:
@@ -654,6 +668,7 @@ token_apply_macro_replacements(
         }
         break;
       }
+      case Token_Type_Newline:
       case Token_Type_Integer:
       case Token_Type_Operator:
       case Token_Type_String: {
@@ -863,6 +878,14 @@ token_force_value(
       panic("TODO");
       return 0;
     }
+    case Token_Type_Newline: {
+      program_push_error_from_slice(
+        builder->program,
+        token->location,
+        slice_literal("Unexpected newline token")
+      );
+      return 0;
+    }
   }
   panic("Not reached");
   return 0;
@@ -1058,6 +1081,23 @@ token_match_struct_field(
   return true;
 }
 
+void
+token_rewrite_newlines_with_semicolons(
+  Array_Token_Ptr children
+) {
+  // TODO remove this and instead support multiple matches in token_split?
+  static Token fake_semicolon = {
+    .type = Token_Type_Operator,
+    .source = slice_literal_fields(";"),
+  };
+  for(u64 i = 0; i < dyn_array_length(children); ++i) {
+    Token **token = dyn_array_get(children, i);
+    if ((*token)->type == Token_Type_Newline) {
+      *token = &fake_semicolon;
+    }
+  }
+}
+
 bool
 token_rewrite_struct_definitions(
   Token_Matcher_State *state,
@@ -1078,6 +1118,7 @@ token_rewrite_struct_definitions(
   };
 
   if (dyn_array_length(body->children) != 0) {
+    token_rewrite_newlines_with_semicolons(body->children);
     Array_Token_Matcher_State definitions = token_split(body->children, &(Token){
       .type = Token_Type_Operator,
       .source = slice_literal(";"),
@@ -1197,17 +1238,25 @@ token_parse_block(
   Function_Builder *builder,
   Value *target
 ) {
+  if (!dyn_array_length(children)) return 0;
   Scope *block_scope = scope_make(scope);
   Value *block_result = 0;
-  if (dyn_array_length(children) != 0) {
-    Array_Token_Matcher_State block_statements = token_split(children, &(Token){
-      .type = Token_Type_Operator,
-      .source = slice_literal(";"),
-    });
-    for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
-      Token_Matcher_State *state = dyn_array_get(block_statements, i);
-      block_result = token_match_expression(builder->program, state, block_scope, builder, target);
-    }
+
+  while ((*dyn_array_last(children))->type == Token_Type_Newline) {
+    dyn_array_pop(children);
+  }
+
+  token_rewrite_newlines_with_semicolons(
+    children
+  );
+
+  Array_Token_Matcher_State block_statements = token_split(children, &(Token){
+    .type = Token_Type_Operator,
+    .source = slice_literal(";"),
+  });
+  for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
+    Token_Matcher_State *state = dyn_array_get(block_statements, i);
+    block_result = token_match_expression(builder->program, state, block_scope, builder, target);
   }
   return block_result;
 }
@@ -1833,6 +1882,18 @@ token_rewrite_greater_than(
   return true;
 }
 
+bool
+token_clear_newlines(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  Token_Match(newline, .type = Token_Type_Newline);
+  token_replace_tokens_in_state(state, 1, 0);
+  return true;
+}
+
 Value *
 token_match_expression(
   Program *program,
@@ -1844,6 +1905,7 @@ token_match_expression(
   if (!dyn_array_length(state->tokens)) {
     return 0;
   }
+  token_rewrite_statement(state, scope, builder, token_clear_newlines);
   token_rewrite_macros(state, scope, builder);
 
   // Statement handling
@@ -1987,6 +2049,7 @@ token_match_module(
   Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
   Function_Builder global_builder = { .program = program };
 
+  token_rewrite_statement(state, program->global_scope, &global_builder, token_clear_newlines);
   token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_struct_definitions);
   token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_macro_definitions);
   token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_external_import);
