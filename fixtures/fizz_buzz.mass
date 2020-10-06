@@ -4,57 +4,57 @@ WriteFile :: (status : s64, buffer : [s8], size : s32, bytes_written : s64, over
   -> (s64) external("kernel32.dll", "WriteFile")
 
 print :: (integer : s32) -> () {
-  buffer : s8[64];
-  zero_code :: 48;
-  minus_code :: 45;
-  temp := integer;
-  count := 0;
+  buffer : s8[64]
+  zero_code :: 48
+  minus_code :: 45
+  temp := integer
+  count := 0
   while (temp) {
-    temp = temp / 10;
-    count = count + 1;
-  };
+    temp = temp / 10
+    count = count + 1
+  }
   if (count == 0) {
-    count = 1;
-  };
-  start_index := 0;
-  index := 0;
+    count = 1
+  }
+  start_index := 0
+  index := 0
   if (integer < 0) {
-    start_index = 1;
-    buffer[0] = minus_code;
-    integer = cast(s32, 0) - integer;
-  };
+    start_index = 1
+    buffer[0] = minus_code
+    integer = cast(s32, 0) - integer
+  }
   while (index < count) {
-    index = index + 1;
-    digit_s32 := integer % 10;
-    digit := cast(s8, digit_s32);
-    buffer[start_index + count - index] = zero_code + digit;
-    integer = integer / 10;
-  };
-  WriteFile(GetStdHandle(-11), &buffer, start_index + count, 0, 0);
+    index = index + 1
+    digit_s32 := integer % 10
+    digit := cast(s8, digit_s32)
+    buffer[start_index + count - index] = zero_code + digit
+    integer = integer / 10
+  }
+  WriteFile(GetStdHandle(-11), &buffer, start_index + count, 0, 0)
 }
 
 fizz_buzz :: () -> () {
-  i : s32 = 0;
-  stdout_handle := GetStdHandle(-11);
+  i : s32 = 0
+  stdout_handle := GetStdHandle(-11)
   while (i < 100) {
-    i = i + 1;
-    print_number := 1;
+    i = i + 1
+    print_number := 1
     if (i % 3 == 0) {
-      print_number = 0;
-      WriteFile(stdout_handle, "fizz", 4, 0, 0);
-    };
+      print_number = 0
+      WriteFile(stdout_handle, "fizz", 4, 0, 0)
+    }
     if (i % 5 == 0) {
-      print_number = 0;
-      WriteFile(stdout_handle, "buzz", 4, 0, 0);
-    };
+      print_number = 0
+      WriteFile(stdout_handle, "buzz", 4, 0, 0)
+    }
     if (print_number) {
-      print(i);
-    };
-    WriteFile(stdout_handle, " ", 1, 0, 0);
-  };
+      print(i)
+    }
+    WriteFile(stdout_handle, " ", 1, 0, 0)
+  }
 }
 
 main :: () -> () {
-  fizz_buzz();
-  ExitProcess(0);
+  fizz_buzz()
+  ExitProcess(0)
 }
