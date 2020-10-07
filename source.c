@@ -1779,7 +1779,7 @@ token_rewrite_minus(
 
   Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
   Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
-  Value *temp = reserve_stack(builder, lhs_value->descriptor);
+  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
   minus(&builder->instructions, &op_token->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
   return true;
