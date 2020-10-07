@@ -1,18 +1,21 @@
 #ifndef PRELUDE_H
 #define PRELUDE_H
 
-#include <stdint.h>
+#include <stdint.h> // int8_t, etc
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <stdio.h>  // printf
+#include <string.h> // malloc, realloc, free
 #include <assert.h>
+#include <stdarg.h> // va_arg
+#include <ctype.h> // isspace, isdigit etc
 
 #ifndef countof
 #define countof(...)\
   (sizeof(__VA_ARGS__) / sizeof((__VA_ARGS__)[0]))
 #endif
 
+#undef static_assert
 #define static_assert(_condition_, _message_)\
   struct _message_ { int _message_ : !!(_condition_); }
 
@@ -22,7 +25,13 @@
     _type_##__expected_to_be_aligned_to__##_alignment_\
   );
 
+#ifndef __APPLE__
 #define panic(_message_) assert(!(_message_))
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Numbers
+//////////////////////////////////////////////////////////////////////////////
 
 typedef int8_t  s8;
 typedef int16_t s16;
@@ -93,10 +102,10 @@ static_assert(sizeof(void *) == sizeof(u64), prelude_only_supports_64_bit_archit
 //////////////////////////////////////////////////////////////////////////////
 
 #define DEFINE_UNSIGNED_CAST(_source_type_, _target_type_)\
-  inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
+  static inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
     return value <= _target_type_##_max_value;\
   }\
-  inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
+  static inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
     assert(value <= _target_type_##_max_value);\
     return (_target_type_)value;\
   }
@@ -111,10 +120,10 @@ PRELUDE_ENUMERATE_INTEGER_TYPES
 #undef DEFINE_UNSIGNED_CAST
 
 #define DEFINE_SIGNED_CAST(_source_type_, _target_type_)\
-  inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
+  static inline bool _source_type_##_fits_into_##_target_type_(_source_type_ value) {\
     return value >= _target_type_##_min_value && value <= _target_type_##_max_value;\
   }\
-  inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
+  static inline _target_type_ _source_type_##_to_##_target_type_(_source_type_ value) {\
     assert(value >= _target_type_##_min_value);\
     assert(value <= _target_type_##_max_value);\
     return (_target_type_)value;\
@@ -134,19 +143,29 @@ PRELUDE_ENUMERATE_INTEGER_TYPES
 //////////////////////////////////////////////////////////////////////////////
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  inline _type_ _type_##_min(_type_ x, _type_ y) { return x < y ? x : y; }\
-  inline _type_ _type_##_max(_type_ x, _type_ y) { return x > y ? x : y; }
+  static inline _type_ _type_##_min(_type_ x, _type_ y) { return x < y ? x : y; }\
+  static inline _type_ _type_##_max(_type_ x, _type_ y) { return x > y ? x : y; }
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  inline _type_ _type_##_abs(_type_ x) { return x < 0 ? (-x) : x; }
+  static inline _type_ _type_##_abs(_type_ x) { return x < 0 ? (-x) : x; }
 PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES
+PRELUDE_ENUMERATE_FLOAT_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  inline _type_ _type_##_align(_type_ x, _type_ align) { return ((x + align - 1) / align) * align; }
+  static inline _type_ _type_##_align(_type_ x, _type_ align) { return ((x + align - 1) / align) * align; }
 PRELUDE_ENUMERATE_INTEGER_TYPES
+#undef PRELUDE_PROCESS_TYPE
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  inline int _type_##_comparator(const _type_ *x, const _type_ *y) {\
+    if (*x < *y) return -1;\
+    if (*x > *y) return 1;\
+    return 0;\
+  }
+PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -194,6 +213,87 @@ memory_page_size() {
 }
 
 //////////////////////////////////////////////////////////////////////////////
+// System
+//////////////////////////////////////////////////////////////////////////////
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
+s32
+system_logical_core_count() {
+  static s32 count = -1;
+  if (count == -1) {
+    #ifdef _WIN32
+    SYSTEM_INFO system_info;
+    GetSystemInfo(&system_info);
+    count = system_info.dwNumberOfProcessors;
+    #else
+    count = sysconf(_SC_NPROCESSORS_ONLN);
+    #endif
+  }
+  return count;
+}
+
+typedef struct {
+  u64 start_time;
+  u64 frequency;
+} Performance_Counter;
+
+#ifdef _WIN32
+Performance_Counter
+system_performance_counter_start() {
+  LARGE_INTEGER frequency;
+  QueryPerformanceFrequency(&frequency);
+  LARGE_INTEGER start_time;
+  QueryPerformanceCounter(&start_time);
+  return (const Performance_Counter) {
+    .frequency = frequency.QuadPart,
+    .start_time = start_time.QuadPart
+  };
+}
+
+u64
+system_performance_counter_end(
+  Performance_Counter *counter
+) {
+  LARGE_INTEGER end_time;
+  QueryPerformanceCounter(&end_time);
+  u64 elapsed = end_time.QuadPart - counter->start_time;
+  return (elapsed * 1000000) / counter->frequency;
+}
+
+#elif __APPLE__
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+Performance_Counter
+system_performance_counter_start() {
+  return (const Performance_Counter) {
+    .start_time = mach_absolute_time(),
+  };
+}
+
+u64
+system_performance_counter_end(
+  Performance_Counter *counter
+) {
+  static mach_timebase_info_data_t time_base_info;
+  u64 elapsed = mach_absolute_time() - counter->start_time;
+  if ( time_base_info.denom == 0 ) {
+    mach_timebase_info(&time_base_info);
+  }
+
+  // We might consider doing this math in double
+  // to avoid overflow with the cost of performance
+  u64 elapsed_micro =
+    elapsed * time_base_info.numer / time_base_info.denom / 1000;
+
+  return elapsed_micro;
+}
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Allocator
 //////////////////////////////////////////////////////////////////////////////
 typedef struct {
@@ -202,7 +302,7 @@ typedef struct {
 
 typedef struct {
   void *(*allocate)(Allocator_Handle handle, u64 size_in_bytes, u64 alignment);
-  void  (*deallocate)(Allocator_Handle handle, void *address);
+  void  (*deallocate)(Allocator_Handle handle, void *address, u64 size_in_bytes);
   void *(*reallocate)(
     Allocator_Handle handle,
     void *address,
@@ -213,7 +313,7 @@ typedef struct {
   Allocator_Handle handle;
 } Allocator;
 
-inline void *
+static inline void *
 allocator_default_allocate(
   Allocator_Handle handle,
   u64 size_in_bytes,
@@ -222,15 +322,16 @@ allocator_default_allocate(
   // TODO use aligned malloc if available
   return malloc(size_in_bytes);
 }
-inline void
+static inline void
 allocator_default_deallocate(
   Allocator_Handle handle,
-  void *address
+  void *address,
+  u64 size_in_bytes
 ) {
   free(address);
 }
 
-inline void *
+static inline void *
 allocator_default_reallocate(
   Allocator_Handle handle,
   void *address,
@@ -249,7 +350,7 @@ const Allocator *allocator_default = &(Allocator){
 };
 
 #ifdef _WIN32
-inline void *
+static inline void *
 allocator_system_allocate(
   Allocator_Handle handle,
   u64 size_in_bytes,
@@ -258,15 +359,42 @@ allocator_system_allocate(
   // More than page of alignment is probably not required anyway so can ignore
   return VirtualAlloc(0, size_in_bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
-inline void
+static inline void
 allocator_system_deallocate(
   Allocator_Handle handle,
-  void *address
+  void *address,
+  u64 size_in_bytes
 ) {
   VirtualFree(address, 0, MEM_RELEASE);
 }
+#else
+#include <sys/mman.h>
 
-inline void *
+static inline void *
+allocator_system_allocate(
+  Allocator_Handle handle,
+  u64 size_in_bytes,
+  u64 alignment
+) {
+  // More than page of alignment is probably not required anyway so can ignore
+  void *address = 0; // system chosen
+  int prot = PROT_READ | PROT_WRITE;
+  int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+  int fd = -1; // Required by MAP_ANONYMOUS
+  size_t offset = 0; // Required by MAP_ANONYMOUS
+  return mmap(0, size_in_bytes, prot, flags, fd, offset);
+}
+static inline void
+allocator_system_deallocate(
+  Allocator_Handle handle,
+  void *address,
+  u64 size_in_bytes
+) {
+  munmap(address, size_in_bytes);
+}
+#endif
+
+static inline void *
 allocator_system_reallocate(
   Allocator_Handle handle,
   void *address,
@@ -277,7 +405,7 @@ allocator_system_reallocate(
   // More than page of alignment is probably not required anyway so can ignore
   void *new_address = allocator_system_allocate(handle, new_size_in_bytes, alignment);
   memcpy(new_address, address, old_size_in_bytes);
-  allocator_system_deallocate(handle, address);
+  allocator_system_deallocate(handle, address, old_size_in_bytes);
   return new_address;
 }
 
@@ -286,9 +414,8 @@ const Allocator *allocator_system = &(Allocator){
   allocator_system_deallocate,
   allocator_system_reallocate,
 };
-#endif
 
-inline void *
+static inline void *
 allocator_allocate_bytes_internal(
   const Allocator *allocator,
   u64 size_in_bytes,
@@ -321,15 +448,16 @@ allocator_allocate_bytes_internal(
 #define allocator_allocate_array(_allocator_, _type_, _count_)\
   (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_) * (_count_), _Alignof(_type_))
 
-inline void
+static inline void
 allocator_deallocate(
   const Allocator *allocator,
-  void *address
+  void *address,
+  u64 size_in_bytes
 ) {
-  allocator->deallocate(allocator->handle, address);
+  allocator->deallocate(allocator->handle, address, size_in_bytes);
 }
 
-inline void *
+static inline void *
 allocator_reallocate(
   const Allocator *allocator,
   void *address,
@@ -436,7 +564,7 @@ struct Bucket_Array_Make_Options {
   const Allocator *allocator;
 };
 
-inline Bucket_Array_Internal *
+static inline Bucket_Array_Internal *
 bucket_array_alloc_internal(
   struct Bucket_Array_Make_Options *options,
   u64 single_bucket_byte_size,
@@ -466,7 +594,7 @@ bucket_array_alloc_internal(
   return result;
 }
 
-inline void
+static inline void
 bucket_array_ensure_capacity_for_push(
   Bucket_Array_Internal **internal_pointer,
   u64 single_bucket_byte_size,
@@ -500,7 +628,7 @@ bucket_array_ensure_capacity_for_push(
   ++internal->bucket_tail_length;
 }
 
-inline u64
+static inline u64
 bucket_array_length_internal(
   Bucket_Array_Internal *internal,
   u64 bucket_item_capacity
@@ -514,12 +642,15 @@ bucket_array_length_internal(
 
 void
 bucket_array_destroy_internal(
-  Bucket_Array_Internal *internal
+  Bucket_Array_Internal *internal,
+  u64 single_bucket_byte_size
 ) {
   for (u64 i = 0; i < internal->bucket_tail_length; ++i) {
-    allocator_deallocate(internal->allocator, internal->bucket_tail[i].memory);
+    allocator_deallocate(
+      internal->allocator, internal->bucket_tail[i].memory, single_bucket_byte_size
+    );
   }
-  allocator_deallocate(internal->allocator, internal);
+  allocator_deallocate(internal->allocator, internal, sizeof(Bucket_Array_Internal));
 }
 
 #define bucket_array_bucket_capacity(_array_)\
@@ -570,7 +701,10 @@ bucket_array_destroy_internal(
   )
 
 #define bucket_array_destroy(_array_)\
-  bucket_array_destroy_internal((_array_).internal)
+  bucket_array_destroy_internal(\
+    (_array_).internal,\
+    sizeof(*(_array_).typed->bucket_tail[0].items)\
+  )
 
 //////////////////////////////////////////////////////////////////////////////
 // Array
@@ -597,7 +731,7 @@ typedef dyn_array_struct(s8) Dyn_Array_Internal;
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
-inline Dyn_Array_Internal *
+static inline Dyn_Array_Internal *
 dyn_array_realloc_internal(
   Dyn_Array_Internal *internal,
   u64 length,
@@ -618,7 +752,7 @@ dyn_array_realloc_internal(
   if (result) {
     result->capacity = capacity;
   } else {
-    allocator_deallocate(internal->allocator, internal);
+    allocator_deallocate(internal->allocator, internal, old_allocation_size);
   }
   return result;
 }
@@ -629,7 +763,7 @@ struct Dyn_Array_Make_Options {
   const Allocator *allocator;
 };
 
-inline Dyn_Array_Internal *
+static inline Dyn_Array_Internal *
 dyn_array_alloc_internal(
   struct Dyn_Array_Make_Options *options,
   u64 item_byte_size
@@ -657,7 +791,7 @@ dyn_array_alloc_internal(
 #define dyn_array_raw(_array_)\
   ((_array_).data->items)
 
-inline u64
+static inline u64
 dyn_array_bounds_check(
   u64 index,
   u64 length
@@ -678,7 +812,7 @@ dyn_array_bounds_check(
 #define dyn_array_clear(_array_)\
   ((_array_).data->length = 0)
 
-inline void
+static inline void
 dyn_array_ensure_capacity(
   Dyn_Array_Internal **internal,
   u64 item_byte_size,
@@ -707,7 +841,7 @@ dyn_array_ensure_capacity(
     )\
   })
 
-inline Dyn_Array_Internal *
+static inline Dyn_Array_Internal *
 dyn_array_sub_internal(
   Dyn_Array_Internal *source,
   u64 item_byte_size,
@@ -729,7 +863,7 @@ dyn_array_sub_internal(
   return result;
 }
 
-inline Dyn_Array_Internal *
+static inline Dyn_Array_Internal *
 dyn_array_copy_internal(
   Dyn_Array_Internal *source,
   u64 item_byte_size
@@ -754,10 +888,22 @@ dyn_array_copy_internal(
     )\
   })
 
-#define dyn_array_destroy(_array_)\
-  allocator_deallocate((_array_).data->allocator, (_array_).data)
+static inline void
+dyn_array_destroy_internal(
+  Dyn_Array_Internal **internal,
+  u64 item_byte_size
+) {
+  allocator_deallocate(
+    (*internal)->allocator, *internal,
+    sizeof(Dyn_Array_Internal) + item_byte_size * (*internal)->capacity
+  );
+  *internal = 0;
+}
 
-inline void *
+#define dyn_array_destroy(_array_)\
+  dyn_array_destroy_internal(&(_array_).internal, sizeof((_array_).data->items[0]))
+
+static inline void *
 dyn_array_insert_internal(
   Dyn_Array_Internal **internal,
   u64 index,
@@ -814,7 +960,7 @@ dyn_array_insert_internal(
 #define dyn_array_pop(_array_, ...)\
   (dyn_array_length(_array_) > 0 ? &(_array_).data->items[((_array_).data->length--) - 1] : 0)
 
-inline void
+static inline void
 dyn_array_delete_range_internal(
   Dyn_Array_Internal *internal,
   u64 item_byte_size,
@@ -832,7 +978,7 @@ dyn_array_delete_range_internal(
   internal->length -= range_length;
 }
 
-inline void
+static inline void
 dyn_array_delete_internal(
   Dyn_Array_Internal *internal,
   u64 item_byte_size,
@@ -863,18 +1009,72 @@ dyn_array_delete_internal(
     \
   } while(0)
 
+static inline void
+dyn_array_first_n_internal(
+  Dyn_Array_Internal *internal,
+  u64 item_byte_size,
+  u64 count,
+  ...
+) {
+  assert(count <= internal->length);
+  va_list list;
+  va_start(list, count);
+  for (u64 i = 0; i < count; ++i) {
+    memcpy(va_arg(list, void *), internal->items + item_byte_size * i, item_byte_size);
+  }
+  va_end(list);
+}
+
+#define dyn_array_first_2(_array_, _item_type_, _a1_, _a2_)\
+  _item_type_ _a1_, _a2_;\
+  dyn_array_first_n_internal(\
+    (_array_).internal, sizeof((_array_).data->items[0]), 2, &_a1_, &_a2_\
+  )
+
+#define dyn_array_first_3(_array_, _item_type_, _a1_, _a2_, _a3_)\
+  _item_type_ _a1_, _a2_, _a3_;\
+  dyn_array_first_n_internal(\
+    (_array_).internal, sizeof((_array_).data->items[0]), 3, &_a1_, &_a2_, &_a3_\
+  )
+
+#define dyn_array_first_4(_array_, _item_type_, _a1_, _a2_, _a3_, _a4_)\
+  _item_type_ _a1_, _a2_, _a3_, _a4_;\
+  dyn_array_first_n_internal(\
+    (_array_).internal, sizeof((_array_).data->items[0]), 4, &_a1_, &_a2_, &_a3_, &_a4_\
+  )
+
+typedef int (*Prelude_Comparator_Function)(const void*, const void*);
+
+inline void
+dyn_array_sort_internal(
+  Dyn_Array_Internal *internal,
+  u64 item_byte_size,
+  Prelude_Comparator_Function comparator
+) {
+  qsort(internal->items, internal->length, item_byte_size, comparator);
+}
+
+#define dyn_array_sort(_array_, _comparator_)\
+  dyn_array_sort_internal(\
+    (_array_).internal,\
+    /* type checking that comparator has right types for array items */\
+    (sizeof(_comparator_(&(_array_).data->items[0], &(_array_).data->items[0]))) * 0 +\
+    sizeof((_array_).data->items[0]),\
+    (_comparator_)\
+  )
+
 //////////////////////////////////////////////////////////////////////////////
 // Slice
 //////////////////////////////////////////////////////////////////////////////
 
 typedef struct {
-  const s8 *bytes;
+  const char *bytes;
   u64 length;
 } Slice;
 
 typedef dyn_array_type(Slice) Array_Slice;
 
-inline void
+static inline void
 slice_print(
   Slice slice
 ) {
@@ -910,9 +1110,9 @@ slice_parse_s64(
   return integer;
 }
 
-inline Slice
+static inline Slice
 slice_from_c_string(
-  const s8 *c_string
+  const char *c_string
 ) {
   if (!c_string) return (Slice){0};
   return (Slice){
@@ -927,7 +1127,7 @@ slice_from_c_string(
 #define slice_literal(...)\
   ((Slice)slice_literal_fields(__VA_ARGS__))
 
-inline Slice
+static inline Slice
 slice_trim_starting_whitespace(
   Slice slice
 ) {
@@ -942,7 +1142,7 @@ slice_trim_starting_whitespace(
   };
 }
 
-inline Slice
+static inline Slice
 slice_trim_ending_whitespace(
   Slice slice
 ) {
@@ -964,7 +1164,7 @@ slice_trim_whitespace(
   return slice_trim_ending_whitespace(slice_trim_starting_whitespace(slice));
 }
 
-inline bool
+static inline bool
 slice_starts_with(
   Slice haystack,
   Slice needle
@@ -978,7 +1178,7 @@ slice_starts_with(
   ) == 0;
 }
 
-inline bool
+static inline bool
 slice_ends_with(
   Slice haystack,
   Slice needle
@@ -1057,7 +1257,7 @@ slice_index_of_in_range(
   return INDEX_OF_NOT_FOUND;
 }
 
-inline u64
+static inline u64
 slice_index_of(
   Slice haystack,
   Slice needle
@@ -1065,7 +1265,7 @@ slice_index_of(
   return slice_index_of_in_range(haystack, needle, (Range_u64){0, haystack.length});
 }
 
-inline u64
+static inline u64
 slice_index_of_char_in_range(
   Slice haystack,
   char needle,
@@ -1075,7 +1275,7 @@ slice_index_of_char_in_range(
   return slice_index_of_in_range(haystack, needle_slice, range);
 }
 
-inline u64
+static inline u64
 slice_index_of_char(
   Slice haystack,
   char needle
@@ -1084,7 +1284,7 @@ slice_index_of_char(
   return slice_index_of(haystack, needle_slice);
 }
 
-inline bool
+static inline bool
 slice_equal(
   const Slice a,
   const Slice b
@@ -1104,24 +1304,24 @@ const s8 ascii_case_insensitive_map[64] = {
   0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f
 };
 
-inline bool
+static inline bool
 slice_ascii_case_insensitive_equal_bytes_internal(
-  const s8 *a,
-  const s8 *b,
+  const char *a,
+  const char *b,
   u64 length
 ) {
   for (u64 i = 0; i < length; ++i) {
-    s8 a_char = a[i];
-    s8 b_char = b[i];
-    s8 is_strict_same = a_char == b_char;
+    char a_char = a[i];
+    char b_char = b[i];
+    char is_strict_same = a_char == b_char;
     // Both 'a' and 'A' are above 0x40 which means that if signed compare
     // with that number is false we are definitely not dealing with letters
     // Signed compare means that codes above 127 are negative numbers and
     // are also excluded. This observation allows to shrink lookup table
     // to just 64 bytes that should fit into 1 cache line on most x64 CPUs
-    s8 a_normalized = ascii_case_insensitive_map[(a_char - 0x40) & 0x3F];
-    s8 b_normalized = ascii_case_insensitive_map[(b_char - 0x40) & 0x3F];
-    s8 is_case_insensitive_same =
+    char a_normalized = ascii_case_insensitive_map[(a_char - 0x40) & 0x3F];
+    char b_normalized = ascii_case_insensitive_map[(b_char - 0x40) & 0x3F];
+    char is_case_insensitive_same =
       (a_char > 0x40) & (b_char > 0x40) & (a_normalized == b_normalized);
     if (!(is_strict_same | is_case_insensitive_same)) return false;
   }
@@ -1141,8 +1341,8 @@ slice_ascii_case_insensitive_equal(
   for (u64 i = 0; i < block_length; ++i) {
     if (a_blocks[i] != b_blocks[i]) {
       if (!slice_ascii_case_insensitive_equal_bytes_internal(
-        (s8 *)&a_blocks[i],
-        (s8 *)&b_blocks[i],
+        (char *)&a_blocks[i],
+        (char *)&b_blocks[i],
         sizeof(u64)
       )) {
         return false;
@@ -1158,7 +1358,7 @@ slice_ascii_case_insensitive_equal(
   );
 }
 
-inline bool
+static inline bool
 slice_contains(
   const Slice haystack,
   const Slice needle
@@ -1166,7 +1366,7 @@ slice_contains(
   return slice_index_of(haystack, needle) != INDEX_OF_NOT_FOUND;
 }
 
-inline Slice
+static inline Slice
 slice_sub(
   const Slice slice,
   u64 from,
@@ -1180,7 +1380,7 @@ slice_sub(
   };
 }
 
-inline Slice
+static inline Slice
 slice_sub_range(
   const Slice slice,
   Range_u64 range
@@ -1188,7 +1388,7 @@ slice_sub_range(
   return slice_sub(slice, range.from, range.to);
 }
 
-inline Slice
+static inline Slice
 slice_sub_length(
   const Slice slice,
   u64 start,
@@ -1288,7 +1488,7 @@ slice_split_by_callback_internal(
   return result;
 }
 
-inline Array_Slice
+static inline Array_Slice
 slice_split_by_callback(
   const Allocator *allocator,
   Slice slice,
@@ -1299,7 +1499,7 @@ slice_split_by_callback(
   );
 }
 
-inline Array_Slice
+static inline Array_Slice
 slice_split_by_callback_indexed(
   const Allocator *allocator,
   Slice slice,
@@ -1333,9 +1533,9 @@ slice_basename(
 }
 
 #ifdef _WIN32
-static const s8 system_path_separator = '\\';
+static const char system_path_separator = '\\';
 #else
-static const s8 system_path_separator = '/';
+static const char system_path_separator = '/';
 #endif
 
 Slice
@@ -1345,7 +1545,7 @@ slice_normalize_path(
 ) {
   u64 after_last_slash = 0;
   u64 available_segments = 0;
-  s8 *buffer = allocator_allocate_bytes(allocator, path.length, sizeof(s8));
+  char *buffer = allocator_allocate_bytes(allocator, path.length, sizeof(char));
   s64 buffer_length = 0;
 
   static const Slice dot = slice_literal_fields(".");
@@ -1363,7 +1563,7 @@ slice_normalize_path(
           // Find the start of last segment
           s64 last_slash = 0;
           for (last_slash = buffer_length - 2; last_slash >= 0; --last_slash) {
-            if (buffer[last_slash] == system_path_separator) break;
+            if (buffer[last_slash] == '\\' || buffer[last_slash] == '/') break;
           }
           buffer_length = last_slash + 1;
           continue;
@@ -1441,7 +1641,7 @@ hex_parse_color_digits(
 // C Strings
 //////////////////////////////////////////////////////////////////////////////
 
-inline bool
+static inline bool
 c_string_starts_with(
   const char *haystack,
   const char *needle
@@ -1455,7 +1655,7 @@ c_string_starts_with(
   return true;
 }
 
-inline bool
+static inline bool
 c_string_ends_with(
   const char *haystack,
   const char *needle
@@ -1516,7 +1716,7 @@ c_string_index_of(
   return INDEX_OF_NOT_FOUND;
 }
 
-inline bool
+static inline bool
 c_string_contains(
   const char *haystack,
   const char *needle
@@ -1524,7 +1724,7 @@ c_string_contains(
   return c_string_index_of(haystack, needle) != INDEX_OF_NOT_FOUND;
 }
 
-inline u64
+static inline u64
 c_string_length(
   const char *string
 ) {
@@ -1532,7 +1732,7 @@ c_string_length(
   return (u64)strlen(string);
 }
 
-inline s32
+static inline s32
 c_string_compare(
   const char *lhs,
   const char *rhs
@@ -1540,7 +1740,7 @@ c_string_compare(
   return strcmp(lhs, rhs);
 }
 
-inline bool
+static inline bool
 c_string_equal(
   const char *lhs,
   const char *rhs
@@ -1548,7 +1748,7 @@ c_string_equal(
   return c_string_compare(lhs, rhs) == 0;
 }
 
-inline Array_Slice
+static inline Array_Slice
 c_string_split_by_c_string(
   const Allocator *allocator,
   const char *string,
@@ -1623,7 +1823,7 @@ c_string_split_by_callback_internal(
   return result;
 }
 
-inline Array_Slice
+static inline Array_Slice
 c_string_split_by_callback(
   const Allocator *allocator,
   const char *string,
@@ -1634,7 +1834,7 @@ c_string_split_by_callback(
   );
 }
 
-inline Array_Slice
+static inline Array_Slice
 c_string_split_by_callback_indexed(
   const Allocator *allocator,
   const char *string,
@@ -1648,21 +1848,21 @@ c_string_split_by_callback_indexed(
 //////////////////////////////////////////////////////////////////////////////
 
 
-inline bool
+static inline bool
 code_point_is_ascii_letter(
   s32 ch
 ) {
   return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
 }
 
-inline bool
+static inline bool
 code_point_is_digit(
   s32 code_point
 ) {
   return (code_point >= '0' && code_point <= '9');
 }
 
-inline bool
+static inline bool
 code_point_is_hex_digit(
   s32 code_point
 ) {
@@ -1671,14 +1871,14 @@ code_point_is_hex_digit(
     (code_point >= 'A' && code_point <= 'F');
 }
 
-inline bool
+static inline bool
 code_point_is_ascii_alphanumeric(
   s32 ch
 ) {
   return code_point_is_ascii_letter(ch) || code_point_is_digit(ch);
 }
 
-inline bool
+static inline bool
 code_point_is_ascii_space(
   s32 ch
 ) {
@@ -1744,7 +1944,7 @@ static const u8 utf8_dfa_decode_table[] = {
   12,36,12,12,12,12,12,12,12,12,12,12,
 };
 
-inline u32
+static inline u32
 utf8_decode(
   u32* state,
   u32* code_point,
@@ -1760,7 +1960,7 @@ utf8_decode(
   return *state;
 }
 
-inline s32
+static inline s32
 utf8_next_or_fffd(
   Slice utf8,
   u64 *index
@@ -1784,7 +1984,7 @@ utf8_next_or_fffd(
 
 /// Returns count of code_points in the string.
 /// -1 return value indicates invalid UTF-8 sequence.
-inline s64
+static inline s64
 utf8_code_point_length(
   Slice slice
 ) {
@@ -1800,14 +2000,14 @@ utf8_code_point_length(
   return count;
 }
 
-inline bool
+static inline bool
 utf8_is_ascii_byte(
   s8 byte
 ) {
   return byte > 0;
 }
 
-inline u64
+static inline u64
 utf8_code_point_byte_length(
   u32 code_point
 ) {
@@ -1821,7 +2021,7 @@ utf8_code_point_byte_length(
 
 /// The worst case here is for ascii bytes which require 1 byte in UTF-8
 /// but require 2 bytes for UTF-16
-inline u64
+static inline u64
 utf8_to_utf16_estimate_max_byte_length(
   Slice slice
 ) {
@@ -1830,7 +2030,7 @@ utf8_to_utf16_estimate_max_byte_length(
 
 /// The worst case here is for ascii bytes which require 1 byte in UTF-8
 /// but require 4 bytes for UTF-32
-inline u64
+static inline u64
 utf8_to_utf32_estimate_max_byte_length(
   Slice slice
 ) {
@@ -1842,7 +2042,7 @@ utf8_to_utf32_estimate_max_byte_length(
 u64
 utf8_to_utf16_raw(
   Slice utf8,
-  wchar_t *target,
+  u16 *target,
   u64 target_byte_size
 ) {
   u64 target_wide_length = target_byte_size / 2;
@@ -1855,35 +2055,33 @@ utf8_to_utf16_raw(
 
     if (code_point <= 0xFFFF) {
       if (target_index >= target_wide_length) return target_wide_length * 2;
-      target[target_index++] = (wchar_t)code_point;
+      target[target_index++] = (u16)code_point;
     } else {
       if (target_index + 1 >= target_wide_length) return target_wide_length * 2;
-      target[target_index++] = (wchar_t)(0xD7C0 + (code_point >> 10));
-      target[target_index++] = (wchar_t)(0xDC00 + (code_point & 0x3FF));
+      target[target_index++] = (u16)(0xD7C0 + (code_point >> 10));
+      target[target_index++] = (u16)(0xDC00 + (code_point & 0x3FF));
     }
   }
 
   return target_index * 2;
 }
 
-static_assert(sizeof(wchar_t) == 2, wchar_t_must_be_16_bit_wide);
-
-inline wchar_t *
+static inline u16 *
 utf8_to_utf16_null_terminated(
   const Allocator *allocator,
   Slice utf8
 ) {
   u64 max_byte_length = utf8_to_utf16_estimate_max_byte_length(utf8);
-  // + sizeof(wchar_t) accounts for null termination
-  u64 allocation_size = max_byte_length + sizeof(wchar_t);
-  wchar_t *target = allocator_allocate_bytes(allocator, allocation_size, sizeof(wchar_t));
+  // + sizeof(u16) accounts for null termination
+  u64 allocation_size = max_byte_length + sizeof(u16);
+  u16 *target = allocator_allocate_bytes(allocator, allocation_size, sizeof(u16));
   u64 bytes_written = utf8_to_utf16_raw(utf8, target, max_byte_length);
-  u64 end_index = bytes_written / sizeof(wchar_t);
+  u64 end_index = bytes_written / sizeof(u16);
   target[end_index] = 0;
-  u64 actual_size = bytes_written + sizeof(wchar_t);
+  u64 actual_size = bytes_written + sizeof(u16);
 
   if (actual_size != allocation_size) {
-    target = allocator_reallocate(allocator, target, allocation_size, actual_size, sizeof(wchar_t));
+    target = allocator_reallocate(allocator, target, allocation_size, actual_size, sizeof(u16));
   }
 
   return target;
@@ -1892,7 +2090,7 @@ utf8_to_utf16_null_terminated(
 /// Accepts source (UTF-16) string size in *bytes*
 /// The worst case here is for some asian characters that are 2 bytes in UTF16
 /// but require 3 bytes for UTF-8
-inline u64
+static inline u64
 utf16_to_utf8_estimate_max_byte_length(
   u64 size_in_bytes
 ) {
@@ -1905,9 +2103,9 @@ utf16_to_utf8_estimate_max_byte_length(
 /// are replaced with U+FFFD code_point
 u64
 utf16_to_utf8_raw(
-  const wchar_t *source,
+  const u16 *source,
   u64 source_byte_size,
-  s8 *target,
+  char *target,
   u64 target_byte_size
 ) {
   u64 source_wide_length = source_byte_size / 2;
@@ -1919,7 +2117,7 @@ utf16_to_utf8_raw(
     if (code_point >= 0xd800 && code_point <= 0xdbff) {
       ++source_index;
       if (source_index < source_wide_length) {
-        wchar_t pair = source[source_index];
+        u16 pair = source[source_index];
         // Valid pair
         if (pair >= 0xdc00 && pair <= 0xdfff) {
           code_point = (code_point - 0xd800) * 0x400 + (pair - 0xdc00) + 0x10000;
@@ -1963,14 +2161,14 @@ utf16_to_utf8_raw(
 Slice
 utf16_to_utf8(
   const Allocator *allocator,
-  const wchar_t *source,
+  const u16 *source,
   u64 source_byte_size
 ) {
   u64 max_byte_length = utf16_to_utf8_estimate_max_byte_length(source_byte_size);
-  s8 *target = allocator_allocate_bytes(allocator, max_byte_length, sizeof(s8));
+  char *target = allocator_allocate_bytes(allocator, max_byte_length, sizeof(char));
   u64 bytes_written = utf16_to_utf8_raw(source, source_byte_size, target, max_byte_length);
 
-  target = allocator_reallocate(allocator, target, max_byte_length, bytes_written, sizeof(s8));
+  target = allocator_reallocate(allocator, target, max_byte_length, bytes_written, sizeof(char));
 
   return (Slice) {
     .bytes = target,
@@ -1978,174 +2176,30 @@ utf16_to_utf8(
   };
 }
 
+static inline size_t
+utf16_string_length(
+  const u16 *string
+) {
+  size_t length = 0;
+  for(; *string++; ++length);
+  return length;
+}
+
+static inline size_t
+utf16_string_byte_size(
+  const u16 *string
+) {
+  return (utf16_string_length(string) + 1) * sizeof(u16);
+}
+
 Slice
 utf16_null_terminated_to_utf8(
   const Allocator *allocator,
-  const wchar_t *source
+  const u16 *source
 ) {
-  u64 source_byte_size = wcslen(source) * sizeof(wchar_t);
+  u64 source_byte_size = utf16_string_length(source) * sizeof(u16);
   return utf16_to_utf8(allocator, source, source_byte_size);
 }
-
-//////////////////////////////////////////////////////////////////////////////
-// LPEG
-// Loosely based on ideas presented in a paper:
-//   A Text Pattern-Matching Tool based on Parsing Expression Grammars
-//   by Roberto Ierusalimschy in 2008
-//////////////////////////////////////////////////////////////////////////////
-
-typedef enum {
-  Lpeg_Mode_Choice = 0,
-  Lpeg_Mode_Sequence = 1,
-} Lpeg_Mode;
-
-typedef struct {
-  u64 index;
-  const Lpeg_Mode mode;
-  bool success;
-  bool done;
-} Lpeg_Stack_Entry;
-
-typedef struct {
-  u64 index;
-  bool success;
-} Lpeg_Test_Result;
-
-// Use real CPU stack to save previous LPEG stack and restore when nested code is done.
-// If the mode is sequence we stop at the first failed nested pattern
-// and in case of choice we stop at first success.
-#define LPEG_SAVE_INTERNAL\
-  if(lpeg->mode != lpeg->success) continue; else\
-  for(\
-    Lpeg_Stack_Entry *lpeg_saved = lpeg;\
-    lpeg_saved;\
-    (lpeg = lpeg_saved),(lpeg_saved = 0)\
-  )
-
-// "Push" new entry on LPEG stack by shadowing existing `lpeg` variable
-#define LPEG_PUSH_INTERNAL(_mode_, _initial_success_)\
-  Lpeg_Stack_Entry \
-     lpeg_new = {\
-       .index = lpeg_saved->index,\
-       .mode = (_mode_),\
-       .success = (_initial_success_),\
-       .done = 0,\
-     },\
-     *lpeg = &lpeg_new
-
-// Matches zero or more of the nested patterns
-#define LPEG_MANY\
-  LPEG_SAVE_INTERNAL\
-  for( \
-    LPEG_PUSH_INTERNAL(Lpeg_Mode_Sequence, 1);\
-    !lpeg->done;\
-    (\
-      /* check that we made progress or a pattern like (a*)* will not terminate */\
-      (lpeg->success = lpeg->success && lpeg_saved->index != lpeg->index),\
-      (lpeg->done = !lpeg->success),\
-      (lpeg->success && ((lpeg_saved->index = lpeg->index), 0))\
-    )\
-  )
-
-// In both choices and sequences we only go through the loop once
-// because of unconditional `lpeg->done = 1` at the end of the loop.
-#define LPEG_CHOICE_SEQUENCE_INTERNAL(_mode_, _initial_success_)\
-  LPEG_SAVE_INTERNAL\
-  for( \
-    LPEG_PUSH_INTERNAL((_mode_), (_initial_success_));\
-    !lpeg->done;\
-    (\
-      (lpeg->done = 1),\
-      (lpeg_saved->success = lpeg->success),\
-      (lpeg->success && ((lpeg_saved->index = lpeg->index), 0))\
-    )\
-  )
-
-#define LPEG_CHOICE LPEG_CHOICE_SEQUENCE_INTERNAL(Lpeg_Mode_Choice, 0)
-#define LPEG_SEQUENCE LPEG_CHOICE_SEQUENCE_INTERNAL(Lpeg_Mode_Sequence, 1)
-
-#define LPEG_NOT\
-  if(lpeg->mode != lpeg->success) continue;\
-  else for(\
-    bool lpeg_not_loop = 1, lpeg_success_value = 0;\
-    lpeg_not_loop;\
-    (lpeg_not_loop = 0)\
-  )
-
-#define LPEG_CHAR_INTERNAL(_success_)\
-  if(lpeg->mode != lpeg->success) continue;\
-  else if (\
-    lpeg->success = (\
-      lpeg_input[lpeg->index] && ((_success_) ? lpeg_success_value : !lpeg_success_value)\
-    ),\
-    lpeg->success\
-  ) ++lpeg->index;
-
-#define LPEG_END\
-  if(lpeg->mode != lpeg->success) continue;\
-  else if (\
-    lpeg->success = ((lpeg_input[lpeg->index] == 0) ? lpeg_success_value : !lpeg_success_value),\
-    lpeg->success\
-  ) ++lpeg->index;
-
-#define LPEG_ANY\
-  LPEG_CHAR_INTERNAL((lpeg_input[lpeg->index] != 0))
-
-#define LPEG_RANGE(_from_, _to_)\
-  LPEG_CHAR_INTERNAL((lpeg_input[lpeg->index] >= (_from_) && lpeg_input[lpeg->index] <= (_to_)))
-
-#define LPEG_CHAR(_char_)\
-  LPEG_CHAR_INTERNAL((lpeg_input[lpeg->index] == (_char_)))
-
-#define LPEG_DIGIT LPEG_RANGE('0', '9')
-
-#define LPEG_ASCII_LETTER\
-  LPEG_CHAR_INTERNAL(code_point_is_ascii_letter(lpeg_input[lpeg->index]))
-
-#define LPEG_ALPHANUMERIC\
-  LPEG_CHAR_INTERNAL(code_point_is_ascii_alphanumeric(lpeg_input[lpeg->index]))
-
-#define LPEG_TEST(_input_string_, _result_ptr_)\
-  for (\
-    Lpeg_Stack_Entry *lpeg = &(Lpeg_Stack_Entry){\
-      .index = 0,\
-      .mode = Lpeg_Mode_Sequence,\
-      .success = 1,\
-      .done = 0,\
-    }, *lpeg_macro_done = 0;\
-    !lpeg_macro_done;\
-    (++lpeg_macro_done),\
-    ((_result_ptr_)->index = lpeg->index),\
-    ((_result_ptr_)->success = lpeg->success)\
-  )\
-  for(\
-    bool lpeg_success_value_loop = 1, lpeg_success_value = 1;\
-    lpeg_success_value_loop;\
-    (lpeg_success_value_loop = 0),(void)lpeg_success_value\
-  )\
-  for (const char *lpeg_input = (_input_string_); lpeg_input; lpeg_input = 0)
-
-inline bool
-lpeg_string_internal(
-  Lpeg_Stack_Entry *lpeg,
-  const char *haystack,
-  const char *needle
-) {
-  u64 index = lpeg->index;
-  for (;*needle; ++index) {
-    if (*needle++ != *(haystack + index)) {
-      lpeg->success = false;
-      return lpeg->mode == Lpeg_Mode_Sequence;
-    }
-  }
-  lpeg->success = true;
-  lpeg->index = index;
-  return lpeg->mode == Lpeg_Mode_Choice;
-}
-
-#define LPEG_STRING(_string_)\
-  if(lpeg_string_internal(lpeg, lpeg_input, (_string_))) continue
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Fixed Buffer
@@ -2169,7 +2223,7 @@ struct Fixed_Buffer_Make_Options {
   const Allocator *allocator;
 };
 
-inline Fixed_Buffer *
+static inline Fixed_Buffer *
 fixed_buffer_make_internal(
   struct Fixed_Buffer_Make_Options *options
 ) {
@@ -2203,7 +2257,7 @@ fixed_buffer_make_internal(
     { .buffer = { .capacity = (_capacity_) }}\
   ).buffer
 
-inline Fixed_Buffer *
+static inline Fixed_Buffer *
 fixed_buffer_zero(
   Fixed_Buffer *buffer
 ) {
@@ -2212,14 +2266,16 @@ fixed_buffer_zero(
   return buffer;
 }
 
-inline void
+static inline void
 fixed_buffer_destroy(
   Fixed_Buffer *buffer
 ) {
-  if (buffer->allocator) allocator_deallocate(buffer->allocator, buffer);
+  if (buffer->allocator) {
+    allocator_deallocate(buffer->allocator, buffer, buffer->capacity);
+  }
 }
 
-inline void *
+static inline void *
 fixed_buffer_allocate_bytes(
   Fixed_Buffer *buffer,
   u64 byte_size,
@@ -2238,11 +2294,14 @@ fixed_buffer_allocate_bytes(
   return result;
 }
 
-inline Slice
+static inline Slice
 fixed_buffer_as_slice(
   Fixed_Buffer *buffer
 ) {
-  return (Slice){.bytes = buffer->memory, .length = buffer->occupied};
+  return (Slice){
+    .bytes = (char *)buffer->memory,
+    .length = buffer->occupied
+  };
 }
 
 #define fixed_buffer_allocate_unaligned(_buffer_, _type_)\
@@ -2255,7 +2314,7 @@ fixed_buffer_as_slice(
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), _Alignof(_type_)))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  inline _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
+  static inline _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
     _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
     *result = value;\
     return result;\
@@ -2263,7 +2322,7 @@ fixed_buffer_as_slice(
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
-inline Slice
+static inline Slice
 fixed_buffer_append_slice(
   Fixed_Buffer *buffer,
   Slice slice
@@ -2274,17 +2333,20 @@ fixed_buffer_append_slice(
   return (Slice) { .bytes = target, .length = slice.length, };
 }
 
-inline Slice
+static inline Slice
 fixed_buffer_slice(
   Fixed_Buffer *buffer,
   Range_u64 range
 ) {
   u64 from = u64_min(buffer->occupied, range.from);
   u64 to = u64_min(buffer->occupied, range.to);
-  return (Slice){.bytes = buffer->memory + from, to - from};
+  return (Slice){
+    .bytes = (char *)(buffer->memory + from),
+    .length = to - from
+  };
 }
 
-inline void *
+static inline void *
 fixed_buffer_allocator_allocate(
   Allocator_Handle handle,
   u64 size_in_bytes,
@@ -2296,15 +2358,16 @@ fixed_buffer_allocator_allocate(
     alignment
   );
 }
-inline void
+static inline void
 fixed_buffer_allocator_deallocate(
   Allocator_Handle handle,
-  void *address
+  void *address,
+  u64 size_in_bytes
 ) {
   // noop
 }
 
-inline void *
+static inline void *
 fixed_buffer_allocator_reallocate(
   Allocator_Handle handle,
   void *address,
@@ -2320,11 +2383,11 @@ fixed_buffer_allocator_reallocate(
 
   void *result = fixed_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
-  fixed_buffer_allocator_deallocate(handle, address);
+  fixed_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
   return result;
 }
 
-inline Allocator *
+static inline Allocator *
 fixed_buffer_allocator_init(
   Fixed_Buffer *buffer,
   Allocator *allocator
@@ -2338,7 +2401,7 @@ fixed_buffer_allocator_init(
   return allocator;
 }
 
-inline Allocator *
+static inline Allocator *
 fixed_buffer_allocator_make(
   Fixed_Buffer *buffer
 ) {
@@ -2348,21 +2411,21 @@ fixed_buffer_allocator_make(
   );
 }
 
-inline s8 *
+static inline s8 *
 fixed_buffer_first_free_byte_address(
   Fixed_Buffer *buffer
 ) {
   return buffer->memory + buffer->occupied;
 }
 
-inline u64
+static inline u64
 fixed_buffer_remaining_capacity(
   Fixed_Buffer *buffer
 ) {
   return buffer->capacity - buffer->occupied;
 }
 
-inline Slice
+static inline Slice
 fixed_buffer_wrap_snprintf(
   Fixed_Buffer *buffer,
   s32 bytes_written
@@ -2373,12 +2436,12 @@ fixed_buffer_wrap_snprintf(
   }
   void *bytes = fixed_buffer_first_free_byte_address(buffer);
   buffer->occupied += bytes_written;
-  return (Slice) { .bytes = bytes, .length = bytes_written, };
+  return (Slice) { .bytes = bytes, .length = bytes_written };
 }
 
 #define fixed_buffer_vsprintf(_buffer_, _format_, _va_)\
   fixed_buffer_wrap_snprintf((_buffer_), vsnprintf(\
-    fixed_buffer_first_free_byte_address((_buffer_)),\
+    (char *)fixed_buffer_first_free_byte_address((_buffer_)),\
     fixed_buffer_remaining_capacity(_buffer_),\
     (_format_),\
     (_va_)\
@@ -2386,7 +2449,7 @@ fixed_buffer_wrap_snprintf(
 
 #define fixed_buffer_sprintf(_buffer_, _format_, ...)\
   fixed_buffer_wrap_snprintf((_buffer_), snprintf(\
-    fixed_buffer_first_free_byte_address(_buffer_),\
+    (char *)fixed_buffer_first_free_byte_address(_buffer_),\
     fixed_buffer_remaining_capacity(_buffer_),\
     (_format_), \
     __VA_ARGS__\
@@ -2408,7 +2471,7 @@ struct Fixed_Buffer_From_File_Options {
 #ifdef _WIN32
 #include <windows.h>
 #else
-static_assert(false, reading_whole_file_is_not_implemented_on_nix_systems);
+#include <sys/stat.h>
 #endif
 
 static Fixed_Buffer *
@@ -2419,9 +2482,10 @@ fixed_buffer_from_file_internal(
   // Allows to not check for null when reporting
   static File_Read_Error dummy_error = File_Read_Error_None;
   if (!options->error) options->error = &dummy_error;
+  Fixed_Buffer *buffer = 0;
 
 #ifdef _WIN32
-  wchar_t *file_path_utf16 = utf8_to_utf16_null_terminated(allocator_default, file_path);
+  u16 *file_path_utf16 = utf8_to_utf16_null_terminated(allocator_default, file_path);
 
   HANDLE file_handle = CreateFileW(
     file_path_utf16,
@@ -2432,13 +2496,16 @@ fixed_buffer_from_file_internal(
     FILE_ATTRIBUTE_NORMAL,
     0
   );
-  allocator_deallocate(allocator_default, file_path_utf16);
-  Fixed_Buffer *buffer = 0;
+  allocator_deallocate(
+    allocator_default, file_path_utf16,
+    utf16_string_length(file_path_utf16) + sizeof(u16)
+  );
   if (file_handle == INVALID_HANDLE_VALUE) {
     *options->error = File_Read_Error_Failed_To_Open;
     goto handle_error;
   }
 
+  // FIXME use 64bit version
   s32 buffer_size = GetFileSize(file_handle, 0);
   if (options->null_terminate) buffer_size++;
   buffer = fixed_buffer_make(
@@ -2461,7 +2528,36 @@ fixed_buffer_from_file_internal(
     return 0;
   }
 #else
-  assert(!"Not implemented");
+  char *file_path_null_terminated =
+    slice_to_c_string(allocator_default, file_path);
+  FILE *file_handle = fopen(file_path_null_terminated, "r");
+  allocator_deallocate(
+    allocator_default, file_path_null_terminated, file_path.length + 1
+  );
+
+  struct stat st;
+  if (!file_handle || (stat(file_path_null_terminated, &st) != 0)) {
+    *options->error = File_Read_Error_Failed_To_Open;
+    goto handle_error;
+  }
+
+  u64 buffer_size = st.st_size;
+  if (options->null_terminate) buffer_size++;
+  buffer = fixed_buffer_make(
+    .allocator = allocator_system,
+    .capacity = buffer_size,
+  );
+  fread(buffer->memory, buffer_size, 1, file_handle);
+  fclose(file_handle);
+  buffer->occupied = buffer_size;
+  if (options->null_terminate) fixed_buffer_append_u8(buffer, 0);
+  return buffer;
+
+  handle_error: {
+    if (file_handle) fclose(file_handle);
+    if (buffer) fixed_buffer_destroy(buffer);
+    return 0;
+  }
 #endif
 }
 
@@ -2495,7 +2591,7 @@ typedef struct {
   Bucket_Buffer_Internal *internal;
 } Bucket_Buffer;
 
-inline Bucket_Buffer_Bucket *
+static inline Bucket_Buffer_Bucket *
 bucket_buffer_push_bucket_internal(
   Bucket_Buffer_Internal *internal,
   u64 capacity
@@ -2513,7 +2609,7 @@ struct Bucket_Buffer_Make_Options {
   const Allocator *allocator;
 };
 
-inline const Bucket_Buffer
+static inline const Bucket_Buffer
 bucket_buffer_make_internal(
   struct Bucket_Buffer_Make_Options *options
 ) {
@@ -2535,18 +2631,22 @@ bucket_buffer_make_internal(
     __VA_ARGS__\
   })
 
-inline void
+static inline void
 bucket_buffer_destroy(
   const Bucket_Buffer handle
 ) {
   Bucket_Buffer_Internal *internal = handle.internal;
   for (u64 i = 0; i < dyn_array_length(internal->buckets); ++i) {
-    allocator_deallocate(internal->allocator, dyn_array_get(internal->buckets, i)->memory);
+    allocator_deallocate(
+      internal->allocator,
+      dyn_array_get(internal->buckets, i)->memory,
+      dyn_array_get(internal->buckets, i)->capacity
+    );
   }
-  allocator_deallocate(internal->allocator, internal);
+  allocator_deallocate(internal->allocator, internal, sizeof(Bucket_Buffer_Internal));
 }
 
-inline void *
+static inline void *
 bucket_buffer_allocate_bytes(
   const Bucket_Buffer handle,
   u64 byte_size,
@@ -2580,7 +2680,7 @@ bucket_buffer_allocate_bytes(
 #define bucket_buffer_allocate_unaligned(_buffer_, _type_)\
   ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
-inline Slice
+static inline Slice
 bucket_buffer_append_slice(
   const Bucket_Buffer handle,
   Slice slice
@@ -2589,10 +2689,10 @@ bucket_buffer_append_slice(
   if (!slice.length) return result;;
   s8 *bytes = bucket_buffer_allocate_bytes(handle, slice.length, 1);
   memcpy(bytes, slice.bytes, slice.length);
-  return (Slice){.bytes = bytes, .length = slice.length};
+  return (Slice){.bytes = (char *)bytes, .length = slice.length};
 }
 
-inline u64
+static inline u64
 bucket_buffer_total_occupied(
   const Bucket_Buffer handle
 ) {
@@ -2620,7 +2720,7 @@ bucket_buffer_to_fixed_buffer(
   return result;
 }
 
-inline void *
+static inline void *
 bucket_buffer_allocator_allocate(
   Allocator_Handle handle,
   u64 size_in_bytes,
@@ -2633,15 +2733,16 @@ bucket_buffer_allocator_allocate(
   );
 }
 
-inline void
+static inline void
 bucket_buffer_allocator_deallocate(
   Allocator_Handle handle,
-  void *address
+  void *address,
+  u64 size_in_bytes
 ) {
   // noop
 }
 
-inline void *
+static inline void *
 bucket_buffer_allocator_reallocate(
   Allocator_Handle handle,
   void *address,
@@ -2651,11 +2752,11 @@ bucket_buffer_allocator_reallocate(
 ) {
   void *result = bucket_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
-  bucket_buffer_allocator_deallocate(handle, address);
+  bucket_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
   return result;
 }
 
-inline Allocator *
+static inline Allocator *
 bucket_buffer_allocator_init(
   const Bucket_Buffer buffer,
   Allocator *allocator
@@ -2669,7 +2770,7 @@ bucket_buffer_allocator_init(
   return allocator;
 }
 
-inline Allocator *
+static inline Allocator *
 bucket_buffer_allocator_make(
   const Bucket_Buffer buffer
 ) {
@@ -2684,7 +2785,7 @@ bucket_buffer_allocator_make(
 // Hash
 //////////////////////////////////////////////////////////////////////////////
 
-inline s32
+static inline s32
 hash_u64(
   u64 value
 ) {
@@ -2692,7 +2793,7 @@ hash_u64(
   return (s32)(value * prime);
 }
 
-inline s32
+static inline s32
 hash_pointer(
   void *address
 ) {
@@ -2701,7 +2802,7 @@ hash_pointer(
 
 static const s32 hash_byte_start = 7;
 
-inline s32
+static inline s32
 hash_byte(
   s32 previous,
   s8 byte
@@ -2721,7 +2822,7 @@ hash_bytes(
   return hash;
 }
 
-inline s32
+static inline s32
 hash_slice(
   Slice slice
 ) {
@@ -2781,7 +2882,7 @@ typedef struct {
 
 hash_map_type_internal(Hash_Map_Internal, void *, void *)
 
-static u64
+u64
 hash_map_get_insert_index_internal(
   Hash_Map_Internal *map,
   u64 entry_byte_size,
@@ -2804,6 +2905,7 @@ hash_map_resize(
   u64 entry_byte_size
 ) {
   u64 previous_capacity = map->capacity;
+  u64 previous_byte_size = entry_byte_size * map->capacity;
   map->capacity_power_of_2++;
   map->capacity = 1llu << map->capacity_power_of_2;
   map->occupied = 0;
@@ -2825,7 +2927,7 @@ hash_map_resize(
       memcpy(new_entry, old_entry, entry_byte_size);
     }
   }
-  allocator_deallocate(map->allocator, entries);
+  allocator_deallocate(map->allocator, entries, previous_byte_size);
 }
 
 #define hash_map_template(_hash_map_type_, _key_type_, _value_type_, _key_hash_fn_, _key_equality_fn_)\
@@ -2900,7 +3002,7 @@ hash_map_resize(
     _key_type_ key\
   ) {\
     _hash_map_type_##__Entry *entry = _hash_map_type_##__get_by_hash_internal(map, hash, key);\
-    if (entry) memset(entry, 0, sizeof(entry));\
+    if (entry) memset(entry, 0, sizeof(*entry));\
   }\
   \
   static inline void\
@@ -2960,12 +3062,18 @@ hash_map_resize(
 #define hash_map_make(_hash_map_type_)\
   _hash_map_type_##__make(allocator_default)
 
+static inline void
+hash_map_destroy_internal(
+  Hash_Map_Internal *internal,
+  u64 entry_byte_size
+) {
+  u64 entry_array_byte_size = entry_byte_size * internal->capacity;
+  allocator_deallocate(internal->allocator, internal->entries, entry_array_byte_size);
+  allocator_deallocate(internal->allocator, internal, sizeof(Hash_Map_Internal));
+}
+
 #define hash_map_destroy(_map_)\
-  do {\
-    Hash_Map_Internal *internal = (void *)(_map_);\
-    allocator_deallocate(internal->allocator, internal->entries);\
-    allocator_deallocate(internal->allocator, internal);\
-  } while(0)
+  hash_map_destroy_internal((void *)(_map_), sizeof((_map_)->entries[0]))
 
 #define hash_map_get(_map_, _key_)\
   (_map_)->methods->get((_map_), (_key_))
@@ -3013,15 +3121,20 @@ thread_make_win32_wrapper_proc(
 ) {
   Thread_Proc proc = raw_proc_and_data->proc;
   void *data = raw_proc_and_data->data;
-  allocator_deallocate(allocator_system, raw_proc_and_data);
+  allocator_deallocate(
+    allocator_default, raw_proc_and_data, sizeof(struct Win32_Thread_Proc_And_Data)
+  );
   proc(data);
   ExitThread(0);
 }
 
 Thread
-thread_make(Thread_Proc proc, void *data) {
+thread_make(
+  Thread_Proc proc,
+  void *data
+) {
   struct Win32_Thread_Proc_And_Data *proc_and_data =
-    allocator_allocate(allocator_system, struct Win32_Thread_Proc_And_Data);
+    allocator_allocate(allocator_default, struct Win32_Thread_Proc_And_Data);
   proc_and_data->proc = proc;
   proc_and_data->data = data;
   HANDLE handle = CreateThread(0, 0, thread_make_win32_wrapper_proc, proc_and_data, 0, &(DWORD){0});
@@ -3029,11 +3142,36 @@ thread_make(Thread_Proc proc, void *data) {
 }
 
 void
-thread_join(Thread thread) {
+thread_join(
+  Thread thread
+) {
   WaitForSingleObject(thread.native_handle, INFINITE);
 }
-#else
-static_assert(false, TODO_implement_thread_wrappers)
+
+#else // POSIX
+
+#include <pthread.h>
+
+typedef void *(*Thread_Pthread_Proc)(void *);
+Thread
+thread_make(
+  Thread_Proc proc,
+  void *data
+) {
+  pthread_t handle;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+  int result = pthread_create(&handle, &attr, (Thread_Pthread_Proc)proc, data);
+  pthread_attr_destroy(&attr);
+  return (Thread){.native_handle = handle};
+}
+
+void
+thread_join(Thread thread) {
+  pthread_join(thread.native_handle, 0);
+}
+static_assert(sizeof(pthread_t) <= sizeof(Thread), TODO_implement_thread_wrappers);
 #endif
 
 ////////////////////////////////////////////////////////////////////
@@ -3076,4 +3214,4 @@ typedef dyn_array_type(Prelude_Allocation_Info) Array_Prelude_Allocation_Info;
   }
 #endif
 
-#endif PRELUDE_H
+#endif
