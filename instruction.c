@@ -255,45 +255,54 @@ mnemonic(jmp,
   encoding(0xE9, none, imm32),
 );
 
-// TODO add all Jcc mnemonic
-mnemonic(jnz,
-  encoding(0x75, none, imm8),
-  encoding(0x0F85, none, imm32),
-);
+#define ENUMERATE_CC(process)\
+ process(0x0, o)\
+ process(0x1, no)\
+ process(0x2, b)\
+ process(0x2, c)\
+ process(0x2, nae)\
+ process(0x3, ae)\
+ process(0x3, nb)\
+ process(0x3, nc)\
+ process(0x4, e)\
+ process(0x4, z)\
+ process(0x5, ne)\
+ process(0x5, nz)\
+ process(0x6, be)\
+ process(0x6, na)\
+ process(0x7, a)\
+ process(0x7, nbe)\
+ process(0x8, s)\
+ process(0x9, ns)\
+ process(0xA, p)\
+ process(0xA, pe)\
+ process(0xB, np)\
+ process(0xB, po)\
+ process(0xC, l)\
+ process(0xC, nge)\
+ process(0xD, ge)\
+ process(0xD, nl)\
+ process(0xE, le)\
+ process(0xE, ng)\
+ process(0xF, g)\
+ process(0xF, nle)
 
-mnemonic(jz,
-  encoding(0x74, none, imm8),
-  encoding(0x0F84, none, imm32),
-);
+#define jcc(_value_, _suffix_)\
+  mnemonic(j##_suffix_,\
+    encoding(0x70 + (_value_), none, imm8),\
+    encoding(0x0F80 + (_value_), none, imm32),\
+  );
+ENUMERATE_CC(jcc)
+#undef jcc
 
-// TODO add all SETcc mnemonic
-mnemonic(sete,
-  encoding(0x0F94, none, r_m8),
-);
+#define setcc(_value_, _suffix_)\
+  mnemonic(set##_suffix_,\
+    encoding(0x0F90 + (_value_), none, r_m8),\
+  );
+ENUMERATE_CC(setcc)
+#undef setcc
 
-mnemonic(setz,
-  encoding(0x0F94, none, r_m8),
-);
-
-mnemonic(setne,
-  encoding(0x0F95, none, r_m8)
-);
-
-mnemonic(setl,
-  encoding(0x0F9C, none, r_m8),
-);
-
-mnemonic(setg,
-  encoding(0x0F9F, none, r_m8),
-);
-
-mnemonic(setle,
-  encoding(0x0F9E, none, r_m8),
-);
-
-mnemonic(setge,
-  encoding(0x0F9D, none, r_m8),
-);
+#undef ENUMERATE_CC
 
 #undef none
 #undef _r
