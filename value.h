@@ -379,10 +379,17 @@ typedef struct {
 } Compiler_Source_Location;
 
 typedef struct {
+  Slice filename;
+  u64 line;
+  u64 column;
+} Source_Location;
+
+typedef struct {
   X64_Mnemonic mnemonic;
   Operand operands[3];
   Label *maybe_label;
   const Compiler_Source_Location *compiler_source_location;
+  const Source_Location *source_location;
 } Instruction;
 typedef dyn_array_type(Instruction) Array_Instruction;
 
@@ -444,13 +451,6 @@ typedef struct {
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct Scope Scope;
-
-
-typedef struct {
-  Slice filename;
-  u64 line;
-  u64 column;
-} Source_Location;
 
 typedef struct {
   Slice message;

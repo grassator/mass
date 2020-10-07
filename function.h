@@ -13,26 +13,29 @@ reserve_stack(
 inline void
 push_instruction_internal(
   const Compiler_Source_Location *compiler_source_location,
+  const Source_Location *source_location,
   Array_Instruction *instructions,
   Instruction instruction
 ) {
   instruction.compiler_source_location = compiler_source_location;
+  instruction.source_location = source_location;
   dyn_array_push(*instructions, instruction);
 }
 
-#define push_instruction(_array_ptr_, ...)\
+#define push_instruction(_array_ptr_, _location_, ...)\
   {\
-    static const Compiler_Source_Location location_ = {\
+    static const Compiler_Source_Location compiler_location_ = {\
       .filename = __FILE__,\
       .function_name = __func__,\
       .line_number = __LINE__,\
     };\
-    push_instruction_internal(&location_, _array_ptr_, __VA_ARGS__);\
+    push_instruction_internal(&compiler_location_, (_location_), (_array_ptr_), __VA_ARGS__);\
   }
 
 void
 move_value(
   Array_Instruction *instructions,
+  const Source_Location *location,
   Value *a,
   Value *b
 );
@@ -71,12 +74,15 @@ typedef enum {
 void
 fn_return(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *to_return,
   Function_Return_Type return_type
 );
 
-Label *make_if(
+Label *
+make_if(
   Array_Instruction *instructions,
+  const Source_Location *location,
   Value *value
 );
 
@@ -99,18 +105,21 @@ typedef struct {
 
 Loop_Builder
 loop_start(
-  Array_Instruction *instructions
+  Array_Instruction *instructions,
+  const Source_Location *location
 );
 
 void
 loop_end(
   Array_Instruction *instructions,
+  const Source_Location *location,
   Loop_Builder *loop
 );
 
 void
 plus(
   Array_Instruction *instructions,
+  const Source_Location *location,
   Value *result_value,
   Value *a,
   Value *b
@@ -119,6 +128,7 @@ plus(
 void
 minus(
   Array_Instruction *instructions,
+  const Source_Location *location,
   Value *result_value,
   Value *a,
   Value *b
@@ -127,6 +137,7 @@ minus(
 Value *
 multiply(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *x,
   Value *y
 );
@@ -134,6 +145,7 @@ multiply(
 Value *
 divide(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *a,
   Value *b
 );
@@ -141,6 +153,7 @@ divide(
 Value *
 remainder(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *a,
   Value *b
 );
@@ -154,8 +167,9 @@ typedef enum {
 
 Value *
 compare(
-  Function_Builder *builder,
   Compare operation,
+  Function_Builder *builder,
+  const Source_Location *location,
   Value *a,
   Value *b
 );
@@ -163,12 +177,14 @@ compare(
 Value *
 value_pointer_to(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *value
 );
 
 Value *
 call_function_value_array(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *to_call,
   Array_Value_Ptr arguments
 );
@@ -176,6 +192,7 @@ call_function_value_array(
 Value *
 call_function_value(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *to_call,
   ...
 );
@@ -183,6 +200,7 @@ call_function_value(
 Value *
 make_and(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *a,
   Value *b
 );
@@ -190,6 +208,7 @@ make_and(
 Value *
 make_or(
   Function_Builder *builder,
+  const Source_Location *location,
   Value *a,
   Value *b
 );

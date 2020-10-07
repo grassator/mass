@@ -8,6 +8,11 @@
 
 spec("function") {
   static Array_Instruction instructions = {0};
+  static Source_Location test_location = {
+    .filename = slice_literal_fields(__FILE__),
+    .line = 0,
+    .column = 0,
+  };
 
   before() {
     instructions = dyn_array_make(Array_Instruction);
@@ -26,19 +31,19 @@ spec("function") {
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      move_value(&instructions, reg_a, reg_a);
+      move_value(&instructions, &test_location, reg_a, reg_a);
       check(dyn_array_length(instructions) == 0);
     }
     it("should not add any instructions when moving value to itself (value equality)") {
       Value *reg_a1 = value_register_for_descriptor(Register_A, &descriptor_s8);
       Value *reg_a2 = value_register_for_descriptor(Register_A, &descriptor_s8);
-      move_value(&instructions, reg_a1, reg_a2);
+      move_value(&instructions, &test_location, reg_a1, reg_a2);
       check(dyn_array_length(instructions) == 0);
     }
     it("should set the descriptor of `source` type if `target` is Any but still copy") {
       Value *reg_a = &(Value){ .descriptor = &descriptor_any, .operand = al };
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
-      move_value(&instructions, reg_a, reg_b);
+      move_value(&instructions, &test_location, reg_a, reg_b);
       check(reg_a->descriptor == reg_b->descriptor);
       check(dyn_array_length(instructions) == 1);
     }
@@ -48,7 +53,7 @@ spec("function") {
         .operand = { .type = Operand_Type_Any },
       };
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
-      move_value(&instructions, reg_a, reg_b);
+      move_value(&instructions, &test_location, reg_a, reg_b);
       check(operand_equal(&reg_a->operand, &reg_b->operand));
       check(dyn_array_length(instructions) == 0);
     }
@@ -56,7 +61,7 @@ spec("function") {
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      plus(&instructions, reg_a, value_from_s8(30), value_from_s8(12));
+      plus(&instructions, &test_location, reg_a, value_from_s8(30), value_from_s8(12));
       check(dyn_array_length(instructions) == 1);
       Instruction *instruction = dyn_array_get(instructions, 0);
       check(instruction_equal(
@@ -68,7 +73,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      plus(&instructions, reg_a, reg_b, reg_c);
+      plus(&instructions, &test_location, reg_a, reg_b, reg_c);
       check(dyn_array_length(instructions) == 2);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){mov, reg_a->operand, reg_b->operand}
@@ -81,7 +86,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      plus(&instructions, reg_a, reg_a, reg_b);
+      plus(&instructions, &test_location, reg_a, reg_a, reg_b);
       check(dyn_array_length(instructions) == 1);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){add, reg_a->operand, reg_b->operand}
@@ -91,7 +96,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      plus(&instructions, reg_b, reg_a, reg_b);
+      plus(&instructions, &test_location, reg_b, reg_a, reg_b);
       check(dyn_array_length(instructions) == 1);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){add, reg_b->operand, reg_a->operand}
@@ -102,7 +107,7 @@ spec("function") {
       Value *m_a = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m_b = &(Value){&descriptor_s32, stack(4, 4)};
 
-      plus(&instructions, m_a, m_a, m_b);
+      plus(&instructions, &test_location, m_a, m_a, m_b);
       check(dyn_array_length(instructions) == 3);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){mov, reg_r11->operand, m_a->operand}
@@ -118,7 +123,7 @@ spec("function") {
   describe("minus") {
     it("should fold s8 immediates and move them to the result value") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      minus(&instructions, reg_a, value_from_s8(52), value_from_s8(10));
+      minus(&instructions, &test_location, reg_a, value_from_s8(52), value_from_s8(10));
       check(dyn_array_length(instructions) == 1);
       Instruction *instruction = dyn_array_get(instructions, 0);
       check(instruction_equal(
@@ -130,7 +135,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      minus(&instructions, reg_a, reg_b, reg_c);
+      minus(&instructions, &test_location, reg_a, reg_b, reg_c);
       check(dyn_array_length(instructions) == 2);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){mov, reg_a->operand, reg_b->operand}
@@ -143,7 +148,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      minus(&instructions, reg_a, reg_a, reg_b);
+      minus(&instructions, &test_location, reg_a, reg_a, reg_b);
       check(dyn_array_length(instructions) == 1);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){sub, reg_a->operand, reg_b->operand}
@@ -154,7 +159,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      minus(&instructions, reg_c, reg_b, reg_c);
+      minus(&instructions, &test_location, reg_c, reg_b, reg_c);
       check(dyn_array_length(instructions) == 3);
       check(instruction_equal(
         dyn_array_get(instructions, 0), &(Instruction){mov, reg_r11->operand, reg_b->operand}

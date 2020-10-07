@@ -853,7 +853,7 @@ token_force_value(
     case Token_Type_String: {
       Slice string = token_string_to_slice(token);
       Value *string_bytes = value_global_c_string_from_slice(builder->program, string);
-      return value_pointer_to(builder, string_bytes);
+      return value_pointer_to(builder, &token->location, string_bytes);
     }
     case Token_Type_Id: {
       return scope_lookup_force(scope, token->source, builder);
@@ -919,7 +919,7 @@ token_match_call_arguments(
       Value *value = token_match_expression(builder->program, state, scope, builder, result_value);
       // FIXME Hack for :TargetValue
       if (value->descriptor->type != Descriptor_Type_Void) {
-        move_value(&builder->instructions, result_value, value);
+        move_value(&builder->instructions, &token->location, result_value, value);
       }
       dyn_array_push(result, result_value);
     }
@@ -1275,9 +1275,11 @@ token_rewrite_statement_if(
 
   Value *value = token_force_value(condition, scope, builder, target);
   if (value) {
-    Label *else_label = make_if(&builder->instructions, value);
+    Label *else_label = make_if(&builder->instructions, &keyword->location, value);
     (void)token_parse_block(body->children, scope, builder, target);
-    push_instruction(&builder->instructions, (Instruction) {.maybe_label = else_label});
+    push_instruction(
+      &builder->instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
+    );
   }
 
   token_replace_tokens_in_state(state, 3, 0);
@@ -1300,7 +1302,9 @@ token_rewrite_goto(
       value->descriptor->type == Descriptor_Type_Void &&
       value->operand.type == Operand_Type_Label_32
     ) {
-      push_instruction(&builder->instructions, (Instruction) {jmp, {value->operand, 0, 0}});
+      push_instruction(
+        &builder->instructions, &keyword->location, (Instruction) {jmp, {value->operand, 0, 0}}
+      );
     } else {
       program_error_builder(builder->program, label_name->location) {
         program_error_append_slice(label_name->source);
@@ -1325,7 +1329,7 @@ token_rewrite_explicit_return(
   Token_Match(to_return, 0);
   Token_Match_End();
   Value *result = token_force_value(to_return, scope, builder, target);
-  fn_return(builder, result, Function_Return_Type_Explicit);
+  fn_return(builder, &keyword->location, result, Function_Return_Type_Explicit);
 
   token_replace_tokens_in_state(state, 2, 0);
   return true;
@@ -1365,10 +1369,12 @@ token_rewrite_pointer_to(
   Value *target
 ) {
   u64 peek_index = 0;
-  Token_Match_Operator(define, "&");
+  Token_Match_Operator(operator, "&");
   Token_Match(value_token, 0);
 
-  Value *result = value_pointer_to(builder, token_force_value(value_token, scope, builder, target));
+  Value *result = value_pointer_to(
+    builder, &operator->location, token_force_value(value_token, scope, builder, target)
+  );
   token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
   return true;
 }
@@ -1453,7 +1459,7 @@ token_rewrite_cast(
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       result = reserve_stack(builder, cast_to_descriptor);
-      move_value(&builder->instructions, result, value);
+      move_value(&builder->instructions, &cast->location, result, value);
     }
   }
 
@@ -1495,7 +1501,9 @@ token_rewrite_definitions(
   Label *label = token_match_label(&rest_state, scope, builder);
   Value *value = 0;
   if (label) {
-    push_instruction(&builder->instructions, (Instruction) { .maybe_label = label });
+    push_instruction(
+      &builder->instructions, &name->location, (Instruction) { .maybe_label = label }
+    );
     value = temp_allocate(Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -1524,7 +1532,7 @@ token_rewrite_definition_and_assignment_statements(
   Token_Match(token_value, 0);
   Value *value = token_force_value(token_value, scope, builder, target);
   Value *on_stack = reserve_stack(builder, value->descriptor);
-  move_value(&builder->instructions, on_stack, value);
+  move_value(&builder->instructions, &name->location, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
 
   // FIXME definition should rewrite with a token so that we can do proper
@@ -1582,8 +1590,9 @@ token_rewrite_array_index(
     } else if (item_byte_size == 8) {
       scale = SIB_Scale_8;
     }
-    Value *index_value_in_register =
-      ensure_register(&builder->instructions, index_value, Register_R10);
+    Value *index_value_in_register = ensure_register(
+      &builder->instructions, &target_token->location, index_value, Register_R10
+    );
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
@@ -1672,9 +1681,11 @@ token_rewrite_assignment(
   state->start_index = 0;
   u64 lhs_end = 0;
   u64 rhs_start = 0;
+  Token *token_equals = 0;
   for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
     Token *token = *dyn_array_get(state->tokens, i);
     if (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal("="))) {
+      token_equals = token;
       lhs_end = i;
       rhs_start = i + 1;
       break;
@@ -1704,10 +1715,10 @@ token_rewrite_assignment(
 
   Range_u64 rhs_range = { rhs_start, dyn_array_length(state->tokens) };
   Token_Matcher_State rhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, rhs_range)};
-  Value *value =  token_match_expression(builder->program, &rhs_state, scope, builder, target);
+  Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, target);
   // FIXME hack for :TargetValue
   if (value->descriptor->type != Descriptor_Type_Void) {
-    move_value(&builder->instructions, target, value);
+    move_value(&builder->instructions, &token_equals->location, target, value);
   }
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
@@ -1729,7 +1740,7 @@ token_rewrite_function_calls(
   Value *target = token_force_value(target_token, scope, builder, result_value);
   Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder);
 
-  Value *return_value = call_function_value_array(builder, target, args);
+  Value *return_value = call_function_value_array(builder, &target_token->location, target, args);
   token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
   return true;
 }
@@ -1748,9 +1759,8 @@ token_rewrite_plus(
 
   Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
   Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
-  //Value *temp = reserve_stack(builder, lhs_value->descriptor);
   Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  plus(&builder->instructions, temp, lhs_value, rhs_value);
+  plus(&builder->instructions, &op_token->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
   return true;
 }
@@ -1770,7 +1780,7 @@ token_rewrite_minus(
   Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
   Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
   Value *temp = reserve_stack(builder, lhs_value->descriptor);
-  minus(&builder->instructions, temp, lhs_value, rhs_value);
+  minus(&builder->instructions, &op_token->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
   return true;
 }
@@ -1790,6 +1800,7 @@ token_rewrite_divide(
 
   Value *value = divide(
     builder,
+    &operator->location,
     token_force_value(lhs, scope, builder, result_value),
     token_force_value(rhs, scope, builder, result_value)
   );
@@ -1811,6 +1822,32 @@ token_rewrite_remainder(
 
   Value *value = remainder(
     builder,
+    &operator->location,
+    token_force_value(lhs, scope, builder, result_value),
+    token_force_value(rhs, scope, builder, result_value)
+  );
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  return true;
+}
+
+bool
+token_rewrite_compare(
+  Compare compare_type,
+  Slice operator_slice,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  Value *result_value
+) {
+  u64 peek_index = 0;
+  Token_Match(lhs, 0);
+  Token_Match(operator, .type = Token_Type_Operator, .source = operator_slice);
+  Token_Match(rhs, 0);
+
+  Value *value = compare(
+    compare_type,
+    builder,
+    &operator->location,
     token_force_value(lhs, scope, builder, result_value),
     token_force_value(rhs, scope, builder, result_value)
   );
@@ -1825,18 +1862,9 @@ token_rewrite_equals(
   Function_Builder *builder,
   Value *result_value
 ) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(plus_token, "==");
-  Token_Match(rhs, 0);
-
-  Value *value = compare(
-    builder, Compare_Equal,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
+  return token_rewrite_compare(
+    Compare_Equal, slice_literal("=="), state, scope, builder, result_value
   );
-  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
-  return true;
 }
 
 bool
@@ -1846,18 +1874,9 @@ token_rewrite_less_than(
   Function_Builder *builder,
   Value *result_value
 ) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(plus_token, "<");
-  Token_Match(rhs, 0);
-
-  Value *value = compare(
-    builder, Compare_Less,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
+  return token_rewrite_compare(
+    Compare_Less, slice_literal("<"), state, scope, builder, result_value
   );
-  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
-  return true;
 }
 
 bool
@@ -1867,18 +1886,9 @@ token_rewrite_greater_than(
   Function_Builder *builder,
   Value *result_value
 ) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(plus_token, ">");
-  Token_Match(rhs, 0);
-
-  Value *value = compare(
-    builder, Compare_Greater,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
+  return token_rewrite_compare(
+    Compare_Greater, slice_literal(">"), state, scope, builder, result_value
   );
-  token_replace_tokens_in_state(state, 3, token_value_make(plus_token, value));
-  return true;
 }
 
 bool
@@ -2028,7 +2038,8 @@ token_force_lazy_function_definition(
   Value *body_result =
     token_parse_block(body->children, function_scope, builder, descriptor->function.returns);
   if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
-    fn_return(builder, body_result, Function_Return_Type_Implicit);
+    // TODO Consider if we can get better location here, maybe end of body?
+    fn_return(builder, &return_types->location, body_result, Function_Return_Type_Implicit);
   }
 
   fn_end(builder);
