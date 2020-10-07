@@ -12,14 +12,23 @@ reserve_stack(
 
 inline void
 push_instruction_internal(
-  const char *filename,
-  u32 line_number,
+  const Compiler_Source_Location *compiler_source_location,
   Array_Instruction *instructions,
   Instruction instruction
-);
+) {
+  instruction.compiler_source_location = compiler_source_location;
+  dyn_array_push(*instructions, instruction);
+}
 
 #define push_instruction(_array_ptr_, ...)\
-  push_instruction_internal(__FILE__, __LINE__, _array_ptr_, __VA_ARGS__)
+  {\
+    static const Compiler_Source_Location location_ = {\
+      .filename = __FILE__,\
+      .function_name = __func__,\
+      .line_number = __LINE__,\
+    };\
+    push_instruction_internal(&location_, _array_ptr_, __VA_ARGS__);\
+  }
 
 void
 move_value(

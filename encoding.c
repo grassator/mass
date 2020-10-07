@@ -426,7 +426,13 @@ encode_instruction(
     }
     return;
   }
-  printf("at %s:%u\n", instruction.filename, instruction.line_number);
+  const Compiler_Source_Location *location = instruction.compiler_source_location;
+  printf(
+    "Added in compiler at %s:%u (fn: %s)\n",
+    location->filename,
+    location->line_number,
+    location->function_name
+  );
   printf("%s", instruction.mnemonic.name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction.operands[operand_index];

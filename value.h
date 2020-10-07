@@ -373,11 +373,16 @@ typedef struct {
 } X64_Mnemonic;
 
 typedef struct {
+  const char *filename;
+  const char *function_name;
+  u32 line_number;
+} Compiler_Source_Location;
+
+typedef struct {
   X64_Mnemonic mnemonic;
   Operand operands[3];
   Label *maybe_label;
-  const char *filename;
-  u32 line_number;
+  const Compiler_Source_Location *compiler_source_location;
 } Instruction;
 typedef dyn_array_type(Instruction) Array_Instruction;
 

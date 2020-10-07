@@ -17,18 +17,6 @@ reserve_stack(
   return result;
 }
 
-inline void
-push_instruction_internal(
-  const char *filename,
-  u32 line_number,
-  Array_Instruction *instructions,
-  Instruction instruction
-) {
-  instruction.filename = filename;
-  instruction.line_number = line_number;
-  dyn_array_push(*instructions, instruction);
-}
-
 
 Value *
 ensure_register_or_memory(
