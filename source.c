@@ -185,8 +185,8 @@ tokenize(
   Slice filename,
   Slice source
 ) {
+  Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
   Token *root = temp_allocate(Token);
-  root->parent = 0;
   root->type = Token_Type_Module;
   root->children = dyn_array_make(Array_Token_Ptr);
   root->source = source;
@@ -202,7 +202,6 @@ tokenize(
     current_token = temp_allocate(Token);\
     *current_token = (Token) {\
       .type = (_type_),\
-      .parent = parent,\
       .source = {\
         .bytes = &source.bytes[i],\
         .length = 1,\
@@ -281,6 +280,7 @@ tokenize(
           start_token(type);
           current_token->children = dyn_array_make(Array_Token_Ptr, 4);
           dyn_array_push(parent->children, current_token);
+          dyn_array_push(parent_stack, parent);
           parent = current_token;
         } else if (ch == ')' || ch == '}' || ch == ']') {
           s8 expected_paren = 0;
@@ -315,12 +315,12 @@ tokenize(
             goto end;
           }
           parent->source.length = &source.bytes[i] - parent->source.bytes + 1;
-          parent = parent->parent;
-          current_token = 0;
-          if (!parent) {
+          if (!dyn_array_length(parent_stack)) {
             push_error("Encountered a closing brace without a matching open one");
             goto end;
           }
+          parent = *dyn_array_pop(parent_stack);
+          current_token = 0;
         } else {
           push_error("Unpexpected input");
           goto end;
@@ -386,6 +386,7 @@ tokenize(
 #undef push_error
 #undef start_token
 #undef push_and_retry
+  dyn_array_destroy(parent_stack);
   if (dyn_array_length(errors)) {
     return (Tokenizer_Result){.type = Tokenizer_Result_Type_Error, .errors = errors};
   }
@@ -934,7 +935,6 @@ token_value_make(
   Token *result_token = temp_allocate(Token);
   *result_token = (Token){
     .type = Token_Type_Value,
-    .parent = original->parent,
     .source = original->source, // TODO should encompass the whole sub-expression
     .value = result,
   };
@@ -969,7 +969,6 @@ token_rewrite_functions_pattern_callback(
   Token *result_token = temp_allocate(Token);
   *result_token = (Token) {
     .type = Token_Type_Lazy_Function_Definition,
-    .parent = body->parent,
     .source = body->source,
     .lazy_function_definition = {
       .args = args,

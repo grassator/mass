@@ -76,7 +76,6 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
-    check(root->parent == 0);
     check(root->type == Token_Type_Module);
     check(dyn_array_length(root->children) == 0);
   }
@@ -87,7 +86,6 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
-    check(root->parent == 0);
     check(root->type == Token_Type_Module);
     check(dyn_array_length(root->children) == 0);
   }
@@ -98,7 +96,6 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
-    check(root->parent == 0);
     check(root->type == Token_Type_Module);
     check(dyn_array_length(root->children) == 1);
     Token *newline = *dyn_array_get(root->children, 0);

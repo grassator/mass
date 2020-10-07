@@ -28,7 +28,6 @@ typedef struct {
 } Lazy_Function_Definition;
 
 typedef struct Token {
-  struct Token *parent;
   Token_Type type;
   Slice source;
   Source_Location location;
