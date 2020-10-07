@@ -433,7 +433,7 @@ spec("source") {
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
         "sum = 0;"
-        "while (x > 0) {"
+        "while (x >= 0) {"
           "sum = sum + x;"
           "x = x + (-1);"
         "};"

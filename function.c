@@ -695,7 +695,7 @@ remainder(
 
 Value *
 compare(
-  Compare operation,
+  Compare_Type operation,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,
@@ -705,20 +705,28 @@ compare(
   assert(b->descriptor->type == Descriptor_Type_Integer);
 
   switch(operation) {
-    case Compare_Equal: {
+    case Compare_Type_Equal: {
       maybe_constant_fold(a, b, ==);
       break;
     }
-    case Compare_Not_Equal: {
+    case Compare_Type_Not_Equal: {
       maybe_constant_fold(a, b, !=);
       break;
     }
-    case Compare_Less: {
+    case Compare_Type_Less: {
       maybe_constant_fold(a, b, <);
       break;
     }
-    case Compare_Greater: {
+    case Compare_Type_Greater: {
       maybe_constant_fold(a, b, >);
+      break;
+    }
+    case Compare_Type_Less_Equal: {
+      maybe_constant_fold(a, b, <=);
+      break;
+    }
+    case Compare_Type_Greater_Equal: {
+      maybe_constant_fold(a, b, >=);
       break;
     }
     default: {
@@ -741,20 +749,28 @@ compare(
   Value *result = reserve_stack(builder, &descriptor_s8);
 
   switch(operation) {
-    case Compare_Equal: {
+    case Compare_Type_Equal: {
       push_instruction(&builder->instructions, location, (Instruction) {setz, {result->operand, 0, 0}});
       break;
     }
-    case Compare_Not_Equal: {
+    case Compare_Type_Not_Equal: {
       push_instruction(&builder->instructions, location, (Instruction) {setne, {result->operand, 0, 0}});
       break;
     }
-    case Compare_Less: {
+    case Compare_Type_Less: {
       push_instruction(&builder->instructions, location, (Instruction) {setl, {result->operand, 0, 0}});
       break;
     }
-    case Compare_Greater: {
+    case Compare_Type_Less_Equal: {
+      push_instruction(&builder->instructions, location, (Instruction) {setle, {result->operand, 0, 0}});
+      break;
+    }
+    case Compare_Type_Greater: {
       push_instruction(&builder->instructions, location, (Instruction) {setg, {result->operand, 0, 0}});
+      break;
+    }
+    case Compare_Type_Greater_Equal: {
+      push_instruction(&builder->instructions, location, (Instruction) {setge, {result->operand, 0, 0}});
       break;
     }
     default: {
@@ -944,7 +960,7 @@ make_and(
 
   Label *else_label = make_if(&builder->instructions, location, a);
   {
-    Value *rhs = compare(Compare_Not_Equal, builder, location, b, value_from_s8(0));
+    Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
     move_value(&builder->instructions, location, result, rhs);
     push_instruction(&builder->instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
@@ -966,10 +982,11 @@ make_or(
   Label *label = make_label();
 
   Label *else_label = make_if(
-    &builder->instructions, location, compare(Compare_Equal, builder, location, a, value_from_s8(0))
+    &builder->instructions, location,
+    compare(Compare_Type_Equal, builder, location, a, value_from_s8(0))
   );
   {
-    Value *rhs = compare(Compare_Not_Equal, builder, location, b, value_from_s8(0));
+    Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
     move_value(&builder->instructions, location, result, rhs);
     push_instruction(&builder->instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }

@@ -1832,8 +1832,6 @@ token_rewrite_remainder(
 
 bool
 token_rewrite_compare(
-  Compare compare_type,
-  Slice operator_slice,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -1841,7 +1839,40 @@ token_rewrite_compare(
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
-  Token_Match(operator, .type = Token_Type_Operator, .source = operator_slice);
+  Token_Match(operator, .type = Token_Type_Operator);
+  Compare_Type compare_type = 0;
+  switch(operator->source.length) {
+    case 1: {
+      s8 byte1 = operator->source.bytes[0];
+      if (byte1 == '<') {
+        compare_type = Compare_Type_Less;
+      } else if (byte1 == '>') {
+        compare_type = Compare_Type_Greater;
+      } else {
+        return 0;
+      }
+      break;
+    }
+    case 2: {
+      s8 byte1 = operator->source.bytes[0];
+      s8 byte2 = operator->source.bytes[1];
+      if (byte1 == '<' && byte2 == '=') {
+        compare_type = Compare_Type_Less_Equal;
+      } else if (byte1 == '>' && byte2 == '=') {
+        compare_type = Compare_Type_Greater_Equal;
+      } else if (byte1 == '=' && byte2 == '=') {
+        compare_type = Compare_Type_Equal;
+      } else if (byte1 == '!' && byte2 == '=') {
+        compare_type = Compare_Type_Equal;
+      } else {
+        return 0;
+      }
+      break;
+    }
+    default: {
+      return 0;
+    }
+  }
   Token_Match(rhs, 0);
 
   Value *value = compare(
@@ -1853,42 +1884,6 @@ token_rewrite_compare(
   );
   token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
   return true;
-}
-
-bool
-token_rewrite_equals(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  Value *result_value
-) {
-  return token_rewrite_compare(
-    Compare_Equal, slice_literal("=="), state, scope, builder, result_value
-  );
-}
-
-bool
-token_rewrite_less_than(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  Value *result_value
-) {
-  return token_rewrite_compare(
-    Compare_Less, slice_literal("<"), state, scope, builder, result_value
-  );
-}
-
-bool
-token_rewrite_greater_than(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  Value *result_value
-) {
-  return token_rewrite_compare(
-    Compare_Greater, slice_literal(">"), state, scope, builder, result_value
-  );
 }
 
 bool
@@ -1934,9 +1929,7 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_plus);
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_minus);
 
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_equals);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_less_than);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_greater_than);
+  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_compare);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_definition_and_assignment_statements);
   token_rewrite_statement(state, scope, builder, token_rewrite_definitions);

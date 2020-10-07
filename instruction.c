@@ -435,7 +435,7 @@ const X64_Mnemonic jz = {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// setz
+// sete
 ////////////////////////////////////////////////////////////////////////////////
 const Instruction_Encoding setz_encoding_list[] = {
   encoding(0x0F94, none, r_m8),
@@ -484,6 +484,30 @@ const Instruction_Encoding setg_encoding_list[] = {
 const X64_Mnemonic setg = {
   .name = "setg",
   .encoding_list = (const Instruction_Encoding *)setg_encoding_list,
+  .encoding_count = countof(setg_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// setle
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setle_encoding_list[] = {
+  encoding(0x0F9C, none, r_m8),
+};
+const X64_Mnemonic setle = {
+  .name = "setle",
+  .encoding_list = (const Instruction_Encoding *)setle_encoding_list,
+  .encoding_count = countof(setl_encoding_list),
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// setge
+////////////////////////////////////////////////////////////////////////////////
+const Instruction_Encoding setge_encoding_list[] = {
+  encoding(0x0F9D, none, r_m8),
+};
+const X64_Mnemonic setge = {
+  .name = "setge",
+  .encoding_list = (const Instruction_Encoding *)setge_encoding_list,
   .encoding_count = countof(setg_encoding_list),
 };
 

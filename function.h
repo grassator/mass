@@ -159,15 +159,17 @@ remainder(
 );
 
 typedef enum {
-  Compare_Equal = 1,
-  Compare_Not_Equal,
-  Compare_Less,
-  Compare_Greater,
-} Compare;
+  Compare_Type_Equal = 1,
+  Compare_Type_Not_Equal,
+  Compare_Type_Less,
+  Compare_Type_Less_Equal,
+  Compare_Type_Greater,
+  Compare_Type_Greater_Equal,
+} Compare_Type;
 
 Value *
 compare(
-  Compare operation,
+  Compare_Type operation,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,
