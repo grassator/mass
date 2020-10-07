@@ -53,10 +53,14 @@
     .operands = { encoding_operands(__VA_ARGS__) },\
   }
 
-////////////////////////////////////////////////////////////////////////////////
-// mov
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding mov_encoding_list[] = {
+#define mnemonic(_name_, ...)\
+  const X64_Mnemonic *_name_ = &(const X64_Mnemonic){\
+    .name = #_name_,\
+    .encoding_list = (const Instruction_Encoding[]){__VA_ARGS__},\
+    .encoding_count = countof((const Instruction_Encoding[]){__VA_ARGS__}),\
+  }
+
+mnemonic(mov,
   encoding(0x88, _r, r_m8, r8),
   encoding(0x89, _r, r_m16, r16),
   encoding(0x89, _r, r_m32, r32),
@@ -75,115 +79,46 @@ const Instruction_Encoding mov_encoding_list[] = {
 
   encoding(0xB8, plus_r, r16, imm16),
   encoding(0xB8, plus_r, r32, imm32),
-  encoding(0xB8, plus_r, r64, imm64),
-};
+  encoding(0xB8, plus_r, r64, imm64)
+);
 
-const X64_Mnemonic *mov = &(const X64_Mnemonic){
-  .name = "mov",
-  .encoding_list = (const Instruction_Encoding *)mov_encoding_list,
-  .encoding_count = countof(mov_encoding_list),
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-// movsx
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding movsx_encoding_list[] = {
+mnemonic(movsx,
   encoding(0x0FBE, _r, r16, r_m8),
   encoding(0x0FBE, _r, r32, r_m8),
   encoding(0x0FBE, _r, r64, r_m8),
   encoding(0x0FBF, _r, r32, r_m16),
   encoding(0x0FBF, _r, r64, r_m16),
-};
+);
 
-const X64_Mnemonic *movsx = &(const X64_Mnemonic){
-  .name = "movsx",
-  .encoding_list = (const Instruction_Encoding *)movsx_encoding_list,
-  .encoding_count = countof(movsx_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// movss
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding movss_encoding_list[] = {
+mnemonic(movss,
   encoding(0xF30F10, _r, xmm32, xmm_m32),
   encoding(0xF30F11, _r, xmm_m32, xmm32),
-};
+);
 
-const X64_Mnemonic *movss = &(const X64_Mnemonic){
-  .name = "movss",
-  .encoding_list = (const Instruction_Encoding *)movss_encoding_list,
-  .encoding_count = countof(movss_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// movsd
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding movsd_encoding_list[] = {
+mnemonic(movsd,
   encoding(0xF20F10, _r, xmm64, xmm_m64),
   encoding(0xF20F11, _r, xmm_m64, xmm64),
-};
+);
 
-const X64_Mnemonic *movsd = &(const X64_Mnemonic){
-  .name = "movss",
-  .encoding_list = (const Instruction_Encoding *)movsd_encoding_list,
-  .encoding_count = countof(movss_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// lea
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding lea_encoding_list[] = {
+mnemonic(lea,
   encoding(0x8d, _r, r64, m),
-};
-const X64_Mnemonic *lea = &(const X64_Mnemonic){
-  .name = "lea",
-  .encoding_list = (const Instruction_Encoding *)lea_encoding_list,
-  .encoding_count = countof(lea_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// int8
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding int3_encoding_list[] = {
+mnemonic(int3,
   encoding(0xCC, none, 0),
-};
-const X64_Mnemonic *int3 = &(const X64_Mnemonic){
-  .name = "int3",
-  .encoding_list = (const Instruction_Encoding *)int3_encoding_list,
-  .encoding_count = countof(int3_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// ret
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding ret_encoding_list[] = {
+mnemonic(ret,
   encoding(0xC3, none, 0),
-};
-const X64_Mnemonic *ret = &(const X64_Mnemonic){
-  .name = "ret",
-  .encoding_list = (const Instruction_Encoding *)ret_encoding_list,
-  .encoding_count = countof(ret_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// inc
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding inc_encoding_list[] = {
+mnemonic(inc,
   encoding(0xFF, _op_code(0), r_m16),
   encoding(0xFF, _op_code(0), r_m32),
   encoding(0xFF, _op_code(0), r_m64),
-};
-const X64_Mnemonic *inc = &(const X64_Mnemonic){
-  .name = "inc",
-  .encoding_list = (const Instruction_Encoding *)inc_encoding_list,
-  .encoding_count = countof(inc_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// xor
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding xor_encoding_list[] = {
+mnemonic(xor,
   encoding(0x34, none, r_al, imm8),
   encoding(0x35, none, r_ax, imm16),
   encoding(0x35, none, r_eax, imm32),
@@ -193,17 +128,9 @@ const Instruction_Encoding xor_encoding_list[] = {
   encoding(0x33, _r, r16, r_m16),
   encoding(0x33, _r, r32, r_m32),
   encoding(0x33, _r, r64, r_m64),
-};
-const X64_Mnemonic *xor = &(const X64_Mnemonic){
-  .name = "xor",
-  .encoding_list = (const Instruction_Encoding *)xor_encoding_list,
-  .encoding_count = countof(xor_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// add
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding add_encoding_list[] = {
+mnemonic(add,
   encoding(0x04, none, r_al, imm8),
   encoding(0x05, none, r_ax, imm16),
   encoding(0x05, none, r_eax, imm32),
@@ -227,30 +154,13 @@ const Instruction_Encoding add_encoding_list[] = {
   encoding(0x83, _op_code(0), r_m16, imm8),
   encoding(0x83, _op_code(0), r_m32, imm8),
   encoding(0x83, _op_code(0), r_m64, imm8),
-};
-const X64_Mnemonic *add = &(const X64_Mnemonic){
-  .name = "add",
-  .encoding_list = (const Instruction_Encoding *)add_encoding_list,
-  .encoding_count = countof(add_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// addss
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding addss_encoding_list[] = {
+mnemonic(addss,
   encoding(0xF30F58, _r, xmm32, xmm_m32),
-};
+);
 
-const X64_Mnemonic *addss = &(const X64_Mnemonic){
-  .name = "addss",
-  .encoding_list = (const Instruction_Encoding *)addss_encoding_list,
-  .encoding_count = countof(addss_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// sub
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding sub_encoding_list[] = {
+mnemonic(sub,
   encoding(0x2C, none, r_al, imm8),
   encoding(0x2D, none, r_ax, imm16),
   encoding(0x2D, none, r_eax, imm32),
@@ -274,17 +184,9 @@ const Instruction_Encoding sub_encoding_list[] = {
   encoding(0x83, _op_code(5), r_m16, imm8),
   encoding(0x83, _op_code(5), r_m32, imm8),
   encoding(0x83, _op_code(5), r_m64, imm8),
-};
-const X64_Mnemonic *sub = &(const X64_Mnemonic){
-  .name = "sub",
-  .encoding_list = (const Instruction_Encoding *)sub_encoding_list,
-  .encoding_count = countof(sub_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// imul
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding imul_encoding_list[] = {
+mnemonic(imul,
   encoding(0x0FAF, _r, r16, r_m16),
   encoding(0x0FAF, _r, r32, r_m32),
   encoding(0x0FAF, _r, r64, r_m64),
@@ -292,94 +194,41 @@ const Instruction_Encoding imul_encoding_list[] = {
   encoding(0x69, _r, r16, r_m16, imm16),
   encoding(0x69, _r, r32, r_m32, imm32),
   encoding(0x69, _r, r64, r_m64, imm32),
-};
-const X64_Mnemonic *imul = &(const X64_Mnemonic){
-  .name = "imul",
-  .encoding_list = (const Instruction_Encoding *)imul_encoding_list,
-  .encoding_count = countof(imul_encoding_list),
-};
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// idiv
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding idiv_encoding_list[] = {
+mnemonic(idiv,
   encoding(0xF6, _op_code(7), r_m8),
   encoding(0xF7, _op_code(7), r_m16),
   encoding(0xF7, _op_code(7), r_m32),
   encoding(0xF7, _op_code(7), r_m64),
-};
-const X64_Mnemonic *idiv = &(const X64_Mnemonic){
-  .name = "idiv",
-  .encoding_list = (const Instruction_Encoding *)idiv_encoding_list,
-  .encoding_count = countof(idiv_encoding_list),
-};
+);
 
-
-////////////////////////////////////////////////////////////////////////////////
-// cwb/cwd/cdq/cqo
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding cqo_encoding_list[] = {
-  encoding(0x4899, none, 0),
-};
-
-const X64_Mnemonic *cqo = &(const X64_Mnemonic){
-  .name = "cqo",
-  .encoding_list = (const Instruction_Encoding *)cqo_encoding_list,
-  .encoding_count = countof(cqo_encoding_list),
-};
-
-const Instruction_Encoding cdq_encoding_list[] = {
-  encoding(0x99, none, 0),
-};
-const X64_Mnemonic *cdq = &(const X64_Mnemonic){
-  .name = "cdq",
-  .encoding_list = (const Instruction_Encoding *)cdq_encoding_list,
-  .encoding_count = countof(cdq_encoding_list),
-};
-
-const Instruction_Encoding cwd_encoding_list[] = {
-  encoding(0x66, none, 0),
-};
-
-const X64_Mnemonic *cwd = &(const X64_Mnemonic){
-  .name = "cwd",
-  .encoding_list = (const Instruction_Encoding *)cwd_encoding_list,
-  .encoding_count = countof(cwd_encoding_list),
-};
-
-const Instruction_Encoding cwb_encoding_list[] = {
+mnemonic(cwb,
   encoding(0x98, none, 0),
-};
+);
 
-const X64_Mnemonic *cwb = &(const X64_Mnemonic){
-  .name = "cwb",
-  .encoding_list = (const Instruction_Encoding *)cwb_encoding_list,
-  .encoding_count = countof(cwb_encoding_list),
-};
+mnemonic(cwd,
+  encoding(0x6699, none, 0),
+);
 
+mnemonic(cdq,
+  encoding(0x99, none, 0),
+);
 
-////////////////////////////////////////////////////////////////////////////////
-// call
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding call_encoding_list[] = {
+mnemonic(cqo,
+  encoding(0x4899, none, 0),
+);
+
+mnemonic(call,
   encoding(0xE8, none, imm16),
   encoding(0xE8, none, imm32),
 
   encoding(0xFF, _op_code(2), r_m16),
   encoding(0xFF, _op_code(2), r_m32),
   encoding(0xFF, _op_code(2), r_m64),
-};
-const X64_Mnemonic *call = &(const X64_Mnemonic){
-  .name = "call",
-  .encoding_list = (const Instruction_Encoding *)call_encoding_list,
-  .encoding_count = countof(call_encoding_list),
-};
+);
 
-
-////////////////////////////////////////////////////////////////////////////////
-// cmp
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding cmp_encoding_list[] = {
+mnemonic(cmp,
   encoding(0x3C, none, r_al, imm8),
   encoding(0x3D, none, r_ax, imm16),
   encoding(0x3D, none, r_eax, imm32),
@@ -399,131 +248,52 @@ const Instruction_Encoding cmp_encoding_list[] = {
   encoding(0x3B, _r, r16, r_m16),
   encoding(0x3B, _r, r32, r_m32),
   encoding(0x3B, _r, r64, r_m64),
-};
-const X64_Mnemonic *cmp = &(const X64_Mnemonic){
-  .name = "cmp",
-  .encoding_list = (const Instruction_Encoding *)cmp_encoding_list,
-  .encoding_count = countof(cmp_encoding_list),
-};
+);
 
-
-////////////////////////////////////////////////////////////////////////////////
-// jnz
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding jnz_encoding_list[] = {
-  encoding(0x75, none, imm8),
-  encoding(0x0F85, none, imm32),
-};
-const X64_Mnemonic *jnz = &(const X64_Mnemonic){
-  .name = "jnz",
-  .encoding_list = (const Instruction_Encoding *)jnz_encoding_list,
-  .encoding_count = countof(jnz_encoding_list),
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-// jz
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding jz_encoding_list[] = {
-  encoding(0x0F84, none, imm32),
-};
-const X64_Mnemonic *jz = &(const X64_Mnemonic){
-  .name = "jz",
-  .encoding_list = (const Instruction_Encoding *)jz_encoding_list,
-  .encoding_count = countof(jz_encoding_list),
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-// sete
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setz_encoding_list[] = {
-  encoding(0x0F94, none, r_m8),
-};
-const X64_Mnemonic *setz = &(const X64_Mnemonic){
-  .name = "setz",
-  .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
-  .encoding_count = countof(setz_encoding_list),
-};
-const X64_Mnemonic *sete = &(const X64_Mnemonic){
-  .name = "sete",
-  .encoding_list = (const Instruction_Encoding *)setz_encoding_list,
-  .encoding_count = countof(setz_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// setne
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setne_encoding_list[] = {
-  encoding(0x0F95, none, r_m8),
-};
-const X64_Mnemonic *setne = &(const X64_Mnemonic){
-  .name = "setne",
-  .encoding_list = (const Instruction_Encoding *)setne_encoding_list,
-  .encoding_count = countof(setne_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// setl
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setl_encoding_list[] = {
-  encoding(0x0F9C, none, r_m8),
-};
-const X64_Mnemonic *setl = &(const X64_Mnemonic){
-  .name = "setl",
-  .encoding_list = (const Instruction_Encoding *)setl_encoding_list,
-  .encoding_count = countof(setl_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// setg
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setg_encoding_list[] = {
-  encoding(0x0F9F, none, r_m8),
-};
-const X64_Mnemonic *setg = &(const X64_Mnemonic){
-  .name = "setg",
-  .encoding_list = (const Instruction_Encoding *)setg_encoding_list,
-  .encoding_count = countof(setg_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// setle
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setle_encoding_list[] = {
-  encoding(0x0F9C, none, r_m8),
-};
-const X64_Mnemonic *setle = &(const X64_Mnemonic){
-  .name = "setle",
-  .encoding_list = (const Instruction_Encoding *)setle_encoding_list,
-  .encoding_count = countof(setl_encoding_list),
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// setge
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding setge_encoding_list[] = {
-  encoding(0x0F9D, none, r_m8),
-};
-const X64_Mnemonic *setge = &(const X64_Mnemonic){
-  .name = "setge",
-  .encoding_list = (const Instruction_Encoding *)setge_encoding_list,
-  .encoding_count = countof(setg_encoding_list),
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
-// jmp
-////////////////////////////////////////////////////////////////////////////////
-const Instruction_Encoding jmp_encoding_list[] = {
+mnemonic(jmp,
   encoding(0xEB, none, imm8),
   encoding(0xE9, none, imm32),
-};
-const X64_Mnemonic *jmp = &(const X64_Mnemonic){
-  .name = "jmp",
-  .encoding_list = (const Instruction_Encoding *)jmp_encoding_list,
-  .encoding_count = countof(jmp_encoding_list),
-};
+);
+
+// TODO add all Jcc mnemonic
+mnemonic(jnz,
+  encoding(0x75, none, imm8),
+  encoding(0x0F85, none, imm32),
+);
+
+mnemonic(jz,
+  encoding(0x74, none, imm8),
+  encoding(0x0F84, none, imm32),
+);
+
+// TODO add all SETcc mnemonic
+mnemonic(sete,
+  encoding(0x0F94, none, r_m8),
+);
+
+mnemonic(setz,
+  encoding(0x0F94, none, r_m8),
+);
+
+mnemonic(setne,
+  encoding(0x0F95, none, r_m8)
+);
+
+mnemonic(setl,
+  encoding(0x0F9C, none, r_m8),
+);
+
+mnemonic(setg,
+  encoding(0x0F9F, none, r_m8),
+);
+
+mnemonic(setle,
+  encoding(0x0F9E, none, r_m8),
+);
+
+mnemonic(setge,
+  encoding(0x0F9D, none, r_m8),
+);
 
 #undef none
 #undef _r
@@ -562,4 +332,5 @@ const X64_Mnemonic *jmp = &(const X64_Mnemonic){
 
 #undef encoding_operands
 
+#undef mnemonic
 #undef encoding

@@ -9,8 +9,8 @@
 #include <assert.h>
 
 #ifndef countof
-#define countof(_array_)\
-  (sizeof(_array_) / sizeof((_array_)[0]))
+#define countof(...)\
+  (sizeof(__VA_ARGS__) / sizeof((__VA_ARGS__)[0]))
 #endif
 
 #define static_assert(_condition_, _message_)\
