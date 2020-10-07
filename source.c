@@ -36,6 +36,20 @@ token_force_value(
 );
 
 Value *
+token_force_value_or_result(
+  Token *token,
+  Scope *scope,
+  Function_Builder *builder,
+  Value *result
+) {
+  Value *maybe_return = token_force_value(token, scope, builder, result);
+  if (maybe_return && maybe_return->descriptor->type != Descriptor_Type_Void) {
+    move_value(&builder->instructions, &token->location, result, maybe_return);
+  }
+  return result;
+}
+
+Value *
 scope_lookup_force(
   Scope *scope,
   Slice name,
@@ -1798,13 +1812,11 @@ token_rewrite_divide(
   Token_Match_Operator(operator, "/");
   Token_Match(rhs, 0);
 
-  Value *value = divide(
-    builder,
-    &operator->location,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
-  );
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  Value *lhs_value = token_force_value_or_result(lhs, scope, builder, value_any());
+  Value *rhs_value = token_force_value_or_result(rhs, scope, builder, value_any());
+  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
+  divide(builder, &operator->location, temp, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
   return true;
 }
 
@@ -1820,13 +1832,11 @@ token_rewrite_remainder(
   Token_Match_Operator(operator, "%");
   Token_Match(rhs, 0);
 
-  Value *value = remainder(
-    builder,
-    &operator->location,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
-  );
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  Value *lhs_value = token_force_value_or_result(lhs, scope, builder, value_any());
+  Value *rhs_value = token_force_value_or_result(rhs, scope, builder, value_any());
+  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
+  remainder(builder, &operator->location, temp, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
   return true;
 }
 
@@ -2028,8 +2038,13 @@ token_force_lazy_function_definition(
 
   fn_freeze(builder);
 
+  Value *return_result_value =
+    descriptor->function.returns->descriptor->type == Descriptor_Type_Void
+      ? value_any()
+      : descriptor->function.returns;
   Value *body_result =
-    token_parse_block(body->children, function_scope, builder, descriptor->function.returns);
+    token_parse_block(body->children, function_scope, builder, return_result_value);
+  // FIXME this should not be necessary
   if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
     // TODO Consider if we can get better location here, maybe end of body?
     fn_return(builder, &return_types->location, body_result, Function_Return_Type_Implicit);

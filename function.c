@@ -127,6 +127,8 @@ move_value(
       printf(" ");
       print_operand(&source->operand);
       printf("\n");
+      slice_print(location->filename);
+      printf("(%llu:%llu)", location->line, location->column);
       assert(!"Mismatched operand size when moving");
     }
   }
@@ -587,11 +589,12 @@ typedef enum {
   Divide_Operation_Remainder,
 } Divide_Operation;
 
-Value *
+void
 divide_or_remainder(
   Divide_Operation operation,
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
@@ -604,9 +607,21 @@ divide_or_remainder(
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
     s64 divident = operand_immediate_as_s64(&a->operand);
-    s64 divisor = operand_immediate_as_s64(&a->operand);
+    s64 divisor = operand_immediate_as_s64(&b->operand);
     assert(divisor != 0);
-    return value_from_signed_immediate(divident / divisor);
+    s64 folded = 0;
+    switch(operation) {
+      case Divide_Operation_Divide: {
+        folded = divident / divisor;
+        break;
+      }
+      case Divide_Operation_Remainder: {
+        folded = divident % divisor;
+        break;
+      }
+    }
+    move_value(&builder->instructions, location, result_value, value_from_signed_immediate(folded));
+    return;
   }
 
   // Save RDX as it will be used for the remainder
@@ -653,43 +668,42 @@ divide_or_remainder(
   push_instruction(&builder->instructions, location, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
 
-  Value *result = reserve_stack(builder, larger_descriptor);
   if (operation == Divide_Operation_Divide) {
-    move_value(&builder->instructions, location, result, reg_a);
+    move_value(&builder->instructions, location, result_value, reg_a);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
       Value *temp_result = value_register_for_descriptor(Register_AH, larger_descriptor);
-      move_value(&builder->instructions, location, result, temp_result);
+      move_value(&builder->instructions, location, result_value, temp_result);
     } else {
       Value *temp_result = value_register_for_descriptor(Register_D, larger_descriptor);
-      move_value(&builder->instructions, location, result, temp_result);
+      move_value(&builder->instructions, location, result_value, temp_result);
     }
   }
 
   // Restore RDX
   move_value(&builder->instructions, location, reg_rdx, rdx_temp);
-
-  return result;
 }
 
-Value *
+void
 divide(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
-  return divide_or_remainder(Divide_Operation_Divide, builder, location, a, b);
+  divide_or_remainder(Divide_Operation_Divide, builder, location, result_value, a, b);
 }
 
-Value *
+void
 remainder(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
-  return divide_or_remainder(Divide_Operation_Remainder, builder, location, a, b);
+  divide_or_remainder(Divide_Operation_Remainder, builder, location, result_value, a, b);
 }
 
 

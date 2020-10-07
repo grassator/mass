@@ -142,18 +142,20 @@ multiply(
   Value *y
 );
 
-Value *
+void
 divide(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 );
 
-Value *
+void
 remainder(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 );
