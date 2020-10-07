@@ -55,8 +55,8 @@ encode_instruction(
   }
 
   u32 operand_count = sizeof(instruction.operands) / sizeof(instruction.operands[0]);
-  for (u32 index = 0; index < instruction.mnemonic.encoding_count; ++index) {
-    const Instruction_Encoding *encoding = &instruction.mnemonic.encoding_list[index];
+  for (u32 index = 0; index < instruction.mnemonic->encoding_count; ++index) {
+    const Instruction_Encoding *encoding = &instruction.mnemonic->encoding_list[index];
     bool match = true;
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
@@ -433,7 +433,7 @@ encode_instruction(
     location->line_number,
     location->function_name
   );
-  printf("%s", instruction.mnemonic.name);
+  printf("%s", instruction.mnemonic->name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction.operands[operand_index];
     printf(" ");

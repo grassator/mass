@@ -248,7 +248,7 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   Instruction *last_instruction = dyn_array_last(builder->instructions);
   if (!last_instruction) return;
   if (last_instruction->maybe_label) return;
-  if (strcmp(last_instruction->mnemonic.name, "jmp") != 0) return;
+  if (last_instruction->mnemonic != jmp) return;
   Operand op = last_instruction->operands[0];
   if (op.type != Operand_Type_Label_32) return;
   if (op.label32 != builder->epilog_label) return;
@@ -493,7 +493,7 @@ plus_or_minus(
     return;
   }
 
-  X64_Mnemonic mnemonic = {0};
+  const X64_Mnemonic *mnemonic = 0;
   switch(operation) {
     case Arithmetic_Operation_Plus: {
       mnemonic = add;

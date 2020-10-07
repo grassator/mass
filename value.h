@@ -385,7 +385,7 @@ typedef struct {
 } Source_Location;
 
 typedef struct {
-  X64_Mnemonic mnemonic;
+  const X64_Mnemonic *mnemonic;
   Operand operands[3];
   Label *maybe_label;
   const Compiler_Source_Location *compiler_source_location;
