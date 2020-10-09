@@ -1352,14 +1352,13 @@ bool
 token_rewrite_negative_literal(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
   Token_Match(integer, .type = Token_Type_Integer);
-  Value *result = token_force_value(integer, scope, builder, target);
+  Value *result = token_force_value(integer, scope, builder, value_any());
   if (result->operand.type == Operand_Type_Immediate_8) {
     result->operand.imm8 = -result->operand.imm8;
   } else if (result->operand.type == Operand_Type_Immediate_32) {
@@ -1929,7 +1928,7 @@ token_match_expression(
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_struct_field);
   token_rewrite_statement(state, scope, builder, token_rewrite_functions);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_negative_literal);
+  token_rewrite_statement(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_function_calls);
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_pointer_to);
 
