@@ -1278,8 +1278,7 @@ bool
 token_rewrite_statement_if(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
@@ -1287,10 +1286,10 @@ token_rewrite_statement_if(
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
-  Value *value = token_force_value(condition, scope, builder, target);
-  if (value) {
-    Label *else_label = make_if(&builder->instructions, &keyword->location, value);
-    (void)token_parse_block(body->children, scope, builder, target);
+  Value *condition_value = token_force_value_or_result(condition, scope, builder, value_any());
+  if (condition_value) {
+    Label *else_label = make_if(&builder->instructions, &keyword->location, condition_value);
+    token_parse_block(body->children, scope, builder, value_any());
     push_instruction(
       &builder->instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
     );
@@ -1925,7 +1924,7 @@ token_match_expression(
   // Statement handling
   token_rewrite_assignment(state, scope, builder);
 
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_statement_if);
+  token_rewrite_statement(state, scope, builder, token_rewrite_statement_if);
   token_rewrite_statement(state, scope, builder, token_rewrite_cast);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_struct_field);
