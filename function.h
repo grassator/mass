@@ -152,7 +152,7 @@ divide(
 );
 
 void
-remainder(
+value_remainder(
   Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,

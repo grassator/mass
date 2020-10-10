@@ -272,6 +272,12 @@ tokenize(
           push;
         } else if (isspace(ch)) {
           continue;
+        } else if (ch == '0' && peek == 'x') {
+          start_token(Token_Type_Hex_Integer);
+          i++;
+          column++;
+          current_token->source.length++;
+          state = Tokenizer_State_Hex_Integer;
         } else if (isdigit(ch)) {
           start_token(Token_Type_Integer);
           state = Tokenizer_State_Integer;
@@ -316,6 +322,7 @@ tokenize(
             case Token_Type_Value:
             case Token_Type_Id:
             case Token_Type_Integer:
+            case Token_Type_Hex_Integer:
             case Token_Type_Operator:
             case Token_Type_Lazy_Function_Definition:
             case Token_Type_String:
@@ -343,6 +350,15 @@ tokenize(
       }
       case Tokenizer_State_Integer: {
         if (isdigit(ch)) {
+          current_token->source.length++;
+        } else {
+          push;
+          goto retry;
+        }
+        break;
+      }
+      case Tokenizer_State_Hex_Integer: {
+        if (code_point_is_hex_digit(ch)) {
           current_token->source.length++;
         } else {
           push;
@@ -548,6 +564,7 @@ token_force_type(
       };
       break;
     }
+    case Token_Type_Hex_Integer:
     case Token_Type_Integer: {
       program_error_builder(program, token->location) {
         program_error_append_slice(token->source);
@@ -640,6 +657,7 @@ token_clone_token_array_deep(
     switch (token->type) {
       case Token_Type_Newline:
       case Token_Type_Integer:
+      case Token_Type_Hex_Integer:
       case Token_Type_Operator:
       case Token_Type_String:
       case Token_Type_Id: {
@@ -685,6 +703,7 @@ token_apply_macro_replacements(
       }
       case Token_Type_Newline:
       case Token_Type_Integer:
+      case Token_Type_Hex_Integer:
       case Token_Type_Operator:
       case Token_Type_String: {
         // Nothing to do
@@ -862,6 +881,20 @@ token_force_value(
         }
         return 0;
       }
+      return value_from_signed_immediate(number);
+    }
+    case Token_Type_Hex_Integer: {
+      bool ok = false;
+      Slice digits = slice_sub(token->source, 2, token->source.length);
+      u64 number = slice_parse_hex(digits, &ok);
+      if (!ok) {
+        program_error_builder(builder->program, token->location) {
+          program_error_append_literal("Invalid integer hex literal: ");
+          program_error_append_slice(token->source);
+        }
+        return 0;
+      }
+      // TODO should be unsigned
       return value_from_signed_immediate(number);
     }
     case Token_Type_String: {
@@ -1833,7 +1866,7 @@ token_rewrite_remainder(
   Value *lhs_value = token_force_value_or_result(lhs, scope, builder, value_any());
   Value *rhs_value = token_force_value_or_result(rhs, scope, builder, value_any());
   Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  remainder(builder, &operator->location, temp, lhs_value, rhs_value);
+  value_remainder(builder, &operator->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
   return true;
 }

@@ -103,6 +103,19 @@ spec("source") {
     check(slice_equal(newline->source, slice_literal("\n")));
   }
 
+  it("should be able to turn hex digits") {
+    Slice source = slice_literal("0xCAFE");
+    Tokenizer_Result result = tokenize(test_file_name, source);
+    check(result.type == Tokenizer_Result_Type_Success);
+    Token *root = result.root;
+    check(root);
+    check(root->type == Token_Type_Module);
+    check(dyn_array_length(root->children) == 1);
+    Token *newline = *dyn_array_get(root->children, 0);
+    check(newline->type == Token_Type_Hex_Integer);
+    check(slice_equal(newline->source, slice_literal("0xCAFE")));
+  }
+
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
     Tokenizer_Result result = tokenize(test_file_name, source);

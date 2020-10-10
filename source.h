@@ -7,6 +7,7 @@ typedef enum {
   Token_Type_Id = 1,
   Token_Type_Newline,
   Token_Type_Integer,
+  Token_Type_Hex_Integer,
   Token_Type_Operator,
   Token_Type_String,
   Token_Type_Paren,
@@ -42,6 +43,7 @@ typedef dyn_array_type(Token) Array_Token;
 typedef enum {
   Tokenizer_State_Default,
   Tokenizer_State_Integer,
+  Tokenizer_State_Hex_Integer,
   Tokenizer_State_Operator,
   Tokenizer_State_Id,
   Tokenizer_State_String,

@@ -5,8 +5,8 @@ WriteFile :: (status : s64, buffer : [s8], size : s32, bytes_written : s64, over
 
 print :: (integer : s32) -> () {
   buffer : s8[64]
-  zero_code :: 48
-  minus_code :: 45
+  zero_code :: 0x30
+  minus_code :: 0x2d
   temp := integer
   count := 0
   while (temp) {

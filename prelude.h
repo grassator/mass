@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <stdarg.h> // va_arg
 #include <ctype.h> // isspace, isdigit etc
+#include <math.h> // ceilf, etc
 
 #ifndef countof
 #define countof(...)\
@@ -159,8 +160,11 @@ PRELUDE_ENUMERATE_FLOAT_TYPES
 PRELUDE_ENUMERATE_INTEGER_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
+static inline f32 f32_align(f32 x, f32 align) { return ceilf(x / align) * align; }
+static inline f64 f64_align(f64 x, f64 align) { return ceil(x / align) * align; }
+
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  inline int _type_##_comparator(const _type_ *x, const _type_ *y) {\
+  static inline int _type_##_comparator(const _type_ *x, const _type_ *y) {\
     if (*x < *y) return -1;\
     if (*x > *y) return 1;\
     return 0;\
@@ -236,9 +240,12 @@ system_logical_core_count() {
   return count;
 }
 
-typedef struct {
-  u64 start_time;
-  u64 frequency;
+typedef union {
+  struct {
+    u64 start_time;
+    u64 frequency;
+  };
+  void *raw[2];
 } Performance_Counter;
 
 #ifdef _WIN32
@@ -291,6 +298,33 @@ system_performance_counter_end(
 
   return elapsed_micro;
 }
+
+#else
+
+#include <sys/time.h>
+Performance_Counter
+system_performance_counter_start() {
+  Performance_Counter result = {0};
+  gettimeofday((struct timeval *)result.raw, 0);
+  return result;
+}
+
+u64
+system_performance_counter_end(
+  Performance_Counter *counter
+) {
+  struct timeval end;
+  gettimeofday(&end, 0);
+  struct timeval *start = (struct timeval *)counter->raw;
+  f64 microseconds_in_a_second = 1000.0 * 1000.0;
+  f64 elapsed = (end.tv_sec - start->tv_sec) * microseconds_in_a_second;
+  elapsed += (end.tv_usec - start->tv_usec);
+  return (u64)elapsed;
+}
+static_assert(
+  sizeof(struct timeval) <= sizeof(Performance_Counter), unix_timespec_must_fit_into_16bytes
+);
+
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -368,6 +402,9 @@ allocator_system_deallocate(
   VirtualFree(address, 0, MEM_RELEASE);
 }
 #else
+
+// __USE_MISC is required for MAP_ANONYMOUS to be defined on Ubuntu
+#define __USE_MISC
 #include <sys/mman.h>
 
 static inline void *
@@ -1045,7 +1082,7 @@ dyn_array_first_n_internal(
 
 typedef int (*Prelude_Comparator_Function)(const void*, const void*);
 
-inline void
+static inline void
 dyn_array_sort_internal(
   Dyn_Array_Internal *internal,
   u64 item_byte_size,
@@ -1060,7 +1097,7 @@ dyn_array_sort_internal(
     /* type checking that comparator has right types for array items */\
     (sizeof(_comparator_(&(_array_).data->items[0], &(_array_).data->items[0]))) * 0 +\
     sizeof((_array_).data->items[0]),\
-    (_comparator_)\
+    (Prelude_Comparator_Function)(_comparator_)\
   )
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1108,6 +1145,73 @@ slice_parse_s64(
     }
   }
   return integer;
+}
+
+s8
+hex_parse_digit(
+  s8 byte,
+  bool *ok
+) {
+  *ok = true;
+  if (byte >= '0' && byte <= '9') return byte - '0';
+  if (byte >= 'a' && byte <= 'f') return byte - 'a' + 10;
+  if (byte >= 'A' && byte <= 'F') return byte - 'A' + 10;
+  *ok = false;
+  return 0;
+}
+
+/// Input slice is expected to just contain the number without
+/// any surrounding whitespace or 0x prefix.
+u64
+slice_parse_hex(
+  Slice slice,
+  bool *ok
+) {
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+
+  u64 integer = 0;
+  s64 multiplier = 1;
+  for (s64 index = slice.length - 1; index >= 0; --index) {
+    s8 byte = slice.bytes[index];
+    s8 digit = hex_parse_digit(byte, ok);
+    if (!*ok) return 0;
+    integer += ((u64)digit) * multiplier;
+    multiplier *= 16;
+  }
+  return integer;
+}
+
+Color_Rgba_8
+hex_parse_color_digits(
+  Slice color,
+  bool *ok
+) {
+  s8 digits[8] = {0, 0, 0, 0, 0, 0, 0xf, 0xf};
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+
+  if (color.length == 3 || color.length == 4) {
+    digits[0] = digits[1] = hex_parse_digit(color.bytes[0], ok);
+    if (*ok) digits[2] = digits[3] = hex_parse_digit(color.bytes[1], ok);
+    if (*ok) digits[4] = digits[5] = hex_parse_digit(color.bytes[2], ok);
+    if (*ok && color.length == 4) {
+      digits[6] = digits[7] = hex_parse_digit(color.bytes[3], ok);
+    }
+  } else if (color.length == 6 || color.length == 8) {
+    for (u64 i = 0; *ok && i < color.length; ++i) {
+      digits[i] = hex_parse_digit(color.bytes[i], ok);
+    }
+  } else {
+    *ok = false;
+  }
+  if (!*ok) return (Color_Rgba_8){0};
+  return (Color_Rgba_8) {
+    .r = (digits[0] << 4) | digits[1],
+    .g = (digits[2] << 4) | digits[3],
+    .b = (digits[4] << 4) | digits[5],
+    .a = (digits[6] << 4) | digits[7],
+  };
 }
 
 static inline Slice
@@ -1589,55 +1693,6 @@ slice_normalize_path(
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// Hex
-//////////////////////////////////////////////////////////////////////////////
-
-s8
-hex_parse_digit(
-  s8 byte,
-  bool *ok
-) {
-  *ok = true;
-  if (byte >= '0' && byte <= '9') return byte - '0';
-  if (byte >= 'a' && byte <= 'f') return byte - 'a' + 10;
-  if (byte >= 'A' && byte <= 'F') return byte - 'A' + 10;
-  *ok = false;
-  return 0;
-}
-
-Color_Rgba_8
-hex_parse_color_digits(
-  Slice color,
-  bool *ok
-) {
-  s8 digits[8] = {0, 0, 0, 0, 0, 0, 0xf, 0xf};
-  if (!ok) ok = &(bool){0};
-  *ok = true;
-
-  if (color.length == 3 || color.length == 4) {
-    digits[0] = digits[1] = hex_parse_digit(color.bytes[0], ok);
-    if (*ok) digits[2] = digits[3] = hex_parse_digit(color.bytes[1], ok);
-    if (*ok) digits[4] = digits[5] = hex_parse_digit(color.bytes[2], ok);
-    if (*ok && color.length == 4) {
-      digits[6] = digits[7] = hex_parse_digit(color.bytes[3], ok);
-    }
-  } else if (color.length == 6 || color.length == 8) {
-    for (u64 i = 0; *ok && i < color.length; ++i) {
-      digits[i] = hex_parse_digit(color.bytes[i], ok);
-    }
-  } else {
-    *ok = false;
-  }
-  if (!*ok) return (Color_Rgba_8){0};
-  return (Color_Rgba_8) {
-    .r = (digits[0] << 4) | digits[1],
-    .g = (digits[2] << 4) | digits[3],
-    .b = (digits[4] << 4) | digits[5],
-    .a = (digits[6] << 4) | digits[7],
-  };
-}
-
-//////////////////////////////////////////////////////////////////////////////
 // C Strings
 //////////////////////////////////////////////////////////////////////////////
 
@@ -2097,6 +2152,53 @@ utf16_to_utf8_estimate_max_byte_length(
   return size_in_bytes * 3;
 }
 
+/// Calculate exact amount of bytes requied to encode passed string in UTF-8
+/// Returns number of *bytes* written
+/// Accepts source (UTF-16) string size in *bytes*
+/// Invalid code points and orphaned surrogate pair sides
+/// are replaced with U+FFFD code_point
+u64
+utf16_to_utf8_estimate_exact_byte_size(
+  const u16 *source,
+  u64 source_byte_size
+) {
+  u64 source_wide_length = source_byte_size / 2;
+  u64 byte_size = 0;
+
+  for (u64 source_index = 0; source_index < source_wide_length; ++source_index) {
+    u32 code_point = source[source_index];
+    // Surrogate pair
+    if (code_point >= 0xd800 && code_point <= 0xdbff) {
+      ++source_index;
+      if (source_index < source_wide_length) {
+        u16 pair = source[source_index];
+        // Valid pair
+        if (pair >= 0xdc00 && pair <= 0xdfff) {
+          code_point = (code_point - 0xd800) * 0x400 + (pair - 0xdc00) + 0x10000;
+        } else {
+          code_point = 0xfffd;
+        }
+      } else {
+        // Orphaned surrogate pair at the end of the string
+        code_point = 0xfffd;
+      }
+    }
+
+    // There is probably some clever bit fiddling that could make this faster...
+    if (code_point <= 0x7f) {
+      byte_size += 1;
+    } else if (code_point <= 0x7ff) {
+      byte_size += 2;
+    } else if (code_point <= 0xffff) {
+      byte_size += 3;
+    } else {
+      byte_size += 4;
+    }
+  }
+
+  return byte_size;
+}
+
 /// Returns number of *bytes* written
 /// Accepts source (UTF-16) string size in *bytes*
 /// Invalid code points and orphaned surrogate pair sides
@@ -2528,15 +2630,18 @@ fixed_buffer_from_file_internal(
     return 0;
   }
 #else
+
   char *file_path_null_terminated =
     slice_to_c_string(allocator_default, file_path);
   FILE *file_handle = fopen(file_path_null_terminated, "r");
+
+  struct stat st;
+  bool stat_success = stat(file_path_null_terminated, &st) == 0;
   allocator_deallocate(
     allocator_default, file_path_null_terminated, file_path.length + 1
   );
 
-  struct stat st;
-  if (!file_handle || (stat(file_path_null_terminated, &st) != 0)) {
+  if (!file_handle || !stat_success) {
     *options->error = File_Read_Error_Failed_To_Open;
     goto handle_error;
   }
@@ -2679,6 +2784,15 @@ bucket_buffer_allocate_bytes(
 
 #define bucket_buffer_allocate_unaligned(_buffer_, _type_)\
   ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  static inline _type_ *bucket_buffer_append_##_type_(const Bucket_Buffer handle, _type_ value) {\
+    _type_ *result = bucket_buffer_allocate_bytes(handle, sizeof(_type_), 1);\
+    *result = value;\
+    return result;\
+  }
+PRELUDE_ENUMERATE_NUMERIC_TYPES
+#undef PRELUDE_PROCESS_TYPE
 
 static inline Slice
 bucket_buffer_append_slice(
@@ -3075,29 +3189,29 @@ hash_map_destroy_internal(
 #define hash_map_destroy(_map_)\
   hash_map_destroy_internal((void *)(_map_), sizeof((_map_)->entries[0]))
 
-#define hash_map_get(_map_, _key_)\
-  (_map_)->methods->get((_map_), (_key_))
+#define hash_map_get(_map_, ...)\
+  (_map_)->methods->get((_map_), __VA_ARGS__)
 
-#define hash_map_get_by_hash(_map_, _hash_, _key_)\
-  (_map_)->methods->get_by_hash((_map_), _hash_, (_key_))
+#define hash_map_get_by_hash(_map_, ...)\
+  (_map_)->methods->get_by_hash((_map_), __VA_ARGS__)
 
-#define hash_map_has(_map_, _key_)\
-  (hash_map_get((_map_), (_key_)) != 0)
+#define hash_map_has(_map_, ...)\
+  (hash_map_get((_map_), __VA_ARGS__) != 0)
 
 #define hash_map_has_by_hash(_map_, _hash_, _key_)\
-  (hash_map_get_by_hash((_map_), (_hash_), (_key_)) != 0)
+  (hash_map_get_by_hash((_map_),(_hash_), (_key_)) != 0)
 
-#define hash_map_delete(_map_, _key_)\
-  (_map_)->methods->delete((_map_), (_key_))
+#define hash_map_delete(_map_, ...)\
+  (_map_)->methods->delete((_map_), __VA_ARGS__)
 
-#define hash_map_delete_by_hash(_map_, _hash_, _key_)\
-  (_map_)->methods->delete((_map_), (_hash_), (_key_))
+#define hash_map_delete_by_hash(_map_, ...)\
+  (_map_)->methods->delete_by_hash((_map_), __VA_ARGS__)
 
-#define hash_map_set(_map_, _key_, _value_)\
-  (_map_)->methods->set((_map_), (_key_), (_value_))
+#define hash_map_set(_map_, ...)\
+  (_map_)->methods->set((_map_), __VA_ARGS__)
 
-#define hash_map_set_by_hash(_map_, _hash_, _key_, _value_)\
-  (_map_)->methods->set_by_hash((_map_), (_hash_), (_key_), (_value_))
+#define hash_map_set_by_hash(_map_, ...)\
+  (_map_)->methods->set_by_hash((_map_), __VA_ARGS__)
 
 ////////////////////////////////////////////////////////////////////
 // Threads
@@ -3153,23 +3267,20 @@ thread_join(
 #include <pthread.h>
 
 typedef void *(*Thread_Pthread_Proc)(void *);
-Thread
+
+static inline Thread
 thread_make(
   Thread_Proc proc,
   void *data
 ) {
   pthread_t handle;
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  int result = pthread_create(&handle, &attr, (Thread_Pthread_Proc)proc, data);
-  pthread_attr_destroy(&attr);
-  return (Thread){.native_handle = handle};
+  int result = pthread_create(&handle, 0, (Thread_Pthread_Proc)proc, data);
+  return (Thread){.native_handle = (void *)handle};
 }
 
-void
+static inline void
 thread_join(Thread thread) {
-  pthread_join(thread.native_handle, 0);
+  pthread_join((pthread_t)thread.native_handle, 0);
 }
 static_assert(sizeof(pthread_t) <= sizeof(Thread), TODO_implement_thread_wrappers);
 #endif
