@@ -4,7 +4,7 @@ WriteFile :: (status : s64, buffer : [s8], size : s32, bytes_written : [s32], ov
   -> (s64) external("kernel32.dll", "WriteFile")
 
 main :: () -> () {
-  STDOUT_HANDLE :: -11;
-  WriteFile(GetStdHandle(STDOUT_HANDLE), "Hello, World!", 13, 0, 0);
+  //STDOUT_HANDLE :: -11;
+  WriteFile(GetStdHandle(-11), "Hello, World!", 13, 0, 0);
   ExitProcess(0)
 }

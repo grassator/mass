@@ -91,12 +91,12 @@ scope_define_value(
   Value *value
 );
 
-Value *
+void
 token_parse_block(
   Array_Token_Ptr children,
   Scope *scope,
   Function_Builder *builder,
-  Value *target
+  Value *result_value
 );
 
 #endif SOURCE_H

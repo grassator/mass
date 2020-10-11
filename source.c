@@ -918,7 +918,8 @@ token_force_value(
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
-      return token_parse_block(token->children, scope, builder, target);
+      token_parse_block(token->children, scope, builder, target);
+      return 0;
     }
     case Token_Type_Module:
     case Token_Type_Square:
@@ -1277,24 +1278,30 @@ token_rewrite_external_import(
   return true;
 }
 
-Value *
+void
+token_match_statement(
+  Token_Matcher_State *state,
+  const Source_Location *location,
+  Scope *scope,
+  Function_Builder *builder,
+  Value *statement_result_value
+);
+
+void
 token_parse_block(
   Array_Token_Ptr children,
   Scope *scope,
   Function_Builder *builder,
-  Value *target
+  Value *block_result_value
 ) {
-  if (!dyn_array_length(children)) return 0;
+  if (!dyn_array_length(children)) return;
   Scope *block_scope = scope_make(scope);
-  Value *block_result = 0;
 
   while ((*dyn_array_last(children))->type == Token_Type_Newline) {
     dyn_array_pop(children);
   }
 
-  token_rewrite_newlines_with_semicolons(
-    children
-  );
+  token_rewrite_newlines_with_semicolons(children);
 
   Array_Token_Matcher_State block_statements = token_split(children, &(Token){
     .type = Token_Type_Operator,
@@ -1302,9 +1309,12 @@ token_parse_block(
   });
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
-    block_result = token_match_expression(builder->program, state, block_scope, builder, target);
+    bool is_last_statement = i + 1 == dyn_array_length(block_statements);
+    Value *result_value = is_last_statement ? block_result_value : value_any();
+    // FIXME get the real location
+    token_match_statement(state, &(Source_Location){0}, block_scope, builder, result_value);
   }
-  return block_result;
+  return;
 }
 
 bool
@@ -1367,14 +1377,14 @@ bool
 token_rewrite_explicit_return(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
   Token_Match(to_return, 0);
   Token_Match_End();
-  Value *result = token_force_value(to_return, scope, builder, target);
+  // TODO should use the return value of the function descriptor
+  Value *result = token_force_value_or_result(to_return, scope, builder, value_any());
   fn_return(builder, &keyword->location, result, Function_Return_Type_Explicit);
 
   token_replace_tokens_in_state(state, 2, 0);
@@ -1568,21 +1578,36 @@ bool
 token_rewrite_definition_and_assignment_statements(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
-  u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id);
-  Token_Match_Operator(define, ":=");
-  Token_Match(token_value, 0);
-  Value *value = token_force_value(token_value, scope, builder, target);
+  state->start_index = 0;
+  u64 lhs_end = 0;
+  u64 rhs_start = 0;
+  Token *token_equals = 0;
+  for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+    Token *token = *dyn_array_get(state->tokens, i);
+    if (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal(":="))) {
+      token_equals = token;
+      lhs_end = i;
+      rhs_start = i + 1;
+      break;
+    }
+  }
+  if (lhs_end == 0) return false;
+  // For now we support only single ID on the left
+  if (lhs_end > 1) return false;
+  Token *name = *dyn_array_get(state->tokens, 0);
+  if (name->type != Token_Type_Id) return false;
+
+  Range_u64 rhs_range = { rhs_start, dyn_array_length(state->tokens) };
+  Token_Matcher_State rhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, rhs_range)};
+
+  Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, value_any());
   Value *on_stack = reserve_stack(builder, value->descriptor);
   move_value(&builder->instructions, &name->location, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
 
-  // FIXME definition should rewrite with a token so that we can do proper
-  // checking inside statements and maybe pass it around.
-  token_replace_tokens_in_state(state, 3, 0);
+  token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
   return true;
 }
 
@@ -1939,6 +1964,46 @@ token_clear_newlines(
   return true;
 }
 
+inline Token_Matcher_State*
+token_reset_state_start_index(
+  Token_Matcher_State *state
+) {
+  state->start_index = 0;
+  return state;
+}
+
+void
+token_match_statement(
+  Token_Matcher_State *state,
+  const Source_Location *location,
+  Scope *scope,
+  Function_Builder *builder,
+  Value *result_value
+) {
+  // TODO consider how this should work
+  token_rewrite_macros(token_reset_state_start_index(state), scope, builder);
+
+  if (
+    token_rewrite_assignment(token_reset_state_start_index(state), scope, builder) ||
+    token_rewrite_definition_and_assignment_statements(
+      token_reset_state_start_index(state), scope, builder
+    ) ||
+    token_rewrite_definitions(token_reset_state_start_index(state), scope, builder) ||
+    token_rewrite_explicit_return(token_reset_state_start_index(state), scope, builder) ||
+    token_rewrite_goto(token_reset_state_start_index(state), scope, builder) ||
+    token_rewrite_constant_definitions(token_reset_state_start_index(state), scope, builder)||
+    token_rewrite_statement_if(token_reset_state_start_index(state), scope, builder)
+  ) {
+    return;
+  }
+  Value *expression_result =
+    token_match_expression(builder->program, state, scope, builder, result_value);
+  // FIXME Hack :TargetValue
+  if (expression_result && expression_result->descriptor->type != Descriptor_Type_Void) {
+    move_value(&builder->instructions, location, result_value, expression_result);
+  }
+}
+
 Value *
 token_match_expression(
   Program *program,
@@ -1951,14 +2016,7 @@ token_match_expression(
     return 0;
   }
   token_rewrite_statement(state, scope, builder, token_clear_newlines);
-  token_rewrite_macros(state, scope, builder);
-
-  // Statement handling
-  token_rewrite_assignment(state, scope, builder);
-
-  token_rewrite_statement(state, scope, builder, token_rewrite_statement_if);
   token_rewrite_statement(state, scope, builder, token_rewrite_cast);
-
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_struct_field);
   token_rewrite_statement(state, scope, builder, token_rewrite_functions);
   token_rewrite_statement(state, scope, builder, token_rewrite_negative_literal);
@@ -1971,12 +2029,6 @@ token_match_expression(
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_minus);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_compare);
-
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_definition_and_assignment_statements);
-  token_rewrite_statement(state, scope, builder, token_rewrite_definitions);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_explicit_return);
-  token_rewrite_statement(state, scope, builder, token_rewrite_goto);
-  token_rewrite_statement(state, scope, builder, token_rewrite_constant_definitions);
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
@@ -2073,13 +2125,13 @@ token_force_lazy_function_definition(
     descriptor->function.returns->descriptor->type == Descriptor_Type_Void
       ? value_any()
       : descriptor->function.returns;
-  Value *body_result =
+  //Value *body_result =
     token_parse_block(body->children, function_scope, builder, return_result_value);
-  // FIXME this should not be necessary
-  if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
-    // TODO Consider if we can get better location here, maybe end of body?
-    fn_return(builder, &return_types->location, body_result, Function_Return_Type_Implicit);
-  }
+  //// FIXME this should not be necessary
+  //if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
+    //// TODO Consider if we can get better location here, maybe end of body?
+    //fn_return(builder, &return_types->location, body_result, Function_Return_Type_Implicit);
+  //}
 
   fn_end(builder);
   return value;
