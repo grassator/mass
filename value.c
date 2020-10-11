@@ -463,14 +463,20 @@ instruction_equal(
 }
 
 Value *
-value_any() {
+value_any_internal(
+  Compiler_Source_Location compiler_source_location
+) {
   Value *result = temp_allocate(Value);
   *result = (Value) {
     .descriptor = &descriptor_any,
     .operand = {.type = Operand_Type_Any},
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
+
+#define value_any() value_any_internal(COMPILER_SOURCE_LOCATION)
+
 
 Value *
 value_from_f64(

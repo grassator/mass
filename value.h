@@ -157,9 +157,26 @@ operand_type_string(
 
 struct Descriptor;
 
+
+typedef struct {
+  const char *filename;
+  const char *function_name;
+  u32 line_number;
+} Compiler_Source_Location;
+
+#define COMPILER_SOURCE_LOCATION_FIELDS\
+  {\
+    .filename = __FILE__,\
+    .function_name = __func__,\
+    .line_number = __LINE__,\
+  }
+#define COMPILER_SOURCE_LOCATION\
+  ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
+
 typedef struct Value {
   struct Descriptor *descriptor;
   Operand operand;
+  Compiler_Source_Location compiler_source_location;
 } Value;
 
 typedef dyn_array_type(Value) Array_Value;
@@ -371,12 +388,6 @@ typedef struct {
   const Instruction_Encoding *encoding_list;
   u32 encoding_count;
 } X64_Mnemonic;
-
-typedef struct {
-  const char *filename;
-  const char *function_name;
-  u32 line_number;
-} Compiler_Source_Location;
 
 typedef struct {
   Slice filename;

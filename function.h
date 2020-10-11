@@ -24,11 +24,7 @@ push_instruction_internal(
 
 #define push_instruction(_array_ptr_, _location_, ...)\
   {\
-    static const Compiler_Source_Location compiler_location_ = {\
-      .filename = __FILE__,\
-      .function_name = __func__,\
-      .line_number = __LINE__,\
-    };\
+    static const Compiler_Source_Location compiler_location_ = COMPILER_SOURCE_LOCATION_FIELDS;\
     push_instruction_internal(&compiler_location_, (_location_), (_array_ptr_), __VA_ARGS__);\
   }
 
