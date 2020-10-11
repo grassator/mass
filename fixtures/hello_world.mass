@@ -1,7 +1,12 @@
 ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
 GetStdHandle :: (handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
-WriteFile :: (status : s64, buffer : [s8], size : s32, bytes_written : [s32], overlapped : [s64])
-  -> (s64) external("kernel32.dll", "WriteFile")
+WriteFile :: (
+  status : s64,
+  buffer : [s8],
+  size : s32,
+  bytes_written : [s32],
+  overlapped : [s64]
+) -> (s64) external("kernel32.dll", "WriteFile")
 
 main :: () -> () {
   //STDOUT_HANDLE :: -11;
