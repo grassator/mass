@@ -1575,33 +1575,56 @@ token_rewrite_definitions(
 }
 
 bool
-token_rewrite_definition_and_assignment_statements(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+token_maybe_split_on_operator(
+  Array_Token_Ptr tokens,
+  Slice operator,
+  Array_Token_Ptr *lhs,
+  Array_Token_Ptr *rhs,
+  Token **operator_token
 ) {
-  state->start_index = 0;
   u64 lhs_end = 0;
   u64 rhs_start = 0;
-  Token *token_equals = 0;
-  for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-    Token *token = *dyn_array_get(state->tokens, i);
-    if (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal(":="))) {
-      token_equals = token;
+  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
+    Token *token = *dyn_array_get(tokens, i);
+    if (token->type == Token_Type_Operator && slice_equal(token->source, operator)) {
+      *operator_token = token;
       lhs_end = i;
       rhs_start = i + 1;
       break;
     }
   }
-  if (lhs_end == 0) return false;
+
+  if (lhs_end == 0) {
+    *lhs = *rhs = (Array_Token_Ptr){0};
+    return false;
+  }
+
+  *lhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ 0, lhs_end });
+  *rhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ rhs_start, dyn_array_length(tokens) });
+
+  return true;
+}
+
+bool
+token_rewrite_definition_and_assignment_statements(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  Array_Token_Ptr lhs;
+  Array_Token_Ptr rhs;
+  Token *operator;
+
+  if (!token_maybe_split_on_operator(state->tokens, slice_literal(":="), &lhs, &rhs, &operator)) {
+    return false;
+  }
   // For now we support only single ID on the left
-  if (lhs_end > 1) return false;
-  Token *name = *dyn_array_get(state->tokens, 0);
+  if (dyn_array_length(lhs) > 1) return false;
+  Token *name = *dyn_array_get(lhs, 0);
+
   if (name->type != Token_Type_Id) return false;
 
-  Range_u64 rhs_range = { rhs_start, dyn_array_length(state->tokens) };
-  Token_Matcher_State rhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, rhs_range)};
-
+  Token_Matcher_State rhs_state = {rhs};
   Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, value_any());
   Value *on_stack = reserve_stack(builder, value->descriptor);
   move_value(&builder->instructions, &name->location, on_stack, value);
@@ -1748,22 +1771,14 @@ token_rewrite_assignment(
   Scope *scope,
   Function_Builder *builder
 ) {
-  state->start_index = 0;
-  u64 lhs_end = 0;
-  u64 rhs_start = 0;
-  Token *token_equals = 0;
-  for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-    Token *token = *dyn_array_get(state->tokens, i);
-    if (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal("="))) {
-      token_equals = token;
-      lhs_end = i;
-      rhs_start = i + 1;
-      break;
-    }
+  Array_Token_Ptr lhs;
+  Array_Token_Ptr rhs;
+  Token *operator;
+  if (!token_maybe_split_on_operator(state->tokens, slice_literal("="), &lhs, &rhs, &operator)) {
+    return false;
   }
-  if (lhs_end == 0) return false;
 
-  Token_Matcher_State lhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, (Range_u64){ 0, lhs_end })};
+  Token_Matcher_State lhs_state = {lhs};
   token_rewrite_expression(&lhs_state, scope, builder, 0, token_rewrite_array_index);
   token_rewrite_expression(&lhs_state, scope, builder, 0, token_rewrite_struct_field);
   token_rewrite_statement(&lhs_state, scope, builder, token_rewrite_definitions);
@@ -1783,12 +1798,11 @@ token_rewrite_assignment(
     );
   }
 
-  Range_u64 rhs_range = { rhs_start, dyn_array_length(state->tokens) };
-  Token_Matcher_State rhs_state = {dyn_array_sub(Array_Token_Ptr, state->tokens, rhs_range)};
+  Token_Matcher_State rhs_state = {rhs};
   Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, target);
   // FIXME hack for :TargetValue
   if (value->descriptor->type != Descriptor_Type_Void) {
-    move_value(&builder->instructions, &token_equals->location, target, value);
+    move_value(&builder->instructions, &operator->location, target, value);
   }
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
