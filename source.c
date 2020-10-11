@@ -1572,11 +1572,34 @@ token_rewrite_explicit_return(
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
-  Token_Match(to_return, 0);
-  Token_Match_End();
-  // TODO should use the return value of the function descriptor
-  Value *result = token_force_value_or_result(to_return, scope, builder, value_any());
-  fn_return(builder, &keyword->location, result, Function_Return_Type_Explicit);
+  Array_Token_Ptr rest = dyn_array_sub(
+    Array_Token_Ptr, state->tokens, (Range_u64){peek_index, dyn_array_length(state->tokens)}
+  );
+  bool has_return_expression = dyn_array_length(rest) > 0;
+  Value *fn_return = builder->descriptor->function.returns;
+  Value *to_return = token_match_expression(
+    builder->program, &(Token_Matcher_State){rest}, scope, builder, fn_return
+  );
+
+  bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
+  if (has_return_expression) {
+    if (!is_void) {
+      move_value(&builder->instructions, &keyword->location, fn_return, to_return);
+    }
+  } else {
+    if (!is_void) {
+      program_push_error_from_slice(
+        builder->program, keyword->location,
+        slice_literal("Explicit return from a non-void function requires a value")
+      );
+    }
+  }
+
+  push_instruction(
+    &builder->instructions,
+    &keyword->location,
+    (Instruction){jmp, {label32(builder->epilog_label), 0, 0}}
+  );
 
   token_replace_tokens_in_state(state, 2, 0);
   return true;
@@ -2202,9 +2225,7 @@ token_force_lazy_function_definition(
       Descriptor *return_descriptor =
         token_force_type(program, function_scope, return_type_token, outer_builder);
       if (!return_descriptor) return 0;
-      function_return_descriptor(
-        &descriptor->function, return_descriptor, Function_Return_Type_Explicit
-      );
+      function_return_descriptor(&descriptor->function, return_descriptor);
       break;
     }
     default: {
@@ -2224,13 +2245,7 @@ token_force_lazy_function_definition(
     descriptor->function.returns->descriptor->type == Descriptor_Type_Void
       ? value_any()
       : descriptor->function.returns;
-  //Value *body_result =
-    token_parse_block(body->children, function_scope, builder, return_result_value);
-  //// FIXME this should not be necessary
-  //if (body_result && body_result->descriptor->type != Descriptor_Type_Void) {
-    //// TODO Consider if we can get better location here, maybe end of body?
-    //fn_return(builder, &return_types->location, body_result, Function_Return_Type_Implicit);
-  //}
+  token_parse_block(body->children, function_scope, builder, return_result_value);
 
   fn_end(builder);
   return value;

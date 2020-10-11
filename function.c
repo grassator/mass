@@ -348,8 +348,7 @@ fn_arg(
 void
 function_return_descriptor(
   Descriptor_Function *function,
-  Descriptor *descriptor,
-  Function_Return_Type return_type
+  Descriptor *descriptor
 ) {
   if (!function->returns) {
     if (descriptor->type != Descriptor_Type_Void) {
@@ -363,27 +362,6 @@ function_return_descriptor(
       function->returns = &void_value;
     }
   }
-}
-
-void
-fn_return(
-  Function_Builder *builder,
-  const Source_Location *location,
-  Value *to_return,
-  Function_Return_Type return_type
-) {
-  function_return_descriptor(&builder->descriptor->function, to_return->descriptor, return_type);
-  if (builder->descriptor->function.returns->descriptor->type == Descriptor_Type_Void) {
-    if (to_return->descriptor->type != Descriptor_Type_Void) {
-      assert(return_type == Function_Return_Type_Implicit);
-    }
-  } else {
-    move_value(&builder->instructions, location, builder->descriptor->function.returns, to_return);
-  }
-
-  push_instruction(
-    &builder->instructions, location, (Instruction){jmp, {label32(builder->epilog_label), 0, 0}}
-  );
 }
 
 Label *

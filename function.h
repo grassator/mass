@@ -62,19 +62,6 @@ fn_arg(
   Descriptor *descriptor
 );
 
-typedef enum {
-  Function_Return_Type_Implicit,
-  Function_Return_Type_Explicit,
-} Function_Return_Type;
-
-void
-fn_return(
-  Function_Builder *builder,
-  const Source_Location *location,
-  Value *to_return,
-  Function_Return_Type return_type
-);
-
 Label *
 make_if(
   Array_Instruction *instructions,
