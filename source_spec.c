@@ -297,8 +297,7 @@ spec("source") {
     check(answer == 42);
   }
 
-  // FIXME :TargetValue
-  xit("should be able to define a local function") {
+  it("should be able to define a local function") {
     test_program_inline_source(
       "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
       checker
@@ -307,8 +306,7 @@ spec("source") {
     check(answer == 42);
   }
 
-  // FIXME :TargetValue
-  xit("should be able to parse and run functions with overloads") {
+  it("should be able to parse and run functions with overloads") {
     Slice source = slice_literal(
       "size_of :: (x : s32) -> (s64) { 4 }\n"
       "size_of :: (x : s64) -> (s64) { 8 }\n"
@@ -463,7 +461,7 @@ spec("source") {
     check(sum_up_to_fn(3) == 6);
   }
 
-  xit("should be able to parse and run functions with local overloads") {
+  it("should be able to parse and run functions with local overloads") {
     test_program_inline_source(
       "size_of :: (x : s32) -> (s64) { 4 }\n"
       "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
