@@ -966,7 +966,7 @@ token_match_call_arguments(
       Value *result_value = value_any();
       Value *value = token_match_expression(builder->program, state, scope, builder, result_value);
       // FIXME Hack for :TargetValue
-      if (value->descriptor->type != Descriptor_Type_Void) {
+      if (value && value->descriptor->type != Descriptor_Type_Void) {
         move_value(&builder->instructions, &token->location, result_value, value);
       }
       dyn_array_push(result, result_value);
@@ -1192,20 +1192,33 @@ token_rewrite_struct_definitions(
 }
 
 bool
-token_rewrite_constant_definitions(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
+token_maybe_split_on_operator(
+  Array_Token_Ptr tokens,
+  Slice operator,
+  Array_Token_Ptr *lhs,
+  Array_Token_Ptr *rhs,
+  Token **operator_token
 ) {
-  u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id);
-  Token_Match_Operator(define, "::");
-  Token_Match(value, 0);
-  scope_define_lazy(scope, name->source, value);
+  u64 lhs_end = 0;
+  u64 rhs_start = 0;
+  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
+    Token *token = *dyn_array_get(tokens, i);
+    if (token->type == Token_Type_Operator && slice_equal(token->source, operator)) {
+      *operator_token = token;
+      lhs_end = i;
+      rhs_start = i + 1;
+      break;
+    }
+  }
 
-  // FIXME definition should rewrite with a token so that we can do proper
-  // checking inside statements and maybe pass it around.
-  token_replace_tokens_in_state(state, 3, 0);
+  if (lhs_end == 0) {
+    *lhs = *rhs = (Array_Token_Ptr){0};
+    return false;
+  }
+
+  *lhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ 0, lhs_end });
+  *rhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ rhs_start, dyn_array_length(tokens) });
+
   return true;
 }
 
@@ -1278,6 +1291,180 @@ token_rewrite_external_import(
   return true;
 }
 
+inline Token_Matcher_State*
+token_reset_state_start_index(
+  Token_Matcher_State *state
+) {
+  state->start_index = 0;
+  return state;
+}
+
+typedef bool (*token_rewrite_expression_callback)
+(Token_Matcher_State *, Scope *, Function_Builder *, Value *result_value);
+
+void
+token_rewrite_expression(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  Value *result_value,
+  token_rewrite_expression_callback callback
+) {
+  start: for (;;) {
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+      state->start_index = i;
+      if (callback(state, scope, builder, result_value)) goto start;
+    }
+    break;
+  }
+  state->start_index = 0;
+}
+
+typedef bool (*token_rewrite_statement_callback)
+(Token_Matcher_State *, Scope *, Function_Builder *);
+
+void
+token_rewrite_statement(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  token_rewrite_statement_callback callback
+) {
+  start: for (;;) {
+    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
+      state->start_index = i;
+      if (callback(state, scope, builder)) goto start;
+    }
+    break;
+  }
+  state->start_index = 0;
+}
+
+bool
+token_rewrite_negative_literal(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  // FIXME Allow unary minus on any expression
+  Token_Match_Operator(define, "-");
+  Token_Match(integer, .type = Token_Type_Integer);
+  Value *result = token_force_value(integer, scope, builder, value_any());
+  if (result->operand.type == Operand_Type_Immediate_8) {
+    result->operand.imm8 = -result->operand.imm8;
+  } else if (result->operand.type == Operand_Type_Immediate_32) {
+    result->operand.imm32 = -result->operand.imm32;
+  } else if (result->operand.type == Operand_Type_Immediate_64) {
+    result->operand.imm64 = -result->operand.imm64;
+  } else {
+    panic("Internal error, expected an immediate");
+  }
+
+  token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
+  return true;
+}
+
+bool
+token_clear_newlines(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  Token_Match(newline, .type = Token_Type_Newline);
+  token_replace_tokens_in_state(state, 1, 0);
+  return true;
+}
+
+Token *
+token_rewrite_constant_expression(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+
+bool
+token_rewrite_constant_sub_expression(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  Token_Match(paren, .type = Token_Type_Paren);
+
+  Token_Matcher_State sub_state = {paren->children};
+  Token *result_token = token_rewrite_constant_expression(&sub_state, scope, builder);
+  if (!result_token) {
+    return false;
+  }
+  token_replace_tokens_in_state(state, 1, result_token);
+  return true;
+}
+
+Token *
+token_rewrite_constant_expression(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  token_rewrite_statement(state, scope, builder, token_clear_newlines);
+  token_rewrite_statement(state, scope, builder, token_rewrite_negative_literal);
+  token_rewrite_statement(state, scope, builder, token_rewrite_external_import);
+
+  token_rewrite_struct_definitions(token_reset_state_start_index(state), scope, builder) ||
+  token_rewrite_functions(token_reset_state_start_index(state), scope, builder);
+
+  token_rewrite_statement(state, scope, builder, token_rewrite_constant_sub_expression);
+
+  if (dyn_array_length(state->tokens) != 1) {
+    // FIXME :LocationInfoMissing
+    program_push_error_from_slice(
+      builder->program, (Source_Location){0}, slice_literal("Invalid constant definition")
+    );
+    return 0;
+  }
+  return *dyn_array_get(state->tokens, 0);
+}
+
+bool
+token_rewrite_constant_definitions(
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  Array_Token_Ptr lhs;
+  Array_Token_Ptr rhs;
+  Token *operator;
+
+  if (!token_maybe_split_on_operator(state->tokens, slice_literal("::"), &lhs, &rhs, &operator)) {
+    return false;
+  }
+  // For now we support only single ID on the left
+  if (dyn_array_length(lhs) > 1) return false;
+  Token *name = *dyn_array_get(lhs, 0);
+  if (name->type != Token_Type_Id) return false;
+
+  Token_Matcher_State rhs_state = {rhs};
+  Token *token_value = token_rewrite_constant_expression(&rhs_state, scope, builder);
+  if (!token_value) {
+    return false;
+  }
+
+  if (token_value->type == Token_Type_Lazy_Function_Definition) {
+    scope_define_lazy(scope, name->source, token_value);
+  } else {
+    Value *result = token_force_value_or_result(token_value, scope, builder, value_any());
+    if (result->descriptor->type == Descriptor_Type_Any) {
+      panic("Ooops");
+    }
+    scope_define_value(scope, name->source, result);
+  }
+
+  token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
+  return true;
+}
+
 void
 token_match_statement(
   Token_Matcher_State *state,
@@ -1297,9 +1484,12 @@ token_parse_block(
   if (!dyn_array_length(children)) return;
   Scope *block_scope = scope_make(scope);
 
-  while ((*dyn_array_last(children))->type == Token_Type_Newline) {
-    dyn_array_pop(children);
-  }
+  // Newlines at the end of the block do not count as semucolons otherwise this:
+  // { 42
+  // }
+  // is being interpreted as:
+  // { 42 ; }
+  while ((*dyn_array_last(children))->type == Token_Type_Newline) dyn_array_pop(children);
 
   token_rewrite_newlines_with_semicolons(children);
 
@@ -1309,6 +1499,7 @@ token_parse_block(
   });
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
+    if (!dyn_array_length(state->tokens)) continue;
     bool is_last_statement = i + 1 == dyn_array_length(block_statements);
     Value *result_value = is_last_statement ? block_result_value : value_any();
     // FIXME get the real location
@@ -1388,31 +1579,6 @@ token_rewrite_explicit_return(
   fn_return(builder, &keyword->location, result, Function_Return_Type_Explicit);
 
   token_replace_tokens_in_state(state, 2, 0);
-  return true;
-}
-
-bool
-token_rewrite_negative_literal(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
-) {
-  u64 peek_index = 0;
-  // FIXME Allow unary minus on any expression
-  Token_Match_Operator(define, "-");
-  Token_Match(integer, .type = Token_Type_Integer);
-  Value *result = token_force_value(integer, scope, builder, value_any());
-  if (result->operand.type == Operand_Type_Immediate_8) {
-    result->operand.imm8 = -result->operand.imm8;
-  } else if (result->operand.type == Operand_Type_Immediate_32) {
-    result->operand.imm32 = -result->operand.imm32;
-  } else if (result->operand.type == Operand_Type_Immediate_64) {
-    result->operand.imm64 = -result->operand.imm64;
-  } else {
-    panic("Internal error, expected an immediate");
-  }
-
-  token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
   return true;
 }
 
@@ -1575,37 +1741,6 @@ token_rewrite_definitions(
 }
 
 bool
-token_maybe_split_on_operator(
-  Array_Token_Ptr tokens,
-  Slice operator,
-  Array_Token_Ptr *lhs,
-  Array_Token_Ptr *rhs,
-  Token **operator_token
-) {
-  u64 lhs_end = 0;
-  u64 rhs_start = 0;
-  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
-    Token *token = *dyn_array_get(tokens, i);
-    if (token->type == Token_Type_Operator && slice_equal(token->source, operator)) {
-      *operator_token = token;
-      lhs_end = i;
-      rhs_start = i + 1;
-      break;
-    }
-  }
-
-  if (lhs_end == 0) {
-    *lhs = *rhs = (Array_Token_Ptr){0};
-    return false;
-  }
-
-  *lhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ 0, lhs_end });
-  *rhs = dyn_array_sub(Array_Token_Ptr, tokens, (Range_u64){ rhs_start, dyn_array_length(tokens) });
-
-  return true;
-}
-
-bool
 token_rewrite_definition_and_assignment_statements(
   Token_Matcher_State *state,
   Scope *scope,
@@ -1626,6 +1761,7 @@ token_rewrite_definition_and_assignment_statements(
 
   Token_Matcher_State rhs_state = {rhs};
   Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, value_any());
+  if (!value) return false;
   Value *on_stack = reserve_stack(builder, value->descriptor);
   move_value(&builder->instructions, &name->location, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
@@ -1726,45 +1862,6 @@ token_rewrite_struct_field(
   return true;
 }
 
-typedef bool (*token_rewrite_statement_callback)
-(Token_Matcher_State *, Scope *, Function_Builder *);
-
-void
-token_rewrite_statement(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  token_rewrite_statement_callback callback
-) {
-  start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-      state->start_index = i;
-      if (callback(state, scope, builder)) goto start;
-    }
-    break;
-  }
-}
-
-typedef bool (*token_rewrite_expression_callback)
-(Token_Matcher_State *, Scope *, Function_Builder *, Value *result_value);
-
-void
-token_rewrite_expression(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder,
-  Value *result_value,
-  token_rewrite_expression_callback callback
-) {
-  start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-      state->start_index = i;
-      if (callback(state, scope, builder, result_value)) goto start;
-    }
-    break;
-  }
-}
-
 bool
 token_rewrite_assignment(
   Token_Matcher_State *state,
@@ -1821,9 +1918,16 @@ token_rewrite_function_calls(
   Token_Match(args_token, .type = Token_Type_Paren);
   if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
 
-  Value *target = token_force_value(target_token, scope, builder, result_value);
+  Value *target = token_force_value_or_result(target_token, scope, builder, value_any());
   Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder);
 
+  if (target->descriptor->type != Descriptor_Type_Function) {
+    program_error_builder(builder->program, target_token->location) {
+      program_error_append_slice(target_token->source);
+      program_error_append_literal(" is not a function");
+    }
+    return false;
+  }
   Value *return_value = call_function_value_array(builder, &target_token->location, target, args);
   token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
   return true;
@@ -1966,26 +2070,6 @@ token_rewrite_compare(
   return true;
 }
 
-bool
-token_clear_newlines(
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
-) {
-  u64 peek_index = 0;
-  Token_Match(newline, .type = Token_Type_Newline);
-  token_replace_tokens_in_state(state, 1, 0);
-  return true;
-}
-
-inline Token_Matcher_State*
-token_reset_state_start_index(
-  Token_Matcher_State *state
-) {
-  state->start_index = 0;
-  return state;
-}
-
 void
 token_match_statement(
   Token_Matcher_State *state,
@@ -2100,6 +2184,7 @@ token_force_lazy_function_definition(
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
+      token_rewrite_statement(state, function_scope, builder, token_clear_newlines);
       Token_Match_Arg *arg = token_match_argument(program, state, function_scope, outer_builder);
       if (!arg) return 0;
       Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
@@ -2161,17 +2246,25 @@ token_match_module(
   }
   if (!dyn_array_length(token->children)) return true;
 
-  Token_Matcher_State *state = &(Token_Matcher_State) {.tokens = token->children};
   Function_Builder global_builder = { .program = program };
 
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_clear_newlines);
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_struct_definitions);
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_macro_definitions);
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_external_import);
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_functions);
-  token_rewrite_statement(state, program->global_scope, &global_builder, token_rewrite_constant_definitions);
+  token_rewrite_newlines_with_semicolons(token->children);
 
-  return dyn_array_length(state->tokens) == 0;
+  Array_Token_Matcher_State module_statements = token_split(token->children, &(Token){
+    .type = Token_Type_Operator,
+    .source = slice_literal(";"),
+  });
+  for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
+    Token_Matcher_State *state = dyn_array_get(module_statements, i);
+    if (!dyn_array_length(state->tokens)) continue;
+    token_rewrite_macro_definitions(state, program->global_scope, &global_builder);
+    token_rewrite_statement(
+      state, program->global_scope, &global_builder, token_rewrite_constant_definitions
+    );
+    // FIXME detect unmatched statements
+  }
+
+  return true;
 }
 
 Parse_Result

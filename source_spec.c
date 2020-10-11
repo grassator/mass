@@ -231,7 +231,7 @@ spec("source") {
 
   it("should be unwind stack on hardware exception") {
     test_program_inline_source(
-      "inner :: (x : s32) -> (s32) { x / x }"
+      "inner :: (x : s32) -> (s32) { x / x }\n"
       "foo :: (x : s32) -> (s32) { inner(x) }",
       foo
     );
@@ -279,7 +279,7 @@ spec("source") {
 
   it("should be able to parse and run a sum passed to another function as an argument") {
     test_program_inline_source(
-      "id :: (ignored : s64, x : s64) -> (s64) { x }"
+      "id :: (ignored : s64, x : s64) -> (s64) { x }\n"
       "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }",
       plus
     );
@@ -289,7 +289,7 @@ spec("source") {
 
   it("should be able to parse and run multiple function definitions") {
     test_program_inline_source(
-      "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }"
+      "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }\n"
       "plus :: (x : s32, y : s32) -> (s32) { x + y }",
       proxy
     );
@@ -310,10 +310,10 @@ spec("source") {
   // FIXME :TargetValue
   xit("should be able to parse and run functions with overloads") {
     Slice source = slice_literal(
-      "size_of :: (x : s32) -> (s64) { 4 }"
-      "size_of :: (x : s64) -> (s64) { 8 }"
-      "checker_s64 :: (x : s64) -> (s64) { size_of(x) }"
-      "checker_s32 :: (x : s32) -> (s64) { size_of(x) }"
+      "size_of :: (x : s32) -> (s64) { 4 }\n"
+      "size_of :: (x : s64) -> (s64) { 8 }\n"
+      "checker_s64 :: (x : s64) -> (s64) { size_of(x) }\n"
+      "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
     );
     Tokenizer_Result result = tokenize(test_file_name, source);
     check(result.type == Tokenizer_Result_Type_Success);
@@ -465,7 +465,7 @@ spec("source") {
 
   xit("should be able to parse and run functions with local overloads") {
     test_program_inline_source(
-      "size_of :: (x : s32) -> (s64) { 4 }"
+      "size_of :: (x : s32) -> (s64) { 4 }\n"
       "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
       checker
     );
@@ -493,7 +493,7 @@ spec("source") {
 
   it("should parse and write out an executable that exits with status code 42") {
     Slice source = slice_literal(
-      "main :: () -> () { ExitProcess(42) }"
+      "main :: () -> () { ExitProcess(42) }\n"
       "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
     );
     Tokenizer_Result result = tokenize(test_file_name, source);
@@ -541,7 +541,7 @@ spec("source") {
     }
     it("should be reported when non-type id is being used as type") {
       test_program_inline_source_base(
-        "foo :: () -> () {}"
+        "foo :: () -> () {};"
         "main :: (arg : foo) -> () {}", main
       );
       check(!main);
