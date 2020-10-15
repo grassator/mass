@@ -930,6 +930,18 @@ program_deinit(
   dyn_array_destroy(program->import_libraries);
 }
 
+EXCEPTION_DISPOSITION
+program_test_exception_handler(
+  PEXCEPTION_RECORD ExceptionRecord,
+  ULONG64 EstablisherFrame,
+  PCONTEXT ContextRecord,
+  PDISPATCHER_CONTEXT DispatcherContext
+) {
+  printf("RIP: %llx\n", ContextRecord->Rip);
+  return ExceptionContinueSearch;
+}
+
+
 Fixed_Buffer *
 program_end(
   Program *program
@@ -954,7 +966,7 @@ program_end(
     }
   }
 
-  u64 code_segment_size = estimate_max_code_size_in_bytes(program);
+  u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
   u64 function_count = dyn_array_length(program->functions);
   u64 global_data_size = u64_align(program->data_buffer->occupied, 16);
   u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
@@ -985,17 +997,26 @@ program_end(
     result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
   );
 
-  s8 *code_memory = result_buffer->memory + result_buffer->occupied;
-
   RUNTIME_FUNCTION *fn_exception_info = allocator_allocate_array(
     allocator_system, RUNTIME_FUNCTION, function_count
   );
+
+  s8 *code_memory = result_buffer->memory + result_buffer->occupied;
+  u64 trampoline_address = (u64)program_test_exception_handler;
+
+  u32 trampoline_virtual_address = make_trampoline(result_buffer, trampoline_address);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
     u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
     fn_encode(result_buffer, builder, &fn_exception_info[i], unwind_info, unwind_data_rva);
+    {
+      unwind_info->Flags |= UNW_FLAG_EHANDLER;
+      u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
+      u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
+      *exception_handler_address = trampoline_virtual_address;
+    }
   }
 
   // Making code executable

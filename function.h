@@ -28,6 +28,14 @@ push_instruction_internal(
     push_instruction_internal(&compiler_location_, (_location_), (_array_ptr_), __VA_ARGS__);\
   }
 
+
+#define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
+u32
+make_trampoline(
+  Fixed_Buffer *buffer,
+  s64 address
+);
+
 void
 move_value(
   Array_Instruction *instructions,

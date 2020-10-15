@@ -437,7 +437,7 @@ typedef struct {
   u8 FrameRegister : 4;
   u8 FrameOffset   : 4;
   // :RegisterAllocation need to add more reserved space for UnwindCode
-  UNWIND_CODE UnwindCode[2];
+  UNWIND_CODE UnwindCode[2 + 2];
 /*  union {
 *       OPTIONAL u32 ExceptionHandler;
 *       OPTIONAL u32 FunctionEntry;

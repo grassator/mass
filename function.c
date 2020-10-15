@@ -243,6 +243,19 @@ fn_end(
   fn_freeze(builder);
 }
 
+u32
+make_trampoline(
+  Fixed_Buffer *buffer,
+  s64 address
+) {
+  u32 result = u64_to_u32(buffer->occupied);
+  // TODO maybe we want a builder here
+  encode_instruction(buffer, 0, (Instruction) {mov, {rax, imm64(address)}});
+  encode_instruction(buffer, 0, (Instruction) {jmp, {rax}});
+  return result;
+}
+
+
 void
 fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   Function_Builder *builder

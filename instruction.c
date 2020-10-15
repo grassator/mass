@@ -253,6 +253,7 @@ mnemonic(cmp,
 mnemonic(jmp,
   encoding(0xEB, none, imm8),
   encoding(0xE9, none, imm32),
+  encoding(0xFF, _op_code(4), r_m64),
 );
 
 #define ENUMERATE_CC(process)\
