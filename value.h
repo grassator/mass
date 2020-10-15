@@ -164,6 +164,13 @@ typedef struct {
   u32 line_number;
 } Compiler_Source_Location;
 
+#define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
+  {\
+    .filename = __FILE__,\
+    .function_name = "GLOBAL",\
+    .line_number = __LINE__,\
+  }
+
 #define COMPILER_SOURCE_LOCATION_FIELDS\
   {\
     .filename = __FILE__,\
@@ -282,6 +289,7 @@ Descriptor descriptor_f64 = {
 Value void_value = {
   .descriptor = &descriptor_void,
   .operand = { .type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
 Value *type_s64_value = &(Value) {
@@ -290,6 +298,7 @@ Value *type_s64_value = &(Value) {
     .type_descriptor = &descriptor_s64,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 Value *type_s32_value = &(Value) {
   .descriptor = &(Descriptor) {
@@ -297,6 +306,7 @@ Value *type_s32_value = &(Value) {
     .type_descriptor = &descriptor_s32,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 Value *type_s16_value = &(Value) {
   .descriptor = &(Descriptor) {
@@ -304,6 +314,7 @@ Value *type_s16_value = &(Value) {
     .type_descriptor = &descriptor_s16,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 Value *type_s8_value = &(Value) {
   .descriptor = &(Descriptor) {
@@ -311,6 +322,7 @@ Value *type_s8_value = &(Value) {
     .type_descriptor = &descriptor_s8,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
 Value *type_f64_value = &(Value) {
@@ -319,6 +331,7 @@ Value *type_f64_value = &(Value) {
     .type_descriptor = &descriptor_f64,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 Value *type_f32_value = &(Value) {
   .descriptor = &(Descriptor) {
@@ -326,6 +339,7 @@ Value *type_f32_value = &(Value) {
     .type_descriptor = &descriptor_f32,
   },
   .operand = {.type = Operand_Type_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
 u32
@@ -512,18 +526,6 @@ typedef struct {
 
 Bucket_Buffer temp_buffer;
 Allocator *temp_allocator;
-
-Value *
-value_global(
-  Program *program,
-  Descriptor *descriptor
-);
-
-Value *
-value_global_c_string(
-  Program *program,
-  const char *string
-);
 
 void *
 rip_value_pointer(

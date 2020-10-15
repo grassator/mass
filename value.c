@@ -463,6 +463,30 @@ instruction_equal(
 }
 
 Value *
+value_global_internal(
+  Compiler_Source_Location compiler_source_location,
+  Program *program,
+  Descriptor *descriptor
+) {
+  u32 byte_size = descriptor_byte_size(descriptor);
+  u32 alignment = descriptor_alignment(descriptor);
+  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
+  s64 offset_in_data_section = address - program->data_buffer->memory;
+
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = descriptor,
+    .operand = {
+      .type = Operand_Type_RIP_Relative,
+      .byte_size = byte_size,
+      .rip_offset_in_data = (s64) offset_in_data_section,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+
+Value *
 value_any_internal(
   Compiler_Source_Location compiler_source_location
 ) {
@@ -479,102 +503,130 @@ value_any_internal(
 
 
 Value *
-value_from_f64(
+value_from_f64_internal(
+  Compiler_Source_Location compiler_source_location,
   Program *program,
   f32 float_value
 ) {
-  Value *result = value_global(program, &descriptor_f64);
+  Value *result = value_global_internal(compiler_source_location, program, &descriptor_f64);
   f64 *memory = rip_value_pointer(program, result);
   *memory = float_value;
   return result;
 }
 
+#define value_from_f64(...) value_from_f64_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
 Value *
-value_from_f32(
+value_from_f32_internal(
+  Compiler_Source_Location compiler_source_location,
   Program *program,
   f32 float_value
 ) {
-  Value *result = value_global(program, &descriptor_f32);
+  Value *result = value_global_internal(compiler_source_location, program, &descriptor_f32);
   f32 *memory = rip_value_pointer(program, result);
   *memory = float_value;
   return result;
 }
 
+#define value_from_f32(...) value_from_f32_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
 Value *
-value_from_s64(
+value_from_s64_internal(
+  Compiler_Source_Location compiler_source_location,
   s64 integer
 ) {
   Value *result = temp_allocate(Value);
   *result = (Value) {
     .descriptor = &descriptor_s64,
     .operand = imm64(integer),
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
+#define value_from_s64(...) value_from_s64_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Value *
-value_from_s32(
+value_from_s32_internal(
+  Compiler_Source_Location compiler_source_location,
   s32 integer
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = &descriptor_s32,
     .operand = imm32(integer),
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
+#define value_from_s32(...) value_from_s32_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
 Value *
-value_from_s16(
+value_from_s16_internal(
+  Compiler_Source_Location compiler_source_location,
   s16 integer
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = &descriptor_s16,
     .operand = imm16(integer),
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
+#define value_from_s16(...) value_from_s16_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
 Value *
-value_from_s8(
+value_from_s8_internal(
+  Compiler_Source_Location compiler_source_location,
   s8 integer
 ) {
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = &descriptor_s8,
     .operand = imm8(integer),
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
+#define value_from_s8(...) value_from_s8_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
 inline Value *
-value_from_signed_immediate(
+value_from_signed_immediate_internal(
+  Compiler_Source_Location compiler_source_location,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return value_from_s8((s8) value);
+    return value_from_s8_internal(compiler_source_location, (s8) value);
   }
   if (s64_fits_into_s16(value)) {
-    return value_from_s16((s16) value);
+    return value_from_s16_internal(compiler_source_location, (s16) value);
   }
   if (s64_fits_into_s32(value)) {
-    return value_from_s32((s32) value);
+    return value_from_s32_internal(compiler_source_location, (s32) value);
   }
-  return value_from_s64(value);
+  return value_from_s64_internal(compiler_source_location, value);
 }
+#define value_from_signed_immediate(...)\
+  value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Value *
-value_byte_size(
+value_byte_size_internal(
+  Compiler_Source_Location compiler_source_location,
   Value *value
 ) {
   s32 byte_size = descriptor_byte_size(value->descriptor);
-  return value_from_s32(byte_size);
+  return value_from_s32_internal(compiler_source_location, byte_size);
 }
+#define value_byte_size(...)\
+  value_byte_size_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 
 Value *
-value_register_for_descriptor(
+value_register_for_descriptor_internal(
+  Compiler_Source_Location compiler_source_location,
   Register reg,
   Descriptor *descriptor
 ) {
@@ -593,9 +645,12 @@ value_register_for_descriptor(
       .reg = reg,
       .byte_size = byte_size,
     },
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
+#define value_register_for_descriptor(...)\
+  value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 void *
 rip_value_pointer(
@@ -607,29 +662,8 @@ rip_value_pointer(
 }
 
 Value *
-value_global(
-  Program *program,
-  Descriptor *descriptor
-) {
-  u32 byte_size = descriptor_byte_size(descriptor);
-  u32 alignment = descriptor_alignment(descriptor);
-  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
-  s64 offset_in_data_section = address - program->data_buffer->memory;
-
-  Value *result = temp_allocate(Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .operand = {
-      .type = Operand_Type_RIP_Relative,
-      .byte_size = byte_size,
-      .rip_offset_in_data = (s64) offset_in_data_section,
-    },
-  };
-  return result;
-}
-
-Value *
-value_global_c_string_from_slice(
+value_global_c_string_from_slice_internal(
+  Compiler_Source_Location compiler_source_location,
   Program *program,
   Slice slice
 ) {
@@ -643,12 +677,14 @@ value_global_c_string_from_slice(
     },
   };
 
-  Value *string_value = value_global(program, descriptor);
+  Value *string_value = value_global_internal(compiler_source_location, program, descriptor);
   s8 *memory = rip_value_pointer(program, string_value);
   memcpy(memory, slice.bytes, slice.length);
   memory[length - 1] = 0;
   return string_value;
 }
+#define value_global_c_string_from_slice(...)\
+  value_global_c_string_from_slice_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Descriptor *
 descriptor_pointer_to(
@@ -704,7 +740,8 @@ memory_range_equal_to_c_string(
 }
 
 Value *
-function_push_argument(
+function_push_argument_internal(
+  Compiler_Source_Location compiler_source_location,
   Descriptor_Function *function,
   Descriptor *arg_descriptor
 ) {
@@ -713,26 +750,26 @@ function_push_argument(
   switch (dyn_array_length(function->arguments)) {
     case 0: {
       Value *value = arg_descriptor->type == Descriptor_Type_Float
-        ? value_register_for_descriptor(Register_Xmm0, arg_descriptor)
-        : value_register_for_descriptor(Register_C, arg_descriptor);
+        ? value_register_for_descriptor_internal(compiler_source_location, Register_Xmm0, arg_descriptor)
+        : value_register_for_descriptor_internal(compiler_source_location, Register_C, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 1: {
       Value *value = arg_descriptor->type == Descriptor_Type_Float
-        ? value_register_for_descriptor(Register_Xmm1, arg_descriptor)
-        : value_register_for_descriptor(Register_D, arg_descriptor);
+        ? value_register_for_descriptor_internal(compiler_source_location, Register_Xmm1, arg_descriptor)
+        : value_register_for_descriptor_internal(compiler_source_location, Register_D, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 2: {
       Value *value = arg_descriptor->type == Descriptor_Type_Float
-        ? value_register_for_descriptor(Register_Xmm2, arg_descriptor)
-        : value_register_for_descriptor(Register_R8, arg_descriptor);
+        ? value_register_for_descriptor_internal(compiler_source_location, Register_Xmm2, arg_descriptor)
+        : value_register_for_descriptor_internal(compiler_source_location, Register_R8, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 3: {
       Value *value = arg_descriptor->type == Descriptor_Type_Float
-        ? value_register_for_descriptor(Register_Xmm3, arg_descriptor)
-        : value_register_for_descriptor(Register_R9, arg_descriptor);
+        ? value_register_for_descriptor_internal(compiler_source_location, Register_Xmm3, arg_descriptor)
+        : value_register_for_descriptor_internal(compiler_source_location, Register_R9, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     default: {
@@ -747,6 +784,8 @@ function_push_argument(
     }
   }
 }
+#define function_push_argument(...)\
+  function_push_argument_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Descriptor *
 parse_c_type(
