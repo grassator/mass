@@ -927,7 +927,6 @@ call_function_value_array(
   if (match.value) {
     return call_function_overload(builder, location, match.value, arguments);
   }
-  dyn_array_destroy(arguments);
   assert(!"No matching overload found");
   return 0;
 }
@@ -950,7 +949,9 @@ call_function_value(
       dyn_array_push(arguments, arg);
     }
   }
-  return call_function_value_array(builder, location, to_call, arguments);
+  Value *result = call_function_value_array(builder, location, to_call, arguments);
+  dyn_array_destroy(arguments);
+  return result;
 }
 
 Value *

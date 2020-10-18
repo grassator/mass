@@ -27,27 +27,13 @@ scope_lookup(
   return 0;
 }
 
-Value *
+void
 token_force_value(
   Token *token,
   Scope *scope,
   Function_Builder *builder,
-  Value *value
+  Value *result_value
 );
-
-Value *
-token_force_value_or_result(
-  Token *token,
-  Scope *scope,
-  Function_Builder *builder,
-  Value *result
-) {
-  Value *maybe_return = token_force_value(token, scope, builder, result);
-  if (maybe_return && maybe_return->descriptor->type != Descriptor_Type_Void) {
-    move_value(&builder->instructions, &token->location, result, maybe_return);
-  }
-  return result;
-}
 
 Value *
 scope_lookup_force(
@@ -75,12 +61,14 @@ scope_lookup_force(
       for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
         Token *token = *dyn_array_get(tokens, i);
         if (!result) {
-          result = token_force_value(token, scope, builder, 0);
+          result = value_any();
+          token_force_value(token, scope, builder, result);
         } else {
           if (result->descriptor->type != Descriptor_Type_Function) {
             panic("Only functions should be lazy values");
           }
-          Value *overload = token_force_value(token, scope, builder, 0);
+          Value *overload = value_any();
+          token_force_value(token, scope, builder, overload);
           overload->descriptor->function.next_overload = result;
           result = overload;
         }
@@ -838,7 +826,7 @@ token_force_lazy_function_definition(
   Function_Builder *builder
 );
 
-Value *
+void
 token_match_expression(
   Program *program,
   Token_Matcher_State *state,
@@ -863,12 +851,12 @@ token_string_to_slice(
   };
 }
 
-Value *
+void
 token_force_value(
   Token *token,
   Scope *scope,
   Function_Builder *builder,
-  Value *target
+  Value *result_value
 ) {
   switch(token->type) {
     case Token_Type_Integer: {
@@ -879,9 +867,11 @@ token_force_value(
           program_error_append_literal("Invalid integer literal: ");
           program_error_append_slice(token->source);
         }
-        return 0;
+        return;
       }
-      return value_from_signed_immediate(number);
+      Value *immediate = value_from_signed_immediate(number);
+      move_value(&builder->instructions, &token->location, result_value, immediate);
+      return;
     }
     case Token_Type_Hex_Integer: {
       bool ok = false;
@@ -892,40 +882,52 @@ token_force_value(
           program_error_append_literal("Invalid integer hex literal: ");
           program_error_append_slice(token->source);
         }
-        return 0;
+        return;
       }
       // TODO should be unsigned
-      return value_from_signed_immediate(number);
+      Value *immediate = value_from_signed_immediate(number);
+      move_value(&builder->instructions, &token->location, result_value, immediate);
+      return;
     }
     case Token_Type_String: {
       Slice string = token_string_to_slice(token);
       Value *string_bytes = value_global_c_string_from_slice(builder->program, string);
-      return value_pointer_to(builder, &token->location, string_bytes);
+      Value *c_string_pointer = value_pointer_to(builder, &token->location, string_bytes);
+      move_value(&builder->instructions, &token->location, result_value, c_string_pointer);
+      return;
     }
     case Token_Type_Id: {
-      return scope_lookup_force(scope, token->source, builder);
+      Value *value = scope_lookup_force(scope, token->source, builder);
+      move_value(&builder->instructions, &token->location, result_value, value);
+      return;
     }
     case Token_Type_Value: {
-      return token->value;
+      move_value(&builder->instructions, &token->location, result_value, token->value);
+      return;
     }
     case Token_Type_Lazy_Function_Definition: {
-      return token_force_lazy_function_definition(&token->lazy_function_definition, builder);
+      Value *fn = token_force_lazy_function_definition(&token->lazy_function_definition, builder);
+      if (fn) {
+        move_value(&builder->instructions, &token->location, result_value, fn);
+      }
+      return;
     }
     case Token_Type_Paren: {
       if (!builder) panic("Caller should only force (...) in a builder context");
       Token_Matcher_State state = {.tokens = token->children};
-      return token_match_expression(builder->program, &state, scope, builder, target);
+      token_match_expression(builder->program, &state, scope, builder, result_value);
+      return;
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
-      token_parse_block(token->children, scope, builder, target);
-      return 0;
+      token_parse_block(token->children, scope, builder, result_value);
+      return;
     }
     case Token_Type_Module:
     case Token_Type_Square:
     case Token_Type_Operator: {
       panic("TODO");
-      return 0;
+      return;
     }
     case Token_Type_Newline: {
       program_push_error_from_slice(
@@ -933,11 +935,11 @@ token_force_value(
         token->location,
         slice_literal("Unexpected newline token")
       );
-      return 0;
+      return;
     }
   }
   panic("Not reached");
-  return 0;
+  return;
 }
 
 
@@ -964,11 +966,7 @@ token_match_call_arguments(
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
       Value *result_value = value_any();
-      Value *value = token_match_expression(builder->program, state, scope, builder, result_value);
-      // FIXME Hack for :TargetValue
-      if (value && value->descriptor->type != Descriptor_Type_Void) {
-        move_value(&builder->instructions, &token->location, result_value, value);
-      }
+      token_match_expression(builder->program, state, scope, builder, result_value);
       dyn_array_push(result, result_value);
     }
   }
@@ -1350,7 +1348,8 @@ token_rewrite_negative_literal(
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
   Token_Match(integer, .type = Token_Type_Integer);
-  Value *result = token_force_value(integer, scope, builder, value_any());
+  Value *result = value_any();
+  token_force_value(integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
     result->operand.imm8 = -result->operand.imm8;
   } else if (result->operand.type == Operand_Type_Immediate_32) {
@@ -1454,10 +1453,8 @@ token_rewrite_constant_definitions(
   if (token_value->type == Token_Type_Lazy_Function_Definition) {
     scope_define_lazy(scope, name->source, token_value);
   } else {
-    Value *result = token_force_value_or_result(token_value, scope, builder, value_any());
-    if (result->descriptor->type == Descriptor_Type_Any) {
-      panic("Ooops");
-    }
+    Value *result = value_any();
+    token_force_value(token_value, scope, builder, result);
     scope_define_value(scope, name->source, result);
   }
 
@@ -1520,14 +1517,13 @@ token_rewrite_statement_if(
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
-  Value *condition_value = token_force_value_or_result(condition, scope, builder, value_any());
-  if (condition_value) {
-    Label *else_label = make_if(&builder->instructions, &keyword->location, condition_value);
-    token_parse_block(body->children, scope, builder, value_any());
-    push_instruction(
-      &builder->instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
-    );
-  }
+  Value *condition_value = value_any();
+  token_force_value(condition, scope, builder, condition_value);
+  Label *else_label = make_if(&builder->instructions, &keyword->location, condition_value);
+  token_parse_block(body->children, scope, builder, value_any());
+  push_instruction(
+    &builder->instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
+  );
 
   token_replace_tokens_in_state(state, 3, 0);
   return true;
@@ -1577,22 +1573,14 @@ token_rewrite_explicit_return(
   );
   bool has_return_expression = dyn_array_length(rest) > 0;
   Value *fn_return = builder->descriptor->function.returns;
-  Value *to_return = token_match_expression(
-    builder->program, &(Token_Matcher_State){rest}, scope, builder, fn_return
-  );
+  token_match_expression(builder->program, &(Token_Matcher_State){rest}, scope, builder, fn_return);
 
   bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
-  if (has_return_expression) {
-    if (!is_void) {
-      move_value(&builder->instructions, &keyword->location, fn_return, to_return);
-    }
-  } else {
-    if (!is_void) {
-      program_push_error_from_slice(
-        builder->program, keyword->location,
-        slice_literal("Explicit return from a non-void function requires a value")
-      );
-    }
+  if (!is_void && !has_return_expression) {
+    program_push_error_from_slice(
+      builder->program, keyword->location,
+      slice_literal("Explicit return from a non-void function requires a value")
+    );
   }
 
   push_instruction(
@@ -1609,16 +1597,15 @@ bool
 token_rewrite_pointer_to(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match_Operator(operator, "&");
   Token_Match(value_token, 0);
 
-  Value *result = value_pointer_to(
-    builder, &operator->location, token_force_value(value_token, scope, builder, target)
-  );
+  Value *pointee = value_any();
+  token_force_value(value_token, scope, builder, pointee);
+  Value *result = value_pointer_to(builder, &operator->location, pointee);
   token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
   return true;
 }
@@ -1637,9 +1624,8 @@ token_match_fixed_array_type(
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
   // FIXME :TargetValue Make a convention to have this as a constant / immediate
-  Value *target = 0;
-  Value *size_value = token_match_expression(builder->program, &size_state, scope, builder, target);
-  if (!size_value) return 0;
+  Value *size_value = value_any();
+  token_match_expression(builder->program, &size_state, scope, builder, size_value);
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
       builder->program,
@@ -1783,8 +1769,8 @@ token_rewrite_definition_and_assignment_statements(
   if (name->type != Token_Type_Id) return false;
 
   Token_Matcher_State rhs_state = {rhs};
-  Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, value_any());
-  if (!value) return false;
+  Value *value = value_any();
+  token_match_expression(builder->program, &rhs_state, scope, builder, value);
   Value *on_stack = reserve_stack(builder, value->descriptor);
   move_value(&builder->instructions, &name->location, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
@@ -1804,9 +1790,11 @@ token_rewrite_array_index(
   Token_Match(target_token, 0);
   Token_Match(brackets, .type = Token_Type_Square);
 
-  Value *array = token_force_value(target_token, scope, builder, target);
+  Value *array = value_any();
+  token_force_value(target_token, scope, builder, array);
   Token_Matcher_State *index_state = &(Token_Matcher_State) {brackets->children};
-  Value *index_value = token_match_expression(builder->program, index_state, scope, builder, target);
+  Value *index_value = value_any();
+  token_match_expression(builder->program, index_state, scope, builder, index_value);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
@@ -1842,8 +1830,10 @@ token_rewrite_array_index(
     } else if (item_byte_size == 8) {
       scale = SIB_Scale_8;
     }
-    Value *index_value_in_register = ensure_register(
-      &builder->instructions, &target_token->location, index_value, Register_R10
+    Value *index_value_in_register =
+      value_register_for_descriptor(Register_R10, index_value->descriptor);
+    move_value(
+      &builder->instructions, &target_token->location, index_value_in_register, index_value
     );
     *result = (Value){
       .descriptor = item_descriptor,
@@ -1870,15 +1860,15 @@ bool
 token_rewrite_struct_field(
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
-  Value *target
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(struct_token, 0);
   Token_Match_Operator(dot, ".");
   Token_Match(field_name, .type = Token_Type_Id);
 
-  Value *struct_value = token_force_value(struct_token, scope, builder, target);
+  Value *struct_value = value_any();
+  token_force_value(struct_token, scope, builder, struct_value);
   Value *result = struct_get_field(struct_value, field_name->source);
 
   token_replace_tokens_in_state(state, 3, token_value_make(struct_token, result));
@@ -1900,15 +1890,15 @@ token_rewrite_assignment(
 
   Token_Matcher_State lhs_state = {lhs};
   token_rewrite_expression(&lhs_state, scope, builder, 0, token_rewrite_array_index);
-  token_rewrite_expression(&lhs_state, scope, builder, 0, token_rewrite_struct_field);
+  token_rewrite_statement(&lhs_state, scope, builder, token_rewrite_struct_field);
   token_rewrite_statement(&lhs_state, scope, builder, token_rewrite_definitions);
   if (!dyn_array_length(lhs_state.tokens)) {
     panic("Left hand side is checked to be non-empty when matched so something went wrong");
   }
-  Value *target = 0;
+  Value *target = value_any();
   if (dyn_array_length(lhs_state.tokens) == 1) {
     Token *token = *dyn_array_get(lhs_state.tokens, 0);
-    target = token_force_value(token, scope, builder, target);
+    token_force_value(token, scope, builder, target);
   } else {
     Token *first_token = *dyn_array_get(lhs_state.tokens, 0);
     program_push_error_from_slice(
@@ -1919,11 +1909,7 @@ token_rewrite_assignment(
   }
 
   Token_Matcher_State rhs_state = {rhs};
-  Value *value = token_match_expression(builder->program, &rhs_state, scope, builder, target);
-  // FIXME hack for :TargetValue
-  if (value->descriptor->type != Descriptor_Type_Void) {
-    move_value(&builder->instructions, &operator->location, target, value);
-  }
+  token_match_expression(builder->program, &rhs_state, scope, builder, target);
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
   return true;
@@ -1941,7 +1927,8 @@ token_rewrite_function_calls(
   Token_Match(args_token, .type = Token_Type_Paren);
   if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
 
-  Value *target = token_force_value_or_result(target_token, scope, builder, value_any());
+  Value *target = value_any();
+  token_force_value(target_token, scope, builder, target);
   Array_Value_Ptr args = token_match_call_arguments(args_token, scope, builder);
 
   if (target->descriptor->type != Descriptor_Type_Function) {
@@ -1952,6 +1939,7 @@ token_rewrite_function_calls(
     return false;
   }
   Value *return_value = call_function_value_array(builder, &target_token->location, target, args);
+  dyn_array_destroy(args);
   token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
   return true;
 }
@@ -1968,11 +1956,13 @@ token_rewrite_plus(
   Token_Match_Operator(op_token, "+");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
-  Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
-  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  plus(&builder->instructions, &op_token->location, temp, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
+  Value *lhs_value = value_any();
+  token_force_value(lhs, scope, builder, lhs_value);
+  Value *rhs_value = value_any();
+  token_force_value(rhs, scope, builder, rhs_value);
+  //Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
+  plus(&builder->instructions, &op_token->location, result_value, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
   return true;
 }
 
@@ -1988,11 +1978,12 @@ token_rewrite_minus(
   Token_Match_Operator(op_token, "-");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = token_force_value(lhs, scope, builder, result_value);
-  Value *rhs_value = token_force_value(rhs, scope, builder, result_value);
-  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  minus(&builder->instructions, &op_token->location, temp, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(op_token, temp));
+  Value *lhs_value = value_any();
+  token_force_value(lhs, scope, builder, lhs_value);
+  Value *rhs_value = value_any();
+  token_force_value(rhs, scope, builder, rhs_value);
+  minus(&builder->instructions, &op_token->location, result_value, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
   return true;
 }
 
@@ -2009,11 +2000,12 @@ token_rewrite_divide(
   Token_Match_Operator(operator, "/");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = token_force_value_or_result(lhs, scope, builder, value_any());
-  Value *rhs_value = token_force_value_or_result(rhs, scope, builder, value_any());
-  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  divide(builder, &operator->location, temp, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
+  Value *lhs_value = value_any();
+  token_force_value(lhs, scope, builder, lhs_value);
+  Value *rhs_value = value_any();
+  token_force_value(rhs, scope, builder, rhs_value);
+  divide(builder, &operator->location, result_value, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, result_value));
   return true;
 }
 
@@ -2029,8 +2021,10 @@ token_rewrite_remainder(
   Token_Match_Operator(operator, "%");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = token_force_value_or_result(lhs, scope, builder, value_any());
-  Value *rhs_value = token_force_value_or_result(rhs, scope, builder, value_any());
+  Value *lhs_value = value_any();
+  token_force_value(lhs, scope, builder, lhs_value);
+  Value *rhs_value = value_any();
+  token_force_value(rhs, scope, builder, rhs_value);
   Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
   value_remainder(builder, &operator->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
@@ -2082,13 +2076,11 @@ token_rewrite_compare(
   }
   Token_Match(rhs, 0);
 
-  Value *value = compare(
-    compare_type,
-    builder,
-    &operator->location,
-    token_force_value(lhs, scope, builder, result_value),
-    token_force_value(rhs, scope, builder, result_value)
-  );
+  Value *lhs_value = value_any();
+  token_force_value(lhs, scope, builder, lhs_value);
+  Value *rhs_value = value_any();
+  token_force_value(rhs, scope, builder, rhs_value);
+  Value *value = compare(compare_type, builder, &operator->location, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
   return true;
 }
@@ -2117,15 +2109,10 @@ token_match_statement(
   ) {
     return;
   }
-  Value *expression_result =
-    token_match_expression(builder->program, state, scope, builder, result_value);
-  // FIXME Hack :TargetValue
-  if (expression_result && expression_result->descriptor->type != Descriptor_Type_Void) {
-    move_value(&builder->instructions, location, result_value, expression_result);
-  }
+  token_match_expression(builder->program, state, scope, builder, result_value);
 }
 
-Value *
+void
 token_match_expression(
   Program *program,
   Token_Matcher_State *state,
@@ -2134,15 +2121,15 @@ token_match_expression(
   Value *result_value
 ) {
   if (!dyn_array_length(state->tokens)) {
-    return 0;
+    return;
   }
   token_rewrite_statement(state, scope, builder, token_clear_newlines);
   token_rewrite_statement(state, scope, builder, token_rewrite_cast);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_struct_field);
+  token_rewrite_statement(state, scope, builder, token_rewrite_struct_field);
   token_rewrite_statement(state, scope, builder, token_rewrite_functions);
   token_rewrite_statement(state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_function_calls);
-  token_rewrite_expression(state, scope, builder, result_value, token_rewrite_pointer_to);
+  token_rewrite_statement(state, scope, builder, token_rewrite_pointer_to);
 
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_divide);
   token_rewrite_expression(state, scope, builder, result_value, token_rewrite_remainder);
@@ -2153,17 +2140,19 @@ token_match_expression(
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
-      return &void_value;
+      return;
     }
     case 1: {
-      return token_force_value(*dyn_array_get(state->tokens, 0), scope, builder, result_value);
+      Token *token = *dyn_array_get(state->tokens, 0);
+      token_force_value(token, scope, builder, result_value);
+      return;
     }
     default: {
       Token *token = *dyn_array_get(state->tokens, 0);
       program_push_error_from_slice(
         program, token->location, slice_literal("Could not parse the expression")
       );
-      return 0;
+      return;
     }
   }
 }
@@ -2368,5 +2357,4 @@ program_import_file(
 
   return program_parse(program, file_path, source);
 }
-
 
