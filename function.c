@@ -932,29 +932,6 @@ call_function_value_array(
 }
 
 Value *
-call_function_value(
-  Function_Builder *builder,
-  const Source_Location *location,
-  Value *to_call,
-  ...
-) {
-  assert(to_call);
-  Array_Value_Ptr arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator);
-  {
-    va_list va_values;
-    va_start(va_values, to_call);
-    for(;;) {
-      Value *arg = va_arg(va_values, Value *);
-      if (!arg) break;
-      dyn_array_push(arguments, arg);
-    }
-  }
-  Value *result = call_function_value_array(builder, location, to_call, arguments);
-  dyn_array_destroy(arguments);
-  return result;
-}
-
-Value *
 make_and(
   Function_Builder *builder,
   const Source_Location *location,
