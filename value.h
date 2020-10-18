@@ -528,6 +528,7 @@ typedef struct _Program {
   s64 data_base_rva;
   Scope *global_scope;
   Array_Parse_Error errors;
+  bool is_stack_unwinding_in_progress;
 } Program;
 
 typedef struct {

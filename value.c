@@ -1036,6 +1036,98 @@ program_test_exception_handler(
   Function_Builder **builder_pointer = DispatcherContext->HandlerData;
   Function_Builder *builder = *builder_pointer;
 
+  if (!builder->program->is_stack_unwinding_in_progress) {
+    builder->program->is_stack_unwinding_in_progress = true;
+    printf("Unhandled Exception: ");
+    switch(ExceptionRecord->ExceptionCode) {
+      case EXCEPTION_ACCESS_VIOLATION: {
+        printf("Access Violation");
+        break;
+      }
+      case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: {
+        printf("Hardware Array Bounds Check Failed");
+        break;
+      }
+      case EXCEPTION_BREAKPOINT: {
+        printf("User Breakpoint");
+        break;
+      }
+      case EXCEPTION_DATATYPE_MISALIGNMENT: {
+        printf("Misaligned Read / Write");
+        break;
+      }
+      case EXCEPTION_FLT_DENORMAL_OPERAND: {
+        printf("Denormal Float Value Result");
+        break;
+      }
+      case EXCEPTION_FLT_DIVIDE_BY_ZERO: {
+        printf("Float Divide By Zero");
+        break;
+      }
+      case EXCEPTION_FLT_INEXACT_RESULT: {
+        printf("Float Inexact Decimal Fraction");
+        break;
+      }
+      case EXCEPTION_FLT_INVALID_OPERATION: {
+        printf("Float Invalid Operation");
+        break;
+      }
+      case EXCEPTION_FLT_OVERFLOW: {
+        printf("Float Overflow");
+        break;
+      }
+      case EXCEPTION_FLT_STACK_CHECK: {
+        printf("Stack Overflow After Float Operation");
+        break;
+      }
+      case EXCEPTION_FLT_UNDERFLOW: {
+        printf("Float Underflow");
+        break;
+      }
+      case EXCEPTION_ILLEGAL_INSTRUCTION: {
+        printf("Illegal Machine Code Instruction");
+        break;
+      }
+      case EXCEPTION_IN_PAGE_ERROR: {
+        printf("Read Missing Memory Page");
+        break;
+      }
+      case EXCEPTION_INT_DIVIDE_BY_ZERO: {
+        printf("Integer Divide By Zero");
+        break;
+      }
+      case EXCEPTION_INT_OVERFLOW: {
+        printf("Integer Overflow");
+        break;
+      }
+      case EXCEPTION_INVALID_DISPOSITION: {
+        printf("Invalid Disposition From An Exception Handler");
+        break;
+      }
+      case EXCEPTION_NONCONTINUABLE_EXCEPTION: {
+        printf("Continue Execution After Noncontinuable Exception");
+        break;
+      }
+      case EXCEPTION_PRIV_INSTRUCTION: {
+        printf("Instruction Not Allowed In Current CPU Mode");
+        break;
+      }
+      case EXCEPTION_SINGLE_STEP: {
+        printf("Single Step Instruction");
+        break;
+      }
+      case EXCEPTION_STACK_OVERFLOW: {
+        printf("Stack Overflow");
+        break;
+      }
+      default: {
+        printf("Unknown");
+        break;
+      }
+    }
+    printf(".\n");
+  }
+
   u64 current_offset = 0;
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
@@ -1045,7 +1137,7 @@ program_test_exception_handler(
     if (current_offset == relative_instruction_byte_offset) {
       const Source_Location *source_location = instruction->source_location;
       printf(
-        "Source code at %.*s:(%llu:%llu)\n",
+        "  at %.*s:(%llu:%llu)\n",
         u64_to_s32(source_location->filename.length),
         source_location->filename.bytes,
         source_location->line,
