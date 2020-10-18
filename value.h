@@ -426,6 +426,22 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 
 typedef struct _Program Program;
 
+typedef struct {
+  s32 stack_reserve;
+  u32 max_call_parameters_stack_size;
+
+  Label *prolog_label;
+  Label *epilog_label;
+
+  Array_Instruction instructions;
+
+  Descriptor *descriptor;
+  Program *program;
+
+  Value *value;
+} Function_Builder;
+typedef dyn_array_type(Function_Builder) Array_Function_Builder;
+
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=vs-2019#unwind-data-definitions-in-c
 typedef enum _UNWIND_OP_CODES {
   UWOP_PUSH_NONVOL = 0, /* info == register number */
@@ -449,6 +465,10 @@ typedef union {
   u16 DataForPreviousCode;
 } UNWIND_CODE;
 
+#define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK 2
+#define UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES (sizeof(u32) / sizeof(UNWIND_CODE))
+#define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (sizeof(void *) / sizeof(UNWIND_CODE))
+
 typedef struct {
   u8 Version       : 3;
   u8 Flags         : 5;
@@ -456,30 +476,14 @@ typedef struct {
   u8 CountOfCodes;
   u8 FrameRegister : 4;
   u8 FrameOffset   : 4;
+  // FIXME actually turn this into a variadic struct with getter functions
   // :RegisterAllocation need to add more reserved space for UnwindCode
-  UNWIND_CODE UnwindCode[2 + 2];
-/*  union {
-*       OPTIONAL u32 ExceptionHandler;
-*       OPTIONAL u32 FunctionEntry;
-*   };
-*   OPTIONAL u32 ExceptionData[]; */
+  UNWIND_CODE UnwindCode[
+    UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK +
+    UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES +
+    UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES
+  ];
 } UNWIND_INFO;
-
-typedef struct {
-  s32 stack_reserve;
-  u32 max_call_parameters_stack_size;
-
-  Label *prolog_label;
-  Label *epilog_label;
-
-  Array_Instruction instructions;
-
-  Descriptor *descriptor;
-  Program *program;
-
-  Value *value;
-} Function_Builder;
-typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct Scope Scope;
 

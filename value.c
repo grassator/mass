@@ -1023,12 +1023,19 @@ program_deinit(
 
 EXCEPTION_DISPOSITION
 program_test_exception_handler(
-  PEXCEPTION_RECORD ExceptionRecord,
-  ULONG64 EstablisherFrame,
-  PCONTEXT ContextRecord,
-  PDISPATCHER_CONTEXT DispatcherContext
+  EXCEPTION_RECORD *ExceptionRecord,
+  u64 EstablisherFrame,
+  CONTEXT *ContextRecord,
+  DISPATCHER_CONTEXT *DispatcherContext
 ) {
-  printf("RIP: %llx\n", ContextRecord->Rip);
+  //printf("RIP: %llx\n", ContextRecord->Rip);
+  //RUNTIME_FUNCTION *function = DispatcherContext->FunctionEntry;
+  //UNWIND_INFO *info = (void *)(DispatcherContext->ImageBase + function->UnwindInfoAddress);
+  //u64 handler_data_offset =
+    //u64_align(info->CountOfCodes, 2) + UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES;
+  //Function_Builder *builder = (void *)(info->UnwindCode + handler_data_offset);
+  Function_Builder **builder = DispatcherContext->HandlerData;
+  (void)builder;
   return ExceptionContinueSearch;
 }
 
@@ -1107,6 +1114,9 @@ program_end(
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
       u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
       *exception_handler_address = trampoline_virtual_address;
+      Function_Builder **exception_data = (void *)(exception_handler_address + 1);
+      *exception_data = builder;
+      printf("Exception Data Address: 0x%llx\n", (u64)exception_data);
     }
   }
 
