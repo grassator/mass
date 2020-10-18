@@ -508,10 +508,13 @@ instruction_equal(
   const Instruction *a,
   const Instruction *b
 ) {
-  return (
-    memcmp(&a->mnemonic, &b->mnemonic, sizeof(X64_Mnemonic)) == 0 &&
-    memcmp(a->operands, b->operands, sizeof(a->operands)) == 0
-  );
+  if (a->mnemonic != b->mnemonic) return false;
+  for (u64 i = 0; i < countof(a->operands); ++i) {
+    if (!operand_equal(&a->operands[i], &b->operands[i])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 Value *
