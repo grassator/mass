@@ -222,15 +222,20 @@ encode_text_section(
 
   program->code_base_rva = header->VirtualAddress;
 
+  bool found_entry_point = false;
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     if (builder->value == program->entry_point) {
       result.entry_point_rva = get_rva();
+      found_entry_point = true;
     }
     RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
     UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
     u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
     fn_encode(result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
+  }
+  if (!found_entry_point) {
+    panic("Internal error: Could not find entry point in the list of program functions");
   }
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
