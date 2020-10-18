@@ -83,6 +83,10 @@ int main(s32 argc, char **argv) {
   if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
 
   program->entry_point = scope_lookup_force(program->global_scope, slice_literal("main"), 0);
+  if (!program->entry_point) {
+    printf("Could not find entry point function `main`");
+    return -1;
+  }
   if (dyn_array_length(program->errors)) return mass_cli_print_errors(program->errors);
 
   switch(mode) {
