@@ -155,6 +155,12 @@ operand_type_string(
   Operand_Type type
 );
 
+static inline bool
+operand_equal(
+  const Operand *a,
+  const Operand *b
+);
+
 struct Descriptor;
 
 

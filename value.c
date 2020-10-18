@@ -443,12 +443,64 @@ operand_is_immediate(
   return false;
 }
 
-bool
+static inline bool
 operand_equal(
   const Operand *a,
   const Operand *b
 ) {
-  return memcmp(a, b, sizeof(Operand)) == 0;
+  if (a->type != b->type) return false;
+  if (a->byte_size != b->byte_size) return false;
+  switch(a->type) {
+    case Operand_Type_Immediate_8: {
+      return a->imm8 == b->imm8;
+    }
+    case Operand_Type_Immediate_16: {
+      return a->imm16 == b->imm16;
+    }
+    case Operand_Type_Immediate_32: {
+      return a->imm32 == b->imm32;
+    }
+    case Operand_Type_Immediate_64: {
+      return a->imm64 == b->imm64;
+    }
+    case Operand_Type_Label_32: {
+      return a->label32 == b->label32;
+    }
+    case Operand_Type_Xmm:
+    case Operand_Type_Register: {
+      return a->reg == b->reg;
+    }
+    case Operand_Type_Any: {
+      return false; // Is this the semantics I want though?
+    }
+    case Operand_Type_None: {
+      return true;
+    }
+    case Operand_Type_Sib: {
+      return (
+        a->sib.scale == b->sib.scale &&
+        a->sib.index == b->sib.index &&
+        a->sib.base == b->sib.base
+      );
+    }
+    case Operand_Type_Memory_Indirect: {
+      return (
+        a->indirect.reg == b->indirect.reg &&
+        a->indirect.displacement == b->indirect.displacement
+      );
+    }
+    case Operand_Type_RIP_Relative_Import: {
+      return (
+        slice_equal(a->import.library_name, b->import.library_name) &&
+        slice_equal(a->import.symbol_name, b->import.symbol_name)
+      );
+    }
+    case Operand_Type_RIP_Relative: {
+      return a->rip_offset_in_data == b->rip_offset_in_data;
+    }
+  }
+  panic("Unknown operand type");
+  return false;
 }
 
 bool
