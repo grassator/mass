@@ -240,12 +240,18 @@ spec("source") {
   }
 
   it("should be unwind stack on hardware exception") {
-    test_program_inline_source(
-      "inner :: (x : s32) -> (s32) { x / x }\n"
-      "foo :: (x : s32) -> (s32) { inner(x) }",
-      foo
-    );
-    fn_type_s32_to_s32 checker = value_as_function(foo, fn_type_s32_to_s32);
+    Parse_Result result =
+      program_import_file(program_, slice_literal("fixtures\\error_runtime_divide_by_zero"));
+    check(result.type == Parse_Result_Type_Success);
+    Value *main =
+      scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+    check(main);
+
+    program_end(program_);
+    check(!dyn_array_length(program_->errors))
+
+    fn_type_s32_to_s32 checker = value_as_function(main, fn_type_s32_to_s32);
+
     volatile bool caught_exception = false;
     __try {
       checker(0);

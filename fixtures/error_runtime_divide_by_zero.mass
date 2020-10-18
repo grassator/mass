@@ -1,0 +1,2 @@
+inner :: (x : s32) -> (s32) { x / x }
+main :: () -> () { inner(0) }
