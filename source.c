@@ -14,6 +14,23 @@ scope_make(
   return scope;
 }
 
+void
+scope_print_names(
+  Scope *scope
+) {
+  while (scope) {
+    for (u64 i = 0; i < scope->map->capacity; ++i) {
+      Scope_Map__Entry *entry = &scope->map->entries[i];
+      if (entry->occupied) {
+        slice_print(entry->key);
+        printf(" ; ");
+      }
+    }
+    scope = scope->parent;
+  }
+  printf("\n");
+}
+
 Scope_Entry *
 scope_lookup(
   Scope *scope,
