@@ -433,6 +433,14 @@ encode_instruction(
     location->line_number,
     location->function_name
   );
+  const Source_Location *source_location = instruction.source_location;
+  printf(
+    "Source code at %.*s:(%llu:%llu)\n",
+    u64_to_s32(source_location->filename.length),
+    source_location->filename.bytes,
+    source_location->line,
+    source_location->column
+  );
   printf("%s", instruction.mnemonic->name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction.operands[operand_index];
