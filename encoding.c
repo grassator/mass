@@ -38,10 +38,10 @@ void
 encode_instruction(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
-  Instruction instruction
+  Instruction *instruction
 ) {
-  if (instruction.maybe_label) {
-    Label *label = instruction.maybe_label;
+  if (instruction->maybe_label) {
+    Label *label = instruction->maybe_label;
     assert(!label->target);
     label->target = buffer->memory + buffer->occupied;
 
@@ -51,16 +51,18 @@ encode_instruction(
       assert(diff >= 0);
       *label_location->patch_target = s64_to_s32(diff);
     }
+    instruction->encoded_byte_size = 0;
     return;
   }
 
-  u32 operand_count = sizeof(instruction.operands) / sizeof(instruction.operands[0]);
-  for (u32 index = 0; index < instruction.mnemonic->encoding_count; ++index) {
-    const Instruction_Encoding *encoding = &instruction.mnemonic->encoding_list[index];
+  u64 original_buffer_length = buffer->occupied;
+  u32 operand_count = sizeof(instruction->operands) / sizeof(instruction->operands[0]);
+  for (u32 index = 0; index < instruction->mnemonic->encoding_count; ++index) {
+    const Instruction_Encoding *encoding = &instruction->mnemonic->encoding_list[index];
     bool match = true;
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
-      Operand *operand = &instruction.operands[operand_index];
+      Operand *operand = &instruction->operands[operand_index];
 
       if (operand_encoding->size != Operand_Size_Any) {
         if (operand->byte_size != s32_to_u32(operand_encoding->size)) {
@@ -215,7 +217,7 @@ encode_instruction(
     s32 displacement = 0;
 
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-      Operand *operand = &instruction.operands[operand_index];
+      Operand *operand = &instruction->operands[operand_index];
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
 
       if (operand->byte_size == 2) {
@@ -362,7 +364,7 @@ encode_instruction(
     // Write out displacement
     if (needs_mod_r_m && mod != MOD_Register) {
       for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-        Operand *operand = &instruction.operands[operand_index];
+        Operand *operand = &instruction->operands[operand_index];
         if (operand->type == Operand_Type_RIP_Relative_Import) {
           Program *program = builder->program;
           s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
@@ -397,7 +399,7 @@ encode_instruction(
     }
     // Write out immediate operand(s?)
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-      Operand *operand = &instruction.operands[operand_index];
+      Operand *operand = &instruction->operands[operand_index];
       if (operand->type == Operand_Type_Label_32) {
         if (operand->label32->target) {
           u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
@@ -424,16 +426,21 @@ encode_instruction(
         fixed_buffer_append_s64(buffer, operand->imm64);
       }
     }
+
+    instruction->encoded_byte_size = u64_to_u8(
+      buffer->occupied - original_buffer_length
+    );
+
     return;
   }
-  const Compiler_Source_Location *location = instruction.compiler_source_location;
+  const Compiler_Source_Location *location = instruction->compiler_source_location;
   printf(
     "Added in compiler at %s:%u (fn: %s)\n",
     location->filename,
     location->line_number,
     location->function_name
   );
-  const Source_Location *source_location = instruction.source_location;
+  const Source_Location *source_location = instruction->source_location;
   printf(
     "Source code at %.*s:(%llu:%llu)\n",
     u64_to_s32(source_location->filename.length),
@@ -441,9 +448,9 @@ encode_instruction(
     source_location->line,
     source_location->column
   );
-  printf("%s", instruction.mnemonic->name);
+  printf("%s", instruction->mnemonic->name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-    Operand *operand = &instruction.operands[operand_index];
+    Operand *operand = &instruction->operands[operand_index];
     printf(" ");
     print_operand(operand);
   }

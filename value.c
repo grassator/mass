@@ -1028,13 +1028,32 @@ program_test_exception_handler(
   CONTEXT *ContextRecord,
   DISPATCHER_CONTEXT *DispatcherContext
 ) {
-  //printf("RIP: %llx\n", ContextRecord->Rip);
-  //RUNTIME_FUNCTION *function = DispatcherContext->FunctionEntry;
-  //UNWIND_INFO *info = (void *)(DispatcherContext->ImageBase + function->UnwindInfoAddress);
-  //u64 handler_data_offset =
-    //u64_align(info->CountOfCodes, 2) + UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES;
-  //Function_Builder *builder = (void *)(info->UnwindCode + handler_data_offset);
-  Function_Builder **builder = DispatcherContext->HandlerData;
+  RUNTIME_FUNCTION *function = DispatcherContext->FunctionEntry;
+  u64 absolute_function_begin_address = DispatcherContext->ImageBase + function->BeginAddress;
+  u64 relative_instruction_byte_offset =
+    DispatcherContext->ControlPc - absolute_function_begin_address;
+
+  Function_Builder **builder_pointer = DispatcherContext->HandlerData;
+  Function_Builder *builder = *builder_pointer;
+
+  u64 current_offset = 0;
+  for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->instructions, i);
+    // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
+    // so we add instruction byte size before comparing
+    current_offset += instruction->encoded_byte_size;
+    if (current_offset == relative_instruction_byte_offset) {
+      const Source_Location *source_location = instruction->source_location;
+      printf(
+        "Source code at %.*s:(%llu:%llu)\n",
+        u64_to_s32(source_location->filename.length),
+        source_location->filename.bytes,
+        source_location->line,
+        source_location->column
+      );
+    }
+  }
+
   (void)builder;
   return ExceptionContinueSearch;
 }
@@ -1116,7 +1135,6 @@ program_end(
       *exception_handler_address = trampoline_virtual_address;
       Function_Builder **exception_data = (void *)(exception_handler_address + 1);
       *exception_data = builder;
-      printf("Exception Data Address: 0x%llx\n", (u64)exception_data);
     }
   }
 

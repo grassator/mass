@@ -250,8 +250,8 @@ make_trampoline(
 ) {
   u32 result = u64_to_u32(buffer->occupied);
   // TODO maybe we want a builder here
-  encode_instruction(buffer, 0, (Instruction) {mov, {rax, imm64(address)}});
-  encode_instruction(buffer, 0, (Instruction) {jmp, {rax}});
+  encode_instruction(buffer, 0, &(Instruction) {mov, {rax, imm64(address)}});
+  encode_instruction(buffer, 0, &(Instruction) {jmp, {rax}});
   return result;
 }
 
@@ -282,24 +282,24 @@ fn_encode(
 
   s64 code_base_rva = builder->program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
-  encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->prolog_label});
-  encode_instruction(buffer, builder, (Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->prolog_label});
+  encode_instruction(buffer, builder, &(Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
   u32 stack_allocation_offset_in_prolog =
     u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
 
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
-    encode_instruction(buffer, builder, *instruction);
+    encode_instruction(buffer, builder, instruction);
   }
 
-  encode_instruction(buffer, builder, (Instruction) {.maybe_label = builder->epilog_label});
-  encode_instruction(buffer, builder, (Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->epilog_label});
+  encode_instruction(buffer, builder, &(Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
 
-  encode_instruction(buffer, builder, (Instruction) {ret, {0}});
+  encode_instruction(buffer, builder, &(Instruction) {ret, {0}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
-  encode_instruction(buffer, builder, (Instruction) {int3, {0}});
+  encode_instruction(buffer, builder, &(Instruction) {int3, {0}});
 
   if (function_exception_info || unwind_info) {
     // Make sure either both or none are provided
@@ -343,8 +343,6 @@ fn_encode(
       .UnwindData = unwind_data_rva,
     };
   }
-
-  dyn_array_destroy(builder->instructions);
 }
 
 Value *
