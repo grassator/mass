@@ -225,7 +225,7 @@ encode_text_section(
   bool found_entry_point = false;
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder->value == program->entry_point) {
+    if (operand_equal(&builder->value->operand, &program->entry_point->operand)) {
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
