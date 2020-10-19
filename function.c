@@ -70,6 +70,8 @@ move_value(
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
+  assert(target_size >= source_size);
+
   if (
     target->descriptor->type == Descriptor_Type_Float ||
     source->descriptor->type == Descriptor_Type_Float
@@ -138,6 +140,18 @@ move_value(
     return;
   }
 
+  if (operand_is_immediate(&source->operand)) {
+    if (
+      target->operand.type == Operand_Type_Register &&
+      operand_immediate_as_s64(&source->operand) == 0
+    ) {
+      // This messes up flags register so comparisons need to be aware of this optimization
+      push_instruction(instructions, location, (Instruction) {xor, {target->operand, target->operand}});
+      return;
+    }
+
+  }
+
   // TODO figure out more type checking
 
   if (target_size != source_size) {
@@ -176,20 +190,6 @@ move_value(
     Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
     move_value(instructions, location, reg_a, source);
     move_value(instructions, location, target, reg_a);
-    return;
-  }
-
-  if (
-    target->operand.type == Operand_Type_Register &&
-    (
-      (source->operand.type == Operand_Type_Immediate_64 && source->operand.imm64 == 0) ||
-      (source->operand.type == Operand_Type_Immediate_32 && source->operand.imm32 == 0) ||
-      (source->operand.type == Operand_Type_Immediate_16 && source->operand.imm16 == 0) ||
-      (source->operand.type == Operand_Type_Immediate_8  && source->operand.imm8 == 0)
-    )
-  ) {
-    // This messes up flags register so comparisons need to be aware of this optimization
-    push_instruction(instructions, location, (Instruction) {xor, {target->operand, target->operand, 0}});
     return;
   }
 

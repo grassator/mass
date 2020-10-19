@@ -419,6 +419,7 @@ operand_immediate_as_s64(
   Operand *operand
 ) {
   if (operand->type == Operand_Type_Immediate_8) return operand->imm8;
+  if (operand->type == Operand_Type_Immediate_16) return operand->imm16;
   if (operand->type == Operand_Type_Immediate_32) return operand->imm32;
   if (operand->type == Operand_Type_Immediate_64) return operand->imm64;
   assert(!"Expected and immediate operand");

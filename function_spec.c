@@ -57,6 +57,28 @@ spec("function") {
       check(operand_equal(&reg_a->operand, &reg_b->operand));
       check(dyn_array_length(instructions) == 0);
     }
+    it("should be use `xor` to clear the register instead of move of 0") {
+      Descriptor *descriptors[] = {
+        &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
+      };
+      Value *immediates[] = {
+        value_from_s8(0), value_from_s16(0), value_from_s32(0), value_from_s64(0),
+      };
+      for (u64 i = 0; i < countof(descriptors); ++i) {
+        Value *reg_a = value_register_for_descriptor(Register_A, descriptors[i]);
+        // We end at the current descriptor index to make sure we do not
+        // try to move larger immediate into a smaller register
+        for (u64 j = 0; j <= u64_min(i, countof(immediates)); ++j) {
+          dyn_array_clear(instructions);
+          move_value(&instructions, &test_location, reg_a, immediates[j]);
+          check(dyn_array_length(instructions) == 1);
+          Instruction *instruction = dyn_array_get(instructions, 0);
+          check(instruction_equal(
+            instruction, &(Instruction){xor, reg_a->operand, reg_a->operand}
+          ));
+        }
+      }
+    }
   }
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {
