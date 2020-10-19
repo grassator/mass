@@ -149,6 +149,52 @@ spec("function") {
         dyn_array_get(instructions, 1), &(Instruction){mov, memory->operand, reg_a->operand}
       ));
     }
+    it("should use appropriate setCC instruction when moving from eflags") {
+      struct { Compare_Type compare_type; const X64_Mnemonic *mnemonic; } tests[] = {
+        { Compare_Type_Equal, sete },
+        { Compare_Type_Less, setl },
+        { Compare_Type_Greater_Equal, setge },
+      };
+      for (u64 i = 0; i < countof(tests); ++i) {
+        dyn_array_clear(instructions);
+        Value *memory = &(Value){&descriptor_s8, stack(0, 1)};
+        Value *eflags = value_from_compare(tests[i].compare_type);
+        move_value(&instructions, &test_location, memory, eflags);
+        check(dyn_array_length(instructions) == 1);
+        Instruction *instruction = dyn_array_get(instructions, 0);
+        check(instruction->mnemonic == tests[i].mnemonic);
+        check(operand_equal(&instruction->operands[0], &memory->operand));
+        check(operand_equal(&instruction->operands[1], &eflags->operand));
+      }
+    }
+    it("should use a temporary register for setCC to more than a byte") {
+      struct { Descriptor *descriptor; } tests[] = {
+        { &descriptor_s16 },
+        { &descriptor_s32 },
+        { &descriptor_s64 },
+      };
+      for (u64 i = 0; i < countof(tests); ++i) {
+        dyn_array_clear(instructions);
+        Value *memory = &(Value){
+          tests[i].descriptor,
+          stack(0, descriptor_byte_size(tests[i].descriptor))
+        };
+        Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
+        Value *resized_reg_a = value_register_for_descriptor(Register_A, tests[i].descriptor);
+        Value *eflags = value_from_compare(Compare_Type_Equal);
+        move_value(&instructions, &test_location, memory, eflags);
+        check(dyn_array_length(instructions) == 3);
+        check(instruction_equal(
+          dyn_array_get(instructions, 0), &(Instruction){sete, reg_a->operand, eflags->operand}
+        ));
+        check(instruction_equal(
+          dyn_array_get(instructions, 1), &(Instruction){movsx, resized_reg_a->operand, reg_a->operand}
+        ));
+        check(instruction_equal(
+          dyn_array_get(instructions, 2), &(Instruction){mov, memory->operand, resized_reg_a->operand}
+        ));
+      }
+    }
   }
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {

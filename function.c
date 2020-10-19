@@ -107,7 +107,7 @@ move_value(
       : value_register_for_descriptor(Register_A, &descriptor_s8);
     switch(source->operand.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, location, (Instruction) {setz, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {sete, {temp->operand, source->operand, 0}});
         break;
       }
       case Compare_Type_Not_Equal: {
