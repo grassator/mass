@@ -141,15 +141,46 @@ move_value(
   }
 
   if (operand_is_immediate(&source->operand)) {
-    if (
-      target->operand.type == Operand_Type_Register &&
-      operand_immediate_as_s64(&source->operand) == 0
-    ) {
+    s64 immediate = operand_immediate_as_s64(&source->operand);
+    if (immediate == 0 && target->operand.type == Operand_Type_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_instruction(instructions, location, (Instruction) {xor, {target->operand, target->operand}});
       return;
     }
-
+    Value *adjusted_source = 0;
+    switch(target_size) {
+      case 1: {
+        adjusted_source = value_from_s8(s64_to_s8(immediate));
+        break;
+      }
+      case 2: {
+        adjusted_source = value_from_s16(s64_to_s16(immediate));
+        break;
+      }
+      case 4: {
+        adjusted_source = value_from_s32(s64_to_s32(immediate));
+        break;
+      }
+      case 8: {
+        if (s64_fits_into_s32(immediate)) {
+          adjusted_source = value_from_s32(s64_to_s32(immediate));
+        } else {
+          adjusted_source = value_from_s64(immediate);
+        }
+        break;
+      }
+    }
+    // Because of 15 byte instruction limit on x86 there is no way to move 64bit immediate
+    // to a memory location. In which case we do a move through a temp register
+    bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
+    if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
+      Value *temp = value_register_for_descriptor(Register_A, target->descriptor);
+      push_instruction(instructions, location, (Instruction) {mov, {temp->operand, adjusted_source->operand}});
+      push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand}});
+    } else {
+      push_instruction(instructions, location, (Instruction) {mov, {target->operand, adjusted_source->operand}});
+    }
+    return;
   }
 
   // TODO figure out more type checking
@@ -192,10 +223,6 @@ move_value(
     move_value(instructions, location, target, reg_a);
     return;
   }
-
-  //if (source->operand.type == Operand_Type_Immediate_64 && ((s32)source->operand.imm64) >= 0) {
-    //move_value(builder, target, value_from_s32(source->operand.imm32));
-  //}
 
   if ((
     target->operand.type != Operand_Type_Register &&

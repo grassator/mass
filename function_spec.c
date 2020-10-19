@@ -79,6 +79,76 @@ spec("function") {
         }
       }
     }
+    it("should be able to do a single instruction move for imm to a register") {
+      Descriptor *descriptors[] = {
+        &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
+      };
+      Value *immediates[] = {
+        value_from_s8(42), value_from_s16(4200), value_from_s32(42000), value_from_s64(42ll << 32ll),
+      };
+      for (u64 i = 0; i < countof(descriptors); ++i) {
+        Value *reg_a = value_register_for_descriptor(Register_A, descriptors[i]);
+        // We end at the current descriptor index to make sure we do not
+        // try to move larger immediate into a smaller register
+        for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
+          dyn_array_clear(instructions);
+          move_value(&instructions, &test_location, reg_a, immediates[j]);
+          check(dyn_array_length(instructions) == 1);
+          Instruction *instruction = dyn_array_get(instructions, 0);
+          check(instruction->mnemonic == mov);
+          check(operand_equal(&instruction->operands[0], &reg_a->operand));
+          s64 actual_immediate = operand_immediate_as_s64(&instruction->operands[1]);
+          s64 expected_immediate = operand_immediate_as_s64(&immediates[j]->operand);
+          check(actual_immediate == expected_immediate);
+        }
+      }
+    }
+    it("should be able to do a single instruction move for non-64bit imm to memory") {
+      Descriptor *descriptors[] = {
+        &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
+      };
+      Value *immediates[] = {
+        value_from_s8(42), value_from_s16(4200), value_from_s32(42000),
+      };
+      for (u64 i = 0; i < countof(descriptors); ++i) {
+        Value *memory = &(Value){descriptors[i], stack(0, descriptor_byte_size(descriptors[i]))};
+        // We end at the current descriptor index to make sure we do not
+        // try to move larger immediate into a smaller register
+        for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
+          dyn_array_clear(instructions);
+          move_value(&instructions, &test_location, memory, immediates[j]);
+          check(dyn_array_length(instructions) == 1);
+          Instruction *instruction = dyn_array_get(instructions, 0);
+          check(instruction->mnemonic == mov);
+          check(operand_equal(&instruction->operands[0], &memory->operand));
+          s64 actual_immediate = operand_immediate_as_s64(&instruction->operands[1]);
+          s64 expected_immediate = operand_immediate_as_s64(&immediates[j]->operand);
+          check(actual_immediate == expected_immediate);
+        }
+      }
+    }
+    it("should use a 32bit immediate when the value fits for a move to a 64bit value") {
+      Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
+      move_value(&instructions, &test_location, memory, value_from_s64(42000));
+      check(dyn_array_length(instructions) == 1);
+      Instruction *instruction = dyn_array_get(instructions, 0);
+      check(instruction->mnemonic == mov);
+      check(operand_equal(&instruction->operands[0], &memory->operand));
+      check(instruction->operands[1].byte_size == 4);
+    }
+    it("should use a temp register for a imm64 to memory move") {
+      Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
+      Value *immediate = value_from_s64(42ll << 32);
+      move_value(&instructions, &test_location, memory, immediate);
+      check(dyn_array_length(instructions) == 2);
+      Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
+      check(instruction_equal(
+        dyn_array_get(instructions, 0), &(Instruction){mov, reg_a->operand, immediate->operand}
+      ));
+      check(instruction_equal(
+        dyn_array_get(instructions, 1), &(Instruction){mov, memory->operand, reg_a->operand}
+      ));
+    }
   }
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {
