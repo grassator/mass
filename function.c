@@ -844,10 +844,10 @@ compare(
   Value *temp_b = reserve_stack(builder, larger_descriptor);
   move_value(&builder->instructions, location, temp_b, b);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
-  move_value(&builder->instructions, location,  reg_a, a);
+  Value *reg_r11 = value_register_for_descriptor(Register_R11, larger_descriptor);
+  move_value(&builder->instructions, location,  reg_r11, a);
 
-  push_instruction(&builder->instructions, location, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
+  push_instruction(&builder->instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
 
   return value_from_compare(operation);
 }

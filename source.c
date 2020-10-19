@@ -2042,7 +2042,7 @@ token_rewrite_remainder(
   token_force_value(lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(rhs, scope, builder, rhs_value);
-  Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
+  Value *temp = reserve_stack(builder, lhs_value->descriptor);
   value_remainder(builder, &operator->location, temp, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
   return true;
@@ -2092,6 +2092,11 @@ token_rewrite_compare(
     }
   }
   Token_Match(rhs, 0);
+
+  //Value *lhs_value_raw = value_any();
+  //token_force_value(lhs, scope, builder, lhs_value_raw);
+  //Value *lhs_value = reserve_stack(builder, lhs_value_raw->descriptor);
+  //move_value(&builder->instructions, &operator->location, lhs_value, lhs_value_raw);
 
   Value *lhs_value = value_any();
   token_force_value(lhs, scope, builder, lhs_value);
