@@ -99,6 +99,45 @@ move_value(
     }
   }
 
+  if (source->operand.type == Operand_Type_Eflags) {
+    Value *temp = descriptor_byte_size(target->descriptor) == 1
+      ? target
+      : value_register_for_descriptor(Register_A, &descriptor_s8);
+    switch(source->operand.compare_type) {
+      case Compare_Type_Equal: {
+        push_instruction(instructions, location, (Instruction) {setz, {temp->operand, source->operand, 0}});
+        break;
+      }
+      case Compare_Type_Not_Equal: {
+        push_instruction(instructions, location, (Instruction) {setne, {temp->operand, source->operand, 0}});
+        break;
+      }
+      case Compare_Type_Less: {
+        push_instruction(instructions, location, (Instruction) {setl, {temp->operand, source->operand, 0}});
+        break;
+      }
+      case Compare_Type_Less_Equal: {
+        push_instruction(instructions, location, (Instruction) {setle, {temp->operand, source->operand, 0}});
+        break;
+      }
+      case Compare_Type_Greater: {
+        push_instruction(instructions, location, (Instruction) {setg, {temp->operand, source->operand, 0}});
+        break;
+      }
+      case Compare_Type_Greater_Equal: {
+        push_instruction(instructions, location, (Instruction) {setge, {temp->operand, source->operand, 0}});
+        break;
+      }
+      default: {
+        assert(!"Unsupported comparison");
+      }
+    }
+    if (temp != target) {
+      move_value(instructions, location, target, temp);
+    }
+    return;
+  }
+
   // TODO figure out more type checking
 
   if (target_size != source_size) {
@@ -390,15 +429,48 @@ make_if(
 
   Label *label = make_label();
   if (!is_always_true) {
-    u32 byte_size = descriptor_byte_size(value->descriptor);
-    if (byte_size == 4 || byte_size == 8) {
-      push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm32(0), 0}});
-    } else if (byte_size == 1) {
-      push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm8(0), 0}});
+    if (value->operand.type == Operand_Type_Eflags) {
+      switch(value->operand.compare_type) {
+        case Compare_Type_Equal: {
+          push_instruction(instructions, location, (Instruction) {jne, {label32(label), value->operand, 0}});
+          break;
+        }
+        case Compare_Type_Not_Equal: {
+          push_instruction(instructions, location, (Instruction) {je, {label32(label), value->operand, 0}});
+          break;
+        }
+        case Compare_Type_Less: {
+          push_instruction(instructions, location, (Instruction) {jge, {label32(label), value->operand, 0}});
+          break;
+        }
+        case Compare_Type_Less_Equal: {
+          push_instruction(instructions, location, (Instruction) {jg, {label32(label), value->operand, 0}});
+          break;
+        }
+        case Compare_Type_Greater: {
+          push_instruction(instructions, location, (Instruction) {jle, {label32(label), value->operand, 0}});
+          break;
+        }
+        case Compare_Type_Greater_Equal: {
+          push_instruction(instructions, location, (Instruction) {jl, {label32(label), value->operand, 0}});
+          break;
+        }
+        default: {
+          assert(!"Unsupported comparison");
+        }
+      }
     } else {
-      assert(!"Unsupported value inside `if`");
+      u32 byte_size = descriptor_byte_size(value->descriptor);
+      if (byte_size == 4 || byte_size == 8) {
+        push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+      } else if (byte_size == 1) {
+        push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm8(0), 0}});
+      } else {
+        assert(!"Unsupported value inside `if`");
+      }
+      Value *eflags = value_from_compare(Compare_Type_Equal);
+      push_instruction(instructions, location, (Instruction) {je, {label32(label), eflags->operand, 0}});
     }
-    push_instruction(instructions, location, (Instruction) {jz, {label32(label), 0, 0}});
   }
   return label;
 }
@@ -749,38 +821,8 @@ compare(
   move_value(&builder->instructions, location,  reg_a, a);
 
   push_instruction(&builder->instructions, location, (Instruction) {cmp, {reg_a->operand, temp_b->operand, 0}});
-  Value *result = reserve_stack(builder, &descriptor_s8);
 
-  switch(operation) {
-    case Compare_Type_Equal: {
-      push_instruction(&builder->instructions, location, (Instruction) {setz, {result->operand, 0, 0}});
-      break;
-    }
-    case Compare_Type_Not_Equal: {
-      push_instruction(&builder->instructions, location, (Instruction) {setne, {result->operand, 0, 0}});
-      break;
-    }
-    case Compare_Type_Less: {
-      push_instruction(&builder->instructions, location, (Instruction) {setl, {result->operand, 0, 0}});
-      break;
-    }
-    case Compare_Type_Less_Equal: {
-      push_instruction(&builder->instructions, location, (Instruction) {setle, {result->operand, 0, 0}});
-      break;
-    }
-    case Compare_Type_Greater: {
-      push_instruction(&builder->instructions, location, (Instruction) {setg, {result->operand, 0, 0}});
-      break;
-    }
-    case Compare_Type_Greater_Equal: {
-      push_instruction(&builder->instructions, location, (Instruction) {setge, {result->operand, 0, 0}});
-      break;
-    }
-    default: {
-      assert(!"Unsupported comparison");
-    }
-  }
-  return result;
+  return value_from_compare(operation);
 }
 
 Value *

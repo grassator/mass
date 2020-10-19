@@ -70,6 +70,12 @@ encode_instruction(
           break;
         }
       }
+      if (
+        operand->type == Operand_Type_Eflags &&
+        operand_encoding->type == Operand_Encoding_Type_Eflags
+      ) {
+        continue;
+      }
 
       if (
         operand->type == Operand_Type_None &&

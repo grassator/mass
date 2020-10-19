@@ -161,6 +161,10 @@ print_operand(
       printf("any");
       break;
     }
+    case Operand_Type_Eflags: {
+      printf("eflags");
+      break;
+    }
     case Operand_Type_Register: {
       u32 bits = operand->byte_size * 8;
       printf("r%d", bits);
@@ -451,6 +455,9 @@ operand_equal(
   if (a->type != b->type) return false;
   if (a->byte_size != b->byte_size) return false;
   switch(a->type) {
+    case Operand_Type_Eflags: {
+      return a->compare_type == b->compare_type;
+    }
     case Operand_Type_Immediate_8: {
       return a->imm8 == b->imm8;
     }
@@ -516,6 +523,27 @@ instruction_equal(
   }
   return true;
 }
+
+Value *
+value_from_compare_internal(
+  Compiler_Source_Location compiler_source_location,
+  Compare_Type compare_type
+) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    // TODO consider adding explicit boolean descriptor type
+    .descriptor = &descriptor_s8,
+    .operand = {
+      .type = Operand_Type_Eflags,
+      .byte_size = 1,
+      .compare_type = compare_type,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+
+#define value_from_compare(...) value_from_compare_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Value *
 value_global_internal(

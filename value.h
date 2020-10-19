@@ -31,6 +31,7 @@ typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 typedef enum {
   Operand_Type_None,
   Operand_Type_Any,
+  Operand_Type_Eflags,
   Operand_Type_Register,
   Operand_Type_Xmm,
   Operand_Type_Immediate_8,
@@ -133,6 +134,15 @@ typedef struct {
   Slice symbol_name;
 } Operand_RIP_Relative_Import;
 
+typedef enum {
+  Compare_Type_Equal = 1,
+  Compare_Type_Not_Equal,
+  Compare_Type_Less,
+  Compare_Type_Less_Equal,
+  Compare_Type_Greater,
+  Compare_Type_Greater_Equal,
+} Compare_Type;
+
 typedef struct {
   Operand_Type type;
   u32 byte_size;
@@ -147,6 +157,7 @@ typedef struct {
     Operand_Sib sib;
     s64 rip_offset_in_data;
     Operand_RIP_Relative_Import import;
+    Compare_Type compare_type;
   };
 } Operand;
 
@@ -374,6 +385,7 @@ typedef enum {
 
 typedef enum {
   Operand_Encoding_Type_None,
+  Operand_Encoding_Type_Eflags,
   Operand_Encoding_Type_Register,
   Operand_Encoding_Type_Register_A,
   Operand_Encoding_Type_Register_Memory,

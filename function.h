@@ -151,15 +151,6 @@ value_remainder(
   Value *b
 );
 
-typedef enum {
-  Compare_Type_Equal = 1,
-  Compare_Type_Not_Equal,
-  Compare_Type_Less,
-  Compare_Type_Less_Equal,
-  Compare_Type_Greater,
-  Compare_Type_Greater_Equal,
-} Compare_Type;
-
 Value *
 compare(
   Compare_Type operation,

@@ -8,6 +8,8 @@
   .op_code_extension = (_extension_ & 0b111),
 
 
+#define eflags  { Operand_Encoding_Type_Eflags, Operand_Size_8 }
+
 #define r_al  { Operand_Encoding_Type_Register_A, Operand_Size_8 }
 #define r_ax  { Operand_Encoding_Type_Register_A, Operand_Size_16 }
 #define r_eax { Operand_Encoding_Type_Register_A, Operand_Size_32 }
@@ -290,15 +292,15 @@ mnemonic(jmp,
 
 #define jcc(_value_, _suffix_)\
   mnemonic(j##_suffix_,\
-    encoding(0x70 + (_value_), none, imm8),\
-    encoding(0x0F80 + (_value_), none, imm32),\
+    encoding(0x70 + (_value_), none, imm8, eflags),\
+    encoding(0x0F80 + (_value_), none, imm32, eflags),\
   );
 ENUMERATE_CC(jcc)
 #undef jcc
 
 #define setcc(_value_, _suffix_)\
   mnemonic(set##_suffix_,\
-    encoding(0x0F90 + (_value_), none, r_m8),\
+    encoding(0x0F90 + (_value_), none, r_m8, eflags),\
   );
 ENUMERATE_CC(setcc)
 #undef setcc
@@ -309,6 +311,7 @@ ENUMERATE_CC(setcc)
 #undef _r
 #undef plus_r
 #undef _op_code
+#undef eflags
 
 #undef r_al
 #undef r_ax
