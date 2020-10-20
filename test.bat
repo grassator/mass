@@ -1,15 +1,15 @@
 @echo off
 
 cls
-call build
-if %errorlevel% neq 0 (exit /b %errorlevel%)
-build\source_spec.exe
-if %errorlevel% neq 0 (exit /b %errorlevel%)
-build\function_spec.exe
-if %errorlevel% neq 0 (exit /b %errorlevel%)
+call build.bat
+
+for %%f in (build\*_spec.exe) do (
+  %%f
+  if errorlevel 1 (exit /b 1)
+)
 
 build\test_parsed.exe
-if %errorlevel% neq 42 (exit /b %errorlevel%)
+if %errorlevel% neq 42 (exit /b 1)
 
 build\hello_world.exe
-if %errorlevel% neq 0 (exit /b %errorlevel%)
+if %errorlevel% neq 0 (exit /b 1)
