@@ -518,17 +518,6 @@ loop_start(
 }
 
 void
-loop_end(
-  Array_Instruction *instructions,
-  const Source_Location *location,
-  Loop_Builder *loop
-) {
-  push_instruction(instructions, location, (Instruction) {jmp, {label32(loop->label_start), 0, 0}});
-  push_instruction(instructions, location, (Instruction) { .maybe_label = loop->label_end });
-  loop->done = true;
-}
-
-void
 assert_not_register_ax(
   Value *overload
 ) {
