@@ -60,6 +60,40 @@ encode_instruction_internal(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
+  // :OperandNormalization
+  // Normalizing operands to simplify future handling in the encoder
+  for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
+    Operand *operand = &instruction->operands[operand_index];
+    // RIP-relative imports are regular RIP-relative operands that we only know
+    // target offset of at the point of encoding
+    if (operand->type == Operand_Type_RIP_Relative_Import) {
+      Import_Symbol *symbol = program_find_import(
+        builder->program,
+        operand->import.library_name,
+        operand->import.symbol_name
+      );
+      *operand = (Operand){
+        .type = Operand_Type_RIP_Relative,
+        .byte_size = operand->byte_size,
+        .rip_offset_in_data = symbol->offset_in_data,
+      };
+    }
+    // [RSP + X] always needs to be encoded as SIB because RSP register index
+    // in MOD R/M is occupied by RIP-relative encoding
+    else if (operand->type == Operand_Type_Memory_Indirect && operand->indirect.reg == rsp.reg) {
+      *operand = (Operand){
+        .type = Operand_Type_Sib,
+        .byte_size = operand->byte_size,
+        .sib = {
+          .scale = SIB_Scale_1,
+          .base = rsp.reg,
+          .index = rsp.reg,
+          .displacement = operand->indirect.displacement
+        },
+      };
+    }
+  }
+
   for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction->operands[operand_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
@@ -112,10 +146,7 @@ encode_instruction_internal(
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
       mod_r_m_operand_index = operand_index;
-      if (
-        operand->type == Operand_Type_RIP_Relative ||
-        operand->type == Operand_Type_RIP_Relative_Import
-      ) {
+      if (operand->type == Operand_Type_RIP_Relative) {
         r_m = 0b101;
         mod = 0;
       } else if (operand->type == Operand_Type_Register) {
@@ -129,19 +160,10 @@ encode_instruction_internal(
         mod = MOD_Register;
       } else {
         if (operand->type == Operand_Type_Memory_Indirect) {
+          // :OperandNormalization
+          assert(operand->indirect.reg != rsp.reg);
           displacement = operand->indirect.displacement;
-          if (operand->indirect.reg == rsp.reg) {
-            r_m = R_M_SIB;
-            displacement = adjust_stack_displacement(builder, displacement);
-            needs_sib = true;
-            sib_byte = (
-              (SIB_Scale_1 << 6) |
-              (r_m << 3) |
-              (r_m)
-            );
-          } else {
-            r_m = operand->indirect.reg;
-          }
+          r_m = operand->indirect.reg;
         } else if (operand->type == Operand_Type_Sib) {
           displacement = operand->sib.displacement;
           needs_sib = true;
@@ -221,18 +243,8 @@ encode_instruction_internal(
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     Operand *operand = &instruction->operands[mod_r_m_operand_index];
-    if (operand->type == Operand_Type_RIP_Relative_Import) {
-      Import_Symbol *symbol = program_find_import(
-        builder->program,
-        operand->import.library_name,
-        operand->import.symbol_name
-      );
-      assert(symbol);
-      s64 symbol_rva = builder->program->data_base_rva + symbol->offset_in_data;
-      // :AfterInstructionPatch
-      after_instruction_diff_patches[after_instruction_diff_patch_count++] =
-        fixed_buffer_append_s32(buffer, s64_to_s32(symbol_rva));
-    } else if (operand->type == Operand_Type_RIP_Relative) {
+    // :OperandNormalization
+    if (operand->type == Operand_Type_RIP_Relative) {
       s64 operand_rva = builder->program->data_base_rva + operand->rip_offset_in_data;
       // :AfterInstructionPatch
       after_instruction_diff_patches[after_instruction_diff_patch_count++] =
