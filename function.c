@@ -311,13 +311,13 @@ fn_end(
 
 u32
 make_trampoline(
+  const Program *program,
   Fixed_Buffer *buffer,
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
-  // TODO maybe we want a builder here
-  encode_instruction(buffer, 0, &(Instruction) {mov, {rax, imm64(address)}});
-  encode_instruction(buffer, 0, &(Instruction) {jmp, {rax}});
+  encode_instruction(program, buffer, &(Instruction) {mov, {rax, imm64(address)}});
+  encode_instruction(program, buffer, &(Instruction) {jmp, {rax}});
   return result;
 }
 
@@ -407,13 +407,14 @@ fn_encode(
   UNWIND_INFO *unwind_info,
   u32 unwind_data_rva
 ) {
+  Program *program = builder->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
 
   s64 code_base_rva = builder->program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
-  encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->prolog_label});
-  encode_instruction(buffer, builder, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
+  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->prolog_label});
+  encode_instruction(program, buffer, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
   u32 stack_allocation_offset_in_prolog =
     u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
@@ -421,16 +422,16 @@ fn_encode(
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
     fn_normalize_instruction_operands(builder, instruction);
-    encode_instruction(buffer, builder, instruction);
+    encode_instruction(program, buffer, instruction);
   }
 
-  encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->epilog_label});
-  encode_instruction(buffer, builder, &(Instruction) {add, {rsp, stack_size_operand, 0}});
+  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->epilog_label});
+  encode_instruction(program, buffer, &(Instruction) {add, {rsp, stack_size_operand, 0}});
 
-  encode_instruction(buffer, builder, &(Instruction) {ret, {0}});
+  encode_instruction(program, buffer, &(Instruction) {ret, {0}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
-  encode_instruction(buffer, builder, &(Instruction) {int3, {0}});
+  encode_instruction(program, buffer, &(Instruction) {int3, {0}});
 
   if (function_exception_info || unwind_info) {
     // Make sure either both or none are provided

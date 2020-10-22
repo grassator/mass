@@ -17,8 +17,8 @@ typedef enum {
 
 void
 encode_instruction_internal(
+  const Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder,
   Instruction *instruction,
   const Instruction_Encoding *encoding,
   u32 operand_count
@@ -189,7 +189,7 @@ encode_instruction_internal(
     Operand *operand = &instruction->operands[mod_r_m_operand_index];
     // :OperandNormalization
     if (operand->type == Operand_Type_RIP_Relative) {
-      s64 operand_rva = builder->program->data_base_rva + operand->rip_offset_in_data;
+      s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
       // :AfterInstructionPatch
       after_instruction_diff_patches[after_instruction_diff_patch_count++] =
         fixed_buffer_append_s32(buffer, s64_to_s32(operand_rva));
@@ -246,15 +246,15 @@ encode_instruction_internal(
   // :AfterInstructionPatch
   for (u64 i = 0; i < after_instruction_diff_patch_count; ++i){
     s32 *patch_target = after_instruction_diff_patches[i];
-    s32 next_instruction_rva = u64_to_s32(builder->program->code_base_rva + buffer->occupied);
+    s32 next_instruction_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
     *patch_target -= next_instruction_rva;
   }
 }
 
 void
 encode_instruction(
+  const Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder,
   Instruction *instruction
 ) {
   if (instruction->maybe_label) {
@@ -409,7 +409,7 @@ encode_instruction(
     }
 
     if (encoding) {
-      encode_instruction_internal(buffer, builder, instruction, encoding, operand_count);
+      encode_instruction_internal(program, buffer, instruction, encoding, operand_count);
       return;
     }
   }

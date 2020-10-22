@@ -1261,7 +1261,7 @@ program_end(
   s8 *code_memory = result_buffer->memory + result_buffer->occupied;
   u64 trampoline_address = (u64)program_test_exception_handler;
 
-  u32 trampoline_virtual_address = make_trampoline(result_buffer, trampoline_address);
+  u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_address);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);

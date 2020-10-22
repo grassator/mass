@@ -32,6 +32,7 @@ push_instruction_internal(
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 u32
 make_trampoline(
+  const Program *program,
   Fixed_Buffer *buffer,
   s64 address
 );
