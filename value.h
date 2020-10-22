@@ -545,11 +545,6 @@ typedef struct _Program {
   bool is_stack_unwinding_in_progress;
 } Program;
 
-typedef struct {
-  Fixed_Buffer *code_buffer;
-  Fixed_Buffer *data_buffer;
-} Jit_Program;
-
 Bucket_Buffer temp_buffer;
 Allocator *temp_allocator;
 
