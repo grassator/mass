@@ -336,6 +336,25 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   dyn_array_pop(builder->instructions);
 }
 
+s32
+fn_adjust_stack_displacement(
+  const Function_Builder *builder,
+  s32 displacement
+) {
+  // Negative diplacement is used to encode local variables
+  if (displacement < 0) {
+    displacement += builder->stack_reserve;
+  } else
+  // Positive values larger than max_call_parameters_stack_size
+  if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
+    // Return address will be pushed on the stack by the caller
+    // and we need to account for that
+    s32 return_address_size = 8;
+    displacement += builder->stack_reserve + return_address_size;
+  }
+  return displacement;
+}
+
 void
 fn_normalize_instruction_operands(
   const Function_Builder *builder,
@@ -367,11 +386,15 @@ fn_normalize_instruction_operands(
         .byte_size = operand->byte_size,
         .sib = {
           .scale = SIB_Scale_1,
-          .base = rsp.reg,
-          .index = rsp.reg,
+          .base = Register_SP,
+          .index = Register_SP,
           .displacement = operand->indirect.displacement,
         },
       };
+    }
+    bool is_stack_operand = operand->type == Operand_Type_Sib && operand->sib.base == Register_SP;
+    if (is_stack_operand) {
+      operand->sib.displacement = fn_adjust_stack_displacement(builder, operand->sib.displacement);
     }
   }
 }

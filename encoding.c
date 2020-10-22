@@ -15,25 +15,6 @@ typedef enum {
   REX_B = 0b01000001, // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
 } REX_BYTE;
 
-s32
-adjust_stack_displacement(
-  Function_Builder *builder,
-  s32 displacement
-) {
-  // Negative diplacement is used to encode local variables
-  if (displacement < 0) {
-    displacement += builder->stack_reserve;
-  } else
-  // Positive values larger than max_call_parameters_stack_size
-  if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
-    // Return address will be pushed on the stack by the caller
-    // and we need to account for that
-    s32 return_address_size = 8;
-    displacement += builder->stack_reserve + return_address_size;
-  }
-  return displacement;
-}
-
 void
 encode_instruction_internal(
   Fixed_Buffer *buffer,
@@ -137,9 +118,6 @@ encode_instruction_internal(
 
           if (operand->sib.index & 0b1000) {
             rex_byte |= REX_X;
-          }
-          if (operand->sib.base == rsp.reg) {
-            displacement = adjust_stack_displacement(builder, displacement);
           }
           sib_byte = (
             ((operand->sib.scale & 0b11) << 6) |
