@@ -106,7 +106,8 @@ int main(s32 argc, char **argv) {
     }
     case Mass_Cli_Mode_Run: {
       program_end(program);
-      fn_type_void_to_void main = value_as_function(program->entry_point, fn_type_void_to_void);
+      fn_type_opaque main =
+        helper_value_as_function(program, program->entry_point);
       main();
       return 0;
     }

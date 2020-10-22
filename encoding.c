@@ -215,17 +215,20 @@ encode_instruction_internal(
     }
     Operand *operand = &instruction->operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
-      if (operand->label32->target) {
-        s64 target_rva = operand->label32->target - buffer->memory;
+      if (operand->label32->resolved) {
         // :AfterInstructionPatch
         after_instruction_diff_patches[after_instruction_diff_patch_count++] =
-          fixed_buffer_append_s32(buffer, s64_to_s32(target_rva));
+          fixed_buffer_append_s32(buffer, s64_to_s32(operand->label32->target_rva));
       } else {
         s32 *patch_target = fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
-        dyn_array_push(operand->label32->locations, (Label_Location) {
-          .patch_target = patch_target,
-          .from_offset = buffer->memory + buffer->occupied,
-        });
+        Label_Location *label_location =
+          dyn_array_push(operand->label32->locations, (Label_Location) {
+            .patch_target = patch_target,
+            .negative_next_instruction_rva = 0,
+          });
+        // :AfterInstructionPatch
+        after_instruction_diff_patches[after_instruction_diff_patch_count++] =
+          &label_location->negative_next_instruction_rva;
       }
 
     } else if (operand->type == Operand_Type_Immediate_8) {
@@ -259,14 +262,14 @@ encode_instruction(
 ) {
   if (instruction->maybe_label) {
     Label *label = instruction->maybe_label;
-    assert(!label->target);
-    label->target = buffer->memory + buffer->occupied;
+    label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
+    label->resolved = true;
 
     for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
       Label_Location *label_location = dyn_array_get(label->locations, i);
-      s64 diff = (label->target - label_location->from_offset);
+      s32 diff = label->target_rva + label_location->negative_next_instruction_rva;
       assert(diff >= 0);
-      *label_location->patch_target = s64_to_s32(diff);
+      *label_location->patch_target = diff;
     }
     instruction->encoded_byte_size = 0;
     return;

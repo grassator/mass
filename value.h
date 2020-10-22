@@ -104,12 +104,13 @@ typedef struct {
 
 typedef struct {
   s32 *patch_target;
-  u8 *from_offset;
+  s32 negative_next_instruction_rva;
 } Label_Location;
 typedef dyn_array_type(Label_Location) Array_Label_Location;
 
 typedef struct {
-  u8 *target;
+  bool resolved;
+  s32 target_rva;
   Array_Label_Location locations;
 } Label;
 
@@ -533,6 +534,7 @@ typedef struct {
 
 typedef struct _Program {
   Fixed_Buffer *data_buffer;
+  Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
   Value *entry_point;
   Array_Function_Builder functions;
