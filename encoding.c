@@ -44,7 +44,7 @@ encode_instruction_internal(
 ) {
   u64 original_buffer_length = buffer->occupied;
 
-  bool needs_mod_r_m = false;
+  s8 mod_r_m_operand_index = -1;
   u8 reg_or_op_code = 0;
   u8 rex_byte = 0;
   bool needs_16_bit_prefix = false;
@@ -60,7 +60,7 @@ encode_instruction_internal(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
-  for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
+  for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction->operands[operand_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
 
@@ -108,7 +108,10 @@ encode_instruction_internal(
       operand_encoding->type == Operand_Encoding_Type_Register_Memory ||
       operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
     ) {
-      needs_mod_r_m = true;
+      if (mod_r_m_operand_index != -1) {
+        panic("Multiple MOD R/M operands are not supported in an instruction");
+      }
+      mod_r_m_operand_index = operand_index;
       if (
         operand->type == Operand_Type_RIP_Relative ||
         operand->type == Operand_Type_RIP_Relative_Import
@@ -192,7 +195,7 @@ encode_instruction_internal(
   }
   fixed_buffer_append_u8(buffer, op_code[3]);
 
-  if (needs_mod_r_m) {
+  if (mod_r_m_operand_index != -1) {
     u8 mod_r_m = (
       (mod << 6) |
       ((reg_or_op_code & 0b111) << 3) |
@@ -206,41 +209,40 @@ encode_instruction_internal(
   }
 
   // Write out displacement
-  if (needs_mod_r_m && mod != MOD_Register) {
-    for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-      Operand *operand = &instruction->operands[operand_index];
-      if (operand->type == Operand_Type_RIP_Relative_Import) {
-        Program *program = builder->program;
-        s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
-        Import_Symbol *symbol = program_find_import(
-          program,
-          operand->import.library_name,
-          operand->import.symbol_name
-        );
-        assert(symbol);
-        s64 diff = program->data_base_rva + symbol->offset_in_data - next_instruction_rva;
-        fixed_buffer_append_s32(buffer, s64_to_s32(diff));
-      } else if (operand->type == Operand_Type_RIP_Relative) {
-        Program *program = builder->program;
-        s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
+  if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
+    Operand *operand = &instruction->operands[mod_r_m_operand_index];
+    if (operand->type == Operand_Type_RIP_Relative_Import) {
+      Program *program = builder->program;
+      s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
+      Import_Symbol *symbol = program_find_import(
+        program,
+        operand->import.library_name,
+        operand->import.symbol_name
+      );
+      assert(symbol);
+      s64 diff = program->data_base_rva + symbol->offset_in_data - next_instruction_rva;
+      fixed_buffer_append_s32(buffer, s64_to_s32(diff));
+    } else if (operand->type == Operand_Type_RIP_Relative) {
+      Program *program = builder->program;
+      s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
 
-        s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
-        s64 diff = operand_rva - next_instruction_rva;
-        fixed_buffer_append_s32(buffer, s64_to_s32(diff));
-      } else if (
-        operand->type == Operand_Type_Memory_Indirect ||
-        operand->type == Operand_Type_Sib
-      ) {
-        if (mod == MOD_Displacement_s32) {
-          fixed_buffer_append_s32(buffer, displacement);
-        } else if (mod == MOD_Displacement_s8) {
-          fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
-        } else {
-          assert(mod == MOD_Displacement_0);
-        }
+      s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
+      s64 diff = operand_rva - next_instruction_rva;
+      fixed_buffer_append_s32(buffer, s64_to_s32(diff));
+    } else if (
+      operand->type == Operand_Type_Memory_Indirect ||
+      operand->type == Operand_Type_Sib
+    ) {
+      if (mod == MOD_Displacement_s32) {
+        fixed_buffer_append_s32(buffer, displacement);
+      } else if (mod == MOD_Displacement_s8) {
+        fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
+      } else {
+        assert(mod == MOD_Displacement_0);
       }
     }
   }
+
   // Write out immediate operand(s?)
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction->operands[operand_index];
@@ -271,9 +273,7 @@ encode_instruction_internal(
     }
   }
 
-  instruction->encoded_byte_size = u64_to_u8(
-    buffer->occupied - original_buffer_length
-  );
+  instruction->encoded_byte_size = u64_to_u8(buffer->occupied - original_buffer_length);
 }
 
 void
