@@ -208,27 +208,35 @@ encode_instruction_internal(
     fixed_buffer_append_u8(buffer, sib_byte);
   }
 
+  // :AfterInstructionPatch
+  // Some operands are encoded as diff from a certain machine code byte
+  // to the byte *after* the end of the instruction being encoded.
+  // These operands can appear before the immediates, which means that
+  // we do not know what the diff should be before the immediate is
+  // encoded as well. To solve this we store the patch locations and do
+  // a loop over them after the instruction has been encoded.
+  s32 *after_instruction_diff_patches[3];
+  u8 after_instruction_diff_patch_count = 0;
+
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     Operand *operand = &instruction->operands[mod_r_m_operand_index];
     if (operand->type == Operand_Type_RIP_Relative_Import) {
-      Program *program = builder->program;
-      s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
       Import_Symbol *symbol = program_find_import(
-        program,
+        builder->program,
         operand->import.library_name,
         operand->import.symbol_name
       );
       assert(symbol);
-      s64 diff = program->data_base_rva + symbol->offset_in_data - next_instruction_rva;
-      fixed_buffer_append_s32(buffer, s64_to_s32(diff));
+      s64 symbol_rva = builder->program->data_base_rva + symbol->offset_in_data;
+      // :AfterInstructionPatch
+      after_instruction_diff_patches[after_instruction_diff_patch_count++] =
+        fixed_buffer_append_s32(buffer, s64_to_s32(symbol_rva));
     } else if (operand->type == Operand_Type_RIP_Relative) {
-      Program *program = builder->program;
-      s64 next_instruction_rva = program->code_base_rva + buffer->occupied + sizeof(s32);
-
-      s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
-      s64 diff = operand_rva - next_instruction_rva;
-      fixed_buffer_append_s32(buffer, s64_to_s32(diff));
+      s64 operand_rva = builder->program->data_base_rva + operand->rip_offset_in_data;
+      // :AfterInstructionPatch
+      after_instruction_diff_patches[after_instruction_diff_patch_count++] =
+        fixed_buffer_append_s32(buffer, s64_to_s32(operand_rva));
     } else if (
       operand->type == Operand_Type_Memory_Indirect ||
       operand->type == Operand_Type_Sib
@@ -252,13 +260,12 @@ encode_instruction_internal(
     Operand *operand = &instruction->operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
       if (operand->label32->target) {
-        u8 *from = buffer->memory + buffer->occupied + sizeof(s32);
-        s32 diff = s64_to_s32(operand->label32->target - from);
-        assert(diff < 0);
-        fixed_buffer_append_s32(buffer, diff);
+        s64 target_rva = operand->label32->target - buffer->memory;
+        // :AfterInstructionPatch
+        after_instruction_diff_patches[after_instruction_diff_patch_count++] =
+          fixed_buffer_append_s32(buffer, s64_to_s32(target_rva));
       } else {
         s32 *patch_target = fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
-
         dyn_array_push(operand->label32->locations, (Label_Location) {
           .patch_target = patch_target,
           .from_offset = buffer->memory + buffer->occupied,
@@ -279,6 +286,13 @@ encode_instruction_internal(
   }
 
   instruction->encoded_byte_size = u64_to_u8(buffer->occupied - original_buffer_length);
+
+  // :AfterInstructionPatch
+  for (u64 i = 0; i < after_instruction_diff_patch_count; ++i){
+    s32 *patch_target = after_instruction_diff_patches[i];
+    s32 next_instruction_rva = u64_to_s32(builder->program->code_base_rva + buffer->occupied);
+    *patch_target -= next_instruction_rva;
+  }
 }
 
 void
