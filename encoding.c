@@ -245,6 +245,10 @@ encode_instruction_internal(
 
   // Write out immediate operand(s?)
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
+    const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
+    if (operand_encoding->type != Operand_Encoding_Type_Immediate) {
+      continue;
+    }
     Operand *operand = &instruction->operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
       if (operand->label32->target) {
@@ -253,8 +257,7 @@ encode_instruction_internal(
         assert(diff < 0);
         fixed_buffer_append_s32(buffer, diff);
       } else {
-        s32 *patch_target = (s32 *)(buffer->memory + buffer->occupied);
-        fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
+        s32 *patch_target = fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
 
         dyn_array_push(operand->label32->locations, (Label_Location) {
           .patch_target = patch_target,
@@ -270,6 +273,8 @@ encode_instruction_internal(
       fixed_buffer_append_s32(buffer, operand->imm32);
     } else if (operand->type == Operand_Type_Immediate_64) {
       fixed_buffer_append_s64(buffer, operand->imm64);
+    } else {
+      panic("Unexpected mismatched operand type for immediate encoding.");
     }
   }
 
