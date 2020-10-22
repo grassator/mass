@@ -439,21 +439,29 @@ encode_instruction(
 
     return;
   }
-  const Compiler_Source_Location *location = instruction->compiler_source_location;
-  printf(
-    "Added in compiler at %s:%u (fn: %s)\n",
-    location->filename,
-    location->line_number,
-    location->function_name
-  );
+  const Compiler_Source_Location *compiler_location = instruction->compiler_source_location;
+  if (compiler_location) {
+    printf(
+      "Added in compiler at %s:%u (fn: %s)\n",
+      compiler_location->filename,
+      compiler_location->line_number,
+      compiler_location->function_name
+    );
+  } else {
+    printf("Unknown compiler location\n");
+  }
   const Source_Location *source_location = instruction->source_location;
-  printf(
-    "Source code at %.*s:(%llu:%llu)\n",
-    u64_to_s32(source_location->filename.length),
-    source_location->filename.bytes,
-    source_location->line,
-    source_location->column
-  );
+  if (source_location) {
+    printf(
+      "Source code at %.*s:(%llu:%llu)\n",
+      u64_to_s32(source_location->filename.length),
+      source_location->filename.bytes,
+      source_location->line,
+      source_location->column
+    );
+  } else {
+    printf("Unknown source location\n");
+  }
   printf("%s", instruction->mnemonic->name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction->operands[operand_index];

@@ -348,8 +348,9 @@ fn_encode(
 
   s64 code_base_rva = builder->program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
+  Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->prolog_label});
-  encode_instruction(buffer, builder, &(Instruction) {sub, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
   u32 stack_allocation_offset_in_prolog =
     u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
@@ -360,7 +361,7 @@ fn_encode(
   }
 
   encode_instruction(buffer, builder, &(Instruction) {.maybe_label = builder->epilog_label});
-  encode_instruction(buffer, builder, &(Instruction) {add, {rsp, imm_auto(builder->stack_reserve), 0}});
+  encode_instruction(buffer, builder, &(Instruction) {add, {rsp, stack_size_operand, 0}});
 
   encode_instruction(buffer, builder, &(Instruction) {ret, {0}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);

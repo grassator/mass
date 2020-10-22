@@ -351,11 +351,28 @@ imm64(
 }
 
 inline Operand
+imm_auto_8_or_32(
+  s64 value
+) {
+  if (s64_fits_into_s8(value)) {
+    return imm8((s8) value);
+  }
+  if (s64_fits_into_s32(value)) {
+    return imm32((s32) value);
+  }
+  panic("Operand is does not fit into either s8 or s32");
+  return (Operand){0};
+}
+
+inline Operand
 imm_auto(
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
     return imm8((s8) value);
+  }
+  if (s64_fits_into_s16(value)) {
+    return imm16((s16) value);
   }
   if (s64_fits_into_s32(value)) {
     return imm32((s32) value);
