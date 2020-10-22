@@ -60,40 +60,6 @@ encode_instruction_internal(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
-  // :OperandNormalization
-  // Normalizing operands to simplify future handling in the encoder
-  for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
-    Operand *operand = &instruction->operands[operand_index];
-    // RIP-relative imports are regular RIP-relative operands that we only know
-    // target offset of at the point of encoding
-    if (operand->type == Operand_Type_RIP_Relative_Import) {
-      Import_Symbol *symbol = program_find_import(
-        builder->program,
-        operand->import.library_name,
-        operand->import.symbol_name
-      );
-      *operand = (Operand){
-        .type = Operand_Type_RIP_Relative,
-        .byte_size = operand->byte_size,
-        .rip_offset_in_data = symbol->offset_in_data,
-      };
-    }
-    // [RSP + X] always needs to be encoded as SIB because RSP register index
-    // in MOD R/M is occupied by RIP-relative encoding
-    else if (operand->type == Operand_Type_Memory_Indirect && operand->indirect.reg == rsp.reg) {
-      *operand = (Operand){
-        .type = Operand_Type_Sib,
-        .byte_size = operand->byte_size,
-        .sib = {
-          .scale = SIB_Scale_1,
-          .base = rsp.reg,
-          .index = rsp.reg,
-          .displacement = operand->indirect.displacement
-        },
-      };
-    }
-  }
-
   for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
     Operand *operand = &instruction->operands[operand_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
@@ -380,12 +346,6 @@ encode_instruction(
         continue;
       }
       if (
-        operand->type == Operand_Type_RIP_Relative_Import &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
-      ) {
-        continue;
-      }
-      if (
         operand->type == Operand_Type_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
@@ -393,12 +353,6 @@ encode_instruction(
       }
       if (
         operand->type == Operand_Type_RIP_Relative &&
-        operand_encoding->type == Operand_Encoding_Type_Memory
-      ) {
-        continue;
-      }
-      if (
-        operand->type == Operand_Type_RIP_Relative_Import &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;

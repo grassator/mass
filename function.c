@@ -337,6 +337,46 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
 }
 
 void
+fn_normalize_instruction_operands(
+  const Function_Builder *builder,
+  Instruction *instruction
+) {
+  // :OperandNormalization
+  // Normalizing operands to simplify future handling in the encoder
+  for (u8 operand_index = 0; operand_index < countof(instruction->operands); ++operand_index) {
+    Operand *operand = &instruction->operands[operand_index];
+    // RIP-relative imports are regular RIP-relative operands that we only know
+    // target offset of at the point of encoding
+    if (operand->type == Operand_Type_RIP_Relative_Import) {
+      Import_Symbol *symbol = program_find_import(
+        builder->program,
+        operand->import.library_name,
+        operand->import.symbol_name
+      );
+      *operand = (Operand){
+        .type = Operand_Type_RIP_Relative,
+        .byte_size = operand->byte_size,
+        .rip_offset_in_data = symbol->offset_in_data,
+      };
+    }
+    // [RSP + X] always needs to be encoded as SIB because RSP register index
+    // in MOD R/M is occupied by RIP-relative encoding
+    else if (operand->type == Operand_Type_Memory_Indirect && operand->indirect.reg == rsp.reg) {
+      *operand = (Operand){
+        .type = Operand_Type_Sib,
+        .byte_size = operand->byte_size,
+        .sib = {
+          .scale = SIB_Scale_1,
+          .base = rsp.reg,
+          .index = rsp.reg,
+          .displacement = operand->indirect.displacement,
+        },
+      };
+    }
+  }
+}
+
+void
 fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder,
@@ -357,6 +397,7 @@ fn_encode(
 
   for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->instructions, i);
+    fn_normalize_instruction_operands(builder, instruction);
     encode_instruction(buffer, builder, instruction);
   }
 
