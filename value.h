@@ -441,12 +441,14 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct _Program Program;
 
 typedef struct {
+  Label *end_label;
+  Array_Instruction instructions;
+} Code_Block;
+
+typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
-
-  Label *epilog_label;
-  Array_Instruction instructions;
-
+  Code_Block code_block;
   Descriptor *descriptor;
   Program *program;
 

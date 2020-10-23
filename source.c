@@ -887,7 +887,7 @@ token_force_value(
         return;
       }
       Value *immediate = value_from_signed_immediate(number);
-      move_value(&builder->instructions, &token->location, result_value, immediate);
+      move_value(&builder->code_block.instructions, &token->location, result_value, immediate);
       return;
     }
     case Token_Type_Hex_Integer: {
@@ -903,29 +903,29 @@ token_force_value(
       }
       // TODO should be unsigned
       Value *immediate = value_from_signed_immediate(number);
-      move_value(&builder->instructions, &token->location, result_value, immediate);
+      move_value(&builder->code_block.instructions, &token->location, result_value, immediate);
       return;
     }
     case Token_Type_String: {
       Slice string = token_string_to_slice(token);
       Value *string_bytes = value_global_c_string_from_slice(builder->program, string);
       Value *c_string_pointer = value_pointer_to(builder, &token->location, string_bytes);
-      move_value(&builder->instructions, &token->location, result_value, c_string_pointer);
+      move_value(&builder->code_block.instructions, &token->location, result_value, c_string_pointer);
       return;
     }
     case Token_Type_Id: {
       Value *value = scope_lookup_force(scope, token->source, builder);
-      move_value(&builder->instructions, &token->location, result_value, value);
+      move_value(&builder->code_block.instructions, &token->location, result_value, value);
       return;
     }
     case Token_Type_Value: {
-      move_value(&builder->instructions, &token->location, result_value, token->value);
+      move_value(&builder->code_block.instructions, &token->location, result_value, token->value);
       return;
     }
     case Token_Type_Lazy_Function_Definition: {
       Value *fn = token_force_lazy_function_definition(&token->lazy_function_definition, builder);
       if (fn) {
-        move_value(&builder->instructions, &token->location, result_value, fn);
+        move_value(&builder->code_block.instructions, &token->location, result_value, fn);
       }
       return;
     }
@@ -1536,10 +1536,10 @@ token_rewrite_statement_if(
 
   Value *condition_value = value_any();
   token_force_value(condition, scope, builder, condition_value);
-  Label *else_label = make_if(&builder->instructions, &keyword->location, condition_value);
+  Label *else_label = make_if(&builder->code_block.instructions, &keyword->location, condition_value);
   token_parse_block(body->children, scope, builder, value_any());
   push_instruction(
-    &builder->instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
+    &builder->code_block.instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
   );
 
   token_replace_tokens_in_state(state, 3, 0);
@@ -1563,7 +1563,7 @@ token_rewrite_goto(
       value->operand.type == Operand_Type_Label_32
     ) {
       push_instruction(
-        &builder->instructions, &keyword->location, (Instruction) {jmp, {value->operand, 0, 0}}
+        &builder->code_block.instructions, &keyword->location, (Instruction) {jmp, {value->operand, 0, 0}}
       );
     } else {
       program_error_builder(builder->program, label_name->location) {
@@ -1601,9 +1601,9 @@ token_rewrite_explicit_return(
   }
 
   push_instruction(
-    &builder->instructions,
+    &builder->code_block.instructions,
     &keyword->location,
-    (Instruction){jmp, {label32(builder->epilog_label), 0, 0}}
+    (Instruction){jmp, {label32(builder->code_block.end_label), 0, 0}}
   );
 
   token_replace_tokens_in_state(state, 2, 0);
@@ -1706,7 +1706,7 @@ token_rewrite_cast(
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       result = reserve_stack(builder, cast_to_descriptor);
-      move_value(&builder->instructions, &cast->location, result, value);
+      move_value(&builder->code_block.instructions, &cast->location, result, value);
     }
   }
 
@@ -1749,7 +1749,7 @@ token_rewrite_definitions(
   Value *value = 0;
   if (label) {
     push_instruction(
-      &builder->instructions, &name->location, (Instruction) { .maybe_label = label }
+      &builder->code_block.instructions, &name->location, (Instruction) { .maybe_label = label }
     );
     value = temp_allocate(Value);
     *value = (Value) {
@@ -1789,7 +1789,7 @@ token_rewrite_definition_and_assignment_statements(
   Value *value = value_any();
   token_match_expression(builder->program, &rhs_state, scope, builder, value);
   Value *on_stack = reserve_stack(builder, value->descriptor);
-  move_value(&builder->instructions, &name->location, on_stack, value);
+  move_value(&builder->code_block.instructions, &name->location, on_stack, value);
   scope_define_value(scope, name->source, on_stack);
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
@@ -1850,7 +1850,7 @@ token_rewrite_array_index(
     Value *index_value_in_register =
       value_register_for_descriptor(Register_R10, index_value->descriptor);
     move_value(
-      &builder->instructions, &target_token->location, index_value_in_register, index_value
+      &builder->code_block.instructions, &target_token->location, index_value_in_register, index_value
     );
     *result = (Value){
       .descriptor = item_descriptor,
@@ -1978,7 +1978,7 @@ token_rewrite_plus(
   Value *rhs_value = value_any();
   token_force_value(rhs, scope, builder, rhs_value);
   //Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
-  plus(&builder->instructions, &op_token->location, result_value, lhs_value, rhs_value);
+  plus(&builder->code_block.instructions, &op_token->location, result_value, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
   return true;
 }
@@ -1999,7 +1999,7 @@ token_rewrite_minus(
   token_force_value(lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(rhs, scope, builder, rhs_value);
-  minus(&builder->instructions, &op_token->location, result_value, lhs_value, rhs_value);
+  minus(&builder->code_block.instructions, &op_token->location, result_value, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
   return true;
 }
@@ -2096,7 +2096,7 @@ token_rewrite_compare(
   //Value *lhs_value_raw = value_any();
   //token_force_value(lhs, scope, builder, lhs_value_raw);
   //Value *lhs_value = reserve_stack(builder, lhs_value_raw->descriptor);
-  //move_value(&builder->instructions, &operator->location, lhs_value, lhs_value_raw);
+  //move_value(&builder->code_block.instructions, &operator->location, lhs_value, lhs_value_raw);
 
   Value *lhs_value = value_any();
   token_force_value(lhs, scope, builder, lhs_value);

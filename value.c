@@ -1181,8 +1181,8 @@ program_test_exception_handler(
   }
 
   u64 current_offset = 0;
-  for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->instructions, i);
+  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
     // so we add instruction byte size before comparing
     current_offset += instruction->encoded_byte_size;
@@ -1429,7 +1429,7 @@ estimate_max_code_size_in_bytes(
   u64 total_instruction_count = 0;
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    total_instruction_count += dyn_array_length(builder->instructions);
+    total_instruction_count += dyn_array_length(builder->code_block.instructions);
     total_instruction_count += FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT;
   }
   // TODO this should be architecture-dependent

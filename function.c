@@ -260,10 +260,12 @@ fn_begin(
   Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .program = program,
     .stack_reserve = 0,
-    .epilog_label = make_label(),
     .descriptor = descriptor,
     .value = fn_value,
-    .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
+    .code_block = {
+      .end_label = make_label(),
+      .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
+    },
   });
   *result = fn_value;
 
@@ -324,14 +326,14 @@ void
 fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   Function_Builder *builder
 ) {
-  Instruction *last_instruction = dyn_array_last(builder->instructions);
+  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
   if (!last_instruction) return;
   if (last_instruction->maybe_label) return;
   if (last_instruction->mnemonic != jmp) return;
   Operand op = last_instruction->operands[0];
   if (op.type != Operand_Type_Label_32) return;
-  if (op.label32 != builder->epilog_label) return;
-  dyn_array_pop(builder->instructions);
+  if (op.label32 != builder->code_block.end_label) return;
+  dyn_array_pop(builder->code_block.instructions);
 }
 
 s32
@@ -419,13 +421,13 @@ fn_encode(
     u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
 
-  for (u64 i = 0; i < dyn_array_length(builder->instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->instructions, i);
+  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     fn_normalize_instruction_operands(builder, instruction);
     encode_instruction(program, buffer, instruction);
   }
 
-  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->epilog_label});
+  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label});
   encode_instruction(program, buffer, &(Instruction) {add, {rsp, stack_size_operand, 0}});
 
   encode_instruction(program, buffer, &(Instruction) {ret, {0}});
@@ -699,6 +701,7 @@ multiply(
   Value *x,
   Value *y
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type(x, y));
   assert(x->descriptor->type == Descriptor_Type_Integer);
 
@@ -713,16 +716,16 @@ multiply(
   Value *y_temp = reserve_stack(builder, y->descriptor);
 
   Value *reg_a = value_register_for_descriptor(Register_A, y->descriptor);
-  move_value(&builder->instructions, location, reg_a, y);
-  move_value(&builder->instructions, location, y_temp, reg_a);
+  move_value(instructions, location, reg_a, y);
+  move_value(instructions, location, y_temp, reg_a);
 
   reg_a = value_register_for_descriptor(Register_A, x->descriptor);
-  move_value(&builder->instructions, location, reg_a, x);
+  move_value(instructions, location, reg_a, x);
 
-  push_instruction(&builder->instructions, location, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
+  push_instruction(instructions, location, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
   Value *temp = reserve_stack(builder, x->descriptor);
-  move_value(&builder->instructions, location, temp, reg_a);
+  move_value(instructions, location, temp, reg_a);
 
   return temp;
 }
@@ -741,6 +744,7 @@ divide_or_remainder(
   Value *a,
   Value *b
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
   assert(a->descriptor->type == Descriptor_Type_Integer);
 
@@ -763,7 +767,7 @@ divide_or_remainder(
         break;
       }
     }
-    move_value(&builder->instructions, location, result_value, value_from_signed_immediate(folded));
+    move_value(instructions, location, result_value, value_from_signed_immediate(folded));
     return;
   }
 
@@ -771,7 +775,7 @@ divide_or_remainder(
   Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
 
   Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
-  move_value(&builder->instructions, location, rdx_temp, reg_rdx);
+  move_value(instructions, location, rdx_temp, reg_rdx);
 
   Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
@@ -780,27 +784,27 @@ divide_or_remainder(
 
   // TODO deal with signed / unsigned
   Value *divisor = reserve_stack(builder, larger_descriptor);
-  move_value(&builder->instructions, location, divisor, b);
+  move_value(instructions, location, divisor, b);
 
   Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
   {
-    move_value(&builder->instructions, location, reg_a, a);
+    move_value(instructions, location, reg_a, a);
 
     switch (descriptor_byte_size(larger_descriptor)) {
       case 8: {
-        push_instruction(&builder->instructions, location, (Instruction) {cqo, {0}});
+        push_instruction(instructions, location, (Instruction) {cqo, {0}});
         break;
       }
       case 4: {
-        push_instruction(&builder->instructions, location, (Instruction) {cdq, {0}});
+        push_instruction(instructions, location, (Instruction) {cdq, {0}});
         break;
       }
       case 2: {
-        push_instruction(&builder->instructions, location, (Instruction) {cwd, {0}});
+        push_instruction(instructions, location, (Instruction) {cwd, {0}});
         break;
       }
       case 1: {
-        push_instruction(&builder->instructions, location, (Instruction) {cwb, {0}});
+        push_instruction(instructions, location, (Instruction) {cwb, {0}});
         break;
       }
       default: {
@@ -808,23 +812,23 @@ divide_or_remainder(
       }
     }
   }
-  push_instruction(&builder->instructions, location, (Instruction) {idiv, {divisor->operand, 0, 0}});
+  push_instruction(instructions, location, (Instruction) {idiv, {divisor->operand, 0, 0}});
 
 
   if (operation == Divide_Operation_Divide) {
-    move_value(&builder->instructions, location, result_value, reg_a);
+    move_value(instructions, location, result_value, reg_a);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
       Value *temp_result = value_register_for_descriptor(Register_AH, larger_descriptor);
-      move_value(&builder->instructions, location, result_value, temp_result);
+      move_value(instructions, location, result_value, temp_result);
     } else {
       Value *temp_result = value_register_for_descriptor(Register_D, larger_descriptor);
-      move_value(&builder->instructions, location, result_value, temp_result);
+      move_value(instructions, location, result_value, temp_result);
     }
   }
 
   // Restore RDX
-  move_value(&builder->instructions, location, reg_rdx, rdx_temp);
+  move_value(instructions, location, reg_rdx, rdx_temp);
 }
 
 void
@@ -858,6 +862,7 @@ compare(
   Value *a,
   Value *b
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   assert(a->descriptor->type == Descriptor_Type_Integer);
   assert(b->descriptor->type == Descriptor_Type_Integer);
 
@@ -897,12 +902,12 @@ compare(
     : b->descriptor;
 
   Value *temp_b = reserve_stack(builder, larger_descriptor);
-  move_value(&builder->instructions, location, temp_b, b);
+  move_value(instructions, location, temp_b, b);
 
   Value *reg_r11 = value_register_for_descriptor(Register_R11, larger_descriptor);
-  move_value(&builder->instructions, location,  reg_r11, a);
+  move_value(instructions, location,  reg_r11, a);
 
-  push_instruction(&builder->instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
+  push_instruction(instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
 
   return value_from_compare(operation);
 }
@@ -913,6 +918,7 @@ value_pointer_to(
   const Source_Location *location,
   Value *value
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   // TODO support register
   // TODO support immediates
   assert(
@@ -930,10 +936,10 @@ value_pointer_to(
   // instruction encoding.
   source_operand.byte_size = descriptor_byte_size(result_descriptor);
 
-  push_instruction(&builder->instructions, location, (Instruction) {lea, {reg_a->operand, source_operand, 0}});
+  push_instruction(instructions, location, (Instruction) {lea, {reg_a->operand, source_operand, 0}});
 
   Value *result = reserve_stack(builder, result_descriptor);
-  move_value(&builder->instructions, location, result, reg_a);
+  move_value(instructions, location, result, reg_a);
 
   return result;
 }
@@ -946,6 +952,7 @@ call_function_overload(
   Value *to_call,
   Array_Value_Ptr arguments
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   assert(to_call->descriptor->type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->function;
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
@@ -955,7 +962,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
     Value *target_arg = *dyn_array_get(descriptor->arguments, i);
-    move_value(&builder->instructions, location, target_arg, source_arg);
+    move_value(instructions, location, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -970,8 +977,7 @@ call_function_overload(
     Value *reg_c =
       value_register_for_descriptor(Register_C, return_pointer_descriptor);
     push_instruction(
-      &builder->instructions, location,
-      (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}}
+      instructions, location, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}}
     );
   }
 
@@ -981,17 +987,17 @@ call_function_overload(
   ));
 
   if (to_call->operand.type == Operand_Type_Label_32) {
-    push_instruction(&builder->instructions, location, (Instruction) {call, {to_call->operand, 0, 0}});
+    push_instruction(instructions, location, (Instruction) {call, {to_call->operand, 0, 0}});
   } else {
     Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
-    move_value(&builder->instructions, location, reg_a, to_call);
-    push_instruction(&builder->instructions, location, (Instruction) {call, {reg_a->operand, 0, 0}});
+    move_value(instructions, location, reg_a, to_call);
+    push_instruction(instructions, location, (Instruction) {call, {reg_a->operand, 0, 0}});
   }
 
   if (return_size <= 8) {
     if (return_size != 0) {
       Value *result = reserve_stack(builder, descriptor->returns->descriptor);
-      move_value(&builder->instructions, location, result, descriptor->returns);
+      move_value(instructions, location, result, descriptor->returns);
       return result;
     }
   }
@@ -1060,19 +1066,20 @@ make_and(
   Value *a,
   Value *b
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
   Label *label = make_label();
 
-  Label *else_label = make_if(&builder->instructions, location, a);
+  Label *else_label = make_if(instructions, location, a);
   {
     Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(&builder->instructions, location, result, rhs);
-    push_instruction(&builder->instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
+    move_value(instructions, location, result, rhs);
+    push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
-  push_instruction(&builder->instructions, location, (Instruction) {.maybe_label = else_label});
+  push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
 
-  move_value(&builder->instructions, location, result, value_from_s8(0));
-  push_instruction(&builder->instructions, location, (Instruction) {.maybe_label = label});
+  move_value(instructions, location, result, value_from_s8(0));
+  push_instruction(instructions, location, (Instruction) {.maybe_label = label});
   return result;
 }
 
@@ -1083,22 +1090,22 @@ make_or(
   Value *a,
   Value *b
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
   Label *label = make_label();
 
   Label *else_label = make_if(
-    &builder->instructions, location,
-    compare(Compare_Type_Equal, builder, location, a, value_from_s8(0))
+    instructions, location, compare(Compare_Type_Equal, builder, location, a, value_from_s8(0))
   );
   {
     Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(&builder->instructions, location, result, rhs);
-    push_instruction(&builder->instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
+    move_value(instructions, location, result, rhs);
+    push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
-  push_instruction(&builder->instructions, location, (Instruction) {.maybe_label = else_label});
+  push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
 
-  move_value(&builder->instructions, location, result, value_from_s8(1));
-  push_instruction(&builder->instructions, location, (Instruction) {.maybe_label = label});
+  move_value(instructions, location, result, value_from_s8(1));
+  push_instruction(instructions, location, (Instruction) {.maybe_label = label});
   return result;
 }
 
