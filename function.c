@@ -252,16 +252,14 @@ fn_begin(
       .returns = 0,
     },
   };
-  Label *prolog_label = make_label();
   Value *fn_value = temp_allocate(Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(prolog_label),
+    .operand = label32(make_label()),
   };
   Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .program = program,
     .stack_reserve = 0,
-    .prolog_label = prolog_label,
     .epilog_label = make_label(),
     .descriptor = descriptor,
     .value = fn_value,
@@ -409,11 +407,13 @@ fn_encode(
 ) {
   Program *program = builder->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
+  Operand *operand = &builder->value->operand;
+  assert(operand->type == Operand_Type_Label_32);
 
   s64 code_base_rva = builder->program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
-  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->prolog_label});
+  encode_instruction(program, buffer, &(Instruction) {.maybe_label = operand->label32});
   encode_instruction(program, buffer, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
   u32 stack_allocation_offset_in_prolog =
     u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;

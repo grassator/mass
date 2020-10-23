@@ -444,9 +444,7 @@ typedef struct {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
 
-  Label *prolog_label;
   Label *epilog_label;
-
   Array_Instruction instructions;
 
   Descriptor *descriptor;
