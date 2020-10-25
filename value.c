@@ -431,6 +431,31 @@ descriptor_struct_add_field(
   });
 }
 
+static inline void
+register_bitset_set(
+  u64 *bitset,
+  const Operand *operand
+) {
+  if (operand->type == Operand_Type_Register) {
+    *bitset |= 1llu << operand->reg;
+  } else {
+    panic("TODO");
+  }
+}
+
+static inline bool
+register_bitset_get(
+  u64 bitset,
+  const Operand *operand
+) {
+  if (operand->type == Operand_Type_Register) {
+     return !!(bitset & (1llu << operand->reg));
+  } else {
+    panic("TODO");
+  }
+  return false;
+}
+
 s64
 operand_immediate_as_s64(
   Operand *operand

@@ -267,6 +267,22 @@ fn_begin(
       .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
     },
   });
+
+  {
+    // Arguments
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &rcx);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &rdx);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &r8);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &r9);
+
+    // Return
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &rax);
+
+    // Other
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &r10);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, &r11);
+  }
+
   *result = fn_value;
 
   return builder;
@@ -477,17 +493,6 @@ fn_encode(
       .UnwindData = unwind_data_rva,
     };
   }
-}
-
-Value *
-fn_arg(
-  Function_Builder *builder,
-  Descriptor *descriptor
-) {
-  assert(!fn_is_frozen(builder));
-  Descriptor_Function *function = &builder->descriptor->function;
-  Value *result = function_push_argument(function, descriptor);
-  return result;
 }
 
 void
@@ -944,6 +949,11 @@ value_pointer_to(
   return result;
 }
 
+typedef struct {
+  Value saved;
+  Value *stack_value;
+} Saved_Register;
+typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
 Value *
 call_function_overload(
@@ -958,6 +968,29 @@ call_function_overload(
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
 
   fn_ensure_frozen(descriptor);
+
+  Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
+
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    Value to_save = {
+      .descriptor = &descriptor_s64,
+      .operand = {
+        .type = Operand_Type_Register,
+        .byte_size = 8,
+        .reg = reg_index,
+      }
+    };
+    if (register_bitset_get(builder->code_block.register_volatile_bitset, &to_save.operand)) {
+      if (register_bitset_get(builder->code_block.register_occupied_bitset, &to_save.operand)) {
+        Value *stack_value = reserve_stack(builder, to_save.descriptor);
+        move_value(&builder->code_block.instructions, location, stack_value, &to_save);
+        dyn_array_push(saved_array, (Saved_Register){
+          .saved = to_save,
+          .stack_value = stack_value,
+        });
+      }
+    }
+  }
 
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
@@ -994,15 +1027,21 @@ call_function_overload(
     push_instruction(instructions, location, (Instruction) {call, {reg_a->operand, 0, 0}});
   }
 
+  Value *result = descriptor->returns;
   if (return_size <= 8) {
     if (return_size != 0) {
-      Value *result = reserve_stack(builder, descriptor->returns->descriptor);
+      result = reserve_stack(builder, descriptor->returns->descriptor);
       move_value(instructions, location, result, descriptor->returns);
-      return result;
     }
   }
 
-  return descriptor->returns;
+  for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
+    Saved_Register *reg = dyn_array_get(saved_array, i);
+    move_value(&builder->code_block.instructions, location, &reg->saved, reg->stack_value);
+    // TODO :FreeStackAllocation 
+  }
+
+  return result;
 }
 
 typedef struct {

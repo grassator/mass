@@ -173,6 +173,18 @@ operand_equal(
   const Operand *b
 );
 
+static inline void
+register_bitset_set(
+  u64 *bitset,
+  const Operand *operand
+);
+
+static inline bool
+register_bitset_get(
+  u64 bitset,
+  const Operand *operand
+);
+
 struct Descriptor;
 
 
@@ -443,6 +455,8 @@ typedef struct _Program Program;
 typedef struct {
   Label *end_label;
   Array_Instruction instructions;
+  u64 register_volatile_bitset;
+  u64 register_occupied_bitset;
 } Code_Block;
 
 typedef struct {

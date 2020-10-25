@@ -268,6 +268,17 @@ spec("source") {
     check(checker() == 42);
   }
 
+  it("should correctly save volatile registers when calling other functions") {
+    test_program_inline_source(
+      "inner :: (x : s64) -> () { x = 21 };"
+      "outer :: (x : s64) -> (s64) { inner(1); x }",
+      outer
+    );
+    fn_type_s64_to_s64 checker = value_as_function(outer, fn_type_s64_to_s64);
+    s64 actual = checker(42);
+    check(actual == 42);
+  }
+
   it("should be able to parse and run a s64 -> s64 function") {
     test_program_inline_source("foo :: (x : s64) -> (s64) { x }", foo);
     fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);

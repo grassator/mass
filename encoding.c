@@ -327,14 +327,14 @@ encode_instruction(
         continue;
       }
       if (
-        operand->type == Operand_Type_Memory_Indirect &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+        operand->type == Operand_Type_RIP_Relative &&
+        operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_RIP_Relative &&
-        operand_encoding->type == Operand_Encoding_Type_Memory
+        operand->type == Operand_Type_Memory_Indirect &&
+        operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
