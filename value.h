@@ -444,7 +444,7 @@ typedef struct {
   const X64_Mnemonic *mnemonic;
   Operand operands[3];
   Label *maybe_label;
-  const Compiler_Source_Location *compiler_source_location;
+  Compiler_Source_Location compiler_source_location;
   const Source_Location *source_location;
   u8 encoded_byte_size;
 } Instruction;

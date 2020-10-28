@@ -332,8 +332,10 @@ make_trampoline(
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
-  encode_instruction(program, buffer, &(Instruction) {mov, {rax, imm64(address)}});
-  encode_instruction(program, buffer, &(Instruction) {jmp, {rax}});
+  encode_instruction_with_compiler_location(
+    program, buffer, &(Instruction) {mov, {rax, imm64(address)}}
+  );
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {jmp, {rax}});
   return result;
 }
 
@@ -436,7 +438,9 @@ fn_encode(
   s64 code_base_rva = builder->program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
-  encode_instruction(program, buffer, &(Instruction) {.maybe_label = operand->label32});
+  encode_instruction_with_compiler_location(
+    program, buffer, &(Instruction) {.maybe_label = operand->label32}
+  );
 
   Array_UNWIND_CODE unwind_codes = dyn_array_make(Array_UNWIND_CODE);
 
@@ -452,7 +456,7 @@ fn_encode(
     };
     if (register_bitset_get(builder->used_register_bitset, &to_save)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, &to_save)) {
-        encode_instruction(program, buffer, &(Instruction) {push, {to_save}});
+        encode_instruction_with_compiler_location(program, buffer, &(Instruction) {push, {to_save}});
         dyn_array_push(unwind_codes, (UNWIND_CODE) {
           .CodeOffset = fn_offset_in_prolog(),
           .UnwindOp = UWOP_PUSH_NONVOL,
@@ -462,7 +466,9 @@ fn_encode(
     }
   }
 
-  encode_instruction(program, buffer, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
+  encode_instruction_with_compiler_location(
+    program, buffer, &(Instruction) {sub, {rsp, stack_size_operand}}
+  );
   u32 stack_allocation_offset_in_prolog = fn_offset_in_prolog();
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
 
@@ -474,8 +480,12 @@ fn_encode(
     encode_instruction(program, buffer, instruction);
   }
 
-  encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label});
-  encode_instruction(program, buffer, &(Instruction) {add, {rsp, stack_size_operand, 0}});
+  encode_instruction_with_compiler_location(
+    program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label}
+  );
+  encode_instruction_with_compiler_location(
+    program, buffer, &(Instruction) {add, {rsp, stack_size_operand}}
+  );
 
 
   // Pop non-volatile registers
@@ -485,13 +495,13 @@ fn_encode(
       .byte_size = 8,
       .reg = dyn_array_get(unwind_codes, i)->OpInfo,
     };
-    encode_instruction(program, buffer, &(Instruction) {pop, {to_save}});
+    encode_instruction_with_compiler_location(program, buffer, &(Instruction) {pop, {to_save}});
   }
 
-  encode_instruction(program, buffer, &(Instruction) {ret, {0}});
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {ret, {0}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
-  encode_instruction(program, buffer, &(Instruction) {int3, {0}});
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {int3, {0}});
 
   if (function_exception_info || unwind_info) {
     // Make sure either both or none are provided

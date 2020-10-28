@@ -10,24 +10,42 @@ reserve_stack(
   Descriptor *descriptor
 );
 
-inline void
-push_instruction_internal(
-  const Compiler_Source_Location *compiler_source_location,
-  const Source_Location *source_location,
-  Array_Instruction *instructions,
-  Instruction instruction
+static inline Instruction  *
+instruction_add_compiler_location_internal(
+  const Compiler_Source_Location compiler_source_location,
+  Instruction *instruction
 ) {
-  instruction.compiler_source_location = compiler_source_location;
-  instruction.source_location = source_location;
-  dyn_array_push(*instructions, instruction);
+  instruction->compiler_source_location = compiler_source_location;
+  return instruction;
 }
 
-#define push_instruction(_array_ptr_, _location_, ...)\
-  {\
-    static const Compiler_Source_Location compiler_location_ = COMPILER_SOURCE_LOCATION_FIELDS;\
-    push_instruction_internal(&compiler_location_, (_location_), (_array_ptr_), __VA_ARGS__);\
-  }
+static inline Instruction *
+instruction_add_source_location_internal(
+  const Source_Location *source_location,
+  Instruction *instruction
+) {
+  instruction->source_location = source_location;
+  return instruction;
+}
 
+#define instruction_add_compiler_location(...)\
+  instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+#define push_instruction(_array_ptr_, _location_, ...)\
+  dyn_array_push(\
+    *(_array_ptr_),\
+    *instruction_add_source_location_internal(\
+      (_location_), \
+      instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, &(__VA_ARGS__))\
+    )\
+  )
+
+#define encode_instruction_with_compiler_location(_program_, _buffer_, ...)\
+  encode_instruction(\
+    (_program_),\
+    (_buffer_),\
+    instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, (__VA_ARGS__))\
+  )
 
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 u32

@@ -418,7 +418,7 @@ encode_instruction(
       return;
     }
   }
-  const Compiler_Source_Location *compiler_location = instruction->compiler_source_location;
+  const Compiler_Source_Location *compiler_location = &instruction->compiler_source_location;
   if (compiler_location) {
     printf(
       "Added in compiler at %s:%u (fn: %s)\n",
