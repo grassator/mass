@@ -30,6 +30,14 @@
 #define panic(_message_) assert(!(_message_))
 #endif
 
+#define value_swap(_type_, _a_, _b_)\
+  do {\
+    struct { _type_ *a; _type_ *b; _type_ temp; } value_swap = { .a = &(_a_), .b = &(_b_) };\
+    value_swap.temp = *value_swap.a;\
+    *value_swap.a = *value_swap.b;\
+    *value_swap.b = value_swap.temp;\
+  } while (0)
+
 //////////////////////////////////////////////////////////////////////////////
 // Numbers
 //////////////////////////////////////////////////////////////////////////////
@@ -525,14 +533,14 @@ allocator_reallocate(
 #define range_length(_r_)\
   ((_r_).to - (_r_).from)
 
-#define range_equal(_a_, _b_)\
-  ((_a_).from == (_b_).from && (_a_).to == (_b_).to)
+#define range_equal(_a_, ...)\
+  ((_a_).from == (__VA_ARGS__).from && (_a_).to == (__VA_ARGS__).to)
 
-#define range_intersects(_a_, _b_)\
-  ((_a_).from < (_b_).to && (_b_).from < (_a_).to)
+#define range_intersects(_a_, ...)\
+  ((_a_).from < (__VA_ARGS__).to && (__VA_ARGS__).from < (_a_).to)
 
-#define range_contains(_range_, _value_)\
-  ((_value_) >= (_range_).from && (_value_) < (_range_).to)
+#define range_contains(_range_, ...)\
+  ((__VA_ARGS__) >= (_range_).from && (__VA_ARGS__) < (_range_).to)
 
 /// `from` is inclusive, `to` is exclusive
 #define PRELUDE_PROCESS_TYPE(_type_)\
@@ -2416,10 +2424,10 @@ fixed_buffer_as_slice(
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), _Alignof(_type_)))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  static inline _type_ *fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
+  static inline u64 fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
     _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
     *result = value;\
-    return result;\
+    return (s8 *)result - buffer->memory;\
   }
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
@@ -2689,22 +2697,19 @@ typedef dyn_array_type(Bucket_Buffer_Bucket) Array_Bucket_Buffer_Bucket;
 typedef struct {
   const Allocator *allocator;
   u64 default_bucket_size;
+  u64 occupied;
   Array_Bucket_Buffer_Bucket buckets;
-} Bucket_Buffer_Internal;
-
-typedef struct {
-  Bucket_Buffer_Internal *internal;
 } Bucket_Buffer;
 
 static inline Bucket_Buffer_Bucket *
 bucket_buffer_push_bucket_internal(
-  Bucket_Buffer_Internal *internal,
+  Bucket_Buffer *buffer,
   u64 capacity
 ) {
-  return dyn_array_push(internal->buckets, (Bucket_Buffer_Bucket) {
+  return dyn_array_push(buffer->buckets, (Bucket_Buffer_Bucket) {
     .occupied = 0,
     .capacity = capacity,
-    .memory = allocator_allocate_bytes(internal->allocator, capacity, _Alignof(void *)),
+    .memory = allocator_allocate_bytes(buffer->allocator, capacity, _Alignof(void *)),
   });
 }
 
@@ -2714,18 +2719,19 @@ struct Bucket_Buffer_Make_Options {
   const Allocator *allocator;
 };
 
-static inline const Bucket_Buffer
+static inline Bucket_Buffer *
 bucket_buffer_make_internal(
   struct Bucket_Buffer_Make_Options *options
 ) {
-  Bucket_Buffer_Internal *internal = allocator_allocate(options->allocator, Bucket_Buffer_Internal);
-  *internal = (Bucket_Buffer_Internal) {
+  Bucket_Buffer *internal = allocator_allocate(options->allocator, Bucket_Buffer);
+  *internal = (Bucket_Buffer) {
     .allocator = options->allocator,
+    .occupied = 0,
     .buckets = dyn_array_make(Array_Bucket_Buffer_Bucket, 16),
     .default_bucket_size = options->bucket_capacity,
   };
   bucket_buffer_push_bucket_internal(internal, internal->default_bucket_size);
-  return (Bucket_Buffer){internal};
+  return internal;
 }
 
 #define bucket_buffer_make(...)\
@@ -2738,26 +2744,25 @@ bucket_buffer_make_internal(
 
 static inline void
 bucket_buffer_destroy(
-  const Bucket_Buffer handle
+  Bucket_Buffer *buffer
 ) {
-  Bucket_Buffer_Internal *internal = handle.internal;
-  for (u64 i = 0; i < dyn_array_length(internal->buckets); ++i) {
+  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
     allocator_deallocate(
-      internal->allocator,
-      dyn_array_get(internal->buckets, i)->memory,
-      dyn_array_get(internal->buckets, i)->capacity
+      buffer->allocator,
+      dyn_array_get(buffer->buckets, i)->memory,
+      dyn_array_get(buffer->buckets, i)->capacity
     );
   }
-  allocator_deallocate(internal->allocator, internal, sizeof(Bucket_Buffer_Internal));
+  allocator_deallocate(buffer->allocator, buffer, sizeof(*buffer));
 }
 
 static inline void *
 bucket_buffer_allocate_bytes(
-  const Bucket_Buffer handle,
+  Bucket_Buffer *buffer,
   u64 byte_size,
   u64 alignment
 ) {
-  Bucket_Buffer_Bucket *bucket = dyn_array_last(handle.internal->buckets);
+  Bucket_Buffer_Bucket *bucket = dyn_array_last(buffer->buckets);
   u64 aligned_occupied = bucket->occupied;
   if (alignment != 1) {
     aligned_occupied = u64_align(aligned_occupied, alignment);
@@ -2765,14 +2770,15 @@ bucket_buffer_allocate_bytes(
   }
 
   if (bucket->capacity < aligned_occupied + byte_size) {
-    u64 capacity = handle.internal->default_bucket_size;
+    u64 capacity = buffer->default_bucket_size;
     if (byte_size > capacity) capacity = byte_size;
-    bucket = bucket_buffer_push_bucket_internal(handle.internal, capacity);
+    bucket = bucket_buffer_push_bucket_internal(buffer, capacity);
   } else {
     bucket->occupied = aligned_occupied;
   }
   void *result = bucket->memory + bucket->occupied;
   bucket->occupied += byte_size;
+  buffer->occupied += byte_size;
   return result;
 }
 
@@ -2786,8 +2792,8 @@ bucket_buffer_allocate_bytes(
   ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  static inline _type_ *bucket_buffer_append_##_type_(const Bucket_Buffer handle, _type_ value) {\
-    _type_ *result = bucket_buffer_allocate_bytes(handle, sizeof(_type_), 1);\
+  static inline _type_ *bucket_buffer_append_##_type_(Bucket_Buffer *buffer, _type_ value) {\
+    _type_ *result = bucket_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
     *result = value;\
     return result;\
   }
@@ -2796,38 +2802,25 @@ PRELUDE_ENUMERATE_NUMERIC_TYPES
 
 static inline Slice
 bucket_buffer_append_slice(
-  const Bucket_Buffer handle,
+  Bucket_Buffer *buffer,
   Slice slice
 ) {
   Slice result = {0};
   if (!slice.length) return result;;
-  s8 *bytes = bucket_buffer_allocate_bytes(handle, slice.length, 1);
+  s8 *bytes = bucket_buffer_allocate_bytes(buffer, slice.length, 1);
   memcpy(bytes, slice.bytes, slice.length);
   return (Slice){.bytes = (char *)bytes, .length = slice.length};
-}
-
-static inline u64
-bucket_buffer_total_occupied(
-  const Bucket_Buffer handle
-) {
-  u64 occupied = 0;
-  Bucket_Buffer_Internal *internal = handle.internal;
-  for (u64 i = 0; i < dyn_array_length(internal->buckets); ++i) {
-    occupied += dyn_array_get(internal->buckets, i)->occupied;
-  }
-  return occupied;
 }
 
 Fixed_Buffer *
 bucket_buffer_to_fixed_buffer(
   const Allocator *allocator,
-  const Bucket_Buffer handle
+  const Bucket_Buffer *buffer
 ) {
-  Bucket_Buffer_Internal *internal = handle.internal;
-  u64 total_occupied = bucket_buffer_total_occupied(handle);
+  u64 total_occupied = buffer->occupied;
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator, .capacity = total_occupied);
-  for (u64 i = 0; i < dyn_array_length(internal->buckets); ++i) {
-    Bucket_Buffer_Bucket *bucket = dyn_array_get(internal->buckets, i);
+  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
+    Bucket_Buffer_Bucket *bucket = dyn_array_get(buffer->buckets, i);
     s8 *target = fixed_buffer_allocate_bytes(result, bucket->occupied, 1);
     memcpy(target, bucket->memory, bucket->occupied);
   }
@@ -2840,11 +2833,7 @@ bucket_buffer_allocator_allocate(
   u64 size_in_bytes,
   u64 alignment
 ) {
-  return bucket_buffer_allocate_bytes(
-    (Bucket_Buffer){.internal = handle.raw},
-    size_in_bytes,
-    alignment
-  );
+  return bucket_buffer_allocate_bytes(handle.raw, size_in_bytes, alignment);
 }
 
 static inline void
@@ -2872,26 +2861,23 @@ bucket_buffer_allocator_reallocate(
 
 static inline Allocator *
 bucket_buffer_allocator_init(
-  const Bucket_Buffer buffer,
+  Bucket_Buffer *buffer,
   Allocator *allocator
 ) {
   *allocator = (Allocator){
     .allocate = bucket_buffer_allocator_allocate,
     .reallocate = bucket_buffer_allocator_reallocate,
     .deallocate = bucket_buffer_allocator_deallocate,
-    .handle = {buffer.internal},
+    .handle = {buffer},
   };
   return allocator;
 }
 
 static inline Allocator *
 bucket_buffer_allocator_make(
-  const Bucket_Buffer buffer
+  Bucket_Buffer *buffer
 ) {
-  return bucket_buffer_allocator_init(
-    buffer,
-    bucket_buffer_allocate(buffer, Allocator)
-  );
+  return bucket_buffer_allocator_init(buffer, bucket_buffer_allocate(buffer, Allocator));
 }
 
 

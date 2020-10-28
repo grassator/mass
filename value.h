@@ -564,7 +564,7 @@ typedef struct _Program {
   bool is_stack_unwinding_in_progress;
 } Program;
 
-Bucket_Buffer temp_buffer;
+Bucket_Buffer *temp_buffer;
 Allocator *temp_allocator;
 
 void *
@@ -593,7 +593,7 @@ void
 program_push_error_from_bucket_buffer(
   Program *program,
   Source_Location location,
-  Bucket_Buffer buffer
+  Bucket_Buffer *buffer
 );
 
 void
@@ -605,10 +605,10 @@ program_push_error_from_slice(
 
 #define program_error_builder(_program_, _location_)\
   for(\
-    Bucket_Buffer _buffer = bucket_buffer_make(.allocator = allocator_system);\
-    _buffer.internal;\
+    Bucket_Buffer *_buffer = bucket_buffer_make(.allocator = allocator_system);\
+    _buffer;\
     program_push_error_from_bucket_buffer((_program_), (_location_), _buffer),\
-    _buffer.internal = 0\
+    _buffer = 0\
   )
 #define program_error_append_slice(_slice_)\
   bucket_buffer_append_slice(_buffer, (_slice_))

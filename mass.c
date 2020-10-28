@@ -93,7 +93,7 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Compile: {
       Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("\\"));
       Slice base_name = *dyn_array_pop(parts);
-      Bucket_Buffer path_builder = bucket_buffer_make(); // @Leak
+      Bucket_Buffer *path_builder = bucket_buffer_make(); // @Leak
       bucket_buffer_append_slice(path_builder, slice_literal("build\\"));
       bucket_buffer_append_slice(path_builder, base_name);
       bucket_buffer_append_slice(path_builder, slice_literal(".exe"));

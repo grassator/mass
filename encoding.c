@@ -191,8 +191,9 @@ encode_instruction_internal(
     if (operand->type == Operand_Type_RIP_Relative) {
       s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
       // :AfterInstructionPatch
-      after_instruction_diff_patches[after_instruction_diff_patch_count++] =
-        fixed_buffer_append_s32(buffer, s64_to_s32(operand_rva));
+      s32 *diff = fixed_buffer_allocate_unaligned(buffer, s32);
+      *diff = s64_to_s32(operand_rva);
+      after_instruction_diff_patches[after_instruction_diff_patch_count++] = diff;
     } else if (
       operand->type == Operand_Type_Memory_Indirect ||
       operand->type == Operand_Type_Sib
@@ -217,10 +218,11 @@ encode_instruction_internal(
     if (operand->type == Operand_Type_Label_32) {
       if (operand->label32->resolved) {
         // :AfterInstructionPatch
-        after_instruction_diff_patches[after_instruction_diff_patch_count++] =
-          fixed_buffer_append_s32(buffer, s64_to_s32(operand->label32->target_rva));
+        s32 *diff = fixed_buffer_allocate_unaligned(buffer, s32);
+        *diff = s64_to_s32(operand->label32->target_rva);
+        after_instruction_diff_patches[after_instruction_diff_patch_count++] = diff;
       } else {
-        s32 *patch_target = fixed_buffer_append_s32(buffer, 0xCCCCCCCC);
+        s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
         Label_Location *label_location =
           dyn_array_push(operand->label32->locations, (Label_Location) {
             .patch_target = patch_target,

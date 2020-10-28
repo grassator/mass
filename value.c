@@ -1245,8 +1245,8 @@ program_jit(
         const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
-        u64 *rip_target = fixed_buffer_append_u64(program->data_buffer, (u64)fn_address);
-        symbol->offset_in_data = u64_to_s32((s8*)rip_target - program->data_buffer->memory);
+        symbol->offset_in_data =
+          u64_to_u32(fixed_buffer_append_u64(program->data_buffer, (u64)fn_address));
       }
     }
   }
@@ -1330,7 +1330,7 @@ void
 program_push_error_from_bucket_buffer(
   Program *program,
   Source_Location location,
-  Bucket_Buffer buffer
+  Bucket_Buffer *buffer
 ) {
   Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(temp_allocator, buffer);
   Slice message = fixed_buffer_as_slice(message_buffer);
