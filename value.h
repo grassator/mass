@@ -465,6 +465,7 @@ typedef struct {
   Code_Block code_block;
   Descriptor *descriptor;
   Program *program;
+  u64 used_register_bitset;
 
   Value *value;
 } Function_Builder;
@@ -493,7 +494,10 @@ typedef union {
   u16 DataForPreviousCode;
 } UNWIND_CODE;
 
+typedef dyn_array_type(UNWIND_CODE) Array_UNWIND_CODE;
+
 #define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK 2
+#define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_NON_VOLATILE_REGISTER_PUSH 16
 #define UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES (sizeof(u32) / sizeof(UNWIND_CODE))
 #define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (sizeof(void *) / sizeof(UNWIND_CODE))
 
@@ -508,6 +512,7 @@ typedef struct {
   // :RegisterAllocation need to add more reserved space for UnwindCode
   UNWIND_CODE UnwindCode[
     UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK +
+    UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_NON_VOLATILE_REGISTER_PUSH +
     UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES +
     UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES
   ];

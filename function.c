@@ -415,6 +415,11 @@ fn_normalize_instruction_operands(
   }
 }
 
+typedef struct {
+  u8 register_index;
+  u8 offset_in_prolog;
+} Function_Pushed_Register;
+
 void
 fn_encode(
   Fixed_Buffer *buffer,
@@ -432,10 +437,36 @@ fn_encode(
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction(program, buffer, &(Instruction) {.maybe_label = operand->label32});
+
+  Array_UNWIND_CODE unwind_codes = dyn_array_make(Array_UNWIND_CODE);
+
+  #define fn_offset_in_prolog()\
+    u64_to_u8(code_base_rva + buffer->occupied - fn_start_rva)
+
+  // Push non-volatile registers (in reverse order)
+  for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+    Operand to_save = {
+      .type = Operand_Type_Register,
+      .byte_size = 8,
+      .reg = reg_index,
+    };
+    if (register_bitset_get(builder->used_register_bitset, &to_save)) {
+      if (!register_bitset_get(builder->code_block.register_volatile_bitset, &to_save)) {
+        encode_instruction(program, buffer, &(Instruction) {push, {to_save}});
+        dyn_array_push(unwind_codes, (UNWIND_CODE) {
+          .CodeOffset = fn_offset_in_prolog(),
+          .UnwindOp = UWOP_PUSH_NONVOL,
+          .OpInfo = reg_index,
+        });
+      }
+    }
+  }
+
   encode_instruction(program, buffer, &(Instruction) {sub, {rsp, stack_size_operand, 0}});
-  u32 stack_allocation_offset_in_prolog =
-    u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
+  u32 stack_allocation_offset_in_prolog = fn_offset_in_prolog();
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
+
+  #undef fn_offset_in_prolog
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
@@ -445,6 +476,17 @@ fn_encode(
 
   encode_instruction(program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label});
   encode_instruction(program, buffer, &(Instruction) {add, {rsp, stack_size_operand, 0}});
+
+
+  // Pop non-volatile registers
+  for (s64 i = dyn_array_length(unwind_codes) - 1; i >= 0; --i) {
+    Operand to_save = {
+      .type = Operand_Type_Register,
+      .byte_size = 8,
+      .reg = dyn_array_get(unwind_codes, i)->OpInfo,
+    };
+    encode_instruction(program, buffer, &(Instruction) {pop, {to_save}});
+  }
 
   encode_instruction(program, buffer, &(Instruction) {ret, {0}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
@@ -464,28 +506,32 @@ fn_encode(
       .FrameOffset = 0,
     };
 
+    u8 unwind_code_index = 0;
+    for (u64 i = 0; i < dyn_array_length(unwind_codes); ++i) {
+      unwind_info->UnwindCode[unwind_code_index++] = *dyn_array_get(unwind_codes, i);
+    }
+
     if (builder->stack_reserve) {
       assert(builder->stack_reserve >= 8);
       assert(builder->stack_reserve % 8 == 0);
       if (builder->stack_reserve <= 128) {
-        unwind_info->CountOfCodes = 1;
-        unwind_info->UnwindCode[0] = (UNWIND_CODE){
+        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
           .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
           .UnwindOp = UWOP_ALLOC_SMALL,
           .OpInfo = (builder->stack_reserve - 8) / 8,
         };
       } else {
-        unwind_info->CountOfCodes = 2;
-        unwind_info->UnwindCode[0] = (UNWIND_CODE){
+        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
           .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
           .UnwindOp = UWOP_ALLOC_LARGE,
           .OpInfo = 0,
         };
-        unwind_info->UnwindCode[1] = (UNWIND_CODE){
+        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
           .DataForPreviousCode = u32_to_u16(builder->stack_reserve / 8),
         };
         // TODO support 512k + allocations
       }
+      unwind_info->CountOfCodes = unwind_code_index;
     }
     *function_exception_info = (RUNTIME_FUNCTION) {
       .BeginAddress = fn_start_rva,
@@ -493,6 +539,7 @@ fn_encode(
       .UnwindData = unwind_data_rva,
     };
   }
+  dyn_array_destroy(unwind_codes);
 }
 
 void
@@ -1038,7 +1085,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
     move_value(&builder->code_block.instructions, location, &reg->saved, reg->stack_value);
-    // TODO :FreeStackAllocation 
+    // TODO :FreeStackAllocation
   }
 
   return result;

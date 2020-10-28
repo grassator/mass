@@ -114,6 +114,26 @@ mnemonic(ret,
   encoding(0xC3, none, 0),
 );
 
+mnemonic(push,
+  encoding(0x50, plus_r, r16),
+  encoding(0x50, plus_r, r32),
+  encoding(0x50, plus_r, r64),
+
+  encoding(0xFF, _op_code(6), r_m16),
+  encoding(0xFF, _op_code(6), r_m32),
+  encoding(0xFF, _op_code(6), r_m64),
+);
+
+mnemonic(pop,
+  encoding(0x58, plus_r, r16),
+  encoding(0x58, plus_r, r32),
+  encoding(0x58, plus_r, r64),
+
+  encoding(0x8F, _op_code(0), r_m16),
+  encoding(0x8F, _op_code(0), r_m32),
+  encoding(0x8F, _op_code(0), r_m64),
+);
+
 mnemonic(inc,
   encoding(0xFF, _op_code(0), r_m16),
   encoding(0xFF, _op_code(0), r_m32),
