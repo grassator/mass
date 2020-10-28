@@ -105,7 +105,7 @@ int main(s32 argc, char **argv) {
       break;
     }
     case Mass_Cli_Mode_Run: {
-      program_end(program);
+      program_jit(program);
       fn_type_opaque main =
         helper_value_as_function(program, program->entry_point);
       main();

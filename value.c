@@ -1228,8 +1228,8 @@ program_test_exception_handler(
 }
 
 
-Fixed_Buffer *
-program_end(
+void
+program_jit(
   Program *program
 ) {
   if (dyn_array_is_initialized(program->import_libraries)) {
@@ -1315,7 +1315,6 @@ program_end(
     panic("Could not add function table definition");
   }
   program->jit_buffer = result_buffer;
-  return result_buffer;
 }
 
 void

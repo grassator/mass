@@ -31,7 +31,7 @@ spec_check_and_print_program(
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
   check(_fn_value_id_);\
-  program_end(program_);\
+  program_jit(program_);\
   check(!spec_check_and_print_program(program_))
 
 
@@ -247,7 +247,7 @@ spec("source") {
       scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
     check(main);
 
-    program_end(program_);
+    program_jit(program_);
     check(!dyn_array_length(program_->errors))
 
     fn_type_s32_to_s32 checker = value_as_function(main, fn_type_s32_to_s32);
@@ -350,7 +350,7 @@ spec("source") {
     Value *checker_32 =
       scope_lookup_force(program_->global_scope, slice_literal("checker_s32"), 0);
 
-    program_end(program_);
+    program_jit(program_);
 
     {
       s64 size = value_as_function(checker_s64, fn_type_s64_to_s64)(0);
@@ -447,7 +447,7 @@ spec("source") {
       scope_lookup_force(program_->global_scope, slice_literal("fizz_buzz"), 0);
     check(fizz_buzz);
 
-    program_end(program_);
+    program_jit(program_);
     check(!dyn_array_length(program_->errors))
 
     fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
@@ -461,7 +461,7 @@ spec("source") {
     Value *check_value =
       scope_lookup_force(program_->global_scope, slice_literal("check"), 0);
 
-    program_end(program_);
+    program_jit(program_);
 
     fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
     check(checker() == 42);

@@ -579,8 +579,8 @@ estimate_max_code_size_in_bytes(
   Program *program
 );
 
-Fixed_Buffer *
-program_end(
+void
+program_jit(
   Program *program
 );
 
