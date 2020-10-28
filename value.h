@@ -552,7 +552,7 @@ typedef struct {
 } Parse_Result;
 
 typedef struct _Program {
-  Fixed_Buffer *data_buffer;
+  Bucket_Buffer *data_buffer;
   Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
   Value *entry_point;

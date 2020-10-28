@@ -99,7 +99,7 @@ encode_rdata_section(
   Fixed_Buffer *buffer = result.buffer;
 
   void *global_data = fixed_buffer_allocate_bytes(buffer, global_data_size, sizeof(s8));
-  memcpy(global_data, program->data_buffer->memory, program->data_buffer->occupied);
+  bucket_buffer_copy_to_memory(program->data_buffer, global_data);
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);

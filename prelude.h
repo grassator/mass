@@ -2792,10 +2792,11 @@ bucket_buffer_allocate_bytes(
   ((_type_ *)bucket_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  static inline _type_ *bucket_buffer_append_##_type_(Bucket_Buffer *buffer, _type_ value) {\
-    _type_ *result = bucket_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
-    *result = value;\
-    return result;\
+  static inline u64 bucket_buffer_append_##_type_(Bucket_Buffer *buffer, _type_ value) {\
+    _type_ *temp = bucket_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    *temp = value;\
+    u64 offset = buffer->occupied - sizeof(_type_);\
+    return offset;\
   }
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
@@ -2812,18 +2813,57 @@ bucket_buffer_append_slice(
   return (Slice){.bytes = (char *)bytes, .length = slice.length};
 }
 
+static inline s64
+bucket_buffer_pointer_to_offset(
+  const Bucket_Buffer *buffer,
+  void *pointer
+) {
+  s8 *byte_pointer = pointer;
+  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
+    Bucket_Buffer_Bucket *bucket = dyn_array_get(buffer->buckets, i);
+    if (byte_pointer >= bucket->memory && byte_pointer <= bucket->memory + bucket->occupied) {
+      return byte_pointer - bucket->memory;
+    }
+  }
+  return -1;
+}
+
+static inline void *
+bucket_buffer_offset_to_pointer(
+  const Bucket_Buffer *buffer,
+  u64 offset
+) {
+  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
+    Bucket_Buffer_Bucket *bucket = dyn_array_get(buffer->buckets, i);
+    if (offset < bucket->occupied) {
+      return bucket->memory + offset;
+    }
+    offset -= bucket->occupied;
+  }
+  return 0;
+}
+
+void
+bucket_buffer_copy_to_memory(
+  const Bucket_Buffer *buffer,
+  void *target
+) {
+  s8 *memory = target;
+  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
+    Bucket_Buffer_Bucket *bucket = dyn_array_get(buffer->buckets, i);
+    memcpy(memory, bucket->memory, bucket->occupied);
+    memory += bucket->occupied;
+  }
+}
+
 Fixed_Buffer *
 bucket_buffer_to_fixed_buffer(
   const Allocator *allocator,
   const Bucket_Buffer *buffer
 ) {
-  u64 total_occupied = buffer->occupied;
-  Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator, .capacity = total_occupied);
-  for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
-    Bucket_Buffer_Bucket *bucket = dyn_array_get(buffer->buckets, i);
-    s8 *target = fixed_buffer_allocate_bytes(result, bucket->occupied, 1);
-    memcpy(target, bucket->memory, bucket->occupied);
-  }
+  Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator, .capacity = buffer->occupied);
+  bucket_buffer_copy_to_memory(buffer, result->memory);
+  result->occupied = buffer->occupied;
   return result;
 }
 

@@ -596,8 +596,10 @@ value_global_internal(
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
   u32 alignment = descriptor_alignment(descriptor);
-  s8 *address = fixed_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
-  s64 offset_in_data_section = address - program->data_buffer->memory;
+  void *allocation =
+    bucket_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
+  s64 offset_in_data_section = bucket_buffer_pointer_to_offset(program->data_buffer, allocation);
+  assert(offset_in_data_section >= 0);
 
   Value *result = temp_allocate(Value);
   *result = (Value) {
@@ -605,7 +607,7 @@ value_global_internal(
     .operand = {
       .type = Operand_Type_RIP_Relative,
       .byte_size = byte_size,
-      .rip_offset_in_data = (s64) offset_in_data_section,
+      .rip_offset_in_data = u64_to_s64(offset_in_data_section),
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -784,7 +786,7 @@ rip_value_pointer(
   Value *value
 ) {
   assert(value->operand.type == Operand_Type_RIP_Relative);
-  return program->data_buffer->memory + value->operand.rip_offset_in_data;
+  return bucket_buffer_offset_to_pointer(program->data_buffer, value->operand.rip_offset_in_data);
 }
 
 Value *
@@ -1071,7 +1073,7 @@ program_init(
   Program *program
 ) {
   *program = (Program) {
-    .data_buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = 128 * 1024),
+    .data_buffer = bucket_buffer_make(.allocator = allocator_system),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
     .errors = dyn_array_make(Array_Parse_Error, .capacity = 16),
@@ -1246,7 +1248,7 @@ program_jit(
         fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
         symbol->offset_in_data =
-          u64_to_u32(fixed_buffer_append_u64(program->data_buffer, (u64)fn_address));
+          u64_to_u32(bucket_buffer_append_u64(program->data_buffer, (u64)fn_address));
       }
     }
   }
@@ -1265,9 +1267,10 @@ program_jit(
   );
 
   { // Copying and repointing the data segment into contiguous buffer
-    fixed_buffer_append_slice(result_buffer, fixed_buffer_as_slice(program->data_buffer));
+    void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
+    bucket_buffer_copy_to_memory(program->data_buffer, global_data);
     // TODO rename to temp_data_buffer and turn it into a bucket buffer
-    fixed_buffer_destroy(program->data_buffer);
+    bucket_buffer_destroy(program->data_buffer);
     // Nobody should be trying to read or write to this temp buffer after compilation
     program->data_buffer = 0;
   }
