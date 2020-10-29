@@ -7,6 +7,13 @@
 #include "function.c"
 #include "source.c"
 
+typedef struct {
+  s64 x;
+  s64 y;
+} Test_128bit;
+
+typedef Test_128bit (*fn_type_s64_to_test_128bit_struct)(s64);
+
 bool
 spec_check_and_print_program(
   Program *program
@@ -465,6 +472,25 @@ spec("source") {
 
     fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
     check(checker() == 42);
+  }
+
+  xit("should be able to return structs while accepting other arguments") {
+    test_program_inline_source(
+      "Test_128bit :: struct { x : s64; y : s64 };"
+      "return_struct :: (x : s64) -> (Test_128bit) {"
+        "result : Test_128bit;"
+        "result.x = x;"
+        "result.y = x / 2;"
+        "return result"
+      "}",
+      return_struct
+    );
+
+    fn_type_s64_to_test_128bit_struct checker =
+      value_as_function(return_struct, fn_type_s64_to_test_128bit_struct);
+    Test_128bit test_128bit = checker(42);
+    check(test_128bit.x == 42);
+    check(test_128bit.y == 21);
   }
 
   it("should be able to define and use a macro for while loop") {
