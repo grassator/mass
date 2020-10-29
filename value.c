@@ -443,6 +443,18 @@ register_bitset_set(
   }
 }
 
+static inline void
+register_bitset_unset(
+  u64 *bitset,
+  const Operand *operand
+) {
+  if (operand->type == Operand_Type_Register) {
+    *bitset &= ~(1llu << operand->reg);
+  } else {
+    panic("TODO");
+  }
+}
+
 static inline bool
 register_bitset_get(
   u64 bitset,

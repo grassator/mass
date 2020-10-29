@@ -17,6 +17,42 @@ reserve_stack(
   return result;
 }
 
+Register
+temp_register_acquire(
+  Function_Builder *builder
+) {
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    Operand operand = {
+      .type = Operand_Type_Register,
+      .byte_size = 8,
+      .reg = reg_index,
+    };
+    if (!register_bitset_get(builder->code_block.register_occupied_bitset, &operand)) {
+      register_bitset_set(&builder->used_register_bitset, &operand);
+      register_bitset_set(&builder->code_block.register_occupied_bitset, &operand);
+      return reg_index;
+    }
+  }
+
+  // FIXME
+  panic("Could not acquire a temp register");
+  return -1;
+}
+
+void
+temp_register_release(
+  Function_Builder *builder,
+  Register reg_index
+) {
+  Operand operand = {
+    .type = Operand_Type_Register,
+    .byte_size = 8,
+    .reg = reg_index,
+  };
+  assert(register_bitset_get(builder->code_block.register_occupied_bitset, &operand));
+  register_bitset_unset(&builder->code_block.register_occupied_bitset, &operand);
+}
+
 
 Value *
 ensure_register_or_memory(
@@ -175,9 +211,11 @@ move_value(
     // to a memory location. In which case we do a move through a temp register
     bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
     if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
-      Value *temp = value_register_for_descriptor(Register_A, target->descriptor);
+      // TODO add `operand_register_for_descriptor`
+      Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
       push_instruction(instructions, location, (Instruction) {mov, {temp->operand, adjusted_source->operand}});
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand}});
+      temp_register_release(builder, temp->operand.reg);
     } else {
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, adjusted_source->operand}});
     }
@@ -202,9 +240,10 @@ move_value(
           push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand, 0}});
         }
       } else {
-        Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-        push_instruction(instructions, location, (Instruction) {movsx, {reg_a->operand, source->operand, 0}});
-        push_instruction(instructions, location, (Instruction) {mov, {target->operand, reg_a->operand, 0}});
+        Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+        push_instruction(instructions, location, (Instruction) {movsx, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand, 0}});
+        temp_register_release(builder, temp->operand.reg);
       }
       return;
     } else {
@@ -221,25 +260,29 @@ move_value(
   if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
     if (target_size >= 16) {
       // TODO probably can use larger chunks for copying but need to check alignment
-      // FIXME :RegisterAllocation
-      Value *temp_rsi = reserve_stack(builder, &descriptor_s64);
-      Value *temp_rdi = reserve_stack(builder, &descriptor_s64);
-      Value *temp_rcx = reserve_stack(builder, &descriptor_s64);
-      Value *reg_rsi = value_register_for_descriptor(Register_SI, &descriptor_s64);
-      Value *reg_rdi = value_register_for_descriptor(Register_DI, &descriptor_s64);
-      Value *reg_rcx = value_register_for_descriptor(Register_C, &descriptor_s64);
-      move_value(builder, location, temp_rsi, reg_rsi);
-      move_value(builder, location, temp_rdi, reg_rdi);
-      move_value(builder, location, temp_rcx, reg_rcx);
+      Value *temp_rsi = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
+      Value *temp_rdi = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
+      Value *temp_rcx = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
+      {
+        Value *reg_rsi = value_register_for_descriptor(Register_SI, &descriptor_s64);
+        Value *reg_rdi = value_register_for_descriptor(Register_DI, &descriptor_s64);
+        Value *reg_rcx = value_register_for_descriptor(Register_C, &descriptor_s64);
+        move_value(builder, location, temp_rsi, reg_rsi);
+        move_value(builder, location, temp_rdi, reg_rdi);
+        move_value(builder, location, temp_rcx, reg_rcx);
 
-      push_instruction(instructions, location, (Instruction) {lea, {reg_rsi->operand, source->operand}});
-      push_instruction(instructions, location, (Instruction) {lea, {reg_rdi->operand, target->operand}});
-      move_value(builder, location, reg_rcx, value_from_s64(target_size));
-      push_instruction(instructions, location, (Instruction) {rep_movs});
+        push_instruction(instructions, location, (Instruction) {lea, {reg_rsi->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {lea, {reg_rdi->operand, target->operand}});
+        move_value(builder, location, reg_rcx, value_from_s64(target_size));
+        push_instruction(instructions, location, (Instruction) {rep_movs});
 
-      move_value(builder, location, reg_rsi, temp_rsi);
-      move_value(builder, location, reg_rdi, temp_rdi);
-      move_value(builder, location, reg_rcx, temp_rcx);
+        move_value(builder, location, reg_rsi, temp_rsi);
+        move_value(builder, location, reg_rdi, temp_rdi);
+        move_value(builder, location, reg_rcx, temp_rcx);
+      }
+      temp_register_release(builder, temp_rsi->operand.reg);
+      temp_register_release(builder, temp_rdi->operand.reg);
+      temp_register_release(builder, temp_rcx->operand.reg);
     } else {
       Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
 
