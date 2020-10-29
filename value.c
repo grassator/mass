@@ -773,10 +773,7 @@ value_register_for_descriptor_internal(
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
-  Operand_Type operand_type =
-    descriptor->type == Descriptor_Type_Float
-    ? Operand_Type_Xmm
-    : Operand_Type_Register;
+  Operand_Type operand_type = register_is_xmm(reg) ? Operand_Type_Xmm : Operand_Type_Register;
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = descriptor,

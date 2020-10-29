@@ -73,15 +73,31 @@ typedef enum {
   Register_R14 = 0b1110,
   Register_R15 = 0b1111,
 
-  Register_Xmm0 = 0b000,
-  Register_Xmm1 = 0b001,
-  Register_Xmm2 = 0b010,
-  Register_Xmm3 = 0b011,
-  Register_Xmm4 = 0b100,
-  Register_Xmm5 = 0b101,
-  Register_Xmm6 = 0b110,
-  Register_Xmm7 = 0b111,
+  Register_Xmm0 = 0b10000,
+  Register_Xmm1 = 0b10001,
+  Register_Xmm2 = 0b10010,
+  Register_Xmm3 = 0b10011,
+  Register_Xmm4 = 0b10100,
+  Register_Xmm5 = 0b10101,
+  Register_Xmm6 = 0b10110,
+  Register_Xmm7 = 0b10111,
+
+  Register_Xmm8  = 0b11000,
+  Register_Xmm9  = 0b11001,
+  Register_Xmm10 = 0b11010,
+  Register_Xmm11 = 0b11011,
+  Register_Xmm12 = 0b11100,
+  Register_Xmm13 = 0b11101,
+  Register_Xmm14 = 0b11110,
+  Register_Xmm15 = 0b11111,
 } Register;
+
+static inline bool
+register_is_xmm(
+  Register reg
+) {
+  return !!(reg & Register_Xmm0);
+}
 
 typedef struct {
   Register reg;
