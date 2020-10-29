@@ -219,6 +219,7 @@ move_value(
 
   if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
     Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+
     move_value(instructions, location, reg_a, source);
     move_value(instructions, location, target, reg_a);
     return;
@@ -563,7 +564,24 @@ function_return_descriptor(
       if (descriptor->type == Descriptor_Type_Float) {
         function->returns = value_register_for_descriptor(Register_Xmm0, descriptor);
       } else {
-        function->returns = value_register_for_descriptor(Register_A, descriptor);
+        // :ReturnTypeLargerThanRegister
+        u32 byte_size = descriptor_byte_size(descriptor);
+        if (byte_size > 8) {
+          function->returns = temp_allocate(Value);
+          *function->returns = (Value){
+            .descriptor = descriptor,
+            .operand = {
+              .type = Operand_Type_Memory_Indirect,
+              .byte_size = byte_size,
+              .indirect = {
+                .reg = Register_A,
+                .displacement = 0,
+              },
+            },
+          };
+        } else {
+          function->returns = value_register_for_descriptor(Register_A, descriptor);
+        }
       }
     } else {
       function->returns = &void_value;
@@ -1059,7 +1077,7 @@ call_function_overload(
   // area of at least 4 arguments?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
-  // FIXME support this for fns that accept arguments
+  // :ReturnTypeLargerThanRegister
   u32 return_size = descriptor_byte_size(descriptor->returns->descriptor);
   if (return_size > 8) {
     parameters_stack_size += return_size;

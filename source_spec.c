@@ -481,7 +481,7 @@ spec("source") {
         "result : Test_128bit;"
         "result.x = x;"
         "result.y = x / 2;"
-        "return result"
+        "result"
       "}",
       return_struct
     );

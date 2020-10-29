@@ -2211,24 +2211,6 @@ token_force_lazy_function_definition(
     descriptor = builder->descriptor;
   }
 
-  if (dyn_array_length(args->children) != 0) {
-    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
-      .type = Token_Type_Operator,
-      .source = slice_literal(","),
-    });
-    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
-      Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      token_rewrite_statement(state, function_scope, builder, token_clear_newlines);
-      Token_Match_Arg *arg = token_match_argument(program, state, function_scope, outer_builder);
-      if (!arg) return 0;
-      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
-      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
-        register_bitset_set(&builder->code_block.register_occupied_bitset, &arg_value->operand);
-      }
-      scope_define_value(function_scope, arg->arg_name, arg_value);
-    }
-  }
-
   switch (dyn_array_length(return_types->children)) {
     case 0: {
       descriptor->function.returns = &void_value;
@@ -2245,6 +2227,24 @@ token_force_lazy_function_definition(
     default: {
       panic("Multiple return types are not supported at the moment");
       break;
+    }
+  }
+
+  if (dyn_array_length(args->children) != 0) {
+    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(","),
+    });
+    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
+      Token_Matcher_State *state = dyn_array_get(argument_states, i);
+      token_rewrite_statement(state, function_scope, builder, token_clear_newlines);
+      Token_Match_Arg *arg = token_match_argument(program, state, function_scope, outer_builder);
+      if (!arg) return 0;
+      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
+      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
+        register_bitset_set(&builder->code_block.register_occupied_bitset, &arg_value->operand);
+      }
+      scope_define_value(function_scope, arg->arg_name, arg_value);
     }
   }
 

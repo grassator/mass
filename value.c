@@ -878,7 +878,16 @@ function_push_argument_internal(
 ) {
   u32 byte_size = descriptor_byte_size(arg_descriptor);
   assert(byte_size <= 8);
-  switch (dyn_array_length(function->arguments)) {
+
+  u64 argument_index = dyn_array_length(function->arguments);
+  // :ReturnTypeLargerThanRegister
+  // If return type is larger than register, the pointer to stack location
+  // where it needs to be written to is passed as the first argument
+  // shifting registers for actual arguments by one
+  if (descriptor_byte_size(function->returns->descriptor) > 8) {
+    argument_index++;
+  }
+  switch (argument_index) {
     case 0: {
       Value *value = arg_descriptor->type == Descriptor_Type_Float
         ? value_register_for_descriptor_internal(compiler_source_location, Register_Xmm0, arg_descriptor)
