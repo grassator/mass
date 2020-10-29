@@ -102,6 +102,11 @@ mnemonic(movsd,
   encoding(0xF20F11, _r, xmm_m64, xmm64),
 );
 
+// TODO figure out how to better deal with implicit parameters here
+mnemonic(rep_movs,
+  encoding(0xF3A4, none, 0),
+);
+
 mnemonic(lea,
   encoding(0x8d, _r, r64, m),
 );

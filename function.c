@@ -20,14 +20,14 @@ reserve_stack(
 
 Value *
 ensure_register_or_memory(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *value
 ) {
   assert(value->operand.type != Operand_Type_None);
   if (operand_is_immediate(&value->operand)) {
     Value *result = value_register_for_descriptor(Register_A, value->descriptor);
-    move_value(instructions, location, result, value);
+    move_value(builder, location, result, value);
     return result;
   }
   return value;
@@ -35,7 +35,7 @@ ensure_register_or_memory(
 
 Value *
 ensure_register(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *value,
   Register reg
@@ -43,7 +43,7 @@ ensure_register(
   assert(value->operand.type != Operand_Type_None);
   if (value->operand.type != Operand_Type_Register) {
     Value *result = value_register_for_descriptor(reg, value->descriptor);
-    move_value(instructions, location, result, value);
+    move_value(builder, location, result, value);
     return result;
   }
   return value;
@@ -51,11 +51,12 @@ ensure_register(
 
 void
 move_value(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *target,
   Value *source
 ) {
+  Array_Instruction *instructions = &builder->code_block.instructions;
   if (target == source) return;
   if (operand_equal(&target->operand, &source->operand)) return;
 
@@ -95,8 +96,8 @@ move_value(
       assert(operand_is_memory(&source->operand));
       // Using xmm4 as it is volatile and not used in function arguments
       Value *reg_xmm4 = value_register_for_descriptor(Register_Xmm4, target->descriptor);
-      move_value(instructions, location, reg_xmm4, source);
-      move_value(instructions, location, target, reg_xmm4);
+      move_value(builder, location, reg_xmm4, source);
+      move_value(builder, location, target, reg_xmm4);
       return;
     }
   }
@@ -135,7 +136,7 @@ move_value(
       }
     }
     if (temp != target) {
-      move_value(instructions, location, target, temp);
+      move_value(builder, location, target, temp);
     }
     return;
   }
@@ -188,7 +189,7 @@ move_value(
   if (target_size != source_size) {
     if (source_size < target_size) {
       // TODO deal with unsigned numbers
-      source = ensure_register_or_memory(instructions, location, source);
+      source = ensure_register_or_memory(builder, location, source);
       if (target->operand.type == Operand_Type_Register) {
         if (source_size == 4) {
           Operand adjusted_target = {
@@ -218,10 +219,33 @@ move_value(
   }
 
   if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
-    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+    if (target_size >= 16) {
+      // TODO probably can use larger chunks for copying but need to check alignment
+      // FIXME :RegisterAllocation
+      Value *temp_rsi = reserve_stack(builder, &descriptor_s64);
+      Value *temp_rdi = reserve_stack(builder, &descriptor_s64);
+      Value *temp_rcx = reserve_stack(builder, &descriptor_s64);
+      Value *reg_rsi = value_register_for_descriptor(Register_SI, &descriptor_s64);
+      Value *reg_rdi = value_register_for_descriptor(Register_DI, &descriptor_s64);
+      Value *reg_rcx = value_register_for_descriptor(Register_C, &descriptor_s64);
+      move_value(builder, location, temp_rsi, reg_rsi);
+      move_value(builder, location, temp_rdi, reg_rdi);
+      move_value(builder, location, temp_rcx, reg_rcx);
 
-    move_value(instructions, location, reg_a, source);
-    move_value(instructions, location, target, reg_a);
+      push_instruction(instructions, location, (Instruction) {lea, {reg_rsi->operand, source->operand}});
+      push_instruction(instructions, location, (Instruction) {lea, {reg_rdi->operand, target->operand}});
+      move_value(builder, location, reg_rcx, value_from_s64(target_size));
+      push_instruction(instructions, location, (Instruction) {rep_movs});
+
+      move_value(builder, location, reg_rsi, temp_rsi);
+      move_value(builder, location, reg_rdi, temp_rdi);
+      move_value(builder, location, reg_rcx, temp_rcx);
+    } else {
+      Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
+
+      move_value(builder, location, reg_a, source);
+      move_value(builder, location, target, reg_a);
+    }
     return;
   }
 
@@ -233,8 +257,8 @@ move_value(
     operand_is_memory(&source->operand)
   )) {
     Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-    move_value(instructions, location, reg_a, source);
-    move_value(instructions, location, target, reg_a);
+    move_value(builder, location, reg_a, source);
+    move_value(builder, location, target, reg_a);
   } else {
     push_instruction(instructions, location, (Instruction) {mov, {target->operand, source->operand, 0}});
   }
@@ -484,10 +508,19 @@ fn_encode(
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label}
   );
+
+  // :ReturnTypeLargerThanRegister
+  if(descriptor_byte_size(builder->value->descriptor->function.returns->descriptor) > 8) {
+    // FIXME :RegisterAllocation
+    //       make sure that return value is always available in RCX at this point
+    encode_instruction_with_compiler_location(
+      program, buffer, &(Instruction) {mov, {rax, rcx}}
+    );
+  }
+
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {add, {rsp, stack_size_operand}}
   );
-
 
   // Pop non-volatile registers
   for (s64 i = dyn_array_length(unwind_codes) - 1; i >= 0; --i) {
@@ -574,7 +607,7 @@ function_return_descriptor(
               .type = Operand_Type_Memory_Indirect,
               .byte_size = byte_size,
               .indirect = {
-                .reg = Register_A,
+                .reg = Register_C,
                 .displacement = 0,
               },
             },
@@ -693,7 +726,7 @@ typedef enum {
 void
 plus_or_minus(
   Arithmetic_Operation operation,
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,
   Value *a,
@@ -716,7 +749,7 @@ plus_or_minus(
       case Arithmetic_Operation_Plus: folded = a_s64 + b_s64; break;
       case Arithmetic_Operation_Minus: folded = a_s64 - b_s64; break;
     }
-    move_value(instructions, location, result_value, value_from_signed_immediate(folded));
+    move_value(builder, location, result_value, value_from_signed_immediate(folded));
     return;
   }
 
@@ -747,31 +780,35 @@ plus_or_minus(
     ? result_value
     : value_register_for_descriptor(Register_R11, a->descriptor); // TODO register allocation
 
-  move_value(instructions, location, temp, a);
-  push_instruction(instructions, location, (Instruction) {mnemonic, {temp->operand, b->operand}});
-  move_value(instructions, location, result_value, temp);
+  move_value(builder, location, temp, a);
+  push_instruction(
+    &builder->code_block.instructions,
+    location,
+    (Instruction) {mnemonic, {temp->operand, b->operand}}
+  );
+  move_value(builder, location, result_value, temp);
 }
 
 void
 plus(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(Arithmetic_Operation_Plus, instructions, location, result_value, a, b);
+  plus_or_minus(Arithmetic_Operation_Plus, builder, location, result_value, a, b);
 }
 
 void
 minus(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(Arithmetic_Operation_Minus, instructions, location, result_value, a, b);
+  plus_or_minus(Arithmetic_Operation_Minus, builder, location, result_value, a, b);
 }
 
 Value *
@@ -796,16 +833,16 @@ multiply(
   Value *y_temp = reserve_stack(builder, y->descriptor);
 
   Value *reg_a = value_register_for_descriptor(Register_A, y->descriptor);
-  move_value(instructions, location, reg_a, y);
-  move_value(instructions, location, y_temp, reg_a);
+  move_value(builder, location, reg_a, y);
+  move_value(builder, location, y_temp, reg_a);
 
   reg_a = value_register_for_descriptor(Register_A, x->descriptor);
-  move_value(instructions, location, reg_a, x);
+  move_value(builder, location, reg_a, x);
 
   push_instruction(instructions, location, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
   Value *temp = reserve_stack(builder, x->descriptor);
-  move_value(instructions, location, temp, reg_a);
+  move_value(builder, location, temp, reg_a);
 
   return temp;
 }
@@ -847,7 +884,7 @@ divide_or_remainder(
         break;
       }
     }
-    move_value(instructions, location, result_value, value_from_signed_immediate(folded));
+    move_value(builder, location, result_value, value_from_signed_immediate(folded));
     return;
   }
 
@@ -855,7 +892,7 @@ divide_or_remainder(
   Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
 
   Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
-  move_value(instructions, location, rdx_temp, reg_rdx);
+  move_value(builder, location, rdx_temp, reg_rdx);
 
   Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
@@ -864,11 +901,11 @@ divide_or_remainder(
 
   // TODO deal with signed / unsigned
   Value *divisor = reserve_stack(builder, larger_descriptor);
-  move_value(instructions, location, divisor, b);
+  move_value(builder, location, divisor, b);
 
   Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
   {
-    move_value(instructions, location, reg_a, a);
+    move_value(builder, location, reg_a, a);
 
     switch (descriptor_byte_size(larger_descriptor)) {
       case 8: {
@@ -896,19 +933,19 @@ divide_or_remainder(
 
 
   if (operation == Divide_Operation_Divide) {
-    move_value(instructions, location, result_value, reg_a);
+    move_value(builder, location, result_value, reg_a);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
       Value *temp_result = value_register_for_descriptor(Register_AH, larger_descriptor);
-      move_value(instructions, location, result_value, temp_result);
+      move_value(builder, location, result_value, temp_result);
     } else {
       Value *temp_result = value_register_for_descriptor(Register_D, larger_descriptor);
-      move_value(instructions, location, result_value, temp_result);
+      move_value(builder, location, result_value, temp_result);
     }
   }
 
   // Restore RDX
-  move_value(instructions, location, reg_rdx, rdx_temp);
+  move_value(builder, location, reg_rdx, rdx_temp);
 }
 
 void
@@ -982,10 +1019,10 @@ compare(
     : b->descriptor;
 
   Value *temp_b = reserve_stack(builder, larger_descriptor);
-  move_value(instructions, location, temp_b, b);
+  move_value(builder, location, temp_b, b);
 
   Value *reg_r11 = value_register_for_descriptor(Register_R11, larger_descriptor);
-  move_value(instructions, location,  reg_r11, a);
+  move_value(builder, location,  reg_r11, a);
 
   push_instruction(instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
 
@@ -1019,7 +1056,7 @@ value_pointer_to(
   push_instruction(instructions, location, (Instruction) {lea, {reg_a->operand, source_operand, 0}});
 
   Value *result = reserve_stack(builder, result_descriptor);
-  move_value(instructions, location, result, reg_a);
+  move_value(builder, location, result, reg_a);
 
   return result;
 }
@@ -1058,7 +1095,7 @@ call_function_overload(
     if (register_bitset_get(builder->code_block.register_volatile_bitset, &to_save.operand)) {
       if (register_bitset_get(builder->code_block.register_occupied_bitset, &to_save.operand)) {
         Value *stack_value = reserve_stack(builder, to_save.descriptor);
-        move_value(&builder->code_block.instructions, location, stack_value, &to_save);
+        move_value(builder, location, stack_value, &to_save);
         dyn_array_push(saved_array, (Saved_Register){
           .saved = to_save,
           .stack_value = stack_value,
@@ -1070,7 +1107,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
     Value *target_arg = *dyn_array_get(descriptor->arguments, i);
-    move_value(instructions, location, target_arg, source_arg);
+    move_value(builder, location, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -1098,7 +1135,7 @@ call_function_overload(
     push_instruction(instructions, location, (Instruction) {call, {to_call->operand, 0, 0}});
   } else {
     Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
-    move_value(instructions, location, reg_a, to_call);
+    move_value(builder, location, reg_a, to_call);
     push_instruction(instructions, location, (Instruction) {call, {reg_a->operand, 0, 0}});
   }
 
@@ -1106,13 +1143,13 @@ call_function_overload(
   if (return_size <= 8) {
     if (return_size != 0) {
       result = reserve_stack(builder, descriptor->returns->descriptor);
-      move_value(instructions, location, result, descriptor->returns);
+      move_value(builder, location, result, descriptor->returns);
     }
   }
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
-    move_value(&builder->code_block.instructions, location, &reg->saved, reg->stack_value);
+    move_value(builder, location, &reg->saved, reg->stack_value);
     // TODO :FreeStackAllocation
   }
 
@@ -1187,12 +1224,12 @@ make_and(
   Label *else_label = make_if(instructions, location, a);
   {
     Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(instructions, location, result, rhs);
+    move_value(builder, location, result, rhs);
     push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
   push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
 
-  move_value(instructions, location, result, value_from_s8(0));
+  move_value(builder, location, result, value_from_s8(0));
   push_instruction(instructions, location, (Instruction) {.maybe_label = label});
   return result;
 }
@@ -1213,12 +1250,12 @@ make_or(
   );
   {
     Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(instructions, location, result, rhs);
+    move_value(builder, location, result, rhs);
     push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
   push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
 
-  move_value(instructions, location, result, value_from_s8(1));
+  move_value(builder, location, result, value_from_s8(1));
   push_instruction(instructions, location, (Instruction) {.maybe_label = label});
   return result;
 }

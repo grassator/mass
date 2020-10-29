@@ -57,7 +57,7 @@ make_trampoline(
 
 void
 move_value(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *a,
   Value *b
@@ -128,7 +128,7 @@ loop_end(
 
 void
 plus(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,
   Value *a,
@@ -137,7 +137,7 @@ plus(
 
 void
 minus(
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Location *location,
   Value *result_value,
   Value *a,

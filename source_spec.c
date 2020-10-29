@@ -474,7 +474,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  xit("should be able to return structs while accepting other arguments") {
+  it("should be able to return structs while accepting other arguments") {
     test_program_inline_source(
       "Test_128bit :: struct { x : s64; y : s64 };"
       "return_struct :: (x : s64) -> (Test_128bit) {"
