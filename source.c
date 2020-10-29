@@ -2240,7 +2240,7 @@ token_force_lazy_function_definition(
       if (!arg) return 0;
       Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
       if (!is_external && arg_value->operand.type == Operand_Type_Register) {
-        register_bitset_set(&builder->code_block.register_occupied_bitset, &arg_value->operand);
+        register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
       scope_define_value(function_scope, arg->arg_name, arg_value);
     }

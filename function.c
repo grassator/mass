@@ -22,14 +22,9 @@ temp_register_acquire(
   Function_Builder *builder
 ) {
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    Operand operand = {
-      .type = Operand_Type_Register,
-      .byte_size = 8,
-      .reg = reg_index,
-    };
-    if (!register_bitset_get(builder->code_block.register_occupied_bitset, &operand)) {
-      register_bitset_set(&builder->used_register_bitset, &operand);
-      register_bitset_set(&builder->code_block.register_occupied_bitset, &operand);
+    if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+      register_bitset_set(&builder->used_register_bitset, reg_index);
+      register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
       return reg_index;
     }
   }
@@ -44,13 +39,8 @@ temp_register_release(
   Function_Builder *builder,
   Register reg_index
 ) {
-  Operand operand = {
-    .type = Operand_Type_Register,
-    .byte_size = 8,
-    .reg = reg_index,
-  };
-  assert(register_bitset_get(builder->code_block.register_occupied_bitset, &operand));
-  register_bitset_unset(&builder->code_block.register_occupied_bitset, &operand);
+  assert(register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
+  register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
 }
 
 void
@@ -305,17 +295,17 @@ fn_begin(
 
   {
     // Arguments
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &rcx);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &rdx);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &r8);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &r9);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_C);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_D);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R8);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R9);
 
     // Return
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &rax);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_A);
 
     // Other
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &r10);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, &r11);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R10);
+    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R11);
   }
 
   *result = fn_value;
@@ -484,13 +474,9 @@ fn_encode(
 
   // Push non-volatile registers (in reverse order)
   for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    Operand to_save = {
-      .type = Operand_Type_Register,
-      .byte_size = 8,
-      .reg = reg_index,
-    };
-    if (register_bitset_get(builder->used_register_bitset, &to_save)) {
-      if (!register_bitset_get(builder->code_block.register_volatile_bitset, &to_save)) {
+    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+        Operand to_save = operand_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(program, buffer, &(Instruction) {push, {to_save}});
         dyn_array_push(unwind_codes, (UNWIND_CODE) {
           .CodeOffset = fn_offset_in_prolog(),
@@ -1094,22 +1080,20 @@ call_function_overload(
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    Value to_save = {
-      .descriptor = &descriptor_s64,
-      .operand = {
-        .type = Operand_Type_Register,
-        .byte_size = 8,
-        .reg = reg_index,
-      }
-    };
-    if (register_bitset_get(builder->code_block.register_volatile_bitset, &to_save.operand)) {
-      if (register_bitset_get(builder->code_block.register_occupied_bitset, &to_save.operand)) {
+    if (register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+      if (register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+        Value to_save = {
+          .descriptor = &descriptor_s64,
+          .operand = {
+            .type = Operand_Type_Register,
+            .byte_size = 8,
+            .reg = reg_index,
+          }
+        };
+        Operand source = operand_register_for_descriptor(reg_index, &descriptor_s64);
         Value *stack_value = reserve_stack(builder, to_save.descriptor);
-        move_value(builder, location, stack_value, &to_save);
-        dyn_array_push(saved_array, (Saved_Register){
-          .saved = to_save,
-          .stack_value = stack_value,
-        });
+        push_instruction(instructions, location, (Instruction) {mov, {stack_value->operand, source}});
+        dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
       }
     }
   }
@@ -1129,10 +1113,9 @@ call_function_overload(
   if (return_size > 8) {
     parameters_stack_size += return_size;
     Descriptor *return_pointer_descriptor = descriptor_pointer_to(descriptor->returns->descriptor);
-    Value *reg_c =
-      value_register_for_descriptor(Register_C, return_pointer_descriptor);
+    Value *reg_c = value_register_for_descriptor(Register_C, return_pointer_descriptor);
     push_instruction(
-      instructions, location, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand, 0}}
+      instructions, location, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand}}
     );
   }
 

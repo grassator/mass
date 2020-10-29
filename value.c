@@ -434,38 +434,25 @@ descriptor_struct_add_field(
 static inline void
 register_bitset_set(
   u64 *bitset,
-  const Operand *operand
+  Register reg
 ) {
-  if (operand->type == Operand_Type_Register) {
-    *bitset |= 1llu << operand->reg;
-  } else {
-    panic("TODO");
-  }
+  *bitset |= 1llu << reg;
 }
 
 static inline void
 register_bitset_unset(
   u64 *bitset,
-  const Operand *operand
+  Register reg
 ) {
-  if (operand->type == Operand_Type_Register) {
-    *bitset &= ~(1llu << operand->reg);
-  } else {
-    panic("TODO");
-  }
+  *bitset &= ~(1llu << reg);
 }
 
 static inline bool
 register_bitset_get(
   u64 bitset,
-  const Operand *operand
+  Register reg
 ) {
-  if (operand->type == Operand_Type_Register) {
-     return !!(bitset & (1llu << operand->reg));
-  } else {
-    panic("TODO");
-  }
-  return false;
+  return !!(bitset & (1llu << reg));
 }
 
 s64
@@ -763,25 +750,32 @@ value_byte_size_internal(
 #define value_byte_size(...)\
   value_byte_size_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-
-Value *
-value_register_for_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
+static inline Operand
+operand_register_for_descriptor(
   Register reg,
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
-  Operand_Type operand_type = register_is_xmm(reg) ? Operand_Type_Xmm : Operand_Type_Register;
+  Operand result = {
+    .type = register_is_xmm(reg) ? Operand_Type_Xmm : Operand_Type_Register,
+    .reg = reg,
+    .byte_size = byte_size,
+  };
+  return result;
+}
+
+static inline Value *
+value_register_for_descriptor_internal(
+  Compiler_Source_Location compiler_source_location,
+  Register reg,
+  Descriptor *descriptor
+) {
   Value *result = temp_allocate(Value);
-  *result = (const Value) {
+  *result = (Value) {
     .descriptor = descriptor,
-    .operand = {
-      .type = operand_type,
-      .reg = reg,
-      .byte_size = byte_size,
-    },
+    .operand = operand_register_for_descriptor(reg, descriptor),
     .compiler_source_location = compiler_source_location,
   };
   return result;

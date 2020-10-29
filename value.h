@@ -192,13 +192,19 @@ operand_equal(
 static inline void
 register_bitset_set(
   u64 *bitset,
-  const Operand *operand
+  Register reg
+);
+
+static inline void
+register_bitset_unset(
+  u64 *bitset,
+  Register reg
 );
 
 static inline bool
 register_bitset_get(
   u64 bitset,
-  const Operand *operand
+  Register reg
 );
 
 struct Descriptor;
