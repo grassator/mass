@@ -53,38 +53,6 @@ temp_register_release(
   register_bitset_unset(&builder->code_block.register_occupied_bitset, &operand);
 }
 
-
-Value *
-ensure_register_or_memory(
-  Function_Builder *builder,
-  const Source_Location *location,
-  Value *value
-) {
-  assert(value->operand.type != Operand_Type_None);
-  if (operand_is_immediate(&value->operand)) {
-    Value *result = value_register_for_descriptor(Register_A, value->descriptor);
-    move_value(builder, location, result, value);
-    return result;
-  }
-  return value;
-}
-
-Value *
-ensure_register(
-  Function_Builder *builder,
-  const Source_Location *location,
-  Value *value,
-  Register reg
-) {
-  assert(value->operand.type != Operand_Type_None);
-  if (value->operand.type != Operand_Type_Register) {
-    Value *result = value_register_for_descriptor(reg, value->descriptor);
-    move_value(builder, location, result, value);
-    return result;
-  }
-  return value;
-}
-
 void
 move_value(
   Function_Builder *builder,
@@ -227,7 +195,6 @@ move_value(
   if (target_size != source_size) {
     if (source_size < target_size) {
       // TODO deal with unsigned numbers
-      source = ensure_register_or_memory(builder, location, source);
       if (target->operand.type == Operand_Type_Register) {
         if (source_size == 4) {
           Operand adjusted_target = {
@@ -235,14 +202,14 @@ move_value(
             .reg = target->operand.reg,
             .byte_size = 4,
           };
-          push_instruction(instructions, location, (Instruction) {mov, {adjusted_target, source->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {mov, {adjusted_target, source->operand}});
         } else {
-          push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand}});
         }
       } else {
         Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
-        push_instruction(instructions, location, (Instruction) {movsx, {temp->operand, source->operand, 0}});
-        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {movsx, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand}});
         temp_register_release(builder, temp->operand.reg);
       }
       return;
