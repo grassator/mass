@@ -674,14 +674,17 @@ typedef enum {
   Arithmetic_Operation_Minus,
 } Arithmetic_Operation;
 
-#define maybe_constant_fold(_a_, _b_, _operator_)\
+
+#define maybe_constant_fold(_builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     Operand *a_operand = &(_a_)->operand;\
     Operand *b_operand = &(_b_)->operand;\
     if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {\
       s64 a_s64 = operand_immediate_as_s64(a_operand);\
       s64 b_s64 = operand_immediate_as_s64(b_operand);\
-      return value_from_signed_immediate(a_s64 _operator_ b_s64);\
+      move_value(\
+        (_builder_), (_loc_), (_result_), value_from_signed_immediate(a_s64 _operator_ b_s64)\
+      );\
     }\
   } while(0)
 
@@ -775,10 +778,11 @@ minus(
   plus_or_minus(Arithmetic_Operation_Minus, builder, location, result_value, a, b);
 }
 
-Value *
+void
 multiply(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *x,
   Value *y
 ) {
@@ -789,7 +793,7 @@ multiply(
   assert_not_register_ax(x);
   assert_not_register_ax(y);
 
-  maybe_constant_fold(x, y, *);
+  maybe_constant_fold(builder, location, result_value, x, y, *);
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
@@ -805,10 +809,7 @@ multiply(
 
   push_instruction(instructions, location, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
 
-  Value *temp = reserve_stack(builder, x->descriptor);
-  move_value(builder, location, temp, reg_a);
-
-  return temp;
+  move_value(builder, location, result_value, reg_a);
 }
 
 typedef enum {
@@ -935,11 +936,12 @@ value_remainder(
 }
 
 
-Value *
+void
 compare(
   Compare_Type operation,
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 ) {
@@ -949,27 +951,27 @@ compare(
 
   switch(operation) {
     case Compare_Type_Equal: {
-      maybe_constant_fold(a, b, ==);
+      maybe_constant_fold(builder, location, result_value, a, b, ==);
       break;
     }
     case Compare_Type_Not_Equal: {
-      maybe_constant_fold(a, b, !=);
+      maybe_constant_fold(builder, location, result_value, a, b, !=);
       break;
     }
     case Compare_Type_Less: {
-      maybe_constant_fold(a, b, <);
+      maybe_constant_fold(builder, location, result_value, a, b, <);
       break;
     }
     case Compare_Type_Greater: {
-      maybe_constant_fold(a, b, >);
+      maybe_constant_fold(builder, location, result_value, a, b, >);
       break;
     }
     case Compare_Type_Less_Equal: {
-      maybe_constant_fold(a, b, <=);
+      maybe_constant_fold(builder, location, result_value, a, b, <=);
       break;
     }
     case Compare_Type_Greater_Equal: {
-      maybe_constant_fold(a, b, >=);
+      maybe_constant_fold(builder, location, result_value, a, b, >=);
       break;
     }
     default: {
@@ -990,7 +992,7 @@ compare(
 
   push_instruction(instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
 
-  return value_from_compare(operation);
+  move_value(builder, location, result_value, value_from_compare(operation));
 }
 
 Value *
@@ -1182,8 +1184,7 @@ make_and(
 
   Label *else_label = make_if(instructions, location, a);
   {
-    Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(builder, location, result, rhs);
+    compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
     push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
   }
   push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
@@ -1204,13 +1205,11 @@ make_or(
   Value *result = reserve_stack(builder, &descriptor_s8);
   Label *label = make_label();
 
-  Label *else_label = make_if(
-    instructions, location, compare(Compare_Type_Equal, builder, location, a, value_from_s8(0))
-  );
+  compare(Compare_Type_Equal, builder, location, result, a, value_from_s8(0));
+  Label *else_label = make_if(instructions, location, result);
   {
-    Value *rhs = compare(Compare_Type_Not_Equal, builder, location, b, value_from_s8(0));
-    move_value(builder, location, result, rhs);
-    push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
+    compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
+    push_instruction(instructions, location, (Instruction) {jmp, {label32(label)}});
   }
   push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
 

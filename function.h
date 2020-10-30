@@ -144,10 +144,11 @@ minus(
   Value *b
 );
 
-Value *
+void
 multiply(
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *x,
   Value *y
 );
@@ -170,11 +171,12 @@ value_remainder(
   Value *b
 );
 
-Value *
+void
 compare(
   Compare_Type operation,
   Function_Builder *builder,
   const Source_Location *location,
+  Value *result_value,
   Value *a,
   Value *b
 );

@@ -2091,17 +2091,12 @@ token_rewrite_compare(
   }
   Token_Match(rhs, 0);
 
-  //Value *lhs_value_raw = value_any();
-  //token_force_value(lhs, scope, builder, lhs_value_raw);
-  //Value *lhs_value = reserve_stack(builder, lhs_value_raw->descriptor);
-  //move_value(builder, &operator->location, lhs_value, lhs_value_raw);
-
   Value *lhs_value = value_any();
   token_force_value(lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(rhs, scope, builder, rhs_value);
-  Value *value = compare(compare_type, builder, &operator->location, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, value));
+  compare(compare_type, builder, &operator->location, result_value, lhs_value, rhs_value);
+  token_replace_tokens_in_state(state, 3, token_value_make(operator, result_value));
   return true;
 }
 
