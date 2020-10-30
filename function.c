@@ -308,40 +308,12 @@ fn_begin(
 }
 
 void
-fn_ensure_frozen(
-  Descriptor_Function *function
-) {
-  if(function->frozen) return;
-
-  if (!function->returns) {
-    function->returns = &void_value;
-  }
-  function->frozen = true;
-}
-
-void
-fn_freeze(
-  Function_Builder *builder
-) {
-  fn_ensure_frozen(&builder->descriptor->function);
-}
-
-bool
-fn_is_frozen(
-  Function_Builder *builder
-) {
-  return builder->descriptor->function.frozen;
-}
-
-void
 fn_end(
   Function_Builder *builder
 ) {
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
-
-  fn_freeze(builder);
 }
 
 u32
@@ -1068,8 +1040,6 @@ call_function_overload(
   assert(to_call->descriptor->type == Descriptor_Type_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->function;
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
-
-  fn_ensure_frozen(descriptor);
 
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
 

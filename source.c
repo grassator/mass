@@ -2251,8 +2251,6 @@ token_force_lazy_function_definition(
     return body->value;
   }
 
-  fn_freeze(builder);
-
   Value *return_result_value =
     descriptor->function.returns->descriptor->type == Descriptor_Type_Void
       ? value_any()

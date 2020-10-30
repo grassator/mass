@@ -258,7 +258,6 @@ typedef struct Descriptor_Function {
   Array_Value_Ptr arguments;
 
   Value *returns;
-  bool frozen;
   Value *next_overload;
 } Descriptor_Function;
 
