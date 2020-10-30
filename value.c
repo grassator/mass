@@ -467,7 +467,7 @@ operand_immediate_as_s64(
   return 0;
 }
 
-bool
+static inline bool
 operand_is_memory(
   Operand *operand
 ) {
@@ -476,6 +476,13 @@ operand_is_memory(
     operand->type == Operand_Type_RIP_Relative ||
     operand->type == Operand_Type_Sib
   );
+}
+
+static inline bool
+operand_is_register_or_memory(
+  Operand *operand
+) {
+  return operand->type == Operand_Type_Register || operand_is_memory(operand);
 }
 
 bool

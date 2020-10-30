@@ -97,32 +97,34 @@ move_value(
   }
 
   if (source->operand.type == Operand_Type_Eflags) {
-    Value *temp = descriptor_byte_size(target->descriptor) == 1
-      ? target
-      : value_register_for_descriptor(Register_A, &descriptor_s8);
+    assert(operand_is_register_or_memory(&target->operand));
+    Value *temp = target;
+    if (descriptor_byte_size(temp->descriptor) != 1) {
+      temp = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s8);
+    }
     switch(source->operand.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, location, (Instruction) {sete, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {sete, {temp->operand, source->operand}});
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_instruction(instructions, location, (Instruction) {setne, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {setne, {temp->operand, source->operand}});
         break;
       }
       case Compare_Type_Less: {
-        push_instruction(instructions, location, (Instruction) {setl, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {setl, {temp->operand, source->operand}});
         break;
       }
       case Compare_Type_Less_Equal: {
-        push_instruction(instructions, location, (Instruction) {setle, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {setle, {temp->operand, source->operand}});
         break;
       }
       case Compare_Type_Greater: {
-        push_instruction(instructions, location, (Instruction) {setg, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {setg, {temp->operand, source->operand}});
         break;
       }
       case Compare_Type_Greater_Equal: {
-        push_instruction(instructions, location, (Instruction) {setge, {temp->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {setge, {temp->operand, source->operand}});
         break;
       }
       default: {
@@ -130,7 +132,11 @@ move_value(
       }
     }
     if (temp != target) {
-      move_value(builder, location, target, temp);
+      assert(temp->operand.type == Operand_Type_Register);
+      Operand resized_temp = operand_register_for_descriptor(temp->operand.reg, target->descriptor);
+      push_instruction(instructions, location, (Instruction) {movsx, {resized_temp, temp->operand}});
+      push_instruction(instructions, location, (Instruction) {mov, {target->operand, resized_temp}});
+      temp_register_release(builder, temp->operand.reg);
     }
     return;
   }
@@ -187,6 +193,7 @@ move_value(
       // TODO deal with unsigned numbers
       if (target->operand.type == Operand_Type_Register) {
         if (source_size == 4) {
+          // TODO check whether this correctly sign extends
           Operand adjusted_target = {
             .type = Operand_Type_Register,
             .reg = target->operand.reg,
