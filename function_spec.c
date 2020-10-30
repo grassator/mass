@@ -253,7 +253,7 @@ spec("function") {
       ));
     }
     it("should use a temp register when result is also `a`, but both operands are memory") {
-      Value *reg_r11 = value_register_for_descriptor(Register_R11, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *m_a = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m_b = &(Value){&descriptor_s32, stack(4, 4)};
 
@@ -261,15 +261,15 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){mov, reg_r11->operand, m_a->operand}
+        &(Instruction){mov, reg_a->operand, m_a->operand}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){add, reg_r11->operand, m_b->operand}
+        &(Instruction){add, reg_a->operand, m_b->operand}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 2),
-        &(Instruction){mov, m_a->operand, reg_r11->operand}
+        &(Instruction){mov, m_a->operand, reg_a->operand}
       ));
     }
   }
@@ -311,7 +311,7 @@ spec("function") {
       ));
     }
     it("should use a temp A register when result is also `b`") {
-      Value *reg_r11 = value_register_for_descriptor(Register_R11, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
@@ -319,15 +319,15 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){mov, reg_r11->operand, reg_b->operand}
+        &(Instruction){mov, reg_a->operand, reg_b->operand}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){sub, reg_r11->operand, reg_c->operand}
+        &(Instruction){sub, reg_a->operand, reg_c->operand}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 2),
-        &(Instruction){mov, reg_c->operand, reg_r11->operand}
+        &(Instruction){mov, reg_c->operand, reg_a->operand}
       ));
     }
   }

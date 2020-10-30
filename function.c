@@ -722,9 +722,7 @@ plus_or_minus(
       // Addition is commutative (a + b == b + a)
       // so we can swap operands and save one instruction
       if (operand_equal(&result_value->operand, &b->operand)) {
-        Value *swap_temp = a;
-        a = b;
-        b = swap_temp;
+        value_swap(Value *, a, b);
       }
       break;
     }
@@ -740,7 +738,7 @@ plus_or_minus(
   );
   Value *temp = can_reuse_result_as_temp
     ? result_value
-    : value_register_for_descriptor(Register_R11, a->descriptor); // TODO register allocation
+    : value_register_for_descriptor(temp_register_acquire(builder), a->descriptor);
 
   move_value(builder, location, temp, a);
   push_instruction(
@@ -748,7 +746,11 @@ plus_or_minus(
     location,
     (Instruction) {mnemonic, {temp->operand, b->operand}}
   );
-  move_value(builder, location, result_value, temp);
+  if (temp != result_value) {
+    move_value(builder, location, result_value, temp);
+    assert(temp->operand.type == Operand_Type_Register);
+    temp_register_release(builder, temp->operand.reg);
+  }
 }
 
 void
