@@ -103,7 +103,7 @@ mnemonic(movsd,
 );
 
 // TODO figure out how to better deal with implicit parameters here
-mnemonic(rep_movs,
+mnemonic(rep_movsb,
   encoding(0xF3A4, none, 0),
 );
 

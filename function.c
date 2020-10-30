@@ -175,11 +175,10 @@ move_value(
     // to a memory location. In which case we do a move through a temp register
     bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
     if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
-      // TODO add `operand_register_for_descriptor`
-      Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
-      push_instruction(instructions, location, (Instruction) {mov, {temp->operand, adjusted_source->operand}});
-      push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand}});
-      temp_register_release(builder, temp->operand.reg);
+      Operand temp = operand_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+      push_instruction(instructions, location, (Instruction) {mov, {temp, adjusted_source->operand}});
+      push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
+      temp_register_release(builder, temp.reg);
     } else {
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, adjusted_source->operand}});
     }
@@ -204,10 +203,10 @@ move_value(
           push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand}});
         }
       } else {
-        Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
-        push_instruction(instructions, location, (Instruction) {movsx, {temp->operand, source->operand}});
-        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp->operand}});
-        temp_register_release(builder, temp->operand.reg);
+        Operand temp = operand_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+        push_instruction(instructions, location, (Instruction) {movsx, {temp, source->operand}});
+        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
+        temp_register_release(builder, temp.reg);
       }
       return;
     } else {
@@ -238,7 +237,7 @@ move_value(
         push_instruction(instructions, location, (Instruction) {lea, {reg_rsi->operand, source->operand}});
         push_instruction(instructions, location, (Instruction) {lea, {reg_rdi->operand, target->operand}});
         move_value(builder, location, reg_rcx, value_from_s64(target_size));
-        push_instruction(instructions, location, (Instruction) {rep_movs});
+        push_instruction(instructions, location, (Instruction) {rep_movsb});
 
         move_value(builder, location, reg_rsi, temp_rsi);
         move_value(builder, location, reg_rdi, temp_rdi);
@@ -248,27 +247,15 @@ move_value(
       temp_register_release(builder, temp_rdi->operand.reg);
       temp_register_release(builder, temp_rcx->operand.reg);
     } else {
-      Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-
-      move_value(builder, location, reg_a, source);
-      move_value(builder, location, target, reg_a);
+      Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+      move_value(builder, location, temp, source);
+      move_value(builder, location, target, temp);
+      temp_register_release(builder, temp->operand.reg);
     }
     return;
   }
 
-  if ((
-    target->operand.type != Operand_Type_Register &&
-    source->operand.type == Operand_Type_Immediate_64
-  ) || (
-    operand_is_memory(&target->operand) &&
-    operand_is_memory(&source->operand)
-  )) {
-    Value *reg_a = value_register_for_descriptor(Register_A, target->descriptor);
-    move_value(builder, location, reg_a, source);
-    move_value(builder, location, target, reg_a);
-  } else {
-    push_instruction(instructions, location, (Instruction) {mov, {target->operand, source->operand, 0}});
-  }
+  push_instruction(instructions, location, (Instruction) {mov, {target->operand, source->operand}});
 }
 
 Function_Builder *
