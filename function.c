@@ -10,7 +10,7 @@ reserve_stack(
   fn->stack_reserve += byte_size;
   Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = temp_allocate(Value);
-  *result = (const Value) {
+  *result = (Value) {
     .descriptor = descriptor,
     .operand = operand,
   };
@@ -18,7 +18,7 @@ reserve_stack(
 }
 
 Register
-temp_register_acquire(
+register_acquire_temp(
   Function_Builder *builder
 ) {
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
@@ -35,7 +35,7 @@ temp_register_acquire(
 }
 
 void
-temp_register_release(
+register_release(
   Function_Builder *builder,
   Register reg_index
 ) {
@@ -100,7 +100,7 @@ move_value(
     assert(operand_is_register_or_memory(&target->operand));
     Value *temp = target;
     if (descriptor_byte_size(temp->descriptor) != 1) {
-      temp = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s8);
+      temp = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s8);
     }
     switch(source->operand.compare_type) {
       case Compare_Type_Equal: {
@@ -136,7 +136,7 @@ move_value(
       Operand resized_temp = operand_register_for_descriptor(temp->operand.reg, target->descriptor);
       push_instruction(instructions, location, (Instruction) {movsx, {resized_temp, temp->operand}});
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, resized_temp}});
-      temp_register_release(builder, temp->operand.reg);
+      register_release(builder, temp->operand.reg);
     }
     return;
   }
@@ -175,10 +175,10 @@ move_value(
     // to a memory location. In which case we do a move through a temp register
     bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
     if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
-      Operand temp = operand_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+      Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
       push_instruction(instructions, location, (Instruction) {mov, {temp, adjusted_source->operand}});
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
-      temp_register_release(builder, temp.reg);
+      register_release(builder, temp.reg);
     } else {
       push_instruction(instructions, location, (Instruction) {mov, {target->operand, adjusted_source->operand}});
     }
@@ -203,10 +203,10 @@ move_value(
           push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand}});
         }
       } else {
-        Operand temp = operand_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+        Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
         push_instruction(instructions, location, (Instruction) {movsx, {temp, source->operand}});
         push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
-        temp_register_release(builder, temp.reg);
+        register_release(builder, temp.reg);
       }
       return;
     } else {
@@ -223,9 +223,9 @@ move_value(
   if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
     if (target_size >= 16) {
       // TODO probably can use larger chunks for copying but need to check alignment
-      Value *temp_rsi = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
-      Value *temp_rdi = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
-      Value *temp_rcx = value_register_for_descriptor(temp_register_acquire(builder), &descriptor_s64);
+      Value *temp_rsi = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
+      Value *temp_rdi = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
+      Value *temp_rcx = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
       {
         Value *reg_rsi = value_register_for_descriptor(Register_SI, &descriptor_s64);
         Value *reg_rdi = value_register_for_descriptor(Register_DI, &descriptor_s64);
@@ -243,14 +243,14 @@ move_value(
         move_value(builder, location, reg_rdi, temp_rdi);
         move_value(builder, location, reg_rcx, temp_rcx);
       }
-      temp_register_release(builder, temp_rsi->operand.reg);
-      temp_register_release(builder, temp_rdi->operand.reg);
-      temp_register_release(builder, temp_rcx->operand.reg);
+      register_release(builder, temp_rsi->operand.reg);
+      register_release(builder, temp_rdi->operand.reg);
+      register_release(builder, temp_rcx->operand.reg);
     } else {
-      Value *temp = value_register_for_descriptor(temp_register_acquire(builder), target->descriptor);
+      Value *temp = value_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
       move_value(builder, location, temp, source);
       move_value(builder, location, target, temp);
-      temp_register_release(builder, temp->operand.reg);
+      register_release(builder, temp->operand.reg);
     }
     return;
   }
@@ -741,7 +741,7 @@ plus_or_minus(
   );
   Value *temp = can_reuse_result_as_temp
     ? result_value
-    : value_register_for_descriptor(temp_register_acquire(builder), a->descriptor);
+    : value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
 
   move_value(builder, location, temp, a);
   push_instruction(
@@ -752,7 +752,7 @@ plus_or_minus(
   if (temp != result_value) {
     move_value(builder, location, result_value, temp);
     assert(temp->operand.type == Operand_Type_Register);
-    temp_register_release(builder, temp->operand.reg);
+    register_release(builder, temp->operand.reg);
   }
 }
 
@@ -829,10 +829,6 @@ divide_or_remainder(
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
   assert(a->descriptor->type == Descriptor_Type_Integer);
-
-  // TODO type check values
-  assert_not_register_ax(a);
-  assert_not_register_ax(b);
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
     s64 divident = operand_immediate_as_s64(&a->operand);
