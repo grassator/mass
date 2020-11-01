@@ -462,7 +462,6 @@ spec("source") {
   }
 
   it("should be able to parse struct definitions") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
     program_import_file(program_, slice_literal("fixtures\\struct"));
 
     Value *check_value =
