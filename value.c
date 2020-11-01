@@ -1288,8 +1288,6 @@ program_jit(
   { // Copying and repointing the data segment into contiguous buffer
     void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
     bucket_buffer_copy_to_memory(program->data_buffer, global_data);
-    // TODO rename to temp_data_buffer and turn it into a bucket buffer
-    bucket_buffer_destroy(program->data_buffer);
     // Nobody should be trying to read or write to this temp buffer after compilation
     program->data_buffer = 0;
   }

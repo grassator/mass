@@ -485,6 +485,7 @@ typedef struct {
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   Descriptor *descriptor;
+  // FIXME remove this reference!
   Program *program;
   u64 used_register_bitset;
 

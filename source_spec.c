@@ -32,7 +32,7 @@ spec_check_and_print_program(
   Tokenizer_Result result = tokenize(test_file_name, source);\
   check(result.type == Tokenizer_Result_Type_Success);\
   token_match_module(result.root, program_);\
-  Value *_fn_value_id_ = scope_lookup_force(program_->global_scope, slice_literal(#_fn_value_id_), 0);\
+  Value *_fn_value_id_ = scope_lookup_force(program_, program_->global_scope, slice_literal(#_fn_value_id_), 0);\
   (void)_fn_value_id_
 
 #define test_program_inline_source(_source_, _fn_value_id_)\
@@ -251,7 +251,7 @@ spec("source") {
       program_import_file(program_, slice_literal("fixtures\\error_runtime_divide_by_zero"));
     check(result.type == Parse_Result_Type_Success);
     Value *main =
-      scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
     check(main);
 
     program_jit(program_);
@@ -353,9 +353,9 @@ spec("source") {
     token_match_module(result.root, program_);
 
     Value *checker_s64 =
-      scope_lookup_force(program_->global_scope, slice_literal("checker_s64"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("checker_s64"), 0);
     Value *checker_32 =
-      scope_lookup_force(program_->global_scope, slice_literal("checker_s32"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("checker_s32"), 0);
 
     program_jit(program_);
 
@@ -451,7 +451,7 @@ spec("source") {
     check(result.type == Parse_Result_Type_Success);
 
     Value *fizz_buzz =
-      scope_lookup_force(program_->global_scope, slice_literal("fizz_buzz"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("fizz_buzz"), 0);
     check(fizz_buzz);
 
     program_jit(program_);
@@ -465,12 +465,22 @@ spec("source") {
     program_import_file(program_, slice_literal("fixtures\\struct"));
 
     Value *check_value =
-      scope_lookup_force(program_->global_scope, slice_literal("check"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("check"), 0);
 
     program_jit(program_);
 
     fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
     check(checker() == 42);
+  }
+
+  it("should be able to parse struct definitions") {
+    program_import_file(program_, slice_literal("fixtures\\compile_time"));
+
+    Value *status =
+      scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
+    check(status->descriptor->type == Descriptor_Type_Integer);
+    check(status->operand.type == Operand_Type_Immediate_32);
+    check(status->operand.imm32 == 42);
   }
 
   it("should be able to return structs while accepting other arguments") {
@@ -551,7 +561,7 @@ spec("source") {
 
     token_match_module(result.root, program_);
 
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+    program_->entry_point = scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
     check(program_->entry_point->descriptor->type != Descriptor_Type_Any);
     check(!spec_check_and_print_program(program_));
 
@@ -560,7 +570,7 @@ spec("source") {
 
   it("should parse and write an executable that prints Hello, world!") {
     program_import_file(program_, slice_literal("fixtures\\hello_world"));
-    program_->entry_point = scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+    program_->entry_point = scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
     check(program_->entry_point->descriptor->type != Descriptor_Type_Any);
     check(!spec_check_and_print_program(program_));
 
@@ -611,7 +621,7 @@ spec("source") {
       Parse_Result result =
         program_import_file(program_, slice_literal("fixtures\\error_unknown_type"));
       check(result.type == Parse_Result_Type_Success);
-      scope_lookup_force(program_->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
       check(dyn_array_length(program_->errors));
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
