@@ -260,7 +260,6 @@ move_value(
 
 Function_Builder *
 fn_begin(
-  Value **result,
   Program *program
 ) {
   Descriptor *descriptor = temp_allocate(Descriptor);
@@ -301,8 +300,6 @@ fn_begin(
     register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R10);
     register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R11);
   }
-
-  *result = fn_value;
 
   return builder;
 }

@@ -65,7 +65,6 @@ move_value(
 
 Function_Builder *
 fn_begin(
-  Value **result,
   Program *program
 );
 

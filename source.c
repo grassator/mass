@@ -1454,7 +1454,7 @@ token_rewrite_compile_time_eval(
     .global_scope = scope_make(program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),
   };
-  Function_Builder *eval_builder = fn_begin(&(Value *){0}, &eval_program);
+  Function_Builder *eval_builder = fn_begin(&eval_program);
 
   Value *expression_result_value = value_any();
   token_match_expression(&eval_program, &sub_state, eval_program.global_scope, eval_builder, expression_result_value);
@@ -2269,7 +2269,6 @@ token_force_lazy_function_definition(
   //Program *program = lazy_function_definition->program;
   Scope *function_scope = scope_make(program->global_scope);
 
-  Value *value = 0;
   Function_Builder *builder = 0;
   // TODO think about a better way to distinguish imports
   bool is_external = body->type == Token_Type_Value;
@@ -2286,7 +2285,7 @@ token_force_lazy_function_definition(
       },
     };
   } else {
-    builder = fn_begin(&value, program);
+    builder = fn_begin(program);
     descriptor = builder->descriptor;
   }
 
@@ -2339,7 +2338,7 @@ token_force_lazy_function_definition(
   token_parse_block(program, body->children, function_scope, builder, return_result_value);
 
   fn_end(builder);
-  return value;
+  return builder->value;
 }
 
 bool
