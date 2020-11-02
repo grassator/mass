@@ -1439,7 +1439,7 @@ token_rewrite_compile_time_eval(
   Program *program,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *unused_vu
 ) {
   u64 peek_index = 0;
   Token_Match_Operator(at, "@");
@@ -1455,23 +1455,103 @@ token_rewrite_compile_time_eval(
     .errors = dyn_array_make(Array_Parse_Error),
   };
   Function_Builder *eval_builder = fn_begin(&eval_program);
+  function_return_descriptor(&eval_builder->descriptor->function, &descriptor_void);
 
   Value *expression_result_value = value_any();
-  token_match_expression(&eval_program, &sub_state, eval_program.global_scope, eval_builder, expression_result_value);
-  function_return_descriptor(&eval_builder->descriptor->function, expression_result_value->descriptor);
-  Value *eval_return = eval_builder->descriptor->function.returns;
-  move_value(eval_builder, &paren->location, eval_return, expression_result_value);
+  token_match_expression(
+    &eval_program, &sub_state, eval_program.global_scope, eval_builder, expression_result_value
+  );
+
+  // We use a something like a C++ reference out parameter for the
+  // result to have a consitent function signature on this C side of things.
+
+  // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
+  Value *arg_value = function_push_argument(
+    &eval_builder->value->descriptor->function,
+    descriptor_pointer_to(expression_result_value->descriptor)
+  );
+
+  // Create a reference Value
+  assert(arg_value->operand.type == Operand_Type_Register);
+  Value *out_value = temp_allocate(Value);
+  *out_value = (Value) {
+    .descriptor = expression_result_value->descriptor,
+    .operand = (Operand){
+      .type = Operand_Type_Memory_Indirect,
+      .byte_size = expression_result_value->operand.byte_size,
+      .indirect = { .reg = arg_value->operand.reg },
+    },
+  };
+
+  move_value(eval_builder, &paren->location, out_value, expression_result_value);
   fn_end(eval_builder);
 
   program_jit(&eval_program);
 
-  // FIXME eval_builder should wrap the return value into a Value struct
-  // so that we have consistent return type here
-  fn_type_void_to_s32 jitted_code =
-    (fn_type_void_to_s32)helper_value_as_function(&eval_program, eval_builder->value);
+  u32 result_byte_size = out_value->operand.byte_size;
+  // Need to ensure 16-byte alignment here because result value might be __m128
+  // TODO When we support AVX-2 or AVX-512, this might need to increase further
+  u32 alignment = 16;
+  void *result = allocator_allocate_bytes(temp_allocator, result_byte_size, alignment);
 
-  s32 imm = jitted_code();
-  Token *result_token = token_value_make(paren, value_from_s32(imm));
+  fn_type_voidp_to_void jitted_code =
+    (fn_type_voidp_to_void)helper_value_as_function(&eval_program, eval_builder->value);
+
+  jitted_code(result);
+  Value *token_value = temp_allocate(Value);
+  *token_value = (Value) {
+    .descriptor = out_value->descriptor,
+  };
+  switch(out_value->descriptor->type) {
+    case Descriptor_Type_Float:
+    case Descriptor_Type_Integer: {
+      switch (result_byte_size) {
+        case 8: {
+          token_value->operand = imm64(*(s64 *)result);
+          break;
+        }
+        case 4: {
+          token_value->operand = imm32(*(s32 *)result);
+          break;
+        }
+        case 2: {
+          token_value->operand = imm16(*(s16 *)result);
+          break;
+        }
+        case 1: {
+          token_value->operand = imm8(*(s8 *)result);
+          break;
+        }
+        default: {
+          panic("Unsupported immediate size");
+          break;
+        }
+      }
+      break;
+    }
+    case Descriptor_Type_Void: {
+      token_value->operand = (Operand){0};
+      break;
+    }
+    case Descriptor_Type_Any: {
+      panic("Internal Error: We should never get Any type from comp time eval");
+      break;
+    }
+    case Descriptor_Type_Tagged_Union:
+    case Descriptor_Type_Fixed_Size_Array:
+    case Descriptor_Type_Pointer:
+    case Descriptor_Type_Struct: {
+      panic("TODO move to data section or maybe we should allocate from there right away above?");
+      break;
+    };
+    case Descriptor_Type_Function:
+    case Descriptor_Type_Type: {
+      panic("TODO figure out how that works");
+      break;
+    }
+  }
+
+  Token *result_token = token_value_make(paren, token_value);
 
   if (!result_token) {
     return false;
