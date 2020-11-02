@@ -63,16 +63,6 @@ move_value(
   Value *b
 );
 
-Function_Builder *
-fn_begin(
-  Program *program
-);
-
-void
-fn_end(
-  Function_Builder *builder
-);
-
 void
 fn_encode(
   Program *program,
@@ -81,19 +71,6 @@ fn_encode(
   RUNTIME_FUNCTION *function_exception_info,
   UNWIND_INFO *unwind_info,
   u32 unwind_data_rva
-);
-
-Value *
-fn_arg(
-  Function_Builder *builder,
-  Descriptor *descriptor
-);
-
-Label *
-make_if(
-  Array_Instruction *instructions,
-  const Source_Location *location,
-  Value *value
 );
 
 typedef struct Struct_Builder_Field {
