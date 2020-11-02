@@ -486,8 +486,6 @@ typedef struct {
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   Descriptor *descriptor;
-  // FIXME remove this reference!
-  Program *program;
   u64 used_register_bitset;
 
   Value *value;
@@ -519,10 +517,15 @@ typedef union {
 
 typedef dyn_array_type(UNWIND_CODE) Array_UNWIND_CODE;
 
+typedef struct {
+  const Function_Builder *builder;
+  Program *program;
+} Exception_Data;
+
 #define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK 2
 #define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_NON_VOLATILE_REGISTER_PUSH 16
 #define UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES (sizeof(u32) / sizeof(UNWIND_CODE))
-#define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (sizeof(void *) / sizeof(UNWIND_CODE))
+#define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (sizeof(Exception_Data) / sizeof(UNWIND_CODE))
 
 typedef struct {
   u8 Version       : 3;

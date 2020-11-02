@@ -276,7 +276,6 @@ fn_begin(
     .operand = label32(make_label()),
   };
   Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
-    .program = program,
     .stack_reserve = 0,
     .descriptor = descriptor,
     .value = fn_value,
@@ -363,6 +362,7 @@ fn_adjust_stack_displacement(
 
 void
 fn_normalize_instruction_operands(
+  Program *program,
   const Function_Builder *builder,
   Instruction *instruction
 ) {
@@ -374,9 +374,7 @@ fn_normalize_instruction_operands(
     // target offset of at the point of encoding
     if (operand->type == Operand_Type_RIP_Relative_Import) {
       Import_Symbol *symbol = program_find_import(
-        builder->program,
-        operand->import.library_name,
-        operand->import.symbol_name
+        program, operand->import.library_name, operand->import.symbol_name
       );
       *operand = (Operand){
         .type = Operand_Type_RIP_Relative,
@@ -412,18 +410,18 @@ typedef struct {
 
 void
 fn_encode(
+  Program *program,
   Fixed_Buffer *buffer,
   Function_Builder *builder,
   RUNTIME_FUNCTION *function_exception_info,
   UNWIND_INFO *unwind_info,
   u32 unwind_data_rva
 ) {
-  Program *program = builder->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand->type == Operand_Type_Label_32);
 
-  s64 code_base_rva = builder->program->code_base_rva;
+  s64 code_base_rva = program->code_base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction_with_compiler_location(
@@ -460,7 +458,7 @@ fn_encode(
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    fn_normalize_instruction_operands(builder, instruction);
+    fn_normalize_instruction_operands(program, builder, instruction);
     encode_instruction(program, buffer, instruction);
   }
 

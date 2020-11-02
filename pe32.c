@@ -232,7 +232,7 @@ encode_text_section(
     RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
     UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
     u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
-    fn_encode(result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
+    fn_encode(program, result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
   }
   if (!found_entry_point) {
     panic("Internal error: Could not find entry point in the list of program functions");

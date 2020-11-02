@@ -1131,11 +1131,10 @@ program_test_exception_handler(
   u64 relative_instruction_byte_offset =
     DispatcherContext->ControlPc - absolute_function_begin_address;
 
-  Function_Builder **builder_pointer = DispatcherContext->HandlerData;
-  Function_Builder *builder = *builder_pointer;
+  Exception_Data *exception_data = DispatcherContext->HandlerData;
 
-  if (!builder->program->is_stack_unwinding_in_progress) {
-    builder->program->is_stack_unwinding_in_progress = true;
+  if (!exception_data->program->is_stack_unwinding_in_progress) {
+    exception_data->program->is_stack_unwinding_in_progress = true;
     printf("Unhandled Exception: ");
     switch(ExceptionRecord->ExceptionCode) {
       case EXCEPTION_ACCESS_VIOLATION: {
@@ -1227,8 +1226,8 @@ program_test_exception_handler(
   }
 
   u64 current_offset = 0;
-  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
+  for (u64 i = 0; i < dyn_array_length(exception_data->builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(exception_data->builder->code_block.instructions, i);
     // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
     // so we add instruction byte size before comparing
     current_offset += instruction->encoded_byte_size;
@@ -1244,7 +1243,6 @@ program_test_exception_handler(
     }
   }
 
-  (void)builder;
   return ExceptionContinueSearch;
 }
 
@@ -1315,14 +1313,17 @@ program_jit(
     Function_Builder *builder = dyn_array_get(program->functions, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
     u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
-    fn_encode(result_buffer, builder, &fn_exception_info[i], unwind_info, unwind_data_rva);
+    fn_encode(program, result_buffer, builder, &fn_exception_info[i], unwind_info, unwind_data_rva);
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
       u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
       *exception_handler_address = trampoline_virtual_address;
-      Function_Builder **exception_data = (void *)(exception_handler_address + 1);
-      *exception_data = builder;
+      Exception_Data *exception_data = (void *)(exception_handler_address + 1);
+      *exception_data = (Exception_Data) {
+        .builder = builder,
+        .program = program,
+      };
     }
   }
 

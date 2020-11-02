@@ -75,6 +75,7 @@ fn_end(
 
 void
 fn_encode(
+  Program *program,
   Fixed_Buffer *buffer,
   Function_Builder *builder,
   RUNTIME_FUNCTION *function_exception_info,

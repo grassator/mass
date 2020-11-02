@@ -603,6 +603,7 @@ token_force_type(
 }
 
 typedef Array_Token_Ptr (*token_pattern_callback)(
+  Program *program,
   Array_Token_Ptr match,
   Scope *scope,
   Function_Builder *builder_
@@ -638,6 +639,7 @@ token_replace_length_with_tokens(
 
 bool
 token_rewrite_pattern(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -646,7 +648,7 @@ token_rewrite_pattern(
 ) {
   Array_Token_Ptr match = token_match_pattern(state, pattern);
   if (!dyn_array_is_initialized(match)) return false;
-  Array_Token_Ptr replacement = callback(match, scope, builder);
+  Array_Token_Ptr replacement = callback(program, match, scope, builder);
   token_replace_length_with_tokens(state, dyn_array_length(pattern), replacement);
   dyn_array_destroy(match);
   return true;
@@ -1027,6 +1029,7 @@ token_replace_tokens_in_state(
 
 Array_Token_Ptr
 token_rewrite_functions_pattern_callback(
+  Program *program,
   Array_Token_Ptr match,
   Scope *scope,
   Function_Builder *builder_
@@ -1043,7 +1046,7 @@ token_rewrite_functions_pattern_callback(
       .args = args,
       .return_types = return_types,
       .body = body,
-      .program = builder_->program,
+      .program = program,
     },
   };
   dyn_array_clear(match);
@@ -1071,7 +1074,9 @@ token_rewrite_functions(
     dyn_array_push(pattern, &body);
   }
 
-  return token_rewrite_pattern(state, scope, builder_, pattern, token_rewrite_functions_pattern_callback);
+  return token_rewrite_pattern(
+    program, state, scope, builder_, pattern, token_rewrite_functions_pattern_callback
+  );
 }
 
 void
@@ -1088,8 +1093,7 @@ scope_add_macro(
 bool
 token_rewrite_macro_definitions(
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
+  Scope *scope
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("macro"));
@@ -1309,7 +1313,7 @@ token_rewrite_external_import(
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("external"));
   Token_Match(args, .type = Token_Type_Paren);
   Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
-  Token *result_token = token_import_match_arguments(args->location, args_state, builder_->program);
+  Token *result_token = token_import_match_arguments(args->location, args_state, program);
   if (!result_token) result_token = token_value_make(args, 0);
 
   token_replace_tokens_in_state(state, 2, result_token);
@@ -1439,7 +1443,7 @@ token_rewrite_compile_time_eval(
   Program *program,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *unused_vu
+  Function_Builder *unused_builder
 ) {
   u64 peek_index = 0;
   Token_Match_Operator(at, "@");
@@ -2431,7 +2435,7 @@ token_match_module(
   }
   if (!dyn_array_length(token->children)) return true;
 
-  Function_Builder global_builder = { .program = program };
+  Function_Builder global_builder = { 0 };
 
   token_rewrite_newlines_with_semicolons(token->children);
 
@@ -2442,7 +2446,7 @@ token_match_module(
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(module_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
-    token_rewrite_macro_definitions(state, program->global_scope, &global_builder);
+    token_rewrite_macro_definitions(state, program->global_scope);
     token_rewrite_statement(
       program, state, program->global_scope, &global_builder, token_rewrite_constant_definitions
     );
