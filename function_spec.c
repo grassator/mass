@@ -25,6 +25,9 @@ spec("function") {
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
     dyn_array_clear(builder->code_block.instructions);
+    *builder = (Function_Builder){
+      .code_block.instructions = builder->code_block.instructions,
+    };
   }
 
   after_each() {
@@ -250,6 +253,26 @@ spec("function") {
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
         &(Instruction){add, reg_b->operand, reg_a->operand}
+      ));
+    }
+    it("should use the larger operand's size for the result") {
+      Value *r32 = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s32);
+      Value *result_m32 = &(Value){&descriptor_s32, stack(0, 4)};
+      Value *m8 = &(Value){&descriptor_s8, stack(0, 1)};
+      plus(builder, &test_location, result_m32, r32, m8);
+      check(dyn_array_length(builder->code_block.instructions) == 3);
+      Value *temp = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s32);
+      check(instruction_equal(
+        dyn_array_get(builder->code_block.instructions, 0),
+        &(Instruction){movsx, temp->operand, m8->operand}
+      ));
+      check(instruction_equal(
+        dyn_array_get(builder->code_block.instructions, 1),
+        &(Instruction){add, temp->operand, r32->operand}
+      ));
+      check(instruction_equal(
+        dyn_array_get(builder->code_block.instructions, 2),
+        &(Instruction){mov, result_m32->operand, temp->operand}
       ));
     }
     it("should use a temp register when result is also `a`, but both operands are memory") {

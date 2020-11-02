@@ -65,8 +65,6 @@ move_value(
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
-  assert(target_size >= source_size);
-
   if (
     target->descriptor->type == Descriptor_Type_Float ||
     source->descriptor->type == Descriptor_Type_Float
@@ -713,13 +711,33 @@ plus_or_minus(
     return;
   }
 
+  u32 a_size = descriptor_byte_size(a->descriptor);
+  u32 b_size = descriptor_byte_size(b->descriptor);
+  Value *maybe_a_or_b_temp = 0;
+
+  if (a_size != b_size) {
+    if (a_size > b_size) {
+      Value *b_sized_to_a =
+        value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
+      move_value(builder, location, b_sized_to_a, b);
+      b = b_sized_to_a;
+      maybe_a_or_b_temp = b;
+    } else {
+      Value *a_sized_to_b =
+        value_register_for_descriptor(register_acquire_temp(builder), b->descriptor);
+      move_value(builder, location, a_sized_to_b, b);
+      a = a_sized_to_b;
+      maybe_a_or_b_temp = a;
+    }
+  }
+
   const X64_Mnemonic *mnemonic = 0;
   switch(operation) {
     case Arithmetic_Operation_Plus: {
       mnemonic = add;
       // Addition is commutative (a + b == b + a)
       // so we can swap operands and save one instruction
-      if (operand_equal(&result_value->operand, &b->operand)) {
+      if (operand_equal(&result_value->operand, &b->operand) || maybe_a_or_b_temp == b) {
         value_swap(Value *, a, b);
       }
       break;
@@ -734,9 +752,14 @@ plus_or_minus(
     result_value->operand.type == Operand_Type_Register &&
     !operand_equal(&result_value->operand, &b->operand)
   );
-  Value *temp = can_reuse_result_as_temp
-    ? result_value
-    : value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
+  Value *temp = 0;
+  if (can_reuse_result_as_temp) {
+    temp = result_value;
+  } else if (maybe_a_or_b_temp == a) {
+    temp = a;
+  } else {
+    temp = value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
+  }
 
   move_value(builder, location, temp, a);
   push_instruction(
