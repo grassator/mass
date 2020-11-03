@@ -294,7 +294,7 @@ spec("source") {
 
   it("should be able to define, assign and lookup an s64 variable on the stack") {
     test_program_inline_source(
-      "foo :: () -> (s8) { y : s8; y = 10; x := 21; x = 32; x + y }",
+      "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
       foo
     );
     fn_type_void_to_s8 checker = value_as_function(foo, fn_type_void_to_s8);

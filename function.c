@@ -690,14 +690,16 @@ plus_or_minus(
   Value *a,
   Value *b
 ) {
-  if (!(
+  bool is_pointer_arithmetic = (
     a->descriptor->type == Descriptor_Type_Pointer &&
     b->descriptor->type == Descriptor_Type_Integer &&
     b->descriptor->integer.byte_size == 8
-  )) {
-    assert(same_value_type_or_can_implicitly_move_cast(a, b));
-    assert(a->descriptor->type == Descriptor_Type_Integer);
-  }
+  );
+  bool both_operands_are_integers = (
+    a->descriptor->type == Descriptor_Type_Integer &&
+    b->descriptor->type == Descriptor_Type_Integer
+  );
+  assert(is_pointer_arithmetic || both_operands_are_integers);
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&b->operand)) {
     s64 a_s64 = operand_immediate_as_s64(&a->operand);

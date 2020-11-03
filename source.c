@@ -1947,8 +1947,22 @@ token_rewrite_definition_and_assignment_statements(
   Token_Matcher_State rhs_state = {rhs};
   Value *value = value_any();
   token_match_expression(program, &rhs_state, scope, builder, value);
+
+  // x := 42 should always be initialized to s64 to avoid weird suprises
+  if (
+    value->descriptor->type == Descriptor_Type_Integer &&
+    operand_is_immediate(&value->operand)
+  ) {
+    value = value_from_s64(operand_immediate_as_s64(&value->operand));
+  } else if (
+    value->descriptor->type == Descriptor_Type_Float &&
+    operand_is_immediate(&value->operand)
+  ) {
+    panic("TODO decide how to handle floats");
+  }
   Value *on_stack = reserve_stack(builder, value->descriptor);
   move_value(builder, &name->location, on_stack, value);
+
   scope_define_value(scope, name->source, on_stack);
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
