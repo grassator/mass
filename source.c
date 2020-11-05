@@ -1619,24 +1619,7 @@ token_rewrite_constant_definitions(
   if (dyn_array_length(lhs) > 1) return false;
   Token *name = *dyn_array_get(lhs, 0);
   if (name->type != Token_Type_Id) return false;
-
-  Token_Matcher_State rhs_state = {rhs};
-  Token *token_value = token_rewrite_constant_expression(program, &rhs_state, scope, builder);
-  if (!token_value) {
-    return false;
-  }
-
-  // TODO turn all constant definitions into lazy scope definitions
-  if (token_value->type == Token_Type_Lazy_Function_Definition) {
-    Array_Token_Ptr tokens = dyn_array_make(Array_Token_Ptr);
-    dyn_array_push(tokens, token_value);
-    scope_define_lazy(scope, name->source, tokens);
-  } else {
-    Value *result = value_any();
-    token_force_value(program, token_value, scope, builder, result);
-    scope_define_value(scope, name->source, result);
-  }
-
+  scope_define_lazy(scope, name->source, rhs);
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
   return true;
 }
