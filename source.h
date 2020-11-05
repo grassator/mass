@@ -50,16 +50,22 @@ typedef enum {
   Tokenizer_State_Single_Line_Comment,
 } Tokenizer_State;
 
+typedef struct {
+  Array_Token_Ptr tokens;
+  u64 start_index;
+} Token_Matcher_State;
+typedef dyn_array_type(Token_Matcher_State) Array_Token_Matcher_State;
+
 typedef enum {
   Scope_Entry_Type_Value = 1,
-  Scope_Entry_Type_Lazy,
+  Scope_Entry_Type_Lazy_Constant_Expression,
 } Scope_Entry_Type;
 
 typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Token *lazy_function_definition_token;
+    Array_Token_Ptr lazy_constant_expression;
   };
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;

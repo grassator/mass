@@ -44,6 +44,14 @@ scope_lookup(
   return 0;
 }
 
+Token *
+token_rewrite_constant_expression(
+  Program *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+
 void
 token_force_value(
   Program *program,
@@ -74,9 +82,12 @@ scope_lookup_force(
   // Force lazy entries
   for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
     Scope_Entry *entry = dyn_array_get(*entries, i);
-    if (entry->type == Scope_Entry_Type_Lazy) {
+    if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
       Value *result = value_any();
-      token_force_value(program, entry->lazy_function_definition_token, scope, builder, result);
+      Token *token = token_rewrite_constant_expression(
+        program, &(Token_Matcher_State){entry->lazy_constant_expression}, scope, builder
+      );
+      token_force_value(program, token, scope, builder, result);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -159,11 +170,11 @@ void
 scope_define_lazy(
   Scope *scope,
   Slice name,
-  Token *token
+  Array_Token_Ptr tokens
 ) {
   scope_define_internal(scope, name, (Scope_Entry) {
-    .type = Scope_Entry_Type_Lazy,
-    .lazy_function_definition_token = token,
+    .type = Scope_Entry_Type_Lazy_Constant_Expression,
+    .lazy_constant_expression = tokens,
   });
 }
 
@@ -442,12 +453,6 @@ tokenize(
   }
   return (Tokenizer_Result){.type = Tokenizer_Result_Type_Success, .root = root};
 }
-
-typedef struct {
-  Array_Token_Ptr tokens;
-  u64 start_index;
-} Token_Matcher_State;
-typedef dyn_array_type(Token_Matcher_State) Array_Token_Matcher_State;
 
 Token *
 token_peek(
@@ -1424,14 +1429,6 @@ token_clear_newlines(
   return true;
 }
 
-Token *
-token_rewrite_constant_expression(
-  Program *program,
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
-);
-
 bool
 token_rewrite_constant_sub_expression(
   Program *program,
@@ -1631,7 +1628,9 @@ token_rewrite_constant_definitions(
 
   // TODO turn all constant definitions into lazy scope definitions
   if (token_value->type == Token_Type_Lazy_Function_Definition) {
-    scope_define_lazy(scope, name->source, token_value);
+    Array_Token_Ptr tokens = dyn_array_make(Array_Token_Ptr);
+    dyn_array_push(tokens, token_value);
+    scope_define_lazy(scope, name->source, tokens);
   } else {
     Value *result = value_any();
     token_force_value(program, token_value, scope, builder, result);
