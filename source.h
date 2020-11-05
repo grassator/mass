@@ -59,11 +59,12 @@ typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Array_Token_Ptr tokens;
+    Token *lazy_function_definition_token;
   };
 } Scope_Entry;
+typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
-hash_map_slice_template(Scope_Map, Scope_Entry)
+hash_map_slice_template(Scope_Map, Array_Scope_Entry)
 hash_map_slice_template(Macro_Replacement_Map, Token *)
 
 typedef struct {

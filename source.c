@@ -31,13 +31,13 @@ scope_print_names(
   printf("\n");
 }
 
-Scope_Entry *
+Array_Scope_Entry *
 scope_lookup(
   Scope *scope,
   Slice name
 ) {
   while (scope) {
-    Scope_Entry *result = hash_map_get(scope->map, name);
+    Array_Scope_Entry *result = hash_map_get(scope->map, name);
     if (result) return result;
     scope = scope->parent;
   }
@@ -60,43 +60,52 @@ scope_lookup_force(
   Slice name,
   Function_Builder *builder
 ) {
-  Scope_Entry *entry = 0;
+  Array_Scope_Entry *entries = 0;
   while (scope) {
-    entry = hash_map_get(scope->map, name);
-    if (entry) break;
+    entries = hash_map_get(scope->map, name);
+    if (entries) break;
     scope = scope->parent;
   }
-  if (!entry) {
+  if (!entries) {
     return 0;
   }
-  Value *result = 0;
-  switch(entry->type) {
-    case Scope_Entry_Type_Value: {
-      result = entry->value;
-      break;
-    }
-    case Scope_Entry_Type_Lazy: {
-      Array_Token_Ptr tokens = entry->tokens;
-      for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
-        Token *token = *dyn_array_get(tokens, i);
-        if (!result) {
-          result = value_any();
-          token_force_value(program, token, scope, builder, result);
-        } else {
-          if (result->descriptor->type != Descriptor_Type_Function) {
-            panic("Only functions should be lazy values");
-          }
-          Value *overload = value_any();
-          token_force_value(program, token, scope, builder, overload);
-          overload->descriptor->function.next_overload = result;
-          result = overload;
-        }
-      }
-      if (!result) return 0;
+  assert(dyn_array_length(*entries));
+
+  // Force lazy entries
+  for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
+    Scope_Entry *entry = dyn_array_get(*entries, i);
+    if (entry->type == Scope_Entry_Type_Lazy) {
+      Value *result = value_any();
+      token_force_value(program, entry->lazy_function_definition_token, scope, builder, result);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
       };
+    }
+  }
+
+
+
+  Value *result = 0;
+  if (dyn_array_length(*entries) == 1) {
+    Scope_Entry *entry = dyn_array_get(*entries, 0);
+    assert(entry->type == Scope_Entry_Type_Value);
+    result = entry->value;
+  } else {
+    // Must be a function overload
+    for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
+      Scope_Entry *entry = dyn_array_get(*entries, i);
+      assert(entry->type == Scope_Entry_Type_Value);
+      if (!result) {
+        result = entry->value;
+      } else {
+        Value *overload = entry->value;
+        overload->descriptor->function.next_overload = result;
+        result = overload;
+      }
+      if (result->descriptor->type != Descriptor_Type_Function) {
+        panic("Only functions should be lazy values");
+      }
     }
   }
   // For functions we need to gather up overloads from all parent scopes
@@ -121,18 +130,29 @@ scope_lookup_force(
   return result;
 }
 
+static inline void
+scope_define_internal(
+  Scope *scope,
+  Slice name,
+  Scope_Entry entry
+) {
+  if (!hash_map_has(scope->map, name)) {
+    hash_map_set(scope->map, name, dyn_array_make(Array_Scope_Entry));
+  }
+  Array_Scope_Entry *entries = hash_map_get(scope->map, name);
+  dyn_array_push(*entries, entry);
+}
+
 void
 scope_define_value(
   Scope *scope,
   Slice name,
   Value *value
 ) {
-  // TODO think about what should happen when trying to redefine existing thing
-  Scope_Entry entry = {
+  scope_define_internal(scope, name, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
     .value = value,
-  };
-  hash_map_set(scope->map, name, entry);
+  });
 }
 
 void
@@ -141,17 +161,10 @@ scope_define_lazy(
   Slice name,
   Token *token
 ) {
-  // For overloads with only check current scope and allow multiple overloads
-  // in multiple nested scopes
-  if (!hash_map_has(scope->map, name)) {
-    Scope_Entry entry = {
-      .type = Scope_Entry_Type_Lazy,
-      .tokens = dyn_array_make(Array_Token_Ptr),
-    };
-    hash_map_set(scope->map, name, entry);
-  }
-  Scope_Entry *entry = hash_map_get(scope->map, name);
-  dyn_array_push(entry->tokens, token);
+  scope_define_internal(scope, name, (Scope_Entry) {
+    .type = Scope_Entry_Type_Lazy,
+    .lazy_function_definition_token = token,
+  });
 }
 
 bool

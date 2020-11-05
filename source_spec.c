@@ -63,7 +63,9 @@ spec("source") {
     Value *test = value_from_s64(42);
     Scope *root_scope = scope_make(0);
     scope_define_value(root_scope, slice_literal("test"), test);
-    Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
+    Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("test"));
+    check(dyn_array_length(*entries), 1);
+    Scope_Entry *entry = dyn_array_pop(*entries);
     check(entry->type == Scope_Entry_Type_Value);
     check(entry->value == test);
   }
@@ -81,7 +83,9 @@ spec("source") {
     Scope *scope_level_2 = scope_make(scope_level_1);
     scope_define_value(scope_level_2, slice_literal("test"), level_2_test);
 
-    Scope_Entry *entry = scope_lookup(scope_level_2, slice_literal("global"));
+    Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("global"));
+    check(dyn_array_length(*entries), 1);
+    Scope_Entry *entry = dyn_array_pop(*entries);
     check(entry->type == Scope_Entry_Type_Value);
     check(entry->value == global);
   }
