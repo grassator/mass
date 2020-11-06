@@ -83,11 +83,13 @@ scope_lookup_force(
   for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
     Scope_Entry *entry = dyn_array_get(*entries, i);
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
-      Value *result = value_any();
-      Token *token = token_rewrite_constant_expression(
-        program, &(Token_Matcher_State){entry->lazy_constant_expression}, scope, builder
-      );
-      token_force_value(program, token, scope, builder, result);
+      Token_Matcher_State state = {entry->lazy_constant_expression};
+      Token *token = token_rewrite_constant_expression(program, &state, scope, builder);
+      Value *result = 0;
+      if (token) {
+        result = value_any();
+        token_force_value(program, token, scope, builder, result);
+      }
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -120,7 +122,7 @@ scope_lookup_force(
     }
   }
   // For functions we need to gather up overloads from all parent scopes
-  if (result->descriptor->type == Descriptor_Type_Function) {
+  if (result && result->descriptor->type == Descriptor_Type_Function) {
     Value *last = result;
     Scope *parent = scope;
     for (;;) {
@@ -355,7 +357,6 @@ tokenize(
             case Token_Type_Integer:
             case Token_Type_Hex_Integer:
             case Token_Type_Operator:
-            case Token_Type_Lazy_Function_Definition:
             case Token_Type_String:
             case Token_Type_Module: {
               panic("Tokenizer: unexpected closing char for group");
@@ -611,7 +612,6 @@ token_force_type(
     case Token_Type_Curly:
     case Token_Type_Module:
     case Token_Type_Value:
-    case Token_Type_Lazy_Function_Definition:
     default: {
       panic("TODO");
       break;
@@ -698,8 +698,7 @@ token_clone_token_array_deep(
         copy->children = token_clone_token_array_deep(token->children);
         break;
       }
-      case Token_Type_Value:
-      case Token_Type_Lazy_Function_Definition: {
+      case Token_Type_Value: {
         panic("Macro definitions should not contain semi-resolved tokens");
         break;
       }
@@ -743,8 +742,7 @@ token_apply_macro_replacements(
         copy->children = token_apply_macro_replacements(map, token->children);
         break;
       }
-      case Token_Type_Value:
-      case Token_Type_Lazy_Function_Definition: {
+      case Token_Type_Value: {
         panic("Macro definitions should not contain semi-resolved tokens");
         break;
       }
@@ -860,13 +858,6 @@ token_match_argument(
   return arg;
 }
 
-Value *
-token_force_lazy_function_definition(
-  Program *program,
-  Lazy_Function_Definition *lazy_function_definition,
-  Function_Builder *builder
-);
-
 void
 token_match_expression(
   Program *program,
@@ -945,13 +936,6 @@ token_force_value(
     }
     case Token_Type_Value: {
       move_value(builder, &token->location, result_value, token->value);
-      return;
-    }
-    case Token_Type_Lazy_Function_Definition: {
-      Value *fn = token_force_lazy_function_definition(program, &token->lazy_function_definition, builder);
-      if (fn) {
-        move_value(builder, &token->location, result_value, fn);
-      }
       return;
     }
     case Token_Type_Paren: {
@@ -1045,56 +1029,17 @@ token_replace_tokens_in_state(
   dyn_array_delete_range(state->tokens, (Range_u64){from, from + length});
 }
 
-Array_Token_Ptr
-token_rewrite_functions_pattern_callback(
-  Program *program,
-  Array_Token_Ptr match,
-  Scope *scope,
-  Function_Builder *builder_
-) {
-  Token *args = *dyn_array_get(match, 0);
-  Token *return_types = *dyn_array_get(match, 2);
-  Token *body = *dyn_array_get(match, 3);
-
-  Token *result_token = temp_allocate(Token);
-  *result_token = (Token) {
-    .type = Token_Type_Lazy_Function_Definition,
-    .source = body->source,
-    .lazy_function_definition = {
-      .args = args,
-      .return_types = return_types,
-      .body = body,
-      .program = program,
-    },
-  };
-  dyn_array_clear(match);
-  dyn_array_push(match, result_token);
-  return match;
-}
-
 bool
-token_rewrite_functions(
+token_clear_newlines(
   Program *program,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
-  Array_Token_Ptr pattern = {0};
-  if (!dyn_array_is_initialized(pattern)) {
-    pattern = dyn_array_make(Array_Token_Ptr);
-    static Token args = { .type = Token_Type_Paren };
-    dyn_array_push(pattern, &args);
-    static Token arrow = { .type = Token_Type_Operator, .source = slice_literal_fields("->") };
-    dyn_array_push(pattern, &arrow);
-    static Token return_types = { .type = Token_Type_Paren };
-    dyn_array_push(pattern, &return_types);
-    static Token body = {0};
-    dyn_array_push(pattern, &body);
-  }
-
-  return token_rewrite_pattern(
-    program, state, scope, builder_, pattern, token_rewrite_functions_pattern_callback
-  );
+  u64 peek_index = 0;
+  Token_Match(newline, .type = Token_Type_Newline);
+  token_replace_tokens_in_state(state, 1, 0);
+  return true;
 }
 
 void
@@ -1390,6 +1335,97 @@ token_rewrite_statement(
 }
 
 bool
+token_rewrite_function_literal(
+  Program *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *outer_builder
+) {
+  u64 peek_index = 0;
+  Token_Match(args, .type = Token_Type_Paren);
+  Token_Match_Operator(arrow, "->");
+  Token_Match(return_types, .type = Token_Type_Paren);
+  Token_Match(body, 0);
+
+  Scope *function_scope = scope_make(program->global_scope);
+
+  Function_Builder *builder = 0;
+  // TODO think about a better way to distinguish imports
+  bool is_external = body->type == Token_Type_Value;
+  Descriptor *descriptor = 0;
+
+  if (is_external) {
+    if(!body->value) return 0;
+    descriptor = temp_allocate(Descriptor);
+    *descriptor = (Descriptor) {
+      .type = Descriptor_Type_Function,
+      .function = {
+        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
+        .returns = 0,
+      },
+    };
+  } else {
+    builder = fn_begin(program);
+    descriptor = builder->descriptor;
+  }
+
+  switch (dyn_array_length(return_types->children)) {
+    case 0: {
+      descriptor->function.returns = &void_value;
+      break;
+    }
+    case 1: {
+      Token *return_type_token = *dyn_array_get(return_types->children, 0);
+      Descriptor *return_descriptor =
+        token_force_type(program, function_scope, return_type_token, outer_builder);
+      if (!return_descriptor) return 0;
+      function_return_descriptor(&descriptor->function, return_descriptor);
+      break;
+    }
+    default: {
+      panic("Multiple return types are not supported at the moment");
+      break;
+    }
+  }
+
+  if (dyn_array_length(args->children) != 0) {
+    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
+      .type = Token_Type_Operator,
+      .source = slice_literal(","),
+    });
+    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
+      Token_Matcher_State *args_state = dyn_array_get(argument_states, i);
+      token_rewrite_statement(program, args_state, function_scope, builder, token_clear_newlines);
+      Token_Match_Arg *arg =
+        token_match_argument(program, args_state, function_scope, outer_builder);
+      if (!arg) return 0;
+      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
+      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
+        register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
+      }
+      scope_define_value(function_scope, arg->arg_name, arg_value);
+    }
+  }
+
+  Value *result = 0;
+  if (is_external) {
+    body->value->descriptor = descriptor;
+    result = body->value;
+  } else {
+    Value *return_result_value =
+      descriptor->function.returns->descriptor->type == Descriptor_Type_Void
+        ? value_any()
+        : descriptor->function.returns;
+    token_parse_block(program, body->children, function_scope, builder, return_result_value);
+
+    fn_end(builder);
+    result = builder->value;
+  }
+  token_replace_tokens_in_state(state, 4, token_value_make(arrow, result));
+  return true;
+}
+
+bool
 token_rewrite_negative_literal(
   Program *program,
   Token_Matcher_State *state,
@@ -1413,19 +1449,6 @@ token_rewrite_negative_literal(
   }
 
   token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
-  return true;
-}
-
-bool
-token_clear_newlines(
-  Program *program,
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
-) {
-  u64 peek_index = 0;
-  Token_Match(newline, .type = Token_Type_Newline);
-  token_replace_tokens_in_state(state, 1, 0);
   return true;
 }
 
@@ -1586,7 +1609,7 @@ token_rewrite_constant_expression(
   token_rewrite_statement(program, state, scope, builder, token_rewrite_external_import);
 
   token_rewrite_struct_definitions(program, token_reset_state_start_index(state), scope, builder) ||
-  token_rewrite_functions(program, token_reset_state_start_index(state), scope, builder) ||
+  token_rewrite_function_literal(program, token_reset_state_start_index(state), scope, builder) ||
   token_rewrite_compile_time_eval(program, token_reset_state_start_index(state), scope, builder);
 
   token_rewrite_statement(program, state, scope, builder, token_rewrite_constant_sub_expression);
@@ -2319,7 +2342,7 @@ token_match_expression(
   token_rewrite_statement(program, state, scope, builder, token_clear_newlines);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_cast);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_struct_field);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_functions);
+  token_rewrite_statement(program, state, scope, builder, token_rewrite_function_literal);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_function_calls);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_pointer_to);
@@ -2348,90 +2371,6 @@ token_match_expression(
       return;
     }
   }
-}
-
-Value *
-token_force_lazy_function_definition(
-  Program *program,
-  Lazy_Function_Definition *lazy_function_definition,
-  Function_Builder *outer_builder
-) {
-  Token *args = lazy_function_definition->args;
-  Token *return_types = lazy_function_definition->return_types;
-  Token *body = lazy_function_definition->body;
-  //Program *program = lazy_function_definition->program;
-  Scope *function_scope = scope_make(program->global_scope);
-
-  Function_Builder *builder = 0;
-  // TODO think about a better way to distinguish imports
-  bool is_external = body->type == Token_Type_Value;
-  Descriptor *descriptor = 0;
-
-  if (is_external) {
-    if(!body->value) return 0;
-    descriptor = temp_allocate(Descriptor);
-    *descriptor = (Descriptor) {
-      .type = Descriptor_Type_Function,
-      .function = {
-        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
-        .returns = 0,
-      },
-    };
-  } else {
-    builder = fn_begin(program);
-    descriptor = builder->descriptor;
-  }
-
-  switch (dyn_array_length(return_types->children)) {
-    case 0: {
-      descriptor->function.returns = &void_value;
-      break;
-    }
-    case 1: {
-      Token *return_type_token = *dyn_array_get(return_types->children, 0);
-      Descriptor *return_descriptor =
-        token_force_type(program, function_scope, return_type_token, outer_builder);
-      if (!return_descriptor) return 0;
-      function_return_descriptor(&descriptor->function, return_descriptor);
-      break;
-    }
-    default: {
-      panic("Multiple return types are not supported at the moment");
-      break;
-    }
-  }
-
-  if (dyn_array_length(args->children) != 0) {
-    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
-      .type = Token_Type_Operator,
-      .source = slice_literal(","),
-    });
-    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
-      Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      token_rewrite_statement(program, state, function_scope, builder, token_clear_newlines);
-      Token_Match_Arg *arg = token_match_argument(program, state, function_scope, outer_builder);
-      if (!arg) return 0;
-      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
-      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
-        register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
-      }
-      scope_define_value(function_scope, arg->arg_name, arg_value);
-    }
-  }
-
-  if (is_external) {
-    body->value->descriptor = descriptor;
-    return body->value;
-  }
-
-  Value *return_result_value =
-    descriptor->function.returns->descriptor->type == Descriptor_Type_Void
-      ? value_any()
-      : descriptor->function.returns;
-  token_parse_block(program, body->children, function_scope, builder, return_result_value);
-
-  fn_end(builder);
-  return builder->value;
 }
 
 bool

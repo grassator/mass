@@ -15,18 +15,10 @@ typedef enum {
   Token_Type_Curly,
   Token_Type_Module,
   Token_Type_Value,
-  Token_Type_Lazy_Function_Definition,
 } Token_Type;
 
 typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
-
-typedef struct {
-  Token *args;
-  Token *return_types;
-  Token *body;
-  Program *program;
-} Lazy_Function_Definition;
 
 typedef struct Token {
   Token_Type type;
@@ -35,7 +27,6 @@ typedef struct Token {
   union {
     Array_Token_Ptr children;
     Value *value;
-    Lazy_Function_Definition lazy_function_definition;
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
