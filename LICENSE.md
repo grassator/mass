@@ -1,4 +1,4 @@
-Copyright (c) 2020 Dmitriy Kubyskin (unless noted otherwise in the code).
+Copyright (c) 2020 Dmitriy Kubyshkin (unless noted otherwise in the code).
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
