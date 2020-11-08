@@ -1870,26 +1870,39 @@ token_rewrite_inline_machine_code_bytes(
   Token_Match_End();
 
   Array_Value_Ptr args = token_match_call_arguments(program, args_token, scope, builder);
-  // TODO error out if there are more than 15 bytes, at least on x64
-  //assert(dyn_array_length(args) <= 15);
 
   u64 byte_count = dyn_array_length(args);
+  if (byte_count > 15) {
+    program_error_builder(program, args_token->location) {
+      program_error_append_literal("Expected a maximum of 15 arguments, got ");
+      program_error_append_number("%lld", byte_count);
+    }
+    goto end;
+  }
+
   Fixed_Buffer *buffer = fixed_buffer_make(.allocator = temp_allocator, .capacity = byte_count);
   for (u64 i = 0; i < byte_count; ++i) {
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->descriptor->type != Descriptor_Type_Integer) {
-      // TODO report error
-      continue;
+      program_error_builder(program, args_token->location) {
+        program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
+      }
+      goto end;
     }
     if (!operand_is_immediate(&value->operand)) {
-      // TODO report error
-      continue;
+      program_error_builder(program, args_token->location) {
+        program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
+      }
+      goto end;
     }
     s64 byte = operand_immediate_as_s64(&value->operand);
     if (!u64_fits_into_u8(byte)) {
-      // TODO report error
-      continue;
+      program_error_builder(program, args_token->location) {
+        program_error_append_literal("Expected integer between 0 and 255, got ");
+        program_error_append_number("%lld", byte);
+      }
+      goto end;
     }
     fixed_buffer_append_u8(buffer, s64_to_u8(byte));
   }
@@ -1902,6 +1915,7 @@ token_rewrite_inline_machine_code_bytes(
      }
   );
 
+  end:
   token_replace_tokens_in_state(state, 2, 0);
   return true;
 }
