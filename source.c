@@ -930,8 +930,16 @@ token_force_value(
       return;
     }
     case Token_Type_Id: {
-      Value *value = scope_lookup_force(program, scope, token->source, builder);
-      move_value(builder, &token->location, result_value, value);
+      Slice name = token->source;
+      Value *value = scope_lookup_force(program, scope, name, builder);
+      if (!value) {
+        program_error_builder(program, token->location) {
+          program_error_append_literal("Undefined variable ");
+          program_error_append_slice(name);
+        }
+      } else {
+        move_value(builder, &token->location, result_value, value);
+      }
       return;
     }
     case Token_Type_Value: {
@@ -1850,6 +1858,55 @@ token_match_fixed_array_type(
 }
 
 bool
+token_rewrite_inline_machine_code_bytes(
+  Program *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  u64 peek_index = 0;
+  Token_Match(id_token, .type = Token_Type_Id, .source = slice_literal("inline_machine_code_bytes"));
+  Token_Match(args_token, .type = Token_Type_Paren);
+  Token_Match_End();
+
+  Array_Value_Ptr args = token_match_call_arguments(program, args_token, scope, builder);
+  // TODO error out if there are more than 15 bytes, at least on x64
+  //assert(dyn_array_length(args) <= 15);
+
+  u64 byte_count = dyn_array_length(args);
+  Fixed_Buffer *buffer = fixed_buffer_make(.allocator = temp_allocator, .capacity = byte_count);
+  for (u64 i = 0; i < byte_count; ++i) {
+    Value *value = *dyn_array_get(args, i);
+    if (!value) continue;
+    if (value->descriptor->type != Descriptor_Type_Integer) {
+      // TODO report error
+      continue;
+    }
+    if (!operand_is_immediate(&value->operand)) {
+      // TODO report error
+      continue;
+    }
+    s64 byte = operand_immediate_as_s64(&value->operand);
+    if (!u64_fits_into_u8(byte)) {
+      // TODO report error
+      continue;
+    }
+    fixed_buffer_append_u8(buffer, s64_to_u8(byte));
+  }
+
+  push_instruction(
+    &builder->code_block.instructions, &id_token->location,
+    (Instruction) {
+      .type = Instruction_Type_Bytes,
+      .bytes = fixed_buffer_as_slice(buffer),
+     }
+  );
+
+  token_replace_tokens_in_state(state, 2, 0);
+  return true;
+}
+
+bool
 token_rewrite_cast(
   Program *program,
   Token_Matcher_State *state,
@@ -2316,6 +2373,7 @@ token_match_statement(
   token_rewrite_macros(token_reset_state_start_index(state), scope, builder);
 
   if (
+    token_rewrite_inline_machine_code_bytes(program, token_reset_state_start_index(state), scope, builder) ||
     token_rewrite_assignment(program, token_reset_state_start_index(state), scope, builder) ||
     token_rewrite_definition_and_assignment_statements(
       program, token_reset_state_start_index(state), scope, builder

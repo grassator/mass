@@ -465,6 +465,7 @@ typedef struct {
 typedef enum {
   Instruction_Type_Assembly,
   Instruction_Type_Label,
+  Instruction_Type_Bytes,
 } Instruction_Type;
 
 typedef struct {
@@ -477,6 +478,7 @@ typedef struct {
   union {
     Instruction_Assembly assembly;
     Label *label;
+    Slice bytes;
   };
   Compiler_Source_Location compiler_source_location;
   const Source_Location *source_location;

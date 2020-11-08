@@ -263,6 +263,7 @@ encode_instruction(
   Fixed_Buffer *buffer,
   Instruction *instruction
 ) {
+  // TODO turn into a switch statement on type
   if (instruction->type == Instruction_Type_Label) {
     Label *label = instruction->label;
     assert(instruction->label);
@@ -276,6 +277,10 @@ encode_instruction(
       *label_location->patch_target = diff;
     }
     instruction->encoded_byte_size = 0;
+    return;
+  } else if (instruction->type == Instruction_Type_Bytes) {
+    fixed_buffer_append_slice(buffer, instruction->bytes);
+    instruction->encoded_byte_size = u64_to_u8(instruction->bytes.length);
     return;
   }
 

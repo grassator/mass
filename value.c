@@ -578,6 +578,9 @@ instruction_equal(
     case Instruction_Type_Label: {
       return a->label == b->label;
     }
+    case Instruction_Type_Bytes: {
+      return slice_equal(a->bytes, b->bytes);
+    }
   }
   return true;
 }

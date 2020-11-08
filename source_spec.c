@@ -238,6 +238,18 @@ spec("source") {
     check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
   }
 
+  it("should be able to include raw machine code bytes") {
+    // :WindowsOnly
+    test_program_inline_source(
+      // FIXME return type here should be s64, but then it will expect a value to return
+      //       which does not exist as we are dealing with machine code bytes directly
+      "foo :: () -> () { inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00) }",
+      foo
+    );
+    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+    check(checker() == 42);
+  }
+
   it("should be able to tokenize complex input") {
     Slice source = slice_literal(
       "foo :: (x: s8) -> {\n"
