@@ -76,9 +76,9 @@ move_value(
       source->operand.type == Operand_Type_Xmm
     ) {
       if (target_size == 4) {
-        push_instruction(instructions, location, (Instruction) {movss, {target->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {movss, {target->operand, source->operand, 0}}});
       } else if (target_size == 8) {
-        push_instruction(instructions, location, (Instruction) {movsd, {target->operand, source->operand, 0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {movsd, {target->operand, source->operand, 0}}});
       } else {
         panic("Internal Error: XMM operand of unexpected size");
       }
@@ -102,27 +102,27 @@ move_value(
     }
     switch(source->operand.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, location, (Instruction) {sete, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {sete, {temp->operand, source->operand}}});
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_instruction(instructions, location, (Instruction) {setne, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {setne, {temp->operand, source->operand}}});
         break;
       }
       case Compare_Type_Less: {
-        push_instruction(instructions, location, (Instruction) {setl, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {setl, {temp->operand, source->operand}}});
         break;
       }
       case Compare_Type_Less_Equal: {
-        push_instruction(instructions, location, (Instruction) {setle, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {setle, {temp->operand, source->operand}}});
         break;
       }
       case Compare_Type_Greater: {
-        push_instruction(instructions, location, (Instruction) {setg, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {setg, {temp->operand, source->operand}}});
         break;
       }
       case Compare_Type_Greater_Equal: {
-        push_instruction(instructions, location, (Instruction) {setge, {temp->operand, source->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {setge, {temp->operand, source->operand}}});
         break;
       }
       default: {
@@ -132,8 +132,8 @@ move_value(
     if (temp != target) {
       assert(temp->operand.type == Operand_Type_Register);
       Operand resized_temp = operand_register_for_descriptor(temp->operand.reg, target->descriptor);
-      push_instruction(instructions, location, (Instruction) {movsx, {resized_temp, temp->operand}});
-      push_instruction(instructions, location, (Instruction) {mov, {target->operand, resized_temp}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {movsx, {resized_temp, temp->operand}}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {mov, {target->operand, resized_temp}}});
       register_release(builder, temp->operand.reg);
     }
     return;
@@ -143,7 +143,7 @@ move_value(
     s64 immediate = operand_immediate_as_s64(&source->operand);
     if (immediate == 0 && target->operand.type == Operand_Type_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
-      push_instruction(instructions, location, (Instruction) {xor, {target->operand, target->operand}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {xor, {target->operand, target->operand}}});
       return;
     }
     Value *adjusted_source = 0;
@@ -174,11 +174,11 @@ move_value(
     bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
     if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
       Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
-      push_instruction(instructions, location, (Instruction) {mov, {temp, adjusted_source->operand}});
-      push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {mov, {temp, adjusted_source->operand}}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {mov, {target->operand, temp}}});
       register_release(builder, temp.reg);
     } else {
-      push_instruction(instructions, location, (Instruction) {mov, {target->operand, adjusted_source->operand}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {mov, {target->operand, adjusted_source->operand}}});
     }
     return;
   }
@@ -196,14 +196,14 @@ move_value(
             .reg = target->operand.reg,
             .byte_size = 4,
           };
-          push_instruction(instructions, location, (Instruction) {mov, {adjusted_target, source->operand}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {mov, {adjusted_target, source->operand}}});
         } else {
-          push_instruction(instructions, location, (Instruction) {movsx, {target->operand, source->operand}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {movsx, {target->operand, source->operand}}});
         }
       } else {
         Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
-        push_instruction(instructions, location, (Instruction) {movsx, {temp, source->operand}});
-        push_instruction(instructions, location, (Instruction) {mov, {target->operand, temp}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {movsx, {temp, source->operand}}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {mov, {target->operand, temp}}});
         register_release(builder, temp.reg);
       }
       return;
@@ -232,10 +232,10 @@ move_value(
         move_value(builder, location, temp_rdi, reg_rdi);
         move_value(builder, location, temp_rcx, reg_rcx);
 
-        push_instruction(instructions, location, (Instruction) {lea, {reg_rsi->operand, source->operand}});
-        push_instruction(instructions, location, (Instruction) {lea, {reg_rdi->operand, target->operand}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {lea, {reg_rsi->operand, source->operand}}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {lea, {reg_rdi->operand, target->operand}}});
         move_value(builder, location, reg_rcx, value_from_s64(target_size));
-        push_instruction(instructions, location, (Instruction) {rep_movsb});
+        push_instruction(instructions, location, (Instruction) {.assembly = {rep_movsb}});
 
         move_value(builder, location, reg_rsi, temp_rsi);
         move_value(builder, location, reg_rdi, temp_rdi);
@@ -253,7 +253,7 @@ move_value(
     return;
   }
 
-  push_instruction(instructions, location, (Instruction) {mov, {target->operand, source->operand}});
+  push_instruction(instructions, location, (Instruction) {.assembly = {mov, {target->operand, source->operand}}});
 }
 
 Function_Builder *
@@ -318,9 +318,9 @@ make_trampoline(
 ) {
   u32 result = u64_to_u32(buffer->occupied);
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {mov, {rax, imm64(address)}}
+    program, buffer, &(Instruction) {.assembly = {mov, {rax, imm64(address)}}}
   );
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {jmp, {rax}});
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {jmp, {rax}}});
   return result;
 }
 
@@ -331,9 +331,9 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
 ) {
   Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
   if (!last_instruction) return;
-  if (last_instruction->maybe_label) return;
-  if (last_instruction->mnemonic != jmp) return;
-  Operand op = last_instruction->operands[0];
+  if (last_instruction->type != Instruction_Type_Assembly) return;
+  if (last_instruction->assembly.mnemonic != jmp) return;
+  Operand op = last_instruction->assembly.operands[0];
   if (op.type != Operand_Type_Label_32) return;
   if (op.label32 != builder->code_block.end_label) return;
   dyn_array_pop(builder->code_block.instructions);
@@ -366,8 +366,8 @@ fn_normalize_instruction_operands(
 ) {
   // :OperandNormalization
   // Normalizing operands to simplify future handling in the encoder
-  for (u8 operand_index = 0; operand_index < countof(instruction->operands); ++operand_index) {
-    Operand *operand = &instruction->operands[operand_index];
+  for (u8 operand_index = 0; operand_index < countof(instruction->assembly.operands); ++operand_index) {
+    Operand *operand = &instruction->assembly.operands[operand_index];
     // RIP-relative imports are regular RIP-relative operands that we only know
     // target offset of at the point of encoding
     if (operand->type == Operand_Type_RIP_Relative_Import) {
@@ -423,7 +423,7 @@ fn_encode(
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.maybe_label = operand->label32}
+    program, buffer, &(Instruction) {.type = Instruction_Type_Label, .label = operand->label32}
   );
 
   Array_UNWIND_CODE unwind_codes = dyn_array_make(Array_UNWIND_CODE);
@@ -436,7 +436,7 @@ fn_encode(
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
         Operand to_save = operand_register_for_descriptor(reg_index, &descriptor_s64);
-        encode_instruction_with_compiler_location(program, buffer, &(Instruction) {push, {to_save}});
+        encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {push, {to_save}}});
         dyn_array_push(unwind_codes, (UNWIND_CODE) {
           .CodeOffset = fn_offset_in_prolog(),
           .UnwindOp = UWOP_PUSH_NONVOL,
@@ -447,7 +447,7 @@ fn_encode(
   }
 
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {sub, {rsp, stack_size_operand}}
+    program, buffer, &(Instruction) {.assembly = {sub, {rsp, stack_size_operand}}}
   );
   u32 stack_allocation_offset_in_prolog = fn_offset_in_prolog();
   u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
@@ -461,7 +461,9 @@ fn_encode(
   }
 
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.maybe_label = builder->code_block.end_label}
+    program, buffer, &(Instruction) {
+      .type = Instruction_Type_Label, .label = builder->code_block.end_label
+    }
   );
 
   // :ReturnTypeLargerThanRegister
@@ -469,12 +471,12 @@ fn_encode(
     // FIXME :RegisterAllocation
     //       make sure that return value is always available in RCX at this point
     encode_instruction_with_compiler_location(
-      program, buffer, &(Instruction) {mov, {rax, rcx}}
+      program, buffer, &(Instruction) {.assembly = {mov, {rax, rcx}}}
     );
   }
 
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {add, {rsp, stack_size_operand}}
+    program, buffer, &(Instruction) {.assembly = {add, {rsp, stack_size_operand}}}
   );
 
   // Pop non-volatile registers
@@ -484,13 +486,13 @@ fn_encode(
       .byte_size = 8,
       .reg = dyn_array_get(unwind_codes, i)->OpInfo,
     };
-    encode_instruction_with_compiler_location(program, buffer, &(Instruction) {pop, {to_save}});
+    encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {pop, {to_save}}});
   }
 
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {ret, {0}});
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {ret, {0}}});
   u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {int3, {0}});
+  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
 
   if (function_exception_info || unwind_info) {
     // Make sure either both or none are provided
@@ -595,27 +597,27 @@ make_if(
     if (value->operand.type == Operand_Type_Eflags) {
       switch(value->operand.compare_type) {
         case Compare_Type_Equal: {
-          push_instruction(instructions, location, (Instruction) {jne, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {jne, {label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Not_Equal: {
-          push_instruction(instructions, location, (Instruction) {je, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {je, {label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Less: {
-          push_instruction(instructions, location, (Instruction) {jge, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {jge, {label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Less_Equal: {
-          push_instruction(instructions, location, (Instruction) {jg, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {jg, {label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Greater: {
-          push_instruction(instructions, location, (Instruction) {jle, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {jle, {label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Greater_Equal: {
-          push_instruction(instructions, location, (Instruction) {jl, {label32(label), value->operand, 0}});
+          push_instruction(instructions, location, (Instruction) {.assembly = {jl, {label32(label), value->operand, 0}}});
           break;
         }
         default: {
@@ -625,14 +627,14 @@ make_if(
     } else {
       u32 byte_size = descriptor_byte_size(value->descriptor);
       if (byte_size == 4 || byte_size == 8) {
-        push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm32(0), 0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cmp, {value->operand, imm32(0), 0}}});
       } else if (byte_size == 1) {
-        push_instruction(instructions, location, (Instruction) {cmp, {value->operand, imm8(0), 0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cmp, {value->operand, imm8(0), 0}}});
       } else {
         assert(!"Unsupported value inside `if`");
       }
       Value *eflags = value_from_compare(Compare_Type_Equal);
-      push_instruction(instructions, location, (Instruction) {je, {label32(label), eflags->operand, 0}});
+      push_instruction(instructions, location, (Instruction) {.assembly = {je, {label32(label), eflags->operand, 0}}});
     }
   }
   return label;
@@ -644,7 +646,10 @@ loop_start(
   const Source_Location *location
 ) {
   Label *label_start = make_label();
-  push_instruction(instructions, location, (Instruction) { .maybe_label = label_start });
+  push_instruction(instructions, location, (Instruction) {
+    .type = Instruction_Type_Label,
+    .label = label_start
+  });
   return (Loop_Builder) {
     .done = false,
     .label_start = label_start,
@@ -767,7 +772,7 @@ plus_or_minus(
   push_instruction(
     &builder->code_block.instructions,
     location,
-    (Instruction) {mnemonic, {temp->operand, b->operand}}
+    (Instruction) {.assembly = {mnemonic, {temp->operand, b->operand}}}
   );
   if (temp != result_value) {
     move_value(builder, location, result_value, temp);
@@ -827,7 +832,7 @@ multiply(
   reg_a = value_register_for_descriptor(Register_A, x->descriptor);
   move_value(builder, location, reg_a, x);
 
-  push_instruction(instructions, location, (Instruction) {imul, {reg_a->operand, y_temp->operand}});
+  push_instruction(instructions, location, (Instruction) {.assembly = {imul, {reg_a->operand, y_temp->operand}}});
 
   move_value(builder, location, result_value, reg_a);
 }
@@ -890,19 +895,19 @@ divide_or_remainder(
 
     switch (descriptor_byte_size(larger_descriptor)) {
       case 8: {
-        push_instruction(instructions, location, (Instruction) {cqo, {0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cqo, {0}}});
         break;
       }
       case 4: {
-        push_instruction(instructions, location, (Instruction) {cdq, {0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cdq, {0}}});
         break;
       }
       case 2: {
-        push_instruction(instructions, location, (Instruction) {cwd, {0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cwd, {0}}});
         break;
       }
       case 1: {
-        push_instruction(instructions, location, (Instruction) {cwb, {0}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {cwb, {0}}});
         break;
       }
       default: {
@@ -910,7 +915,7 @@ divide_or_remainder(
       }
     }
   }
-  push_instruction(instructions, location, (Instruction) {idiv, {divisor->operand, 0, 0}});
+  push_instruction(instructions, location, (Instruction) {.assembly = {idiv, {divisor->operand, 0, 0}}});
 
 
   if (operation == Divide_Operation_Divide) {
@@ -1006,7 +1011,7 @@ compare(
   Value *reg_r11 = value_register_for_descriptor(Register_R11, larger_descriptor);
   move_value(builder, location,  reg_r11, a);
 
-  push_instruction(instructions, location, (Instruction) {cmp, {reg_r11->operand, temp_b->operand, 0}});
+  push_instruction(instructions, location, (Instruction) {.assembly = {cmp, {reg_r11->operand, temp_b->operand, 0}}});
 
   move_value(builder, location, result_value, value_from_compare(operation));
 }
@@ -1035,7 +1040,7 @@ value_pointer_to(
   // instruction encoding.
   source_operand.byte_size = descriptor_byte_size(result_descriptor);
 
-  push_instruction(instructions, location, (Instruction) {lea, {reg_a->operand, source_operand, 0}});
+  push_instruction(instructions, location, (Instruction) {.assembly = {lea, {reg_a->operand, source_operand, 0}}});
 
   Value *result = reserve_stack(builder, result_descriptor);
   move_value(builder, location, result, reg_a);
@@ -1076,7 +1081,7 @@ call_function_overload(
         };
         Operand source = operand_register_for_descriptor(reg_index, &descriptor_s64);
         Value *stack_value = reserve_stack(builder, to_save.descriptor);
-        push_instruction(instructions, location, (Instruction) {mov, {stack_value->operand, source}});
+        push_instruction(instructions, location, (Instruction) {.assembly = {mov, {stack_value->operand, source}}});
         dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
       }
     }
@@ -1099,7 +1104,7 @@ call_function_overload(
     Descriptor *return_pointer_descriptor = descriptor_pointer_to(descriptor->returns->descriptor);
     Value *reg_c = value_register_for_descriptor(Register_C, return_pointer_descriptor);
     push_instruction(
-      instructions, location, (Instruction) {lea, {reg_c->operand, descriptor->returns->operand}}
+      instructions, location, (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns->operand}}}
     );
   }
 
@@ -1109,11 +1114,11 @@ call_function_overload(
   ));
 
   if (to_call->operand.type == Operand_Type_Label_32) {
-    push_instruction(instructions, location, (Instruction) {call, {to_call->operand, 0, 0}});
+    push_instruction(instructions, location, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
   } else {
     Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
     move_value(builder, location, reg_a, to_call);
-    push_instruction(instructions, location, (Instruction) {call, {reg_a->operand, 0, 0}});
+    push_instruction(instructions, location, (Instruction) {.assembly = {call, {reg_a->operand, 0, 0}}});
   }
 
   Value *result = descriptor->returns;
@@ -1201,12 +1206,18 @@ make_and(
   Label *else_label = make_if(instructions, location, a);
   {
     compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
-    push_instruction(instructions, location, (Instruction) {jmp, {label32(label), 0, 0}});
+    push_instruction(instructions, location, (Instruction) {.assembly = {jmp, {label32(label), 0, 0}}});
   }
-  push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
+  push_instruction(instructions, location, (Instruction) {
+    .type = Instruction_Type_Label,
+    .label = else_label,
+  });
 
   move_value(builder, location, result, value_from_s8(0));
-  push_instruction(instructions, location, (Instruction) {.maybe_label = label});
+  push_instruction(instructions, location, (Instruction) {
+    .type = Instruction_Type_Label,
+    .label = label,
+  });
   return result;
 }
 
@@ -1225,12 +1236,18 @@ make_or(
   Label *else_label = make_if(instructions, location, result);
   {
     compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
-    push_instruction(instructions, location, (Instruction) {jmp, {label32(label)}});
+    push_instruction(instructions, location, (Instruction) {.assembly = {jmp, {label32(label)}}});
   }
-  push_instruction(instructions, location, (Instruction) {.maybe_label = else_label});
+  push_instruction(instructions, location, (Instruction) {
+    .type = Instruction_Type_Label,
+    .label = else_label,
+  });
 
   move_value(builder, location, result, value_from_s8(1));
-  push_instruction(instructions, location, (Instruction) {.maybe_label = label});
+  push_instruction(instructions, location, (Instruction) {
+    .type = Instruction_Type_Label,
+    .label = label,
+  });
   return result;
 }
 

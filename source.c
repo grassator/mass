@@ -1710,7 +1710,8 @@ token_rewrite_statement_if(
   Label *else_label = make_if(&builder->code_block.instructions, &keyword->location, condition_value);
   token_parse_block(program, body->children, scope, builder, value_any());
   push_instruction(
-    &builder->code_block.instructions, &keyword->location, (Instruction) {.maybe_label = else_label}
+    &builder->code_block.instructions, &keyword->location,
+    (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
   token_replace_tokens_in_state(state, 3, 0);
@@ -1735,7 +1736,8 @@ token_rewrite_goto(
       value->operand.type == Operand_Type_Label_32
     ) {
       push_instruction(
-        &builder->code_block.instructions, &keyword->location, (Instruction) {jmp, {value->operand, 0, 0}}
+        &builder->code_block.instructions, &keyword->location,
+        (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
       );
     } else {
       program_error_builder(program, label_name->location) {
@@ -1776,7 +1778,7 @@ token_rewrite_explicit_return(
   push_instruction(
     &builder->code_block.instructions,
     &keyword->location,
-    (Instruction){jmp, {label32(builder->code_block.end_label), 0, 0}}
+    (Instruction) {.assembly = {jmp, {label32(builder->code_block.end_label), 0, 0}}}
   );
 
   token_replace_tokens_in_state(state, 2, 0);
@@ -1925,7 +1927,8 @@ token_rewrite_definitions(
   Value *value = 0;
   if (label) {
     push_instruction(
-      &builder->code_block.instructions, &name->location, (Instruction) { .maybe_label = label }
+      &builder->code_block.instructions, &name->location,
+      (Instruction) {.type = Instruction_Type_Label, .label = label }
     );
     value = temp_allocate(Value);
     *value = (Value) {

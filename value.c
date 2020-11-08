@@ -564,10 +564,19 @@ instruction_equal(
   const Instruction *a,
   const Instruction *b
 ) {
-  if (a->mnemonic != b->mnemonic) return false;
-  for (u64 i = 0; i < countof(a->operands); ++i) {
-    if (!operand_equal(&a->operands[i], &b->operands[i])) {
-      return false;
+  if (a->type != b->type) return false;
+  switch(a->type) {
+    case Instruction_Type_Assembly: {
+      if (a->assembly.mnemonic != b->assembly.mnemonic) return false;
+      for (u64 i = 0; i < countof(a->assembly.operands); ++i) {
+        if (!operand_equal(&a->assembly.operands[i], &b->assembly.operands[i])) {
+          return false;
+        }
+      }
+      break;
+    }
+    case Instruction_Type_Label: {
+      return a->label == b->label;
     }
   }
   return true;

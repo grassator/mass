@@ -462,14 +462,27 @@ typedef struct {
   u64 column;
 } Source_Location;
 
+typedef enum {
+  Instruction_Type_Assembly,
+  Instruction_Type_Label,
+} Instruction_Type;
+
 typedef struct {
   const X64_Mnemonic *mnemonic;
   Operand operands[3];
-  Label *maybe_label;
+} Instruction_Assembly;
+
+typedef struct {
+  Instruction_Type type;
+  union {
+    Instruction_Assembly assembly;
+    Label *label;
+  };
   Compiler_Source_Location compiler_source_location;
   const Source_Location *source_location;
   u8 encoded_byte_size;
 } Instruction;
+
 typedef dyn_array_type(Instruction) Array_Instruction;
 
 typedef struct _Program Program;

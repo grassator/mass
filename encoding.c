@@ -16,13 +16,14 @@ typedef enum {
 } REX_BYTE;
 
 void
-encode_instruction_internal(
+encode_instruction_assembly(
   const Program *program,
   Fixed_Buffer *buffer,
   Instruction *instruction,
   const Instruction_Encoding *encoding,
   u32 operand_count
 ) {
+  assert(instruction->type == Instruction_Type_Assembly);
   u64 original_buffer_length = buffer->occupied;
 
   s8 mod_r_m_operand_index = -1;
@@ -42,7 +43,7 @@ encode_instruction_internal(
   s32 displacement = 0;
 
   for (u8 operand_index = 0; operand_index < operand_count; ++operand_index) {
-    Operand *operand = &instruction->operands[operand_index];
+    Operand *operand = &instruction->assembly.operands[operand_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
 
     if (operand->byte_size == 2) {
@@ -186,7 +187,7 @@ encode_instruction_internal(
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
-    Operand *operand = &instruction->operands[mod_r_m_operand_index];
+    Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
     // :OperandNormalization
     if (operand->type == Operand_Type_RIP_Relative) {
       s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
@@ -214,7 +215,7 @@ encode_instruction_internal(
     if (operand_encoding->type != Operand_Encoding_Type_Immediate) {
       continue;
     }
-    Operand *operand = &instruction->operands[operand_index];
+    Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
       if (operand->label32->resolved) {
         // :AfterInstructionPatch
@@ -262,8 +263,9 @@ encode_instruction(
   Fixed_Buffer *buffer,
   Instruction *instruction
 ) {
-  if (instruction->maybe_label) {
-    Label *label = instruction->maybe_label;
+  if (instruction->type == Instruction_Type_Label) {
+    Label *label = instruction->label;
+    assert(instruction->label);
     label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
     label->resolved = true;
 
@@ -277,12 +279,12 @@ encode_instruction(
     return;
   }
 
-  u32 operand_count = sizeof(instruction->operands) / sizeof(instruction->operands[0]);
-  for (u32 index = 0; index < instruction->mnemonic->encoding_count; ++index) {
-    const Instruction_Encoding *encoding = &instruction->mnemonic->encoding_list[index];
+  u32 operand_count = countof(instruction->assembly.operands);
+  for (u32 index = 0; index < instruction->assembly.mnemonic->encoding_count; ++index) {
+    const Instruction_Encoding *encoding = &instruction->assembly.mnemonic->encoding_list[index];
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
-      Operand *operand = &instruction->operands[operand_index];
+      Operand *operand = &instruction->assembly.operands[operand_index];
 
       if (operand_encoding->size != Operand_Size_Any) {
         if (operand->byte_size != s32_to_u32(operand_encoding->size)) {
@@ -414,7 +416,7 @@ encode_instruction(
     }
 
     if (encoding) {
-      encode_instruction_internal(program, buffer, instruction, encoding, operand_count);
+      encode_instruction_assembly(program, buffer, instruction, encoding, operand_count);
       return;
     }
   }
@@ -441,9 +443,9 @@ encode_instruction(
   } else {
     printf("Unknown source location\n");
   }
-  printf("%s", instruction->mnemonic->name);
+  printf("%s", instruction->assembly.mnemonic->name);
   for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
-    Operand *operand = &instruction->operands[operand_index];
+    Operand *operand = &instruction->assembly.operands[operand_index];
     printf(" ");
     print_operand(operand);
   }
