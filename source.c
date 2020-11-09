@@ -1498,6 +1498,8 @@ token_rewrite_compile_time_eval(
     .data_buffer = program->data_buffer,
     .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
     .labels = dyn_array_copy(Array_Label, program->labels),
+    .patch_info_array =
+      dyn_array_copy(Array_Label_Location_Diff_Patch_Info, program->patch_info_array),
     .functions = dyn_array_copy(Array_Function_Builder, program->functions),
     .global_scope = scope_make(program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),

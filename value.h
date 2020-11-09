@@ -95,19 +95,19 @@ typedef struct {
 } Operand_Sib;
 
 typedef struct {
-  s32 *patch_target;
-  s32 from_rva;
-} Label_Location;
-typedef dyn_array_type(Label_Location) Array_Label_Location;
-
-typedef struct {
   u64 value;
 } Label_Index;
 
 typedef struct {
+  Label_Index label;
+  s32 *patch_target;
+  s32 from_rva;
+} Label_Location_Diff_Patch_Info;
+typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
+
+typedef struct {
   bool resolved;
   u32 target_rva;
-  Array_Label_Location locations;
 } Label;
 typedef dyn_array_type(Label) Array_Label;
 
@@ -577,6 +577,7 @@ typedef struct _Program {
   Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
   Array_Label labels;
+  Array_Label_Location_Diff_Patch_Info patch_info_array;
   Value *entry_point;
   Array_Function_Builder functions;
   s64 code_base_rva;

@@ -184,7 +184,7 @@ encode_instruction_assembly(
   // a loop over them after the instruction has been encoded.
   s32 *rip_relative_patch = 0;
   s32 *immediate_label_patch = 0;
-  Label_Location *immediate_label_location = 0;
+  Label_Location_Diff_Patch_Info *immediate_label_location_diff_patch_info = 0;
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
@@ -226,8 +226,9 @@ encode_instruction_assembly(
       } else {
         s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
         // :AfterInstructionPatch
-        immediate_label_location =
-          dyn_array_push(label->locations, (Label_Location) {
+        immediate_label_location_diff_patch_info =
+          dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+            .label = operand->label32,
             .patch_target = patch_target,
           });
       }
@@ -255,8 +256,8 @@ encode_instruction_assembly(
   if (immediate_label_patch) {
     *immediate_label_patch -= next_instruction_rva;
   }
-  if (immediate_label_location) {
-    immediate_label_location->from_rva = next_instruction_rva;
+  if (immediate_label_location_diff_patch_info) {
+    immediate_label_location_diff_patch_info->from_rva = next_instruction_rva;
   }
 }
 

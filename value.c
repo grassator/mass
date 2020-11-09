@@ -299,9 +299,7 @@ make_label(
   Program *program
 ) {
   Label_Index index = {dyn_array_length(program->labels)};
-  dyn_array_push(program->labels, (Label) {
-    .locations = dyn_array_make(Array_Label_Location, .allocator = temp_allocator),
-  });
+  dyn_array_push(program->labels, (Label) {0});
   return index;
 }
 
@@ -1116,6 +1114,7 @@ program_init(
   *program = (Program) {
     .data_buffer = bucket_buffer_make(.allocator = allocator_system),
     .labels = dyn_array_make(Array_Label, .capacity = 128),
+    .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
     .errors = dyn_array_make(Array_Parse_Error, .capacity = 16),
@@ -1273,17 +1272,16 @@ void
 program_patch_labels(
   Program *program
 ) {
-  for (u64 label_index = 0; label_index < dyn_array_length(program->labels); ++label_index) {
-    Label *label = dyn_array_get(program->labels, label_index);
-    for (
-      u64 location_index = 0;
-      location_index < dyn_array_length(label->locations);
-      ++location_index
-    ) {
-      Label_Location *label_location = dyn_array_get(label->locations, location_index);
-      s64 diff = (s64)label->target_rva - (s64)label_location->from_rva;
-      *label_location->patch_target = s64_to_s32(diff);
-    }
+  for (
+    u64 patch_index = 0;
+    patch_index < dyn_array_length(program->patch_info_array);
+    ++patch_index
+  ) {
+    Label_Location_Diff_Patch_Info *info = dyn_array_get(program->patch_info_array, patch_index);
+    Label *label = program_get_label(program, info->label);
+    assert(label->resolved);
+    s64 diff = (s64)label->target_rva - (s64)info->from_rva;
+    *info->patch_target = s64_to_s32(diff);
   }
 }
 
