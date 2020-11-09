@@ -630,48 +630,4 @@ program_jit(
   Program *program
 );
 
-void
-program_push_error_from_bucket_buffer(
-  Program *program,
-  Source_Location location,
-  Bucket_Buffer *buffer
-);
-
-void
-program_push_error_from_slice(
-  Program *program,
-  Source_Location location,
-  Slice message
-);
-
-#define program_error_builder(_program_, _location_)\
-  for(\
-    struct {\
-      Bucket_Buffer *buffer;\
-      u8 number_print_buffer[32];\
-    } _error_builder = {\
-      .buffer = bucket_buffer_make(.allocator = allocator_system),\
-    };\
-    _error_builder.buffer;\
-    program_push_error_from_bucket_buffer((_program_), (_location_), _error_builder.buffer),\
-    _error_builder.buffer = 0\
-  )
-#define program_error_append_number(_format_, _number_)\
-  do {\
-    snprintf(\
-      _error_builder.number_print_buffer,\
-      countof(_error_builder.number_print_buffer),\
-      _format_,\
-      (_number_)\
-    );\
-    Slice _number_slice = slice_from_c_string(_error_builder.number_print_buffer);\
-    bucket_buffer_append_slice(_error_builder.buffer, _number_slice);\
-  } while (0)
-
-#define program_error_append_slice(_slice_)\
-  bucket_buffer_append_slice(_error_builder.buffer, (_slice_))
-
-#define program_error_append_literal(_message_)\
-  program_error_append_slice(slice_literal(_message_))
-
 #endif VALUE_H
