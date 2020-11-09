@@ -182,8 +182,8 @@ encode_instruction_assembly(
   // we do not know what the diff should be before the immediate is
   // encoded as well. To solve this we store the patch locations and do
   // a loop over them after the instruction has been encoded.
-  s32 *after_instruction_diff_patches[3];
-  u8 after_instruction_diff_patch_count = 0;
+  s32 *rip_relative_patch = 0;
+  s32 *immediate_label_patch = 0;
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
@@ -192,9 +192,8 @@ encode_instruction_assembly(
     if (operand->type == Operand_Type_RIP_Relative) {
       s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
       // :AfterInstructionPatch
-      s32 *diff = fixed_buffer_allocate_unaligned(buffer, s32);
-      *diff = s64_to_s32(operand_rva);
-      after_instruction_diff_patches[after_instruction_diff_patch_count++] = diff;
+      rip_relative_patch = fixed_buffer_allocate_unaligned(buffer, s32);
+      *rip_relative_patch = s64_to_s32(operand_rva);
     } else if (
       operand->type == Operand_Type_Memory_Indirect ||
       operand->type == Operand_Type_Sib
@@ -217,11 +216,11 @@ encode_instruction_assembly(
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
+      assert(!immediate_label_patch);
       if (operand->label32->resolved) {
         // :AfterInstructionPatch
-        s32 *diff = fixed_buffer_allocate_unaligned(buffer, s32);
-        *diff = s64_to_s32(operand->label32->target_rva);
-        after_instruction_diff_patches[after_instruction_diff_patch_count++] = diff;
+        immediate_label_patch = fixed_buffer_allocate_unaligned(buffer, s32);
+        *immediate_label_patch = s64_to_s32(operand->label32->target_rva);
       } else {
         s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
         Label_Location *label_location =
@@ -230,8 +229,7 @@ encode_instruction_assembly(
             .negative_next_instruction_rva = 0,
           });
         // :AfterInstructionPatch
-        after_instruction_diff_patches[after_instruction_diff_patch_count++] =
-          &label_location->negative_next_instruction_rva;
+        immediate_label_patch = &label_location->negative_next_instruction_rva;
       }
 
     } else if (operand->type == Operand_Type_Immediate_8) {
@@ -250,10 +248,12 @@ encode_instruction_assembly(
   instruction->encoded_byte_size = u64_to_u8(buffer->occupied - original_buffer_length);
 
   // :AfterInstructionPatch
-  for (u64 i = 0; i < after_instruction_diff_patch_count; ++i){
-    s32 *patch_target = after_instruction_diff_patches[i];
-    s32 next_instruction_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
-    *patch_target -= next_instruction_rva;
+  s32 next_instruction_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
+  if (rip_relative_patch) {
+    *rip_relative_patch -= next_instruction_rva;
+  }
+  if (immediate_label_patch) {
+    *immediate_label_patch -= next_instruction_rva;
   }
 }
 
@@ -272,9 +272,8 @@ encode_instruction(
 
     for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
       Label_Location *label_location = dyn_array_get(label->locations, i);
-      s32 diff = label->target_rva + label_location->negative_next_instruction_rva;
-      assert(diff >= 0);
-      *label_location->patch_target = diff;
+      s64 diff = (s64)label->target_rva + (s64)label_location->negative_next_instruction_rva;
+      *label_location->patch_target = s64_to_s32(diff);
     }
     instruction->encoded_byte_size = 0;
     return;
