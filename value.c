@@ -1138,7 +1138,14 @@ program_deinit(
     Import_Library *library = dyn_array_get(program->import_libraries, i);
     dyn_array_destroy(library->symbols);
   }
+  if (program->data_buffer) {
+    bucket_buffer_destroy(program->data_buffer);
+  }
+  dyn_array_destroy(program->labels);
+  dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
+  dyn_array_destroy(program->functions);
+  dyn_array_destroy(program->errors);
 }
 
 EXCEPTION_DISPOSITION
