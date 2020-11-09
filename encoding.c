@@ -271,12 +271,6 @@ encode_instruction(
     Label *label = program_get_label(program, instruction->label);
     label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
     label->resolved = true;
-
-    for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
-      Label_Location *label_location = dyn_array_get(label->locations, i);
-      s64 diff = (s64)label->target_rva - (s64)label_location->next_instruction_rva;
-      *label_location->patch_target = s64_to_s32(diff);
-    }
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {

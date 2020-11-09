@@ -234,6 +234,11 @@ encode_text_section(
     u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
     fn_encode(program, result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
   }
+
+  // After all the functions are encoded we should know all the offsets
+  // and can patch all the label locations
+  program_patch_labels(program);
+
   if (!found_entry_point) {
     panic("Internal error: Could not find entry point in the list of program functions");
   }

@@ -611,4 +611,9 @@ program_jit(
   Program *program
 );
 
+void
+program_patch_labels(
+  Program *program
+);
+
 #endif VALUE_H

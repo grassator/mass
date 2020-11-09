@@ -1270,6 +1270,24 @@ program_test_exception_handler(
 }
 
 void
+program_patch_labels(
+  Program *program
+) {
+  for (u64 label_index = 0; label_index < dyn_array_length(program->labels); ++label_index) {
+    Label *label = dyn_array_get(program->labels, label_index);
+    for (
+      u64 location_index = 0;
+      location_index < dyn_array_length(label->locations);
+      ++location_index
+    ) {
+      Label_Location *label_location = dyn_array_get(label->locations, location_index);
+      s64 diff = (s64)label->target_rva - (s64)label_location->next_instruction_rva;
+      *label_location->patch_target = s64_to_s32(diff);
+    }
+  }
+}
+
+void
 program_jit(
   Program *program
 ) {
@@ -1348,6 +1366,10 @@ program_jit(
       };
     }
   }
+
+  // After all the functions are encoded we should know all the offsets
+  // and can patch all the label locations
+  program_patch_labels(program);
 
   // Making code executable
   VirtualProtect(code_memory, code_segment_size, PAGE_EXECUTE_READ, &(DWORD){0});
