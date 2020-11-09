@@ -1479,6 +1479,8 @@ token_rewrite_constant_sub_expression(
   return true;
 }
 
+typedef void (*Compile_Time_Eval_Proc)(void *);
+
 bool
 token_rewrite_compile_time_eval(
   Program *program,
@@ -1539,8 +1541,8 @@ token_rewrite_compile_time_eval(
   u32 alignment = 16;
   void *result = allocator_allocate_bytes(temp_allocator, result_byte_size, alignment);
 
-  fn_type_voidp_to_void jitted_code =
-    (fn_type_voidp_to_void)helper_value_as_function(&eval_program, eval_builder->value);
+  Compile_Time_Eval_Proc jitted_code =
+    (Compile_Time_Eval_Proc)helper_value_as_function(&eval_program, eval_builder->value);
 
   jitted_code(result);
   Value *token_value = temp_allocate(Value);

@@ -1258,7 +1258,6 @@ program_test_exception_handler(
   return ExceptionContinueSearch;
 }
 
-
 void
 program_jit(
   Program *program
