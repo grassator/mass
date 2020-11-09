@@ -271,14 +271,14 @@ fn_begin(
   Value *fn_value = temp_allocate(Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(make_label()),
+    .operand = label32(make_label(program)),
   };
   Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .stack_reserve = 0,
     .descriptor = descriptor,
     .value = fn_value,
     .code_block = {
-      .end_label = make_label(),
+      .end_label = make_label(program),
       .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
     },
   });
@@ -312,7 +312,7 @@ fn_end(
 
 u32
 make_trampoline(
-  const Program *program,
+  Program *program,
   Fixed_Buffer *buffer,
   s64 address
 ) {
@@ -335,7 +335,7 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   if (last_instruction->assembly.mnemonic != jmp) return;
   Operand op = last_instruction->assembly.operands[0];
   if (op.type != Operand_Type_Label_32) return;
-  if (op.label32 != builder->code_block.end_label) return;
+  if (op.label32.value != builder->code_block.end_label.value) return;
   dyn_array_pop(builder->code_block.instructions);
 }
 
@@ -579,20 +579,21 @@ function_return_descriptor(
   }
 }
 
-Label *
+Label_Index
 make_if(
+  Program *program,
   Array_Instruction *instructions,
   const Source_Location *location,
   Value *value
 ) {
   bool is_always_true = false;
+  Label_Index label = make_label(program);
   if(operand_is_immediate(&value->operand)) {
     s64 imm = operand_immediate_as_s64(&value->operand);
-    if (imm == 0) return 0;
+    if (imm == 0) return label;
     is_always_true = true;
   }
 
-  Label *label = make_label();
   if (!is_always_true) {
     if (value->operand.type == Operand_Type_Eflags) {
       switch(value->operand.compare_type) {
@@ -642,10 +643,11 @@ make_if(
 
 Loop_Builder
 loop_start(
+  Program *program,
   Array_Instruction *instructions,
   const Source_Location *location
 ) {
-  Label *label_start = make_label();
+  Label_Index label_start = make_label(program);
   push_instruction(instructions, location, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label_start
@@ -653,7 +655,7 @@ loop_start(
   return (Loop_Builder) {
     .done = false,
     .label_start = label_start,
-    .label_end = make_label(),
+    .label_end = make_label(program),
   };
 }
 
@@ -1194,6 +1196,7 @@ call_function_value_array(
 
 Value *
 make_and(
+  Program *program,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,
@@ -1201,9 +1204,9 @@ make_and(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
-  Label *label = make_label();
+  Label_Index label = make_label(program);
 
-  Label *else_label = make_if(instructions, location, a);
+  Label_Index else_label = make_if(program, instructions, location, a);
   {
     compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
     push_instruction(instructions, location, (Instruction) {.assembly = {jmp, {label32(label), 0, 0}}});
@@ -1223,6 +1226,7 @@ make_and(
 
 Value *
 make_or(
+  Program *program,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,
@@ -1230,10 +1234,10 @@ make_or(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
-  Label *label = make_label();
+  Label_Index label = make_label(program);
 
   compare(Compare_Type_Equal, builder, location, result, a, value_from_s8(0));
-  Label *else_label = make_if(instructions, location, result);
+  Label_Index else_label = make_if(program, instructions, location, result);
   {
     compare(Compare_Type_Not_Equal, builder, location, result, b, value_from_s8(0));
     push_instruction(instructions, location, (Instruction) {.assembly = {jmp, {label32(label)}}});

@@ -50,7 +50,7 @@ instruction_add_source_location_internal(
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 u32
 make_trampoline(
-  const Program *program,
+  Program *program,
   Fixed_Buffer *buffer,
   s64 address
 );
@@ -86,12 +86,13 @@ typedef struct {
 
 typedef struct {
   bool done;
-  Label *label_start;
-  Label *label_end;
+  Label_Index label_start;
+  Label_Index label_end;
 } Loop_Builder;
 
 Loop_Builder
 loop_start(
+  Program *program,
   Array_Instruction *instructions,
   const Source_Location *location
 );
@@ -183,6 +184,7 @@ call_function_value(
 
 Value *
 make_and(
+  Program *program,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,
@@ -191,6 +193,7 @@ make_and(
 
 Value *
 make_or(
+  Program *program,
   Function_Builder *builder,
   const Source_Location *location,
   Value *a,

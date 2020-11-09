@@ -101,10 +101,15 @@ typedef struct {
 typedef dyn_array_type(Label_Location) Array_Label_Location;
 
 typedef struct {
+  u64 value;
+} Label_Index;
+
+typedef struct {
   bool resolved;
-  s32 target_rva;
+  u32 target_rva;
   Array_Label_Location locations;
 } Label;
+typedef dyn_array_type(Label) Array_Label;
 
 typedef struct {
   Slice name;
@@ -145,7 +150,7 @@ typedef struct {
     s16 imm16;
     s32 imm32;
     s64 imm64;
-    Label *label32;
+    Label_Index label32;
     Operand_Memory_Indirect indirect;
     Operand_Sib sib;
     s64 rip_offset_in_data;
@@ -452,7 +457,7 @@ typedef struct {
   Instruction_Type type;
   union {
     Instruction_Assembly assembly;
-    Label *label;
+    Label_Index label;
     Slice bytes;
   };
   Compiler_Source_Location compiler_source_location;
@@ -465,7 +470,7 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct _Program Program;
 
 typedef struct {
-  Label *end_label;
+  Label_Index end_label;
   Array_Instruction instructions;
   u64 register_volatile_bitset;
   u64 register_occupied_bitset;
@@ -571,6 +576,7 @@ typedef struct _Program {
   Bucket_Buffer *data_buffer;
   Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
+  Array_Label labels;
   Value *entry_point;
   Array_Function_Builder functions;
   s64 code_base_rva;

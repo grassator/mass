@@ -1497,6 +1497,7 @@ token_rewrite_compile_time_eval(
   Program eval_program = {
     .data_buffer = program->data_buffer,
     .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
+    .labels = dyn_array_copy(Array_Label, program->labels),
     .functions = dyn_array_copy(Array_Function_Builder, program->functions),
     .global_scope = scope_make(program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),
@@ -1717,7 +1718,9 @@ token_rewrite_statement_if(
 
   Value *condition_value = value_any();
   token_force_value(program, condition, scope, builder, condition_value);
-  Label *else_label = make_if(&builder->code_block.instructions, &keyword->location, condition_value);
+  Label_Index else_label = make_if(
+    program, &builder->code_block.instructions, &keyword->location, condition_value
+  );
   token_parse_block(program, body->children, scope, builder, value_any());
   push_instruction(
     &builder->code_block.instructions, &keyword->location,
@@ -1964,17 +1967,29 @@ token_rewrite_cast(
   return true;
 }
 
-Label *
+Value *
 token_match_label(
+  Program *program,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder_
+  Function_Builder *builder
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
   Token_Match_End();
 
-  return make_label();
+  Label_Index label = make_label(program);
+  push_instruction(
+    &builder->code_block.instructions, &keyword->location,
+    (Instruction) {.type = Instruction_Type_Label, .label = label }
+  );
+  Value *value = temp_allocate(Value);
+  *value = (Value) {
+    .descriptor = &descriptor_void,
+    .operand = label32(label),
+  };
+
+  return value;
 }
 
 bool
@@ -1996,19 +2011,8 @@ token_rewrite_definitions(
   Token_Matcher_State rest_state = {.tokens = rest};
   u64 size_to_replace = dyn_array_length(state->tokens) - state->start_index;
 
-  Label *label = token_match_label(&rest_state, scope, builder);
-  Value *value = 0;
-  if (label) {
-    push_instruction(
-      &builder->code_block.instructions, &name->location,
-      (Instruction) {.type = Instruction_Type_Label, .label = label }
-    );
-    value = temp_allocate(Value);
-    *value = (Value) {
-      .descriptor = &descriptor_void,
-      .operand = label32(label),
-    };
-  } else {
+  Value *value = token_match_label(program, &rest_state, scope, builder);
+  if (!value) {
     Descriptor *descriptor = token_match_type(program, &rest_state, scope, builder);
     value = reserve_stack(builder, descriptor);
   }

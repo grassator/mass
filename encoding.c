@@ -17,7 +17,7 @@ typedef enum {
 
 void
 encode_instruction_assembly(
-  const Program *program,
+  Program *program,
   Fixed_Buffer *buffer,
   Instruction *instruction,
   const Instruction_Encoding *encoding,
@@ -217,16 +217,17 @@ encode_instruction_assembly(
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
-      if (operand->label32->resolved) {
+      Label *label = program_get_label(program, operand->label32);
+      if (label->resolved) {
         assert(!immediate_label_patch);
         // :AfterInstructionPatch
         immediate_label_patch = fixed_buffer_allocate_unaligned(buffer, s32);
-        *immediate_label_patch = s64_to_s32(operand->label32->target_rva);
+        *immediate_label_patch = s64_to_s32(label->target_rva);
       } else {
         s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
         // :AfterInstructionPatch
         immediate_label_location =
-          dyn_array_push(operand->label32->locations, (Label_Location) {
+          dyn_array_push(label->locations, (Label_Location) {
             .patch_target = patch_target,
           });
       }
@@ -261,14 +262,13 @@ encode_instruction_assembly(
 
 void
 encode_instruction(
-  const Program *program,
+  Program *program,
   Fixed_Buffer *buffer,
   Instruction *instruction
 ) {
   // TODO turn into a switch statement on type
   if (instruction->type == Instruction_Type_Label) {
-    Label *label = instruction->label;
-    assert(instruction->label);
+    Label *label = program_get_label(program, instruction->label);
     label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
     label->resolved = true;
 

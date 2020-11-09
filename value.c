@@ -2,6 +2,14 @@
 #include "function.h"
 #include "source.h"
 
+static inline Label *
+program_get_label(
+  Program *program,
+  Label_Index label
+) {
+  return dyn_array_get(program->labels, label.value);
+}
+
 inline bool
 same_value_type(
   Value *a,
@@ -286,18 +294,20 @@ define_xmm_register(xmm6, 0b110);
 define_xmm_register(xmm7, 0b111);
 #undef define_xmm_register
 
-inline Label*
-make_label() {
-  Label *label = temp_allocate(Label);
-  *label = (Label) {
+inline Label_Index
+make_label(
+  Program *program
+) {
+  Label_Index index = {dyn_array_length(program->labels)};
+  dyn_array_push(program->labels, (Label) {
     .locations = dyn_array_make(Array_Label_Location, .allocator = temp_allocator),
-  };
-  return label;
+  });
+  return index;
 }
 
 inline Operand
 label32(
-  Label *label
+  Label_Index label
 ) {
   return (const Operand) {
     .type = Operand_Type_Label_32,
@@ -520,7 +530,7 @@ operand_equal(
       return a->imm64 == b->imm64;
     }
     case Operand_Type_Label_32: {
-      return a->label32 == b->label32;
+      return a->label32.value == b->label32.value;
     }
     case Operand_Type_Xmm:
     case Operand_Type_Register: {
@@ -576,7 +586,7 @@ instruction_equal(
       break;
     }
     case Instruction_Type_Label: {
-      return a->label == b->label;
+      return a->label.value == b->label.value;
     }
     case Instruction_Type_Bytes: {
       return slice_equal(a->bytes, b->bytes);
@@ -854,7 +864,7 @@ descriptor_array_of(
   u32 length
 ) {
   Descriptor *result = temp_allocate(Descriptor);
-  *result = (const Descriptor) {
+  *result = (Descriptor) {
     .type = Descriptor_Type_Fixed_Size_Array,
     .array = {
       .item = descriptor,
@@ -871,8 +881,8 @@ helper_value_as_function(
 ) {
   assert(value->operand.type == Operand_Type_Label_32);
   assert(program->jit_buffer);
-  s8 *target =
-    program->jit_buffer->memory + program->code_base_rva + value->operand.label32->target_rva;
+  Label *label = program_get_label(program, value->operand.label32);
+  s8 *target = program->jit_buffer->memory + program->code_base_rva + label->target_rva;
   return (fn_type_opaque)target;
 }
 
@@ -1105,6 +1115,7 @@ program_init(
 ) {
   *program = (Program) {
     .data_buffer = bucket_buffer_make(.allocator = allocator_system),
+    .labels = dyn_array_make(Array_Label, .capacity = 128),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
     .errors = dyn_array_make(Array_Parse_Error, .capacity = 16),
