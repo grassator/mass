@@ -184,6 +184,7 @@ encode_instruction_assembly(
   // a loop over them after the instruction has been encoded.
   s32 *rip_relative_patch = 0;
   s32 *immediate_label_patch = 0;
+  Label_Location *immediate_label_location = 0;
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
@@ -216,20 +217,18 @@ encode_instruction_assembly(
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
-      assert(!immediate_label_patch);
       if (operand->label32->resolved) {
+        assert(!immediate_label_patch);
         // :AfterInstructionPatch
         immediate_label_patch = fixed_buffer_allocate_unaligned(buffer, s32);
         *immediate_label_patch = s64_to_s32(operand->label32->target_rva);
       } else {
         s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
-        Label_Location *label_location =
+        // :AfterInstructionPatch
+        immediate_label_location =
           dyn_array_push(operand->label32->locations, (Label_Location) {
             .patch_target = patch_target,
-            .negative_next_instruction_rva = 0,
           });
-        // :AfterInstructionPatch
-        immediate_label_patch = &label_location->negative_next_instruction_rva;
       }
 
     } else if (operand->type == Operand_Type_Immediate_8) {
@@ -255,6 +254,9 @@ encode_instruction_assembly(
   if (immediate_label_patch) {
     *immediate_label_patch -= next_instruction_rva;
   }
+  if (immediate_label_location) {
+    immediate_label_location->next_instruction_rva = next_instruction_rva;
+  }
 }
 
 void
@@ -272,7 +274,7 @@ encode_instruction(
 
     for (u64 i = 0; i < dyn_array_length(label->locations); ++i) {
       Label_Location *label_location = dyn_array_get(label->locations, i);
-      s64 diff = (s64)label->target_rva + (s64)label_location->negative_next_instruction_rva;
+      s64 diff = (s64)label->target_rva - (s64)label_location->next_instruction_rva;
       *label_location->patch_target = s64_to_s32(diff);
     }
     instruction->encoded_byte_size = 0;
