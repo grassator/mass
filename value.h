@@ -96,7 +96,7 @@ typedef struct {
 
 typedef struct {
   s32 *patch_target;
-  s32 next_instruction_rva;
+  s32 from_rva;
 } Label_Location;
 typedef dyn_array_type(Label_Location) Array_Label_Location;
 

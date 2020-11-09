@@ -256,7 +256,7 @@ encode_instruction_assembly(
     *immediate_label_patch -= next_instruction_rva;
   }
   if (immediate_label_location) {
-    immediate_label_location->next_instruction_rva = next_instruction_rva;
+    immediate_label_location->from_rva = next_instruction_rva;
   }
 }
 

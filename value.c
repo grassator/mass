@@ -1281,7 +1281,7 @@ program_patch_labels(
       ++location_index
     ) {
       Label_Location *label_location = dyn_array_get(label->locations, location_index);
-      s64 diff = (s64)label->target_rva - (s64)label_location->next_instruction_rva;
+      s64 diff = (s64)label->target_rva - (s64)label_location->from_rva;
       *label_location->patch_target = s64_to_s32(diff);
     }
   }
