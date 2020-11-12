@@ -43,34 +43,30 @@ typedef struct {
   };
 } Type;
 
-typedef enum {
-  Output_Mode_C,
-  Output_Mode_Mass,
-} Output_Mode;
-
-Output_Mode output_mode = Output_Mode_C;
+typedef void (*print_type_proc)(FILE *file, Type *type);
 
 void
 print_c_type(
+  FILE *file,
   Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
-      printf("typedef struct {\n");
+      fprintf(file, "typedef struct {\n");
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
-        printf("  %s %s;\n", item->type, item->name);
+        fprintf(file, "  %s %s;\n", item->type, item->name);
       }
-      printf("} %s;\n\n", type->struct_.name);
+      fprintf(file, "} %s;\n\n", type->struct_.name);
       break;
     }
     case Type_Tag_Enum: {
-      printf("typedef enum {\n");
+      fprintf(file, "typedef enum {\n");
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
         Enum_Item *item = &type->enum_.items[i];
-        printf("  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
+        fprintf(file, "  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
       }
-      printf("} %s;\n\n", type->enum_.name);
+      fprintf(file, "} %s;\n\n", type->enum_.name);
       break;
     }
   }
@@ -78,42 +74,58 @@ print_c_type(
 
 void
 print_mass_type(
+  FILE *file,
   Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
-      printf("Mass_%s :: struct {\n", type->struct_.name);
+      fprintf(file, "Mass_%s :: struct {\n", type->struct_.name);
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
-        printf("  %s : %s\n", item->name, item->type);
+        fprintf(file, "  %s : %s\n", item->name, item->type);
       }
-      printf("}\n\n");
+      fprintf(file, "}\n\n");
       break;
     }
     case Type_Tag_Enum: {
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
         Enum_Item *item = &type->enum_.items[i];
-        printf("Mass_%s_%s :: %d\n", type->enum_.name, item->name, item->value);
+        fprintf(file, "Mass_%s_%s :: %d\n", type->enum_.name, item->name, item->value);
       }
-      printf("\n");
+      fprintf(file, "\n");
       break;
     }
   }
 }
 
-void
-print_type(
-  Type *type
-) {
-  switch(output_mode) {
-    case Output_Mode_C: print_c_type(type); break;
-    case Output_Mode_Mass: print_mass_type(type); break;
-  }
-}
+#define print_enum(_FILE_, _NAME_STRING_, ...)\
+  print_type(_FILE_, &(Type){\
+    .tag = Type_Tag_Enum,\
+    .enum_ = {\
+      .name = _NAME_STRING_,\
+      .items = (__VA_ARGS__),\
+      .item_count = countof(__VA_ARGS__),\
+    }\
+  })
 
-int
-main(void) {
-  output_mode = Output_Mode_Mass;
+#define print_struct(_FILE_, _NAME_STRING_, ...)\
+  print_type(_FILE_, &(Type){\
+    .tag = Type_Tag_Struct,\
+    .struct_ = {\
+      .name = _NAME_STRING_,\
+      .items = (__VA_ARGS__),\
+      .item_count = countof(__VA_ARGS__),\
+    }\
+  })
+
+void
+write_types(
+  const char *path,
+  print_type_proc print_type
+) {
+  #pragma warning(disable : 4996)
+  FILE *file = fopen(path, "w");
+  if (!file) exit(1);
   {
     int32_t value = 0;
     Enum_Item items[] = {
@@ -132,26 +144,27 @@ main(void) {
       { "RIP_Relative_Import", value++ },
       { "Label_32", value++ },
     };
-    Enum type = {
-      .name = "Operand_Type",
-      .items = items,
-      .item_count = countof(items),
-    };
-    print_type(&(Type){ .tag = Type_Tag_Enum, .enum_ = type });
+    print_enum(file, "Operand_Type", items);
   }
 
+  print_struct(file, "Label", (Struct_Item[]){
+    { "bool", "resolved" },
+    { "u32", "target_rva" },
+  });
+  fclose(file);
+}
+
+int
+main(void) {
   {
-    Struct_Item items[] = {
-      { "bool", "resolved" },
-      { "u32", "target_rva" },
-    };
-    Struct type = {
-      .name = "Label",
-      .items = items,
-      .item_count = countof(items),
-    };
-    print_type(&(Type){ .tag = Type_Tag_Struct, .struct_ = type });
+    const char *filename = "..\\types.h";
+    write_types(filename, print_c_type);
+    printf("C Types Generated at: %s\n", filename);
   }
-
+  {
+    const char *filename = "..\\lib\\compiler_types.mass";
+    write_types(filename, print_mass_type);
+    printf("Mass Types Generated at: %s\n", filename);
+  }
   return 0;
 }

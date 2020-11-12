@@ -1,0 +1,20 @@
+Mass_Operand_Type_None :: 0
+Mass_Operand_Type_Any :: 1
+Mass_Operand_Type_Eflags :: 2
+Mass_Operand_Type_Register :: 3
+Mass_Operand_Type_Xmm :: 4
+Mass_Operand_Type_Immediate_8 :: 5
+Mass_Operand_Type_Immediate_16 :: 6
+Mass_Operand_Type_Immediate_32 :: 7
+Mass_Operand_Type_Immediate_64 :: 8
+Mass_Operand_Type_Memory_Indirect :: 9
+Mass_Operand_Type_Sib :: 10
+Mass_Operand_Type_RIP_Relative :: 11
+Mass_Operand_Type_RIP_Relative_Import :: 12
+Mass_Operand_Type_Label_32 :: 13
+
+Mass_Label :: struct {
+  resolved : bool
+  target_rva : u32
+}
+
