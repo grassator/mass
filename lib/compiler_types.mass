@@ -13,8 +13,8 @@ Mass_Operand_Type_RIP_Relative :: 11
 Mass_Operand_Type_RIP_Relative_Import :: 12
 Mass_Operand_Type_Label_32 :: 13
 
-Mass_Label :: struct {
-  resolved : bool
-  target_rva : u32
+Mass_Parse_Error :: struct {
+  message : Slice
+  location : Source_Location
 }
 

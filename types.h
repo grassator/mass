@@ -1,4 +1,12 @@
-typedef enum {
+// Forward declarations
+
+typedef enum Operand_Type Operand_Type;
+typedef struct Parse_Error Parse_Error;
+typedef struct Parse_Result Parse_Result;
+
+// Type Definitions
+
+typedef enum Operand_Type {
   Operand_Type_None = 0,
   Operand_Type_Any = 1,
   Operand_Type_Eflags = 2,
@@ -15,10 +23,25 @@ typedef enum {
   Operand_Type_Label_32 = 13,
 } Operand_Type;
 
+typedef struct Parse_Error {
+  Slice message;
+  Source_Location location;
+} Parse_Error;
+typedef dyn_array_type(Parse_Error) Array_Parse_Error;
+typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
+
+typedef enum {
+  Parse_Result_Tag_Success = 0,
+  Parse_Result_Tag_Error = 1,
+} Parse_Result_Tag;
+
 typedef struct {
-  bool resolved;
-  u32 target_rva;
-} Label;
-typedef dyn_array_type(Label) Array_Label;
-typedef dyn_array_type(Label *) Array_Label_Ptr;
+  list Array_Parse_Error;
+} Parse_Result_Error;
+typedef struct Parse_Result {
+  Parse_Result_Tag tag;
+  Parse_Result_Error Error;
+} Parse_Result;
+typedef dyn_array_type(Parse_Result) Array_Parse_Result;
+typedef dyn_array_type(Parse_Result *) Array_Parse_Result_Ptr;
 
