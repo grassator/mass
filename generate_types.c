@@ -57,7 +57,11 @@ print_c_type(
         Struct_Item *item = &type->struct_.items[i];
         fprintf(file, "  %s %s;\n", item->type, item->name);
       }
-      fprintf(file, "} %s;\n\n", type->struct_.name);
+      fprintf(file, "} %s;\n", type->struct_.name);
+      fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n",
+        type->struct_.name, type->struct_.name);
+      fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n\n",
+        type->struct_.name, type->struct_.name);
       break;
     }
     case Type_Tag_Enum: {

@@ -19,4 +19,6 @@ typedef struct {
   bool resolved;
   u32 target_rva;
 } Label;
+typedef dyn_array_type(Label) Array_Label;
+typedef dyn_array_type(Label *) Array_Label_Ptr;
 
