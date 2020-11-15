@@ -1447,13 +1447,13 @@ token_rewrite_negative_literal(
   Value *result = value_any();
   token_force_value(program, integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
-    result->operand.imm8 = -result->operand.imm8;
+    result->operand.s8 = -result->operand.s8;
   } else if (result->operand.type == Operand_Type_Immediate_16) {
-    result->operand.imm16 = -result->operand.imm16;
+    result->operand.s16 = -result->operand.s16;
   } else if (result->operand.type == Operand_Type_Immediate_32) {
-    result->operand.imm32 = -result->operand.imm32;
+    result->operand.s32 = -result->operand.s32;
   } else if (result->operand.type == Operand_Type_Immediate_64) {
-    result->operand.imm64 = -result->operand.imm64;
+    result->operand.s64 = -result->operand.s64;
   } else {
     panic("Internal error, expected an immediate");
   }

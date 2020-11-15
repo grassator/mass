@@ -521,7 +521,7 @@ spec("source") {
       scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
     check(status->descriptor->type == Descriptor_Type_Integer);
     check(status->operand.type == Operand_Type_Immediate_8);
-    check(status->operand.imm8 == 42);
+    check(status->operand.s8 == 42);
   }
 
   it("should be able to return structs while accepting other arguments") {

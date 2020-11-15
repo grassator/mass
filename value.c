@@ -184,19 +184,19 @@ print_operand(
       break;
     }
     case Operand_Type_Immediate_8: {
-      printf("imm8(0x%02x)", operand->imm8);
+      printf("imm8(0x%02x)", operand->s8);
       break;
     }
     case Operand_Type_Immediate_16: {
-      printf("imm16(0x%04x)", operand->imm16);
+      printf("imm16(0x%04x)", operand->s16);
       break;
     }
     case Operand_Type_Immediate_32: {
-      printf("imm32(0x%08x)", operand->imm32);
+      printf("imm32(0x%08x)", operand->s32);
       break;
     }
     case Operand_Type_Immediate_64: {
-      printf("imm64(0x%016llx)", operand->imm64);
+      printf("imm64(0x%016llx)", operand->s64);
       break;
     }
     case Operand_Type_Sib:
@@ -321,7 +321,7 @@ imm8(
   return (const Operand) {
     .type = Operand_Type_Immediate_8,
     .byte_size = 1,
-    .imm8 = value
+    .s8 = value
   };
 }
 
@@ -332,7 +332,7 @@ imm16(
   return (const Operand) {
     .type = Operand_Type_Immediate_16,
     .byte_size = 2,
-    .imm16 = value
+    .s16 = value
   };
 }
 
@@ -343,7 +343,7 @@ imm32(
   return (const Operand) {
     .type = Operand_Type_Immediate_32,
     .byte_size = 4,
-    .imm32 = value
+    .s32 = value
   };
 }
 
@@ -354,7 +354,7 @@ imm64(
   return (const Operand) {
     .type = Operand_Type_Immediate_64,
     .byte_size = 8,
-    .imm64 = value
+    .s64 = value
   };
 }
 
@@ -467,10 +467,10 @@ s64
 operand_immediate_as_s64(
   Operand *operand
 ) {
-  if (operand->type == Operand_Type_Immediate_8) return operand->imm8;
-  if (operand->type == Operand_Type_Immediate_16) return operand->imm16;
-  if (operand->type == Operand_Type_Immediate_32) return operand->imm32;
-  if (operand->type == Operand_Type_Immediate_64) return operand->imm64;
+  if (operand->type == Operand_Type_Immediate_8) return operand->s8;
+  if (operand->type == Operand_Type_Immediate_16) return operand->s16;
+  if (operand->type == Operand_Type_Immediate_32) return operand->s32;
+  if (operand->type == Operand_Type_Immediate_64) return operand->s64;
   assert(!"Expected and immediate operand");
   return 0;
 }
@@ -516,16 +516,16 @@ operand_equal(
       return a->compare_type == b->compare_type;
     }
     case Operand_Type_Immediate_8: {
-      return a->imm8 == b->imm8;
+      return a->s8 == b->s8;
     }
     case Operand_Type_Immediate_16: {
-      return a->imm16 == b->imm16;
+      return a->s16 == b->s16;
     }
     case Operand_Type_Immediate_32: {
-      return a->imm32 == b->imm32;
+      return a->s32 == b->s32;
     }
     case Operand_Type_Immediate_64: {
-      return a->imm64 == b->imm64;
+      return a->s64 == b->s64;
     }
     case Operand_Type_Label_32: {
       return a->label32.value == b->label32.value;

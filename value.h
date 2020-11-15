@@ -146,10 +146,10 @@ typedef struct {
   u32 byte_size;
   union {
     Register reg;
-    s8 imm8;
-    s16 imm16;
-    s32 imm32;
-    s64 imm64;
+    s8 s8;
+    s16 s16;
+    s32 s32;
+    s64 s64;
     Label_Index label32;
     Operand_Memory_Indirect indirect;
     Operand_Sib sib;
@@ -266,6 +266,7 @@ typedef struct {
 
 typedef struct {
   u32 byte_size;
+  bool is_signed;
 } Descriptor_Integer;
 
 typedef struct {
@@ -289,19 +290,19 @@ typedef struct Descriptor {
 
 Descriptor descriptor_s8 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1 },
+  .integer = { .byte_size = 1, .is_signed = true },
 };
 Descriptor descriptor_s16 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2 },
+  .integer = { .byte_size = 2, .is_signed = true },
 };
 Descriptor descriptor_s32 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4 },
+  .integer = { .byte_size = 4, .is_signed = true },
 };
 Descriptor descriptor_s64 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8 },
+  .integer = { .byte_size = 8, .is_signed = true },
 };
 Descriptor descriptor_void = {
   .type = Descriptor_Type_Void,
