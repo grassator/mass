@@ -286,9 +286,10 @@ encode_instruction(
     for (u32 operand_index = 0; operand_index < operand_count; ++operand_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[operand_index];
       Operand *operand = &instruction->assembly.operands[operand_index];
+      u32 encoding_size = s32_to_u32(operand_encoding->size);
 
       if (operand_encoding->size != Operand_Size_Any) {
-        if (operand->byte_size != s32_to_u32(operand_encoding->size)) {
+        if (operand->byte_size != encoding_size) {
           encoding = 0;
           break;
         }
@@ -386,29 +387,11 @@ encode_instruction(
         continue;
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
-        Operand_Size encoding_size = operand_encoding->size;
-        if (operand->type == Operand_Type_Immediate_8 && encoding_size == Operand_Size_8) {
+        if (operand_is_immediate(operand)) {
+          assert(encoding_size == operand->byte_size);
           continue;
-        }
-        if (
-          operand->type == Operand_Type_Label_32 &&
-          encoding_size == Operand_Size_32
-        ) {
-          continue;
-        }
-        if (
-          operand->type == Operand_Type_Immediate_16 &&
-          encoding_size == Operand_Size_16
-        ) {
-          continue;
-        }
-        if (
-          operand->type == Operand_Type_Immediate_32 &&
-          encoding_size == Operand_Size_32
-        ) {
-          continue;
-        }
-        if (operand->type == Operand_Type_Immediate_64 && encoding_size == Operand_Size_64) {
+        } else if (operand->type == Operand_Type_Label_32) {
+          assert(encoding_size == Operand_Size_32);
           continue;
         }
       }
