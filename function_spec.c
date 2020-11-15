@@ -160,8 +160,8 @@ spec("function") {
     it("should use appropriate setCC instruction when moving from eflags") {
       struct { Compare_Type compare_type; const X64_Mnemonic *mnemonic; } tests[] = {
         { Compare_Type_Equal, sete },
-        { Compare_Type_Less, setl },
-        { Compare_Type_Greater_Equal, setge },
+        { Compare_Type_Signed_Less, setl },
+        { Compare_Type_Signed_Greater_Equal, setge },
       };
       for (u64 i = 0; i < countof(tests); ++i) {
         dyn_array_clear(builder->code_block.instructions);

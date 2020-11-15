@@ -1155,6 +1155,28 @@ slice_parse_s64(
   return integer;
 }
 
+s64
+slice_parse_u64(
+  Slice slice,
+  bool *ok
+) {
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+  u64 integer = 0;
+  u64 multiplier = 1;
+  for (s64 index = slice.length - 1; index >= 0; --index) {
+    u8 digit = slice.bytes[index];
+    if (digit >= '0' && digit <= '9') {
+      integer += (digit - '0') * multiplier;
+      multiplier *= 10;
+    } else {
+      *ok = false;
+      return 0;
+    }
+  }
+  return integer;
+}
+
 s8
 hex_parse_digit(
   s8 byte,

@@ -32,6 +32,8 @@ typedef s64 (*fn_type_s64_s64_s64_s64_s64_to_s64)(s64, s64, s64, s64, s64);
 typedef s64 (*fn_type_s64_s64_s64_s64_s64_s64_to_s64)(s64, s64, s64, s64, s64, s64);
 typedef s32 (*fn_type__void_to_s32__to_s32)(fn_type_void_to_s32);
 
+typedef u8 (*fn_type_void_to_u8)(void);
+
 typedef struct {
   s64 x;
   s64 y;
@@ -581,6 +583,24 @@ spec("source") {
     );
     const char *string = value_as_function(checker, fn_type_void_to_const_charp)();
     check(strcmp(string, "test") == 0);
+  }
+
+  it("should be able to return unsigned integer literals") {
+    test_program_inline_source(
+      "return_200 :: () -> (u8) { 200 }",
+      return_200
+    );
+    fn_type_void_to_u8 checker = value_as_function(return_200, fn_type_void_to_u8);
+    check(checker() == 200);
+  }
+
+  it("should use correct EFLAGS values when dealing with unsigned integers") {
+    test_program_inline_source(
+      "test :: () -> (u8) { x : u8 = 200; x < 0 }",
+      test
+    );
+    fn_type_void_to_u8 checker = value_as_function(test, fn_type_void_to_u8);
+    check(checker() == false);
   }
 
   it("should parse and correctly deal with 16 bit values") {

@@ -894,7 +894,7 @@ token_force_value(
   switch(token->type) {
     case Token_Type_Integer: {
       bool ok = false;
-      s64 number = slice_parse_s64(token->source, &ok);
+      u64 number = slice_parse_u64(token->source, &ok);
       if (!ok) {
         program_error_builder(program, token->location) {
           program_error_append_literal("Invalid integer literal: ");
@@ -902,7 +902,7 @@ token_force_value(
         }
         return;
       }
-      Value *immediate = value_from_signed_immediate(number);
+      Value *immediate = value_from_unsigned_immediate(number);
       move_value(builder, &token->location, result_value, immediate);
       return;
     }
@@ -2345,9 +2345,9 @@ token_rewrite_compare(
     case 1: {
       s8 byte1 = operator->source.bytes[0];
       if (byte1 == '<') {
-        compare_type = Compare_Type_Less;
+        compare_type = Compare_Type_Signed_Less;
       } else if (byte1 == '>') {
-        compare_type = Compare_Type_Greater;
+        compare_type = Compare_Type_Signed_Greater;
       } else {
         return 0;
       }
@@ -2357,9 +2357,9 @@ token_rewrite_compare(
       s8 byte1 = operator->source.bytes[0];
       s8 byte2 = operator->source.bytes[1];
       if (byte1 == '<' && byte2 == '=') {
-        compare_type = Compare_Type_Less_Equal;
+        compare_type = Compare_Type_Signed_Less_Equal;
       } else if (byte1 == '>' && byte2 == '=') {
-        compare_type = Compare_Type_Greater_Equal;
+        compare_type = Compare_Type_Signed_Greater_Equal;
       } else if (byte1 == '=' && byte2 == '=') {
         compare_type = Compare_Type_Equal;
       } else if (byte1 == '!' && byte2 == '=') {
@@ -2379,6 +2379,110 @@ token_rewrite_compare(
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
+
+  // FIXME add implicit unsigned to signed conversion
+  if (
+    lhs_value->descriptor->type != Descriptor_Type_Integer ||
+    rhs_value->descriptor->type != Descriptor_Type_Integer
+  ) {
+    panic("FIXME handle errors here");
+  }
+
+  if (lhs_value->descriptor->integer.is_signed != rhs_value->descriptor->integer.is_signed) {
+    // FIXME solve generally
+    if (!rhs_value->descriptor->integer.is_signed && operand_is_immediate(&rhs_value->operand)) {
+      switch(lhs_value->operand.byte_size) {
+        case 1: {
+          if (u8_fits_into_s8(rhs_value->operand.u8)) {
+            Value *adjusted = temp_allocate(Value);
+            *adjusted = *rhs_value;
+            adjusted->descriptor = &descriptor_s8;
+            rhs_value = adjusted;
+          } else {
+            panic("FIXME report immediate overflow");
+          }
+          break;
+        }
+        case 2: {
+          if (u16_fits_into_s16(rhs_value->operand.u16)) {
+            Value *adjusted = temp_allocate(Value);
+            *adjusted = *rhs_value;
+            adjusted->descriptor = &descriptor_s16;
+            rhs_value = adjusted;
+          } else {
+            panic("FIXME report immediate overflow");
+          }
+          break;
+        }
+        case 4: {
+          if (u32_fits_into_s32(rhs_value->operand.u32)) {
+            Value *adjusted = temp_allocate(Value);
+            *adjusted = *rhs_value;
+            adjusted->descriptor = &descriptor_s32;
+            rhs_value = adjusted;
+          } else {
+            panic("FIXME report immediate overflow");
+          }
+          break;
+        }
+        case 8: {
+          if (u64_fits_into_s64(rhs_value->operand.u64)) {
+            Value *adjusted = temp_allocate(Value);
+            *adjusted = *rhs_value;
+            adjusted->descriptor = &descriptor_s64;
+            rhs_value = adjusted;
+          } else {
+            panic("FIXME report immediate overflow");
+          }
+          break;
+        }
+        default: {
+          panic("Internal Error: Unexpected integer size");
+          break;
+        }
+      }
+    } else {
+      panic("FIXME handle errors here");
+    }
+  }
+
+  if (!lhs_value->descriptor->integer.is_signed) {
+    switch(compare_type) {
+      case Compare_Type_Equal:
+      case Compare_Type_Not_Equal: {
+        break;
+      }
+
+      case Compare_Type_Unsigned_Below:
+      case Compare_Type_Unsigned_Below_Equal:
+      case Compare_Type_Unsigned_Above:
+      case Compare_Type_Unsigned_Above_Equal: {
+        panic("Internal error. Expected to parse operators as signed compares");
+        break;
+      }
+
+      case Compare_Type_Signed_Less: {
+        compare_type = Compare_Type_Unsigned_Below;
+        break;
+      }
+      case Compare_Type_Signed_Less_Equal: {
+        compare_type = Compare_Type_Unsigned_Below_Equal;
+        break;
+      }
+      case Compare_Type_Signed_Greater: {
+        compare_type = Compare_Type_Unsigned_Above;
+        break;
+      }
+      case Compare_Type_Signed_Greater_Equal: {
+        compare_type = Compare_Type_Unsigned_Above_Equal;
+        break;
+      }
+      default: {
+        assert(!"Unsupported comparison");
+      }
+    }
+  }
+
   compare(compare_type, builder, &operator->location, result_value, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(operator, result_value));
   return true;

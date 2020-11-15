@@ -109,19 +109,37 @@ move_value(
         push_instruction(instructions, location, (Instruction) {.assembly = {setne, {temp->operand, source->operand}}});
         break;
       }
-      case Compare_Type_Less: {
+
+      case Compare_Type_Unsigned_Below: {
+        push_instruction(instructions, location, (Instruction) {.assembly = {setb, {temp->operand, source->operand}}});
+        break;
+      }
+      case Compare_Type_Unsigned_Below_Equal: {
+        push_instruction(instructions, location, (Instruction) {.assembly = {setbe, {temp->operand, source->operand}}});
+        break;
+      }
+      case Compare_Type_Unsigned_Above: {
+        push_instruction(instructions, location, (Instruction) {.assembly = {seta, {temp->operand, source->operand}}});
+        break;
+      }
+      case Compare_Type_Unsigned_Above_Equal: {
+        push_instruction(instructions, location, (Instruction) {.assembly = {setae, {temp->operand, source->operand}}});
+        break;
+      }
+
+      case Compare_Type_Signed_Less: {
         push_instruction(instructions, location, (Instruction) {.assembly = {setl, {temp->operand, source->operand}}});
         break;
       }
-      case Compare_Type_Less_Equal: {
+      case Compare_Type_Signed_Less_Equal: {
         push_instruction(instructions, location, (Instruction) {.assembly = {setle, {temp->operand, source->operand}}});
         break;
       }
-      case Compare_Type_Greater: {
+      case Compare_Type_Signed_Greater: {
         push_instruction(instructions, location, (Instruction) {.assembly = {setg, {temp->operand, source->operand}}});
         break;
       }
-      case Compare_Type_Greater_Equal: {
+      case Compare_Type_Signed_Greater_Equal: {
         push_instruction(instructions, location, (Instruction) {.assembly = {setge, {temp->operand, source->operand}}});
         break;
       }
@@ -605,19 +623,37 @@ make_if(
           push_instruction(instructions, location, (Instruction) {.assembly = {je, {label32(label), value->operand, 0}}});
           break;
         }
-        case Compare_Type_Less: {
+
+        case Compare_Type_Unsigned_Below: {
+          push_instruction(instructions, location, (Instruction) {.assembly = {jae, {label32(label), value->operand, 0}}});
+          break;
+        }
+        case Compare_Type_Unsigned_Below_Equal: {
+          push_instruction(instructions, location, (Instruction) {.assembly = {ja, {label32(label), value->operand, 0}}});
+          break;
+        }
+        case Compare_Type_Unsigned_Above: {
+          push_instruction(instructions, location, (Instruction) {.assembly = {jbe, {label32(label), value->operand, 0}}});
+          break;
+        }
+        case Compare_Type_Unsigned_Above_Equal: {
+          push_instruction(instructions, location, (Instruction) {.assembly = {jb, {label32(label), value->operand, 0}}});
+          break;
+        }
+
+        case Compare_Type_Signed_Less: {
           push_instruction(instructions, location, (Instruction) {.assembly = {jge, {label32(label), value->operand, 0}}});
           break;
         }
-        case Compare_Type_Less_Equal: {
+        case Compare_Type_Signed_Less_Equal: {
           push_instruction(instructions, location, (Instruction) {.assembly = {jg, {label32(label), value->operand, 0}}});
           break;
         }
-        case Compare_Type_Greater: {
+        case Compare_Type_Signed_Greater: {
           push_instruction(instructions, location, (Instruction) {.assembly = {jle, {label32(label), value->operand, 0}}});
           break;
         }
-        case Compare_Type_Greater_Equal: {
+        case Compare_Type_Signed_Greater_Equal: {
           push_instruction(instructions, location, (Instruction) {.assembly = {jl, {label32(label), value->operand, 0}}});
           break;
         }
@@ -981,19 +1017,37 @@ compare(
       maybe_constant_fold(builder, location, result_value, a, b, !=);
       break;
     }
-    case Compare_Type_Less: {
+
+    case Compare_Type_Unsigned_Below: {
       maybe_constant_fold(builder, location, result_value, a, b, <);
       break;
     }
-    case Compare_Type_Greater: {
-      maybe_constant_fold(builder, location, result_value, a, b, >);
-      break;
-    }
-    case Compare_Type_Less_Equal: {
+    case Compare_Type_Unsigned_Below_Equal: {
       maybe_constant_fold(builder, location, result_value, a, b, <=);
       break;
     }
-    case Compare_Type_Greater_Equal: {
+    case Compare_Type_Unsigned_Above: {
+      maybe_constant_fold(builder, location, result_value, a, b, >);
+      break;
+    }
+    case Compare_Type_Unsigned_Above_Equal: {
+      maybe_constant_fold(builder, location, result_value, a, b, >=);
+      break;
+    }
+
+    case Compare_Type_Signed_Less: {
+      maybe_constant_fold(builder, location, result_value, a, b, <);
+      break;
+    }
+    case Compare_Type_Signed_Less_Equal: {
+      maybe_constant_fold(builder, location, result_value, a, b, <=);
+      break;
+    }
+    case Compare_Type_Signed_Greater: {
+      maybe_constant_fold(builder, location, result_value, a, b, >);
+      break;
+    }
+    case Compare_Type_Signed_Greater_Equal: {
       maybe_constant_fold(builder, location, result_value, a, b, >=);
       break;
     }

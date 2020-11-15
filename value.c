@@ -747,6 +747,86 @@ value_from_s8_internal(
 
 #define value_from_s8(...) value_from_s8_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
+// FIXME turn these into macros
+
+Value *
+value_from_u64_internal(
+  Compiler_Source_Location compiler_source_location,
+  u64 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = &descriptor_u64,
+    .operand = {
+      .type = Operand_Type_Immediate_64,
+      .byte_size = 8,
+      .u64 = integer,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+#define value_from_u64(...) value_from_u64_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+Value *
+value_from_u32_internal(
+  Compiler_Source_Location compiler_source_location,
+  u32 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = &descriptor_u32,
+    .operand = {
+      .type = Operand_Type_Immediate_32,
+      .byte_size = 4,
+      .u32 = integer,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+#define value_from_u32(...) value_from_u32_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+Value *
+value_from_u16_internal(
+  Compiler_Source_Location compiler_source_location,
+  u16 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = &descriptor_u16,
+    .operand = {
+      .type = Operand_Type_Immediate_16,
+      .byte_size = 2,
+      .u16 = integer,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+#define value_from_u16(...) value_from_u16_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+Value *
+value_from_u8_internal(
+  Compiler_Source_Location compiler_source_location,
+  u8 integer
+) {
+  Value *result = temp_allocate(Value);
+  *result = (Value) {
+    .descriptor = &descriptor_u8,
+    .operand = {
+      .type = Operand_Type_Immediate_8,
+      .byte_size = 1,
+      .u8 = integer,
+    },
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+#define value_from_u8(...) value_from_u8_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+
+
 inline Value *
 value_from_signed_immediate_internal(
   Compiler_Source_Location compiler_source_location,
@@ -765,6 +845,25 @@ value_from_signed_immediate_internal(
 }
 #define value_from_signed_immediate(...)\
   value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+inline Value *
+value_from_unsigned_immediate_internal(
+  Compiler_Source_Location compiler_source_location,
+  u64 value
+) {
+  if (u64_fits_into_u8(value)) {
+    return value_from_u8_internal(compiler_source_location, (u8) value);
+  }
+  if (u64_fits_into_u16(value)) {
+    return value_from_u16_internal(compiler_source_location, (u16) value);
+  }
+  if (u64_fits_into_u32(value)) {
+    return value_from_u32_internal(compiler_source_location, (u32) value);
+  }
+  return value_from_u64_internal(compiler_source_location, value);
+}
+#define value_from_unsigned_immediate(...)\
+  value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Value *
 value_byte_size_internal(
@@ -1127,6 +1226,11 @@ program_init(
   scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
   scope_define_value(program->global_scope, slice_literal("s16"), type_s16_value);
   scope_define_value(program->global_scope, slice_literal("s8"), type_s8_value);
+
+  scope_define_value(program->global_scope, slice_literal("u64"), type_u64_value);
+  scope_define_value(program->global_scope, slice_literal("u32"), type_u32_value);
+  scope_define_value(program->global_scope, slice_literal("u16"), type_u16_value);
+  scope_define_value(program->global_scope, slice_literal("u8"), type_u8_value);
   return program;
 };
 

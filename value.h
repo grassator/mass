@@ -135,10 +135,16 @@ typedef struct {
 typedef enum {
   Compare_Type_Equal = 1,
   Compare_Type_Not_Equal,
-  Compare_Type_Less,
-  Compare_Type_Less_Equal,
-  Compare_Type_Greater,
-  Compare_Type_Greater_Equal,
+
+  Compare_Type_Unsigned_Below,
+  Compare_Type_Unsigned_Below_Equal,
+  Compare_Type_Unsigned_Above,
+  Compare_Type_Unsigned_Above_Equal,
+
+  Compare_Type_Signed_Less,
+  Compare_Type_Signed_Less_Equal,
+  Compare_Type_Signed_Greater,
+  Compare_Type_Signed_Greater_Equal,
 } Compare_Type;
 
 typedef struct {
@@ -150,6 +156,10 @@ typedef struct {
     s16 s16;
     s32 s32;
     s64 s64;
+    u8 u8;
+    u16 u16;
+    u32 u32;
+    u64 u64;
     Label_Index label32;
     Operand_Memory_Indirect indirect;
     Operand_Sib sib;
@@ -304,6 +314,26 @@ Descriptor descriptor_s64 = {
   .type = { Descriptor_Type_Integer },
   .integer = { .byte_size = 8, .is_signed = true },
 };
+
+
+Descriptor descriptor_u8 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 1, .is_signed = false },
+};
+Descriptor descriptor_u16 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 2, .is_signed = false },
+};
+Descriptor descriptor_u32 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 4, .is_signed = false },
+};
+Descriptor descriptor_u64 = {
+  .type = { Descriptor_Type_Integer },
+  .integer = { .byte_size = 8, .is_signed = false },
+};
+
+
 Descriptor descriptor_void = {
   .type = Descriptor_Type_Void,
 };
@@ -319,59 +349,32 @@ Descriptor descriptor_f64 = {
   .integer = { .byte_size = 8 },
 };
 
+#define define_type_value(_TYPE_)\
+  Value *type_##_TYPE_##_value = &(Value) {\
+    .descriptor = &(Descriptor) {\
+      .type = Descriptor_Type_Type,\
+      .type_descriptor = &descriptor_##_TYPE_,\
+    },\
+    .operand = {.type = Operand_Type_None },\
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
+  }
+
+define_type_value(s64);
+define_type_value(s32);
+define_type_value(s16);
+define_type_value(s8);
+
+define_type_value(u64);
+define_type_value(u32);
+define_type_value(u16);
+define_type_value(u8);
+
+define_type_value(f64);
+define_type_value(f32);
+
 Value void_value = {
   .descriptor = &descriptor_void,
   .operand = { .type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-
-Value *type_s64_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s64,
-  },
-  .operand = {.type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-Value *type_s32_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s32,
-  },
-  .operand = {.type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-Value *type_s16_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s16,
-  },
-  .operand = {.type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-Value *type_s8_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_s8,
-  },
-  .operand = {.type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-
-Value *type_f64_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_f64,
-  },
-  .operand = {.type = Operand_Type_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-Value *type_f32_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = &descriptor_f32,
-  },
-  .operand = {.type = Operand_Type_None },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
