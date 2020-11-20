@@ -1982,7 +1982,7 @@ token_match_label(
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
   Token_Match_End();
 
-  Label_Index label = make_label(program);
+  Label_Index label = make_label(program, Section_Code);
   push_instruction(
     &builder->code_block.instructions, &keyword->location,
     (Instruction) {.type = Instruction_Type_Label, .label = label }

@@ -124,7 +124,8 @@ encode_rdata_section(
     lib->rva = get_rva();
     for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
       Import_Symbol *fn = dyn_array_get(lib->symbols, i);
-      fn->offset_in_data = get_rva() - header->VirtualAddress;
+      u32 offset = get_rva() - header->VirtualAddress;
+      program_set_label_offset(program, fn->label32, offset);
       fixed_buffer_append_u64(buffer, fn->name_rva);
     }
 

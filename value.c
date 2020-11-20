@@ -206,7 +206,8 @@ print_operand(
       break;
     }
     case Operand_Type_RIP_Relative: {
-      printf("[.rdata + 0x%08llx]", operand->rip_offset_in_data);
+      // FIXME unify with label
+      printf("[.rdata + UNIMPLEMENTED]");
       break;
     }
     case Operand_Type_RIP_Relative_Import: {
@@ -296,10 +297,11 @@ define_xmm_register(xmm7, 0b111);
 
 inline Label_Index
 make_label(
-  Program *program
+  Program *program,
+  Section section
 ) {
   Label_Index index = {dyn_array_length(program->labels)};
-  dyn_array_push(program->labels, (Label) {0});
+  dyn_array_push(program->labels, (Label) {.section = section});
   return index;
 }
 
@@ -527,7 +529,9 @@ operand_equal(
     case Operand_Type_Immediate_64: {
       return a->s64 == b->s64;
     }
+    case Operand_Type_RIP_Relative:
     case Operand_Type_Label_32: {
+      // TODO figure out if need some other way to compare labels
       return a->label32.value == b->label32.value;
     }
     case Operand_Type_Xmm:
@@ -558,9 +562,6 @@ operand_equal(
         slice_equal(a->import.library_name, b->import.library_name) &&
         slice_equal(a->import.symbol_name, b->import.symbol_name)
       );
-    }
-    case Operand_Type_RIP_Relative: {
-      return a->rip_offset_in_data == b->rip_offset_in_data;
     }
   }
   panic("Unknown operand type");
@@ -625,15 +626,18 @@ value_global_internal(
   void *allocation =
     bucket_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
   s64 offset_in_data_section = bucket_buffer_pointer_to_offset(program->data_buffer, allocation);
-  assert(offset_in_data_section >= 0);
 
   Value *result = temp_allocate(Value);
+  Label_Index label_index = make_label(program, Section_Data);
+  Label *label = program_get_label(program, label_index);
+  label->offset_in_section = s64_to_u32(offset_in_data_section);
+
   *result = (Value) {
     .descriptor = descriptor,
     .operand = {
       .type = Operand_Type_RIP_Relative,
       .byte_size = byte_size,
-      .rip_offset_in_data = u64_to_s64(offset_in_data_section),
+      .label32 = label_index,
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -915,7 +919,9 @@ rip_value_pointer(
   Value *value
 ) {
   assert(value->operand.type == Operand_Type_RIP_Relative);
-  return bucket_buffer_offset_to_pointer(program->data_buffer, value->operand.rip_offset_in_data);
+  Label *label = program_get_label(program, value->operand.label32);
+  assert(label->section == Section_Data);
+  return bucket_buffer_offset_to_pointer(program->data_buffer, label->offset_in_section);
 }
 
 Value *
@@ -979,7 +985,8 @@ helper_value_as_function(
   assert(value->operand.type == Operand_Type_Label_32);
   assert(program->jit_buffer);
   Label *label = program_get_label(program, value->operand.label32);
-  s8 *target = program->jit_buffer->memory + program->code_base_rva + label->target_rva;
+  assert(label->section == Section_Code);
+  s8 *target = program->jit_buffer->memory + program->code_base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1380,6 +1387,30 @@ program_test_exception_handler(
 }
 
 void
+program_set_label_offset(
+  Program *program,
+  Label_Index label_index,
+  u32 offset_in_section
+) {
+  Label *label = program_get_label(program, label_index);
+  label->offset_in_section = offset_in_section;
+}
+
+u32
+program_resolve_label_to_rva(
+  const Program *program,
+  const Label *label
+) {
+  u32 section_base_rva = 0;
+  switch(label->section) {
+    case Section_Code: section_base_rva = program->code_base_rva; break;
+    case Section_Data: section_base_rva = program->data_base_rva; break;
+    default: panic("Unknown Section"); break;
+  }
+  return section_base_rva + label->offset_in_section;
+}
+
+void
 program_patch_labels(
   Program *program
 ) {
@@ -1389,8 +1420,12 @@ program_patch_labels(
     ++patch_index
   ) {
     Label_Location_Diff_Patch_Info *info = dyn_array_get(program->patch_info_array, patch_index);
-    Label *label = program_get_label(program, info->label);
-    s64 diff = (s64)label->target_rva - (s64)info->from_rva;
+    Label *target_label = program_get_label(program, info->target_label_index);
+
+    s64 from_rva = program_resolve_label_to_rva(program, &info->from);
+    s64 target_rva = program_resolve_label_to_rva(program, target_label);
+
+    s64 diff = target_rva - from_rva;
     *info->patch_target = s64_to_s32(diff);
   }
 }
@@ -1412,8 +1447,8 @@ program_jit(
         const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
-        symbol->offset_in_data =
-          u64_to_u32(bucket_buffer_append_u64(program->data_buffer, (u64)fn_address));
+        u64 offset = bucket_buffer_append_u64(program->data_buffer, (u64)fn_address);
+        program_set_label_offset(program, symbol->label32, u64_to_u32(offset));
       }
     }
   }
@@ -1570,10 +1605,11 @@ import_symbol(
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
+    Label_Index label = make_label(program, Section_Data);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .name_rva = 0xCCCCCCCC,
-      .offset_in_data = 0
+      .label32 = label,
     });
   }
 

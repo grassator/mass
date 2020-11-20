@@ -22,6 +22,11 @@ typedef enum {
 } Operand_Type;
 
 typedef enum {
+  Section_Code,
+  Section_Data,
+} Section;
+
+typedef enum {
   Register_A   = 0b0000,
   Register_C   = 0b0001,
   Register_D   = 0b0010,
@@ -99,21 +104,22 @@ typedef struct {
 } Label_Index;
 
 typedef struct {
-  Label_Index label;
-  s32 *patch_target;
-  s32 from_rva;
-} Label_Location_Diff_Patch_Info;
-typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
-
-typedef struct {
-  u32 target_rva;
+  Section section;
+  u32 offset_in_section;
 } Label;
 typedef dyn_array_type(Label) Array_Label;
 
 typedef struct {
+  Label_Index target_label_index;
+  Label from;
+  s32 *patch_target;
+} Label_Location_Diff_Patch_Info;
+typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
+
+typedef struct {
   Slice name;
   u32 name_rva;
-  u32 offset_in_data;
+  Label_Index label32;
 } Import_Symbol;
 typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
@@ -162,7 +168,6 @@ typedef struct {
     Label_Index label32;
     Operand_Memory_Indirect indirect;
     Operand_Sib sib;
-    s64 rip_offset_in_data;
     Operand_RIP_Relative_Import import;
     Compare_Type compare_type;
   };
@@ -583,8 +588,8 @@ typedef struct _Program {
   Array_Label_Location_Diff_Patch_Info patch_info_array;
   Value *entry_point;
   Array_Function_Builder functions;
-  s64 code_base_rva;
-  s64 data_base_rva;
+  u32 code_base_rva;
+  u32 data_base_rva;
   Scope *global_scope;
   Array_Parse_Error errors;
   bool is_stack_unwinding_in_progress;
@@ -618,6 +623,13 @@ program_jit(
 void
 program_patch_labels(
   Program *program
+);
+
+void
+program_set_label_offset(
+  Program *program,
+  Label_Index label_index,
+  u32 offset_in_section
 );
 
 #endif VALUE_H

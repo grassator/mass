@@ -182,18 +182,22 @@ encode_instruction_assembly(
   // we do not know what the diff should be before the immediate is
   // encoded as well. To solve this we store the patch locations and do
   // a loop over them after the instruction has been encoded.
-  s32 *rip_relative_patch = 0;
-  Label_Location_Diff_Patch_Info *immediate_label_location_diff_patch_info = 0;
+  Label_Location_Diff_Patch_Info *rip_relative_patch_info = 0;
+  Label_Location_Diff_Patch_Info *immediate_label_patch_info = 0;
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
     // :OperandNormalization
     if (operand->type == Operand_Type_RIP_Relative) {
-      s64 operand_rva = program->data_base_rva + operand->rip_offset_in_data;
+      s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
-      rip_relative_patch = fixed_buffer_allocate_unaligned(buffer, s32);
-      *rip_relative_patch = s64_to_s32(operand_rva);
+      rip_relative_patch_info =
+        dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+          .target_label_index = operand->label32,
+          .from = {.section = Section_Code},
+          .patch_target = patch_target,
+        });
     } else if (
       operand->type == Operand_Type_Memory_Indirect ||
       operand->type == Operand_Type_Sib
@@ -218,9 +222,10 @@ encode_instruction_assembly(
     if (operand->type == Operand_Type_Label_32) {
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
-      immediate_label_location_diff_patch_info =
+      immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          .label = operand->label32,
+          .target_label_index = operand->label32,
+          .from = {.section = Section_Code},
           .patch_target = patch_target,
         });
     } else if (operand->type == Operand_Type_Immediate_8) {
@@ -239,12 +244,12 @@ encode_instruction_assembly(
   instruction->encoded_byte_size = u64_to_u8(buffer->occupied - original_buffer_length);
 
   // :AfterInstructionPatch
-  s32 next_instruction_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
-  if (rip_relative_patch) {
-    *rip_relative_patch -= next_instruction_rva;
+  u32 next_instruction_offset = u64_to_u32(buffer->occupied);
+  if (rip_relative_patch_info) {
+    rip_relative_patch_info->from.offset_in_section = next_instruction_offset;
   }
-  if (immediate_label_location_diff_patch_info) {
-    immediate_label_location_diff_patch_info->from_rva = next_instruction_rva;
+  if (immediate_label_patch_info) {
+    immediate_label_patch_info->from.offset_in_section = next_instruction_offset;
   }
 }
 
@@ -257,7 +262,9 @@ encode_instruction(
   // TODO turn into a switch statement on type
   if (instruction->type == Instruction_Type_Label) {
     Label *label = program_get_label(program, instruction->label);
-    label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
+    label->section = Section_Code;
+    // FIXME do this somewhere program->code_base_rva +
+    label->offset_in_section = u64_to_u32(buffer->occupied);
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {
