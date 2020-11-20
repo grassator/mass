@@ -1390,7 +1390,6 @@ program_patch_labels(
   ) {
     Label_Location_Diff_Patch_Info *info = dyn_array_get(program->patch_info_array, patch_index);
     Label *label = program_get_label(program, info->label);
-    assert(label->resolved);
     s64 diff = (s64)label->target_rva - (s64)info->from_rva;
     *info->patch_target = s64_to_s32(diff);
   }

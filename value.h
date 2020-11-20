@@ -106,7 +106,6 @@ typedef struct {
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
 typedef struct {
-  bool resolved;
   u32 target_rva;
 } Label;
 typedef dyn_array_type(Label) Array_Label;

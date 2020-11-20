@@ -183,7 +183,6 @@ encode_instruction_assembly(
   // encoded as well. To solve this we store the patch locations and do
   // a loop over them after the instruction has been encoded.
   s32 *rip_relative_patch = 0;
-  s32 *immediate_label_patch = 0;
   Label_Location_Diff_Patch_Info *immediate_label_location_diff_patch_info = 0;
 
   // Write out displacement
@@ -217,22 +216,13 @@ encode_instruction_assembly(
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand->type == Operand_Type_Label_32) {
-      Label *label = program_get_label(program, operand->label32);
-      if (label->resolved) {
-        assert(!immediate_label_patch);
-        // :AfterInstructionPatch
-        immediate_label_patch = fixed_buffer_allocate_unaligned(buffer, s32);
-        *immediate_label_patch = s64_to_s32(label->target_rva);
-      } else {
-        s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
-        // :AfterInstructionPatch
-        immediate_label_location_diff_patch_info =
-          dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-            .label = operand->label32,
-            .patch_target = patch_target,
-          });
-      }
-
+      s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
+      // :AfterInstructionPatch
+      immediate_label_location_diff_patch_info =
+        dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+          .label = operand->label32,
+          .patch_target = patch_target,
+        });
     } else if (operand->type == Operand_Type_Immediate_8) {
       fixed_buffer_append_s8(buffer, operand->s8);
     } else if (operand->type == Operand_Type_Immediate_16) {
@@ -253,9 +243,6 @@ encode_instruction_assembly(
   if (rip_relative_patch) {
     *rip_relative_patch -= next_instruction_rva;
   }
-  if (immediate_label_patch) {
-    *immediate_label_patch -= next_instruction_rva;
-  }
   if (immediate_label_location_diff_patch_info) {
     immediate_label_location_diff_patch_info->from_rva = next_instruction_rva;
   }
@@ -271,7 +258,6 @@ encode_instruction(
   if (instruction->type == Instruction_Type_Label) {
     Label *label = program_get_label(program, instruction->label);
     label->target_rva = u64_to_s32(program->code_base_rva + buffer->occupied);
-    label->resolved = true;
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {
