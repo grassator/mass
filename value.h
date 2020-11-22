@@ -31,7 +31,7 @@ typedef struct {
   Bucket_Buffer *buffer;
   Slice name;
   u32 base_rva;
-  Section_Permissions permission;
+  Section_Permissions permissions;
 } Section;
 typedef dyn_array_type(Section *) Array_Section_Ptr;
 

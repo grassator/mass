@@ -1226,9 +1226,11 @@ program_init(
     .global_scope = scope_make(0),
     .data_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
+      .permissions = Section_Permissions_Read | Section_Permissions_Write,
     },
     .code_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
+      .permissions = Section_Permissions_Execute,
     },
   };
 
@@ -1428,6 +1430,26 @@ program_patch_labels(
   }
 }
 
+static DWORD
+win32_section_permissions_to_virtual_protect_flags(
+  Section_Permissions permissions
+) {
+  if (permissions & Section_Permissions_Execute) {
+    if (permissions & Section_Permissions_Write) {
+      return PAGE_EXECUTE_READWRITE;
+    } else if (permissions & Section_Permissions_Read) {
+      return PAGE_EXECUTE_READ;
+    }
+    return PAGE_EXECUTE;
+  }
+  if (permissions & Section_Permissions_Write) {
+    return PAGE_READWRITE;
+  } else if (permissions & Section_Permissions_Read) {
+    return PAGE_READONLY;
+  }
+  return PAGE_NOACCESS;
+}
+
 void
 program_jit(
   Program *program
@@ -1467,6 +1489,10 @@ program_jit(
   { // Copying and repointing the data segment into contiguous buffer
     void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
     bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
+    // Setup permissions for the data segment
+    DWORD win32_permissions =
+      win32_section_permissions_to_virtual_protect_flags(program->data_section.permissions);
+    VirtualProtect(global_data, global_data_size, win32_permissions, &(DWORD){0});
   }
 
   // Since we are writing to the same buffer both data segment and code segment,
@@ -1510,8 +1536,10 @@ program_jit(
   // and can patch all the label locations
   program_patch_labels(program);
 
-  // Making code executable
-  VirtualProtect(code_memory, code_segment_size, PAGE_EXECUTE_READ, &(DWORD){0});
+  // Setup permissions for the code segment
+  DWORD win32_permissions =
+    win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
+  VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
 
   if (!RtlAddFunctionTable(
     fn_exception_info, u64_to_u32(function_count), (s64) result_buffer->memory

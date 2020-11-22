@@ -1508,6 +1508,7 @@ token_rewrite_compile_time_eval(
     .data_section = program->data_section,
     .code_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
+      .permissions = Section_Permissions_Execute,
     }
   };
   Function_Builder *eval_builder = fn_begin(&eval_program);

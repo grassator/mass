@@ -251,6 +251,26 @@ encode_text_section(
   return result;
 }
 
+static DWORD
+win32_section_permissions_to_pe32_section_characteristics(
+  Section_Permissions permissions
+) {
+  DWORD result = 0;
+  if (permissions & Section_Permissions_Execute) {
+    // TODO What does CNT_CODE actually do?
+    result |= IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE;
+  } else {
+    // TODO What does initialized data actually do?
+    result |= IMAGE_SCN_CNT_INITIALIZED_DATA;
+  }
+  if (permissions & Section_Permissions_Write) {
+    result |= IMAGE_SCN_MEM_WRITE;
+  } else if (permissions & Section_Permissions_Read) {
+    result |= IMAGE_SCN_MEM_READ;
+  }
+  return result;
+}
+
 typedef enum {
   Executable_Type_Gui,
   Executable_Type_Cli,
@@ -271,7 +291,9 @@ write_executable(
       .VirtualAddress = 0,
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
-      .Characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_READ,
+      .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
+        program->data_section.permissions
+      ),
     },
     {
       .Name = ".text",
@@ -279,7 +301,9 @@ write_executable(
       .VirtualAddress = 0,
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
-      .Characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_EXECUTE,
+      .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
+        program->code_section.permissions
+      ),
     },
     {0}
   };
