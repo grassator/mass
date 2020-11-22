@@ -261,7 +261,7 @@ spec("source") {
     Parse_Error *error = dyn_array_get(result.errors, 0);
     check(slice_equal(error->location.filename, test_file_name));
     check(error->location.line == 1);
-    check(error->location.column == 4);
+    check(error->location.column == 4, "Expected 4, got %d", error->location.column);
     check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
   }
 

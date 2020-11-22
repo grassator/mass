@@ -291,13 +291,6 @@ tokenize(
       ch = '\n';
     }
 
-    if (ch == '\n') {
-      line++;
-      column = 1;
-    } else {
-      column++;
-    }
-
     retry: switch(state) {
       case Tokenizer_State_Default: {
         if (ch == '\n') {
@@ -429,6 +422,13 @@ tokenize(
         }
         break;
       }
+    }
+
+    if (ch == '\n') {
+      line++;
+      column = 0;
+    } else {
+      column++;
     }
   }
 
