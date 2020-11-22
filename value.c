@@ -298,7 +298,7 @@ define_xmm_register(xmm7, 0b111);
 inline Label_Index
 make_label(
   Program *program,
-  Section section
+  Section *section
 ) {
   Label_Index index = {dyn_array_length(program->labels)};
   dyn_array_push(program->labels, (Label) {.section = section});
@@ -624,11 +624,12 @@ value_global_internal(
   u32 byte_size = descriptor_byte_size(descriptor);
   u32 alignment = descriptor_alignment(descriptor);
   void *allocation =
-    bucket_buffer_allocate_bytes(program->data_buffer, byte_size, alignment);
-  s64 offset_in_data_section = bucket_buffer_pointer_to_offset(program->data_buffer, allocation);
+    bucket_buffer_allocate_bytes(program->data_section.buffer, byte_size, alignment);
+  s64 offset_in_data_section =
+    bucket_buffer_pointer_to_offset(program->data_section.buffer, allocation);
 
   Value *result = temp_allocate(Value);
-  Label_Index label_index = make_label(program, Section_Data);
+  Label_Index label_index = make_label(program, &program->data_section);
   Label *label = program_get_label(program, label_index);
   label->offset_in_section = s64_to_u32(offset_in_data_section);
 
@@ -920,8 +921,7 @@ rip_value_pointer(
 ) {
   assert(value->operand.type == Operand_Type_RIP_Relative);
   Label *label = program_get_label(program, value->operand.label32);
-  assert(label->section == Section_Data);
-  return bucket_buffer_offset_to_pointer(program->data_buffer, label->offset_in_section);
+  return bucket_buffer_offset_to_pointer(label->section->buffer, label->offset_in_section);
 }
 
 Value *
@@ -985,8 +985,8 @@ helper_value_as_function(
   assert(value->operand.type == Operand_Type_Label_32);
   assert(program->jit_buffer);
   Label *label = program_get_label(program, value->operand.label32);
-  assert(label->section == Section_Code);
-  s8 *target = program->jit_buffer->memory + program->code_base_rva + label->offset_in_section;
+  assert(label->section == &program->code_section);
+  s8 *target = program->jit_buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1218,13 +1218,18 @@ program_init(
   Program *program
 ) {
   *program = (Program) {
-    .data_buffer = bucket_buffer_make(.allocator = allocator_system),
     .labels = dyn_array_make(Array_Label, .capacity = 128),
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16),
     .errors = dyn_array_make(Array_Parse_Error, .capacity = 16),
     .global_scope = scope_make(0),
+    .data_section = {
+      .buffer = bucket_buffer_make(.allocator = allocator_system),
+    },
+    .code_section = {
+      .buffer = bucket_buffer_make(.allocator = allocator_system),
+    },
   };
 
   scope_define_value(program->global_scope, slice_literal("f64"), type_f64_value);
@@ -1249,9 +1254,8 @@ program_deinit(
     Import_Library *library = dyn_array_get(program->import_libraries, i);
     dyn_array_destroy(library->symbols);
   }
-  if (program->data_buffer) {
-    bucket_buffer_destroy(program->data_buffer);
-  }
+  bucket_buffer_destroy(program->data_section.buffer);
+  bucket_buffer_destroy(program->code_section.buffer);
   dyn_array_destroy(program->labels);
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
@@ -1396,18 +1400,12 @@ program_set_label_offset(
   label->offset_in_section = offset_in_section;
 }
 
-u32
+static inline u32
 program_resolve_label_to_rva(
   const Program *program,
   const Label *label
 ) {
-  u32 section_base_rva = 0;
-  switch(label->section) {
-    case Section_Code: section_base_rva = program->code_base_rva; break;
-    case Section_Data: section_base_rva = program->data_base_rva; break;
-    default: panic("Unknown Section"); break;
-  }
-  return section_base_rva + label->offset_in_section;
+  return label->section->base_rva + label->offset_in_section;
 }
 
 void
@@ -1447,7 +1445,7 @@ program_jit(
         const char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);
         assert(fn_address);
-        u64 offset = bucket_buffer_append_u64(program->data_buffer, (u64)fn_address);
+        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)fn_address);
         program_set_label_offset(program, symbol->label32, u64_to_u32(offset));
       }
     }
@@ -1455,7 +1453,7 @@ program_jit(
 
   u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
   u64 function_count = dyn_array_length(program->functions);
-  u64 global_data_size = u64_align(program->data_buffer->occupied, 16);
+  u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
   u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
   u64 data_segment_size = global_data_size + unwind_info_size;
   u64 program_size = data_segment_size + code_segment_size;
@@ -1468,16 +1466,14 @@ program_jit(
 
   { // Copying and repointing the data segment into contiguous buffer
     void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
-    bucket_buffer_copy_to_memory(program->data_buffer, global_data);
-    // Nobody should be trying to read or write to this temp buffer after compilation
-    program->data_buffer = 0;
+    bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
   }
 
   // Since we are writing to the same buffer both data segment and code segment,
   // and there is no weird file vs virtual address stuff going on like in PE32,
   // we can just use natural offsets and ignore the base RVA
-  program->data_base_rva = 0;
-  program->code_base_rva = 0;
+  program->data_section.base_rva = 0;
+  program->code_section.base_rva = 0;
 
   UNWIND_INFO *unwind_info_array = fixed_buffer_allocate_bytes(
     result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
@@ -1605,7 +1601,8 @@ import_symbol(
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
-    Label_Index label = make_label(program, Section_Data);
+    // FIXME move to a readonly section
+    Label_Index label = make_label(program, &program->data_section);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .name_rva = 0xCCCCCCCC,

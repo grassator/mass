@@ -289,14 +289,14 @@ fn_begin(
   Value *fn_value = temp_allocate(Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(make_label(program, Section_Code)),
+    .operand = label32(make_label(program, &program->code_section)),
   };
   Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .stack_reserve = 0,
     .descriptor = descriptor,
     .value = fn_value,
     .code_block = {
-      .end_label = make_label(program, Section_Code),
+      .end_label = make_label(program, &program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
     },
   });
@@ -436,8 +436,9 @@ fn_encode(
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand->type == Operand_Type_Label_32);
+  Label *label = program_get_label(program, operand->label32);
 
-  s64 code_base_rva = program->code_base_rva;
+  s64 code_base_rva = label->section->base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction_with_compiler_location(
@@ -605,7 +606,7 @@ make_if(
   Value *value
 ) {
   bool is_always_true = false;
-  Label_Index label = make_label(program, Section_Code);
+  Label_Index label = make_label(program, &program->code_section);
   if(operand_is_immediate(&value->operand)) {
     s64 imm = operand_immediate_as_s64(&value->operand);
     if (imm == 0) return label;
@@ -683,7 +684,7 @@ loop_start(
   Array_Instruction *instructions,
   const Source_Location *location
 ) {
-  Label_Index label_start = make_label(program, Section_Code);
+  Label_Index label_start = make_label(program, &program->code_section);
   push_instruction(instructions, location, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label_start
@@ -691,7 +692,7 @@ loop_start(
   return (Loop_Builder) {
     .done = false,
     .label_start = label_start,
-    .label_end = make_label(program, Section_Code),
+    .label_end = make_label(program, &program->code_section),
   };
 }
 
@@ -1258,7 +1259,7 @@ make_and(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
-  Label_Index label = make_label(program, Section_Code);
+  Label_Index label = make_label(program, &program->code_section);
 
   Label_Index else_label = make_if(program, instructions, location, a);
   {
@@ -1288,7 +1289,7 @@ make_or(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(builder, &descriptor_s8);
-  Label_Index label = make_label(program, Section_Code);
+  Label_Index label = make_label(program, &program->code_section);
 
   compare(Compare_Type_Equal, builder, location, result, a, value_from_s8(0));
   Label_Index else_label = make_if(program, instructions, location, result);

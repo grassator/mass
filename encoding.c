@@ -195,7 +195,7 @@ encode_instruction_assembly(
       rip_relative_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
           .target_label_index = operand->label32,
-          .from = {.section = Section_Code},
+          .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
     } else if (
@@ -225,7 +225,7 @@ encode_instruction_assembly(
       immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
           .target_label_index = operand->label32,
-          .from = {.section = Section_Code},
+          .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
     } else if (operand->type == Operand_Type_Immediate_8) {
@@ -262,8 +262,7 @@ encode_instruction(
   // TODO turn into a switch statement on type
   if (instruction->type == Instruction_Type_Label) {
     Label *label = program_get_label(program, instruction->label);
-    label->section = Section_Code;
-    // FIXME do this somewhere program->code_base_rva +
+    label->section = &program->code_section;
     label->offset_in_section = u64_to_u32(buffer->occupied);
     instruction->encoded_byte_size = 0;
     return;

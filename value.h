@@ -22,9 +22,18 @@ typedef enum {
 } Operand_Type;
 
 typedef enum {
-  Section_Code,
-  Section_Data,
+  Section_Permissions_Read    = 1 << 0,
+  Section_Permissions_Write   = 1 << 1,
+  Section_Permissions_Execute = 1 << 2,
+} Section_Permissions;
+
+typedef struct {
+  Bucket_Buffer *buffer;
+  Slice name;
+  u32 base_rva;
+  Section_Permissions permission;
 } Section;
+typedef dyn_array_type(Section *) Array_Section_Ptr;
 
 typedef enum {
   Register_A   = 0b0000,
@@ -104,7 +113,7 @@ typedef struct {
 } Label_Index;
 
 typedef struct {
-  Section section;
+  Section *section;
   u32 offset_in_section;
 } Label;
 typedef dyn_array_type(Label) Array_Label;
@@ -581,15 +590,14 @@ typedef struct {
 } Parse_Result;
 
 typedef struct _Program {
-  Bucket_Buffer *data_buffer;
   Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
   Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
   Value *entry_point;
   Array_Function_Builder functions;
-  u32 code_base_rva;
-  u32 data_base_rva;
+  Section data_section;
+  Section code_section;
   Scope *global_scope;
   Array_Parse_Error errors;
   bool is_stack_unwinding_in_progress;

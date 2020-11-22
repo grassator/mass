@@ -1497,14 +1497,18 @@ token_rewrite_compile_time_eval(
   Token_Matcher_State sub_state = {paren->children};
 
   Program eval_program = {
-    .data_buffer = program->data_buffer,
     .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
+    // FIXME this is probably broken now because code ones should point to a different section
     .labels = dyn_array_copy(Array_Label, program->labels),
     .patch_info_array =
       dyn_array_copy(Array_Label_Location_Diff_Patch_Info, program->patch_info_array),
     .functions = dyn_array_copy(Array_Function_Builder, program->functions),
     .global_scope = scope_make(program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),
+    .data_section = program->data_section,
+    .code_section = {
+      .buffer = bucket_buffer_make(.allocator = allocator_system),
+    }
   };
   Function_Builder *eval_builder = fn_begin(&eval_program);
   function_return_descriptor(&eval_builder->descriptor->function, &descriptor_void);
@@ -1982,7 +1986,7 @@ token_match_label(
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
   Token_Match_End();
 
-  Label_Index label = make_label(program, Section_Code);
+  Label_Index label = make_label(program, &program->code_section);
   push_instruction(
     &builder->code_block.instructions, &keyword->location,
     (Instruction) {.type = Instruction_Type_Label, .label = label }
