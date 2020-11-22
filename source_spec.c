@@ -91,7 +91,7 @@ spec("source") {
     Scope *root_scope = scope_make(0);
     scope_define_value(root_scope, slice_literal("test"), test);
     Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("test"));
-    check(dyn_array_length(*entries), 1);
+    check(dyn_array_length(*entries) == 1);
     Scope_Entry *entry = dyn_array_pop(*entries);
     check(entry->type == Scope_Entry_Type_Value);
     check(entry->value == test);
@@ -111,7 +111,7 @@ spec("source") {
     scope_define_value(scope_level_2, slice_literal("test"), level_2_test);
 
     Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("global"));
-    check(dyn_array_length(*entries), 1);
+    check(dyn_array_length(*entries) == 1);
     Scope_Entry *entry = dyn_array_pop(*entries);
     check(entry->type == Scope_Entry_Type_Value);
     check(entry->value == global);
@@ -248,8 +248,8 @@ spec("source") {
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
     check(slice_equal(error->location.filename, test_file_name));
-    check(error->location.line, 1);
-    check(error->location.column, 4);
+    check(error->location.line == 1);
+    check(error->location.column == 4);
     check(slice_equal(error->message, slice_literal("Unexpected end of file. Expected a closing brace.")));
   }
 
@@ -260,8 +260,8 @@ spec("source") {
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
     check(slice_equal(error->location.filename, test_file_name));
-    check(error->location.line, 1);
-    check(error->location.column, 4);
+    check(error->location.line == 1);
+    check(error->location.column == 4);
     check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
   }
 
