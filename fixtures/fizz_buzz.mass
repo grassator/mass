@@ -26,7 +26,7 @@ print :: (integer : s32) -> () {
   if (integer < 0) {
     start_index = 1
     buffer[0] = minus_code
-    integer = cast(s32, 0) - integer
+    integer = 0 - integer
   }
   while (index < count) {
     index = index + 1
