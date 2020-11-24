@@ -2466,6 +2466,7 @@ fixed_buffer_resizing_ensure_capacity(
     *new_buffer = **buffer;
     new_buffer->capacity = new_size_in_bytes;
     memcpy(new_buffer->memory, (*buffer)->memory, new_buffer->occupied);
+    fixed_buffer_destroy(*buffer);
     *buffer = new_buffer;
   }
   return *buffer;
