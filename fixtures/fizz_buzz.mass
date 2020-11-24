@@ -21,21 +21,21 @@ print :: (integer : s32) -> () {
   if (count == 0) {
     count = 1
   }
-  start_index : s32 = 0
   index : s32 = 0
   if (integer < 0) {
-    start_index = 1
     buffer[0] = minus_code
     integer = 0 - integer
+    index = 1
+    count = count + 1
   }
   while (index < count) {
-    index = index + 1
     digit_s32 := integer % 10
     digit := cast(s8, digit_s32)
-    buffer[start_index + count - index] = zero_code + digit
+    buffer[index] = zero_code + digit
     integer = integer / 10
+    index = index + 1
   }
-  WriteFile(GetStdHandle(-11), &buffer, start_index + count, 0, 0)
+  WriteFile(GetStdHandle(-11), &buffer, index, 0, 0)
 }
 
 fizz_buzz :: () -> () {
