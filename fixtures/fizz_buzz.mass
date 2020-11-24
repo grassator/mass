@@ -43,13 +43,13 @@ fizz_buzz :: () -> () {
   stdout_handle := GetStdHandle(-11)
   while (i < 100) {
     i = i + 1
-    print_number := 1
+    print_number := true
     if (i % 3 == 0) {
-      print_number = 0
+      print_number = false
       WriteFile(stdout_handle, "fizz", 4, 0, 0)
     }
     if (i % 5 == 0) {
-      print_number = 0
+      print_number = false
       WriteFile(stdout_handle, "buzz", 4, 0, 0)
     }
     if (print_number) {
