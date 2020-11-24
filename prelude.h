@@ -995,6 +995,12 @@ dyn_array_insert_internal(
     } \
   } while(0);
 
+#define dyn_array_push_uninitialized(_array_)\
+  (\
+    dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
+    &(_array_).data->items[(_array_).data->length++]\
+  )
+
 #define dyn_array_push(_array_, ...)\
   (\
     dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
@@ -1155,7 +1161,7 @@ slice_parse_s64(
   return integer;
 }
 
-s64
+u64
 slice_parse_u64(
   Slice slice,
   bool *ok
@@ -2436,6 +2442,35 @@ fixed_buffer_as_slice(
   };
 }
 
+static inline u64
+fixed_buffer_remaining_capacity(
+  Fixed_Buffer *buffer
+) {
+  return buffer->capacity - buffer->occupied;
+}
+
+static inline Fixed_Buffer *
+fixed_buffer_resizing_ensure_capacity(
+  Fixed_Buffer **buffer,
+  u64 size_in_bytes
+) {
+  if (fixed_buffer_remaining_capacity(*buffer) < size_in_bytes) {
+    u64 new_size_in_bytes = u64_min(
+      (*buffer)->capacity * 3 / 2,
+      (*buffer)->capacity + size_in_bytes
+    );
+    Fixed_Buffer *new_buffer = fixed_buffer_make(
+      .allocator = (*buffer)->allocator,
+      .capacity = new_size_in_bytes,
+    );
+    *new_buffer = **buffer;
+    new_buffer->capacity = new_size_in_bytes;
+    memcpy(new_buffer->memory, (*buffer)->memory, new_buffer->occupied);
+    *buffer = new_buffer;
+  }
+  return *buffer;
+}
+
 #define fixed_buffer_allocate_unaligned(_buffer_, _type_)\
   ((_type_ *)fixed_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
 
@@ -2447,6 +2482,12 @@ fixed_buffer_as_slice(
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline u64 fixed_buffer_append_##_type_(Fixed_Buffer *buffer, _type_ value) {\
+    _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    *result = value;\
+    return (s8 *)result - buffer->memory;\
+  }\
+  static inline u64 fixed_buffer_resizing_append_##_type_(Fixed_Buffer **buffer_pointer, _type_ value) {\
+    Fixed_Buffer *buffer = fixed_buffer_resizing_ensure_capacity(buffer_pointer, sizeof(_type_));\
     _type_ *result = fixed_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
     *result = value;\
     return (s8 *)result - buffer->memory;\
@@ -2463,6 +2504,15 @@ fixed_buffer_append_slice(
   void *target = fixed_buffer_allocate_bytes(buffer, slice.length, _Alignof(s8));
   memcpy(target, slice.bytes, slice.length);
   return (Slice) { .bytes = target, .length = slice.length, };
+}
+
+static inline Slice
+fixed_buffer_resizing_append_slice(
+  Fixed_Buffer **buffer_pointer,
+  Slice slice
+) {
+  Fixed_Buffer *buffer = fixed_buffer_resizing_ensure_capacity(buffer_pointer, slice.length);
+  return fixed_buffer_append_slice(buffer, slice);
 }
 
 static inline Slice
@@ -2548,13 +2598,6 @@ fixed_buffer_first_free_byte_address(
   Fixed_Buffer *buffer
 ) {
   return buffer->memory + buffer->occupied;
-}
-
-static inline u64
-fixed_buffer_remaining_capacity(
-  Fixed_Buffer *buffer
-) {
-  return buffer->capacity - buffer->occupied;
 }
 
 static inline Slice
