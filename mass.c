@@ -93,17 +93,22 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Compile: {
       Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("\\"));
       Slice base_name = *dyn_array_pop(parts);
-      Bucket_Buffer *path_builder = bucket_buffer_make(); // @Leak
+      Bucket_Buffer *path_builder = bucket_buffer_make();
       bucket_buffer_append_slice(path_builder, slice_literal("build\\"));
+      Slice extension = slice_literal(".mass");
+      if (slice_ends_with(base_name, extension)) {
+        base_name.length -= extension.length;
+      }
       bucket_buffer_append_slice(path_builder, base_name);
       bucket_buffer_append_slice(path_builder, slice_literal(".exe"));
       Fixed_Buffer *path_buffer =
         bucket_buffer_to_fixed_buffer(allocator_default, path_builder); // @Leak
-      wchar_t *exe_path_wide = utf8_to_utf16_null_terminated(
+      wchar_t *exe_path_wide = utf8_to_utf16_null_terminated( // @Leak
         allocator_default,
         fixed_buffer_as_slice(path_buffer)
       );
       write_executable(exe_path_wide, program, win32_executable_type);
+      bucket_buffer_destroy(path_builder);
       break;
     }
     case Mass_Cli_Mode_Run: {
