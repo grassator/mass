@@ -241,6 +241,10 @@ tokenize(
   Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
   Token *parent = root;
+  Fixed_Buffer *string_buffer = fixed_buffer_make(
+    .allocator = allocator_system,
+    .capacity = 4096,
+  );
 
   Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
 
@@ -316,6 +320,7 @@ tokenize(
           start_token(Token_Type_Operator);
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
+          string_buffer->occupied = 0;
           start_token(Token_Type_String);
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
@@ -411,9 +416,31 @@ tokenize(
       }
       case Tokenizer_State_String: {
         current_token->source.length++;
-        if (ch == '"') {
+        if (ch == '\\') {
+          state = Tokenizer_State_String_Escape;
+        } else if (ch == '"') {
+          u8 *string = allocator_allocate_bytes(temp_allocator, string_buffer->occupied, 1);
+          memcpy(string, string_buffer->memory, string_buffer->occupied);
+          current_token->string = (Slice){string, string_buffer->occupied};
           push;
+        } else {
+          fixed_buffer_resizing_append_u8(&string_buffer, ch);
         }
+        break;
+      }
+      case Tokenizer_State_String_Escape: {
+        current_token->source.length++;
+        s8 escaped_character;
+        switch (ch) {
+          case 'n': escaped_character = '\n'; break;
+          case 'r': escaped_character = '\r'; break;
+          case 't': escaped_character = '\t'; break;
+          case 'v': escaped_character = '\v'; break;
+          case '0': escaped_character = '\0'; break;
+          default: escaped_character = ch; break;
+        }
+        fixed_buffer_resizing_append_s8(&string_buffer, escaped_character);
+        state = Tokenizer_State_String;
         break;
       }
       case Tokenizer_State_Single_Line_Comment: {
@@ -448,6 +475,7 @@ tokenize(
 #undef push_error
 #undef start_token
 #undef push_and_retry
+  fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
   if (dyn_array_length(errors)) {
     return (Tokenizer_Result){.type = Tokenizer_Result_Type_Error, .errors = errors};
@@ -867,22 +895,6 @@ token_match_expression(
   Value *target
 );
 
-Slice
-token_string_to_slice(
-  Token *token
-) {
-  if (token->type != Token_Type_String) {
-    panic("Caller is expected to only use this on string tokens");
-  }
-  if (token->source.length <= 2) {
-    panic("Tokenizer (or somebody else) managed to produce a string without quotes");
-  }
-  return (Slice) {
-    .bytes = token->source.bytes + 1,
-    .length = token->source.length - 2
-  };
-}
-
 void
 token_force_value(
   Program *program,
@@ -923,7 +935,7 @@ token_force_value(
       return;
     }
     case Token_Type_String: {
-      Slice string = token_string_to_slice(token);
+      Slice string = token->string;
       Value *string_bytes = value_global_c_string_from_slice(program, string);
       Value *c_string_pointer = value_pointer_to(builder, &token->location, string_bytes);
       move_value(builder, &token->location, result_value, c_string_pointer);
@@ -1227,10 +1239,10 @@ token_import_match_arguments(
   Token_Matcher_State *state,
   Program *program
 ) {
-  Token *library_name_string = token_peek_match(state, 0, &(Token) {
+  Token *library_name_token = token_peek_match(state, 0, &(Token) {
     .type = Token_Type_String,
   });
-  if (!library_name_string) {
+  if (!library_name_token) {
     program_push_error_from_slice(
       program, location,
       slice_literal("First argument to external() must be a literal string")
@@ -1248,18 +1260,18 @@ token_import_match_arguments(
     );
     return 0;
   }
-  Token *symbol_name_string = token_peek_match(state, 2, &(Token) {
+  Token *symbol_name_token = token_peek_match(state, 2, &(Token) {
     .type = Token_Type_String,
   });
-  if (!symbol_name_string) {
+  if (!symbol_name_token) {
     program_push_error_from_slice(
       program, location,
       slice_literal("Second argument to external() must be a literal string")
     );
     return 0;
   }
-  Slice library_name = token_string_to_slice(library_name_string);
-  Slice symbol_name = token_string_to_slice(symbol_name_string);
+  Slice library_name = library_name_token->string;
+  Slice symbol_name = symbol_name_token->string;
 
   Value *result = temp_allocate(Value);
   *result = (const Value) {
@@ -1270,7 +1282,7 @@ token_import_match_arguments(
       symbol_name
     ),
   };
-  return token_value_make(library_name_string, result);
+  return token_value_make(library_name_token, result);
 }
 
 bool
@@ -2639,7 +2651,7 @@ win32_absolute_path(
     Allocator *convert_allocator = fixed_buffer_allocator_init(sys_buffer, &(Allocator){0});
     utf8_to_utf16_null_terminated(convert_allocator, raw_path);
     wchar_t *wide_string = (wchar_t *)sys_buffer->memory;
-    result_path = utf16_null_terminated_to_utf8(temp_allocator, wide_string);
+    result_path = utf16_null_terminated_to_utf8(convert_allocator, wide_string);
   }
   Fixed_Buffer *result_buffer = fixed_buffer_make(
     .allocator = allocator_system,

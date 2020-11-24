@@ -27,6 +27,7 @@ typedef struct Token {
   union {
     Array_Token_Ptr children;
     Value *value;
+    Slice string;
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
@@ -38,6 +39,7 @@ typedef enum {
   Tokenizer_State_Operator,
   Tokenizer_State_Id,
   Tokenizer_State_String,
+  Tokenizer_State_String_Escape,
   Tokenizer_State_Single_Line_Comment,
 } Tokenizer_State;
 
