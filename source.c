@@ -1464,6 +1464,7 @@ token_rewrite_function_literal(
         ? value_any()
         : descriptor->function.returns;
     if (inline_) {
+      descriptor->function.parent_scope = scope;
       descriptor->function.inline_body = token_clone_deep(body);
     }
     // TODO might want to do this lazily for inline functions
@@ -2327,7 +2328,12 @@ token_rewrite_function_calls(
     Value *return_value;
     Descriptor_Function *function = &overload->descriptor->function;
     if (function->inline_body) {
-      Scope *body_scope = scope_make(scope);
+      assert(function->parent_scope);
+      // We make a nested scope based on function's original parent scope
+      // instead of current scope for hygiene reasons. I.e. function body
+      // should not have access to locals inside the call scope.
+      Scope *body_scope = scope_make(function->parent_scope);
+
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Slice arg_name = *dyn_array_get(function->argument_names, i);
         Value *arg_value = *dyn_array_get(args, i);

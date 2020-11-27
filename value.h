@@ -259,11 +259,13 @@ typedef enum {
 } Descriptor_Type;
 
 typedef struct Token Token;
+typedef struct Scope Scope;
 
 typedef struct Descriptor_Function {
   Array_Value_Ptr arguments;
   Array_Slice argument_names;
   Token *inline_body;
+  Scope *parent_scope;
 
   Value *returns;
   Value *next_overload;
