@@ -94,7 +94,7 @@ scope_define_value(
 void
 token_parse_block(
   Program *program,
-  Array_Token_Ptr children,
+  Token *block,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value

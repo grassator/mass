@@ -980,7 +980,7 @@ token_force_value(
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
-      token_parse_block(program, token->children, scope, builder, result_value);
+      token_parse_block(program, token, scope, builder, result_value);
       return;
     }
     case Token_Type_Module:
@@ -1467,7 +1467,7 @@ token_rewrite_function_literal(
       descriptor->function.inline_body = token_clone_deep(body);
     }
     // TODO might want to do this lazily for inline functions
-    token_parse_block(program, body->children, function_scope, builder, return_result_value);
+    token_parse_block(program, body, function_scope, builder, return_result_value);
 
     fn_end(builder);
     result = builder->value;
@@ -1724,15 +1724,17 @@ token_match_statement(
 void
 token_parse_block(
   Program *program,
-  Array_Token_Ptr children,
+  Token *block,
   Scope *scope,
   Function_Builder *builder,
   Value *block_result_value
 ) {
+  assert(block->type == Token_Type_Curly);
+  Array_Token_Ptr children = block->children;
   if (!dyn_array_length(children)) return;
   Scope *block_scope = scope_make(scope);
 
-  // Newlines at the end of the block do not count as semucolons otherwise this:
+  // Newlines at the end of the block do not count as semicolons otherwise this:
   // { 42
   // }
   // is being interpreted as:
@@ -1745,8 +1747,6 @@ token_parse_block(
     .type = Token_Type_Operator,
     .source = slice_literal(";"),
   });
-  // FIXME get the real location
-  Source_Location *location = &(Source_Location){0};
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
@@ -1762,7 +1762,7 @@ token_parse_block(
       }
     }
 
-    token_match_statement(program, state, location, block_scope, builder, result_value);
+    token_match_statement(program, state, &block->location, block_scope, builder, result_value);
   }
   return;
 }
@@ -1785,7 +1785,7 @@ token_rewrite_statement_if(
   Label_Index else_label = make_if(
     program, &builder->code_block.instructions, &keyword->location, condition_value
   );
-  token_parse_block(program, body->children, scope, builder, value_any());
+  token_parse_block(program, body, scope, builder, value_any());
   push_instruction(
     &builder->code_block.instructions, &keyword->location,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
@@ -2334,7 +2334,6 @@ token_rewrite_function_calls(
         scope_define_value(body_scope, arg_name, arg_value);
       }
       return_value = result_value;
-      Array_Token_Ptr body = function->inline_body->children;
 
       // We need to have a fake builder so that return target label and
       // the return types are correct
@@ -2346,7 +2345,7 @@ token_rewrite_function_calls(
         inline_builder.descriptor->function.returns = result_value;
       }
 
-      token_parse_block(program, body, body_scope, &inline_builder, return_value);
+      token_parse_block(program, function->inline_body, body_scope, &inline_builder, return_value);
 
       // Because instructions are stored in a dynamic array it might have been
       // reallocated which means we need to copy it. It might be better to
