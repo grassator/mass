@@ -1745,13 +1745,24 @@ token_parse_block(
     .type = Token_Type_Operator,
     .source = slice_literal(";"),
   });
+  // FIXME get the real location
+  Source_Location *location = &(Source_Location){0};
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
     bool is_last_statement = i + 1 == dyn_array_length(block_statements);
     Value *result_value = is_last_statement ? block_result_value : value_any();
-    // FIXME get the real location
-    token_match_statement(program, state, &(Source_Location){0}, block_scope, builder, result_value);
+
+    // If result is a register we need to make sure it is acquired to avoid it being used
+    // as temporary when evaluating last statement. This definitely can happen with
+    // the function returns but should be safe to do all the time.
+    if (is_last_statement && result_value->operand.type == Operand_Type_Register) {
+      if (!register_bitset_get(builder->used_register_bitset, result_value->operand.reg)) {
+        register_acquire(builder, result_value->operand.reg);
+      }
+    }
+
+    token_match_statement(program, state, location, block_scope, builder, result_value);
   }
   return;
 }
@@ -2272,7 +2283,36 @@ token_rewrite_function_calls(
 
   Value *target = value_any();
   token_force_value(program, target_token, scope, builder, target);
-  Array_Value_Ptr args = token_match_call_arguments(program, args_token, scope, builder);
+
+  Array_Value_Ptr args;
+
+  // FIXME this is a bit of hack to make sure we don't use argument registers for
+  //       computing arguments as it might end up in the wrong one and overwrite.
+  //       The right fix for that is to add type-only evaluation to figure out the
+  //       correct target register for each argument and use it during mathcing.
+  //       We will need type-only eval anyway for things like `typeof(some expression)`.
+  {
+    Register arg_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
+    bool acquired_registers[countof(arg_registers)] = {0};
+    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
+      Register reg_index = arg_registers[i];
+      if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+        register_acquire(builder, reg_index);
+        acquired_registers[i] = true;
+      }
+    }
+
+    args = token_match_call_arguments(program, args_token, scope, builder);
+
+    // Release any registers that we fake acquired to make sure that the actual call
+    // does not unnecessarily store them to stack
+    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
+      if (acquired_registers[i]) {
+        Register reg_index = arg_registers[i];
+        register_release(builder, reg_index);
+      }
+    }
+  }
 
   if (target->descriptor->type != Descriptor_Type_Function) {
     program_error_builder(program, target_token->location) {
@@ -2294,7 +2334,33 @@ token_rewrite_function_calls(
         scope_define_value(body_scope, arg_name, arg_value);
       }
       return_value = result_value;
-      token_parse_block(program, function->inline_body->children, body_scope, builder, return_value);
+      Array_Token_Ptr body = function->inline_body->children;
+
+      // We need to have a fake builder so that return target label and
+      // the return types are correct
+      Function_Builder inline_builder = *builder;
+      {
+        inline_builder.code_block.end_label = make_label(program, &program->code_section);
+        inline_builder.descriptor = &(Descriptor) {0};
+        *inline_builder.descriptor = *builder->descriptor;
+        inline_builder.descriptor->function.returns = result_value;
+      }
+
+      token_parse_block(program, body, body_scope, &inline_builder, return_value);
+
+      // Because instructions are stored in a dynamic array it might have been
+      // reallocated which means we need to copy it. It might be better to
+      // switch to a bucket array.
+      builder->code_block.instructions = inline_builder.code_block.instructions;
+
+      push_instruction(
+        &builder->code_block.instructions,
+        &target_token->location,
+        (Instruction) {
+          .type = Instruction_Type_Label,
+          .label = inline_builder.code_block.end_label
+        }
+      );
     } else {
       return_value = call_function_overload(builder, location, overload, args);
     }
@@ -2327,7 +2393,6 @@ token_rewrite_plus(
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
-  //Value *temp = result_value ? result_value : reserve_stack(builder, lhs_value->descriptor);
   plus(builder, &op_token->location, result_value, lhs_value, rhs_value);
   token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
   return true;

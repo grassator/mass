@@ -385,8 +385,8 @@ spec("source") {
 
   it("should be able to parse and run inline id with an explicit return function") {
     test_program_inline_source(
-      "id :: inline (x : s64) -> (s64) { if (x > 0) { return 21 }; x }\n"
-      "test :: () -> (s64) { id(42) }",
+      "id :: inline (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
+      "test :: () -> (s64) { id(42) + 1 }",
       test
     );
     fn_type_void_to_s64 checker = value_as_function(test, fn_type_void_to_s64);

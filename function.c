@@ -17,14 +17,23 @@ reserve_stack(
   return result;
 }
 
+void
+register_acquire(
+  Function_Builder *builder,
+  Register reg_index
+) {
+  assert(!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
+  register_bitset_set(&builder->used_register_bitset, reg_index);
+  register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
+}
+
 Register
 register_acquire_temp(
   Function_Builder *builder
 ) {
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-      register_bitset_set(&builder->used_register_bitset, reg_index);
-      register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
+      register_acquire(builder, reg_index);
       return reg_index;
     }
   }
