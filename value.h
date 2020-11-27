@@ -258,8 +258,12 @@ typedef enum {
   Descriptor_Type_Type
 } Descriptor_Type;
 
+typedef struct Token Token;
+
 typedef struct Descriptor_Function {
   Array_Value_Ptr arguments;
+  Array_Slice argument_names;
+  Token *inline_body;
 
   Value *returns;
   Value *next_overload;

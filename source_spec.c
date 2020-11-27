@@ -364,6 +364,35 @@ spec("source") {
     check(checker() == 42);
   }
 
+  it("should report an error for inline external functions") {
+    test_program_inline_source_base(
+      "ExitProcess :: inline (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
+      "test :: () -> (s64) { ExitProcess(42) }",
+      test
+    );
+    check(dyn_array_length(program_->errors));
+  }
+
+  it("should be able to parse and run inline id function") {
+    test_program_inline_source(
+      "id :: inline (x : s64) -> (s64) { x }\n"
+      "test :: () -> (s64) { id(42) }",
+      test
+    );
+    fn_type_void_to_s64 checker = value_as_function(test, fn_type_void_to_s64);
+    check(checker() == 42);
+  }
+
+  it("should be able to parse and run inline id with an explicit return function") {
+    test_program_inline_source(
+      "id :: inline (x : s64) -> (s64) { if (x > 0) { return 21 }; x }\n"
+      "test :: () -> (s64) { id(42) }",
+      test
+    );
+    fn_type_void_to_s64 checker = value_as_function(test, fn_type_void_to_s64);
+    check(checker() == 21);
+  }
+
   it("should be able to parse and run multiple function definitions") {
     test_program_inline_source(
       "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }\n"

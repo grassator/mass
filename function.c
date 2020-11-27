@@ -283,6 +283,7 @@ fn_begin(
     .type = Descriptor_Type_Function,
     .function = {
       .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
+      .argument_names = dyn_array_make(Array_Slice, .allocator = temp_allocator),
       .returns = 0,
     },
   };
@@ -722,6 +723,7 @@ typedef enum {
       move_value(\
         (_builder_), (_loc_), (_result_), value_from_signed_immediate(a_s64 _operator_ b_s64)\
       );\
+      return;\
     }\
   } while(0)
 
@@ -1225,9 +1227,8 @@ calculate_arguments_match_score(
 }
 
 Value *
-call_function_value_array(
+find_matching_function_overload(
   Function_Builder *builder,
-  const Source_Location *location,
   Value *to_call,
   Array_Value_Ptr arguments
 ) {
@@ -1242,11 +1243,7 @@ call_function_value_array(
       match.score = score;
     }
   }
-  if (match.value) {
-    return call_function_overload(builder, location, match.value, arguments);
-  }
-  assert(!"No matching overload found");
-  return 0;
+  return match.value;
 }
 
 Value *

@@ -558,11 +558,12 @@ scope_lookup_type(
   return descriptor;
 }
 
-#define Maybe_Token_Match(_id_, ...)\
-  Token *(_id_) = token_peek_match(state, peek_index++, &(Token) { __VA_ARGS__ });\
+#define Token_Maybe_Match(_id_, ...)\
+  Token *(_id_) = token_peek_match(state, peek_index, &(Token) { __VA_ARGS__ });\
+  if (_id_) (++peek_index)
 
 #define Token_Match(_id_, ...)\
-  Maybe_Token_Match(_id_, __VA_ARGS__);\
+  Token_Maybe_Match(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
@@ -703,35 +704,48 @@ token_rewrite_pattern(
 Array_Token_Ptr
 token_clone_token_array_deep(
   Array_Token_Ptr source
+);
+
+Token *
+token_clone_deep(
+  Token *token
+) {
+  Token *clone = temp_allocate(Token);
+  *clone = *token;
+  switch (token->type) {
+    case Token_Type_Newline:
+    case Token_Type_Integer:
+    case Token_Type_Hex_Integer:
+    case Token_Type_Operator:
+    case Token_Type_String:
+    case Token_Type_Id: {
+      // Nothing to do
+      break;
+    }
+    case Token_Type_Square:
+    case Token_Type_Paren:
+    case Token_Type_Curly:
+    case Token_Type_Module: {
+      clone->children = token_clone_token_array_deep(token->children);
+      break;
+    }
+    case Token_Type_Value: {
+      panic("Macro definitions should not contain semi-resolved tokens");
+      break;
+    }
+  }
+  return clone;
+}
+
+Array_Token_Ptr
+token_clone_token_array_deep(
+  Array_Token_Ptr source
 ) {
   Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
   for (u64 i = 0; i < dyn_array_length(source); ++i) {
     Token *token = *dyn_array_get(source, i);
-    Token *copy = temp_allocate(Token);
-    *copy = *token;
-    switch (token->type) {
-      case Token_Type_Newline:
-      case Token_Type_Integer:
-      case Token_Type_Hex_Integer:
-      case Token_Type_Operator:
-      case Token_Type_String:
-      case Token_Type_Id: {
-        // Nothing to do
-        break;
-      }
-      case Token_Type_Square:
-      case Token_Type_Paren:
-      case Token_Type_Curly:
-      case Token_Type_Module: {
-        copy->children = token_clone_token_array_deep(token->children);
-        break;
-      }
-      case Token_Type_Value: {
-        panic("Macro definitions should not contain semi-resolved tokens");
-        break;
-      }
-    }
-    dyn_array_push(result, token);
+    Token *clone = token_clone_deep(token);
+    dyn_array_push(result, clone);
   }
   return result;
 }
@@ -1362,6 +1376,7 @@ token_rewrite_function_literal(
   Function_Builder *outer_builder
 ) {
   u64 peek_index = 0;
+  Token_Maybe_Match(inline_, .type = Token_Type_Id, .source = slice_literal("inline"));
   Token_Match(args, .type = Token_Type_Paren);
   Token_Match_Operator(arrow, "->");
   Token_Match(return_types, .type = Token_Type_Paren);
@@ -1375,12 +1390,19 @@ token_rewrite_function_literal(
   Descriptor *descriptor = 0;
 
   if (is_external) {
+    if (inline_) {
+      program_error_builder(program, inline_->location) {
+        program_error_append_literal("External functions can not be inline");
+      }
+      inline_ = 0;
+    }
     if(!body->value) return 0;
     descriptor = temp_allocate(Descriptor);
     *descriptor = (Descriptor) {
       .type = Descriptor_Type_Function,
       .function = {
         .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
+        .argument_names = dyn_array_make(Array_Slice, .allocator = temp_allocator),
         .returns = 0,
       },
     };
@@ -1423,8 +1445,13 @@ token_rewrite_function_literal(
       if (!is_external && arg_value->operand.type == Operand_Type_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
+      dyn_array_push(descriptor->function.argument_names, arg->arg_name);
       scope_define_value(function_scope, arg->arg_name, arg_value);
     }
+    assert(
+      dyn_array_length(descriptor->function.argument_names) ==
+      dyn_array_length(descriptor->function.arguments)
+    );
   }
 
   Value *result = 0;
@@ -1436,12 +1463,17 @@ token_rewrite_function_literal(
       descriptor->function.returns->descriptor->type == Descriptor_Type_Void
         ? value_any()
         : descriptor->function.returns;
+    if (inline_) {
+      descriptor->function.inline_body = token_clone_deep(body);
+    }
+    // TODO might want to do this lazily for inline functions
     token_parse_block(program, body->children, function_scope, builder, return_result_value);
 
     fn_end(builder);
     result = builder->value;
   }
-  token_replace_tokens_in_state(state, 4, token_value_make(arrow, result));
+  u64 replacement_count = inline_ ? 5 : 4;
+  token_replace_tokens_in_state(state, replacement_count, token_value_make(arrow, result));
   return true;
 }
 
@@ -2249,9 +2281,32 @@ token_rewrite_function_calls(
     }
     return false;
   }
-  Value *return_value = call_function_value_array(builder, &target_token->location, target, args);
+  Source_Location *location = &target_token->location;
+  Value *overload = find_matching_function_overload(builder, target, args);
+  if (overload) {
+    Value *return_value;
+    Descriptor_Function *function = &overload->descriptor->function;
+    if (function->inline_body) {
+      Scope *body_scope = scope_make(scope);
+      for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+        Slice arg_name = *dyn_array_get(function->argument_names, i);
+        Value *arg_value = *dyn_array_get(args, i);
+        scope_define_value(body_scope, arg_name, arg_value);
+      }
+      return_value = result_value;
+      token_parse_block(program, function->inline_body->children, body_scope, builder, return_value);
+    } else {
+      return_value = call_function_overload(builder, location, overload, args);
+    }
+    token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
+  } else {
+    program_error_builder(program, target_token->location) {
+      // TODO add better error message
+      program_error_append_literal("Could not find matching overload");
+    }
+    token_replace_tokens_in_state(state, 2, 0);
+  }
   dyn_array_destroy(args);
-  token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
   return true;
 }
 
