@@ -547,14 +547,16 @@ spec("source") {
   }
 
   it("should be able to parse struct definitions") {
-    program_import_file(program_, slice_literal("fixtures\\struct"));
+    test_program_inline_source(
+      "Point :: type(c_struct) { x : s32; y : s32; };"
+      "test :: () -> (s32) {"
+        "p : Point; p.x = 20; p.y = 22;"
+        "p.x + p.y"
+      "}",
+      test
+    );
 
-    Value *check_value =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("check"), 0);
-
-    program_jit(program_);
-
-    fn_type_void_to_s32 checker = value_as_function(check_value, fn_type_void_to_s32);
+    fn_type_void_to_s32 checker = value_as_function(test, fn_type_void_to_s32);
     check(checker() == 42);
   }
 
