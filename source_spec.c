@@ -560,6 +560,21 @@ spec("source") {
     check(checker() == 42);
   }
 
+  it("should be able to call a function at compile time") {
+    test_program_inline_source_base(
+      "STATUS_CODE :: the_answer();"
+      "the_answer :: () -> (s8) { 42 }",
+      STATUS_CODE
+    );
+
+    Value *status =
+      scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
+    check(status);
+    check(status->descriptor->type == Descriptor_Type_Integer);
+    check(status->operand.type == Operand_Type_Immediate_8);
+    check(status->operand.s8 == 42);
+  }
+
   it("should be able to execute arbitrary expression at compile time") {
     test_program_inline_source_base(
       "STATUS_CODE :: @( the_answer() + 2 );"
@@ -569,6 +584,7 @@ spec("source") {
 
     Value *status =
       scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
+    check(status);
     check(status->descriptor->type == Descriptor_Type_Integer);
     check(status->operand.type == Operand_Type_Immediate_8);
     check(status->operand.s8 == 42);

@@ -2,6 +2,18 @@
 #include "source.h"
 #include "function.h"
 
+static inline Slice
+token_source_from_start_end(
+  Token *start,
+  Token *end
+) {
+  assert(start->source.bytes <= end->source.bytes);
+  return (Slice) {
+    .bytes = start->source.bytes,
+    .length = end->source.bytes - start->source.bytes,
+  };
+}
+
 Scope *
 scope_make(
   Scope *parent
@@ -572,6 +584,12 @@ scope_lookup_type(
 #define Token_Match_End()\
   if(peek_index != dyn_array_length(state->tokens)) return 0
 
+#define TOKEN_MATCHED_SOURCE()\
+  token_source_from_start_end(\
+    *dyn_array_get(state->tokens, state->start_index),\
+    *dyn_array_get(state->tokens, state->start_index + peek_index - 1)\
+  )
+
 typedef struct {
   Slice arg_name;
   Descriptor *type_descriptor;
@@ -1034,15 +1052,17 @@ token_match_call_arguments(
   return result;
 }
 
-Token *
+static inline Token *
 token_value_make(
-  Token *original,
-  Value *result
+  Value *result,
+  Source_Location location,
+  Slice source
 ) {
   Token *result_token = temp_allocate(Token);
   *result_token = (Token){
     .type = Token_Type_Value,
-    .source = original->source, // TODO should encompass the whole sub-expression
+    .source = source,
+    .location = location,
     .value = result,
   };
   return result_token;
@@ -1193,7 +1213,11 @@ token_rewrite_type_definitions(
       Token *token = *dyn_array_get(layout_token->children, 0);
       // TODO should be a compile time function later on
       if (token->type == Token_Type_Id && slice_equal(token->source, slice_literal("c_struct"))) {
-        layout_block = token_peek_match(state, peek_index, &(Token) { .type = Token_Type_Curly });
+        layout_block = token_peek_match(state, peek_index++, &(Token) { .type = Token_Type_Curly });
+        if (!layout_block) {
+          // TODO print error
+          goto err;
+        }
         break;
       }
       // fallthrough
@@ -1261,7 +1285,7 @@ token_rewrite_type_definitions(
     .descriptor = value_descriptor,
     .operand = {.type = Operand_Type_None },
   };
-  replacement_token = token_value_make(name, result);
+  replacement_token = token_value_make(result, name->location, TOKEN_MATCHED_SOURCE());
 
   err:
   u64 replacement_count = layout_block ? 3 : 2;
@@ -1307,7 +1331,8 @@ token_import_match_arguments(
   Token_Matcher_State *state,
   Program *program
 ) {
-  Token *library_name_token = token_peek_match(state, 0, &(Token) {
+  u64 peek_index = 0;
+  Token *library_name_token = token_peek_match(state, peek_index++, &(Token) {
     .type = Token_Type_String,
   });
   if (!library_name_token) {
@@ -1317,7 +1342,7 @@ token_import_match_arguments(
     );
     return 0;
   }
-  Token *comma = token_peek_match(state, 1, &(Token) {
+  Token *comma = token_peek_match(state, peek_index++, &(Token) {
     .type = Token_Type_Operator,
     .source = slice_literal(","),
   });
@@ -1328,7 +1353,7 @@ token_import_match_arguments(
     );
     return 0;
   }
-  Token *symbol_name_token = token_peek_match(state, 2, &(Token) {
+  Token *symbol_name_token = token_peek_match(state, peek_index++, &(Token) {
     .type = Token_Type_String,
   });
   if (!symbol_name_token) {
@@ -1350,7 +1375,7 @@ token_import_match_arguments(
       symbol_name
     ),
   };
-  return token_value_make(library_name_token, result);
+  return token_value_make(result, library_name_token->location, TOKEN_MATCHED_SOURCE());
 }
 
 bool
@@ -1365,7 +1390,6 @@ token_rewrite_external_import(
   Token_Match(args, .type = Token_Type_Paren);
   Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
   Token *result_token = token_import_match_arguments(args->location, args_state, program);
-  if (!result_token) result_token = token_value_make(args, 0);
 
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
@@ -1528,7 +1552,8 @@ token_rewrite_function_literal(
     result = builder->value;
   }
   u64 replacement_count = inline_ ? 5 : 4;
-  token_replace_tokens_in_state(state, replacement_count, token_value_make(arrow, result));
+  Token *value_token = token_value_make(result, arrow->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, replacement_count, value_token);
   return true;
 }
 
@@ -1557,7 +1582,8 @@ token_rewrite_negative_literal(
     panic("Internal error, expected an immediate");
   }
 
-  token_replace_tokens_in_state(state, 2, token_value_make(integer, result));
+  Token *value_token = token_value_make(result, integer->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 2, value_token);
   return true;
 }
 
@@ -1582,18 +1608,15 @@ token_rewrite_constant_sub_expression(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-bool
-token_rewrite_compile_time_eval(
+Token *
+compile_time_eval(
   Program *program,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *unused_builder
+  Scope *scope
 ) {
-  u64 peek_index = 0;
-  Token_Match_Operator(at, "@");
-  Token_Match(paren, .type = Token_Type_Paren);
-
-  Token_Matcher_State sub_state = {paren->children};
+  Token *first_token = *dyn_array_get(state->tokens, state->start_index);
+  Token *last_token =
+    *dyn_array_get(state->tokens, dyn_array_length(state->tokens) - state->start_index - 1);
 
   Program eval_program = {
     .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
@@ -1615,7 +1638,7 @@ token_rewrite_compile_time_eval(
 
   Value *expression_result_value = value_any();
   token_match_expression(
-    &eval_program, &sub_state, eval_program.global_scope, eval_builder, expression_result_value
+    &eval_program, state, eval_program.global_scope, eval_builder, expression_result_value
   );
 
   // We use a something like a C++ reference out parameter for the
@@ -1639,7 +1662,7 @@ token_rewrite_compile_time_eval(
     },
   };
 
-  move_value(eval_builder, &paren->location, out_value, expression_result_value);
+  move_value(eval_builder, &first_token->location, out_value, expression_result_value);
   fn_end(eval_builder);
 
   program_jit(&eval_program);
@@ -1707,14 +1730,55 @@ token_rewrite_compile_time_eval(
       break;
     }
   }
+  return token_value_make(
+    token_value, first_token->location, token_source_from_start_end(first_token, last_token)
+  );
+}
 
-  Token *result_token = token_value_make(paren, token_value);
+bool
+token_rewrite_compile_time_eval(
+  Program *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *unused_builder
+) {
+  u64 peek_index = 0;
+  Token_Match_Operator(at, "@");
+  Token_Match(paren, .type = Token_Type_Paren);
+
+  Token_Matcher_State sub_state = {paren->children};
+
+  Token *result_token = compile_time_eval(program, &sub_state, scope);
 
   if (!result_token) {
     return false;
   }
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
+}
+
+bool
+token_rewrite_compile_time_function_call(
+  Program *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+) {
+  // @CopyPaste with the regular function call
+  u64 peek_index = 0;
+  Token_Match(target_token, 0);
+  Token_Match(args_token, .type = Token_Type_Paren);
+  if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
+
+  Range_u64 call_token_range = {
+    .from = state->start_index,
+    .to = state->start_index + peek_index
+  };
+  Array_Token_Ptr call_tokens = dyn_array_sub(Array_Token_Ptr, state->tokens, call_token_range);
+  Token *result = compile_time_eval(program, &(Token_Matcher_State){call_tokens}, scope);
+
+  token_replace_tokens_in_state(state, 2, result);
+  return result;
 }
 
 Token *
@@ -1730,6 +1794,7 @@ token_rewrite_constant_expression(
 
   token_rewrite_type_definitions(program, token_reset_state_start_index(state), scope, builder) ||
   token_rewrite_function_literal(program, token_reset_state_start_index(state), scope, builder) ||
+  token_rewrite_compile_time_function_call(program, token_reset_state_start_index(state), scope, builder) ||
   token_rewrite_compile_time_eval(program, token_reset_state_start_index(state), scope, builder);
 
   token_rewrite_statement(program, state, scope, builder, token_rewrite_constant_sub_expression);
@@ -1932,7 +1997,8 @@ token_rewrite_pointer_to(
   Value *pointee = value_any();
   token_force_value(program, value_token, scope, builder, pointee);
   Value *result = value_pointer_to(builder, &operator->location, pointee);
-  token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
+  Token *token_value = token_value_make(result, operator->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
 
@@ -2083,7 +2149,8 @@ token_rewrite_cast(
     }
   }
 
-  token_replace_tokens_in_state(state, 2, token_value_make(value_token, result));
+  Token *token_value = token_value_make(result, cast->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
 
@@ -2143,7 +2210,8 @@ token_rewrite_definitions(
     value = reserve_stack(builder, descriptor);
   }
   scope_define_value(scope, name->source, value);
-  token_replace_tokens_in_state(state, size_to_replace, token_value_make(name, value));
+  Token *token_value = token_value_make(value, name->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, size_to_replace, token_value);
 
   return true;
 }
@@ -2265,7 +2333,8 @@ token_rewrite_array_index(
     panic("TODO");
   }
 
-  token_replace_tokens_in_state(state, 2, token_value_make(target_token, result));
+  Token *token_value = token_value_make(result, target_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
 
@@ -2285,7 +2354,8 @@ token_rewrite_struct_field(
   token_force_value(program, struct_token, scope, builder, struct_value);
   Value *result = struct_get_field(struct_value, field_name->source);
 
-  token_replace_tokens_in_state(state, 3, token_value_make(struct_token, result));
+  Token *token_value = token_value_make(result, struct_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
@@ -2430,7 +2500,9 @@ token_rewrite_function_calls(
     } else {
       return_value = call_function_overload(builder, location, overload, args);
     }
-    token_replace_tokens_in_state(state, 2, token_value_make(args_token, return_value));
+    Token *token_value =
+      token_value_make(return_value, args_token->location, TOKEN_MATCHED_SOURCE());
+    token_replace_tokens_in_state(state, 2, token_value);
   } else {
     program_error_builder(program, target_token->location) {
       // TODO add better error message
@@ -2460,7 +2532,8 @@ token_rewrite_plus(
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
   plus(builder, &op_token->location, result_value, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
+  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
@@ -2482,7 +2555,8 @@ token_rewrite_minus(
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
   minus(builder, &op_token->location, result_value, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(op_token, result_value));
+  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
@@ -2497,15 +2571,16 @@ token_rewrite_divide(
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
-  Token_Match_Operator(operator, "/");
+  Token_Match_Operator(op_token, "/");
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
-  divide(builder, &operator->location, result_value, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, result_value));
+  divide(builder, &op_token->location, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
@@ -2519,7 +2594,7 @@ token_rewrite_remainder(
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
-  Token_Match_Operator(operator, "%");
+  Token_Match_Operator(op_token, "%");
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
@@ -2527,8 +2602,9 @@ token_rewrite_remainder(
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
   Value *temp = reserve_stack(builder, lhs_value->descriptor);
-  value_remainder(builder, &operator->location, temp, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, temp));
+  value_remainder(builder, &op_token->location, temp, lhs_value, rhs_value);
+  Token *token_value = token_value_make(temp, op_token->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
@@ -2687,7 +2763,8 @@ token_rewrite_compare(
   }
 
   compare(compare_type, builder, &operator->location, result_value, lhs_value, rhs_value);
-  token_replace_tokens_in_state(state, 3, token_value_make(operator, result_value));
+  Token *token_value = token_value_make(result_value, operator->location, TOKEN_MATCHED_SOURCE());
+  token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
 
