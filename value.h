@@ -248,6 +248,7 @@ typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef enum {
   Descriptor_Type_Void,
   Descriptor_Type_Any,
+  Descriptor_Type_Opaque,
   Descriptor_Type_Integer,
   Descriptor_Type_Float,
   Descriptor_Type_Pointer,
@@ -302,6 +303,10 @@ typedef struct {
   u32 byte_size;
 } Descriptor_Float;
 
+typedef struct {
+  u64 bit_size;
+} Descriptor_Opaque;
+
 typedef struct Descriptor {
   Descriptor_Type type;
   union {
@@ -313,6 +318,7 @@ typedef struct Descriptor {
     Descriptor_Tagged_Union tagged_union;
     struct Descriptor *pointer_to;
     struct Descriptor *type_descriptor;
+    Descriptor_Opaque opaque;
   };
 } Descriptor;
 

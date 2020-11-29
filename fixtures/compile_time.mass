@@ -1,9 +1,0 @@
-ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
-
-STATUS_CODE :: @( the_answer() + 2 )
-
-the_answer :: () -> (s8) { 40 }
-
-main :: () -> () {
-  ExitProcess(STATUS_CODE)
-}

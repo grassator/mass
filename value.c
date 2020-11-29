@@ -43,6 +43,7 @@ same_type(
     case Descriptor_Type_Fixed_Size_Array: {
       return same_type(a->array.item, b->array.item) && a->array.length == b->array.length;
     }
+    case Descriptor_Type_Opaque:
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Struct: {
       return a == b;
@@ -136,6 +137,10 @@ descriptor_byte_size(
     }
     case Descriptor_Type_Float: {
       return descriptor->float_.byte_size;
+    }
+    case Descriptor_Type_Opaque: {
+      u64 size_of_byte = 8;
+      return u64_to_u32((descriptor->opaque.bit_size + (size_of_byte - 1)) / size_of_byte);
     }
     case Descriptor_Type_Integer: {
       return descriptor->integer.byte_size;
@@ -1147,6 +1152,7 @@ c_function_return_value(
       assert(!"TODO");
     }
     case Descriptor_Type_Any:
+    case Descriptor_Type_Opaque:
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:
     case Descriptor_Type_Struct:

@@ -1,4 +1,4 @@
-Point :: struct {
+Point :: type(c_struct) {
   x : s32;
   y : s32;
 }

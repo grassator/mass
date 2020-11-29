@@ -533,6 +533,19 @@ spec("source") {
     checker();
   }
 
+  it("should be able to parse fixed-bit sized type definitions") {
+    test_program_inline_source(
+      "int8 :: type(8);"
+      "test :: () -> () {"
+        "x : int8;"
+      "}",
+      test
+    );
+
+    fn_type_void_to_void checker = value_as_function(test, fn_type_void_to_void);
+    checker();
+  }
+
   it("should be able to parse struct definitions") {
     program_import_file(program_, slice_literal("fixtures\\struct"));
 
@@ -545,8 +558,12 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should be able to parse struct definitions") {
-    program_import_file(program_, slice_literal("fixtures\\compile_time"));
+  it("should be able to execute arbitrary expression at compile time") {
+    test_program_inline_source_base(
+      "STATUS_CODE :: @( the_answer() + 2 );"
+      "the_answer :: () -> (s8) { 40 }",
+      STATUS_CODE
+    );
 
     Value *status =
       scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
@@ -557,7 +574,7 @@ spec("source") {
 
   it("should be able to return structs while accepting other arguments") {
     test_program_inline_source(
-      "Test_128bit :: struct { x : s64; y : s64 };"
+      "Test_128bit :: type(c_struct) { x : s64; y : s64 };"
       "return_struct :: (x : s64) -> (Test_128bit) {"
         "result : Test_128bit;"
         "result.x = x;"

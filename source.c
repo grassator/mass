@@ -1170,48 +1170,102 @@ token_rewrite_newlines_with_semicolons(
 }
 
 bool
-token_rewrite_struct_definitions(
+token_rewrite_type_definitions(
   Program *program,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("struct"));
-  Token_Match(body, .type = Token_Type_Curly);
+  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("type"));
+  Token_Match(layout_token, .type = Token_Type_Paren);
+  Token *replacement_token = 0;
 
+  u64 layout_children_count = dyn_array_length(layout_token->children);
+  Token *layout_block = 0;
+  Value *bit_size_value = 0;
+  switch (layout_children_count) {
+    case 0: {
+      // TODO print error
+      goto err;
+    }
+    case 1: {
+      Token *token = *dyn_array_get(layout_token->children, 0);
+      // TODO should be a compile time function later on
+      if (token->type == Token_Type_Id && slice_equal(token->source, slice_literal("c_struct"))) {
+        layout_block = token_peek_match(state, peek_index, &(Token) { .type = Token_Type_Curly });
+        break;
+      }
+      // fallthrough
+    }
+    default: {
+      Token_Matcher_State layout_state = {layout_token->children};
+      Token *token = token_rewrite_constant_expression(program, &layout_state, scope, builder);
+      if (token) {
+        bit_size_value = value_any();
+        token_force_value(program, token, scope, builder, bit_size_value);
+      }
+      if (!bit_size_value) {
+        // TODO print error
+        goto err;
+      }
+      break;
+    }
+  }
+
+  assert(layout_block || bit_size_value);
   Value *result = temp_allocate(Value);
-  Descriptor *struct_descriptor = temp_allocate(Descriptor);
-  *struct_descriptor = (Descriptor) {
-    .type = Descriptor_Type_Struct,
-    .struct_ = {
-      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
-    },
-  };
 
-  if (dyn_array_length(body->children) != 0) {
-    token_rewrite_newlines_with_semicolons(body->children);
-    Array_Token_Matcher_State definitions = token_split(body->children, &(Token){
-      .type = Token_Type_Operator,
-      .source = slice_literal(";"),
-    });
-    for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
-      Token_Matcher_State *field_state = dyn_array_get(definitions, i);
-      token_match_struct_field(program, struct_descriptor, field_state, scope, builder);
+  Descriptor *descriptor = temp_allocate(Descriptor);
+  if (bit_size_value) {
+    if (bit_size_value->descriptor->type != Descriptor_Type_Integer) {
+      // TODO err
+      goto err;
+    }
+    if (!operand_is_immediate(&bit_size_value->operand)) {
+      // TODO err
+      goto err;
+    }
+    u64 bit_size = s64_to_u64(operand_immediate_as_s64(&bit_size_value->operand));
+    *descriptor = (Descriptor) {
+      .type = Descriptor_Type_Opaque,
+      .opaque = { .bit_size = bit_size },
+    };
+  } else {
+    *descriptor = (Descriptor) {
+      .type = Descriptor_Type_Struct,
+      .struct_ = {
+        .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+      },
+    };
+
+    if (dyn_array_length(layout_block->children) != 0) {
+      token_rewrite_newlines_with_semicolons(layout_block->children);
+      Array_Token_Matcher_State definitions = token_split(layout_block->children, &(Token){
+        .type = Token_Type_Operator,
+        .source = slice_literal(";"),
+      });
+      for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
+        Token_Matcher_State *field_state = dyn_array_get(definitions, i);
+        token_match_struct_field(program, descriptor, field_state, scope, builder);
+      }
     }
   }
 
   Descriptor *value_descriptor = temp_allocate(Descriptor);
   *value_descriptor = (Descriptor) {
     .type = Descriptor_Type_Type,
-    .type_descriptor = struct_descriptor,
+    .type_descriptor = descriptor,
   };
   *result = (Value) {
     .descriptor = value_descriptor,
     .operand = {.type = Operand_Type_None },
   };
+  replacement_token = token_value_make(name, result);
 
-  token_replace_tokens_in_state(state, 2, token_value_make(body, result));
+  err:
+  u64 replacement_count = layout_block ? 3 : 2;
+  token_replace_tokens_in_state(state, replacement_count, replacement_token);
 
   return true;
 }
@@ -1646,6 +1700,7 @@ token_rewrite_compile_time_eval(
       panic("TODO move to data section or maybe we should allocate from there right away above?");
       break;
     };
+    case Descriptor_Type_Opaque:
     case Descriptor_Type_Function:
     case Descriptor_Type_Type: {
       panic("TODO figure out how that works");
@@ -1673,7 +1728,7 @@ token_rewrite_constant_expression(
   token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_external_import);
 
-  token_rewrite_struct_definitions(program, token_reset_state_start_index(state), scope, builder) ||
+  token_rewrite_type_definitions(program, token_reset_state_start_index(state), scope, builder) ||
   token_rewrite_function_literal(program, token_reset_state_start_index(state), scope, builder) ||
   token_rewrite_compile_time_eval(program, token_reset_state_start_index(state), scope, builder);
 
@@ -2079,6 +2134,12 @@ token_rewrite_definitions(
   Value *value = token_match_label(program, &rest_state, scope, builder);
   if (!value) {
     Descriptor *descriptor = token_match_type(program, &rest_state, scope, builder);
+    if (!descriptor) {
+      program_error_builder(program, define->location) {
+        program_error_append_literal("Could not find type");
+      }
+      return false;
+    }
     value = reserve_stack(builder, descriptor);
   }
   scope_define_value(scope, name->source, value);
