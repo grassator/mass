@@ -2,15 +2,20 @@
 #include "source.h"
 #include "function.h"
 
-static inline Slice
-token_source_from_start_end(
-  Token *start,
-  Token *end
+Source_Range
+source_range_from_token_matcher_state(
+  const Token_Matcher_State *state,
+  u64 delta
 ) {
-  assert(start->source.bytes <= end->source.bytes);
-  return (Slice) {
-    .bytes = start->source.bytes,
-    .length = end->source.bytes - start->source.bytes,
+  Token *first = *dyn_array_get(state->tokens, state->start_index);
+  Token *last = *dyn_array_get(state->tokens, state->start_index + delta - 1);
+  assert(first->source_range.file == last->source_range.file);
+  return (Source_Range) {
+    .file = first->source_range.file,
+    .offsets = {
+      .from = first->source_range.offsets.from,
+      .to = last->source_range.offsets.to,
+    },
   };
 }
 
@@ -223,33 +228,24 @@ code_point_is_operator(
   }
 }
 
-void
-print_message_with_location(
-  Slice message,
-  Source_Location *location
-) {
-  printf(
-    "%.*s(%llu:%llu): %.*s\n",
-    u64_to_s32(location->filename.length),
-    location->filename.bytes,
-    location->line,
-    location->column,
-    u64_to_s32(message.length),
-    message.bytes
-  );
-}
-
 Tokenizer_Result
 tokenize(
-  Slice filename,
-  Slice source
+  Source_File *file
 ) {
   Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
   Token *root = temp_allocate(Token);
   root->type = Token_Type_Module;
   root->children = dyn_array_make(Array_Token_Ptr);
-  root->source = source;
+  root->source_range = (Source_Range){
+    .file = file,
+    .offsets = {.from = 0, .to = file->text.length},
+  };
+  root->source = slice_sub_range(file->text, root->source_range.offsets);
 
+  assert(!dyn_array_is_initialized(file->lines));
+  file->lines = dyn_array_make(Array_Range_u64);
+
+  Range_u64 current_line = {0};
   Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
   Token *parent = root;
@@ -265,60 +261,70 @@ tokenize(
     current_token = temp_allocate(Token);\
     *current_token = (Token) {\
       .type = (_type_),\
-      .source = {\
-        .bytes = &source.bytes[i],\
-        .length = 1,\
-      },\
-      .location = {\
-        .filename = filename,\
-        .line = line,\
-        .column = column,\
+      .source_range = {\
+        .file = file,\
+        .offsets = {.from = i, .to = i},\
       }\
     };\
   } while(0)
 
-#define push\
+#define do_push\
   do {\
+    current_token->source = \
+      slice_sub_range(file->text, current_token->source_range.offsets);\
     dyn_array_push(parent->children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
   } while(0)
 
-#define push_error(_message_)\
+#define reject_and_push\
+  do {\
+    current_token->source_range.offsets.to = i;\
+    do_push;\
+  } while(0)
+
+#define accept_and_push\
+  do {\
+    current_token->source_range.offsets.to = i + 1;\
+    do_push;\
+  } while(0)
+
+#define push_error(_MESSAGE_)\
   dyn_array_push(errors, (Parse_Error) {\
-    .message = slice_literal(_message_),\
-    .location = {\
-      .filename = filename,\
-      .line = line,\
-      .column = column,\
+    .message = slice_literal(_MESSAGE_),\
+    .source_range = {\
+      .file = file,\
+      .offsets = {.from = i, .to = i},\
     }\
   })
+#define push_line()\
+  do {\
+    current_line.to = i + 1;\
+    dyn_array_push(file->lines, current_line);\
+    current_line.from = current_line.to;\
+  } while(0)
 
-  u64 line = 1;
-  u64 column = 0;
-  for (u64 i = 0; i < source.length; ++i) {
-    s8 ch = source.bytes[i];
-    s8 peek = i + 1 < source.length ? source.bytes[i + 1] : 0;
-
-    if (ch == '\r') {
-      if (peek == '\n') {
-        continue;
-      }
-      ch = '\n';
-    }
+  u64 i = 0;
+  for (; i < file->text.length; ++i) {
+    s8 ch = file->text.bytes[i];
+    s8 peek = i + 1 < file->text.length ? file->text.bytes[i + 1] : 0;
 
     retry: switch(state) {
       case Tokenizer_State_Default: {
         if (ch == '\n') {
           start_token(Token_Type_Newline);
-          push;
+          push_line();
+          accept_and_push;
+        } else if (ch == '\r') {
+          start_token(Token_Type_Newline);
+          if (peek == '\n') i++;
+          push_line();
+          accept_and_push;
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
           start_token(Token_Type_Hex_Integer);
           i++;
-          column++;
-          current_token->source.length++;
           state = Tokenizer_State_Hex_Integer;
         } else if (isdigit(ch)) {
           start_token(Token_Type_Integer);
@@ -377,7 +383,8 @@ tokenize(
             push_error("Mismatched closing brace");
             goto end;
           }
-          parent->source.length = &source.bytes[i] - parent->source.bytes + 1;
+          parent->source_range.offsets.to = i + 1;
+          parent->source = slice_sub_range(file->text, parent->source_range.offsets);
           if (!dyn_array_length(parent_stack)) {
             push_error("Encountered a closing brace without a matching open one");
             goto end;
@@ -391,57 +398,47 @@ tokenize(
         break;
       }
       case Tokenizer_State_Integer: {
-        if (isdigit(ch)) {
-          current_token->source.length++;
-        } else {
-          push;
+        if (!isdigit(ch)) {
+          reject_and_push;
           goto retry;
         }
         break;
       }
       case Tokenizer_State_Hex_Integer: {
-        if (code_point_is_hex_digit(ch)) {
-          current_token->source.length++;
-        } else {
-          push;
+        if (!code_point_is_hex_digit(ch)) {
+          reject_and_push;
           goto retry;
         }
         break;
       }
       case Tokenizer_State_Id: {
-        if (isalpha(ch) || isdigit(ch) || ch == '_') {
-          current_token->source.length++;
-        } else {
-          push;
+        if (!(isalpha(ch) || isdigit(ch) || ch == '_')) {
+          reject_and_push;
           goto retry;
         }
         break;
       }
       case Tokenizer_State_Operator: {
-        if (code_point_is_operator(ch)) {
-          current_token->source.length++;
-        } else {
-          push;
+        if (!code_point_is_operator(ch)) {
+          reject_and_push;
           goto retry;
         }
         break;
       }
       case Tokenizer_State_String: {
-        current_token->source.length++;
         if (ch == '\\') {
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
           u8 *string = allocator_allocate_bytes(temp_allocator, string_buffer->occupied, 1);
           memcpy(string, string_buffer->memory, string_buffer->occupied);
           current_token->string = (Slice){string, string_buffer->occupied};
-          push;
+          accept_and_push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
         }
         break;
       }
       case Tokenizer_State_String_Escape: {
-        current_token->source.length++;
         s8 escaped_character;
         switch (ch) {
           case 'n': escaped_character = '\n'; break;
@@ -462,14 +459,10 @@ tokenize(
         break;
       }
     }
-
-    if (ch == '\n') {
-      line++;
-      column = 0;
-    } else {
-      column++;
-    }
   }
+
+  current_line.to = file->text.length;
+  dyn_array_push(file->lines, current_line);
 
   if (parent != root) {
     push_error("Unexpected end of file. Expected a closing brace.");
@@ -480,7 +473,7 @@ tokenize(
     if (state == Tokenizer_State_String) {
       push_error("Unexpected end of file. Expected a \".");
     } else {
-      dyn_array_push(root->children, current_token);
+      accept_and_push;
     }
   }
   end:
@@ -508,11 +501,13 @@ token_peek(
 
 bool
 token_match(
-  const Token *source,
-  const Token *pattern
+  const Token *token,
+  const Token_Pattern *pattern
 ) {
-  if (pattern->type && pattern->type != source->type) return false;
-  if (pattern->source.length && !slice_equal(pattern->source, source->source)) return false;
+  if (pattern->type && pattern->type != token->type) return false;
+  if (pattern->source.length) {
+    return slice_equal(token->source, pattern->source);
+  }
   return true;
 }
 
@@ -520,18 +515,18 @@ Token *
 token_peek_match(
   Token_Matcher_State *state,
   u64 delta,
-  Token *pattern_token
+  const Token_Pattern *pattern
 ) {
-  Token *source_token = token_peek(state, delta);
-  if (!source_token) return 0;
-  if (!token_match(source_token, pattern_token)) return 0;
-  return source_token;
+  Token *token = token_peek(state, delta);
+  if (!token) return 0;
+  if (!token_match(token, pattern)) return 0;
+  return token;
 }
 
 Array_Token_Matcher_State
 token_split(
   Array_Token_Ptr tokens,
-  const Token *separator
+  const Token_Pattern *separator
 ) {
   Array_Token_Matcher_State result = dyn_array_make(Array_Token_Matcher_State);
 
@@ -549,18 +544,43 @@ token_split(
   return result;
 }
 
+Array_Token_Matcher_State
+token_split_by_newlines_and_semicolons(
+  Array_Token_Ptr tokens
+) {
+  Array_Token_Matcher_State result = dyn_array_make(Array_Token_Matcher_State);
+
+  Array_Token_Ptr sequence = dyn_array_make(Array_Token_Ptr);
+  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
+    Token *token = *dyn_array_get(tokens, i);
+    if (
+      token->type == Token_Type_Newline ||
+      (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal(";")))
+    ) {
+      if (dyn_array_length(sequence)) {
+        dyn_array_push(result, (Token_Matcher_State) { .tokens = sequence });
+        sequence = dyn_array_make(Array_Token_Ptr);
+      }
+    } else {
+      dyn_array_push(sequence, token);
+    }
+  }
+  dyn_array_push(result, (Token_Matcher_State) { .tokens = sequence });
+  return result;
+}
+
 Descriptor *
 scope_lookup_type(
   Program *program,
   Scope *scope,
-  Source_Location location,
+  Source_Range source_range,
   Slice type_name,
   Function_Builder *builder
 ) {
   Value *value = scope_lookup_force(program, scope, type_name, builder);
   if (!value) return 0;
   if (value->descriptor->type != Descriptor_Type_Type) {
-    program_error_builder(program, location) {
+    program_error_builder(program, source_range) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
@@ -571,7 +591,7 @@ scope_lookup_type(
 }
 
 #define Token_Maybe_Match(_id_, ...)\
-  Token *(_id_) = token_peek_match(state, peek_index, &(Token) { __VA_ARGS__ });\
+  Token *(_id_) = token_peek_match(state, peek_index, &(Token_Pattern) { __VA_ARGS__ });\
   if (_id_) (++peek_index)
 
 #define Token_Match(_id_, ...)\
@@ -585,10 +605,7 @@ scope_lookup_type(
   if(peek_index != dyn_array_length(state->tokens)) return 0
 
 #define TOKEN_MATCHED_SOURCE()\
-  token_source_from_start_end(\
-    *dyn_array_get(state->tokens, state->start_index),\
-    *dyn_array_get(state->tokens, state->start_index + peek_index - 1)\
-  )
+  source_range_from_token_matcher_state(state, peek_index)
 
 typedef struct {
   Slice arg_name;
@@ -606,9 +623,9 @@ token_force_type(
   switch (token->type) {
     case Token_Type_Id: {
       descriptor =
-        scope_lookup_type(program, scope, token->location, token->source, builder);
+        scope_lookup_type(program, scope, token->source_range, token->source, builder);
       if (!descriptor) {
-        program_error_builder(program, token->location) {
+        program_error_builder(program, token->source_range) {
           program_error_append_literal("Could not find type ");
           program_error_append_slice(token->source);
         }
@@ -620,7 +637,7 @@ token_force_type(
       if (dyn_array_length(token->children) != 1) {
         program_push_error_from_slice(
           program,
-          token->location,
+          token->source_range,
           slice_literal("Pointer type must have a single type inside")
         );
         return 0;
@@ -633,13 +650,13 @@ token_force_type(
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
         .pointer_to =
-          scope_lookup_type(program, scope, child->location, child->source, builder),
+          scope_lookup_type(program, scope, child->source_range, child->source, builder),
       };
       break;
     }
     case Token_Type_Hex_Integer:
     case Token_Type_Integer: {
-      program_error_builder(program, token->location) {
+      program_error_builder(program, token->source_range) {
         program_error_append_slice(token->source);
         program_error_append_literal(" is not a type");
       }
@@ -648,7 +665,7 @@ token_force_type(
     case Token_Type_Newline: {
       program_push_error_from_slice(
         program,
-        token->location,
+        token->source_range,
         slice_literal("Unexpected newline token")
       );
       return 0;
@@ -677,12 +694,13 @@ typedef Array_Token_Ptr (*token_pattern_callback)(
 Array_Token_Ptr
 token_match_pattern(
   Token_Matcher_State *state,
-  Array_Token_Ptr pattern
+  Array_Token_Pattern pattern_array
 ) {
-  u64 pattern_length = dyn_array_length(pattern);
+  u64 pattern_length = dyn_array_length(pattern_array);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
   for (u64 i = 0; i < pattern_length; ++i) {
-    Token *token = token_peek_match(state, i, *dyn_array_get(pattern, i));
+    Token_Pattern *pattern = dyn_array_get(pattern_array, i);
+    Token *token = token_peek_match(state, i, pattern);
     if (!token) return (Array_Token_Ptr){0};
   }
   Array_Token_Ptr match = dyn_array_make(Array_Token_Ptr, .capacity = pattern_length);
@@ -708,7 +726,7 @@ token_rewrite_pattern(
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
-  Array_Token_Ptr pattern,
+  Array_Token_Pattern pattern,
   token_pattern_callback callback
 ) {
   Array_Token_Ptr match = token_match_pattern(state, pattern);
@@ -829,11 +847,8 @@ token_rewrite_macro_match(
     }
   }
   Array_Token_Ptr replacement = token_apply_macro_replacements(map, macro->replacement);
-  token_replace_length_with_tokens(
-    state,
-    dyn_array_length(macro->pattern),
-    replacement
-  );
+
+  token_replace_length_with_tokens(state, dyn_array_length(macro->pattern), replacement);
   dyn_array_destroy(match);
   hash_map_destroy(map);
 }
@@ -886,7 +901,7 @@ token_match_type(
   if (length > 1) {
     program_push_error_from_slice(
       program,
-      token->location,
+      token->source_range,
       slice_literal("Can not resolve type")
     );
     return 0;
@@ -940,14 +955,14 @@ token_force_value(
       bool ok = false;
       u64 number = slice_parse_u64(token->source, &ok);
       if (!ok) {
-        program_error_builder(program, token->location) {
+        program_error_builder(program, token->source_range) {
           program_error_append_literal("Invalid integer literal: ");
           program_error_append_slice(token->source);
         }
         return;
       }
       Value *immediate = value_from_unsigned_immediate(number);
-      move_value(builder, &token->location, result_value, immediate);
+      move_value(builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Type_Hex_Integer: {
@@ -955,7 +970,7 @@ token_force_value(
       Slice digits = slice_sub(token->source, 2, token->source.length);
       u64 number = slice_parse_hex(digits, &ok);
       if (!ok) {
-        program_error_builder(program, token->location) {
+        program_error_builder(program, token->source_range) {
           program_error_append_literal("Invalid integer hex literal: ");
           program_error_append_slice(token->source);
         }
@@ -963,31 +978,31 @@ token_force_value(
       }
       // TODO should be unsigned
       Value *immediate = value_from_signed_immediate(number);
-      move_value(builder, &token->location, result_value, immediate);
+      move_value(builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Type_String: {
       Slice string = token->string;
       Value *string_bytes = value_global_c_string_from_slice(program, string);
-      Value *c_string_pointer = value_pointer_to(builder, &token->location, string_bytes);
-      move_value(builder, &token->location, result_value, c_string_pointer);
+      Value *c_string_pointer = value_pointer_to(builder, &token->source_range, string_bytes);
+      move_value(builder, &token->source_range, result_value, c_string_pointer);
       return;
     }
     case Token_Type_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(program, scope, name, builder);
       if (!value) {
-        program_error_builder(program, token->location) {
+        program_error_builder(program, token->source_range) {
           program_error_append_literal("Undefined variable ");
           program_error_append_slice(name);
         }
       } else {
-        move_value(builder, &token->location, result_value, value);
+        move_value(builder, &token->source_range, result_value, value);
       }
       return;
     }
     case Token_Type_Value: {
-      move_value(builder, &token->location, result_value, token->value);
+      move_value(builder, &token->source_range, result_value, token->value);
       return;
     }
     case Token_Type_Paren: {
@@ -1010,7 +1025,7 @@ token_force_value(
     case Token_Type_Newline: {
       program_push_error_from_slice(
         program,
-        token->location,
+        token->source_range,
         slice_literal("Unexpected newline token")
       );
       return;
@@ -1031,7 +1046,7 @@ token_match_call_arguments(
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (dyn_array_length(token->children) != 0) {
-    Array_Token_Matcher_State argument_states = token_split(token->children, &(Token){
+    Array_Token_Matcher_State argument_states = token_split(token->children, &(Token_Pattern){
       .type = Token_Type_Operator,
       .source = slice_literal(","),
     });
@@ -1055,14 +1070,13 @@ token_match_call_arguments(
 static inline Token *
 token_value_make(
   Value *result,
-  Source_Location location,
-  Slice source
+  Source_Range source_range
 ) {
   Token *result_token = temp_allocate(Token);
   *result_token = (Token){
     .type = Token_Type_Value,
-    .source = source,
-    .location = location,
+    .source_range = source_range,
+    .source = slice_sub_range(source_range.file->text, source_range.offsets),
     .value = result,
   };
   return result_token;
@@ -1118,20 +1132,27 @@ token_rewrite_macro_definitions(
   Token_Match(replacement_token, .type = Token_Type_Paren);
   token_replace_tokens_in_state(state, 3, 0);
 
-  Array_Token_Ptr pattern = dyn_array_make(Array_Token_Ptr);
+  Array_Token_Pattern pattern = dyn_array_make(Array_Token_Pattern);
   Array_Slice pattern_names = dyn_array_make(Array_Slice);
 
   for (u64 i = 0; i < dyn_array_length(pattern_token->children); ++i) {
     Token *token = *dyn_array_get(pattern_token->children, i);
     if (token->type == Token_Type_Id && slice_starts_with(token->source, slice_literal("_"))) {
-      Slice name = slice_sub(token->source, 1, token->source.length);
-      dyn_array_push(pattern_names, name);
-      Token *item = temp_allocate(Token);
-      *item = (Token){0};
-      dyn_array_push(pattern, item);
+      Slice pattern_name = slice_sub(token->source, 1, token->source.length);
+      dyn_array_push(pattern_names, pattern_name);
+      dyn_array_push(pattern, (Token_Pattern) {0});
     } else {
       dyn_array_push(pattern_names, (Slice){0});
-      dyn_array_push(pattern, token);
+      if (token->type == Token_Type_Id) {
+        dyn_array_push(pattern, (Token_Pattern) {
+          .type = token->type,
+          .source = token->source,
+        });
+      } else {
+        dyn_array_push(pattern, (Token_Pattern) {
+          .type = token->type,
+        });
+      }
     }
   }
 
@@ -1172,23 +1193,6 @@ token_match_struct_field(
   return true;
 }
 
-void
-token_rewrite_newlines_with_semicolons(
-  Array_Token_Ptr children
-) {
-  // TODO remove this and instead support multiple matches in token_split?
-  static Token fake_semicolon = {
-    .type = Token_Type_Operator,
-    .source = slice_literal_fields(";"),
-  };
-  for(u64 i = 0; i < dyn_array_length(children); ++i) {
-    Token **token = dyn_array_get(children, i);
-    if ((*token)->type == Token_Type_Newline) {
-      *token = &fake_semicolon;
-    }
-  }
-}
-
 bool
 token_rewrite_type_definitions(
   Program *program,
@@ -1213,7 +1217,8 @@ token_rewrite_type_definitions(
       Token *token = *dyn_array_get(layout_token->children, 0);
       // TODO should be a compile time function later on
       if (token->type == Token_Type_Id && slice_equal(token->source, slice_literal("c_struct"))) {
-        layout_block = token_peek_match(state, peek_index++, &(Token) { .type = Token_Type_Curly });
+        layout_block =
+          token_peek_match(state, peek_index++, &(Token_Pattern) { .type = Token_Type_Curly });
         if (!layout_block) {
           // TODO print error
           goto err;
@@ -1264,11 +1269,8 @@ token_rewrite_type_definitions(
     };
 
     if (dyn_array_length(layout_block->children) != 0) {
-      token_rewrite_newlines_with_semicolons(layout_block->children);
-      Array_Token_Matcher_State definitions = token_split(layout_block->children, &(Token){
-        .type = Token_Type_Operator,
-        .source = slice_literal(";"),
-      });
+      Array_Token_Matcher_State definitions =
+        token_split_by_newlines_and_semicolons(layout_block->children);
       for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
         Token_Matcher_State *field_state = dyn_array_get(definitions, i);
         token_match_struct_field(program, descriptor, field_state, scope, builder);
@@ -1285,7 +1287,7 @@ token_rewrite_type_definitions(
     .descriptor = value_descriptor,
     .operand = {.type = Operand_Type_None },
   };
-  replacement_token = token_value_make(result, name->location, TOKEN_MATCHED_SOURCE());
+  replacement_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
 
   err:
   u64 replacement_count = layout_block ? 3 : 2;
@@ -1327,38 +1329,38 @@ token_maybe_split_on_operator(
 
 Token *
 token_import_match_arguments(
-  Source_Location location,
+  Source_Range source_range,
   Token_Matcher_State *state,
   Program *program
 ) {
   u64 peek_index = 0;
-  Token *library_name_token = token_peek_match(state, peek_index++, &(Token) {
+  Token *library_name_token = token_peek_match(state, peek_index++, &(Token_Pattern) {
     .type = Token_Type_String,
   });
   if (!library_name_token) {
     program_push_error_from_slice(
-      program, location,
+      program, source_range,
       slice_literal("First argument to external() must be a literal string")
     );
     return 0;
   }
-  Token *comma = token_peek_match(state, peek_index++, &(Token) {
+  Token *comma = token_peek_match(state, peek_index++, &(Token_Pattern) {
     .type = Token_Type_Operator,
     .source = slice_literal(","),
   });
   if (!comma) {
     program_push_error_from_slice(
-      program, location,
+      program, source_range,
       slice_literal("external(\"library_name\", \"symbol_name\") requires two arguments")
     );
     return 0;
   }
-  Token *symbol_name_token = token_peek_match(state, peek_index++, &(Token) {
+  Token *symbol_name_token = token_peek_match(state, peek_index++, &(Token_Pattern) {
     .type = Token_Type_String,
   });
   if (!symbol_name_token) {
     program_push_error_from_slice(
-      program, location,
+      program, source_range,
       slice_literal("Second argument to external() must be a literal string")
     );
     return 0;
@@ -1375,7 +1377,7 @@ token_import_match_arguments(
       symbol_name
     ),
   };
-  return token_value_make(result, library_name_token->location, TOKEN_MATCHED_SOURCE());
+  return token_value_make(result, TOKEN_MATCHED_SOURCE());
 }
 
 bool
@@ -1389,8 +1391,8 @@ token_rewrite_external_import(
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("external"));
   Token_Match(args, .type = Token_Type_Paren);
   Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
-  Token *result_token = token_import_match_arguments(args->location, args_state, program);
-
+  Token *result_token = token_import_match_arguments(args->source_range, args_state, program);
+  if (!result_token) return false;
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
 }
@@ -1458,23 +1460,23 @@ token_rewrite_function_literal(
   Token_Match(args, .type = Token_Type_Paren);
   Token_Match_Operator(arrow, "->");
   Token_Match(return_types, .type = Token_Type_Paren);
-  Token_Match(body, 0);
+  Token_Maybe_Match(external_body, .type = Token_Type_Value);
+  Token_Maybe_Match(regular_body, .type = Token_Type_Curly);
 
   Scope *function_scope = scope_make(program->global_scope);
 
   Function_Builder *builder = 0;
   // TODO think about a better way to distinguish imports
-  bool is_external = body->type == Token_Type_Value;
   Descriptor *descriptor = 0;
 
-  if (is_external) {
+  if (external_body) {
     if (inline_) {
-      program_error_builder(program, inline_->location) {
+      program_error_builder(program, inline_->source_range) {
         program_error_append_literal("External functions can not be inline");
       }
       inline_ = 0;
     }
-    if(!body->value) return 0;
+    if(!external_body->value) return 0;
     descriptor = temp_allocate(Descriptor);
     *descriptor = (Descriptor) {
       .type = Descriptor_Type_Function,
@@ -1484,9 +1486,12 @@ token_rewrite_function_literal(
         .returns = 0,
       },
     };
-  } else {
+  } else if (regular_body) {
     builder = fn_begin(program);
     descriptor = builder->descriptor;
+  } else {
+    // FIXME better error reporting or maybe consider this a function type
+    return 0;
   }
 
   switch (dyn_array_length(return_types->children)) {
@@ -1509,7 +1514,7 @@ token_rewrite_function_literal(
   }
 
   if (dyn_array_length(args->children) != 0) {
-    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token){
+    Array_Token_Matcher_State argument_states = token_split(args->children, &(Token_Pattern){
       .type = Token_Type_Operator,
       .source = slice_literal(","),
     });
@@ -1520,7 +1525,7 @@ token_rewrite_function_literal(
         token_match_argument(program, args_state, function_scope, outer_builder);
       if (!arg) return 0;
       Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
-      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
+      if (regular_body && arg_value->operand.type == Operand_Type_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
       dyn_array_push(descriptor->function.argument_names, arg->arg_name);
@@ -1533,9 +1538,9 @@ token_rewrite_function_literal(
   }
 
   Value *result = 0;
-  if (is_external) {
-    body->value->descriptor = descriptor;
-    result = body->value;
+  if (external_body) {
+    external_body->value->descriptor = descriptor;
+    result = external_body->value;
   } else {
     Value *return_result_value =
       descriptor->function.returns->descriptor->type == Descriptor_Type_Void
@@ -1543,16 +1548,16 @@ token_rewrite_function_literal(
         : descriptor->function.returns;
     if (inline_) {
       descriptor->function.parent_scope = scope;
-      descriptor->function.inline_body = token_clone_deep(body);
+      descriptor->function.inline_body = token_clone_deep(regular_body);
     }
     // TODO might want to do this lazily for inline functions
-    token_parse_block(program, body, function_scope, builder, return_result_value);
+    token_parse_block(program, regular_body, function_scope, builder, return_result_value);
 
     fn_end(builder);
     result = builder->value;
   }
   u64 replacement_count = inline_ ? 5 : 4;
-  Token *value_token = token_value_make(result, arrow->location, TOKEN_MATCHED_SOURCE());
+  Token *value_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, replacement_count, value_token);
   return true;
 }
@@ -1582,7 +1587,7 @@ token_rewrite_negative_literal(
     panic("Internal error, expected an immediate");
   }
 
-  Token *value_token = token_value_make(result, integer->location, TOKEN_MATCHED_SOURCE());
+  Token *value_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, value_token);
   return true;
 }
@@ -1615,8 +1620,6 @@ compile_time_eval(
   Scope *scope
 ) {
   Token *first_token = *dyn_array_get(state->tokens, state->start_index);
-  Token *last_token =
-    *dyn_array_get(state->tokens, dyn_array_length(state->tokens) - state->start_index - 1);
 
   Program eval_program = {
     .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
@@ -1662,7 +1665,7 @@ compile_time_eval(
     },
   };
 
-  move_value(eval_builder, &first_token->location, out_value, expression_result_value);
+  move_value(eval_builder, &first_token->source_range, out_value, expression_result_value);
   fn_end(eval_builder);
 
   program_jit(&eval_program);
@@ -1731,7 +1734,10 @@ compile_time_eval(
     }
   }
   return token_value_make(
-    token_value, first_token->location, token_source_from_start_end(first_token, last_token)
+    token_value,
+    source_range_from_token_matcher_state(
+      state, dyn_array_length(state->tokens) - state->start_index
+    )
   );
 }
 
@@ -1788,6 +1794,9 @@ token_rewrite_constant_expression(
   Scope *scope,
   Function_Builder *builder
 ) {
+  u64 token_count = dyn_array_length(state->tokens);
+  if (!token_count) return 0;
+  Source_Range source_range =  source_range_from_token_matcher_state(state, token_count);
   token_rewrite_statement(program, state, scope, builder, token_clear_newlines);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_external_import);
@@ -1800,9 +1809,9 @@ token_rewrite_constant_expression(
   token_rewrite_statement(program, state, scope, builder, token_rewrite_constant_sub_expression);
 
   if (dyn_array_length(state->tokens) != 1) {
-    // FIXME :LocationInfoMissing
     program_push_error_from_slice(
-      program, (Source_Location){0}, slice_literal("Invalid constant definition")
+      program, source_range,
+      slice_literal("Invalid constant definition")
     );
     return 0;
   }
@@ -1836,7 +1845,7 @@ void
 token_match_statement(
   Program *program,
   Token_Matcher_State *state,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Scope *scope,
   Function_Builder *builder,
   Value *statement_result_value
@@ -1862,12 +1871,8 @@ token_parse_block(
   // { 42 ; }
   while ((*dyn_array_last(children))->type == Token_Type_Newline) dyn_array_pop(children);
 
-  token_rewrite_newlines_with_semicolons(children);
 
-  Array_Token_Matcher_State block_statements = token_split(children, &(Token){
-    .type = Token_Type_Operator,
-    .source = slice_literal(";"),
-  });
+  Array_Token_Matcher_State block_statements = token_split_by_newlines_and_semicolons(children);
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
@@ -1883,7 +1888,7 @@ token_parse_block(
       }
     }
 
-    token_match_statement(program, state, &block->location, block_scope, builder, result_value);
+    token_match_statement(program, state, &block->source_range, block_scope, builder, result_value);
   }
   return;
 }
@@ -1904,11 +1909,11 @@ token_rewrite_statement_if(
   Value *condition_value = value_any();
   token_force_value(program, condition, scope, builder, condition_value);
   Label_Index else_label = make_if(
-    program, &builder->code_block.instructions, &keyword->location, condition_value
+    program, &builder->code_block.instructions, &keyword->source_range, condition_value
   );
   token_parse_block(program, body, scope, builder, value_any());
   push_instruction(
-    &builder->code_block.instructions, &keyword->location,
+    &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
@@ -1934,11 +1939,11 @@ token_rewrite_goto(
       value->operand.type == Operand_Type_Label_32
     ) {
       push_instruction(
-        &builder->code_block.instructions, &keyword->location,
+        &builder->code_block.instructions, &keyword->source_range,
         (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
       );
     } else {
-      program_error_builder(program, label_name->location) {
+      program_error_builder(program, label_name->source_range) {
         program_error_append_slice(label_name->source);
         program_error_append_literal(" is not a label");
       }
@@ -1968,14 +1973,14 @@ token_rewrite_explicit_return(
   bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
   if (!is_void && !has_return_expression) {
     program_push_error_from_slice(
-      program, keyword->location,
+      program, keyword->source_range,
       slice_literal("Explicit return from a non-void function requires a value")
     );
   }
 
   push_instruction(
     &builder->code_block.instructions,
-    &keyword->location,
+    &keyword->source_range,
     (Instruction) {.assembly = {jmp, {label32(builder->code_block.end_label), 0, 0}}}
   );
 
@@ -1996,8 +2001,8 @@ token_rewrite_pointer_to(
 
   Value *pointee = value_any();
   token_force_value(program, value_token, scope, builder, pointee);
-  Value *result = value_pointer_to(builder, &operator->location, pointee);
-  Token *token_value = token_value_make(result, operator->location, TOKEN_MATCHED_SOURCE());
+  Value *result = value_pointer_to(builder, &operator->source_range, pointee);
+  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2012,7 +2017,8 @@ token_match_fixed_array_type(
   u64 peek_index = 0;
   Token_Match(type, .type = Token_Type_Id);
   Token_Match(square_brace, .type = Token_Type_Square);
-  Descriptor *descriptor = scope_lookup_type(program, scope, type->location, type->source, builder);
+  Descriptor *descriptor =
+    scope_lookup_type(program, scope, type->source_range, type->source, builder);
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
   // FIXME :TargetValue Make a convention to have this as a constant / immediate
@@ -2021,7 +2027,7 @@ token_match_fixed_array_type(
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
       program,
-      square_brace->location,
+      square_brace->source_range,
       slice_literal("Fixed size array size is not an integer")
     );
     return 0;
@@ -2029,7 +2035,7 @@ token_match_fixed_array_type(
   if (!operand_is_immediate(&size_value->operand)) {
     program_push_error_from_slice(
       program,
-      square_brace->location,
+      square_brace->source_range,
       slice_literal("Fixed size array size must be known at compile time")
     );
     return 0;
@@ -2064,7 +2070,7 @@ token_rewrite_inline_machine_code_bytes(
 
   u64 byte_count = dyn_array_length(args);
   if (byte_count > 15) {
-    program_error_builder(program, args_token->location) {
+    program_error_builder(program, args_token->source_range) {
       program_error_append_literal("Expected a maximum of 15 arguments, got ");
       program_error_append_number("%lld", byte_count);
     }
@@ -2076,20 +2082,20 @@ token_rewrite_inline_machine_code_bytes(
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->descriptor->type != Descriptor_Type_Integer) {
-      program_error_builder(program, args_token->location) {
+      program_error_builder(program, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
       }
       goto end;
     }
     if (!operand_is_immediate(&value->operand)) {
-      program_error_builder(program, args_token->location) {
+      program_error_builder(program, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
       }
       goto end;
     }
     s64 byte = operand_immediate_as_s64(&value->operand);
     if (!u64_fits_into_u8(byte)) {
-      program_error_builder(program, args_token->location) {
+      program_error_builder(program, args_token->source_range) {
         program_error_append_literal("Expected integer between 0 and 255, got ");
         program_error_append_number("%lld", byte);
       }
@@ -2099,7 +2105,7 @@ token_rewrite_inline_machine_code_bytes(
   }
 
   push_instruction(
-    &builder->code_block.instructions, &id_token->location,
+    &builder->code_block.instructions, &id_token->source_range,
     (Instruction) {
       .type = Instruction_Type_Bytes,
       .bytes = fixed_buffer_as_slice(buffer),
@@ -2145,11 +2151,11 @@ token_rewrite_cast(
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       result = reserve_stack(builder, cast_to_descriptor);
-      move_value(builder, &cast->location, result, value);
+      move_value(builder, &cast->source_range, result, value);
     }
   }
 
-  Token *token_value = token_value_make(result, cast->location, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2167,7 +2173,7 @@ token_match_label(
 
   Label_Index label = make_label(program, &program->code_section);
   push_instruction(
-    &builder->code_block.instructions, &keyword->location,
+    &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = label }
   );
   Value *value = temp_allocate(Value);
@@ -2202,7 +2208,7 @@ token_rewrite_definitions(
   if (!value) {
     Descriptor *descriptor = token_match_type(program, &rest_state, scope, builder);
     if (!descriptor) {
-      program_error_builder(program, define->location) {
+      program_error_builder(program, define->source_range) {
         program_error_append_literal("Could not find type");
       }
       return false;
@@ -2210,7 +2216,7 @@ token_rewrite_definitions(
     value = reserve_stack(builder, descriptor);
   }
   scope_define_value(scope, name->source, value);
-  Token *token_value = token_value_make(value, name->location, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, size_to_replace, token_value);
 
   return true;
@@ -2253,7 +2259,7 @@ token_rewrite_definition_and_assignment_statements(
     panic("TODO decide how to handle floats");
   }
   Value *on_stack = reserve_stack(builder, value->descriptor);
-  move_value(builder, &name->location, on_stack, value);
+  move_value(builder, &name->source_range, on_stack, value);
 
   scope_define_value(scope, name->source, on_stack);
 
@@ -2315,7 +2321,7 @@ token_rewrite_array_index(
     }
     Value *index_value_in_register =
       value_register_for_descriptor(Register_R10, index_value->descriptor);
-    move_value(builder, &target_token->location, index_value_in_register, index_value);
+    move_value(builder, &target_token->source_range, index_value_in_register, index_value);
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
@@ -2333,7 +2339,7 @@ token_rewrite_array_index(
     panic("TODO");
   }
 
-  Token *token_value = token_value_make(result, target_token->location, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2354,7 +2360,7 @@ token_rewrite_struct_field(
   token_force_value(program, struct_token, scope, builder, struct_value);
   Value *result = struct_get_field(struct_value, field_name->source);
 
-  Token *token_value = token_value_make(result, struct_token->location, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2388,7 +2394,7 @@ token_rewrite_assignment(
     Token *first_token = *dyn_array_get(lhs_state.tokens, 0);
     program_push_error_from_slice(
       program,
-      first_token->location,
+      first_token->source_range,
       slice_literal("Could not parse the target of the assignment")
     );
   }
@@ -2447,13 +2453,13 @@ token_rewrite_function_calls(
   }
 
   if (target->descriptor->type != Descriptor_Type_Function) {
-    program_error_builder(program, target_token->location) {
+    program_error_builder(program, target_token->source_range) {
       program_error_append_slice(target_token->source);
       program_error_append_literal(" is not a function");
     }
     return false;
   }
-  Source_Location *location = &target_token->location;
+  Source_Range *source_range = &target_token->source_range;
   Value *overload = find_matching_function_overload(builder, target, args);
   if (overload) {
     Value *return_value;
@@ -2491,20 +2497,19 @@ token_rewrite_function_calls(
 
       push_instruction(
         &builder->code_block.instructions,
-        &target_token->location,
+        &target_token->source_range,
         (Instruction) {
           .type = Instruction_Type_Label,
           .label = inline_builder.code_block.end_label
         }
       );
     } else {
-      return_value = call_function_overload(builder, location, overload, args);
+      return_value = call_function_overload(builder, source_range, overload, args);
     }
-    Token *token_value =
-      token_value_make(return_value, args_token->location, TOKEN_MATCHED_SOURCE());
+    Token *token_value = token_value_make(return_value, TOKEN_MATCHED_SOURCE());
     token_replace_tokens_in_state(state, 2, token_value);
   } else {
-    program_error_builder(program, target_token->location) {
+    program_error_builder(program, target_token->source_range) {
       // TODO add better error message
       program_error_append_literal("Could not find matching overload");
     }
@@ -2531,8 +2536,8 @@ token_rewrite_plus(
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
-  plus(builder, &op_token->location, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  plus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2554,8 +2559,8 @@ token_rewrite_minus(
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
-  minus(builder, &op_token->location, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  minus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2578,8 +2583,8 @@ token_rewrite_divide(
   token_force_value(program, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
-  divide(builder, &op_token->location, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, op_token->location, TOKEN_MATCHED_SOURCE());
+  divide(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2602,8 +2607,8 @@ token_rewrite_remainder(
   Value *rhs_value = value_any();
   token_force_value(program, rhs, scope, builder, rhs_value);
   Value *temp = reserve_stack(builder, lhs_value->descriptor);
-  value_remainder(builder, &op_token->location, temp, lhs_value, rhs_value);
-  Token *token_value = token_value_make(temp, op_token->location, TOKEN_MATCHED_SOURCE());
+  value_remainder(builder, &op_token->source_range, temp, lhs_value, rhs_value);
+  Token *token_value = token_value_make(temp, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2762,8 +2767,8 @@ token_rewrite_compare(
     }
   }
 
-  compare(compare_type, builder, &operator->location, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, operator->location, TOKEN_MATCHED_SOURCE());
+  compare(compare_type, builder, &operator->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(result_value,TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2772,7 +2777,7 @@ void
 token_match_statement(
   Program *program,
   Token_Matcher_State *state,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value
@@ -2834,9 +2839,9 @@ token_match_expression(
     }
     default: {
       Token *token = *dyn_array_get(state->tokens, 0);
-      program_push_error_from_slice(
-        program, token->location, slice_literal("Could not parse the expression")
-      );
+      program_error_builder(program, token->source_range) {
+        program_error_append_literal("Could not parse the expression");
+      }
       return;
     }
   }
@@ -2854,12 +2859,8 @@ token_match_module(
 
   Function_Builder global_builder = { 0 };
 
-  token_rewrite_newlines_with_semicolons(token->children);
-
-  Array_Token_Matcher_State module_statements = token_split(token->children, &(Token){
-    .type = Token_Type_Operator,
-    .source = slice_literal(";"),
-  });
+  Array_Token_Matcher_State module_statements =
+    token_split_by_newlines_and_semicolons(token->children);
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(module_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
@@ -2876,10 +2877,9 @@ token_match_module(
 Parse_Result
 program_parse(
   Program *program,
-  Slice file_path,
-  Slice source
+  Source_File *file
 ) {
-  Tokenizer_Result tokenizer_result = tokenize(file_path, source);
+  Tokenizer_Result tokenizer_result = tokenize(file);
   if (tokenizer_result.type != Tokenizer_Result_Type_Success) {
     return (Parse_Result) {
       .type = Parse_Result_Type_Error,
@@ -2941,13 +2941,18 @@ program_import_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
+  Source_File *file = temp_allocate(Source_File);
+  *file = (Source_File) {
+    .path = file_path,
+    .text = {0},
+  };
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
     Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
     dyn_array_push(errors, (Parse_Error) {
       .message = slice_literal("Unable to open the file"),
-      .location = {
-        .filename = file_path,
+      .source_range = {
+        .file = file,
       },
     });
     return (Parse_Result) {
@@ -2955,8 +2960,7 @@ program_import_file(
       .errors = errors,
     };
   }
-  Slice source = fixed_buffer_as_slice(buffer);
-
-  return program_parse(program, file_path, source);
+  file->text = fixed_buffer_as_slice(buffer);
+  return program_parse(program, file);
 }
 

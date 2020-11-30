@@ -7,10 +7,13 @@
 #include "source.c"
 
 spec("function") {
-  static Source_Location test_location = {
-    .filename = slice_literal_fields(__FILE__),
-    .line = 0,
-    .column = 0,
+  static Source_File test_source_file = {
+    .path = slice_literal_fields(__FILE__),
+    .text = slice_literal_fields(""),
+  };
+  static Source_Range test_range = {
+    .file = &test_source_file,
+    .offsets = {0},
   };
   static Function_Builder *builder = 0;
 
@@ -37,19 +40,19 @@ spec("function") {
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      move_value(builder, &test_location, reg_a, reg_a);
+      move_value(builder, &test_range, reg_a, reg_a);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
     it("should not add any instructions when moving value to itself (value equality)") {
       Value *reg_a1 = value_register_for_descriptor(Register_A, &descriptor_s8);
       Value *reg_a2 = value_register_for_descriptor(Register_A, &descriptor_s8);
-      move_value(builder, &test_location, reg_a1, reg_a2);
+      move_value(builder, &test_range, reg_a1, reg_a2);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
     it("should set the descriptor of `source` type if `target` is Any but still copy") {
       Value *reg_a = &(Value){ .descriptor = &descriptor_any, .operand = al };
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
-      move_value(builder, &test_location, reg_a, reg_b);
+      move_value(builder, &test_range, reg_a, reg_b);
       check(reg_a->descriptor == reg_b->descriptor);
       check(dyn_array_length(builder->code_block.instructions) == 1);
     }
@@ -59,7 +62,7 @@ spec("function") {
         .operand = { .type = Operand_Type_Any },
       };
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s8);
-      move_value(builder, &test_location, reg_a, reg_b);
+      move_value(builder, &test_range, reg_a, reg_b);
       check(operand_equal(&reg_a->operand, &reg_b->operand));
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
@@ -76,7 +79,7 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates)); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(builder, &test_location, reg_a, immediates[j]);
+          move_value(builder, &test_range, reg_a, immediates[j]);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction_equal(
@@ -98,7 +101,7 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(builder, &test_location, reg_a, immediates[j]);
+          move_value(builder, &test_range, reg_a, immediates[j]);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
@@ -122,7 +125,7 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(builder, &test_location, memory, immediates[j]);
+          move_value(builder, &test_range, memory, immediates[j]);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
@@ -135,7 +138,7 @@ spec("function") {
     }
     it("should use a 32bit immediate when the value fits for a move to a 64bit value") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
-      move_value(builder, &test_location, memory, value_from_s64(42000));
+      move_value(builder, &test_range, memory, value_from_s64(42000));
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction->assembly.mnemonic == mov);
@@ -145,7 +148,7 @@ spec("function") {
     it("should use a temp register for a imm64 to memory move") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
       Value *immediate = value_from_s64(42ll << 32);
-      move_value(builder, &test_location, memory, immediate);
+      move_value(builder, &test_range, memory, immediate);
       check(dyn_array_length(builder->code_block.instructions) == 2);
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s64);
       check(instruction_equal(
@@ -167,7 +170,7 @@ spec("function") {
         dyn_array_clear(builder->code_block.instructions);
         Value *memory = &(Value){&descriptor_s8, stack(0, 1)};
         Value *eflags = value_from_compare(tests[i].compare_type);
-        move_value(builder, &test_location, memory, eflags);
+        move_value(builder, &test_range, memory, eflags);
         check(dyn_array_length(builder->code_block.instructions) == 1);
         Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
         check(instruction->assembly.mnemonic == tests[i].mnemonic);
@@ -190,7 +193,7 @@ spec("function") {
         Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
         Value *resized_reg_a = value_register_for_descriptor(Register_A, tests[i].descriptor);
         Value *eflags = value_from_compare(Compare_Type_Equal);
-        move_value(builder, &test_location, memory, eflags);
+        move_value(builder, &test_range, memory, eflags);
         check(dyn_array_length(builder->code_block.instructions) == 3);
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 0),
@@ -210,7 +213,7 @@ spec("function") {
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      plus(builder, &test_location, reg_a, value_from_s8(30), value_from_s8(12));
+      plus(builder, &test_range, reg_a, value_from_s8(30), value_from_s8(12));
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
@@ -222,7 +225,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      plus(builder, &test_location, reg_a, reg_b, reg_c);
+      plus(builder, &test_range, reg_a, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 2);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -237,7 +240,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      plus(builder, &test_location, reg_a, reg_a, reg_b);
+      plus(builder, &test_range, reg_a, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -248,7 +251,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      plus(builder, &test_location, reg_b, reg_a, reg_b);
+      plus(builder, &test_range, reg_b, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -259,7 +262,7 @@ spec("function") {
       Value *r32 = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s32);
       Value *result_m32 = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m8 = &(Value){&descriptor_s8, stack(0, 1)};
-      plus(builder, &test_location, result_m32, r32, m8);
+      plus(builder, &test_range, result_m32, r32, m8);
       check(dyn_array_length(builder->code_block.instructions) == 3);
       Value *temp = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s32);
       check(instruction_equal(
@@ -280,7 +283,7 @@ spec("function") {
       Value *m_a = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m_b = &(Value){&descriptor_s32, stack(4, 4)};
 
-      plus(builder, &test_location, m_a, m_a, m_b);
+      plus(builder, &test_range, m_a, m_a, m_b);
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -299,7 +302,7 @@ spec("function") {
   describe("minus") {
     it("should fold s8 immediates and move them to the result value") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s8);
-      minus(builder, &test_location, reg_a, value_from_s8(52), value_from_s8(10));
+      minus(builder, &test_range, reg_a, value_from_s8(52), value_from_s8(10));
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
@@ -311,7 +314,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      minus(builder, &test_location, reg_a, reg_b, reg_c);
+      minus(builder, &test_range, reg_a, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 2);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -326,7 +329,7 @@ spec("function") {
       Value *reg_a = value_register_for_descriptor(Register_A, &descriptor_s32);
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
 
-      minus(builder, &test_location, reg_a, reg_a, reg_b);
+      minus(builder, &test_range, reg_a, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
@@ -338,7 +341,7 @@ spec("function") {
       Value *reg_b = value_register_for_descriptor(Register_B, &descriptor_s32);
       Value *reg_c = value_register_for_descriptor(Register_C, &descriptor_s32);
 
-      minus(builder, &test_location, reg_c, reg_b, reg_c);
+      minus(builder, &test_range, reg_c, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),

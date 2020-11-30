@@ -22,8 +22,8 @@ typedef dyn_array_type(Token *) Array_Token_Ptr;
 
 typedef struct Token {
   Token_Type type;
+  Source_Range source_range;
   Slice source;
-  Source_Location location;
   union {
     Array_Token_Ptr children;
     Value *value;
@@ -31,6 +31,12 @@ typedef struct Token {
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
+
+typedef struct {
+  Token_Type type;
+  Slice source;
+} Token_Pattern;
+typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 
 typedef enum {
   Tokenizer_State_Default,
@@ -67,7 +73,7 @@ hash_map_slice_template(Scope_Map, Array_Scope_Entry)
 hash_map_slice_template(Macro_Replacement_Map, Token *)
 
 typedef struct {
-  Array_Token_Ptr pattern;
+  Array_Token_Pattern pattern;
   Array_Token_Ptr replacement;
   Array_Slice pattern_names;
 } Macro;
@@ -103,14 +109,14 @@ token_parse_block(
 void
 program_push_error_from_bucket_buffer(
   Program *program,
-  Source_Location location,
+  Source_Range source_range,
   Bucket_Buffer *buffer
 );
 
 void
 program_push_error_from_slice(
   Program *program,
-  Source_Location location,
+  Source_Range source_range,
   Slice message
 );
 

@@ -465,11 +465,27 @@ typedef struct {
   u32 encoding_count;
 } X64_Mnemonic;
 
+typedef dyn_array_type(Range_u64) Array_Range_u64;
 typedef struct {
-  Slice filename;
+  Slice path;
+  Slice text;
+  Array_Range_u64 lines;
+} Source_File;
+
+typedef struct {
   u64 line;
   u64 column;
-} Source_Location;
+} Source_Position;
+
+typedef struct {
+  const Source_File *file;
+  Range_u64 offsets;
+} Source_Range;
+
+void
+source_range_print_start_position(
+  const Source_Range *source_range
+);
 
 typedef enum {
   Instruction_Type_Assembly,
@@ -490,7 +506,7 @@ typedef struct {
     Slice bytes;
   };
   Compiler_Source_Location compiler_source_location;
-  const Source_Location *source_location;
+  const Source_Range *source_range;
   u8 encoded_byte_size;
 } Instruction;
 
@@ -572,7 +588,7 @@ typedef struct Scope Scope;
 
 typedef struct {
   Slice message;
-  Source_Location location;
+  Source_Range source_range;
 } Parse_Error;
 typedef dyn_array_type(Parse_Error) Array_Parse_Error;
 

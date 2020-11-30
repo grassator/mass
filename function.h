@@ -21,10 +21,10 @@ instruction_add_compiler_location_internal(
 
 static inline Instruction *
 instruction_add_source_location_internal(
-  const Source_Location *source_location,
+  const Source_Range *source_range,
   Instruction *instruction
 ) {
-  instruction->source_location = source_location;
+  instruction->source_range = source_range;
   return instruction;
 }
 
@@ -58,7 +58,7 @@ make_trampoline(
 void
 move_value(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *a,
   Value *b
 );
@@ -94,20 +94,20 @@ Loop_Builder
 loop_start(
   Program *program,
   Array_Instruction *instructions,
-  const Source_Location *location
+  const Source_Range *source_range
 );
 
 void
 loop_end(
   Array_Instruction *instructions,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Loop_Builder *loop
 );
 
 void
 plus(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
@@ -116,7 +116,7 @@ plus(
 void
 minus(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
@@ -125,7 +125,7 @@ minus(
 void
 multiply(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *x,
   Value *y
@@ -134,7 +134,7 @@ multiply(
 void
 divide(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
@@ -143,7 +143,7 @@ divide(
 void
 value_remainder(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
@@ -153,7 +153,7 @@ void
 compare(
   Compare_Type operation,
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
@@ -162,14 +162,14 @@ compare(
 Value *
 value_pointer_to(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *value
 );
 
 Value *
 call_function_value_array(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *to_call,
   Array_Value_Ptr arguments
 );
@@ -177,7 +177,7 @@ call_function_value_array(
 Value *
 call_function_value(
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *to_call,
   ...
 );
@@ -186,7 +186,7 @@ Value *
 make_and(
   Program *program,
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *a,
   Value *b
 );
@@ -195,7 +195,7 @@ Value *
 make_or(
   Program *program,
   Function_Builder *builder,
-  const Source_Location *location,
+  const Source_Range *source_range,
   Value *a,
   Value *b
 );

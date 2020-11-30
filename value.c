@@ -161,6 +161,44 @@ descriptor_byte_size(
   return 0;
 }
 
+Source_Position
+source_file_offset_to_position(
+  const Source_File *file,
+  u64 offset
+) {
+  // Binary search in lines
+  s64 left_bound = 0;
+  s64 right_bound = dyn_array_length(file->lines) - 1;
+  s64 line_index = 0;
+  while (left_bound <= right_bound) {
+    line_index = left_bound + (right_bound - left_bound) / 2;
+    Range_u64 *line = dyn_array_get(file->lines, line_index);
+    if (offset < line->from) {
+      right_bound = line_index - 1;
+    } else if (offset >= line->to) {
+      left_bound = line_index + 1;
+    } else {
+      break;
+    }
+  }
+
+  u64 column = offset - dyn_array_get(file->lines, line_index)->from;
+  return (Source_Position) {
+    .line = line_index + 1,
+    .column = column,
+  };
+}
+
+void
+source_range_print_start_position(
+  const Source_Range *source_range
+) {
+  Source_Position from_position =
+    source_file_offset_to_position(source_range->file, source_range->offsets.from);
+  slice_print(source_range->file->path);
+  printf(":(%llu:%llu)\n", from_position.line, from_position.column);
+}
+
 void
 print_operand(
   const Operand *operand
@@ -1384,14 +1422,8 @@ program_test_exception_handler(
     // so we add instruction byte size before comparing
     current_offset += instruction->encoded_byte_size;
     if (current_offset == relative_instruction_byte_offset) {
-      const Source_Location *source_location = instruction->source_location;
-      printf(
-        "  at %.*s:(%llu:%llu)\n",
-        u64_to_s32(source_location->filename.length),
-        source_location->filename.bytes,
-        source_location->line,
-        source_location->column
-      );
+      printf("  at ");
+      source_range_print_start_position(instruction->source_range);
     }
   }
 
@@ -1558,21 +1590,21 @@ program_jit(
 void
 program_push_error_from_slice(
   Program *program,
-  Source_Location location,
+  Source_Range source_range,
   Slice message
 ) {
-  dyn_array_push(program->errors, (Parse_Error) { message,  location });
+  dyn_array_push(program->errors, (Parse_Error) { message,  source_range });
 }
 
 void
 program_push_error_from_bucket_buffer(
   Program *program,
-  Source_Location location,
+  Source_Range source_range,
   Bucket_Buffer *buffer
 ) {
   Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(temp_allocator, buffer);
   Slice message = fixed_buffer_as_slice(message_buffer);
-  program_push_error_from_slice(program, location, message);
+  program_push_error_from_slice(program, source_range, message);
   bucket_buffer_destroy(buffer);
 }
 

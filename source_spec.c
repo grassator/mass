@@ -49,14 +49,17 @@ spec_check_and_print_program(
   for (u64 i = 0; i < dyn_array_length(program->errors); ++i) {
     has_errors = true;
     Parse_Error *error = dyn_array_get(program->errors, i);
-    print_message_with_location(error->message, &error->location);
+
+    slice_print(error->message);
+    printf("\n  at ");
+    source_range_print_start_position(&error->source_range);
   }
   return has_errors;
 }
 
 #define test_program_inline_source_base(_source_, _fn_value_id_)\
   Slice source = slice_literal(_source_);\
-  Tokenizer_Result result = tokenize(test_file_name, source);\
+  Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
   token_match_module(result.root, program_);\
   Value *_fn_value_id_ = scope_lookup_force(program_, program_->global_scope, slice_literal(#_fn_value_id_), 0);\
@@ -120,7 +123,7 @@ spec("source") {
   // Tokenizer
   it("should be able to tokenize an empty string") {
     Slice source = slice_literal("");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -130,7 +133,7 @@ spec("source") {
 
   it("should be able to tokenize a comment") {
     Slice source = slice_literal("// foo\n");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -140,7 +143,7 @@ spec("source") {
 
   it("should be able to turn newlines into tokens") {
     Slice source = slice_literal("\n");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -153,20 +156,20 @@ spec("source") {
 
   it("should be able to turn hex digits") {
     Slice source = slice_literal("0xCAFE");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
     check(root->type == Token_Type_Module);
     check(dyn_array_length(root->children) == 1);
-    Token *newline = *dyn_array_get(root->children, 0);
-    check(newline->type == Token_Type_Hex_Integer);
-    check(slice_equal(newline->source, slice_literal("0xCAFE")));
+    Token *token = *dyn_array_get(root->children, 0);
+    check(token->type == Token_Type_Hex_Integer);
+    check(slice_equal(token->source, slice_literal("0xCAFE")));
   }
 
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 3);
@@ -187,7 +190,7 @@ spec("source") {
 
   it("should be able to tokenize groups") {
     Slice source = slice_literal("(x)");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -203,7 +206,7 @@ spec("source") {
 
   it("should be able to tokenize strings") {
     Slice source = slice_literal("\"foo 123\"");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -213,7 +216,7 @@ spec("source") {
 
   it("should be able to tokenize nested groups with different braces") {
     Slice source = slice_literal("{[]}");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -235,7 +238,7 @@ spec("source") {
       "  return x + 3;\n"
       "}"
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -243,25 +246,25 @@ spec("source") {
 
   it("should report a failure when encountering a brace that is not closed") {
     Slice source = slice_literal("(foo");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
-    check(slice_equal(error->location.filename, test_file_name));
-    check(error->location.line == 1);
-    check(error->location.column == 4);
+    check(slice_equal(error->source_range.file->path, test_file_name));
+    check(error->source_range.offsets.from == 4);
+    check(error->source_range.offsets.to == 4);
     check(slice_equal(error->message, slice_literal("Unexpected end of file. Expected a closing brace.")));
   }
 
   it("should report a failure when encountering a mismatched brace that") {
     Slice source = slice_literal("(foo}");
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
-    check(slice_equal(error->location.filename, test_file_name));
-    check(error->location.line == 1);
-    check(error->location.column == 4, "Expected 4, got %d", error->location.column);
+    check(slice_equal(error->source_range.file->path, test_file_name));
+    check(error->source_range.offsets.from == 4);
+    check(error->source_range.offsets.to == 4);
     check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
   }
 
@@ -283,7 +286,7 @@ spec("source") {
       "  return x + 3;\n"
       "}"
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -419,7 +422,7 @@ spec("source") {
       "checker_s64 :: (x : s64) -> (s64) { size_of(x) }\n"
       "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);
@@ -516,6 +519,27 @@ spec("source") {
     check(checker_fn() == -42);
   }
 
+  it("should be able to define and use a macro for while loop") {
+    program_import_file(program_, slice_literal("lib\\prelude"));
+    test_program_inline_source(
+      "sum_up_to :: (x : s32) -> (s32) {"
+        "sum : s32;"
+        "sum = 0;"
+        "while (x >= 0) {"
+          "sum = sum + x;"
+          "x = x + (-1);"
+        "};"
+        "return sum"
+      "}",
+      sum_up_to
+    );
+    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
+    check(sum_up_to_fn(0) == 0);
+    check(sum_up_to_fn(1) == 1);
+    check(sum_up_to_fn(2) == 3);
+    check(sum_up_to_fn(3) == 6);
+  }
+
   it("should be able to run fizz buzz") {
     Parse_Result result = program_import_file(program_, slice_literal("lib\\prelude"));
     check(result.type == Parse_Result_Type_Success);
@@ -609,27 +633,6 @@ spec("source") {
     check(test_128bit.y == 21);
   }
 
-  it("should be able to define and use a macro for while loop") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
-    test_program_inline_source(
-      "sum_up_to :: (x : s32) -> (s32) {"
-        "sum : s32;"
-        "sum = 0;"
-        "while (x >= 0) {"
-          "sum = sum + x;"
-          "x = x + (-1);"
-        "};"
-        "return sum"
-      "}",
-      sum_up_to
-    );
-    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
-    check(sum_up_to_fn(0) == 0);
-    check(sum_up_to_fn(1) == 1);
-    check(sum_up_to_fn(2) == 3);
-    check(sum_up_to_fn(3) == 6);
-  }
-
   it("should be able to parse and run functions with local overloads") {
     test_program_inline_source(
       "size_of :: (x : s32) -> (s64) { 4 }\n"
@@ -681,7 +684,7 @@ spec("source") {
       "main :: () -> () { ExitProcess(42) }\n"
       "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
     );
-    Tokenizer_Result result = tokenize(test_file_name, source);
+    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_match_module(result.root, program_);

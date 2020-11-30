@@ -407,15 +407,10 @@ encode_instruction(
   } else {
     printf("Unknown compiler location\n");
   }
-  const Source_Location *source_location = instruction->source_location;
-  if (source_location) {
-    printf(
-      "Source code at %.*s:(%llu:%llu)\n",
-      u64_to_s32(source_location->filename.length),
-      source_location->filename.bytes,
-      source_location->line,
-      source_location->column
-    );
+  const Source_Range *source_range = instruction->source_range;
+  if (source_range) {
+    printf("Source code at ");
+    source_range_print_start_position(source_range);
   } else {
     printf("Unknown source location\n");
   }

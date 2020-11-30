@@ -33,7 +33,9 @@ mass_cli_print_errors(
 ) {
   for (u64 i = 0; i < dyn_array_length(errors); ++i) {
     Parse_Error *error = dyn_array_get(errors, i);
-    print_message_with_location(error->message, &error->location);
+    slice_print(error->message);
+    printf("  at ");
+    source_range_print_start_position(&error->source_range);
   }
   return -1;
 }
