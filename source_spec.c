@@ -59,7 +59,7 @@ spec_check_and_print_program(
 
 #define test_program_inline_source_base(_source_, _fn_value_id_)\
   Slice source = slice_literal(_source_);\
-  Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});\
+  Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
   token_parse_module(result.root, &test_context);\
   Value *_fn_value_id_ = scope_lookup_force(\
@@ -70,7 +70,7 @@ spec_check_and_print_program(
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
   check(_fn_value_id_);\
-  program_jit(test_context.program);\
+  program_jit(&test_context);\
   check(!spec_check_and_print_program(test_context.program))
 
 
@@ -82,20 +82,20 @@ spec("source") {
   };
 
   before_each() {
-    temp_buffer = bucket_buffer_make(.allocator = allocator_system);
-    temp_allocator = bucket_buffer_allocator_make(temp_buffer);
-    program_init(&test_program);
+    test_context.allocation_buffer = bucket_buffer_make(.allocator = allocator_system);
+    test_context.allocator = bucket_buffer_allocator_make(test_context.allocation_buffer);
+    program_init(test_context.allocator, &test_program);
   }
 
   after_each() {
     program_deinit(&test_program);
-    bucket_buffer_destroy(temp_buffer);
+    bucket_buffer_destroy(test_context.allocation_buffer);
   }
 
   // Scope
   it("should be able to set and lookup values") {
-    Value *test = value_from_s64(42);
-    Scope *root_scope = scope_make(0);
+    Value *test = value_from_s64(test_context.allocator, 42);
+    Scope *root_scope = scope_make(test_context.allocator, 0);
     scope_define_value(root_scope, slice_literal("test"), test);
     Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("test"));
     check(dyn_array_length(*entries) == 1);
@@ -105,16 +105,16 @@ spec("source") {
   }
 
   it("should be able to lookup things from parent scopes") {
-    Value *global = value_from_s64(42);
-    Scope *root_scope = scope_make(0);
+    Value *global = value_from_s64(test_context.allocator, 42);
+    Scope *root_scope = scope_make(test_context.allocator, 0);
     scope_define_value(root_scope, slice_literal("global"), global);
 
-    Value *level_1_test = value_from_s64(1);
-    Scope *scope_level_1 = scope_make(root_scope);
+    Value *level_1_test = value_from_s64(test_context.allocator, 1);
+    Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
     scope_define_value(scope_level_1, slice_literal("test"), level_1_test);
 
-    Value *level_2_test = value_from_s64(1);
-    Scope *scope_level_2 = scope_make(scope_level_1);
+    Value *level_2_test = value_from_s64(test_context.allocator, 1);
+    Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
     scope_define_value(scope_level_2, slice_literal("test"), level_2_test);
 
     Array_Scope_Entry *entries = scope_lookup(root_scope, slice_literal("global"));
@@ -127,7 +127,7 @@ spec("source") {
   // Tokenizer
   it("should be able to tokenize an empty string") {
     Slice source = slice_literal("");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -137,7 +137,7 @@ spec("source") {
 
   it("should be able to tokenize a comment") {
     Slice source = slice_literal("// foo\n");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -147,7 +147,7 @@ spec("source") {
 
   it("should be able to turn newlines into tokens") {
     Slice source = slice_literal("\n");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -160,7 +160,7 @@ spec("source") {
 
   it("should be able to turn hex digits") {
     Slice source = slice_literal("0xCAFE");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -173,7 +173,7 @@ spec("source") {
 
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 3);
@@ -194,7 +194,7 @@ spec("source") {
 
   it("should be able to tokenize groups") {
     Slice source = slice_literal("(x)");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -210,7 +210,7 @@ spec("source") {
 
   it("should be able to tokenize strings") {
     Slice source = slice_literal("\"foo 123\"");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -220,7 +220,7 @@ spec("source") {
 
   it("should be able to tokenize nested groups with different braces") {
     Slice source = slice_literal("{[]}");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(dyn_array_length(root->children) == 1);
@@ -242,7 +242,7 @@ spec("source") {
       "  return x + 3;\n"
       "}"
     );
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -250,7 +250,7 @@ spec("source") {
 
   it("should report a failure when encountering a brace that is not closed") {
     Slice source = slice_literal("(foo");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
@@ -262,7 +262,7 @@ spec("source") {
 
   it("should report a failure when encountering a mismatched brace that") {
     Slice source = slice_literal("(foo}");
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Error);
     check(dyn_array_length(result.errors) == 1);
     Parse_Error *error = dyn_array_get(result.errors, 0);
@@ -290,7 +290,7 @@ spec("source") {
       "  return x + 3;\n"
       "}"
     );
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     Token *root = result.root;
     check(root);
@@ -304,7 +304,7 @@ spec("source") {
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
     check(main);
 
-    program_jit(test_context.program);
+    program_jit(&test_context);
     check(!dyn_array_length(test_context.program->errors))
 
     fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(test_context.program, main);
@@ -426,7 +426,7 @@ spec("source") {
       "checker_s64 :: (x : s64) -> (s64) { size_of(x) }\n"
       "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
     );
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_parse_module(result.root, &test_context);
@@ -436,7 +436,7 @@ spec("source") {
     Value *checker_32 =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"), 0);
 
-    program_jit(test_context.program);
+    program_jit(&test_context);
 
     {
       s64 size = ((fn_type_s64_to_s64)value_as_function(test_context.program, checker_s64))(0);
@@ -561,7 +561,7 @@ spec("source") {
     );
     check(fizz_buzz);
 
-    program_jit(test_context.program);
+    program_jit(&test_context);
     check(!dyn_array_length(test_context.program->errors))
 
     fn_type_void_to_void checker =
@@ -702,7 +702,7 @@ spec("source") {
       "main :: () -> () { ExitProcess(42) }\n"
       "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
     );
-    Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
     token_parse_module(result.root, &test_context);

@@ -3,10 +3,6 @@
 #include "prelude.h"
 #include "value.h"
 
-typedef struct {
-  Program *program;
-} Compilation_Context;
-
 typedef enum {
   Token_Type_Id = 1,
   Token_Type_Newline,
@@ -91,6 +87,7 @@ typedef struct Scope {
 
 Scope *
 scope_make(
+  Allocator *allocator,
   Scope *parent
 );
 
@@ -112,7 +109,7 @@ token_parse_block(
 
 void
 program_push_error_from_bucket_buffer(
-  Program *program,
+  Compilation_Context *context,
   Source_Range source_range,
   Bucket_Buffer *buffer
 );

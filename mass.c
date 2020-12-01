@@ -45,9 +45,6 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_usage();
   }
 
-  temp_buffer = bucket_buffer_make(.allocator = allocator_system);
-  temp_allocator = bucket_buffer_allocator_make(temp_buffer);
-
   Executable_Type win32_executable_type = Executable_Type_Cli;
 
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
@@ -79,8 +76,13 @@ int main(s32 argc, char **argv) {
 
   Slice file_path = slice_from_c_string(raw_file_path);
 
+  Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
+  Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
+
   Compilation_Context context = {
-    .program = program_init(&(Program) {0}),
+    .allocation_buffer = compilation_buffer,
+    .allocator = compilation_allocator,
+    .program = program_init(compilation_allocator, &(Program) {0}),
   };
 
   Parse_Result result = program_import_file(&context, slice_literal("lib\\prelude"));
@@ -121,7 +123,7 @@ int main(s32 argc, char **argv) {
       break;
     }
     case Mass_Cli_Mode_Run: {
-      program_jit(context.program);
+      program_jit(&context);
       fn_type_opaque main = value_as_function(context.program, context.program->entry_point);
       main();
       return 0;

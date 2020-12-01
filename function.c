@@ -2,6 +2,7 @@
 
 Value *
 reserve_stack(
+  Allocator *allocator,
   Function_Builder *fn,
   Descriptor *descriptor
 ) {
@@ -9,7 +10,7 @@ reserve_stack(
   fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
   Operand operand = stack(-fn->stack_reserve, byte_size);
-  Value *result = temp_allocate(Value);
+  Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
     .operand = operand,
@@ -54,6 +55,7 @@ register_release(
 
 void
 move_value(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *target,
@@ -96,9 +98,9 @@ move_value(
       assert(operand_is_memory(&target->operand));
       assert(operand_is_memory(&source->operand));
       // Using xmm4 as it is volatile and not used in function arguments
-      Value *reg_xmm4 = value_register_for_descriptor(Register_Xmm4, target->descriptor);
-      move_value(builder, source_range, reg_xmm4, source);
-      move_value(builder, source_range, target, reg_xmm4);
+      Value *reg_xmm4 = value_register_for_descriptor(allocator, Register_Xmm4, target->descriptor);
+      move_value(allocator, builder, source_range, reg_xmm4, source);
+      move_value(allocator, builder, source_range, target, reg_xmm4);
       return;
     }
   }
@@ -107,7 +109,7 @@ move_value(
     assert(operand_is_register_or_memory(&target->operand));
     Value *temp = target;
     if (descriptor_byte_size(temp->descriptor) != 1) {
-      temp = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s8);
+      temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s8);
     }
     switch(source->operand.compare_type) {
       case Compare_Type_Equal: {
@@ -176,22 +178,22 @@ move_value(
     Value *adjusted_source = 0;
     switch(target_size) {
       case 1: {
-        adjusted_source = value_from_s8(s64_to_s8(immediate));
+        adjusted_source = value_from_s8(allocator, s64_to_s8(immediate));
         break;
       }
       case 2: {
-        adjusted_source = value_from_s16(s64_to_s16(immediate));
+        adjusted_source = value_from_s16(allocator, s64_to_s16(immediate));
         break;
       }
       case 4: {
-        adjusted_source = value_from_s32(s64_to_s32(immediate));
+        adjusted_source = value_from_s32(allocator, s64_to_s32(immediate));
         break;
       }
       case 8: {
         if (s64_fits_into_s32(immediate)) {
-          adjusted_source = value_from_s32(s64_to_s32(immediate));
+          adjusted_source = value_from_s32(allocator, s64_to_s32(immediate));
         } else {
-          adjusted_source = value_from_s64(immediate);
+          adjusted_source = value_from_s64(allocator, immediate);
         }
         break;
       }
@@ -247,33 +249,33 @@ move_value(
   if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
     if (target_size >= 16) {
       // TODO probably can use larger chunks for copying but need to check alignment
-      Value *temp_rsi = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
-      Value *temp_rdi = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
-      Value *temp_rcx = value_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
+      Value *temp_rsi = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s64);
+      Value *temp_rdi = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s64);
+      Value *temp_rcx = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s64);
       {
-        Value *reg_rsi = value_register_for_descriptor(Register_SI, &descriptor_s64);
-        Value *reg_rdi = value_register_for_descriptor(Register_DI, &descriptor_s64);
-        Value *reg_rcx = value_register_for_descriptor(Register_C, &descriptor_s64);
-        move_value(builder, source_range, temp_rsi, reg_rsi);
-        move_value(builder, source_range, temp_rdi, reg_rdi);
-        move_value(builder, source_range, temp_rcx, reg_rcx);
+        Value *reg_rsi = value_register_for_descriptor(allocator, Register_SI, &descriptor_s64);
+        Value *reg_rdi = value_register_for_descriptor(allocator, Register_DI, &descriptor_s64);
+        Value *reg_rcx = value_register_for_descriptor(allocator, Register_C, &descriptor_s64);
+        move_value(allocator, builder, source_range, temp_rsi, reg_rsi);
+        move_value(allocator, builder, source_range, temp_rdi, reg_rdi);
+        move_value(allocator, builder, source_range, temp_rcx, reg_rcx);
 
         push_instruction(instructions, source_range, (Instruction) {.assembly = {lea, {reg_rsi->operand, source->operand}}});
         push_instruction(instructions, source_range, (Instruction) {.assembly = {lea, {reg_rdi->operand, target->operand}}});
-        move_value(builder, source_range, reg_rcx, value_from_s64(target_size));
+        move_value(allocator, builder, source_range, reg_rcx, value_from_s64(allocator, target_size));
         push_instruction(instructions, source_range, (Instruction) {.assembly = {rep_movsb}});
 
-        move_value(builder, source_range, reg_rsi, temp_rsi);
-        move_value(builder, source_range, reg_rdi, temp_rdi);
-        move_value(builder, source_range, reg_rcx, temp_rcx);
+        move_value(allocator, builder, source_range, reg_rsi, temp_rsi);
+        move_value(allocator, builder, source_range, reg_rdi, temp_rdi);
+        move_value(allocator, builder, source_range, reg_rcx, temp_rcx);
       }
       register_release(builder, temp_rsi->operand.reg);
       register_release(builder, temp_rdi->operand.reg);
       register_release(builder, temp_rcx->operand.reg);
     } else {
-      Value *temp = value_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
-      move_value(builder, source_range, temp, source);
-      move_value(builder, source_range, target, temp);
+      Value *temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), target->descriptor);
+      move_value(allocator, builder, source_range, temp, source);
+      move_value(allocator, builder, source_range, target, temp);
       register_release(builder, temp->operand.reg);
     }
     return;
@@ -284,29 +286,29 @@ move_value(
 
 Function_Builder *
 fn_begin(
-  Program *program
+  Compilation_Context *context
 ) {
-  Descriptor *descriptor = temp_allocate(Descriptor);
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
-      .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
-      .argument_names = dyn_array_make(Array_Slice, .allocator = temp_allocator),
+      .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
+      .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
       .returns = 0,
     },
   };
-  Value *fn_value = temp_allocate(Value);
+  Value *fn_value = allocator_allocate(context->allocator, Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(make_label(program, &program->code_section)),
+    .operand = label32(make_label(context->program, &context->program->code_section)),
   };
-  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
+  Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
     .stack_reserve = 0,
     .descriptor = descriptor,
     .value = fn_value,
     .code_block = {
-      .end_label = make_label(program, &program->code_section),
-      .instructions = dyn_array_make(Array_Instruction, .allocator = temp_allocator),
+      .end_label = make_label(context->program, &context->program->code_section),
+      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   });
 
@@ -573,6 +575,7 @@ fn_encode(
 
 void
 function_return_descriptor(
+  Compilation_Context *context,
   Descriptor_Function *function,
   Descriptor *descriptor
 ) {
@@ -580,12 +583,12 @@ function_return_descriptor(
     if (descriptor->type != Descriptor_Type_Void) {
       // TODO handle 16 bit non-float return values are returned in XMM0
       if (descriptor->type == Descriptor_Type_Float) {
-        function->returns = value_register_for_descriptor(Register_Xmm0, descriptor);
+        function->returns = value_register_for_descriptor(context->allocator, Register_Xmm0, descriptor);
       } else {
         // :ReturnTypeLargerThanRegister
         u32 byte_size = descriptor_byte_size(descriptor);
         if (byte_size > 8) {
-          function->returns = temp_allocate(Value);
+          function->returns = allocator_allocate(context->allocator, Value);
           *function->returns = (Value){
             .descriptor = descriptor,
             .operand = {
@@ -598,7 +601,7 @@ function_return_descriptor(
             },
           };
         } else {
-          function->returns = value_register_for_descriptor(Register_A, descriptor);
+          function->returns = value_register_for_descriptor(context->allocator, Register_A, descriptor);
         }
       }
     } else {
@@ -609,11 +612,12 @@ function_return_descriptor(
 
 Label_Index
 make_if(
-  Program *program,
+  Compilation_Context *context,
   Array_Instruction *instructions,
   const Source_Range *source_range,
   Value *value
 ) {
+  Program *program = context->program;
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->code_section);
   if(operand_is_immediate(&value->operand)) {
@@ -680,7 +684,7 @@ make_if(
       } else {
         assert(!"Unsupported value inside `if`");
       }
-      Value *eflags = value_from_compare(Compare_Type_Equal);
+      Value *eflags = value_from_compare(context->allocator, Compare_Type_Equal);
       push_instruction(instructions, source_range, (Instruction) {.assembly = {je, {label32(label), eflags->operand, 0}}});
     }
   }
@@ -729,7 +733,8 @@ typedef enum {
       s64 a_s64 = operand_immediate_as_s64(a_operand);\
       s64 b_s64 = operand_immediate_as_s64(b_operand);\
       move_value(\
-        (_builder_), (_loc_), (_result_), value_from_signed_immediate(a_s64 _operator_ b_s64)\
+        allocator, (_builder_), (_loc_), (_result_),\
+        value_from_signed_immediate(allocator, a_s64 _operator_ b_s64)\
       );\
       return;\
     }\
@@ -737,6 +742,7 @@ typedef enum {
 
 void
 plus_or_minus(
+  Allocator *allocator,
   Arithmetic_Operation operation,
   Function_Builder *builder,
   const Source_Range *source_range,
@@ -763,7 +769,8 @@ plus_or_minus(
       case Arithmetic_Operation_Plus: folded = a_s64 + b_s64; break;
       case Arithmetic_Operation_Minus: folded = a_s64 - b_s64; break;
     }
-    move_value(builder, source_range, result_value, value_from_signed_immediate(folded));
+    Value *folded_value = value_from_signed_immediate(allocator, folded);
+    move_value(allocator, builder, source_range, result_value, folded_value);
     return;
   }
 
@@ -774,14 +781,14 @@ plus_or_minus(
   if (a_size != b_size) {
     if (a_size > b_size) {
       Value *b_sized_to_a =
-        value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
-      move_value(builder, source_range, b_sized_to_a, b);
+        value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
+      move_value(allocator, builder, source_range, b_sized_to_a, b);
       b = b_sized_to_a;
       maybe_a_or_b_temp = b;
     } else {
       Value *a_sized_to_b =
-        value_register_for_descriptor(register_acquire_temp(builder), b->descriptor);
-      move_value(builder, source_range, a_sized_to_b, b);
+        value_register_for_descriptor(allocator, register_acquire_temp(builder), b->descriptor);
+      move_value(allocator, builder, source_range, a_sized_to_b, b);
       a = a_sized_to_b;
       maybe_a_or_b_temp = a;
     }
@@ -814,17 +821,17 @@ plus_or_minus(
   } else if (maybe_a_or_b_temp == a) {
     temp = a;
   } else {
-    temp = value_register_for_descriptor(register_acquire_temp(builder), a->descriptor);
+    temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
   }
 
-  move_value(builder, source_range, temp, a);
+  move_value(allocator, builder, source_range, temp, a);
   push_instruction(
     &builder->code_block.instructions,
     source_range,
     (Instruction) {.assembly = {mnemonic, {temp->operand, b->operand}}}
   );
   if (temp != result_value) {
-    move_value(builder, source_range, result_value, temp);
+    move_value(allocator, builder, source_range, result_value, temp);
     assert(temp->operand.type == Operand_Type_Register);
     register_release(builder, temp->operand.reg);
   }
@@ -832,28 +839,31 @@ plus_or_minus(
 
 void
 plus(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(Arithmetic_Operation_Plus, builder, source_range, result_value, a, b);
+  plus_or_minus(allocator, Arithmetic_Operation_Plus, builder, source_range, result_value, a, b);
 }
 
 void
 minus(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(Arithmetic_Operation_Minus, builder, source_range, result_value, a, b);
+  plus_or_minus(allocator, Arithmetic_Operation_Minus, builder, source_range, result_value, a, b);
 }
 
 void
 multiply(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -872,18 +882,21 @@ multiply(
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
   // TODO make the move only for imm value
-  Value *y_temp = reserve_stack(builder, y->descriptor);
+  Value *y_temp = reserve_stack(allocator, builder, y->descriptor);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, y->descriptor);
-  move_value(builder, source_range, reg_a, y);
-  move_value(builder, source_range, y_temp, reg_a);
+  Value *reg_a = value_register_for_descriptor(allocator, Register_A, y->descriptor);
+  move_value(allocator, builder, source_range, reg_a, y);
+  move_value(allocator, builder, source_range, y_temp, reg_a);
 
-  reg_a = value_register_for_descriptor(Register_A, x->descriptor);
-  move_value(builder, source_range, reg_a, x);
+  reg_a = value_register_for_descriptor(allocator, Register_A, x->descriptor);
+  move_value(allocator, builder, source_range, reg_a, x);
 
-  push_instruction(instructions, source_range, (Instruction) {.assembly = {imul, {reg_a->operand, y_temp->operand}}});
+  push_instruction(
+    instructions, source_range,
+    (Instruction) {.assembly = {imul, {reg_a->operand, y_temp->operand}}}
+  );
 
-  move_value(builder, source_range, result_value, reg_a);
+  move_value(allocator, builder, source_range, result_value, reg_a);
 }
 
 typedef enum {
@@ -893,6 +906,7 @@ typedef enum {
 
 void
 divide_or_remainder(
+  Allocator *allocator,
   Divide_Operation operation,
   Function_Builder *builder,
   const Source_Range *source_range,
@@ -919,15 +933,16 @@ divide_or_remainder(
         break;
       }
     }
-    move_value(builder, source_range, result_value, value_from_signed_immediate(folded));
+    Value *folded_value = value_from_signed_immediate(allocator, folded);
+    move_value(allocator, builder, source_range, result_value, folded_value);
     return;
   }
 
   // Save RDX as it will be used for the remainder
-  Value *rdx_temp = reserve_stack(builder, &descriptor_s64);
+  Value *rdx_temp = reserve_stack(allocator, builder, &descriptor_s64);
 
-  Value *reg_rdx = value_register_for_descriptor(Register_A, &descriptor_s64);
-  move_value(builder, source_range, rdx_temp, reg_rdx);
+  Value *reg_rdx = value_register_for_descriptor(allocator, Register_A, &descriptor_s64);
+  move_value(allocator, builder, source_range, rdx_temp, reg_rdx);
 
   Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
@@ -935,12 +950,12 @@ divide_or_remainder(
     : b->descriptor;
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(builder, larger_descriptor);
-  move_value(builder, source_range, divisor, b);
+  Value *divisor = reserve_stack(allocator, builder, larger_descriptor);
+  move_value(allocator, builder, source_range, divisor, b);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, larger_descriptor);
+  Value *reg_a = value_register_for_descriptor(allocator, Register_A, larger_descriptor);
   {
-    move_value(builder, source_range, reg_a, a);
+    move_value(allocator, builder, source_range, reg_a, a);
 
     switch (descriptor_byte_size(larger_descriptor)) {
       case 8: {
@@ -968,46 +983,49 @@ divide_or_remainder(
 
 
   if (operation == Divide_Operation_Divide) {
-    move_value(builder, source_range, result_value, reg_a);
+    move_value(allocator, builder, source_range, result_value, reg_a);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
-      Value *temp_result = value_register_for_descriptor(Register_AH, larger_descriptor);
-      move_value(builder, source_range, result_value, temp_result);
+      Value *temp_result = value_register_for_descriptor(allocator, Register_AH, larger_descriptor);
+      move_value(allocator, builder, source_range, result_value, temp_result);
     } else {
-      Value *temp_result = value_register_for_descriptor(Register_D, larger_descriptor);
-      move_value(builder, source_range, result_value, temp_result);
+      Value *temp_result = value_register_for_descriptor(allocator, Register_D, larger_descriptor);
+      move_value(allocator, builder, source_range, result_value, temp_result);
     }
   }
 
   // Restore RDX
-  move_value(builder, source_range, reg_rdx, rdx_temp);
+  move_value(allocator, builder, source_range, reg_rdx, rdx_temp);
 }
 
 void
 divide(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  divide_or_remainder(Divide_Operation_Divide, builder, source_range, result_value, a, b);
+  divide_or_remainder(allocator, Divide_Operation_Divide, builder, source_range, result_value, a, b);
 }
 
 void
 value_remainder(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  divide_or_remainder(Divide_Operation_Remainder, builder, source_range, result_value, a, b);
+  divide_or_remainder(allocator, Divide_Operation_Remainder, builder, source_range, result_value, a, b);
 }
 
 
 void
 compare(
+  Allocator *allocator,
   Compare_Type operation,
   Function_Builder *builder,
   const Source_Range *source_range,
@@ -1072,19 +1090,21 @@ compare(
     ? a->descriptor
     : b->descriptor;
 
-  Value *temp_b = reserve_stack(builder, larger_descriptor);
-  move_value(builder, source_range, temp_b, b);
+  Value *temp_b = reserve_stack(allocator, builder, larger_descriptor);
+  move_value(allocator, builder, source_range, temp_b, b);
 
-  Value *reg_r11 = value_register_for_descriptor(Register_R11, larger_descriptor);
-  move_value(builder, source_range, reg_r11, a);
+  Value *reg_r11 = value_register_for_descriptor(allocator, Register_R11, larger_descriptor);
+  move_value(allocator, builder, source_range, reg_r11, a);
 
   push_instruction(instructions, source_range, (Instruction) {.assembly = {cmp, {reg_r11->operand, temp_b->operand, 0}}});
 
-  move_value(builder, source_range, result_value, value_from_compare(operation));
+  Value *comparison_value = value_from_compare(allocator, operation);
+  move_value(allocator, builder, source_range, result_value, comparison_value);
 }
 
 Value *
 value_pointer_to(
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *value
@@ -1096,9 +1116,9 @@ value_pointer_to(
     value->operand.type == Operand_Type_Memory_Indirect ||
     value->operand.type == Operand_Type_RIP_Relative
   );
-  Descriptor *result_descriptor = descriptor_pointer_to(value->descriptor);
+  Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
-  Value *reg_a = value_register_for_descriptor(Register_A, result_descriptor);
+  Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, result_descriptor);
   Operand source_operand = value->operand;
 
   // TODO rethink operand sizing
@@ -1109,8 +1129,8 @@ value_pointer_to(
 
   push_instruction(instructions, source_range, (Instruction) {.assembly = {lea, {reg_a->operand, source_operand, 0}}});
 
-  Value *result = reserve_stack(builder, result_descriptor);
-  move_value(builder, source_range, result, reg_a);
+  Value *result = reserve_stack(context->allocator, builder, result_descriptor);
+  move_value(context->allocator, builder, source_range, result, reg_a);
 
   return result;
 }
@@ -1123,6 +1143,7 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
 Value *
 call_function_overload(
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *to_call,
@@ -1147,7 +1168,7 @@ call_function_overload(
           }
         };
         Operand source = operand_register_for_descriptor(reg_index, &descriptor_s64);
-        Value *stack_value = reserve_stack(builder, to_save.descriptor);
+        Value *stack_value = reserve_stack(context->allocator, builder, to_save.descriptor);
         push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {stack_value->operand, source}}});
         dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
       }
@@ -1157,7 +1178,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
     Value *target_arg = *dyn_array_get(descriptor->arguments, i);
-    move_value(builder, source_range, target_arg, source_arg);
+    move_value(context->allocator, builder, source_range, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -1168,10 +1189,12 @@ call_function_overload(
   u32 return_size = descriptor_byte_size(descriptor->returns->descriptor);
   if (return_size > 8) {
     parameters_stack_size += return_size;
-    Descriptor *return_pointer_descriptor = descriptor_pointer_to(descriptor->returns->descriptor);
-    Value *reg_c = value_register_for_descriptor(Register_C, return_pointer_descriptor);
+    Descriptor *return_pointer_descriptor =
+      descriptor_pointer_to(context->allocator, descriptor->returns->descriptor);
+    Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, return_pointer_descriptor);
     push_instruction(
-      instructions, source_range, (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns->operand}}}
+      instructions, source_range,
+      (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns->operand}}}
     );
   }
 
@@ -1183,22 +1206,24 @@ call_function_overload(
   if (to_call->operand.type == Operand_Type_Label_32) {
     push_instruction(instructions, source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
   } else {
-    Value *reg_a = value_register_for_descriptor(Register_A, to_call->descriptor);
-    move_value(builder, source_range, reg_a, to_call);
-    push_instruction(instructions, source_range, (Instruction) {.assembly = {call, {reg_a->operand, 0, 0}}});
+    Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, to_call->descriptor);
+    move_value(context->allocator, builder, source_range, reg_a, to_call);
+    push_instruction(
+      instructions, source_range, (Instruction) {.assembly = {call, {reg_a->operand, 0, 0}}}
+    );
   }
 
   Value *result = descriptor->returns;
   if (return_size <= 8) {
     if (return_size != 0) {
-      result = reserve_stack(builder, descriptor->returns->descriptor);
-      move_value(builder, source_range, result, descriptor->returns);
+      result = reserve_stack(context->allocator, builder, descriptor->returns->descriptor);
+      move_value(context->allocator, builder, source_range, result, descriptor->returns);
     }
   }
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
-    move_value(builder, source_range, &reg->saved, reg->stack_value);
+    move_value(context->allocator, builder, source_range, &reg->saved, reg->stack_value);
     // TODO :FreeStackAllocation
   }
 
@@ -1256,27 +1281,33 @@ find_matching_function_overload(
 
 Value *
 make_and(
-  Program *program,
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
   Value *b
 ) {
+  Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(builder, &descriptor_s8);
+  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);
 
-  Label_Index else_label = make_if(program, instructions, source_range, a);
+  Value zero = {
+    .descriptor = &descriptor_s8,
+    .operand = imm8(0),
+  };
+
+  Label_Index else_label = make_if(context, instructions, source_range, a);
   {
-    compare(Compare_Type_Not_Equal, builder, source_range, result, b, value_from_s8(0));
-    push_instruction(instructions, source_range, (Instruction) {.assembly = {jmp, {label32(label), 0, 0}}});
+    compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
+    push_instruction(instructions, source_range, (Instruction) {.assembly = {jmp, {label32(label)}}});
   }
   push_instruction(instructions, source_range, (Instruction) {
     .type = Instruction_Type_Label,
     .label = else_label,
   });
 
-  move_value(builder, source_range, result, value_from_s8(0));
+  move_value(context->allocator, builder, source_range, result, &zero);
   push_instruction(instructions, source_range, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label,
@@ -1286,20 +1317,26 @@ make_and(
 
 Value *
 make_or(
-  Program *program,
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
   Value *b
 ) {
+  Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(builder, &descriptor_s8);
+  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);
 
-  compare(Compare_Type_Equal, builder, source_range, result, a, value_from_s8(0));
-  Label_Index else_label = make_if(program, instructions, source_range, result);
+  Value zero = {
+    .descriptor = &descriptor_s8,
+    .operand = imm8(0),
+  };
+
+  compare(context->allocator, Compare_Type_Equal, builder, source_range, result, a, &zero);
+  Label_Index else_label = make_if(context, instructions, source_range, result);
   {
-    compare(Compare_Type_Not_Equal, builder, source_range, result, b, value_from_s8(0));
+    compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
     push_instruction(instructions, source_range, (Instruction) {.assembly = {jmp, {label32(label)}}});
   }
   push_instruction(instructions, source_range, (Instruction) {
@@ -1307,7 +1344,11 @@ make_or(
     .label = else_label,
   });
 
-  move_value(builder, source_range, result, value_from_s8(1));
+  Value one = {
+    .descriptor = &descriptor_s8,
+    .operand = imm8(1),
+  };
+  move_value(context->allocator, builder, source_range, result, &one);
   push_instruction(instructions, source_range, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label,
@@ -1317,11 +1358,12 @@ make_or(
 
 Value *
 ensure_memory(
+  Allocator *allocator,
   Value *value
 ) {
   Operand operand = value->operand;
   if (operand.type == Operand_Type_Memory_Indirect) return value;
-  Value *result = temp_allocate(Value);
+  Value *result = allocator_allocate(allocator, Value);
   if (value->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
   if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
   *result = (const Value) {
@@ -1339,16 +1381,17 @@ ensure_memory(
 
 Value *
 struct_get_field(
+  Allocator *allocator,
   Value *raw_value,
   Slice name
 ) {
-  Value *struct_value = ensure_memory(raw_value);
+  Value *struct_value = ensure_memory(allocator, raw_value);
   Descriptor *descriptor = struct_value->descriptor;
   assert(descriptor->type == Descriptor_Type_Struct);
   for (u64 i = 0; i < dyn_array_length(descriptor->struct_.fields); ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(descriptor->struct_.fields, i);
     if (slice_equal(name, field->name)) {
-      Value *result = temp_allocate(Value);
+      Value *result = allocator_allocate(allocator, Value);
       Operand operand = struct_value->operand;
       // FIXME support more operands
       assert(operand.type == Operand_Type_Memory_Indirect);

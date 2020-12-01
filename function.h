@@ -6,6 +6,7 @@
 
 Value *
 reserve_stack(
+  Allocator *allocator,
   Function_Builder *fn,
   Descriptor *descriptor
 );
@@ -57,6 +58,7 @@ make_trampoline(
 
 void
 move_value(
+  Allocator* allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
@@ -106,6 +108,7 @@ loop_end(
 
 void
 plus(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -115,6 +118,7 @@ plus(
 
 void
 minus(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -124,6 +128,7 @@ minus(
 
 void
 multiply(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -133,6 +138,7 @@ multiply(
 
 void
 divide(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -142,6 +148,7 @@ divide(
 
 void
 value_remainder(
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
@@ -151,6 +158,7 @@ value_remainder(
 
 void
 compare(
+  Allocator *allocator,
   Compare_Type operation,
   Function_Builder *builder,
   const Source_Range *source_range,
@@ -161,6 +169,7 @@ compare(
 
 Value *
 value_pointer_to(
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *value
@@ -175,16 +184,8 @@ call_function_value_array(
 );
 
 Value *
-call_function_value(
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *to_call,
-  ...
-);
-
-Value *
 make_and(
-  Program *program,
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
@@ -193,7 +194,7 @@ make_and(
 
 Value *
 make_or(
-  Program *program,
+  Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,

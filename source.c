@@ -21,9 +21,10 @@ source_range_from_token_matcher_state(
 
 Scope *
 scope_make(
+  Allocator *allocator,
   Scope *parent
 ) {
-  Scope *scope = temp_allocate(Scope);
+  Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
     .parent = parent,
     .map = hash_map_make(Scope_Map),
@@ -104,7 +105,7 @@ scope_lookup_force(
       Token *token = token_rewrite_constant_expression(context, &state, scope, builder);
       Value *result = 0;
       if (token) {
-        result = value_any();
+        result = value_any(context->allocator);
         token_force_value(context, token, scope, builder, result);
       }
       *entry = (Scope_Entry) {
@@ -230,10 +231,11 @@ code_point_is_operator(
 
 Tokenizer_Result
 tokenize(
+  Allocator *allocator,
   Source_File *file
 ) {
   Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
-  Token *root = temp_allocate(Token);
+  Token *root = allocator_allocate(allocator, Token);
   root->type = Token_Type_Module;
   root->children = dyn_array_make(Array_Token_Ptr);
   root->source_range = (Source_Range){
@@ -258,7 +260,7 @@ tokenize(
 
 #define start_token(_type_)\
   do {\
-    current_token = temp_allocate(Token);\
+    current_token = allocator_allocate(allocator, Token);\
     *current_token = (Token) {\
       .type = (_type_),\
       .source_range = {\
@@ -429,7 +431,7 @@ tokenize(
         if (ch == '\\') {
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
-          u8 *string = allocator_allocate_bytes(temp_allocator, string_buffer->occupied, 1);
+          u8 *string = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
           memcpy(string, string_buffer->memory, string_buffer->occupied);
           current_token->string = (Slice){string, string_buffer->occupied};
           accept_and_push;
@@ -580,7 +582,7 @@ scope_lookup_type(
   Value *value = scope_lookup_force(context, scope, type_name, builder);
   if (!value) return 0;
   if (value->descriptor->type != Descriptor_Type_Type) {
-    program_error_builder(context->program, source_range) {
+    program_error_builder(context, source_range) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
@@ -625,7 +627,7 @@ token_force_type(
       descriptor =
         scope_lookup_type(context, scope, token->source_range, token->source, builder);
       if (!descriptor) {
-        program_error_builder(context->program, token->source_range) {
+        program_error_builder(context, token->source_range) {
           program_error_append_literal("Could not find type ");
           program_error_append_slice(token->source);
         }
@@ -646,7 +648,7 @@ token_force_type(
       if (child->type != Token_Type_Id) {
         panic("TODO: should be recursive");
       }
-      descriptor = temp_allocate(Descriptor);
+      descriptor = allocator_allocate(context->allocator, Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
         .pointer_to =
@@ -656,7 +658,7 @@ token_force_type(
     }
     case Token_Type_Hex_Integer:
     case Token_Type_Integer: {
-      program_error_builder(context->program, token->source_range) {
+      program_error_builder(context, token->source_range) {
         program_error_append_slice(token->source);
         program_error_append_literal(" is not a type");
       }
@@ -739,14 +741,16 @@ token_rewrite_pattern(
 
 Array_Token_Ptr
 token_clone_token_array_deep(
+  Allocator *allocator,
   Array_Token_Ptr source
 );
 
 Token *
 token_clone_deep(
+  Allocator *allocator,
   Token *token
 ) {
-  Token *clone = temp_allocate(Token);
+  Token *clone = allocator_allocate(allocator, Token);
   *clone = *token;
   switch (token->type) {
     case Token_Type_Newline:
@@ -762,7 +766,7 @@ token_clone_deep(
     case Token_Type_Paren:
     case Token_Type_Curly:
     case Token_Type_Module: {
-      clone->children = token_clone_token_array_deep(token->children);
+      clone->children = token_clone_token_array_deep(allocator, token->children);
       break;
     }
     case Token_Type_Value: {
@@ -775,12 +779,13 @@ token_clone_deep(
 
 Array_Token_Ptr
 token_clone_token_array_deep(
+  Allocator *allocator,
   Array_Token_Ptr source
 ) {
   Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
   for (u64 i = 0; i < dyn_array_length(source); ++i) {
     Token *token = *dyn_array_get(source, i);
-    Token *clone = token_clone_deep(token);
+    Token *clone = token_clone_deep(allocator, token);
     dyn_array_push(result, clone);
   }
   return result;
@@ -788,13 +793,14 @@ token_clone_token_array_deep(
 
 Array_Token_Ptr
 token_apply_macro_replacements(
+  Compilation_Context *context,
   Macro_Replacement_Map *map,
   Array_Token_Ptr source
 ) {
   Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
   for (u64 i = 0; i < dyn_array_length(source); ++i) {
     Token *token = *dyn_array_get(source, i);
-    Token *copy = temp_allocate(Token);
+    Token *copy = allocator_allocate(context->allocator, Token);
     *copy = *token;
     switch (token->type) {
       case Token_Type_Id: {
@@ -817,7 +823,7 @@ token_apply_macro_replacements(
       case Token_Type_Paren:
       case Token_Type_Curly:
       case Token_Type_Module: {
-        copy->children = token_apply_macro_replacements(map, token->children);
+        copy->children = token_apply_macro_replacements(context, map, token->children);
         break;
       }
       case Token_Type_Value: {
@@ -832,6 +838,7 @@ token_apply_macro_replacements(
 
 void
 token_rewrite_macro_match(
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Macro *macro,
   Array_Token_Ptr match
@@ -846,7 +853,7 @@ token_rewrite_macro_match(
       hash_map_set(map, *name, *dyn_array_get(match, i));
     }
   }
-  Array_Token_Ptr replacement = token_apply_macro_replacements(map, macro->replacement);
+  Array_Token_Ptr replacement = token_apply_macro_replacements(context, map, macro->replacement);
 
   token_replace_length_with_tokens(state, dyn_array_length(macro->pattern), replacement);
   dyn_array_destroy(match);
@@ -855,6 +862,7 @@ token_rewrite_macro_match(
 
 void
 token_rewrite_macros(
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -868,7 +876,7 @@ token_rewrite_macros(
           Token_Matcher_State sub_state = {state->tokens, i};
           Array_Token_Ptr match = token_match_pattern(&sub_state, macro->pattern);
           if (dyn_array_is_initialized(match)) {
-            token_rewrite_macro_match(&sub_state, macro, match);
+            token_rewrite_macro_match(context, &sub_state, macro, match);
             goto start;
           }
         }
@@ -928,7 +936,7 @@ token_match_argument(
   state->tokens.data->length = state->start_index;
   Descriptor *type_descriptor = token_match_type(context, &rest_state, scope, builder);
   if (!type_descriptor) return 0;
-  Token_Match_Arg *arg = temp_allocate(Token_Match_Arg);
+  Token_Match_Arg *arg = allocator_allocate(context->allocator, Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
   return arg;
 }
@@ -955,14 +963,14 @@ token_force_value(
       bool ok = false;
       u64 number = slice_parse_u64(token->source, &ok);
       if (!ok) {
-        program_error_builder(context->program, token->source_range) {
+        program_error_builder(context, token->source_range) {
           program_error_append_literal("Invalid integer literal: ");
           program_error_append_slice(token->source);
         }
         return;
       }
-      Value *immediate = value_from_unsigned_immediate(number);
-      move_value(builder, &token->source_range, result_value, immediate);
+      Value *immediate = value_from_unsigned_immediate(context->allocator, number);
+      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Type_Hex_Integer: {
@@ -970,39 +978,39 @@ token_force_value(
       Slice digits = slice_sub(token->source, 2, token->source.length);
       u64 number = slice_parse_hex(digits, &ok);
       if (!ok) {
-        program_error_builder(context->program, token->source_range) {
+        program_error_builder(context, token->source_range) {
           program_error_append_literal("Invalid integer hex literal: ");
           program_error_append_slice(token->source);
         }
         return;
       }
       // TODO should be unsigned
-      Value *immediate = value_from_signed_immediate(number);
-      move_value(builder, &token->source_range, result_value, immediate);
+      Value *immediate = value_from_signed_immediate(context->allocator, number);
+      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Type_String: {
       Slice string = token->string;
-      Value *string_bytes = value_global_c_string_from_slice(context->program, string);
-      Value *c_string_pointer = value_pointer_to(builder, &token->source_range, string_bytes);
-      move_value(builder, &token->source_range, result_value, c_string_pointer);
+      Value *string_bytes = value_global_c_string_from_slice(context, string);
+      Value *c_string_pointer = value_pointer_to(context, builder, &token->source_range, string_bytes);
+      move_value(context->allocator, builder, &token->source_range, result_value, c_string_pointer);
       return;
     }
     case Token_Type_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, scope, name, builder);
       if (!value) {
-        program_error_builder(context->program, token->source_range) {
+        program_error_builder(context, token->source_range) {
           program_error_append_literal("Undefined variable ");
           program_error_append_slice(name);
         }
       } else {
-        move_value(builder, &token->source_range, result_value, value);
+        move_value(context->allocator, builder, &token->source_range, result_value, value);
       }
       return;
     }
     case Token_Type_Value: {
-      move_value(builder, &token->source_range, result_value, token->value);
+      move_value(context->allocator, builder, &token->source_range, result_value, token->value);
       return;
     }
     case Token_Type_Paren: {
@@ -1059,7 +1067,7 @@ token_match_call_arguments(
     // needed regardless for something like x := (...)
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
-      Value *result_value = value_any();
+      Value *result_value = value_any(context->allocator);
       token_match_expression(context, state, scope, builder, result_value);
       dyn_array_push(result, result_value);
     }
@@ -1069,10 +1077,11 @@ token_match_call_arguments(
 
 static inline Token *
 token_value_make(
+  Compilation_Context *context,
   Value *result,
   Source_Range source_range
 ) {
-  Token *result_token = temp_allocate(Token);
+  Token *result_token = allocator_allocate(context->allocator, Token);
   *result_token = (Token){
     .type = Token_Type_Value,
     .source_range = source_range,
@@ -1124,6 +1133,7 @@ scope_add_macro(
 
 bool
 token_rewrite_macro_definitions(
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope
 ) {
@@ -1157,7 +1167,7 @@ token_rewrite_macro_definitions(
     }
   }
 
-  Macro *macro = temp_allocate(Macro);
+  Macro *macro = allocator_allocate(context->allocator, Macro);
   *macro = (Macro){
     .pattern = pattern,
     .pattern_names = pattern_names,
@@ -1232,7 +1242,7 @@ token_rewrite_type_definitions(
       Token_Matcher_State layout_state = {layout_token->children};
       Token *token = token_rewrite_constant_expression(context, &layout_state, scope, builder);
       if (token) {
-        bit_size_value = value_any();
+        bit_size_value = value_any(context->allocator);
         token_force_value(context, token, scope, builder, bit_size_value);
       }
       if (!bit_size_value) {
@@ -1244,9 +1254,9 @@ token_rewrite_type_definitions(
   }
 
   assert(layout_block || bit_size_value);
-  Value *result = temp_allocate(Value);
+  Value *result = allocator_allocate(context->allocator, Value);
 
-  Descriptor *descriptor = temp_allocate(Descriptor);
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   if (bit_size_value) {
     if (bit_size_value->descriptor->type != Descriptor_Type_Integer) {
       // TODO err
@@ -1279,7 +1289,7 @@ token_rewrite_type_definitions(
     }
   }
 
-  Descriptor *value_descriptor = temp_allocate(Descriptor);
+  Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
   *value_descriptor = (Descriptor) {
     .type = Descriptor_Type_Type,
     .type_descriptor = descriptor,
@@ -1288,7 +1298,7 @@ token_rewrite_type_definitions(
     .descriptor = value_descriptor,
     .operand = {.type = Operand_Type_None },
   };
-  replacement_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  replacement_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
 
   err:
   u64 replacement_count = layout_block ? 3 : 2;
@@ -1369,12 +1379,12 @@ token_import_match_arguments(
   Slice library_name = library_name_token->string;
   Slice symbol_name = symbol_name_token->string;
 
-  Value *result = temp_allocate(Value);
+  Value *result = allocator_allocate(context->allocator, Value);
   *result = (const Value) {
     .descriptor = 0,
-    .operand = import_symbol(context->program, library_name, symbol_name),
+    .operand = import_symbol(context, library_name, symbol_name),
   };
-  return token_value_make(result, TOKEN_MATCHED_SOURCE());
+  return token_value_make(context, result, TOKEN_MATCHED_SOURCE());
 }
 
 bool
@@ -1450,7 +1460,7 @@ token_rewrite_function_literal(
   Token_Maybe_Match(external_body, .type = Token_Type_Value);
   Token_Maybe_Match(regular_body, .type = Token_Type_Curly);
 
-  Scope *function_scope = scope_make(context->program->global_scope);
+  Scope *function_scope = scope_make(context->allocator, context->program->global_scope);
 
   Function_Builder *builder = 0;
   // TODO think about a better way to distinguish imports
@@ -1458,23 +1468,23 @@ token_rewrite_function_literal(
 
   if (external_body) {
     if (inline_) {
-      program_error_builder(context->program, inline_->source_range) {
+      program_error_builder(context, inline_->source_range) {
         program_error_append_literal("External functions can not be inline");
       }
       inline_ = 0;
     }
     if(!external_body->value) return 0;
-    descriptor = temp_allocate(Descriptor);
+    descriptor = allocator_allocate(context->allocator, Descriptor);
     *descriptor = (Descriptor) {
       .type = Descriptor_Type_Function,
       .function = {
-        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = temp_allocator),
-        .argument_names = dyn_array_make(Array_Slice, .allocator = temp_allocator),
+        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
+        .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
         .returns = 0,
       },
     };
   } else if (regular_body) {
-    builder = fn_begin(context->program);
+    builder = fn_begin(context);
     descriptor = builder->descriptor;
   } else {
     // FIXME better error reporting or maybe consider this a function type
@@ -1491,7 +1501,7 @@ token_rewrite_function_literal(
       Descriptor *return_descriptor =
         token_force_type(context, function_scope, return_type_token, outer_builder);
       if (!return_descriptor) return 0;
-      function_return_descriptor(&descriptor->function, return_descriptor);
+      function_return_descriptor(context, &descriptor->function, return_descriptor);
       break;
     }
     default: {
@@ -1511,7 +1521,8 @@ token_rewrite_function_literal(
       Token_Match_Arg *arg =
         token_match_argument(context, args_state, function_scope, outer_builder);
       if (!arg) return 0;
-      Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
+      Value *arg_value =
+        function_push_argument(context->allocator, &descriptor->function, arg->type_descriptor);
       if (regular_body && arg_value->operand.type == Operand_Type_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
@@ -1531,11 +1542,11 @@ token_rewrite_function_literal(
   } else {
     Value *return_result_value =
       descriptor->function.returns->descriptor->type == Descriptor_Type_Void
-        ? value_any()
+        ? value_any(context->allocator)
         : descriptor->function.returns;
     if (inline_) {
       descriptor->function.parent_scope = scope;
-      descriptor->function.inline_body = token_clone_deep(regular_body);
+      descriptor->function.inline_body = token_clone_deep(context->allocator, regular_body);
     }
     // TODO might want to do this lazily for inline functions
     token_parse_block(context, regular_body, function_scope, builder, return_result_value);
@@ -1544,7 +1555,7 @@ token_rewrite_function_literal(
     result = builder->value;
   }
   u64 replacement_count = inline_ ? 5 : 4;
-  Token *value_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, replacement_count, value_token);
   return true;
 }
@@ -1560,7 +1571,7 @@ token_rewrite_negative_literal(
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
   Token_Match(integer, .type = Token_Type_Integer);
-  Value *result = value_any();
+  Value *result = value_any(context->allocator);
   token_force_value(context, integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
     result->operand.s8 = -result->operand.s8;
@@ -1574,7 +1585,7 @@ token_rewrite_negative_literal(
     panic("Internal error, expected an immediate");
   }
 
-  Token *value_token = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, value_token);
   return true;
 }
@@ -1615,7 +1626,7 @@ compile_time_eval(
     .patch_info_array =
       dyn_array_copy(Array_Label_Location_Diff_Patch_Info, context->program->patch_info_array),
     .functions = dyn_array_copy(Array_Function_Builder, context->program->functions),
-    .global_scope = scope_make(context->program->global_scope),
+    .global_scope = scope_make(context->allocator, context->program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),
     .data_section = context->program->data_section,
     .code_section = {
@@ -1623,13 +1634,14 @@ compile_time_eval(
       .permissions = Section_Permissions_Execute,
     }
   };
-  Function_Builder *eval_builder = fn_begin(&eval_program);
-  function_return_descriptor(&eval_builder->descriptor->function, &descriptor_void);
 
   Compilation_Context eval_context = *context;
   eval_context.program = &eval_program;
 
-  Value *expression_result_value = value_any();
+  Function_Builder *eval_builder = fn_begin(&eval_context);
+  function_return_descriptor(context, &eval_builder->descriptor->function, &descriptor_void);
+
+  Value *expression_result_value = value_any(context->allocator);
   token_match_expression(
     &eval_context, state, eval_program.global_scope, eval_builder, expression_result_value
   );
@@ -1639,13 +1651,14 @@ compile_time_eval(
 
   // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
   Value *arg_value = function_push_argument(
+    context->allocator,
     &eval_builder->value->descriptor->function,
-    descriptor_pointer_to(expression_result_value->descriptor)
+    descriptor_pointer_to(context->allocator, expression_result_value->descriptor)
   );
 
   // Create a reference Value
   assert(arg_value->operand.type == Operand_Type_Register);
-  Value *out_value = temp_allocate(Value);
+  Value *out_value = allocator_allocate(context->allocator, Value);
   *out_value = (Value) {
     .descriptor = expression_result_value->descriptor,
     .operand = (Operand){
@@ -1655,22 +1668,22 @@ compile_time_eval(
     },
   };
 
-  move_value(eval_builder, &first_token->source_range, out_value, expression_result_value);
+  move_value(context->allocator, eval_builder, &first_token->source_range, out_value, expression_result_value);
   fn_end(eval_builder);
 
-  program_jit(&eval_program);
+  program_jit(&eval_context);
 
   u32 result_byte_size = out_value->operand.byte_size;
   // Need to ensure 16-byte alignment here because result value might be __m128
   // TODO When we support AVX-2 or AVX-512, this might need to increase further
   u32 alignment = 16;
-  void *result = allocator_allocate_bytes(temp_allocator, result_byte_size, alignment);
+  void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
 
   Compile_Time_Eval_Proc jitted_code =
     (Compile_Time_Eval_Proc)value_as_function(&eval_program, eval_builder->value);
 
   jitted_code(result);
-  Value *token_value = temp_allocate(Value);
+  Value *token_value = allocator_allocate(context->allocator, Value);
   *token_value = (Value) {
     .descriptor = out_value->descriptor,
   };
@@ -1723,7 +1736,7 @@ compile_time_eval(
       break;
     }
   }
-  return token_value_make(
+  return token_value_make(context,
     token_value,
     source_range_from_token_matcher_state(
       state, dyn_array_length(state->tokens) - state->start_index
@@ -1852,7 +1865,7 @@ token_parse_block(
   assert(block->type == Token_Type_Curly);
   Array_Token_Ptr children = block->children;
   if (!dyn_array_length(children)) return false;
-  Scope *block_scope = scope_make(scope);
+  Scope *block_scope = scope_make(context->allocator, scope);
 
   // Newlines at the end of the block do not count as semicolons otherwise this:
   // { 42
@@ -1866,7 +1879,7 @@ token_parse_block(
     Token_Matcher_State *state = dyn_array_get(block_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
     bool is_last_statement = i + 1 == dyn_array_length(block_statements);
-    Value *result_value = is_last_statement ? block_result_value : value_any();
+    Value *result_value = is_last_statement ? block_result_value : value_any(context->allocator);
 
     // If result is a register we need to make sure it is acquired to avoid it being used
     // as temporary when evaluating last statement. This definitely can happen with
@@ -1895,12 +1908,12 @@ token_rewrite_statement_if(
   Token_Match(body, .type = Token_Type_Curly);
   Token_Match_End();
 
-  Value *condition_value = value_any();
+  Value *condition_value = value_any(context->allocator);
   token_force_value(context, condition, scope, builder, condition_value);
   Label_Index else_label = make_if(
-    context->program, &builder->code_block.instructions, &keyword->source_range, condition_value
+    context, &builder->code_block.instructions, &keyword->source_range, condition_value
   );
-  token_parse_block(context, body, scope, builder, value_any());
+  token_parse_block(context, body, scope, builder, value_any(context->allocator));
   push_instruction(
     &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
@@ -1932,7 +1945,7 @@ token_rewrite_goto(
         (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
       );
     } else {
-      program_error_builder(context->program, label_name->source_range) {
+      program_error_builder(context, label_name->source_range) {
         program_error_append_slice(label_name->source);
         program_error_append_literal(" is not a label");
       }
@@ -1988,10 +2001,10 @@ token_rewrite_pointer_to(
   Token_Match_Operator(operator, "&");
   Token_Match(value_token, 0);
 
-  Value *pointee = value_any();
+  Value *pointee = value_any(context->allocator);
   token_force_value(context, value_token, scope, builder, pointee);
-  Value *result = value_pointer_to(builder, &operator->source_range, pointee);
-  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Value *result = value_pointer_to(context, builder, &operator->source_range, pointee);
+  Token *token_value = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2011,7 +2024,7 @@ token_match_fixed_array_type(
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
   // FIXME :TargetValue Make a convention to have this as a constant / immediate
-  Value *size_value = value_any();
+  Value *size_value = value_any(context->allocator);
   token_match_expression(context, &size_state, scope, builder, size_value);
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
@@ -2032,7 +2045,7 @@ token_match_fixed_array_type(
   u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
 
   // TODO extract into a helper
-  Descriptor *array_descriptor = temp_allocate(Descriptor);
+  Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
   *array_descriptor = (Descriptor) {
     .type = Descriptor_Type_Fixed_Size_Array,
     .array = {
@@ -2059,32 +2072,32 @@ token_rewrite_inline_machine_code_bytes(
 
   u64 byte_count = dyn_array_length(args);
   if (byte_count > 15) {
-    program_error_builder(context->program, args_token->source_range) {
+    program_error_builder(context, args_token->source_range) {
       program_error_append_literal("Expected a maximum of 15 arguments, got ");
       program_error_append_number("%lld", byte_count);
     }
     goto end;
   }
 
-  Fixed_Buffer *buffer = fixed_buffer_make(.allocator = temp_allocator, .capacity = byte_count);
+  Fixed_Buffer *buffer = fixed_buffer_make(.allocator = context->allocator, .capacity = byte_count);
   for (u64 i = 0; i < byte_count; ++i) {
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->descriptor->type != Descriptor_Type_Integer) {
-      program_error_builder(context->program, args_token->source_range) {
+      program_error_builder(context, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
       }
       goto end;
     }
     if (!operand_is_immediate(&value->operand)) {
-      program_error_builder(context->program, args_token->source_range) {
+      program_error_builder(context, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
       }
       goto end;
     }
     s64 byte = operand_immediate_as_s64(&value->operand);
     if (!u64_fits_into_u8(byte)) {
-      program_error_builder(context->program, args_token->source_range) {
+      program_error_builder(context, args_token->source_range) {
         program_error_append_literal("Expected integer between 0 and 255, got ");
         program_error_append_number("%lld", byte);
       }
@@ -2131,7 +2144,7 @@ token_rewrite_cast(
   u32 original_byte_size = descriptor_byte_size(value->descriptor);
   Value *result = value;
   if (cast_to_byte_size != original_byte_size) {
-    result = temp_allocate(Value);
+    result = allocator_allocate(context->allocator, Value);
     if (cast_to_byte_size < original_byte_size) {
       *result = (Value) {
         .descriptor = cast_to_descriptor,
@@ -2139,12 +2152,12 @@ token_rewrite_cast(
       };
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
-      result = reserve_stack(builder, cast_to_descriptor);
-      move_value(builder, &cast->source_range, result, value);
+      result = reserve_stack(context->allocator, builder, cast_to_descriptor);
+      move_value(context->allocator, builder, &cast->source_range, result, value);
     }
   }
 
-  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2165,7 +2178,7 @@ token_match_label(
     &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = label }
   );
-  Value *value = temp_allocate(Value);
+  Value *value = allocator_allocate(context->allocator, Value);
   *value = (Value) {
     .descriptor = &descriptor_void,
     .operand = label32(label),
@@ -2197,15 +2210,15 @@ token_rewrite_definitions(
   if (!value) {
     Descriptor *descriptor = token_match_type(context, &rest_state, scope, builder);
     if (!descriptor) {
-      program_error_builder(context->program, define->source_range) {
+      program_error_builder(context, define->source_range) {
         program_error_append_literal("Could not find type");
       }
       return false;
     }
-    value = reserve_stack(builder, descriptor);
+    value = reserve_stack(context->allocator, builder, descriptor);
   }
   scope_define_value(scope, name->source, value);
-  Token *token_value = token_value_make(value, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(context, value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, size_to_replace, token_value);
 
   return true;
@@ -2232,7 +2245,7 @@ token_rewrite_definition_and_assignment_statements(
   if (name->type != Token_Type_Id) return false;
 
   Token_Matcher_State rhs_state = {rhs};
-  Value *value = value_any();
+  Value *value = value_any(context->allocator);
   token_match_expression(context, &rhs_state, scope, builder, value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -2240,15 +2253,15 @@ token_rewrite_definition_and_assignment_statements(
     value->descriptor->type == Descriptor_Type_Integer &&
     operand_is_immediate(&value->operand)
   ) {
-    value = value_from_s64(operand_immediate_as_s64(&value->operand));
+    value = value_from_s64(context->allocator, operand_immediate_as_s64(&value->operand));
   } else if (
     value->descriptor->type == Descriptor_Type_Float &&
     operand_is_immediate(&value->operand)
   ) {
     panic("TODO decide how to handle floats");
   }
-  Value *on_stack = reserve_stack(builder, value->descriptor);
-  move_value(builder, &name->source_range, on_stack, value);
+  Value *on_stack = reserve_stack(context->allocator, builder, value->descriptor);
+  move_value(context->allocator, builder, &name->source_range, on_stack, value);
 
   scope_define_value(scope, name->source, on_stack);
 
@@ -2268,10 +2281,10 @@ token_rewrite_array_index(
   Token_Match(target_token, 0);
   Token_Match(brackets, .type = Token_Type_Square);
 
-  Value *array = value_any();
+  Value *array = value_any(context->allocator);
   token_force_value(context, target_token, scope, builder, array);
   Token_Matcher_State *index_state = &(Token_Matcher_State) {brackets->children};
-  Value *index_value = value_any();
+  Value *index_value = value_any(context->allocator);
   token_match_expression(context, index_state, scope, builder, index_value);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
@@ -2279,7 +2292,7 @@ token_rewrite_array_index(
   Descriptor *item_descriptor = array->descriptor->array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
-  Value *result = temp_allocate(Value);
+  Value *result = allocator_allocate(context->allocator, Value);
   if (operand_is_immediate(&index_value->operand)) {
     s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
     *result = (Value){
@@ -2309,8 +2322,8 @@ token_rewrite_array_index(
       scale = SIB_Scale_8;
     }
     Value *index_value_in_register =
-      value_register_for_descriptor(Register_R10, index_value->descriptor);
-    move_value(builder, &target_token->source_range, index_value_in_register, index_value);
+      value_register_for_descriptor(context->allocator, Register_R10, index_value->descriptor);
+    move_value(context->allocator, builder, &target_token->source_range, index_value_in_register, index_value);
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
@@ -2328,7 +2341,7 @@ token_rewrite_array_index(
     panic("TODO");
   }
 
-  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
   return true;
 }
@@ -2345,11 +2358,11 @@ token_rewrite_struct_field(
   Token_Match_Operator(dot, ".");
   Token_Match(field_name, .type = Token_Type_Id);
 
-  Value *struct_value = value_any();
+  Value *struct_value = value_any(context->allocator);
   token_force_value(context, struct_token, scope, builder, struct_value);
-  Value *result = struct_get_field(struct_value, field_name->source);
+  Value *result = struct_get_field(context->allocator, struct_value, field_name->source);
 
-  Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2375,7 +2388,7 @@ token_rewrite_assignment(
   if (!dyn_array_length(lhs_state.tokens)) {
     panic("Left hand side is checked to be non-empty when matched so something went wrong");
   }
-  Value *target = value_any();
+  Value *target = value_any(context->allocator);
   if (dyn_array_length(lhs_state.tokens) == 1) {
     Token *token = *dyn_array_get(lhs_state.tokens, 0);
     token_force_value(context, token, scope, builder, target);
@@ -2408,7 +2421,7 @@ token_rewrite_function_calls(
   Token_Match(args_token, .type = Token_Type_Paren);
   if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
 
-  Value *target = value_any();
+  Value *target = value_any(context->allocator);
   token_force_value(context, target_token, scope, builder, target);
 
   Array_Value_Ptr args;
@@ -2442,7 +2455,7 @@ token_rewrite_function_calls(
   }
 
   if (target->descriptor->type != Descriptor_Type_Function) {
-    program_error_builder(context->program, target_token->source_range) {
+    program_error_builder(context, target_token->source_range) {
       program_error_append_slice(target_token->source);
       program_error_append_literal(" is not a function");
     }
@@ -2458,7 +2471,7 @@ token_rewrite_function_calls(
       // We make a nested scope based on function's original parent scope
       // instead of current scope for hygiene reasons. I.e. function body
       // should not have access to locals inside the call scope.
-      Scope *body_scope = scope_make(function->parent_scope);
+      Scope *body_scope = scope_make(context->allocator, function->parent_scope);
 
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Slice arg_name = *dyn_array_get(function->argument_names, i);
@@ -2494,12 +2507,12 @@ token_rewrite_function_calls(
         }
       );
     } else {
-      return_value = call_function_overload(builder, source_range, overload, args);
+      return_value = call_function_overload(context, builder, source_range, overload, args);
     }
-    Token *token_value = token_value_make(return_value, TOKEN_MATCHED_SOURCE());
+    Token *token_value = token_value_make(context, return_value, TOKEN_MATCHED_SOURCE());
     token_replace_tokens_in_state(state, 2, token_value);
   } else {
-    program_error_builder(context->program, target_token->source_range) {
+    program_error_builder(context, target_token->source_range) {
       // TODO add better error message
       program_error_append_literal("Could not find matching overload");
     }
@@ -2522,12 +2535,12 @@ token_rewrite_plus(
   Token_Match_Operator(op_token, "+");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = value_any();
+  Value *lhs_value = value_any(context->allocator);
   token_force_value(context, lhs, scope, builder, lhs_value);
-  Value *rhs_value = value_any();
+  Value *rhs_value = value_any(context->allocator);
   token_force_value(context, rhs, scope, builder, rhs_value);
-  plus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
+  plus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(context, result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2545,12 +2558,12 @@ token_rewrite_minus(
   Token_Match_Operator(op_token, "-");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = value_any();
+  Value *lhs_value = value_any(context->allocator);
   token_force_value(context, lhs, scope, builder, lhs_value);
-  Value *rhs_value = value_any();
+  Value *rhs_value = value_any(context->allocator);
   token_force_value(context, rhs, scope, builder, rhs_value);
-  minus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
+  minus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(context, result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2569,12 +2582,12 @@ token_rewrite_divide(
   Token_Match_Operator(op_token, "/");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = value_any();
+  Value *lhs_value = value_any(context->allocator);
   token_force_value(context, lhs, scope, builder, lhs_value);
-  Value *rhs_value = value_any();
+  Value *rhs_value = value_any(context->allocator);
   token_force_value(context, rhs, scope, builder, rhs_value);
-  divide(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
+  divide(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
+  Token *token_value = token_value_make(context, result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2592,13 +2605,13 @@ token_rewrite_remainder(
   Token_Match_Operator(op_token, "%");
   Token_Match(rhs, 0);
 
-  Value *lhs_value = value_any();
+  Value *lhs_value = value_any(context->allocator);
   token_force_value(context, lhs, scope, builder, lhs_value);
-  Value *rhs_value = value_any();
+  Value *rhs_value = value_any(context->allocator);
   token_force_value(context, rhs, scope, builder, rhs_value);
-  Value *temp = reserve_stack(builder, lhs_value->descriptor);
-  value_remainder(builder, &op_token->source_range, temp, lhs_value, rhs_value);
-  Token *token_value = token_value_make(temp, TOKEN_MATCHED_SOURCE());
+  Value *temp = reserve_stack(context->allocator, builder, lhs_value->descriptor);
+  value_remainder(context->allocator, builder, &op_token->source_range, temp, lhs_value, rhs_value);
+  Token *token_value = token_value_make(context, temp, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2649,9 +2662,9 @@ token_rewrite_compare(
   }
   Token_Match(rhs, 0);
 
-  Value *lhs_value = value_any();
+  Value *lhs_value = value_any(context->allocator);
   token_force_value(context, lhs, scope, builder, lhs_value);
-  Value *rhs_value = value_any();
+  Value *rhs_value = value_any(context->allocator);
   token_force_value(context, rhs, scope, builder, rhs_value);
 
   // FIXME add implicit unsigned to signed conversion
@@ -2668,7 +2681,7 @@ token_rewrite_compare(
       switch(lhs_value->operand.byte_size) {
         case 1: {
           if (u8_fits_into_s8(rhs_value->operand.u8)) {
-            Value *adjusted = temp_allocate(Value);
+            Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s8;
             rhs_value = adjusted;
@@ -2679,7 +2692,7 @@ token_rewrite_compare(
         }
         case 2: {
           if (u16_fits_into_s16(rhs_value->operand.u16)) {
-            Value *adjusted = temp_allocate(Value);
+            Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s16;
             rhs_value = adjusted;
@@ -2690,7 +2703,7 @@ token_rewrite_compare(
         }
         case 4: {
           if (u32_fits_into_s32(rhs_value->operand.u32)) {
-            Value *adjusted = temp_allocate(Value);
+            Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s32;
             rhs_value = adjusted;
@@ -2701,7 +2714,7 @@ token_rewrite_compare(
         }
         case 8: {
           if (u64_fits_into_s64(rhs_value->operand.u64)) {
-            Value *adjusted = temp_allocate(Value);
+            Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s64;
             rhs_value = adjusted;
@@ -2757,8 +2770,11 @@ token_rewrite_compare(
     }
   }
 
-  compare(compare_type, builder, &operator->source_range, result_value, lhs_value, rhs_value);
-  Token *token_value = token_value_make(result_value,TOKEN_MATCHED_SOURCE());
+  compare(
+    context->allocator, compare_type, builder,
+    &operator->source_range, result_value, lhs_value, rhs_value
+  );
+  Token *token_value = token_value_make(context, result_value,TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2773,7 +2789,7 @@ token_parse_statement(
   Value *result_value
 ) {
   // TODO consider how this should work
-  token_rewrite_macros(state, scope, builder);
+  token_rewrite_macros(context, state, scope, builder);
 
   if (
     token_rewrite_inline_machine_code_bytes(context, state, scope, builder) ||
@@ -2827,7 +2843,7 @@ token_match_expression(
     }
     default: {
       Token *token = *dyn_array_get(state->tokens, 0);
-      program_error_builder(context->program, token->source_range) {
+      program_error_builder(context, token->source_range) {
         program_error_append_literal("Could not parse the expression");
       }
       return;
@@ -2852,7 +2868,7 @@ token_parse_module(
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(module_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
-    token_rewrite_macro_definitions(state, context->program->global_scope);
+    token_rewrite_macro_definitions(context, state, context->program->global_scope);
     token_rewrite_statement(
       context, state, context->program->global_scope,
       &global_builder, token_rewrite_constant_definitions
@@ -2861,7 +2877,7 @@ token_parse_module(
     if (dyn_array_length(state->tokens)) {
       Source_Range source_range =
         source_range_from_token_matcher_state(state, dyn_array_length(state->tokens));
-      program_error_builder(context->program, source_range) {
+      program_error_builder(context, source_range) {
         program_error_append_literal("Could not parse a top level statement");
       }
       return false;
@@ -2876,7 +2892,7 @@ program_parse(
   Compilation_Context *context,
   Source_File *file
 ) {
-  Tokenizer_Result tokenizer_result = tokenize(file);
+  Tokenizer_Result tokenizer_result = tokenize(context->allocator, file);
   if (tokenizer_result.type != Tokenizer_Result_Type_Success) {
     return (Parse_Result) {
       .type = Parse_Result_Type_Error,
@@ -2938,7 +2954,7 @@ program_import_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
-  Source_File *file = temp_allocate(Source_File);
+  Source_File *file = allocator_allocate(context->allocator, Source_File);
   *file = (Source_File) {
     .path = file_path,
     .text = {0},

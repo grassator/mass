@@ -631,20 +631,17 @@ typedef struct _Program {
   bool is_stack_unwinding_in_progress;
 } Program;
 
-Bucket_Buffer *temp_buffer;
-Allocator *temp_allocator;
+typedef struct {
+  Bucket_Buffer *allocation_buffer;
+  Allocator *allocator;
+  Program *program;
+} Compilation_Context;
 
 void *
 rip_value_pointer(
   Program *program,
   Value *value
 );
-
-#define temp_allocate(_type_)\
-  bucket_buffer_allocate(temp_buffer, _type_)
-
-#define temp_allocate_array(_type_, _count_)\
-  bucket_buffer_allocate_array(temp_buffer, _type_, _count_)
 
 u64
 estimate_max_code_size_in_bytes(
@@ -653,7 +650,7 @@ estimate_max_code_size_in_bytes(
 
 void
 program_jit(
-  Program *program
+  Compilation_Context *context
 );
 
 void
