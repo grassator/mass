@@ -78,18 +78,25 @@ int main(s32 argc, char **argv) {
   }
 
   Slice file_path = slice_from_c_string(raw_file_path);
-  Program *program = program_init(&(Program) {0});
-  Parse_Result result = program_import_file(program, slice_literal("lib\\prelude"));
+
+  Compilation_Context context = {
+    .program = program_init(&(Program) {0}),
+  };
+
+  Parse_Result result = program_import_file(&context, slice_literal("lib\\prelude"));
   if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
-  result = program_import_file(program, file_path);
+  result = program_import_file(&context, file_path);
   if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
 
-  program->entry_point = scope_lookup_force(program, program->global_scope, slice_literal("main"), 0);
-  if (!program->entry_point) {
+  context.program->entry_point =
+    scope_lookup_force(&context, context.program->global_scope, slice_literal("main"), 0);
+  if (!context.program->entry_point) {
     printf("Could not find entry point function `main`");
     return -1;
   }
-  if (dyn_array_length(program->errors)) return mass_cli_print_errors(program->errors);
+  if (dyn_array_length(context.program->errors)) {
+    return mass_cli_print_errors(context.program->errors);
+  }
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
@@ -109,14 +116,13 @@ int main(s32 argc, char **argv) {
         allocator_default,
         fixed_buffer_as_slice(path_buffer)
       );
-      write_executable(exe_path_wide, program, win32_executable_type);
+      write_executable(exe_path_wide, context.program, win32_executable_type);
       bucket_buffer_destroy(path_builder);
       break;
     }
     case Mass_Cli_Mode_Run: {
-      program_jit(program);
-      fn_type_opaque main =
-        helper_value_as_function(program, program->entry_point);
+      program_jit(context.program);
+      fn_type_opaque main = value_as_function(context.program, context.program->entry_point);
       main();
       return 0;
     }

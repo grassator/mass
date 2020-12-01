@@ -1021,7 +1021,7 @@ descriptor_array_of(
 }
 
 fn_type_opaque
-helper_value_as_function(
+value_as_function(
   Program *program,
   Value *value
 ) {
@@ -1032,9 +1032,6 @@ helper_value_as_function(
   s8 *target = program->jit_buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
-
-#define value_as_function(_value_, _type_) \
-  ((_type_)helper_value_as_function(program_, _value_))
 
 
 bool

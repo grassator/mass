@@ -63,7 +63,7 @@ scope_lookup(
 
 Token *
 token_rewrite_constant_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -71,7 +71,7 @@ token_rewrite_constant_expression(
 
 void
 token_force_value(
-  Program *program,
+  Compilation_Context *context,
   Token *token,
   Scope *scope,
   Function_Builder *builder,
@@ -80,7 +80,7 @@ token_force_value(
 
 Value *
 scope_lookup_force(
-  Program *program,
+  Compilation_Context *context,
   Scope *scope,
   Slice name,
   Function_Builder *builder
@@ -101,11 +101,11 @@ scope_lookup_force(
     Scope_Entry *entry = dyn_array_get(*entries, i);
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
       Token_Matcher_State state = {entry->lazy_constant_expression};
-      Token *token = token_rewrite_constant_expression(program, &state, scope, builder);
+      Token *token = token_rewrite_constant_expression(context, &state, scope, builder);
       Value *result = 0;
       if (token) {
         result = value_any();
-        token_force_value(program, token, scope, builder, result);
+        token_force_value(context, token, scope, builder, result);
       }
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
@@ -146,7 +146,7 @@ scope_lookup_force(
       parent = parent->parent;
       if (!parent) break;
       if (!hash_map_has(parent->map, name)) continue;
-      Value *overload = scope_lookup_force(program, parent, name, builder);
+      Value *overload = scope_lookup_force(context, parent, name, builder);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
       if (overload->descriptor->type != Descriptor_Type_Function) {
         panic("There should only be function overloads");
@@ -571,16 +571,16 @@ token_split_by_newlines_and_semicolons(
 
 Descriptor *
 scope_lookup_type(
-  Program *program,
+  Compilation_Context *context,
   Scope *scope,
   Source_Range source_range,
   Slice type_name,
   Function_Builder *builder
 ) {
-  Value *value = scope_lookup_force(program, scope, type_name, builder);
+  Value *value = scope_lookup_force(context, scope, type_name, builder);
   if (!value) return 0;
   if (value->descriptor->type != Descriptor_Type_Type) {
-    program_error_builder(program, source_range) {
+    program_error_builder(context->program, source_range) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
@@ -614,7 +614,7 @@ typedef struct {
 
 Descriptor *
 token_force_type(
-  Program *program,
+  Compilation_Context *context,
   Scope *scope,
   Token *token,
   Function_Builder *builder
@@ -623,9 +623,9 @@ token_force_type(
   switch (token->type) {
     case Token_Type_Id: {
       descriptor =
-        scope_lookup_type(program, scope, token->source_range, token->source, builder);
+        scope_lookup_type(context, scope, token->source_range, token->source, builder);
       if (!descriptor) {
-        program_error_builder(program, token->source_range) {
+        program_error_builder(context->program, token->source_range) {
           program_error_append_literal("Could not find type ");
           program_error_append_slice(token->source);
         }
@@ -636,7 +636,7 @@ token_force_type(
     case Token_Type_Square: {
       if (dyn_array_length(token->children) != 1) {
         program_push_error_from_slice(
-          program,
+          context->program,
           token->source_range,
           slice_literal("Pointer type must have a single type inside")
         );
@@ -650,13 +650,13 @@ token_force_type(
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
         .pointer_to =
-          scope_lookup_type(program, scope, child->source_range, child->source, builder),
+          scope_lookup_type(context, scope, child->source_range, child->source, builder),
       };
       break;
     }
     case Token_Type_Hex_Integer:
     case Token_Type_Integer: {
-      program_error_builder(program, token->source_range) {
+      program_error_builder(context->program, token->source_range) {
         program_error_append_slice(token->source);
         program_error_append_literal(" is not a type");
       }
@@ -664,7 +664,7 @@ token_force_type(
     }
     case Token_Type_Newline: {
       program_push_error_from_slice(
-        program,
+        context->program,
         token->source_range,
         slice_literal("Unexpected newline token")
       );
@@ -685,7 +685,7 @@ token_force_type(
 }
 
 typedef Array_Token_Ptr (*token_pattern_callback)(
-  Program *program,
+  Compilation_Context *context,
   Array_Token_Ptr match,
   Scope *scope,
   Function_Builder *builder_
@@ -722,7 +722,7 @@ token_replace_length_with_tokens(
 
 bool
 token_rewrite_pattern(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -731,7 +731,7 @@ token_rewrite_pattern(
 ) {
   Array_Token_Ptr match = token_match_pattern(state, pattern);
   if (!dyn_array_is_initialized(match)) return false;
-  Array_Token_Ptr replacement = callback(program, match, scope, builder);
+  Array_Token_Ptr replacement = callback(context, match, scope, builder);
   token_replace_length_with_tokens(state, dyn_array_length(pattern), replacement);
   dyn_array_destroy(match);
   return true;
@@ -880,7 +880,7 @@ token_rewrite_macros(
 
 Descriptor *
 token_match_fixed_array_type(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
@@ -888,30 +888,30 @@ token_match_fixed_array_type(
 
 Descriptor *
 token_match_type(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
 ) {
-  Descriptor *descriptor = token_match_fixed_array_type(program, state, scope, builder);
+  Descriptor *descriptor = token_match_fixed_array_type(context, state, scope, builder);
   if (descriptor) return descriptor;
   u64 length = dyn_array_length(state->tokens);
   if (!length) panic("Caller must not call token_match_type with empty token list");
   Token *token = *dyn_array_get(state->tokens, 0);
   if (length > 1) {
     program_push_error_from_slice(
-      program,
+      context->program,
       token->source_range,
       slice_literal("Can not resolve type")
     );
     return 0;
   }
-  return token_force_type(program, scope, token, builder);
+  return token_force_type(context, scope, token, builder);
 }
 
 Token_Match_Arg *
 token_match_argument(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -926,7 +926,7 @@ token_match_argument(
   );
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
-  Descriptor *type_descriptor = token_match_type(program, &rest_state, scope, builder);
+  Descriptor *type_descriptor = token_match_type(context, &rest_state, scope, builder);
   if (!type_descriptor) return 0;
   Token_Match_Arg *arg = temp_allocate(Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
@@ -935,7 +935,7 @@ token_match_argument(
 
 void
 token_match_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -944,7 +944,7 @@ token_match_expression(
 
 void
 token_force_value(
-  Program *program,
+  Compilation_Context *context,
   Token *token,
   Scope *scope,
   Function_Builder *builder,
@@ -955,7 +955,7 @@ token_force_value(
       bool ok = false;
       u64 number = slice_parse_u64(token->source, &ok);
       if (!ok) {
-        program_error_builder(program, token->source_range) {
+        program_error_builder(context->program, token->source_range) {
           program_error_append_literal("Invalid integer literal: ");
           program_error_append_slice(token->source);
         }
@@ -970,7 +970,7 @@ token_force_value(
       Slice digits = slice_sub(token->source, 2, token->source.length);
       u64 number = slice_parse_hex(digits, &ok);
       if (!ok) {
-        program_error_builder(program, token->source_range) {
+        program_error_builder(context->program, token->source_range) {
           program_error_append_literal("Invalid integer hex literal: ");
           program_error_append_slice(token->source);
         }
@@ -983,16 +983,16 @@ token_force_value(
     }
     case Token_Type_String: {
       Slice string = token->string;
-      Value *string_bytes = value_global_c_string_from_slice(program, string);
+      Value *string_bytes = value_global_c_string_from_slice(context->program, string);
       Value *c_string_pointer = value_pointer_to(builder, &token->source_range, string_bytes);
       move_value(builder, &token->source_range, result_value, c_string_pointer);
       return;
     }
     case Token_Type_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(program, scope, name, builder);
+      Value *value = scope_lookup_force(context, scope, name, builder);
       if (!value) {
-        program_error_builder(program, token->source_range) {
+        program_error_builder(context->program, token->source_range) {
           program_error_append_literal("Undefined variable ");
           program_error_append_slice(name);
         }
@@ -1008,12 +1008,12 @@ token_force_value(
     case Token_Type_Paren: {
       if (!builder) panic("Caller should only force (...) in a builder context");
       Token_Matcher_State state = {.tokens = token->children};
-      token_match_expression(program, &state, scope, builder, result_value);
+      token_match_expression(context, &state, scope, builder, result_value);
       return;
     }
     case Token_Type_Curly: {
       if (!builder) panic("Caller should only force {...} in a builder context");
-      token_parse_block(program, token, scope, builder, result_value);
+      token_parse_block(context, token, scope, builder, result_value);
       return;
     }
     case Token_Type_Module:
@@ -1024,7 +1024,7 @@ token_force_value(
     }
     case Token_Type_Newline: {
       program_push_error_from_slice(
-        program,
+        context->program,
         token->source_range,
         slice_literal("Unexpected newline token")
       );
@@ -1039,7 +1039,7 @@ token_force_value(
 // FIXME pass in the function definition
 Array_Value_Ptr
 token_match_call_arguments(
-  Program *program,
+  Compilation_Context *context,
   Token *token,
   Scope *scope,
   Function_Builder *builder
@@ -1060,7 +1060,7 @@ token_match_call_arguments(
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *state = dyn_array_get(argument_states, i);
       Value *result_value = value_any();
-      token_match_expression(program, state, scope, builder, result_value);
+      token_match_expression(context, state, scope, builder, result_value);
       dyn_array_push(result, result_value);
     }
   }
@@ -1171,7 +1171,7 @@ token_rewrite_macro_definitions(
 
 bool
 token_match_struct_field(
-  Program *program,
+  Compilation_Context *context,
   Descriptor *struct_descriptor,
   Token_Matcher_State *state,
   Scope *scope,
@@ -1188,7 +1188,7 @@ token_match_struct_field(
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
 
-  Descriptor *descriptor = token_match_type(program, &rest_state, scope, builder);
+  Descriptor *descriptor = token_match_type(context, &rest_state, scope, builder);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
@@ -1196,7 +1196,7 @@ token_match_struct_field(
 
 bool
 token_rewrite_type_definitions(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1230,10 +1230,10 @@ token_rewrite_type_definitions(
     }
     default: {
       Token_Matcher_State layout_state = {layout_token->children};
-      Token *token = token_rewrite_constant_expression(program, &layout_state, scope, builder);
+      Token *token = token_rewrite_constant_expression(context, &layout_state, scope, builder);
       if (token) {
         bit_size_value = value_any();
-        token_force_value(program, token, scope, builder, bit_size_value);
+        token_force_value(context, token, scope, builder, bit_size_value);
       }
       if (!bit_size_value) {
         // TODO print error
@@ -1274,7 +1274,7 @@ token_rewrite_type_definitions(
         token_split_by_newlines_and_semicolons(layout_block->children);
       for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
         Token_Matcher_State *field_state = dyn_array_get(definitions, i);
-        token_match_struct_field(program, descriptor, field_state, scope, builder);
+        token_match_struct_field(context, descriptor, field_state, scope, builder);
       }
     }
   }
@@ -1332,7 +1332,7 @@ Token *
 token_import_match_arguments(
   Source_Range source_range,
   Token_Matcher_State *state,
-  Program *program
+  Compilation_Context *context
 ) {
   u64 peek_index = 0;
   Token *library_name_token = token_peek_match(state, peek_index++, &(Token_Pattern) {
@@ -1340,7 +1340,7 @@ token_import_match_arguments(
   });
   if (!library_name_token) {
     program_push_error_from_slice(
-      program, source_range,
+      context->program, source_range,
       slice_literal("First argument to external() must be a literal string")
     );
     return 0;
@@ -1351,7 +1351,7 @@ token_import_match_arguments(
   });
   if (!comma) {
     program_push_error_from_slice(
-      program, source_range,
+      context->program, source_range,
       slice_literal("external(\"library_name\", \"symbol_name\") requires two arguments")
     );
     return 0;
@@ -1361,7 +1361,7 @@ token_import_match_arguments(
   });
   if (!symbol_name_token) {
     program_push_error_from_slice(
-      program, source_range,
+      context->program, source_range,
       slice_literal("Second argument to external() must be a literal string")
     );
     return 0;
@@ -1372,18 +1372,14 @@ token_import_match_arguments(
   Value *result = temp_allocate(Value);
   *result = (const Value) {
     .descriptor = 0,
-    .operand = import_symbol(
-      program,
-      library_name,
-      symbol_name
-    ),
+    .operand = import_symbol(context->program, library_name, symbol_name),
   };
   return token_value_make(result, TOKEN_MATCHED_SOURCE());
 }
 
 bool
 token_rewrite_external_import(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder_
@@ -1392,18 +1388,18 @@ token_rewrite_external_import(
   Token_Match(name, .type = Token_Type_Id, .source = slice_literal("external"));
   Token_Match(args, .type = Token_Type_Paren);
   Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
-  Token *result_token = token_import_match_arguments(args->source_range, args_state, program);
+  Token *result_token = token_import_match_arguments(args->source_range, args_state, context);
   if (!result_token) return false;
   token_replace_tokens_in_state(state, 2, result_token);
   return true;
 }
 
 typedef bool (*token_rewrite_expression_callback)
-(Program *program, Token_Matcher_State *, Scope *, Function_Builder *, Value *result_value);
+(Compilation_Context *context, Token_Matcher_State *, Scope *, Function_Builder *, Value *result_value);
 
 void
 token_rewrite_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -1413,18 +1409,18 @@ token_rewrite_expression(
   start: for (;;) {
     for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
       Token_Matcher_State rewrite_state = {state->tokens, i};
-      if (callback(program, &rewrite_state, scope, builder, result_value)) goto start;
+      if (callback(context, &rewrite_state, scope, builder, result_value)) goto start;
     }
     break;
   }
 }
 
 typedef bool (*token_rewrite_statement_callback)
-(Program *program, Token_Matcher_State *, Scope *, Function_Builder *);
+(Compilation_Context *context, Token_Matcher_State *, Scope *, Function_Builder *);
 
 void
 token_rewrite_statement(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -1433,7 +1429,7 @@ token_rewrite_statement(
   start: for (;;) {
     for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
       Token_Matcher_State rewrite_state = {state->tokens, i};
-      if (callback(program, &rewrite_state, scope, builder)) goto start;
+      if (callback(context, &rewrite_state, scope, builder)) goto start;
     }
     break;
   }
@@ -1441,7 +1437,7 @@ token_rewrite_statement(
 
 bool
 token_rewrite_function_literal(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *outer_builder
@@ -1454,7 +1450,7 @@ token_rewrite_function_literal(
   Token_Maybe_Match(external_body, .type = Token_Type_Value);
   Token_Maybe_Match(regular_body, .type = Token_Type_Curly);
 
-  Scope *function_scope = scope_make(program->global_scope);
+  Scope *function_scope = scope_make(context->program->global_scope);
 
   Function_Builder *builder = 0;
   // TODO think about a better way to distinguish imports
@@ -1462,7 +1458,7 @@ token_rewrite_function_literal(
 
   if (external_body) {
     if (inline_) {
-      program_error_builder(program, inline_->source_range) {
+      program_error_builder(context->program, inline_->source_range) {
         program_error_append_literal("External functions can not be inline");
       }
       inline_ = 0;
@@ -1478,7 +1474,7 @@ token_rewrite_function_literal(
       },
     };
   } else if (regular_body) {
-    builder = fn_begin(program);
+    builder = fn_begin(context->program);
     descriptor = builder->descriptor;
   } else {
     // FIXME better error reporting or maybe consider this a function type
@@ -1493,7 +1489,7 @@ token_rewrite_function_literal(
     case 1: {
       Token *return_type_token = *dyn_array_get(return_types->children, 0);
       Descriptor *return_descriptor =
-        token_force_type(program, function_scope, return_type_token, outer_builder);
+        token_force_type(context, function_scope, return_type_token, outer_builder);
       if (!return_descriptor) return 0;
       function_return_descriptor(&descriptor->function, return_descriptor);
       break;
@@ -1513,7 +1509,7 @@ token_rewrite_function_literal(
       Token_Matcher_State *args_state = dyn_array_get(argument_states, i);
       token_state_clear_newlines(args_state);
       Token_Match_Arg *arg =
-        token_match_argument(program, args_state, function_scope, outer_builder);
+        token_match_argument(context, args_state, function_scope, outer_builder);
       if (!arg) return 0;
       Value *arg_value = function_push_argument(&descriptor->function, arg->type_descriptor);
       if (regular_body && arg_value->operand.type == Operand_Type_Register) {
@@ -1542,7 +1538,7 @@ token_rewrite_function_literal(
       descriptor->function.inline_body = token_clone_deep(regular_body);
     }
     // TODO might want to do this lazily for inline functions
-    token_parse_block(program, regular_body, function_scope, builder, return_result_value);
+    token_parse_block(context, regular_body, function_scope, builder, return_result_value);
 
     fn_end(builder);
     result = builder->value;
@@ -1555,7 +1551,7 @@ token_rewrite_function_literal(
 
 bool
 token_rewrite_negative_literal(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1565,7 +1561,7 @@ token_rewrite_negative_literal(
   Token_Match_Operator(define, "-");
   Token_Match(integer, .type = Token_Type_Integer);
   Value *result = value_any();
-  token_force_value(program, integer, scope, builder, result);
+  token_force_value(context, integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
     result->operand.s8 = -result->operand.s8;
   } else if (result->operand.type == Operand_Type_Immediate_16) {
@@ -1585,7 +1581,7 @@ token_rewrite_negative_literal(
 
 bool
 token_rewrite_constant_sub_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1594,7 +1590,7 @@ token_rewrite_constant_sub_expression(
   Token_Match(paren, .type = Token_Type_Paren);
 
   Token_Matcher_State sub_state = {paren->children};
-  Token *result_token = token_rewrite_constant_expression(program, &sub_state, scope, builder);
+  Token *result_token = token_rewrite_constant_expression(context, &sub_state, scope, builder);
   if (!result_token) {
     return false;
   }
@@ -1606,22 +1602,22 @@ typedef void (*Compile_Time_Eval_Proc)(void *);
 
 Token *
 compile_time_eval(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope
 ) {
   Token *first_token = *dyn_array_get(state->tokens, state->start_index);
 
   Program eval_program = {
-    .import_libraries = dyn_array_copy(Array_Import_Library, program->import_libraries),
+    .import_libraries = dyn_array_copy(Array_Import_Library, context->program->import_libraries),
     // FIXME this is probably broken now because code ones should point to a different section
-    .labels = dyn_array_copy(Array_Label, program->labels),
+    .labels = dyn_array_copy(Array_Label, context->program->labels),
     .patch_info_array =
-      dyn_array_copy(Array_Label_Location_Diff_Patch_Info, program->patch_info_array),
-    .functions = dyn_array_copy(Array_Function_Builder, program->functions),
-    .global_scope = scope_make(program->global_scope),
+      dyn_array_copy(Array_Label_Location_Diff_Patch_Info, context->program->patch_info_array),
+    .functions = dyn_array_copy(Array_Function_Builder, context->program->functions),
+    .global_scope = scope_make(context->program->global_scope),
     .errors = dyn_array_make(Array_Parse_Error),
-    .data_section = program->data_section,
+    .data_section = context->program->data_section,
     .code_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
       .permissions = Section_Permissions_Execute,
@@ -1630,9 +1626,12 @@ compile_time_eval(
   Function_Builder *eval_builder = fn_begin(&eval_program);
   function_return_descriptor(&eval_builder->descriptor->function, &descriptor_void);
 
+  Compilation_Context eval_context = *context;
+  eval_context.program = &eval_program;
+
   Value *expression_result_value = value_any();
   token_match_expression(
-    &eval_program, state, eval_program.global_scope, eval_builder, expression_result_value
+    &eval_context, state, eval_program.global_scope, eval_builder, expression_result_value
   );
 
   // We use a something like a C++ reference out parameter for the
@@ -1668,7 +1667,7 @@ compile_time_eval(
   void *result = allocator_allocate_bytes(temp_allocator, result_byte_size, alignment);
 
   Compile_Time_Eval_Proc jitted_code =
-    (Compile_Time_Eval_Proc)helper_value_as_function(&eval_program, eval_builder->value);
+    (Compile_Time_Eval_Proc)value_as_function(&eval_program, eval_builder->value);
 
   jitted_code(result);
   Value *token_value = temp_allocate(Value);
@@ -1734,7 +1733,7 @@ compile_time_eval(
 
 bool
 token_rewrite_compile_time_eval(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *unused_builder
@@ -1745,7 +1744,7 @@ token_rewrite_compile_time_eval(
 
   Token_Matcher_State sub_state = {paren->children};
 
-  Token *result_token = compile_time_eval(program, &sub_state, scope);
+  Token *result_token = compile_time_eval(context, &sub_state, scope);
 
   if (!result_token) {
     return false;
@@ -1756,7 +1755,7 @@ token_rewrite_compile_time_eval(
 
 bool
 token_rewrite_compile_time_function_call(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1772,7 +1771,7 @@ token_rewrite_compile_time_function_call(
     .to = state->start_index + peek_index
   };
   Array_Token_Ptr call_tokens = dyn_array_sub(Array_Token_Ptr, state->tokens, call_token_range);
-  Token *result = compile_time_eval(program, &(Token_Matcher_State){call_tokens}, scope);
+  Token *result = compile_time_eval(context, &(Token_Matcher_State){call_tokens}, scope);
 
   token_replace_tokens_in_state(state, 2, result);
   return result;
@@ -1780,7 +1779,7 @@ token_rewrite_compile_time_function_call(
 
 Token *
 token_rewrite_constant_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1789,19 +1788,19 @@ token_rewrite_constant_expression(
   if (!token_count) return 0;
   Source_Range source_range =  source_range_from_token_matcher_state(state, token_count);
   token_state_clear_newlines(state);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_external_import);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_negative_literal);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_external_import);
 
-  token_rewrite_type_definitions(program, state, scope, builder) ||
-  token_rewrite_function_literal(program, state, scope, builder) ||
-  token_rewrite_compile_time_function_call(program, state, scope, builder) ||
-  token_rewrite_compile_time_eval(program, state, scope, builder);
+  token_rewrite_type_definitions(context, state, scope, builder) ||
+  token_rewrite_function_literal(context, state, scope, builder) ||
+  token_rewrite_compile_time_function_call(context, state, scope, builder) ||
+  token_rewrite_compile_time_eval(context, state, scope, builder);
 
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_constant_sub_expression);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_constant_sub_expression);
 
   if (dyn_array_length(state->tokens) != 1) {
     program_push_error_from_slice(
-      program, source_range,
+      context->program, source_range,
       slice_literal("Invalid constant definition")
     );
     return 0;
@@ -1811,7 +1810,7 @@ token_rewrite_constant_expression(
 
 bool
 token_rewrite_constant_definitions(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1834,7 +1833,7 @@ token_rewrite_constant_definitions(
 
 void
 token_parse_statement(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   const Source_Range *source_range,
   Scope *scope,
@@ -1844,7 +1843,7 @@ token_parse_statement(
 
 bool
 token_parse_block(
-  Program *program,
+  Compilation_Context *context,
   Token *block,
   Scope *scope,
   Function_Builder *builder,
@@ -1878,14 +1877,14 @@ token_parse_block(
       }
     }
 
-    token_parse_statement(program, state, &block->source_range, block_scope, builder, result_value);
+    token_parse_statement(context, state, &block->source_range, block_scope, builder, result_value);
   }
   return true;
 }
 
 bool
 token_rewrite_statement_if(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1897,11 +1896,11 @@ token_rewrite_statement_if(
   Token_Match_End();
 
   Value *condition_value = value_any();
-  token_force_value(program, condition, scope, builder, condition_value);
+  token_force_value(context, condition, scope, builder, condition_value);
   Label_Index else_label = make_if(
-    program, &builder->code_block.instructions, &keyword->source_range, condition_value
+    context->program, &builder->code_block.instructions, &keyword->source_range, condition_value
   );
-  token_parse_block(program, body, scope, builder, value_any());
+  token_parse_block(context, body, scope, builder, value_any());
   push_instruction(
     &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
@@ -1913,7 +1912,7 @@ token_rewrite_statement_if(
 
 bool
 token_rewrite_goto(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1922,7 +1921,7 @@ token_rewrite_goto(
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
   Token_Match(label_name, .type = Token_Type_Id);
   Token_Match_End();
-  Value *value = scope_lookup_force(program, scope, label_name->source, builder);
+  Value *value = scope_lookup_force(context, scope, label_name->source, builder);
   if (value) {
     if (
       value->descriptor->type == Descriptor_Type_Void &&
@@ -1933,7 +1932,7 @@ token_rewrite_goto(
         (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
       );
     } else {
-      program_error_builder(program, label_name->source_range) {
+      program_error_builder(context->program, label_name->source_range) {
         program_error_append_slice(label_name->source);
         program_error_append_literal(" is not a label");
       }
@@ -1946,7 +1945,7 @@ token_rewrite_goto(
 
 bool
 token_rewrite_explicit_return(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1958,12 +1957,12 @@ token_rewrite_explicit_return(
   );
   bool has_return_expression = dyn_array_length(rest) > 0;
   Value *fn_return = builder->descriptor->function.returns;
-  token_match_expression(program, &(Token_Matcher_State){rest}, scope, builder, fn_return);
+  token_match_expression(context, &(Token_Matcher_State){rest}, scope, builder, fn_return);
 
   bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
   if (!is_void && !has_return_expression) {
     program_push_error_from_slice(
-      program, keyword->source_range,
+      context->program, keyword->source_range,
       slice_literal("Explicit return from a non-void function requires a value")
     );
   }
@@ -1980,7 +1979,7 @@ token_rewrite_explicit_return(
 
 bool
 token_rewrite_pointer_to(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -1990,7 +1989,7 @@ token_rewrite_pointer_to(
   Token_Match(value_token, 0);
 
   Value *pointee = value_any();
-  token_force_value(program, value_token, scope, builder, pointee);
+  token_force_value(context, value_token, scope, builder, pointee);
   Value *result = value_pointer_to(builder, &operator->source_range, pointee);
   Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, token_value);
@@ -1999,7 +1998,7 @@ token_rewrite_pointer_to(
 
 Descriptor *
 token_match_fixed_array_type(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2008,15 +2007,15 @@ token_match_fixed_array_type(
   Token_Match(type, .type = Token_Type_Id);
   Token_Match(square_brace, .type = Token_Type_Square);
   Descriptor *descriptor =
-    scope_lookup_type(program, scope, type->source_range, type->source, builder);
+    scope_lookup_type(context, scope, type->source_range, type->source, builder);
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
   // FIXME :TargetValue Make a convention to have this as a constant / immediate
   Value *size_value = value_any();
-  token_match_expression(program, &size_state, scope, builder, size_value);
+  token_match_expression(context, &size_state, scope, builder, size_value);
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
-      program,
+      context->program,
       square_brace->source_range,
       slice_literal("Fixed size array size is not an integer")
     );
@@ -2024,7 +2023,7 @@ token_match_fixed_array_type(
   }
   if (!operand_is_immediate(&size_value->operand)) {
     program_push_error_from_slice(
-      program,
+      context->program,
       square_brace->source_range,
       slice_literal("Fixed size array size must be known at compile time")
     );
@@ -2046,7 +2045,7 @@ token_match_fixed_array_type(
 
 bool
 token_rewrite_inline_machine_code_bytes(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2056,11 +2055,11 @@ token_rewrite_inline_machine_code_bytes(
   Token_Match(args_token, .type = Token_Type_Paren);
   Token_Match_End();
 
-  Array_Value_Ptr args = token_match_call_arguments(program, args_token, scope, builder);
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token, scope, builder);
 
   u64 byte_count = dyn_array_length(args);
   if (byte_count > 15) {
-    program_error_builder(program, args_token->source_range) {
+    program_error_builder(context->program, args_token->source_range) {
       program_error_append_literal("Expected a maximum of 15 arguments, got ");
       program_error_append_number("%lld", byte_count);
     }
@@ -2072,20 +2071,20 @@ token_rewrite_inline_machine_code_bytes(
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->descriptor->type != Descriptor_Type_Integer) {
-      program_error_builder(program, args_token->source_range) {
+      program_error_builder(context->program, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
       }
       goto end;
     }
     if (!operand_is_immediate(&value->operand)) {
-      program_error_builder(program, args_token->source_range) {
+      program_error_builder(context->program, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
       }
       goto end;
     }
     s64 byte = operand_immediate_as_s64(&value->operand);
     if (!u64_fits_into_u8(byte)) {
-      program_error_builder(program, args_token->source_range) {
+      program_error_builder(context->program, args_token->source_range) {
         program_error_append_literal("Expected integer between 0 and 255, got ");
         program_error_append_number("%lld", byte);
       }
@@ -2109,7 +2108,7 @@ token_rewrite_inline_machine_code_bytes(
 
 bool
 token_rewrite_cast(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2118,7 +2117,7 @@ token_rewrite_cast(
   Token_Match(cast, .type = Token_Type_Id, .source = slice_literal("cast"));
   Token_Match(value_token, .type = Token_Type_Paren);
 
-  Array_Value_Ptr args = token_match_call_arguments(program, value_token, scope, builder);
+  Array_Value_Ptr args = token_match_call_arguments(context, value_token, scope, builder);
   assert(dyn_array_length(args) == 2);
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
@@ -2152,7 +2151,7 @@ token_rewrite_cast(
 
 Value *
 token_match_label(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2161,7 +2160,7 @@ token_match_label(
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
   Token_Match_End();
 
-  Label_Index label = make_label(program, &program->code_section);
+  Label_Index label = make_label(context->program, &context->program->code_section);
   push_instruction(
     &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = label }
@@ -2177,7 +2176,7 @@ token_match_label(
 
 bool
 token_rewrite_definitions(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2194,11 +2193,11 @@ token_rewrite_definitions(
   Token_Matcher_State rest_state = {.tokens = rest};
   u64 size_to_replace = dyn_array_length(state->tokens) - state->start_index;
 
-  Value *value = token_match_label(program, &rest_state, scope, builder);
+  Value *value = token_match_label(context, &rest_state, scope, builder);
   if (!value) {
-    Descriptor *descriptor = token_match_type(program, &rest_state, scope, builder);
+    Descriptor *descriptor = token_match_type(context, &rest_state, scope, builder);
     if (!descriptor) {
-      program_error_builder(program, define->source_range) {
+      program_error_builder(context->program, define->source_range) {
         program_error_append_literal("Could not find type");
       }
       return false;
@@ -2214,7 +2213,7 @@ token_rewrite_definitions(
 
 bool
 token_rewrite_definition_and_assignment_statements(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2234,7 +2233,7 @@ token_rewrite_definition_and_assignment_statements(
 
   Token_Matcher_State rhs_state = {rhs};
   Value *value = value_any();
-  token_match_expression(program, &rhs_state, scope, builder, value);
+  token_match_expression(context, &rhs_state, scope, builder, value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (
@@ -2259,7 +2258,7 @@ token_rewrite_definition_and_assignment_statements(
 
 bool
 token_rewrite_array_index(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2270,10 +2269,10 @@ token_rewrite_array_index(
   Token_Match(brackets, .type = Token_Type_Square);
 
   Value *array = value_any();
-  token_force_value(program, target_token, scope, builder, array);
+  token_force_value(context, target_token, scope, builder, array);
   Token_Matcher_State *index_state = &(Token_Matcher_State) {brackets->children};
   Value *index_value = value_any();
-  token_match_expression(program, index_state, scope, builder, index_value);
+  token_match_expression(context, index_state, scope, builder, index_value);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
@@ -2336,7 +2335,7 @@ token_rewrite_array_index(
 
 bool
 token_rewrite_struct_field(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2347,7 +2346,7 @@ token_rewrite_struct_field(
   Token_Match(field_name, .type = Token_Type_Id);
 
   Value *struct_value = value_any();
-  token_force_value(program, struct_token, scope, builder, struct_value);
+  token_force_value(context, struct_token, scope, builder, struct_value);
   Value *result = struct_get_field(struct_value, field_name->source);
 
   Token *token_value = token_value_make(result, TOKEN_MATCHED_SOURCE());
@@ -2357,7 +2356,7 @@ token_rewrite_struct_field(
 
 bool
 token_rewrite_assignment(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder
@@ -2370,27 +2369,27 @@ token_rewrite_assignment(
   }
 
   Token_Matcher_State lhs_state = {lhs};
-  token_rewrite_expression(program, &lhs_state, scope, builder, 0, token_rewrite_array_index);
-  token_rewrite_statement(program, &lhs_state, scope, builder, token_rewrite_struct_field);
-  token_rewrite_statement(program, &lhs_state, scope, builder, token_rewrite_definitions);
+  token_rewrite_expression(context, &lhs_state, scope, builder, 0, token_rewrite_array_index);
+  token_rewrite_statement(context, &lhs_state, scope, builder, token_rewrite_struct_field);
+  token_rewrite_statement(context, &lhs_state, scope, builder, token_rewrite_definitions);
   if (!dyn_array_length(lhs_state.tokens)) {
     panic("Left hand side is checked to be non-empty when matched so something went wrong");
   }
   Value *target = value_any();
   if (dyn_array_length(lhs_state.tokens) == 1) {
     Token *token = *dyn_array_get(lhs_state.tokens, 0);
-    token_force_value(program, token, scope, builder, target);
+    token_force_value(context, token, scope, builder, target);
   } else {
     Token *first_token = *dyn_array_get(lhs_state.tokens, 0);
     program_push_error_from_slice(
-      program,
+      context->program,
       first_token->source_range,
       slice_literal("Could not parse the target of the assignment")
     );
   }
 
   Token_Matcher_State rhs_state = {rhs};
-  token_match_expression(program, &rhs_state, scope, builder, target);
+  token_match_expression(context, &rhs_state, scope, builder, target);
 
   token_replace_tokens_in_state(state, dyn_array_length(state->tokens), 0);
   return true;
@@ -2398,7 +2397,7 @@ token_rewrite_assignment(
 
 bool
 token_rewrite_function_calls(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2410,7 +2409,7 @@ token_rewrite_function_calls(
   if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
 
   Value *target = value_any();
-  token_force_value(program, target_token, scope, builder, target);
+  token_force_value(context, target_token, scope, builder, target);
 
   Array_Value_Ptr args;
 
@@ -2430,7 +2429,7 @@ token_rewrite_function_calls(
       }
     }
 
-    args = token_match_call_arguments(program, args_token, scope, builder);
+    args = token_match_call_arguments(context, args_token, scope, builder);
 
     // Release any registers that we fake acquired to make sure that the actual call
     // does not unnecessarily store them to stack
@@ -2443,7 +2442,7 @@ token_rewrite_function_calls(
   }
 
   if (target->descriptor->type != Descriptor_Type_Function) {
-    program_error_builder(program, target_token->source_range) {
+    program_error_builder(context->program, target_token->source_range) {
       program_error_append_slice(target_token->source);
       program_error_append_literal(" is not a function");
     }
@@ -2472,13 +2471,14 @@ token_rewrite_function_calls(
       // the return types are correct
       Function_Builder inline_builder = *builder;
       {
-        inline_builder.code_block.end_label = make_label(program, &program->code_section);
+        inline_builder.code_block.end_label =
+          make_label(context->program, &context->program->code_section);
         inline_builder.descriptor = &(Descriptor) {0};
         *inline_builder.descriptor = *builder->descriptor;
         inline_builder.descriptor->function.returns = result_value;
       }
 
-      token_parse_block(program, function->inline_body, body_scope, &inline_builder, return_value);
+      token_parse_block(context, function->inline_body, body_scope, &inline_builder, return_value);
 
       // Because instructions are stored in a dynamic array it might have been
       // reallocated which means we need to copy it. It might be better to
@@ -2499,7 +2499,7 @@ token_rewrite_function_calls(
     Token *token_value = token_value_make(return_value, TOKEN_MATCHED_SOURCE());
     token_replace_tokens_in_state(state, 2, token_value);
   } else {
-    program_error_builder(program, target_token->source_range) {
+    program_error_builder(context->program, target_token->source_range) {
       // TODO add better error message
       program_error_append_literal("Could not find matching overload");
     }
@@ -2511,7 +2511,7 @@ token_rewrite_function_calls(
 
 bool
 token_rewrite_plus(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2523,9 +2523,9 @@ token_rewrite_plus(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
-  token_force_value(program, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
-  token_force_value(program, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, scope, builder, rhs_value);
   plus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
   Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
@@ -2534,7 +2534,7 @@ token_rewrite_plus(
 
 bool
 token_rewrite_minus(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2546,9 +2546,9 @@ token_rewrite_minus(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
-  token_force_value(program, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
-  token_force_value(program, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, scope, builder, rhs_value);
   minus(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
   Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
@@ -2558,7 +2558,7 @@ token_rewrite_minus(
 
 bool
 token_rewrite_divide(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2570,9 +2570,9 @@ token_rewrite_divide(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
-  token_force_value(program, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
-  token_force_value(program, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, scope, builder, rhs_value);
   divide(builder, &op_token->source_range, result_value, lhs_value, rhs_value);
   Token *token_value = token_value_make(result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
@@ -2581,7 +2581,7 @@ token_rewrite_divide(
 
 bool
 token_rewrite_remainder(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2593,9 +2593,9 @@ token_rewrite_remainder(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
-  token_force_value(program, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
-  token_force_value(program, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, scope, builder, rhs_value);
   Value *temp = reserve_stack(builder, lhs_value->descriptor);
   value_remainder(builder, &op_token->source_range, temp, lhs_value, rhs_value);
   Token *token_value = token_value_make(temp, TOKEN_MATCHED_SOURCE());
@@ -2605,7 +2605,7 @@ token_rewrite_remainder(
 
 bool
 token_rewrite_compare(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2650,9 +2650,9 @@ token_rewrite_compare(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any();
-  token_force_value(program, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, scope, builder, lhs_value);
   Value *rhs_value = value_any();
-  token_force_value(program, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, scope, builder, rhs_value);
 
   // FIXME add implicit unsigned to signed conversion
   if (
@@ -2765,7 +2765,7 @@ token_rewrite_compare(
 
 void
 token_parse_statement(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   const Source_Range *source_range,
   Scope *scope,
@@ -2776,25 +2776,23 @@ token_parse_statement(
   token_rewrite_macros(state, scope, builder);
 
   if (
-    token_rewrite_inline_machine_code_bytes(program, state, scope, builder) ||
-    token_rewrite_assignment(program, state, scope, builder) ||
-    token_rewrite_definition_and_assignment_statements(
-      program, state, scope, builder
-    ) ||
-    token_rewrite_definitions(program, state, scope, builder) ||
-    token_rewrite_explicit_return(program, state, scope, builder) ||
-    token_rewrite_goto(program, state, scope, builder) ||
-    token_rewrite_constant_definitions(program, state, scope, builder)||
-    token_rewrite_statement_if(program, state, scope, builder)
+    token_rewrite_inline_machine_code_bytes(context, state, scope, builder) ||
+    token_rewrite_assignment(context, state, scope, builder) ||
+    token_rewrite_definition_and_assignment_statements( context, state, scope, builder) ||
+    token_rewrite_definitions(context, state, scope, builder) ||
+    token_rewrite_explicit_return(context, state, scope, builder) ||
+    token_rewrite_goto(context, state, scope, builder) ||
+    token_rewrite_constant_definitions(context, state, scope, builder)||
+    token_rewrite_statement_if(context, state, scope, builder)
   ) {
     return;
   }
-  token_match_expression(program, state, scope, builder, result_value);
+  token_match_expression(context, state, scope, builder, result_value);
 }
 
 void
 token_match_expression(
-  Program *program,
+  Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
   Function_Builder *builder,
@@ -2804,19 +2802,19 @@ token_match_expression(
     return;
   }
   token_state_clear_newlines(state);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_cast);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_struct_field);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_function_literal);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_function_calls);
-  token_rewrite_statement(program, state, scope, builder, token_rewrite_pointer_to);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_cast);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_struct_field);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_function_literal);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_negative_literal);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_function_calls);
+  token_rewrite_statement(context, state, scope, builder, token_rewrite_pointer_to);
 
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_divide);
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_remainder);
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_plus);
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_minus);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_divide);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_remainder);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_plus);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_minus);
 
-  token_rewrite_expression(program, state, scope, builder, result_value, token_rewrite_compare);
+  token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_compare);
 
   switch(dyn_array_length(state->tokens)) {
     case 0: {
@@ -2824,12 +2822,12 @@ token_match_expression(
     }
     case 1: {
       Token *token = *dyn_array_get(state->tokens, 0);
-      token_force_value(program, token, scope, builder, result_value);
+      token_force_value(context, token, scope, builder, result_value);
       return;
     }
     default: {
       Token *token = *dyn_array_get(state->tokens, 0);
-      program_error_builder(program, token->source_range) {
+      program_error_builder(context->program, token->source_range) {
         program_error_append_literal("Could not parse the expression");
       }
       return;
@@ -2840,7 +2838,7 @@ token_match_expression(
 bool
 token_parse_module(
   Token *token,
-  Program *program
+  Compilation_Context *context
 ) {
   if (token->type != Token_Type_Module) {
     panic("Caller must provide a value known to be a module");
@@ -2854,15 +2852,16 @@ token_parse_module(
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(module_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
-    token_rewrite_macro_definitions(state, program->global_scope);
+    token_rewrite_macro_definitions(state, context->program->global_scope);
     token_rewrite_statement(
-      program, state, program->global_scope, &global_builder, token_rewrite_constant_definitions
+      context, state, context->program->global_scope,
+      &global_builder, token_rewrite_constant_definitions
     );
     // Detect unmatched statements
     if (dyn_array_length(state->tokens)) {
       Source_Range source_range =
         source_range_from_token_matcher_state(state, dyn_array_length(state->tokens));
-      program_error_builder(program, source_range) {
+      program_error_builder(context->program, source_range) {
         program_error_append_literal("Could not parse a top level statement");
       }
       return false;
@@ -2874,7 +2873,7 @@ token_parse_module(
 
 Parse_Result
 program_parse(
-  Program *program,
+  Compilation_Context *context,
   Source_File *file
 ) {
   Tokenizer_Result tokenizer_result = tokenize(file);
@@ -2886,7 +2885,7 @@ program_parse(
   }
   ;
   return (Parse_Result) {
-    .type = token_parse_module(tokenizer_result.root, program)
+    .type = token_parse_module(tokenizer_result.root, context)
       ? Parse_Result_Type_Success
       : Parse_Result_Type_Error
   };
@@ -2929,7 +2928,7 @@ win32_absolute_path(
 
 Parse_Result
 program_import_file(
-  Program *program,
+  Compilation_Context *context,
   Slice file_path
 ) {
   Slice extension = slice_literal(".mass");
@@ -2959,6 +2958,6 @@ program_import_file(
     };
   }
   file->text = fixed_buffer_as_slice(buffer);
-  return program_parse(program, file);
+  return program_parse(context, file);
 }
 

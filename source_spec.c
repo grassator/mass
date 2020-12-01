@@ -61,30 +61,34 @@ spec_check_and_print_program(
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
-  token_parse_module(result.root, program_);\
-  Value *_fn_value_id_ = scope_lookup_force(program_, program_->global_scope, slice_literal(#_fn_value_id_), 0);\
+  token_parse_module(result.root, &test_context);\
+  Value *_fn_value_id_ = scope_lookup_force(\
+    &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_), 0\
+  );\
   (void)_fn_value_id_
 
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
   check(_fn_value_id_);\
-  program_jit(program_);\
-  check(!spec_check_and_print_program(program_))
+  program_jit(test_context.program);\
+  check(!spec_check_and_print_program(test_context.program))
 
 
 spec("source") {
   static Program test_program = {0};
-  static Program *program_ = &test_program;
   static Slice test_file_name = slice_literal_fields("_test_.mass");
+  static Compilation_Context test_context = {
+    .program = &test_program
+  };
 
   before_each() {
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
-    program_init(program_);
+    program_init(&test_program);
   }
 
   after_each() {
-    program_deinit(program_);
+    program_deinit(&test_program);
     bucket_buffer_destroy(temp_buffer);
   }
 
@@ -276,7 +280,7 @@ spec("source") {
       "foo :: () -> () { inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00) }",
       foo
     );
-    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
     check(checker() == 42);
   }
 
@@ -294,16 +298,16 @@ spec("source") {
 
   it("should be unwind stack on hardware exception") {
     Parse_Result result =
-      program_import_file(program_, slice_literal("fixtures\\error_runtime_divide_by_zero"));
+      program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
     check(result.type == Parse_Result_Type_Success);
     Value *main =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
     check(main);
 
-    program_jit(program_);
-    check(!dyn_array_length(program_->errors))
+    program_jit(test_context.program);
+    check(!dyn_array_length(test_context.program->errors))
 
-    fn_type_s32_to_s32 checker = value_as_function(main, fn_type_s32_to_s32);
+    fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(test_context.program, main);
 
     volatile bool caught_exception = false;
     __try {
@@ -317,7 +321,7 @@ spec("source") {
 
   it("should be able to parse and run a void -> s64 function") {
     test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
-    fn_type_void_to_s64 checker = value_as_function(foo, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
     check(checker() == 42);
   }
 
@@ -327,14 +331,14 @@ spec("source") {
       "outer :: (x : s64) -> (s64) { inner(1); x }",
       outer
     );
-    fn_type_s64_to_s64 checker = value_as_function(outer, fn_type_s64_to_s64);
+    fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(test_context.program, outer);
     s64 actual = checker(42);
     check(actual == 42);
   }
 
   it("should be able to parse and run a s64 -> s64 function") {
     test_program_inline_source("foo :: (x : s64) -> (s64) { x }", foo);
-    fn_type_s64_to_s64 checker = value_as_function(foo, fn_type_s64_to_s64);
+    fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(test_context.program, foo);
     check(checker(42) == 42);
   }
 
@@ -343,7 +347,7 @@ spec("source") {
       "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
       foo
     );
-    fn_type_void_to_s8 checker = value_as_function(foo, fn_type_void_to_s8);
+    fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(test_context.program, foo);
     check(checker() == 42);
   }
 
@@ -353,7 +357,7 @@ spec("source") {
       plus
     );
     fn_type_s64_s64_s64_to_s64 checker =
-      value_as_function(plus, fn_type_s64_s64_s64_to_s64);
+      (fn_type_s64_s64_s64_to_s64)value_as_function(test_context.program, plus);
     check(checker(30, 10, 2) == 42);
   }
 
@@ -363,7 +367,7 @@ spec("source") {
       "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }",
       plus
     );
-    fn_type_void_to_s64 checker = value_as_function(plus, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, plus);
     check(checker() == 42);
   }
 
@@ -373,7 +377,7 @@ spec("source") {
       "test :: () -> (s64) { ExitProcess(42) }",
       test
     );
-    check(dyn_array_length(program_->errors));
+    check(dyn_array_length(test_context.program->errors));
   }
 
   it("should be able to parse and run inline id function") {
@@ -382,7 +386,7 @@ spec("source") {
       "test :: () -> (s64) { id(42) }",
       test
     );
-    fn_type_void_to_s64 checker = value_as_function(test, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
     check(checker() == 42);
   }
 
@@ -392,7 +396,7 @@ spec("source") {
       "test :: () -> (s64) { id(42) + 1 }",
       test
     );
-    fn_type_void_to_s64 checker = value_as_function(test, fn_type_void_to_s64);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
     check(checker() == 21);
   }
 
@@ -402,7 +406,7 @@ spec("source") {
       "plus :: (x : s32, y : s32) -> (s32) { x + y }",
       proxy
     );
-    s32 answer = value_as_function(proxy, fn_type_void_to_s32)();
+    s32 answer = ((fn_type_void_to_s32)value_as_function(test_context.program, proxy))();
     check(answer == 42);
   }
 
@@ -411,7 +415,7 @@ spec("source") {
       "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
       checker
     );
-    s64 answer = value_as_function(checker, fn_type_void_to_s64)();
+    s64 answer = ((fn_type_void_to_s64)value_as_function(test_context.program, checker))();
     check(answer == 42);
   }
 
@@ -425,22 +429,22 @@ spec("source") {
     Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse_module(result.root, program_);
+    token_parse_module(result.root, &test_context);
 
     Value *checker_s64 =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("checker_s64"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"), 0);
     Value *checker_32 =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("checker_s32"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"), 0);
 
-    program_jit(program_);
+    program_jit(test_context.program);
 
     {
-      s64 size = value_as_function(checker_s64, fn_type_s64_to_s64)(0);
+      s64 size = ((fn_type_s64_to_s64)value_as_function(test_context.program, checker_s64))(0);
       check(size == 8);
     }
 
     {
-      s64 size = value_as_function(checker_32, fn_type_s32_to_s64)(0);
+      s64 size = ((fn_type_s32_to_s64)value_as_function(test_context.program, checker_32))(0);
       check(size == 4);
     }
   }
@@ -450,7 +454,7 @@ spec("source") {
       "checker :: (x : s32) -> (s32) { return x }",
       checker
     );
-    s32 actual = value_as_function(checker, fn_type_s32_to_s32)(42);
+    s32 actual = ((fn_type_s32_to_s32)value_as_function(test_context.program, checker))(42);
     check(actual == 42);
   }
 
@@ -462,7 +466,8 @@ spec("source") {
       "}",
       is_positive
     );
-    fn_type_s32_to_s8 is_positive_fn = value_as_function(is_positive, fn_type_s32_to_s8);
+    fn_type_s32_to_s8 is_positive_fn =
+      (fn_type_s32_to_s8)value_as_function(test_context.program, is_positive);
     check(is_positive_fn(42) == 1);
     check(is_positive_fn(-2) == 0);
   }
@@ -475,7 +480,8 @@ spec("source") {
       "}",
       test_fn
     );
-    fn_type_void_to_s32 checker = value_as_function(test_fn, fn_type_void_to_s32);
+    fn_type_void_to_s32 checker =
+      (fn_type_void_to_s32)value_as_function(test_context.program, test_fn);
     check(checker() == 42);
   }
 
@@ -492,7 +498,8 @@ spec("source") {
       "}",
       sum_up_to
     );
-    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
+    fn_type_s32_to_s32 sum_up_to_fn =
+      (fn_type_s32_to_s32)value_as_function(test_context.program, sum_up_to);
     check(sum_up_to_fn(0) == 0);
     check(sum_up_to_fn(1) == 1);
     check(sum_up_to_fn(2) == 3);
@@ -505,7 +512,8 @@ spec("source") {
       "checker :: () -> (s32) { the answer }",
       checker
     );
-    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
+    fn_type_void_to_s32 checker_fn =
+      (fn_type_void_to_s32)value_as_function(test_context.program, checker);
     check(checker_fn() == 42);
   }
 
@@ -515,12 +523,13 @@ spec("source") {
       "checker :: () -> (s32) { negative 42 }",
       checker
     );
-    fn_type_void_to_s32 checker_fn = value_as_function(checker, fn_type_void_to_s32);
+    fn_type_void_to_s32 checker_fn =
+      (fn_type_void_to_s32)value_as_function(test_context.program, checker);
     check(checker_fn() == -42);
   }
 
   it("should be able to define and use a macro for while loop") {
-    program_import_file(program_, slice_literal("lib\\prelude"));
+    program_import_file(&test_context, slice_literal("lib\\prelude"));
     test_program_inline_source(
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
@@ -533,7 +542,8 @@ spec("source") {
       "}",
       sum_up_to
     );
-    fn_type_s32_to_s32 sum_up_to_fn = value_as_function(sum_up_to, fn_type_s32_to_s32);
+    fn_type_s32_to_s32 sum_up_to_fn =
+      (fn_type_s32_to_s32)value_as_function(test_context.program, sum_up_to);
     check(sum_up_to_fn(0) == 0);
     check(sum_up_to_fn(1) == 1);
     check(sum_up_to_fn(2) == 3);
@@ -541,19 +551,21 @@ spec("source") {
   }
 
   it("should be able to run fizz buzz") {
-    Parse_Result result = program_import_file(program_, slice_literal("lib\\prelude"));
+    Parse_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
     check(result.type == Parse_Result_Type_Success);
-    result = program_import_file(program_, slice_literal("fixtures\\fizz_buzz"));
+    result = program_import_file(&test_context, slice_literal("fixtures\\fizz_buzz"));
     check(result.type == Parse_Result_Type_Success);
 
-    Value *fizz_buzz =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("fizz_buzz"), 0);
+    Value *fizz_buzz = scope_lookup_force(
+      &test_context, test_context.program->global_scope, slice_literal("fizz_buzz"), 0
+    );
     check(fizz_buzz);
 
-    program_jit(program_);
-    check(!dyn_array_length(program_->errors))
+    program_jit(test_context.program);
+    check(!dyn_array_length(test_context.program->errors))
 
-    fn_type_void_to_void checker = value_as_function(fizz_buzz, fn_type_void_to_void);
+    fn_type_void_to_void checker =
+      (fn_type_void_to_void)value_as_function(test_context.program, fizz_buzz);
     checker();
   }
 
@@ -566,7 +578,8 @@ spec("source") {
       test
     );
 
-    fn_type_void_to_void checker = value_as_function(test, fn_type_void_to_void);
+    fn_type_void_to_void checker =
+      (fn_type_void_to_void)value_as_function(test_context.program, test);
     checker();
   }
 
@@ -580,7 +593,8 @@ spec("source") {
       test
     );
 
-    fn_type_void_to_s32 checker = value_as_function(test, fn_type_void_to_s32);
+    fn_type_void_to_s32 checker =
+      (fn_type_void_to_s32)value_as_function(test_context.program, test);
     check(checker() == 42);
   }
 
@@ -591,8 +605,9 @@ spec("source") {
       STATUS_CODE
     );
 
-    Value *status =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
+    Value *status = scope_lookup_force(
+      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), 0
+    );
     check(status);
     check(status->descriptor->type == Descriptor_Type_Integer);
     check(status->operand.type == Operand_Type_Immediate_8);
@@ -606,8 +621,9 @@ spec("source") {
       STATUS_CODE
     );
 
-    Value *status =
-      scope_lookup_force(program_, program_->global_scope, slice_literal("STATUS_CODE"), 0);
+    Value *status = scope_lookup_force(
+      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), 0
+    );
     check(status);
     check(status->descriptor->type == Descriptor_Type_Integer);
     check(status->operand.type == Operand_Type_Immediate_8);
@@ -627,7 +643,7 @@ spec("source") {
     );
 
     fn_type_s64_to_test_128bit_struct checker =
-      value_as_function(return_struct, fn_type_s64_to_test_128bit_struct);
+      (fn_type_s64_to_test_128bit_struct) value_as_function(test_context.program, return_struct);
     Test_128bit test_128bit = checker(42);
     check(test_128bit.x == 42);
     check(test_128bit.y == 21);
@@ -639,7 +655,7 @@ spec("source") {
       "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
       checker
     );
-    s64 size = value_as_function(checker, fn_type_s32_to_s64)(0);
+    s64 size = ((fn_type_s32_to_s64)value_as_function(test_context.program, checker))(0);
     check(size == 4);
   }
 
@@ -648,7 +664,8 @@ spec("source") {
       "checker :: () -> ([s8]) { \"test\" }",
       checker
     );
-    const char *string = value_as_function(checker, fn_type_void_to_const_charp)();
+    const char *string =
+      ((fn_type_void_to_const_charp)value_as_function(test_context.program, checker))();
     check(strcmp(string, "test") == 0);
   }
 
@@ -657,7 +674,8 @@ spec("source") {
       "return_200 :: () -> (u8) { 200 }",
       return_200
     );
-    fn_type_void_to_u8 checker = value_as_function(return_200, fn_type_void_to_u8);
+    fn_type_void_to_u8 checker =
+      (fn_type_void_to_u8)value_as_function(test_context.program, return_200);
     check(checker() == 200);
   }
 
@@ -666,7 +684,7 @@ spec("source") {
       "test :: () -> (u8) { x : u8 = 200; x < 0 }",
       test
     );
-    fn_type_void_to_u8 checker = value_as_function(test, fn_type_void_to_u8);
+    fn_type_void_to_u8 checker = (fn_type_void_to_u8)value_as_function(test_context.program, test);
     check(checker() == false);
   }
 
@@ -675,7 +693,7 @@ spec("source") {
       "add_one :: (x : s16) -> (s16) { x + 1 }",
       add_one
     );
-    fn_type_s16_to_s16 checker = value_as_function(add_one, fn_type_s16_to_s16);
+    fn_type_s16_to_s16 checker = (fn_type_s16_to_s16)value_as_function(test_context.program, add_one);
     check(checker(8) == 9);
   }
 
@@ -687,45 +705,47 @@ spec("source") {
     Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse_module(result.root, program_);
+    token_parse_module(result.root, &test_context);
 
-    program_->entry_point = scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
-    check(program_->entry_point->descriptor->type != Descriptor_Type_Any);
-    check(!spec_check_and_print_program(program_));
+    test_context.program->entry_point =
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+    check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
+    check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\test_parsed.exe", program_, Executable_Type_Cli);
+    write_executable(L"build\\test_parsed.exe", test_context.program, Executable_Type_Cli);
   }
 
   it("should parse and write an executable that prints Hello, world!") {
-    program_import_file(program_, slice_literal("fixtures\\hello_world"));
-    program_->entry_point = scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
-    check(program_->entry_point->descriptor->type != Descriptor_Type_Any);
-    check(!spec_check_and_print_program(program_));
+    program_import_file(&test_context, slice_literal("fixtures\\hello_world"));
+    test_context.program->entry_point =
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+    check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
+    check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\hello_world.exe", program_, Executable_Type_Cli);
+    write_executable(L"build\\hello_world.exe", test_context.program, Executable_Type_Cli);
   }
 
   describe("User Error") {
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
     }
     it("should be report wrong argument type to external()") {
       test_program_inline_source_base(
         "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", exit
       );
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
     }
     it("should be wrong type of label identifier") {
       test_program_inline_source_base(
         "main :: (status: s32) -> () { x : s32; goto x; }", main
       );
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("x is not a label"), error->message));
     }
     it("should be reported when non-type id is being used as type") {
@@ -733,33 +753,33 @@ spec("source") {
         "foo :: () -> () {};"
         "main :: (arg : foo) -> () {}", main
       );
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("foo is not a type"), error->message));
     }
     it("should be reported when non-type token is being used as type") {
       test_program_inline_source_base(
         "main :: (arg : 42) -> () {}", main
       );
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("42 is not a type"), error->message));
     }
     it("should be reported when encountering unknown type") {
       Parse_Result result =
-        program_import_file(program_, slice_literal("fixtures\\error_unknown_type"));
+        program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
       check(result.type == Parse_Result_Type_Success);
-      scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
     }
     it("should be reported when encountering unknown top level statement") {
       test_program_inline_source_base(
         "foo bar", main
       );
-      check(dyn_array_length(program_->errors));
-      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not parse a top level statement"), error->message));
     }
   }
