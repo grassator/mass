@@ -61,7 +61,7 @@ spec_check_and_print_program(
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
-  token_match_module(result.root, program_);\
+  token_parse_module(result.root, program_);\
   Value *_fn_value_id_ = scope_lookup_force(program_, program_->global_scope, slice_literal(#_fn_value_id_), 0);\
   (void)_fn_value_id_
 
@@ -425,7 +425,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_match_module(result.root, program_);
+    token_parse_module(result.root, program_);
 
     Value *checker_s64 =
       scope_lookup_force(program_, program_->global_scope, slice_literal("checker_s64"), 0);
@@ -687,7 +687,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(&(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_match_module(result.root, program_);
+    token_parse_module(result.root, program_);
 
     program_->entry_point = scope_lookup_force(program_, program_->global_scope, slice_literal("main"), 0);
     check(program_->entry_point->descriptor->type != Descriptor_Type_Any);
@@ -753,6 +753,14 @@ spec("source") {
       check(dyn_array_length(program_->errors));
       Parse_Error *error = dyn_array_get(program_->errors, 0);
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
+    }
+    it("should be reported when encountering unknown top level statement") {
+      test_program_inline_source_base(
+        "foo bar", main
+      );
+      check(dyn_array_length(program_->errors));
+      Parse_Error *error = dyn_array_get(program_->errors, 0);
+      check(slice_equal(slice_literal("Could not parse top level statement"), error->message));
     }
   }
 }

@@ -1842,7 +1842,7 @@ token_rewrite_constant_definitions(
 }
 
 void
-token_match_statement(
+token_parse_statement(
   Program *program,
   Token_Matcher_State *state,
   const Source_Range *source_range,
@@ -1851,7 +1851,7 @@ token_match_statement(
   Value *statement_result_value
 );
 
-void
+bool
 token_parse_block(
   Program *program,
   Token *block,
@@ -1861,7 +1861,7 @@ token_parse_block(
 ) {
   assert(block->type == Token_Type_Curly);
   Array_Token_Ptr children = block->children;
-  if (!dyn_array_length(children)) return;
+  if (!dyn_array_length(children)) return false;
   Scope *block_scope = scope_make(scope);
 
   // Newlines at the end of the block do not count as semicolons otherwise this:
@@ -1870,7 +1870,6 @@ token_parse_block(
   // is being interpreted as:
   // { 42 ; }
   while ((*dyn_array_last(children))->type == Token_Type_Newline) dyn_array_pop(children);
-
 
   Array_Token_Matcher_State block_statements = token_split_by_newlines_and_semicolons(children);
   for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
@@ -1888,9 +1887,9 @@ token_parse_block(
       }
     }
 
-    token_match_statement(program, state, &block->source_range, block_scope, builder, result_value);
+    token_parse_statement(program, state, &block->source_range, block_scope, builder, result_value);
   }
-  return;
+  return true;
 }
 
 bool
@@ -2774,7 +2773,7 @@ token_rewrite_compare(
 }
 
 void
-token_match_statement(
+token_parse_statement(
   Program *program,
   Token_Matcher_State *state,
   const Source_Range *source_range,
@@ -2848,7 +2847,7 @@ token_match_expression(
 }
 
 bool
-token_match_module(
+token_parse_module(
   Token *token,
   Program *program
 ) {
@@ -2868,7 +2867,16 @@ token_match_module(
     token_rewrite_statement(
       program, state, program->global_scope, &global_builder, token_rewrite_constant_definitions
     );
-    // FIXME detect unmatched statements
+    // Detect unmatched statements
+    if (dyn_array_length(state->tokens)) {
+      Source_Range source_range = source_range_from_token_matcher_state(
+        token_reset_state_start_index(state), dyn_array_length(state->tokens)
+      );
+      program_error_builder(program, source_range) {
+        program_error_append_literal("Could not parse a top level statement");
+      }
+      return false;
+    }
   }
 
   return true;
@@ -2888,7 +2896,7 @@ program_parse(
   }
   ;
   return (Parse_Result) {
-    .type = token_match_module(tokenizer_result.root, program)
+    .type = token_parse_module(tokenizer_result.root, program)
       ? Parse_Result_Type_Success
       : Parse_Result_Type_Error
   };

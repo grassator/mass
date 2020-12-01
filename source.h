@@ -97,7 +97,7 @@ scope_define_value(
   Value *value
 );
 
-void
+bool
 token_parse_block(
   Program *program,
   Token *block,
