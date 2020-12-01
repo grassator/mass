@@ -760,7 +760,7 @@ spec("source") {
       );
       check(dyn_array_length(program_->errors));
       Parse_Error *error = dyn_array_get(program_->errors, 0);
-      check(slice_equal(slice_literal("Could not parse top level statement"), error->message));
+      check(slice_equal(slice_literal("Could not parse a top level statement"), error->message));
     }
   }
 }

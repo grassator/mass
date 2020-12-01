@@ -865,10 +865,10 @@ token_rewrite_macros(
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
       start: for (;;) {
         for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-          state->start_index = i;
-          Array_Token_Ptr match = token_match_pattern(state, macro->pattern);
+          Token_Matcher_State sub_state = {state->tokens, i};
+          Array_Token_Ptr match = token_match_pattern(&sub_state, macro->pattern);
           if (dyn_array_is_initialized(match)) {
-            token_rewrite_macro_match(state, macro, match);
+            token_rewrite_macro_match(&sub_state, macro, match);
             goto start;
           }
         }
@@ -1098,15 +1098,16 @@ token_replace_tokens_in_state(
 }
 
 bool
-token_clear_newlines(
-  Program *program,
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+token_state_clear_newlines(
+  Token_Matcher_State *state
 ) {
-  u64 peek_index = 0;
-  Token_Match(newline, .type = Token_Type_Newline);
-  token_replace_tokens_in_state(state, 1, 0);
+  for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
+    Token *token = *dyn_array_get(state->tokens, i);
+    if (token->type == Token_Type_Newline) {
+      dyn_array_delete(state->tokens, i);
+      --i;
+    }
+  }
   return true;
 }
 
@@ -1397,14 +1398,6 @@ token_rewrite_external_import(
   return true;
 }
 
-inline Token_Matcher_State*
-token_reset_state_start_index(
-  Token_Matcher_State *state
-) {
-  state->start_index = 0;
-  return state;
-}
-
 typedef bool (*token_rewrite_expression_callback)
 (Program *program, Token_Matcher_State *, Scope *, Function_Builder *, Value *result_value);
 
@@ -1418,13 +1411,12 @@ token_rewrite_expression(
   token_rewrite_expression_callback callback
 ) {
   start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-      state->start_index = i;
-      if (callback(program, state, scope, builder, result_value)) goto start;
+    for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
+      Token_Matcher_State rewrite_state = {state->tokens, i};
+      if (callback(program, &rewrite_state, scope, builder, result_value)) goto start;
     }
     break;
   }
-  state->start_index = 0;
 }
 
 typedef bool (*token_rewrite_statement_callback)
@@ -1439,13 +1431,12 @@ token_rewrite_statement(
   token_rewrite_statement_callback callback
 ) {
   start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(state->tokens); ++i) {
-      state->start_index = i;
-      if (callback(program, state, scope, builder)) goto start;
+    for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
+      Token_Matcher_State rewrite_state = {state->tokens, i};
+      if (callback(program, &rewrite_state, scope, builder)) goto start;
     }
     break;
   }
-  state->start_index = 0;
 }
 
 bool
@@ -1520,7 +1511,7 @@ token_rewrite_function_literal(
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *args_state = dyn_array_get(argument_states, i);
-      token_rewrite_statement(program, args_state, function_scope, builder, token_clear_newlines);
+      token_state_clear_newlines(args_state);
       Token_Match_Arg *arg =
         token_match_argument(program, args_state, function_scope, outer_builder);
       if (!arg) return 0;
@@ -1797,14 +1788,14 @@ token_rewrite_constant_expression(
   u64 token_count = dyn_array_length(state->tokens);
   if (!token_count) return 0;
   Source_Range source_range =  source_range_from_token_matcher_state(state, token_count);
-  token_rewrite_statement(program, state, scope, builder, token_clear_newlines);
+  token_state_clear_newlines(state);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_external_import);
 
-  token_rewrite_type_definitions(program, token_reset_state_start_index(state), scope, builder) ||
-  token_rewrite_function_literal(program, token_reset_state_start_index(state), scope, builder) ||
-  token_rewrite_compile_time_function_call(program, token_reset_state_start_index(state), scope, builder) ||
-  token_rewrite_compile_time_eval(program, token_reset_state_start_index(state), scope, builder);
+  token_rewrite_type_definitions(program, state, scope, builder) ||
+  token_rewrite_function_literal(program, state, scope, builder) ||
+  token_rewrite_compile_time_function_call(program, state, scope, builder) ||
+  token_rewrite_compile_time_eval(program, state, scope, builder);
 
   token_rewrite_statement(program, state, scope, builder, token_rewrite_constant_sub_expression);
 
@@ -2782,19 +2773,19 @@ token_parse_statement(
   Value *result_value
 ) {
   // TODO consider how this should work
-  token_rewrite_macros(token_reset_state_start_index(state), scope, builder);
+  token_rewrite_macros(state, scope, builder);
 
   if (
-    token_rewrite_inline_machine_code_bytes(program, token_reset_state_start_index(state), scope, builder) ||
-    token_rewrite_assignment(program, token_reset_state_start_index(state), scope, builder) ||
+    token_rewrite_inline_machine_code_bytes(program, state, scope, builder) ||
+    token_rewrite_assignment(program, state, scope, builder) ||
     token_rewrite_definition_and_assignment_statements(
-      program, token_reset_state_start_index(state), scope, builder
+      program, state, scope, builder
     ) ||
-    token_rewrite_definitions(program, token_reset_state_start_index(state), scope, builder) ||
-    token_rewrite_explicit_return(program, token_reset_state_start_index(state), scope, builder) ||
-    token_rewrite_goto(program, token_reset_state_start_index(state), scope, builder) ||
-    token_rewrite_constant_definitions(program, token_reset_state_start_index(state), scope, builder)||
-    token_rewrite_statement_if(program, token_reset_state_start_index(state), scope, builder)
+    token_rewrite_definitions(program, state, scope, builder) ||
+    token_rewrite_explicit_return(program, state, scope, builder) ||
+    token_rewrite_goto(program, state, scope, builder) ||
+    token_rewrite_constant_definitions(program, state, scope, builder)||
+    token_rewrite_statement_if(program, state, scope, builder)
   ) {
     return;
   }
@@ -2812,7 +2803,7 @@ token_match_expression(
   if (!dyn_array_length(state->tokens)) {
     return;
   }
-  token_rewrite_statement(program, state, scope, builder, token_clear_newlines);
+  token_state_clear_newlines(state);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_cast);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_struct_field);
   token_rewrite_statement(program, state, scope, builder, token_rewrite_function_literal);
@@ -2869,9 +2860,8 @@ token_parse_module(
     );
     // Detect unmatched statements
     if (dyn_array_length(state->tokens)) {
-      Source_Range source_range = source_range_from_token_matcher_state(
-        token_reset_state_start_index(state), dyn_array_length(state->tokens)
-      );
+      Source_Range source_range =
+        source_range_from_token_matcher_state(state, dyn_array_length(state->tokens));
       program_error_builder(program, source_range) {
         program_error_append_literal("Could not parse a top level statement");
       }
