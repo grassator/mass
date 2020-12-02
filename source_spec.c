@@ -63,7 +63,7 @@ spec_check_and_print_program(
   check(result.type == Tokenizer_Result_Type_Success);\
   token_parse(&test_context, result.tokens);\
   Value *_fn_value_id_ = scope_lookup_force(\
-    &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_), 0\
+    &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_)\
   );\
   (void)_fn_value_id_
 
@@ -280,7 +280,7 @@ spec("source") {
       program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
     check(result.type == Parse_Result_Type_Success);
     Value *main =
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(main);
 
     program_jit(&test_context);
@@ -412,9 +412,9 @@ spec("source") {
     token_parse(&test_context, result.tokens);
 
     Value *checker_s64 =
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"));
     Value *checker_32 =
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"));
 
     program_jit(&test_context);
 
@@ -567,7 +567,7 @@ spec("source") {
     );
 
     Value *status = scope_lookup_force(
-      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), 0
+      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
     );
     check(status);
     check(status->descriptor->type == Descriptor_Type_Integer);
@@ -583,7 +583,7 @@ spec("source") {
     );
 
     Value *status = scope_lookup_force(
-      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), 0
+      &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
     );
     check(status);
     check(status->descriptor->type == Descriptor_Type_Integer);
@@ -620,7 +620,7 @@ spec("source") {
     check(size == 4);
   }
 
-  it("should parse and return c compatible strings") {
+  it("should parse and return C-compatible strings") {
     test_program_inline_source(
       "checker :: () -> ([s8]) { \"test\" }",
       checker
@@ -669,7 +669,7 @@ spec("source") {
     token_parse(&test_context, result.tokens);
 
     test_context.program->entry_point =
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
     check(!spec_check_and_print_program(test_context.program));
 
@@ -679,7 +679,7 @@ spec("source") {
   it("should parse and write an executable that prints Hello, world!") {
     program_import_file(&test_context, slice_literal("fixtures\\hello_world"));
     test_context.program->entry_point =
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
     check(!spec_check_and_print_program(test_context.program));
 
@@ -693,7 +693,7 @@ spec("source") {
     check(result.type == Parse_Result_Type_Success);
 
     Value *fizz_buzz = scope_lookup_force(
-      &test_context, test_context.program->global_scope, slice_literal("fizz_buzz"), 0
+      &test_context, test_context.program->global_scope, slice_literal("fizz_buzz")
     );
     check(fizz_buzz);
 
@@ -749,7 +749,7 @@ spec("source") {
       Parse_Result result =
         program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
       check(result.type == Parse_Result_Type_Success);
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not find type s33"), error->message));

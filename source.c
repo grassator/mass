@@ -62,7 +62,7 @@ scope_lookup(
   return 0;
 }
 
-Token *
+Value *
 token_rewrite_constant_expression(
   Compilation_Context *context,
   Token_Matcher_State *state,
@@ -82,8 +82,7 @@ Value *
 scope_lookup_force(
   Compilation_Context *context,
   Scope *scope,
-  Slice name,
-  Function_Builder *builder
+  Slice name
 ) {
   Array_Scope_Entry *entries = 0;
   while (scope) {
@@ -102,20 +101,13 @@ scope_lookup_force(
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
       Token_Matcher_State state = {entry->lazy_constant_expression};
       // FIXME should use scope captued in the expression
-      Token *token = token_rewrite_constant_expression(context, &state, scope);
-      Value *result = 0;
-      if (token) {
-        result = value_any(context->allocator);
-        token_force_value(context, token, scope, builder, result);
-      }
+      Value *result = token_rewrite_constant_expression(context, &state, scope);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
       };
     }
   }
-
-
 
   Value *result = 0;
   if (dyn_array_length(*entries) == 1) {
@@ -147,7 +139,7 @@ scope_lookup_force(
       parent = parent->parent;
       if (!parent) break;
       if (!hash_map_has(parent->map, name)) continue;
-      Value *overload = scope_lookup_force(context, parent, name, builder);
+      Value *overload = scope_lookup_force(context, parent, name);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
       if (overload->descriptor->type != Descriptor_Type_Function) {
         panic("There should only be function overloads");
@@ -569,10 +561,9 @@ scope_lookup_type(
   Compilation_Context *context,
   Scope *scope,
   Source_Range source_range,
-  Slice type_name,
-  Function_Builder *builder
+  Slice type_name
 ) {
-  Value *value = scope_lookup_force(context, scope, type_name, builder);
+  Value *value = scope_lookup_force(context, scope, type_name);
   if (!value) return 0;
   if (value->descriptor->type != Descriptor_Type_Type) {
     program_error_builder(context, source_range) {
@@ -611,14 +602,12 @@ Descriptor *
 token_force_type(
   Compilation_Context *context,
   Scope *scope,
-  Token *token,
-  Function_Builder *builder
+  Token *token
 ) {
   Descriptor *descriptor = 0;
   switch (token->type) {
     case Token_Type_Id: {
-      descriptor =
-        scope_lookup_type(context, scope, token->source_range, token->source, builder);
+      descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Could not find type ");
@@ -644,8 +633,7 @@ token_force_type(
       descriptor = allocator_allocate(context->allocator, Descriptor);
       *descriptor = (Descriptor) {
         .type = Descriptor_Type_Pointer,
-        .pointer_to =
-          scope_lookup_type(context, scope, child->source_range, child->source, builder),
+        .pointer_to = scope_lookup_type(context, scope, child->source_range, child->source),
       };
       break;
     }
@@ -880,18 +868,16 @@ Descriptor *
 token_match_fixed_array_type(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder_
+  Scope *scope
 );
 
 Descriptor *
 token_match_type(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
-  Descriptor *descriptor = token_match_fixed_array_type(context, state, scope, builder);
+  Descriptor *descriptor = token_match_fixed_array_type(context, state, scope);
   if (descriptor) return descriptor;
   u64 length = dyn_array_length(state->tokens);
   if (!length) panic("Caller must not call token_match_type with empty token list");
@@ -904,7 +890,7 @@ token_match_type(
     );
     return 0;
   }
-  return token_force_type(context, scope, token, builder);
+  return token_force_type(context, scope, token);
 }
 
 Token_Match_Arg *
@@ -923,7 +909,7 @@ token_match_argument(
   );
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
-  Descriptor *type_descriptor = token_match_type(context, &rest_state, scope, 0);
+  Descriptor *type_descriptor = token_match_type(context, &rest_state, scope);
   if (!type_descriptor) return 0;
   Token_Match_Arg *arg = allocator_allocate(context->allocator, Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
@@ -939,6 +925,106 @@ token_match_expression(
   Value *target
 );
 
+Value *
+value_from_integer_token(
+  Compilation_Context *context,
+  Scope *scope,
+  Token *token
+) {
+  bool ok = false;
+  u64 number = slice_parse_u64(token->source, &ok);
+  if (!ok) {
+    program_error_builder(context, token->source_range) {
+      program_error_append_literal("Invalid integer literal: ");
+      program_error_append_slice(token->source);
+    }
+    return 0;
+  }
+  return value_from_unsigned_immediate(context->allocator, number);
+}
+
+Value *
+value_from_hex_integer_token(
+  Compilation_Context *context,
+  Scope *scope,
+  Token *token
+) {
+  bool ok = false;
+  Slice digits = slice_sub(token->source, 2, token->source.length);
+  u64 number = slice_parse_hex(digits, &ok);
+  if (!ok) {
+    program_error_builder(context, token->source_range) {
+      program_error_append_literal("Invalid integer hex literal: ");
+      program_error_append_slice(token->source);
+    }
+    return 0;
+  }
+  // TODO should be unsigned
+  return value_from_signed_immediate(context->allocator, number);
+}
+
+Value *
+token_force_constant_value(
+  Compilation_Context *context,
+  Scope *scope,
+  Token *token
+) {
+  switch(token->type) {
+    case Token_Type_Integer: {
+      return value_from_integer_token(context, scope, token);
+    }
+    case Token_Type_Hex_Integer: {
+      return value_from_hex_integer_token(context, scope, token);
+    }
+    case Token_Type_String: {
+      Slice string = token->string;
+      Value *string_bytes = value_global_c_string_from_slice(context, string);
+      return string_bytes;
+      //return value_pointer_to(context, builder, &token->source_range, string_bytes);
+    }
+    case Token_Type_Id: {
+      Slice name = token->source;
+      Value *value = scope_lookup_force(context, scope, name);
+      if (!value) {
+        program_error_builder(context, token->source_range) {
+          program_error_append_literal("Undefined variable ");
+          program_error_append_slice(name);
+        }
+      }
+      return value;
+    }
+    case Token_Type_Value: {
+      return token->value;
+    }
+    case Token_Type_Paren: {
+      Token_Matcher_State state = {.tokens = token->children};
+      return token_rewrite_constant_expression(context, &state, scope);
+    }
+    case Token_Type_Curly: {
+      panic("TODO support blocks in constant context");
+      return 0;
+    }
+    case Token_Type_Square: {
+      panic("TODO support array access in constant context");
+      return 0;
+    }
+    case Token_Type_Operator: {
+      panic("TODO support operator lookup in constant context");
+      return 0;
+    }
+    case Token_Type_Newline: {
+      program_push_error_from_slice(
+        context->program,
+        token->source_range,
+        slice_literal("Unexpected newline token")
+      );
+      return 0;
+    }
+  }
+  panic("Internal Error: Unknown token type");
+  return 0;
+}
+
 void
 token_force_value(
   Compilation_Context *context,
@@ -949,32 +1035,12 @@ token_force_value(
 ) {
   switch(token->type) {
     case Token_Type_Integer: {
-      bool ok = false;
-      u64 number = slice_parse_u64(token->source, &ok);
-      if (!ok) {
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Invalid integer literal: ");
-          program_error_append_slice(token->source);
-        }
-        return;
-      }
-      Value *immediate = value_from_unsigned_immediate(context->allocator, number);
+      Value *immediate = value_from_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Type_Hex_Integer: {
-      bool ok = false;
-      Slice digits = slice_sub(token->source, 2, token->source.length);
-      u64 number = slice_parse_hex(digits, &ok);
-      if (!ok) {
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Invalid integer hex literal: ");
-          program_error_append_slice(token->source);
-        }
-        return;
-      }
-      // TODO should be unsigned
-      Value *immediate = value_from_signed_immediate(context->allocator, number);
+      Value *immediate = value_from_hex_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
@@ -987,7 +1053,7 @@ token_force_value(
     }
     case Token_Type_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(context, scope, name, builder);
+      Value *value = scope_lookup_force(context, scope, name);
       if (!value) {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Undefined variable ");
@@ -1189,7 +1255,7 @@ token_match_struct_field(
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
 
-  Descriptor *descriptor = token_match_type(context, &rest_state, scope, 0);
+  Descriptor *descriptor = token_match_type(context, &rest_state, scope);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
@@ -1213,12 +1279,7 @@ token_process_type_definition(
   switch(dyn_array_length(argument_states)) {
     case 1: {
       Token_Matcher_State layout_state = {layout_token->children};
-      Token *token = token_rewrite_constant_expression(context, &layout_state, scope);
-      if (token) {
-        bit_size_value = value_any(context->allocator);
-        // FIXME
-        token_force_value(context, token, scope, 0, bit_size_value);
-      }
+      bit_size_value = token_rewrite_constant_expression(context, &layout_state, scope);
       if (!bit_size_value) {
         // TODO print error
         goto err;
@@ -1491,8 +1552,7 @@ token_process_function_literal(
     }
     case 1: {
       Token *return_type_token = *dyn_array_get(return_types->children, 0);
-      Descriptor *return_descriptor =
-        token_force_type(context, function_scope, return_type_token, 0);
+      Descriptor *return_descriptor = token_force_type(context, function_scope, return_type_token);
       if (!return_descriptor) return 0;
       function_return_descriptor(context, &descriptor->function, return_descriptor);
       break;
@@ -1877,7 +1937,7 @@ token_handle_operator(
   dyn_array_push(*operator_stack, new_operator);
 }
 
-Token *
+Value *
 token_rewrite_constant_expression(
   Compilation_Context *context,
   Token_Matcher_State *state,
@@ -1885,9 +1945,8 @@ token_rewrite_constant_expression(
 ) {
   // FIXME
   u64 token_count = dyn_array_length(state->tokens);
-  Source_Range source_range =  source_range_from_token_matcher_state(state, token_count);
   if (!token_count) {
-    return token_value_make(context, &void_value, source_range);
+    return &void_value;
   }
   Array_Token_Ptr token_stack = dyn_array_make(Array_Token_Ptr);
   Array_Slice operator_stack = dyn_array_make(Array_Slice);
@@ -1910,6 +1969,8 @@ token_rewrite_constant_expression(
         // TODO figure out how to handle this better
         if (token->type != Token_Type_Id || !slice_equal(token->source, slice_literal("inline"))) {
           is_previous_an_operator = false;
+        } else {
+          is_previous_an_operator = true;
         }
         break;
       }
@@ -1949,9 +2010,10 @@ token_rewrite_constant_expression(
     );
   }
 
-  Token *result = 0;
+  Value *result = 0;
   if (dyn_array_length(token_stack) == 1) {
-    result = *dyn_array_last(token_stack);
+    Token *token = *dyn_array_last(token_stack);
+    result = token_force_constant_value(context, scope, token);
   } else {
     // FIXME user error
   }
@@ -2075,7 +2137,7 @@ token_rewrite_goto(
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
   Token_Match(label_name, .type = Token_Type_Id);
   Token_Match_End();
-  Value *value = scope_lookup_force(context, scope, label_name->source, builder);
+  Value *value = scope_lookup_force(context, scope, label_name->source);
   if (value) {
     if (
       value->descriptor->type == Descriptor_Type_Void &&
@@ -2154,19 +2216,16 @@ Descriptor *
 token_match_fixed_array_type(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
   u64 peek_index = 0;
   Token_Match(type, .type = Token_Type_Id);
   Token_Match(square_brace, .type = Token_Type_Square);
-  Descriptor *descriptor =
-    scope_lookup_type(context, scope, type->source_range, type->source, builder);
+  Descriptor *descriptor = scope_lookup_type(context, scope, type->source_range, type->source);
 
   Token_Matcher_State size_state = {.tokens = square_brace->children};
-  // FIXME :TargetValue Make a convention to have this as a constant / immediate
-  Value *size_value = value_any(context->allocator);
-  token_match_expression(context, &size_state, scope, builder, size_value);
+  Value *size_value = token_rewrite_constant_expression(context, &size_state, scope);
+  if (!size_value) return 0;
   if (size_value->descriptor->type != Descriptor_Type_Integer) {
     program_push_error_from_slice(
       context->program,
@@ -2349,7 +2408,7 @@ token_rewrite_definitions(
 
   Value *value = token_match_label(context, &rest_state, scope, builder);
   if (!value) {
-    Descriptor *descriptor = token_match_type(context, &rest_state, scope, builder);
+    Descriptor *descriptor = token_match_type(context, &rest_state, scope);
     if (!descriptor) {
       program_error_builder(context, define->source_range) {
         program_error_append_literal("Could not find type");
