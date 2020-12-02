@@ -61,7 +61,7 @@ spec_check_and_print_program(
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
-  token_parse_module(result.root, &test_context);\
+  token_parse(&test_context, result.tokens);\
   Value *_fn_value_id_ = scope_lookup_force(\
     &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_), 0\
   );\
@@ -129,31 +129,22 @@ spec("source") {
     Slice source = slice_literal("");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
-    check(dyn_array_length(root->children) == 0);
+    check(dyn_array_length(result.tokens) == 0);
   }
 
   it("should be able to tokenize a comment") {
     Slice source = slice_literal("// foo\n");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
-    check(dyn_array_length(root->children) == 0);
+    check(dyn_array_length(result.tokens) == 0);
   }
 
   it("should be able to turn newlines into tokens") {
     Slice source = slice_literal("\n");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
-    check(dyn_array_length(root->children) == 1);
-    Token *newline = *dyn_array_get(root->children, 0);
+    check(dyn_array_length(result.tokens) == 1);
+    Token *newline = *dyn_array_get(result.tokens, 0);
     check(newline->type == Token_Type_Newline);
     check(slice_equal(newline->source, slice_literal("\n")));
   }
@@ -162,11 +153,8 @@ spec("source") {
     Slice source = slice_literal("0xCAFE");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
-    check(root->type == Token_Type_Module);
-    check(dyn_array_length(root->children) == 1);
-    Token *token = *dyn_array_get(root->children, 0);
+    check(dyn_array_length(result.tokens) == 1);
+    Token *token = *dyn_array_get(result.tokens, 0);
     check(token->type == Token_Type_Hex_Integer);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
   }
@@ -175,19 +163,17 @@ spec("source") {
     Slice source = slice_literal("12 + foo123");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(dyn_array_length(root->children) == 3);
-    check(slice_equal(root->source, source));
+    check(dyn_array_length(result.tokens) == 3);
 
-    Token *a_num = *dyn_array_get(root->children, 0);
+    Token *a_num = *dyn_array_get(result.tokens, 0);
     check(a_num->type == Token_Type_Integer);
     check(slice_equal(a_num->source, slice_literal("12")));
 
-    Token *plus = *dyn_array_get(root->children, 1);
+    Token *plus = *dyn_array_get(result.tokens, 1);
     check(plus->type == Token_Type_Operator);
     check(slice_equal(plus->source, slice_literal("+")));
 
-    Token *id = *dyn_array_get(root->children, 2);
+    Token *id = *dyn_array_get(result.tokens, 2);
     check(id->type == Token_Type_Id);
     check(slice_equal(id->source, slice_literal("foo123")));
   }
@@ -196,10 +182,9 @@ spec("source") {
     Slice source = slice_literal("(x)");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(dyn_array_length(root->children) == 1);
+    check(dyn_array_length(result.tokens) == 1);
 
-    Token *paren = *dyn_array_get(root->children, 0);
+    Token *paren = *dyn_array_get(result.tokens, 0);
     check(paren->type == Token_Type_Paren);
     check(dyn_array_length(paren->children) == 1);
     check(slice_equal(paren->source, slice_literal("(x)")));
@@ -212,9 +197,8 @@ spec("source") {
     Slice source = slice_literal("\"foo 123\"");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(dyn_array_length(root->children) == 1);
-    Token *string = *dyn_array_get(root->children, 0);
+    check(dyn_array_length(result.tokens) == 1);
+    Token *string = *dyn_array_get(result.tokens, 0);
     check(slice_equal(string->source, slice_literal("\"foo 123\"")));
   }
 
@@ -222,10 +206,9 @@ spec("source") {
     Slice source = slice_literal("{[]}");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(dyn_array_length(root->children) == 1);
+    check(dyn_array_length(result.tokens) == 1);
 
-    Token *curly = *dyn_array_get(root->children, 0);
+    Token *curly = *dyn_array_get(result.tokens, 0);
     check(curly->type == Token_Type_Curly);
     check(dyn_array_length(curly->children) == 1);
     check(slice_equal(curly->source, slice_literal("{[]}")));
@@ -244,8 +227,6 @@ spec("source") {
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
   }
 
   it("should report a failure when encountering a brace that is not closed") {
@@ -292,8 +273,6 @@ spec("source") {
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
-    Token *root = result.root;
-    check(root);
   }
 
   it("should be unwind stack on hardware exception") {
@@ -430,7 +409,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse_module(result.root, &test_context);
+    token_parse(&test_context, result.tokens);
 
     Value *checker_s64 =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"), 0);
@@ -687,7 +666,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse_module(result.root, &test_context);
+    token_parse(&test_context, result.tokens);
 
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), 0);

@@ -598,11 +598,12 @@ typedef enum {
 } Tokenizer_Result_Type;
 
 typedef struct Token Token;
+typedef dyn_array_type(Token *) Array_Token_Ptr;
 
 typedef struct {
   Tokenizer_Result_Type type;
   union {
-    Token *root;
+    Array_Token_Ptr tokens;
     Array_Parse_Error errors;
   };
 } Tokenizer_Result;

@@ -235,14 +235,8 @@ tokenize(
   Source_File *file
 ) {
   Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
-  Token *root = allocator_allocate(allocator, Token);
-  root->type = Token_Type_Module;
+  Token *root = &(Token){0};
   root->children = dyn_array_make(Array_Token_Ptr);
-  root->source_range = (Source_Range){
-    .file = file,
-    .offsets = {.from = 0, .to = file->text.length},
-  };
-  root->source = slice_sub_range(file->text, root->source_range.offsets);
 
   assert(!dyn_array_is_initialized(file->lines));
   file->lines = dyn_array_make(Array_Range_u64);
@@ -375,8 +369,7 @@ tokenize(
             case Token_Type_Integer:
             case Token_Type_Hex_Integer:
             case Token_Type_Operator:
-            case Token_Type_String:
-            case Token_Type_Module: {
+            case Token_Type_String: {
               panic("Tokenizer: unexpected closing char for group");
               break;
             }
@@ -487,7 +480,7 @@ tokenize(
   if (dyn_array_length(errors)) {
     return (Tokenizer_Result){.type = Tokenizer_Result_Type_Error, .errors = errors};
   }
-  return (Tokenizer_Result){.type = Tokenizer_Result_Type_Success, .root = root};
+  return (Tokenizer_Result){.type = Tokenizer_Result_Type_Success, .tokens = root->children};
 }
 
 Token *
@@ -676,7 +669,6 @@ token_force_type(
     case Token_Type_String:
     case Token_Type_Paren:
     case Token_Type_Curly:
-    case Token_Type_Module:
     case Token_Type_Value:
     default: {
       panic("TODO");
@@ -764,8 +756,7 @@ token_clone_deep(
     }
     case Token_Type_Square:
     case Token_Type_Paren:
-    case Token_Type_Curly:
-    case Token_Type_Module: {
+    case Token_Type_Curly: {
       clone->children = token_clone_token_array_deep(allocator, token->children);
       break;
     }
@@ -821,8 +812,7 @@ token_apply_macro_replacements(
       }
       case Token_Type_Square:
       case Token_Type_Paren:
-      case Token_Type_Curly:
-      case Token_Type_Module: {
+      case Token_Type_Curly: {
         copy->children = token_apply_macro_replacements(context, map, token->children);
         break;
       }
@@ -1028,7 +1018,6 @@ token_force_value(
       token_parse_block(context, token, scope, builder, result_value);
       return;
     }
-    case Token_Type_Module:
     case Token_Type_Square:
     case Token_Type_Operator: {
       panic("TODO");
@@ -1949,10 +1938,6 @@ token_rewrite_constant_expression(
         is_previous_an_operator = false;
         break;
       }
-      case Token_Type_Module: {
-        // FIXME Report user-facing error
-        goto err;
-      }
       case Token_Type_Square: {
         panic("TODO");
         break;
@@ -1979,20 +1964,17 @@ token_rewrite_constant_expression(
     );
   }
 
+  Token *result = 0;
   if (dyn_array_length(token_stack) == 1) {
-    Token *result = *dyn_array_last(token_stack);
-    dyn_array_destroy(token_stack);
-    dyn_array_destroy(operator_stack);
-    return result;
+    result = *dyn_array_last(token_stack);
   } else {
     // FIXME user error
   }
 
-  err:
   dyn_array_destroy(token_stack);
   dyn_array_destroy(operator_stack);
 
-  return 0;
+  return result;
 }
 
 bool
@@ -3026,19 +3008,15 @@ token_match_expression(
 }
 
 bool
-token_parse_module(
-  Token *token,
-  Compilation_Context *context
+token_parse(
+  Compilation_Context *context,
+  Array_Token_Ptr tokens
 ) {
-  if (token->type != Token_Type_Module) {
-    panic("Caller must provide a value known to be a module");
-  }
-  if (!dyn_array_length(token->children)) return true;
+  if (!dyn_array_length(tokens)) return true;
 
   Function_Builder global_builder = { 0 };
 
-  Array_Token_Matcher_State module_statements =
-    token_split_by_newlines_and_semicolons(token->children);
+  Array_Token_Matcher_State module_statements = token_split_by_newlines_and_semicolons(tokens);
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_Matcher_State *state = dyn_array_get(module_statements, i);
     if (!dyn_array_length(state->tokens)) continue;
@@ -3075,7 +3053,7 @@ program_parse(
   }
   ;
   return (Parse_Result) {
-    .type = token_parse_module(tokenizer_result.root, context)
+    .type = token_parse(context, tokenizer_result.tokens)
       ? Parse_Result_Type_Success
       : Parse_Result_Type_Error
   };

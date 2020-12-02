@@ -13,12 +13,8 @@ typedef enum {
   Token_Type_Paren,
   Token_Type_Square,
   Token_Type_Curly,
-  Token_Type_Module,
   Token_Type_Value,
 } Token_Type;
-
-typedef struct Token Token;
-typedef dyn_array_type(Token *) Array_Token_Ptr;
 
 typedef struct Token {
   Token_Type type;
