@@ -66,8 +66,7 @@ Token *
 token_rewrite_constant_expression(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 );
 
 void
@@ -102,7 +101,8 @@ scope_lookup_force(
     Scope_Entry *entry = dyn_array_get(*entries, i);
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
       Token_Matcher_State state = {entry->lazy_constant_expression};
-      Token *token = token_rewrite_constant_expression(context, &state, scope, builder);
+      // FIXME should use scope captued in the expression
+      Token *token = token_rewrite_constant_expression(context, &state, scope);
       Value *result = 0;
       if (token) {
         result = value_any(context->allocator);
@@ -911,8 +911,7 @@ Token_Match_Arg *
 token_match_argument(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
@@ -924,7 +923,7 @@ token_match_argument(
   );
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
-  Descriptor *type_descriptor = token_match_type(context, &rest_state, scope, builder);
+  Descriptor *type_descriptor = token_match_type(context, &rest_state, scope, 0);
   if (!type_descriptor) return 0;
   Token_Match_Arg *arg = allocator_allocate(context->allocator, Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
@@ -1177,8 +1176,7 @@ token_match_struct_field(
   Compilation_Context *context,
   Descriptor *struct_descriptor,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
   u64 peek_index = 0;
   Token_Match(name, .type = Token_Type_Id);
@@ -1191,7 +1189,7 @@ token_match_struct_field(
   Token_Matcher_State rest_state = {.tokens = rest};
   state->tokens.data->length = state->start_index;
 
-  Descriptor *descriptor = token_match_type(context, &rest_state, scope, builder);
+  Descriptor *descriptor = token_match_type(context, &rest_state, scope, 0);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
@@ -1202,7 +1200,6 @@ token_process_type_definition(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
   Token *layout_token
 ) {
   Token *layout_block = 0;
@@ -1216,10 +1213,11 @@ token_process_type_definition(
   switch(dyn_array_length(argument_states)) {
     case 1: {
       Token_Matcher_State layout_state = {layout_token->children};
-      Token *token = token_rewrite_constant_expression(context, &layout_state, scope, builder);
+      Token *token = token_rewrite_constant_expression(context, &layout_state, scope);
       if (token) {
         bit_size_value = value_any(context->allocator);
-        token_force_value(context, token, scope, builder, bit_size_value);
+        // FIXME
+        token_force_value(context, token, scope, 0, bit_size_value);
       }
       if (!bit_size_value) {
         // TODO print error
@@ -1287,7 +1285,7 @@ token_process_type_definition(
         token_split_by_newlines_and_semicolons(layout_block->children);
       for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
         Token_Matcher_State *field_state = dyn_array_get(definitions, i);
-        token_match_struct_field(context, descriptor, field_state, scope, builder);
+        token_match_struct_field(context, descriptor, field_state, scope);
       }
     }
   }
@@ -1450,7 +1448,6 @@ token_process_function_literal(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *outer_builder,
   bool is_inline,
   Token *args,
   Token *return_types,
@@ -1495,7 +1492,7 @@ token_process_function_literal(
     case 1: {
       Token *return_type_token = *dyn_array_get(return_types->children, 0);
       Descriptor *return_descriptor =
-        token_force_type(context, function_scope, return_type_token, outer_builder);
+        token_force_type(context, function_scope, return_type_token, 0);
       if (!return_descriptor) return 0;
       function_return_descriptor(context, &descriptor->function, return_descriptor);
       break;
@@ -1514,8 +1511,7 @@ token_process_function_literal(
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_Matcher_State *args_state = dyn_array_get(argument_states, i);
       token_state_clear_newlines(args_state);
-      Token_Match_Arg *arg =
-        token_match_argument(context, args_state, function_scope, outer_builder);
+      Token_Match_Arg *arg = token_match_argument(context, args_state, function_scope);
       if (!arg) return 0;
       Value *arg_value =
         function_push_argument(context->allocator, &descriptor->function, arg->type_descriptor);
@@ -1557,8 +1553,7 @@ bool
 token_rewrite_function_literal(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *outer_builder
+  Scope *scope
 ) {
   u64 peek_index = 0;
   Token_Maybe_Match(inline_, .type = Token_Type_Id, .source = slice_literal("inline"));
@@ -1568,14 +1563,8 @@ token_rewrite_function_literal(
   Token_Match(body, .type = Token_Type_Value);
 
   Value *result = token_process_function_literal(
-    context,
-    state,
-    scope,
-    outer_builder,
-    !!inline_,
-    args,
-    return_types,
-    body
+    context, state, scope,
+    !!inline_, args, return_types, body
   );
   u64 replacement_count = inline_ ? 5 : 4;
   Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
@@ -1789,7 +1778,6 @@ token_do_handle_operator(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
   Array_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
@@ -1797,7 +1785,8 @@ token_do_handle_operator(
   if (slice_equal(operator, slice_literal("unary -"))) {
     Token *token = *dyn_array_pop(*token_stack);
     Value *value = value_any(context->allocator);
-    token_force_value(context, token, scope, builder, value);
+    // FIXME add something liek token_force_constant_value
+    token_force_value(context, token, scope, 0, value);
     if (value->descriptor->type == Descriptor_Type_Integer && operand_is_immediate(&value->operand)) {
       if (value->operand.type == Operand_Type_Immediate_8) {
         value->operand.s8 = -value->operand.s8;
@@ -1834,9 +1823,7 @@ token_do_handle_operator(
       function->type == Token_Type_Id &&
       slice_equal(function->source, slice_literal("type"))
     ) {
-      result = token_process_type_definition(
-        context, state, scope, builder, args
-      );
+      result = token_process_type_definition(context, state, scope, args);
     } else {
       result = compile_time_eval(context, &(Token_Matcher_State){call_tokens}, scope);
     }
@@ -1856,7 +1843,7 @@ token_do_handle_operator(
       dyn_array_pop(*token_stack);
     }
     Value *function_value = token_process_function_literal(
-      context, state, scope, builder,
+      context, state, scope,
       is_inline, arguments, return_types, body
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
@@ -1871,7 +1858,6 @@ token_handle_operator(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder,
   Array_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice new_operator
@@ -1884,7 +1870,7 @@ token_handle_operator(
     // apply the operator on the stack
     Slice popped_operator = *dyn_array_pop(*operator_stack);
     token_do_handle_operator(
-      context, state, scope, builder,
+      context, state, scope,
       token_stack, operator_stack, popped_operator
     );
   }
@@ -1895,8 +1881,7 @@ Token *
 token_rewrite_constant_expression(
   Compilation_Context *context,
   Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
   // FIXME
   u64 token_count = dyn_array_length(state->tokens);
@@ -1932,7 +1917,7 @@ token_rewrite_constant_expression(
         dyn_array_push(token_stack, token);
         if (!is_previous_an_operator) {
           token_handle_operator(
-            context, state, scope,builder, &token_stack, &operator_stack, slice_literal("()")
+            context, state, scope, &token_stack, &operator_stack, slice_literal("()")
           );
         }
         is_previous_an_operator = false;
@@ -1949,7 +1934,7 @@ token_rewrite_constant_expression(
           operator = slice_literal("unary -");
         }
         token_handle_operator(
-          context, state, scope,builder, &token_stack, &operator_stack, operator
+          context, state, scope, &token_stack, &operator_stack, operator
         );
         is_previous_an_operator = true;
         break;
@@ -1960,7 +1945,7 @@ token_rewrite_constant_expression(
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
     token_do_handle_operator(
-      context, state, scope,builder, &token_stack, &operator_stack, operator
+      context, state, scope, &token_stack, &operator_stack, operator
     );
   }
 
@@ -2976,7 +2961,7 @@ token_match_expression(
   token_state_clear_newlines(state);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_cast);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_struct_field);
-  token_rewrite_statement(context, state, scope, builder, token_rewrite_function_literal);
+  //token_rewrite_statement(context, state, scope, builder, token_rewrite_function_literal);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_function_calls);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_pointer_to);
