@@ -1517,10 +1517,12 @@ token_process_function_literal(
   Scope *function_scope = scope_make(context->allocator, context->program->global_scope);
 
   Function_Builder *builder = 0;
-  // TODO think about a better way to distinguish imports
   Descriptor *descriptor = 0;
 
-  bool is_external = body->type != Token_Type_Curly;
+  if(!body) return 0;
+
+  // TODO think about a better way to distinguish imports
+  bool is_external = body->type == Token_Type_Value;
 
   if (is_external) {
     if (is_inline) {

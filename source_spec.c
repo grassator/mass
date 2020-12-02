@@ -712,7 +712,7 @@ spec("source") {
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
     }
-    xit("should be report wrong argument type to external()") {
+    it("should be report wrong argument type to external()") {
       test_program_inline_source_base(
         "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", exit
       );
