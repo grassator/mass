@@ -979,8 +979,8 @@ token_force_constant_value(
     case Token_Type_String: {
       Slice string = token->string;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
+      // TODO make a proper string type
       return string_bytes;
-      //return value_pointer_to(context, builder, &token->source_range, string_bytes);
     }
     case Token_Type_Id: {
       Slice name = token->source;
@@ -1524,11 +1524,10 @@ token_process_function_literal(
 
   if (is_external) {
     if (is_inline) {
-      // FIXME
-      //program_error_builder(context, inline_->source_range) {
-        //program_error_append_literal("External functions can not be inline");
-      //}
-      is_inline = 0;
+      program_error_builder(context, body->source_range) {
+        program_error_append_literal("External functions can not be inline");
+      }
+      is_inline = false;
     }
     if(!body->value) return 0;
     descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -3020,7 +3019,6 @@ token_match_expression(
   token_state_clear_newlines(state);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_cast);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_struct_field);
-  //token_rewrite_statement(context, state, scope, builder, token_rewrite_function_literal);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_negative_literal);
   token_rewrite_expression(context, state, scope, builder, result_value, token_rewrite_function_calls);
   token_rewrite_statement(context, state, scope, builder, token_rewrite_pointer_to);

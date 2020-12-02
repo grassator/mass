@@ -350,7 +350,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  xit("should report an error for inline external functions") {
+  it("should report an error for inline external functions") {
       int i = 0; (void)i;
     test_program_inline_source_base(
       "ExitProcess :: inline (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
