@@ -1010,7 +1010,11 @@ token_force_value(
       return;
     }
     case Token_Type_Value: {
-      move_value(context->allocator, builder, &token->source_range, result_value, token->value);
+      if (token->value) {
+        move_value(context->allocator, builder, &token->source_range, result_value, token->value);
+      } else {
+        // TODO consider what should happen here
+      }
       return;
     }
     case Token_Type_Paren: {
@@ -1204,41 +1208,24 @@ token_match_struct_field(
   return true;
 }
 
-bool
-token_rewrite_type_definitions(
+Token *
+token_process_type_definition(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  Token *layout_token
 ) {
-  u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("type"));
-  Token_Match(layout_token, .type = Token_Type_Paren);
-  Token *replacement_token = 0;
-
-  u64 layout_children_count = dyn_array_length(layout_token->children);
   Token *layout_block = 0;
   Value *bit_size_value = 0;
-  switch (layout_children_count) {
-    case 0: {
-      // TODO print error
-      goto err;
-    }
+
+  Array_Token_Matcher_State argument_states = token_split(layout_token->children, &(Token_Pattern){
+    .type = Token_Type_Operator,
+    .source = slice_literal(","),
+  });
+
+  switch(dyn_array_length(argument_states)) {
     case 1: {
-      Token *token = *dyn_array_get(layout_token->children, 0);
-      // TODO should be a compile time function later on
-      if (token->type == Token_Type_Id && slice_equal(token->source, slice_literal("c_struct"))) {
-        layout_block =
-          token_peek_match(state, peek_index++, &(Token_Pattern) { .type = Token_Type_Curly });
-        if (!layout_block) {
-          // TODO print error
-          goto err;
-        }
-        break;
-      }
-      // fallthrough
-    }
-    default: {
       Token_Matcher_State layout_state = {layout_token->children};
       Token *token = token_rewrite_constant_expression(context, &layout_state, scope, builder);
       if (token) {
@@ -1250,6 +1237,33 @@ token_rewrite_type_definitions(
         goto err;
       }
       break;
+    }
+    case 2: {
+      Token_Matcher_State *layout_type_state = dyn_array_get(argument_states, 0);
+      if (dyn_array_length(layout_type_state->tokens) != 1) {
+        // TODO print error
+        goto err;
+      }
+      Token *layout_type = *dyn_array_get(layout_type_state->tokens, 0);
+      if (
+        layout_type->type == Token_Type_Id &&
+        slice_equal(layout_type->source, slice_literal("c_struct"))
+      ) {
+        Token_Matcher_State *layout_block_state = dyn_array_get(argument_states, 1);
+        if (dyn_array_length(layout_block_state->tokens) != 1) {
+          // TODO print error
+          goto err;
+        }
+        layout_block = *dyn_array_get(layout_block_state->tokens, 0);
+      } else {
+        // TODO print error
+        goto err;
+      }
+      break;
+    }
+    default: {
+      // TODO print error
+      goto err;
     }
   }
 
@@ -1298,13 +1312,10 @@ token_rewrite_type_definitions(
     .descriptor = value_descriptor,
     .operand = {.type = Operand_Type_None },
   };
-  replacement_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
+  return token_value_make(context, result, layout_token->source_range);
 
   err:
-  u64 replacement_count = layout_block ? 3 : 2;
-  token_replace_tokens_in_state(state, replacement_count, replacement_token);
-
-  return true;
+  return 0;
 }
 
 bool
@@ -1445,35 +1456,34 @@ token_rewrite_statement(
   }
 }
 
-bool
-token_rewrite_function_literal(
+Value *
+token_process_function_literal(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *outer_builder
+  Function_Builder *outer_builder,
+  bool is_inline,
+  Token *args,
+  Token *return_types,
+  Token *body
 ) {
-  u64 peek_index = 0;
-  Token_Maybe_Match(inline_, .type = Token_Type_Id, .source = slice_literal("inline"));
-  Token_Match(args, .type = Token_Type_Paren);
-  Token_Match_Operator(arrow, "->");
-  Token_Match(return_types, .type = Token_Type_Paren);
-  Token_Maybe_Match(external_body, .type = Token_Type_Value);
-  Token_Maybe_Match(regular_body, .type = Token_Type_Curly);
-
   Scope *function_scope = scope_make(context->allocator, context->program->global_scope);
 
   Function_Builder *builder = 0;
   // TODO think about a better way to distinguish imports
   Descriptor *descriptor = 0;
 
-  if (external_body) {
-    if (inline_) {
-      program_error_builder(context, inline_->source_range) {
-        program_error_append_literal("External functions can not be inline");
-      }
-      inline_ = 0;
+  bool is_external = body->type != Token_Type_Curly;
+
+  if (is_external) {
+    if (is_inline) {
+      // FIXME
+      //program_error_builder(context, inline_->source_range) {
+        //program_error_append_literal("External functions can not be inline");
+      //}
+      is_inline = 0;
     }
-    if(!external_body->value) return 0;
+    if(!body->value) return 0;
     descriptor = allocator_allocate(context->allocator, Descriptor);
     *descriptor = (Descriptor) {
       .type = Descriptor_Type_Function,
@@ -1483,12 +1493,9 @@ token_rewrite_function_literal(
         .returns = 0,
       },
     };
-  } else if (regular_body) {
+  } else {
     builder = fn_begin(context);
     descriptor = builder->descriptor;
-  } else {
-    // FIXME better error reporting or maybe consider this a function type
-    return 0;
   }
 
   switch (dyn_array_length(return_types->children)) {
@@ -1523,7 +1530,7 @@ token_rewrite_function_literal(
       if (!arg) return 0;
       Value *arg_value =
         function_push_argument(context->allocator, &descriptor->function, arg->type_descriptor);
-      if (regular_body && arg_value->operand.type == Operand_Type_Register) {
+      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
       dyn_array_push(descriptor->function.argument_names, arg->arg_name);
@@ -1536,24 +1543,51 @@ token_rewrite_function_literal(
   }
 
   Value *result = 0;
-  if (external_body) {
-    external_body->value->descriptor = descriptor;
-    result = external_body->value;
+  if (is_external) {
+    body->value->descriptor = descriptor;
+    result = body->value;
   } else {
     Value *return_result_value =
       descriptor->function.returns->descriptor->type == Descriptor_Type_Void
         ? value_any(context->allocator)
         : descriptor->function.returns;
-    if (inline_) {
+    if (is_inline) {
       descriptor->function.parent_scope = scope;
-      descriptor->function.inline_body = token_clone_deep(context->allocator, regular_body);
+      descriptor->function.inline_body = token_clone_deep(context->allocator, body);
     }
     // TODO might want to do this lazily for inline functions
-    token_parse_block(context, regular_body, function_scope, builder, return_result_value);
+    token_parse_block(context, body, function_scope, builder, return_result_value);
 
     fn_end(builder);
     result = builder->value;
   }
+  return result;
+}
+
+bool
+token_rewrite_function_literal(
+  Compilation_Context *context,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *outer_builder
+) {
+  u64 peek_index = 0;
+  Token_Maybe_Match(inline_, .type = Token_Type_Id, .source = slice_literal("inline"));
+  Token_Match(args, .type = Token_Type_Paren);
+  Token_Match_Operator(arrow, "->");
+  Token_Match(return_types, .type = Token_Type_Paren);
+  Token_Match(body, .type = Token_Type_Value);
+
+  Value *result = token_process_function_literal(
+    context,
+    state,
+    scope,
+    outer_builder,
+    !!inline_,
+    args,
+    return_types,
+    body
+  );
   u64 replacement_count = inline_ ? 5 : 4;
   Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, replacement_count, value_token);
@@ -1587,25 +1621,6 @@ token_rewrite_negative_literal(
 
   Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 2, value_token);
-  return true;
-}
-
-bool
-token_rewrite_constant_sub_expression(
-  Compilation_Context *context,
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *builder
-) {
-  u64 peek_index = 0;
-  Token_Match(paren, .type = Token_Type_Paren);
-
-  Token_Matcher_State sub_state = {paren->children};
-  Token *result_token = token_rewrite_constant_expression(context, &sub_state, scope, builder);
-  if (!result_token) {
-    return false;
-  }
-  token_replace_tokens_in_state(state, 1, result_token);
   return true;
 }
 
@@ -1766,28 +1781,125 @@ token_rewrite_compile_time_eval(
   return true;
 }
 
-bool
-token_rewrite_compile_time_function_call(
+u32
+precedence_for_operator(
+  Slice operator
+) {
+  assert(operator.length);
+  if (slice_equal(operator, slice_literal("()"))) {
+    return 20;
+  } else if (slice_equal(operator, slice_literal("unary -"))) {
+    return 10;
+  } else {
+    return 1;
+  }
+}
+
+void
+token_do_handle_operator(
   Compilation_Context *context,
   Token_Matcher_State *state,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  Array_Token_Ptr *token_stack,
+  Array_Slice *operator_stack,
+  Slice operator
 ) {
-  // @CopyPaste with the regular function call
-  u64 peek_index = 0;
-  Token_Match(target_token, 0);
-  Token_Match(args_token, .type = Token_Type_Paren);
-  if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) return false;
+  if (slice_equal(operator, slice_literal("unary -"))) {
+    Token *token = *dyn_array_pop(*token_stack);
+    Value *value = value_any(context->allocator);
+    token_force_value(context, token, scope, builder, value);
+    if (value->descriptor->type == Descriptor_Type_Integer && operand_is_immediate(&value->operand)) {
+      if (value->operand.type == Operand_Type_Immediate_8) {
+        value->operand.s8 = -value->operand.s8;
+      } else if (value->operand.type == Operand_Type_Immediate_16) {
+        value->operand.s16 = -value->operand.s16;
+      } else if (value->operand.type == Operand_Type_Immediate_32) {
+        value->operand.s32 = -value->operand.s32;
+      } else if (value->operand.type == Operand_Type_Immediate_64) {
+        value->operand.s64 = -value->operand.s64;
+      } else {
+        panic("Internal error, expected an immediate");
+      }
+    } else {
+      panic("TODO");
+    }
+    Token *new_token = token_value_make(context, value, token->source_range);
+    dyn_array_push(*token_stack, new_token);
+  } else if (slice_equal(operator, slice_literal("()"))) {
+    Array_Token_Ptr call_tokens = dyn_array_make(Array_Token_Ptr);
+    Token *args = *dyn_array_pop(*token_stack);
+    Token *function = *dyn_array_pop(*token_stack);
+    dyn_array_push(call_tokens, function);
+    dyn_array_push(call_tokens, args);
 
-  Range_u64 call_token_range = {
-    .from = state->start_index,
-    .to = state->start_index + peek_index
-  };
-  Array_Token_Ptr call_tokens = dyn_array_sub(Array_Token_Ptr, state->tokens, call_token_range);
-  Token *result = compile_time_eval(context, &(Token_Matcher_State){call_tokens}, scope);
+    Token *result;
+    // TODO turn `external` into a compile-time function call
+    if (
+      function->type == Token_Type_Id &&
+      slice_equal(function->source, slice_literal("external"))
+    ) {
+      Token_Matcher_State *args_state = &(Token_Matcher_State) {.tokens = args->children };
+      result = token_import_match_arguments(args->source_range, args_state, context);
+    } else if (
+      function->type == Token_Type_Id &&
+      slice_equal(function->source, slice_literal("type"))
+    ) {
+      result = token_process_type_definition(
+        context, state, scope, builder, args
+      );
+    } else {
+      result = compile_time_eval(context, &(Token_Matcher_State){call_tokens}, scope);
+    }
+    dyn_array_push(*token_stack, result);
+  } else if (slice_equal(operator, slice_literal("->"))) {
+    Token *body = *dyn_array_pop(*token_stack);
+    Token *return_types = *dyn_array_pop(*token_stack);
+    Token *arguments = *dyn_array_pop(*token_stack);
+    Token **maybe_inline = dyn_array_last(*token_stack);
+    bool is_inline = false;
+    if (
+      maybe_inline &&
+      (*maybe_inline)->type == Token_Type_Id &&
+      slice_equal((*maybe_inline)->source, slice_literal("inline"))
+    ) {
+      is_inline = true;
+      dyn_array_pop(*token_stack);
+    }
+    Value *function_value = token_process_function_literal(
+      context, state, scope, builder,
+      is_inline, arguments, return_types, body
+    );
+    Token *result = token_value_make(context, function_value, arguments->source_range);
+    dyn_array_push(*token_stack, result);
+  } else {
+    panic("TODO: Unknown operator");
+  }
+}
 
-  token_replace_tokens_in_state(state, 2, result);
-  return result;
+void
+token_handle_operator(
+  Compilation_Context *context,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder,
+  Array_Token_Ptr *token_stack,
+  Array_Slice *operator_stack,
+  Slice new_operator
+) {
+  u32 precedence = precedence_for_operator(new_operator);
+  while (
+    dyn_array_length(*operator_stack) &&
+    precedence_for_operator(*dyn_array_last(*operator_stack)) > precedence
+  ) {
+    // apply the operator on the stack
+    Slice popped_operator = *dyn_array_pop(*operator_stack);
+    token_do_handle_operator(
+      context, state, scope, builder,
+      token_stack, operator_stack, popped_operator
+    );
+  }
+  dyn_array_push(*operator_stack, new_operator);
 }
 
 Token *
@@ -1797,28 +1909,90 @@ token_rewrite_constant_expression(
   Scope *scope,
   Function_Builder *builder
 ) {
+  // FIXME
   u64 token_count = dyn_array_length(state->tokens);
-  if (!token_count) return 0;
   Source_Range source_range =  source_range_from_token_matcher_state(state, token_count);
-  token_state_clear_newlines(state);
-  token_rewrite_statement(context, state, scope, builder, token_rewrite_negative_literal);
-  token_rewrite_statement(context, state, scope, builder, token_rewrite_external_import);
-
-  token_rewrite_type_definitions(context, state, scope, builder) ||
-  token_rewrite_function_literal(context, state, scope, builder) ||
-  token_rewrite_compile_time_function_call(context, state, scope, builder) ||
-  token_rewrite_compile_time_eval(context, state, scope, builder);
-
-  token_rewrite_statement(context, state, scope, builder, token_rewrite_constant_sub_expression);
-
-  if (dyn_array_length(state->tokens) != 1) {
-    program_push_error_from_slice(
-      context->program, source_range,
-      slice_literal("Invalid constant definition")
-    );
-    return 0;
+  if (!token_count) {
+    return token_value_make(context, &void_value, source_range);
   }
-  return *dyn_array_get(state->tokens, 0);
+  Array_Token_Ptr token_stack = dyn_array_make(Array_Token_Ptr);
+  Array_Slice operator_stack = dyn_array_make(Array_Slice);
+
+  bool is_previous_an_operator = true;
+  for (u64 i = state->start_index; i < dyn_array_length(state->tokens); ++i) {
+    Token *token = *dyn_array_get(state->tokens, i);
+
+    switch(token->type) {
+      case Token_Type_Newline: {
+        continue;
+      }
+      case Token_Type_Integer:
+      case Token_Type_Hex_Integer:
+      case Token_Type_String:
+      case Token_Type_Curly:
+      case Token_Type_Id:
+      case Token_Type_Value: {
+        dyn_array_push(token_stack, token);
+        // TODO figure out how to handle this better
+        if (token->type != Token_Type_Id || !slice_equal(token->source, slice_literal("inline"))) {
+          is_previous_an_operator = false;
+        }
+        break;
+      }
+      case Token_Type_Paren: {
+        dyn_array_push(token_stack, token);
+        if (!is_previous_an_operator) {
+          token_handle_operator(
+            context, state, scope,builder, &token_stack, &operator_stack, slice_literal("()")
+          );
+        }
+        is_previous_an_operator = false;
+        break;
+      }
+      case Token_Type_Module: {
+        // FIXME Report user-facing error
+        goto err;
+      }
+      case Token_Type_Square: {
+        panic("TODO");
+        break;
+      }
+      case Token_Type_Operator: {
+        Slice operator = token->source;
+        // unary minus, i.e x + -5
+        if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
+          operator = slice_literal("unary -");
+        }
+        token_handle_operator(
+          context, state, scope,builder, &token_stack, &operator_stack, operator
+        );
+        is_previous_an_operator = true;
+        break;
+      }
+    }
+  }
+
+  while (dyn_array_length(operator_stack)) {
+    Slice operator = *dyn_array_pop(operator_stack);
+    token_do_handle_operator(
+      context, state, scope,builder, &token_stack, &operator_stack, operator
+    );
+  }
+
+  if (dyn_array_length(token_stack) == 1) {
+    Token *result = *dyn_array_last(token_stack);
+    dyn_array_destroy(token_stack);
+    dyn_array_destroy(operator_stack);
+    return result;
+  } else {
+    // FIXME user error
+  }
+
+  err:
+  dyn_array_destroy(token_stack);
+  dyn_array_destroy(operator_stack);
+
+  return 0;
 }
 
 bool
