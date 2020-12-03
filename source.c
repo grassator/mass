@@ -1600,8 +1600,8 @@ token_process_function_literal(
       descriptor->function.returns->descriptor->type == Descriptor_Type_Void
         ? value_any(context->allocator)
         : descriptor->function.returns;
+    descriptor->function.scope = function_scope;
     if (is_inline) {
-      descriptor->function.parent_scope = scope;
       // FIXME remove this clone when we switch to lazy initialization
       descriptor->function.body = token_clone_deep(context->allocator, body);
       descriptor->function.flags |= Descriptor_Function_Flags_Inline;
@@ -2641,11 +2641,11 @@ token_rewrite_function_calls(
     Value *return_value;
     Descriptor_Function *function = &overload->descriptor->function;
     if (function->flags & Descriptor_Function_Flags_Inline) {
-      assert(function->parent_scope);
+      assert(function->scope->parent);
       // We make a nested scope based on function's original parent scope
       // instead of current scope for hygiene reasons. I.e. function body
       // should not have access to locals inside the call scope.
-      Scope *body_scope = scope_make(context->allocator, function->parent_scope);
+      Scope *body_scope = scope_make(context->allocator, function->scope->parent);
 
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Slice arg_name = *dyn_array_get(function->argument_names, i);

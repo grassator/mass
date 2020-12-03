@@ -272,7 +272,7 @@ typedef struct Descriptor_Function {
   Array_Value_Ptr arguments;
   Array_Slice argument_names;
   Token *body;
-  Scope *parent_scope;
+  Scope *scope;
 
   Value *returns;
   Value *next_overload;
