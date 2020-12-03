@@ -585,7 +585,7 @@ spec("source") {
     check(status->operand.s8 == 42);
   }
 
-  xit("should be able to execute arbitrary expression at compile time") {
+  it("should be able to execute arbitrary expression at compile time") {
     test_program_inline_source_base(
       "STATUS_CODE :: @( the_answer() + 2 );"
       "the_answer :: () -> (s8) { 40 }",

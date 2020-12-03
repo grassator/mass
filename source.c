@@ -1798,28 +1798,6 @@ compile_time_eval(
   );
 }
 
-bool
-token_rewrite_compile_time_eval(
-  Compilation_Context *context,
-  Token_Matcher_State *state,
-  Scope *scope,
-  Function_Builder *unused_builder
-) {
-  u64 peek_index = 0;
-  Token_Match_Operator(at, "@");
-  Token_Match(paren, .type = Token_Type_Paren);
-
-  Token_Matcher_State sub_state = {paren->children};
-
-  Token *result_token = compile_time_eval(context, &sub_state, scope);
-
-  if (!result_token) {
-    return false;
-  }
-  token_replace_tokens_in_state(state, 2, result_token);
-  return true;
-}
-
 u32
 precedence_for_operator(
   Slice operator
@@ -1827,6 +1805,8 @@ precedence_for_operator(
   assert(operator.length);
   if (slice_equal(operator, slice_literal("()"))) {
     return 20;
+  } else if (slice_equal(operator, slice_literal("@"))) {
+    return 15;
   } else if (slice_equal(operator, slice_literal("unary -"))) {
     return 10;
   } else {
@@ -1906,6 +1886,19 @@ token_do_handle_operator(
       is_inline, arguments, return_types, body
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
+    dyn_array_push(*token_stack, result);
+  } else if (slice_equal(operator, slice_literal("@"))) {
+    Token *body = *dyn_array_pop(*token_stack);
+    Token *result = 0;
+    if (body->type == Token_Type_Paren) {
+      Token_Matcher_State sub_state = {body->children};
+      result = compile_time_eval(context, &sub_state, scope);
+    } else {
+      program_error_builder(context, body->source_range) {
+        program_error_append_literal("@ operator must be followed by a parenthesized expression");
+      }
+      result = token_value_make(context, 0, body->source_range);
+    }
     dyn_array_push(*token_stack, result);
   } else {
     panic("TODO: Unknown operator");
