@@ -380,6 +380,16 @@ spec("source") {
     check(checker() == 21);
   }
 
+  it("should be able to parse negation inside a constant expression") {
+    test_program_inline_source(
+      "THE_ANSWER :: -(-42);"
+      "test :: () -> (s64) { THE_ANSWER }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
   it("should be able to parse and run multiple function definitions") {
     test_program_inline_source(
       "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }\n"

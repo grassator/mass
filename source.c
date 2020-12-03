@@ -1845,9 +1845,7 @@ token_do_handle_operator(
 ) {
   if (slice_equal(operator, slice_literal("unary -"))) {
     Token *token = *dyn_array_pop(*token_stack);
-    Value *value = value_any(context->allocator);
-    // FIXME add something liek token_force_constant_value
-    token_force_value(context, token, scope, 0, value);
+    Value *value = token_force_constant_value(context, scope, token);
     if (value->descriptor->type == Descriptor_Type_Integer && operand_is_immediate(&value->operand)) {
       if (value->operand.type == Operand_Type_Immediate_8) {
         value->operand.s8 = -value->operand.s8;
