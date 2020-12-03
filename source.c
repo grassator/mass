@@ -1616,29 +1616,6 @@ token_process_function_literal(
 }
 
 bool
-token_rewrite_function_literal(
-  Compilation_Context *context,
-  Token_Matcher_State *state,
-  Scope *scope
-) {
-  u64 peek_index = 0;
-  Token_Maybe_Match(inline_, .type = Token_Type_Id, .source = slice_literal("inline"));
-  Token_Match(args, .type = Token_Type_Paren);
-  Token_Match_Operator(arrow, "->");
-  Token_Match(return_types, .type = Token_Type_Paren);
-  Token_Match(body, .type = Token_Type_Value);
-
-  Value *result = token_process_function_literal(
-    context, state, scope,
-    !!inline_, args, return_types, body
-  );
-  u64 replacement_count = inline_ ? 5 : 4;
-  Token *value_token = token_value_make(context, result, TOKEN_MATCHED_SOURCE());
-  token_replace_tokens_in_state(state, replacement_count, value_token);
-  return true;
-}
-
-bool
 token_rewrite_negative_literal(
   Compilation_Context *context,
   Token_Matcher_State *state,
