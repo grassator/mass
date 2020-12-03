@@ -57,10 +57,15 @@ typedef enum {
 } Scope_Entry_Type;
 
 typedef struct {
+  Array_Token_Ptr tokens;
+  Scope *scope;
+} Scope_Laze_Constant_Expression;
+
+typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Array_Token_Ptr lazy_constant_expression;
+    Scope_Laze_Constant_Expression lazy_constant_expression;
   };
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;

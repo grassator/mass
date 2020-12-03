@@ -99,9 +99,9 @@ scope_lookup_force(
   for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
     Scope_Entry *entry = dyn_array_get(*entries, i);
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
-      Token_Matcher_State state = {entry->lazy_constant_expression};
-      // FIXME should use scope captued in the expression
-      Value *result = token_rewrite_constant_expression(context, &state, scope);
+      Token_Matcher_State state = {entry->lazy_constant_expression.tokens};
+      Value *result =
+        token_rewrite_constant_expression(context, &state, entry->lazy_constant_expression.scope);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -186,7 +186,10 @@ scope_define_lazy(
 ) {
   scope_define_internal(scope, name, (Scope_Entry) {
     .type = Scope_Entry_Type_Lazy_Constant_Expression,
-    .lazy_constant_expression = tokens,
+    .lazy_constant_expression = {
+      .tokens = tokens,
+      .scope = scope,
+    },
   });
 }
 
