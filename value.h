@@ -262,10 +262,16 @@ typedef enum {
 typedef struct Token Token;
 typedef struct Scope Scope;
 
+typedef enum {
+  Descriptor_Function_Flags_None = 0,
+  Descriptor_Function_Flags_Inline = 1 << 0,
+} Descriptor_Function_Flags;
+
 typedef struct Descriptor_Function {
+  Descriptor_Function_Flags flags;
   Array_Value_Ptr arguments;
   Array_Slice argument_names;
-  Token *inline_body;
+  Token *body;
   Scope *parent_scope;
 
   Value *returns;

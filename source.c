@@ -1602,7 +1602,9 @@ token_process_function_literal(
         : descriptor->function.returns;
     if (is_inline) {
       descriptor->function.parent_scope = scope;
-      descriptor->function.inline_body = token_clone_deep(context->allocator, body);
+      // FIXME remove this clone when we switch to lazy initialization
+      descriptor->function.body = token_clone_deep(context->allocator, body);
+      descriptor->function.flags |= Descriptor_Function_Flags_Inline;
     }
     // TODO might want to do this lazily for inline functions
     token_parse_block(context, body, function_scope, builder, return_result_value);
@@ -2661,7 +2663,7 @@ token_rewrite_function_calls(
   if (overload) {
     Value *return_value;
     Descriptor_Function *function = &overload->descriptor->function;
-    if (function->inline_body) {
+    if (function->flags & Descriptor_Function_Flags_Inline) {
       assert(function->parent_scope);
       // We make a nested scope based on function's original parent scope
       // instead of current scope for hygiene reasons. I.e. function body
@@ -2685,8 +2687,8 @@ token_rewrite_function_calls(
         *inline_builder.descriptor = *builder->descriptor;
         inline_builder.descriptor->function.returns = result_value;
       }
-
-      token_parse_block(context, function->inline_body, body_scope, &inline_builder, return_value);
+      Token *body = token_clone_deep(context->allocator, function->body);
+      token_parse_block(context, body, body_scope, &inline_builder, return_value);
 
       // Because instructions are stored in a dynamic array it might have been
       // reallocated which means we need to copy it. It might be better to
