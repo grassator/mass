@@ -892,7 +892,7 @@ dyn_array_sub_internal(
   u64 item_byte_size,
   Range_u64 range
 ) {
-  assert(source->length == 0 || range.from < source->length);
+  assert(range.from <= source->length);
   assert(range.to <= source->length);
   assert(range.from <= range.to);
   Dyn_Array_Internal *result = dyn_array_alloc_internal(
