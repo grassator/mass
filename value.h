@@ -265,7 +265,10 @@ typedef struct Scope Scope;
 typedef enum {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Inline = 1 << 0,
+  Descriptor_Function_Flags_Pending_Body_Compilation = 1 << 1,
 } Descriptor_Function_Flags;
+
+typedef struct Function_Builder Function_Builder;
 
 typedef struct Descriptor_Function {
   Descriptor_Function_Flags flags;
@@ -273,6 +276,7 @@ typedef struct Descriptor_Function {
   Array_Slice argument_names;
   Token *body;
   Scope *scope;
+  Function_Builder *builder;
 
   Value *returns;
   Value *next_overload;
@@ -527,7 +531,7 @@ typedef struct {
   u64 register_occupied_bitset;
 } Code_Block;
 
-typedef struct {
+typedef struct Function_Builder {
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Code_Block code_block;

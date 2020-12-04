@@ -292,6 +292,7 @@ fn_begin(
   *descriptor = (const Descriptor) {
     .type = Descriptor_Type_Function,
     .function = {
+      .flags = 0,
       .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
       .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
       .returns = 0,

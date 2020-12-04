@@ -696,6 +696,22 @@ spec("source") {
     write_executable(L"build\\hello_world.exe", test_context.program, Executable_Type_Cli);
   }
 
+  it("should be able to run fibonnacii") {
+    test_program_inline_source(
+      "fibonnacci :: (n : s64) -> (s64) {"
+        "if (n < 2) { return n };"
+        "fibonnacci(n + (-1)) + fibonnacci(n + (-2))"
+      "}",
+      fibonnacci
+    );
+
+    fn_type_s64_to_s64 checker =
+      (fn_type_s64_to_s64)value_as_function(test_context.program, fibonnacci);
+    check(checker(0) == 0);
+    check(checker(1) == 1);
+    check(checker(10) == 55);
+  }
+
   it("should be able to run fizz buzz") {
     Parse_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
     check(result.type == Parse_Result_Type_Success);

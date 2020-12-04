@@ -2,6 +2,57 @@
 #include "source.h"
 #include "function.h"
 
+Array_Token_Ptr
+token_clone_token_array_deep(
+  Allocator *allocator,
+  Array_Token_Ptr source
+);
+
+Token *
+token_clone_deep(
+  Allocator *allocator,
+  Token *token
+) {
+  Token *clone = allocator_allocate(allocator, Token);
+  *clone = *token;
+  switch (token->type) {
+    case Token_Type_Newline:
+    case Token_Type_Integer:
+    case Token_Type_Hex_Integer:
+    case Token_Type_Operator:
+    case Token_Type_String:
+    case Token_Type_Id: {
+      // Nothing to do
+      break;
+    }
+    case Token_Type_Square:
+    case Token_Type_Paren:
+    case Token_Type_Curly: {
+      clone->children = token_clone_token_array_deep(allocator, token->children);
+      break;
+    }
+    case Token_Type_Value: {
+      panic("Macro definitions should not contain semi-resolved tokens");
+      break;
+    }
+  }
+  return clone;
+}
+
+Array_Token_Ptr
+token_clone_token_array_deep(
+  Allocator *allocator,
+  Array_Token_Ptr source
+) {
+  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
+  for (u64 i = 0; i < dyn_array_length(source); ++i) {
+    Token *token = *dyn_array_get(source, i);
+    Token *clone = token_clone_deep(allocator, token);
+    dyn_array_push(result, clone);
+  }
+  return result;
+}
+
 Source_Range
 source_range_from_token_matcher_state(
   const Token_Matcher_State *state,
@@ -102,6 +153,7 @@ scope_lookup_force(
       Token_Matcher_State state = {entry->lazy_constant_expression.tokens};
       Value *result =
         token_rewrite_constant_expression(context, &state, entry->lazy_constant_expression.scope);
+
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -110,27 +162,40 @@ scope_lookup_force(
   }
 
   Value *result = 0;
-  if (dyn_array_length(*entries) == 1) {
-    Scope_Entry *entry = dyn_array_get(*entries, 0);
+  for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
+    Scope_Entry *entry = dyn_array_get(*entries, i);
     assert(entry->type == Scope_Entry_Type_Value);
-    result = entry->value;
-  } else {
-    // Must be a function overload
-    for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
-      Scope_Entry *entry = dyn_array_get(*entries, i);
-      assert(entry->type == Scope_Entry_Type_Value);
-      if (!result) {
-        result = entry->value;
-      } else {
-        Value *overload = entry->value;
-        overload->descriptor->function.next_overload = result;
-        result = overload;
-      }
-      if (result->descriptor->type != Descriptor_Type_Function) {
-        panic("Only functions should be lazy values");
+
+    // To support recursive functions without a hack like `self` we
+    // do forcing of the lazy value in two steps. First creates a valid Value
+    // the second one, here, actually processes function body
+    if (entry->value && entry->value->descriptor->type == Descriptor_Type_Function) {
+      Descriptor_Function *function = &entry->value->descriptor->function;
+      if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
+        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
+        Token *body = token_clone_deep(context->allocator, function->body);
+
+        Value *return_result_value =
+          function->returns->descriptor->type == Descriptor_Type_Void
+          ? value_any(context->allocator)
+          : function->returns;
+        token_parse_block(context, body, function->scope, function->builder, return_result_value);
+        fn_end(function->builder);
       }
     }
+
+    if (!result) {
+      result = entry->value;
+    } else {
+      if (entry->value->descriptor->type != Descriptor_Type_Function) {
+        panic("Only functions support overloading");
+      }
+      Value *overload = entry->value;
+      overload->descriptor->function.next_overload = result;
+      result = overload;
+    }
   }
+
   // For functions we need to gather up overloads from all parent scopes
   if (result && result->descriptor->type == Descriptor_Type_Function) {
     Value *last = result;
@@ -720,57 +785,6 @@ token_rewrite_pattern(
   token_replace_length_with_tokens(state, dyn_array_length(pattern), replacement);
   dyn_array_destroy(match);
   return true;
-}
-
-Array_Token_Ptr
-token_clone_token_array_deep(
-  Allocator *allocator,
-  Array_Token_Ptr source
-);
-
-Token *
-token_clone_deep(
-  Allocator *allocator,
-  Token *token
-) {
-  Token *clone = allocator_allocate(allocator, Token);
-  *clone = *token;
-  switch (token->type) {
-    case Token_Type_Newline:
-    case Token_Type_Integer:
-    case Token_Type_Hex_Integer:
-    case Token_Type_Operator:
-    case Token_Type_String:
-    case Token_Type_Id: {
-      // Nothing to do
-      break;
-    }
-    case Token_Type_Square:
-    case Token_Type_Paren:
-    case Token_Type_Curly: {
-      clone->children = token_clone_token_array_deep(allocator, token->children);
-      break;
-    }
-    case Token_Type_Value: {
-      panic("Macro definitions should not contain semi-resolved tokens");
-      break;
-    }
-  }
-  return clone;
-}
-
-Array_Token_Ptr
-token_clone_token_array_deep(
-  Allocator *allocator,
-  Array_Token_Ptr source
-) {
-  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
-  for (u64 i = 0; i < dyn_array_length(source); ++i) {
-    Token *token = *dyn_array_get(source, i);
-    Token *clone = token_clone_deep(allocator, token);
-    dyn_array_push(result, clone);
-  }
-  return result;
 }
 
 Array_Token_Ptr
@@ -1596,20 +1610,13 @@ token_process_function_literal(
     body->value->descriptor = descriptor;
     result = body->value;
   } else {
-    Value *return_result_value =
-      descriptor->function.returns->descriptor->type == Descriptor_Type_Void
-        ? value_any(context->allocator)
-        : descriptor->function.returns;
     descriptor->function.scope = function_scope;
+    descriptor->function.body = body;
+    descriptor->function.builder = builder;
+    descriptor->function.flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
     if (is_inline) {
-      // FIXME remove this clone when we switch to lazy initialization
-      descriptor->function.body = token_clone_deep(context->allocator, body);
       descriptor->function.flags |= Descriptor_Function_Flags_Inline;
     }
-    // TODO might want to do this lazily for inline functions
-    token_parse_block(context, body, function_scope, builder, return_result_value);
-
-    fn_end(builder);
     result = builder->value;
   }
   return result;
