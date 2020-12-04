@@ -655,9 +655,6 @@ scope_lookup_type(
 #define Token_Match_Operator(_id_, _op_)\
   Token_Match(_id_, .type = Token_Type_Operator, .source = slice_literal(_op_))
 
-#define Token_Match_End()\
-  if(peek_index != dyn_array_length(state->tokens)) return 0
-
 #define TOKEN_MATCHED_SOURCE()\
   source_range_from_token_matcher_state(state, peek_index)
 
@@ -2079,9 +2076,6 @@ token_parse_block(
   return true;
 }
 
-
-
-
 bool
 token_rewrite_statement_if(
   Compilation_Context *context,
@@ -2091,12 +2085,34 @@ token_rewrite_statement_if(
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
-  Token_Match(condition, .type = Token_Type_Paren);
-  Token_Match(body, .type = Token_Type_Curly);
-  Token_Match_End();
+
+  Array_Token_Ptr rest = dyn_array_sub(
+    Array_Token_Ptr, state->tokens, (Range_u64){peek_index, dyn_array_length(state->tokens)}
+  );
+
+  if (!dyn_array_length(rest)) {
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_literal("`if` keyword must be followed by an expression");
+    }
+    goto err;
+  }
+
+  Token *body = *dyn_array_pop(rest);
+
+  // FIXME support this without a fake token
+  Token fake_paren = {
+    .type = Token_Type_Paren,
+    .children = rest,
+    .source_range = keyword->source_range, // TODO better range
+    .source = keyword->source, // FIXME proper source
+  };
 
   Value *condition_value = value_any(context->allocator);
-  token_force_value(context, condition, scope, builder, condition_value);
+  token_force_value(context, &fake_paren, scope, builder, condition_value);
+  if (condition_value->descriptor->type == Descriptor_Type_Any) {
+    goto err;
+  }
+
   Label_Index else_label = make_if(
     context, &builder->code_block.instructions, &keyword->source_range, condition_value
   );
@@ -2106,7 +2122,9 @@ token_rewrite_statement_if(
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  token_replace_tokens_in_state(state, 3, 0);
+  err:
+  dyn_array_destroy(rest);
+
   return true;
 }
 
@@ -2120,7 +2138,8 @@ token_rewrite_goto(
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
   Token_Match(label_name, .type = Token_Type_Id);
-  Token_Match_End();
+  // FIXME
+  //Token_Match_End();
   Value *value = scope_lookup_force(context, scope, label_name->source);
   if (value) {
     if (
@@ -2173,7 +2192,6 @@ token_rewrite_explicit_return(
     (Instruction) {.assembly = {jmp, {label32(builder->code_block.end_label), 0, 0}}}
   );
 
-  token_replace_tokens_in_state(state, 2, 0);
   return true;
 }
 
@@ -2250,7 +2268,8 @@ token_rewrite_inline_machine_code_bytes(
   u64 peek_index = 0;
   Token_Match(id_token, .type = Token_Type_Id, .source = slice_literal("inline_machine_code_bytes"));
   Token_Match(args_token, .type = Token_Type_Paren);
-  Token_Match_End();
+  // FIXME
+  //Token_Match_End();
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token, scope, builder);
 
@@ -2355,7 +2374,14 @@ token_match_label(
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
-  Token_Match_End();
+
+  if (peek_index != dyn_array_length(state->tokens)) {
+    Token *extra_token = *dyn_array_get(state->tokens, peek_index);
+    program_error_builder(context, extra_token->source_range) {
+      program_error_append_literal("Unexpected token");
+    }
+    return 0;
+  }
 
   Label_Index label = make_label(context->program, &context->program->code_section);
   push_instruction(
@@ -2958,7 +2984,7 @@ token_rewrite_compare(
     context->allocator, compare_type, builder,
     &operator->source_range, result_value, lhs_value, rhs_value
   );
-  Token *token_value = token_value_make(context, result_value,TOKEN_MATCHED_SOURCE());
+  Token *token_value = token_value_make(context, result_value, TOKEN_MATCHED_SOURCE());
   token_replace_tokens_in_state(state, 3, token_value);
   return true;
 }
@@ -2974,7 +3000,6 @@ token_parse_statement(
 ) {
   // TODO consider how this should work
   token_rewrite_macros(context, state, scope, builder);
-
 
   for (
     Scope *statement_matcher_scope = scope;

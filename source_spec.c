@@ -732,13 +732,23 @@ spec("source") {
   }
 
   describe("User Error") {
-    it("should report an error when the statement is not matched fully") {
+    it("should report an error for an `if` statement without a body or a condition") {
+      test_program_inline_source_base("main :: () -> () { if; }", main);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
+    }
+    it("should report an error for an `if` statement with an incorrect condition") {
       test_program_inline_source_base("main :: () -> () { if (1 < 0) { 0 } 42; }", main);
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
-      slice_print(error->message);
-      // FIXME update error text check
-      //check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
+      check(slice_equal(slice_literal("Could not parse the expression"), error->message));
+    }
+    it("should report an error for extra tokens after `label`") {
+      test_program_inline_source_base("main :: () -> () { bar: label foo; }", main);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(slice_equal(slice_literal("Unexpected token"), error->message));
     }
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
