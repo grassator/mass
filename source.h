@@ -80,10 +80,15 @@ typedef struct {
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
+typedef bool (*Token_Statement_Matcher_Proc)
+(Compilation_Context *context, Token_Matcher_State *, Scope *, Function_Builder *);
+typedef dyn_array_type(Token_Statement_Matcher_Proc) Array_Token_Statement_Matcher_Proc;
+
 typedef struct Scope {
   struct Scope *parent;
   Scope_Map *map;
   Array_Macro_Ptr macros;
+  Array_Token_Statement_Matcher_Proc statement_matchers;
 } Scope;
 
 Scope *
@@ -106,6 +111,63 @@ token_parse_block(
   Scope *scope,
   Function_Builder *builder,
   Value *result_value
+);
+
+bool
+token_rewrite_statement_if(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_inline_machine_code_bytes(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_assignment(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_definition_and_assignment_statements(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_definitions(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_explicit_return(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_goto(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
+);
+bool
+token_rewrite_constant_definitions(
+  Compilation_Context *program,
+  Token_Matcher_State *state,
+  Scope *scope,
+  Function_Builder *builder
 );
 
 void

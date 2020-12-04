@@ -1313,6 +1313,20 @@ program_init(
   scope_define_value(program->global_scope, slice_literal("u32"), type_u32_value);
   scope_define_value(program->global_scope, slice_literal("u16"), type_u16_value);
   scope_define_value(program->global_scope, slice_literal("u8"), type_u8_value);
+
+  {
+    program->global_scope->statement_matchers =
+      dyn_array_make(Array_Token_Statement_Matcher_Proc, .allocator = allocator);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_statement_if);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_inline_machine_code_bytes);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_assignment);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_definition_and_assignment_statements);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_definitions);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_explicit_return);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_goto);
+    dyn_array_push(program->global_scope->statement_matchers, token_rewrite_constant_definitions);
+  }
+
   return program;
 };
 

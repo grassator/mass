@@ -2079,6 +2079,9 @@ token_parse_block(
   return true;
 }
 
+
+
+
 bool
 token_rewrite_statement_if(
   Compilation_Context *context,
@@ -2972,18 +2975,24 @@ token_parse_statement(
   // TODO consider how this should work
   token_rewrite_macros(context, state, scope, builder);
 
-  if (
-    token_rewrite_inline_machine_code_bytes(context, state, scope, builder) ||
-    token_rewrite_assignment(context, state, scope, builder) ||
-    token_rewrite_definition_and_assignment_statements( context, state, scope, builder) ||
-    token_rewrite_definitions(context, state, scope, builder) ||
-    token_rewrite_explicit_return(context, state, scope, builder) ||
-    token_rewrite_goto(context, state, scope, builder) ||
-    token_rewrite_constant_definitions(context, state, scope, builder)||
-    token_rewrite_statement_if(context, state, scope, builder)
+
+  for (
+    Scope *statement_matcher_scope = scope;
+    statement_matcher_scope;
+    statement_matcher_scope = statement_matcher_scope->parent
   ) {
-    return;
+    if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
+      continue;
+    }
+    for (u64 i = 0 ; i < dyn_array_length(statement_matcher_scope->statement_matchers); ++i) {
+      Token_Statement_Matcher_Proc matcher =
+        *dyn_array_get(statement_matcher_scope->statement_matchers, i);
+      if (matcher(context, state, scope, builder)) {
+        return;
+      }
+    }
   }
+
   token_match_expression(context, state, scope, builder, result_value);
 }
 

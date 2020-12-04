@@ -732,6 +732,14 @@ spec("source") {
   }
 
   describe("User Error") {
+    it("should report an error when the statement is not matched fully") {
+      test_program_inline_source_base("main :: () -> () { if (1 < 0) { 0 } 42; }", main);
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      slice_print(error->message);
+      // FIXME update error text check
+      //check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
+    }
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
       check(dyn_array_length(test_context.program->errors));
