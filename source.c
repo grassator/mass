@@ -987,7 +987,7 @@ token_match_argument(
 bool
 token_match_expression(
   Compilation_Context *context,
-  Array_Token_Ptr tokens,
+  Array_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder,
   Value *target
@@ -1142,7 +1142,9 @@ token_force_value(
     }
     case Token_Type_Paren: {
       if (!builder) panic("Caller should only force (...) in a builder context");
-      token_match_expression(context, token->children, scope, builder, result_value);
+      Array_Token_Ptr expression_tokens = dyn_array_copy(Array_Token_Ptr, token->children);
+      token_match_expression(context, &expression_tokens, scope, builder, result_value);
+      dyn_array_destroy(expression_tokens);
       return;
     }
     case Token_Type_Curly: {
@@ -1195,7 +1197,7 @@ token_match_call_arguments(
       Token_View view = *dyn_array_get(argument_states, i);
       Value *result_value = value_any(context->allocator);
       Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, view);
-      token_match_expression(context, expression_tokens, scope, builder, result_value);
+      token_match_expression(context, &expression_tokens, scope, builder, result_value);
       dyn_array_destroy(expression_tokens);
       dyn_array_push(result, result_value);
     }
@@ -1221,12 +1223,12 @@ token_value_make(
 
 bool
 token_state_clear_newlines(
-  Array_Token_Ptr tokens
+  Array_Token_Ptr *tokens
 ) {
-  for (u64 i = 0; i < dyn_array_length(tokens); ++i) {
-    const Token *token = *dyn_array_get(tokens, i);
+  for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
+    const Token *token = *dyn_array_get(*tokens, i);
     if (token->type == Token_Type_Newline) {
-      dyn_array_delete(tokens, i);
+      dyn_array_delete(*tokens, i);
       --i;
     }
   }
@@ -1701,7 +1703,7 @@ compile_time_eval(
   Array_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
   token_match_expression(
-    &eval_context, tokens, eval_program.global_scope, eval_builder, expression_result_value
+    &eval_context, &tokens, eval_program.global_scope, eval_builder, expression_result_value
   );
 
   // We use a something like a C++ reference out parameter for the
@@ -2116,7 +2118,7 @@ token_rewrite_statement_if(
 
   Array_Token_Ptr condition_tokens = token_array_from_view(allocator_system, condition_view);
   Value *condition_value = value_any(context->allocator);
-  token_match_expression(context, condition_tokens, scope, builder, condition_value);
+  token_match_expression(context, &condition_tokens, scope, builder, condition_value);
   dyn_array_destroy(condition_tokens);
   if (condition_value->descriptor->type == Descriptor_Type_Any) {
     goto err;
@@ -2180,7 +2182,7 @@ token_rewrite_explicit_return(
   Value *fn_return = builder->descriptor->function.returns;
 
   Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
-  token_match_expression(context, expression_tokens, scope, builder, fn_return);
+  token_match_expression(context, &expression_tokens, scope, builder, fn_return);
   dyn_array_destroy(expression_tokens);
 
   bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
@@ -2468,7 +2470,7 @@ token_rewrite_definition_and_assignment_statements(
 
   Value *value = value_any(context->allocator);
   Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, expression_tokens, scope, builder, value);
+  token_match_expression(context, &expression_tokens, scope, builder, value);
   dyn_array_destroy(expression_tokens);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -2506,7 +2508,9 @@ token_rewrite_array_index(
   Value *array = value_any(context->allocator);
   token_force_value(context, target_token, scope, builder, array);
   Value *index_value = value_any(context->allocator);
-  token_match_expression(context, brackets->children, scope, builder, index_value);
+  Array_Token_Ptr index_tokens = dyn_array_copy(Array_Token_Ptr, brackets->children);
+  token_match_expression(context, &index_tokens, scope, builder, index_value);
+  dyn_array_destroy(index_tokens);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
@@ -2608,12 +2612,12 @@ token_rewrite_assignment(
   if (!target) {
     target = value_any(context->allocator);
     Array_Token_Ptr lhs_tokens = token_array_from_view(allocator_system, lhs);
-    token_match_expression(context, lhs_tokens, scope, builder, target);
+    token_match_expression(context, &lhs_tokens, scope, builder, target);
     dyn_array_destroy(lhs_tokens);
   }
 
   Array_Token_Ptr rhs_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, rhs_tokens, scope, builder, target);
+  token_match_expression(context, &rhs_tokens, scope, builder, target);
   dyn_array_destroy(rhs_tokens);
 
   return true;
@@ -3032,7 +3036,7 @@ token_parse_statement(
     }
   }
 
-  bool result = token_match_expression(context, statement_tokens, scope, builder, result_value);
+  bool result = token_match_expression(context, &statement_tokens, scope, builder, result_value);
   dyn_array_destroy(statement_tokens);
   return result;
 }
@@ -3040,42 +3044,42 @@ token_parse_statement(
 bool
 token_match_expression(
   Compilation_Context *context,
-  Array_Token_Ptr tokens,
+  Array_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value
 ) {
   token_state_clear_newlines(tokens);
 
-  if (dyn_array_length(tokens)) {
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_cast);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_struct_field);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_negative_literal);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_function_calls);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_array_index);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_pointer_to);
+  if (dyn_array_length(*tokens)) {
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_cast);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_struct_field);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_negative_literal);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_function_calls);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_array_index);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_pointer_to);
 
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_divide);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_remainder);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_plus);
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_minus);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_divide);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_remainder);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_plus);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_minus);
 
-    token_rewrite_expression(context, &tokens, scope, builder, result_value, token_rewrite_compare);
+    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_compare);
   }
 
   bool full_match = true;
-  switch(dyn_array_length(tokens)) {
+  switch(dyn_array_length(*tokens)) {
     case 0: {
       // What should happen here?
       break;
     }
     case 1: {
-      const Token *token = *dyn_array_get(tokens, 0);
+      const Token *token = *dyn_array_get(*tokens, 0);
       token_force_value(context, token, scope, builder, result_value);
       break;
     }
     default: {
-      const Token *token = *dyn_array_get(tokens, 0);
+      const Token *token = *dyn_array_get(*tokens, 0);
       program_error_builder(context, token->source_range) {
         program_error_append_literal("Could not parse the expression");
       }
