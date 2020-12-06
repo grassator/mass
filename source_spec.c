@@ -61,7 +61,7 @@ spec_check_and_print_program(
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});\
   check(result.type == Tokenizer_Result_Type_Success);\
-  token_parse(&test_context, result.tokens);\
+  token_parse(&test_context, token_view_from_token_array(result.tokens));\
   Value *_fn_value_id_ = scope_lookup_force(\
     &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_)\
   );\
@@ -144,7 +144,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 1);
-    Token *newline = *dyn_array_get(result.tokens, 0);
+    const Token *newline = *dyn_array_get(result.tokens, 0);
     check(newline->type == Token_Type_Newline);
     check(slice_equal(newline->source, slice_literal("\n")));
   }
@@ -154,7 +154,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 1);
-    Token *token = *dyn_array_get(result.tokens, 0);
+    const Token *token = *dyn_array_get(result.tokens, 0);
     check(token->type == Token_Type_Hex_Integer);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
   }
@@ -165,15 +165,15 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 3);
 
-    Token *a_num = *dyn_array_get(result.tokens, 0);
+    const Token *a_num = *dyn_array_get(result.tokens, 0);
     check(a_num->type == Token_Type_Integer);
     check(slice_equal(a_num->source, slice_literal("12")));
 
-    Token *plus = *dyn_array_get(result.tokens, 1);
+    const Token *plus = *dyn_array_get(result.tokens, 1);
     check(plus->type == Token_Type_Operator);
     check(slice_equal(plus->source, slice_literal("+")));
 
-    Token *id = *dyn_array_get(result.tokens, 2);
+    const Token *id = *dyn_array_get(result.tokens, 2);
     check(id->type == Token_Type_Id);
     check(slice_equal(id->source, slice_literal("foo123")));
   }
@@ -184,12 +184,12 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 1);
 
-    Token *paren = *dyn_array_get(result.tokens, 0);
+    const Token *paren = *dyn_array_get(result.tokens, 0);
     check(paren->type == Token_Type_Paren);
     check(dyn_array_length(paren->children) == 1);
     check(slice_equal(paren->source, slice_literal("(x)")));
 
-    Token *id = *dyn_array_get(paren->children, 0);
+    const Token *id = *dyn_array_get(paren->children, 0);
     check(id->type == Token_Type_Id);
   }
 
@@ -198,7 +198,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 1);
-    Token *string = *dyn_array_get(result.tokens, 0);
+    const Token *string = *dyn_array_get(result.tokens, 0);
     check(slice_equal(string->source, slice_literal("\"foo 123\"")));
   }
 
@@ -208,12 +208,12 @@ spec("source") {
     check(result.type == Tokenizer_Result_Type_Success);
     check(dyn_array_length(result.tokens) == 1);
 
-    Token *curly = *dyn_array_get(result.tokens, 0);
+    const Token *curly = *dyn_array_get(result.tokens, 0);
     check(curly->type == Token_Type_Curly);
     check(dyn_array_length(curly->children) == 1);
     check(slice_equal(curly->source, slice_literal("{[]}")));
 
-    Token *square = *dyn_array_get(curly->children, 0);
+    const Token *square = *dyn_array_get(curly->children, 0);
     check(square->type == Token_Type_Square);
     check(dyn_array_length(square->children) == 0);
     check(slice_equal(square->source, slice_literal("[]")));
@@ -419,7 +419,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse(&test_context, result.tokens);
+    token_parse(&test_context, token_view_from_token_array(result.tokens));
 
     Value *checker_s64 =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"));
@@ -498,7 +498,7 @@ spec("source") {
 
   it("should be able to define and use a macro without a capture") {
     test_program_inline_source(
-      "macro (the answer) (42)"
+      "macro (the answer) (42);"
       "checker :: () -> (s32) { the answer }",
       checker
     );
@@ -509,7 +509,7 @@ spec("source") {
 
   it("should be able to define and use a macro with a capture") {
     test_program_inline_source(
-      "macro (negative _x) (- x)"
+      "macro (negative _x) (- x);"
       "checker :: () -> (s32) { negative 42 }",
       checker
     );
@@ -676,7 +676,7 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.type == Tokenizer_Result_Type_Success);
 
-    token_parse(&test_context, result.tokens);
+    token_parse(&test_context, token_view_from_token_array(result.tokens));
 
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
@@ -690,6 +690,7 @@ spec("source") {
     program_import_file(&test_context, slice_literal("fixtures\\hello_world"));
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
+    check(test_context.program->entry_point);
     check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
     check(!spec_check_and_print_program(test_context.program));
 
@@ -724,7 +725,7 @@ spec("source") {
     check(fizz_buzz);
 
     program_jit(&test_context);
-    check(!dyn_array_length(test_context.program->errors))
+    check(!spec_check_and_print_program(test_context.program));
 
     fn_type_void_to_void checker =
       (fn_type_void_to_void)value_as_function(test_context.program, fizz_buzz);

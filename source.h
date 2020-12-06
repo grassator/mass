@@ -46,10 +46,11 @@ typedef enum {
 } Tokenizer_State;
 
 typedef struct {
-  Array_Token_Ptr tokens;
-  u64 start_index;
-} Token_Matcher_State;
-typedef dyn_array_type(Token_Matcher_State) Array_Token_Matcher_State;
+  const Token **tokens;
+  u64 length;
+} Token_View;
+
+typedef dyn_array_type(Token_View) Array_Token_View;
 
 typedef enum {
   Scope_Entry_Type_Value = 1,
@@ -57,21 +58,21 @@ typedef enum {
 } Scope_Entry_Type;
 
 typedef struct {
-  Array_Token_Ptr tokens;
+  Token_View tokens;
   Scope *scope;
-} Scope_Laze_Constant_Expression;
+} Scope_Lazy_Constant_Expression;
 
 typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Scope_Laze_Constant_Expression lazy_constant_expression;
+    Scope_Lazy_Constant_Expression lazy_constant_expression;
   };
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
 hash_map_slice_template(Scope_Map, Array_Scope_Entry)
-hash_map_slice_template(Macro_Replacement_Map, Token *)
+hash_map_slice_template(Macro_Replacement_Map, const Token *)
 
 typedef struct {
   Array_Token_Pattern pattern;
@@ -81,7 +82,7 @@ typedef struct {
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
 typedef bool (*Token_Statement_Matcher_Proc)
-(Compilation_Context *context, Token_Matcher_State *, Scope *, Function_Builder *);
+(Compilation_Context *context, Token_View , Scope *, Function_Builder *);
 typedef dyn_array_type(Token_Statement_Matcher_Proc) Array_Token_Statement_Matcher_Proc;
 
 typedef struct Scope {
@@ -107,7 +108,7 @@ scope_define_value(
 bool
 token_parse_block(
   Compilation_Context *program,
-  Token *block,
+  const Token *block,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value
@@ -116,56 +117,56 @@ token_parse_block(
 bool
 token_rewrite_statement_if(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_inline_machine_code_bytes(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_assignment(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_definition_and_assignment_statements(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_definitions(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_explicit_return(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_goto(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );
 bool
 token_rewrite_constant_definitions(
   Compilation_Context *program,
-  Token_Matcher_State *state,
+  Token_View state,
   Scope *scope,
   Function_Builder *builder
 );

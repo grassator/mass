@@ -274,7 +274,7 @@ typedef struct Descriptor_Function {
   Descriptor_Function_Flags flags;
   Array_Value_Ptr arguments;
   Array_Slice argument_names;
-  Token *body;
+  const Token *body;
   Scope *scope;
   Function_Builder *builder;
 
@@ -608,7 +608,7 @@ typedef enum {
 } Tokenizer_Result_Type;
 
 typedef struct Token Token;
-typedef dyn_array_type(Token *) Array_Token_Ptr;
+typedef dyn_array_type(const Token *) Array_Token_Ptr;
 
 typedef struct {
   Tokenizer_Result_Type type;
