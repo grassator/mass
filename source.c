@@ -2022,7 +2022,8 @@ token_rewrite_constant_definitions(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   Token_View lhs;
   Token_View rhs;
@@ -2096,7 +2097,8 @@ token_rewrite_statement_if(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
@@ -2142,7 +2144,8 @@ token_rewrite_goto(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
@@ -2173,7 +2176,8 @@ token_rewrite_explicit_return(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
@@ -2273,7 +2277,8 @@ token_rewrite_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   u64 peek_index = 0;
   Token_Match(id_token, .type = Token_Type_Id, .source = slice_literal("inline_machine_code_bytes"));
@@ -2443,7 +2448,8 @@ token_rewrite_definitions(
   Compilation_Context *program,
   Token_View state,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   return !!token_parse_definition(program, state, scope, builder);
 }
@@ -2453,7 +2459,8 @@ token_rewrite_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   Token_View lhs;
   Token_View rhs;
@@ -2599,7 +2606,8 @@ token_rewrite_assignment(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Function_Builder *builder
+  Function_Builder *builder,
+  void *unused_payload
 ) {
   Token_View lhs;
   Token_View rhs;
@@ -3028,9 +3036,9 @@ token_parse_statement(
       continue;
     }
     for (u64 i = 0 ; i < dyn_array_length(statement_matcher_scope->statement_matchers); ++i) {
-      Token_Statement_Matcher_Proc matcher =
+      Token_Statement_Matcher matcher =
         *dyn_array_get(statement_matcher_scope->statement_matchers, i);
-      if (matcher(context, view, scope, builder)) {
+      if (matcher.proc(context, view, scope, builder, matcher.payload)) {
         return true;
       }
     }
@@ -3107,7 +3115,7 @@ token_parse(
       continue;
     }
     if (token_rewrite_constant_definitions(
-      context, statement, context->program->global_scope, &global_builder
+      context, statement, context->program->global_scope, &global_builder, 0
     )) {
       continue;
     }
