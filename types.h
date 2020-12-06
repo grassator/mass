@@ -76,6 +76,10 @@ typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
 typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
 
+typedef struct Token_Pattern Token_Pattern;
+typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
+typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
+
 typedef struct Tokenizer_Result Tokenizer_Result;
 typedef dyn_array_type(Tokenizer_Result *) Array_Tokenizer_Result_Ptr;
 typedef dyn_array_type(const Tokenizer_Result *) Array_Const_Tokenizer_Result_Ptr;
@@ -321,6 +325,13 @@ typedef struct Token {
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
+typedef struct Token_Pattern {
+  Token_Tag tag;
+  Token_Group_Type group_type;
+  Slice source;
+} Token_Pattern;
+typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
+
 typedef enum {
   Tokenizer_Result_Tag_Success = 1,
   Tokenizer_Result_Tag_Error = 2,

@@ -569,6 +569,12 @@ main(void) {
     { "Slice", "source" },
   }));
 
+  push_type(type_struct("Token_Pattern", (Struct_Item[]){
+    { "Token_Tag", "tag" },
+    { "Token_Group_Type", "group_type" },
+    { "Slice", "source" },
+  }));
+
   push_type(type_union("Tokenizer_Result", (Struct[]){
     struct_fields("Success", (Struct_Item[]){
       { "Array_Const_Token_Ptr", "tokens" },

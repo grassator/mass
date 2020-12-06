@@ -3,13 +3,6 @@
 #include "prelude.h"
 #include "value.h"
 
-typedef struct {
-  Token_Tag type;
-  Token_Group_Type group_type;
-  Slice source;
-} Token_Pattern;
-typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
-
 typedef enum {
   Tokenizer_State_Default,
   Tokenizer_State_Integer,

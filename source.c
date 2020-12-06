@@ -610,7 +610,7 @@ token_match(
     if (token->tag != Token_Tag_Group) return false;
     return token->Group.type == pattern->group_type;
   }
-  if (pattern->type && pattern->type != token->tag) return false;
+  if (pattern->tag && pattern->tag != token->tag) return false;
   if (pattern->source.length) {
     return slice_equal(token->source, pattern->source);
   }
@@ -722,7 +722,7 @@ scope_lookup_type(
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
-  Token_Match(_id_, .type = Token_Tag_Operator, .source = slice_literal(_op_))
+  Token_Match(_id_, .tag = Token_Tag_Operator, .source = slice_literal(_op_))
 
 typedef struct {
   Slice arg_name;
@@ -975,7 +975,7 @@ token_match_argument(
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Tag_Id);
+  Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -1193,7 +1193,7 @@ token_match_call_arguments(
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
     Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .type = Token_Tag_Operator,
+      .tag = Token_Tag_Operator,
       .source = slice_literal(","),
     });
     // TODO :TargetValue
@@ -1263,7 +1263,7 @@ token_rewrite_macro_definitions(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Tag_Id, .source = slice_literal("macro"));
+  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("macro"));
   Token_Match(pattern_token, .group_type = Token_Group_Type_Paren);
   Token_Match(replacement_token, .group_type = Token_Group_Type_Paren);
 
@@ -1280,12 +1280,12 @@ token_rewrite_macro_definitions(
       dyn_array_push(pattern_names, (Slice){0});
       if (token->tag == Token_Tag_Id) {
         dyn_array_push(pattern, (Token_Pattern) {
-          .type = token->tag,
+          .tag = token->tag,
           .source = token->source,
         });
       } else {
         dyn_array_push(pattern, (Token_Pattern) {
-          .type = token->tag,
+          .tag = token->tag,
         });
       }
     }
@@ -1311,7 +1311,7 @@ token_match_struct_field(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Tag_Id);
+  Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -1333,7 +1333,7 @@ token_process_type_definition(
 
   Token_View children = token_view_from_token_array(layout_token->Group.children);
   Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-    .type = Token_Tag_Operator,
+    .tag = Token_Tag_Operator,
     .source = slice_literal(","),
   });
 
@@ -1468,7 +1468,7 @@ token_import_match_arguments(
 ) {
   u64 peek_index = 0;
   const Token *library_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Tag_String,
+    .tag = Token_Tag_String,
   });
   if (!library_name_token) {
     program_push_error_from_slice(
@@ -1478,7 +1478,7 @@ token_import_match_arguments(
     return 0;
   }
   const Token *comma = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Tag_Operator,
+    .tag = Token_Tag_Operator,
     .source = slice_literal(","),
   });
   if (!comma) {
@@ -1489,7 +1489,7 @@ token_import_match_arguments(
     return 0;
   }
   const Token *symbol_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Tag_String,
+    .tag = Token_Tag_String,
   });
   if (!symbol_name_token) {
     program_push_error_from_slice(
@@ -1609,7 +1609,7 @@ token_process_function_literal(
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
     Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .type = Token_Tag_Operator,
+      .tag = Token_Tag_Operator,
       .source = slice_literal(","),
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
@@ -1659,7 +1659,7 @@ token_rewrite_negative_literal(
   u64 peek_index = 0;
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
-  Token_Match(integer, .type = Token_Tag_Integer);
+  Token_Match(integer, .tag = Token_Tag_Integer);
   Value *result = value_any(context->allocator);
   token_force_value(context, integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
@@ -2121,7 +2121,7 @@ token_rewrite_statement_if(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("if"));
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
 
   Token_View rest = token_view_rest(view, peek_index);
 
@@ -2168,9 +2168,9 @@ token_rewrite_goto(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("goto"));
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
   // TODO improve error reporting here.
-  Token_Match(label_name, .type = Token_Tag_Id);
+  Token_Match(label_name, .tag = Token_Tag_Id);
   Value *value = scope_lookup_force(context, scope, label_name->source);
   if (value) {
     if (
@@ -2200,7 +2200,7 @@ token_rewrite_explicit_return(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("return"));
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
   Value *fn_return = builder->descriptor->function.returns;
@@ -2255,7 +2255,7 @@ token_match_fixed_array_type(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(type, .type = Token_Tag_Id);
+  Token_Match(type, .tag = Token_Tag_Id);
   Token_Match(square_brace, .group_type = Token_Group_Type_Square);
   Descriptor *descriptor = scope_lookup_type(context, scope, type->source_range, type->source);
 
@@ -2301,7 +2301,7 @@ token_rewrite_inline_machine_code_bytes(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(id_token, .type = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
+  Token_Match(id_token, .tag = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
   Token_Match(args_token, .group_type = Token_Group_Type_Paren);
 
@@ -2365,7 +2365,7 @@ token_rewrite_cast(
   u64 *replacement_count
 ) {
   u64 peek_index = 0;
-  Token_Match(cast, .type = Token_Tag_Id, .source = slice_literal("cast"));
+  Token_Match(cast, .tag = Token_Tag_Id, .source = slice_literal("cast"));
   Token_Match(value_token, .group_type = Token_Group_Type_Paren);
 
   Array_Value_Ptr args = token_match_call_arguments(context, value_token, scope, builder);
@@ -2408,7 +2408,7 @@ token_match_label(
   Function_Builder *builder
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("label"));
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
 
   if (peek_index != view.length) {
     const Token *extra_token = token_view_get(view, peek_index);
@@ -2441,7 +2441,7 @@ token_parse_definition(
 ) {
   // TODO consider merging with argument matching
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Tag_Id);
+  Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -2607,7 +2607,7 @@ token_rewrite_struct_field(
   u64 peek_index = 0;
   Token_Match(struct_token, 0);
   Token_Match_Operator(dot, ".");
-  Token_Match(field_name, .type = Token_Tag_Id);
+  Token_Match(field_name, .tag = Token_Tag_Id);
 
   Value *struct_value = value_any(context->allocator);
   token_force_value(context, struct_token, scope, builder, struct_value);
@@ -2880,7 +2880,7 @@ token_rewrite_compare(
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
-  Token_Match(operator, .type = Token_Tag_Operator);
+  Token_Match(operator, .tag = Token_Tag_Operator);
   Compare_Type compare_type = 0;
   switch(operator->source.length) {
     case 1: {
