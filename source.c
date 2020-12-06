@@ -1748,7 +1748,6 @@ compile_time_eval(
     .descriptor = out_value->descriptor,
   };
   switch(out_value->descriptor->type) {
-    case Descriptor_Type_Float:
     case Descriptor_Type_Integer: {
       switch (result_byte_size) {
         case 8: {
@@ -2487,10 +2486,10 @@ token_rewrite_definition_and_assignment_statements(
   ) {
     value = value_from_s64(context->allocator, operand_immediate_as_s64(&value->operand));
   } else if (
-    value->descriptor->type == Descriptor_Type_Float &&
+    value->descriptor->type == Descriptor_Type_Opaque &&
     operand_is_immediate(&value->operand)
   ) {
-    panic("TODO decide how to handle floats");
+    panic("TODO decide how to handle opaque types");
   }
   Value *on_stack = reserve_stack(context->allocator, builder, value->descriptor);
   move_value(context->allocator, builder, &name->source_range, on_stack, value);

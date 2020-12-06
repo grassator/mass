@@ -76,10 +76,7 @@ move_value(
   u32 target_size = descriptor_byte_size(target->descriptor);
   u32 source_size = descriptor_byte_size(source->descriptor);
 
-  if (
-    target->descriptor->type == Descriptor_Type_Float ||
-    source->descriptor->type == Descriptor_Type_Float
-  ) {
+  if (descriptor_is_float(target->descriptor) || descriptor_is_float(source->descriptor)) {
     assert(target_size == source_size);
     assert(target->descriptor->type == source->descriptor->type);
     if (
@@ -583,7 +580,7 @@ function_return_descriptor(
   if (!function->returns) {
     if (descriptor->type != Descriptor_Type_Void) {
       // TODO handle 16 bit non-float return values are returned in XMM0
-      if (descriptor->type == Descriptor_Type_Float) {
+      if (descriptor_is_float(descriptor)) {
         function->returns = value_register_for_descriptor(context->allocator, Register_Xmm0, descriptor);
       } else {
         // :ReturnTypeLargerThanRegister

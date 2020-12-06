@@ -250,7 +250,6 @@ typedef enum {
   Descriptor_Type_Any,
   Descriptor_Type_Opaque,
   Descriptor_Type_Integer,
-  Descriptor_Type_Float,
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
@@ -310,25 +309,20 @@ typedef struct {
 } Descriptor_Integer;
 
 typedef struct {
-  u32 byte_size;
-} Descriptor_Float;
-
-typedef struct {
   u64 bit_size;
 } Descriptor_Opaque;
 
 typedef struct Descriptor {
   Descriptor_Type type;
   union {
+    Descriptor_Opaque opaque;
     Descriptor_Integer integer;
-    Descriptor_Float float_;
     Descriptor_Function function;
     Descriptor_Fixed_Size_Array array;
     Descriptor_Struct struct_;
     Descriptor_Tagged_Union tagged_union;
     struct Descriptor *pointer_to;
     struct Descriptor *type_descriptor;
-    Descriptor_Opaque opaque;
   };
 } Descriptor;
 
@@ -376,12 +370,12 @@ Descriptor descriptor_any = {
   .type = Descriptor_Type_Any,
 };
 Descriptor descriptor_f32 = {
-  .type = { Descriptor_Type_Float },
-  .integer = { .byte_size = 4 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_f64 = {
-  .type = { Descriptor_Type_Float },
-  .integer = { .byte_size = 8 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 64 },
 };
 
 #define define_type_value(_TYPE_)\
@@ -406,6 +400,13 @@ define_type_value(u8);
 
 define_type_value(f64);
 define_type_value(f32);
+
+bool
+descriptor_is_float(
+  Descriptor *descriptor
+) {
+  return descriptor == &descriptor_f32 || descriptor == &descriptor_f64;
+}
 
 Value void_value = {
   .descriptor = &descriptor_void,

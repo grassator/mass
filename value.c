@@ -69,9 +69,6 @@ same_type(
     case Descriptor_Type_Integer: {
       return descriptor_byte_size(a) == descriptor_byte_size(b);
     }
-    case Descriptor_Type_Float: {
-      return descriptor_byte_size(a) == descriptor_byte_size(b);
-    }
     case Descriptor_Type_Any:
     case Descriptor_Type_Type:
     default: {
@@ -134,9 +131,6 @@ descriptor_byte_size(
     }
     case Descriptor_Type_Struct: {
       return struct_byte_size(&descriptor->struct_);
-    }
-    case Descriptor_Type_Float: {
-      return descriptor->float_.byte_size;
     }
     case Descriptor_Type_Opaque: {
       u64 size_of_byte = 8;
@@ -1087,25 +1081,25 @@ function_push_argument_internal(
   }
   switch (argument_index) {
     case 0: {
-      Value *value = arg_descriptor->type == Descriptor_Type_Float
+      Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm0, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_C, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 1: {
-      Value *value = arg_descriptor->type == Descriptor_Type_Float
+      Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm1, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_D, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 2: {
-      Value *value = arg_descriptor->type == Descriptor_Type_Float
+      Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm2, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R8, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
     }
     case 3: {
-      Value *value = arg_descriptor->type == Descriptor_Type_Float
+      Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm3, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R9, arg_descriptor);
       return *dyn_array_push(function->arguments, value);
@@ -1206,9 +1200,6 @@ c_function_return_value(
     case Descriptor_Type_Pointer: {
       Value *return_value = value_register_for_descriptor(allocator, Register_A, descriptor);
       return return_value;
-    }
-    case Descriptor_Type_Float: {
-      assert(!"TODO");
     }
     case Descriptor_Type_Any:
     case Descriptor_Type_Opaque:
