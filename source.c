@@ -2,10 +2,10 @@
 #include "source.h"
 #include "function.h"
 
-Array_Token_Ptr
+Array_Const_Token_Ptr
 token_clone_token_array_deep(
   Allocator *allocator,
-  Array_Token_Ptr source
+  Array_Const_Token_Ptr source
 );
 
 Token *
@@ -15,23 +15,22 @@ token_clone_deep(
 ) {
   Token *clone = allocator_allocate(allocator, Token);
   *clone = *token;
-  switch (token->type) {
-    case Token_Type_Newline:
-    case Token_Type_Integer:
-    case Token_Type_Hex_Integer:
-    case Token_Type_Operator:
-    case Token_Type_String:
-    case Token_Type_Id: {
+  switch (token->tag) {
+    case Token_Tag_Newline:
+    case Token_Tag_Integer:
+    case Token_Tag_Hex_Integer:
+    case Token_Tag_Operator:
+    case Token_Tag_String:
+    case Token_Tag_Id: {
       // Nothing to do
       break;
     }
-    case Token_Type_Square:
-    case Token_Type_Paren:
-    case Token_Type_Curly: {
-      clone->children = token_clone_token_array_deep(allocator, token->children);
+    case Token_Tag_Group: {
+      clone->Group.type = token->Group.type;
+      clone->Group.children = token_clone_token_array_deep(allocator, token->Group.children);
       break;
     }
-    case Token_Type_Value: {
+    case Token_Tag_Value: {
       panic("Macro definitions should not contain semi-resolved tokens");
       break;
     }
@@ -39,12 +38,12 @@ token_clone_deep(
   return clone;
 }
 
-Array_Token_Ptr
+Array_Const_Token_Ptr
 token_clone_token_array_deep(
   Allocator *allocator,
-  Array_Token_Ptr source
+  Array_Const_Token_Ptr source
 ) {
-  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
+  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = dyn_array_length(source));
   for (u64 i = 0; i < dyn_array_length(source); ++i) {
     const Token *token = *dyn_array_get(source, i);
     Token *clone = token_clone_deep(allocator, token);
@@ -84,7 +83,7 @@ token_view_rest(
 
 static inline Token_View
 token_view_from_token_array(
-  Array_Token_Ptr token_array
+  Array_Const_Token_Ptr token_array
 ) {
   return (Token_View) {
     .tokens = dyn_array_raw(token_array),
@@ -92,13 +91,13 @@ token_view_from_token_array(
   };
 }
 
-static inline Array_Token_Ptr
+static inline Array_Const_Token_Ptr
 token_array_from_view(
   const Allocator *allocator,
   Token_View view
 ) {
   // TODO optimize
-  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = view.length);
+  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = view.length);
   for (u64 i = 0; i < view.length; ++i) {
     dyn_array_push(result, token_view_get(view, i));
   }
@@ -344,9 +343,9 @@ tokenize(
   Allocator *allocator,
   Source_File *file
 ) {
-  Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
+  Array_Const_Token_Ptr parent_stack = dyn_array_make(Array_Const_Token_Ptr);
   Token *root = &(Token){0};
-  root->children = dyn_array_make(Array_Token_Ptr);
+  root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
 
   assert(!dyn_array_is_initialized(file->lines));
   file->lines = dyn_array_make(Array_Range_u64);
@@ -366,7 +365,7 @@ tokenize(
   do {\
     current_token = allocator_allocate(allocator, Token);\
     *current_token = (Token) {\
-      .type = (_type_),\
+      .tag = (_type_),\
       .source_range = {\
         .file = file,\
         .offsets = {.from = i, .to = i},\
@@ -378,7 +377,7 @@ tokenize(
   do {\
     current_token->source = \
       slice_sub_range(file->text, current_token->source_range.offsets);\
-    dyn_array_push(parent->children, current_token);\
+    dyn_array_push(parent->Group.children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
   } while(0)
@@ -418,69 +417,61 @@ tokenize(
     retry: switch(state) {
       case Tokenizer_State_Default: {
         if (ch == '\n') {
-          start_token(Token_Type_Newline);
+          start_token(Token_Tag_Newline);
           push_line();
           accept_and_push;
         } else if (ch == '\r') {
-          start_token(Token_Type_Newline);
+          start_token(Token_Tag_Newline);
           if (peek == '\n') i++;
           push_line();
           accept_and_push;
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
-          start_token(Token_Type_Hex_Integer);
+          start_token(Token_Tag_Hex_Integer);
           i++;
           state = Tokenizer_State_Hex_Integer;
         } else if (isdigit(ch)) {
-          start_token(Token_Type_Integer);
+          start_token(Token_Tag_Integer);
           state = Tokenizer_State_Integer;
         } else if (isalpha(ch) || ch == '_') {
-          start_token(Token_Type_Id);
+          start_token(Token_Tag_Id);
           state = Tokenizer_State_Id;
         } else if(ch == '/' && peek == '/') {
           state = Tokenizer_State_Single_Line_Comment;
         } else if (code_point_is_operator(ch)) {
-          start_token(Token_Type_Operator);
+          start_token(Token_Tag_Operator);
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
           string_buffer->occupied = 0;
-          start_token(Token_Type_String);
+          start_token(Token_Tag_String);
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
-          Token_Type type =
-            ch == '(' ? Token_Type_Paren :
-            ch == '{' ? Token_Type_Curly :
-            Token_Type_Square;
-          start_token(type);
-          current_token->children = dyn_array_make(Array_Token_Ptr, 4);
-          dyn_array_push(parent->children, current_token);
+          start_token(Token_Tag_Group);
+          current_token->Group.type =
+            ch == '(' ? Token_Group_Type_Paren :
+            ch == '{' ? Token_Group_Type_Curly :
+            Token_Group_Type_Square;
+          current_token->Group.children = dyn_array_make(Array_Const_Token_Ptr, 4);
+          dyn_array_push(parent->Group.children, current_token);
           dyn_array_push(parent_stack, parent);
           parent = current_token;
         } else if (ch == ')' || ch == '}' || ch == ']') {
+          if (parent->tag != Token_Tag_Group) {
+            panic("Tokenizer: unexpected closing char for group");
+          }
           s8 expected_paren = 0;
-
-          switch (parent->type) {
-            case Token_Type_Paren: {
+          switch (parent->Group.type) {
+            case Token_Group_Type_Paren: {
               expected_paren = ')';
               break;
             }
-            case Token_Type_Curly: {
+            case Token_Group_Type_Curly: {
               expected_paren = '}';
               break;
             }
-            case Token_Type_Square: {
+            case Token_Group_Type_Square: {
               expected_paren = ']';
-              break;
-            }
-            case Token_Type_Newline:
-            case Token_Type_Value:
-            case Token_Type_Id:
-            case Token_Type_Integer:
-            case Token_Type_Hex_Integer:
-            case Token_Type_Operator:
-            case Token_Type_String: {
-              panic("Tokenizer: unexpected closing char for group");
               break;
             }
           }
@@ -536,7 +527,7 @@ tokenize(
         } else if (ch == '"') {
           u8 *string = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
           memcpy(string, string_buffer->memory, string_buffer->occupied);
-          current_token->string = (Slice){string, string_buffer->occupied};
+          current_token->String.slice = (Slice){string, string_buffer->occupied};
           accept_and_push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
@@ -588,9 +579,15 @@ tokenize(
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
   if (dyn_array_length(errors)) {
-    return (Tokenizer_Result){.type = Tokenizer_Result_Type_Error, .errors = errors};
+    return (Tokenizer_Result){
+      .tag = Tokenizer_Result_Tag_Error,
+      .Error = { errors },
+    };
   }
-  return (Tokenizer_Result){.type = Tokenizer_Result_Type_Success, .tokens = root->children};
+  return (Tokenizer_Result){
+    .tag = Tokenizer_Result_Tag_Success,
+    .Success = {root->Group.children}
+  };
 }
 
 const Token *
@@ -609,7 +606,11 @@ token_match(
   const Token *token,
   const Token_Pattern *pattern
 ) {
-  if (pattern->type && pattern->type != token->type) return false;
+  if (pattern->group_type) {
+    if (token->tag != Token_Tag_Group) return false;
+    return token->Group.type == pattern->group_type;
+  }
+  if (pattern->type && pattern->type != token->tag) return false;
   if (pattern->source.length) {
     return slice_equal(token->source, pattern->source);
   }
@@ -672,8 +673,8 @@ token_split_by_newlines_and_semicolons(
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
     if (
-      token->type == Token_Type_Newline ||
-      (token->type == Token_Type_Operator && slice_equal(token->source, slice_literal(";")))
+      token->tag == Token_Tag_Newline ||
+      (token->tag == Token_Tag_Operator && slice_equal(token->source, slice_literal(";")))
     ) {
       if (start_index != i) {
         assert(i > start_index);
@@ -721,7 +722,7 @@ scope_lookup_type(
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
-  Token_Match(_id_, .type = Token_Type_Operator, .source = slice_literal(_op_))
+  Token_Match(_id_, .type = Token_Tag_Operator, .source = slice_literal(_op_))
 
 typedef struct {
   Slice arg_name;
@@ -735,8 +736,8 @@ token_force_type(
   const Token *token
 ) {
   Descriptor *descriptor = 0;
-  switch (token->type) {
-    case Token_Type_Id: {
+  switch (token->tag) {
+    case Token_Tag_Id: {
       descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
         program_error_builder(context, token->source_range) {
@@ -747,8 +748,11 @@ token_force_type(
       }
       break;
     }
-    case Token_Type_Square: {
-      if (dyn_array_length(token->children) != 1) {
+    case Token_Tag_Group: {
+      if (token->Group.type != Token_Group_Type_Square) {
+        panic("TODO");
+      }
+      if (dyn_array_length(token->Group.children) != 1) {
         program_push_error_from_slice(
           context->program,
           token->source_range,
@@ -756,8 +760,8 @@ token_force_type(
         );
         return 0;
       }
-      const Token *child = *dyn_array_get(token->children, 0);
-      if (child->type != Token_Type_Id) {
+      const Token *child = *dyn_array_get(token->Group.children, 0);
+      if (child->tag != Token_Tag_Id) {
         panic("TODO: should be recursive");
       }
       descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -767,15 +771,15 @@ token_force_type(
       };
       break;
     }
-    case Token_Type_Hex_Integer:
-    case Token_Type_Integer: {
+    case Token_Tag_Hex_Integer:
+    case Token_Tag_Integer: {
       program_error_builder(context, token->source_range) {
         program_error_append_slice(token->source);
         program_error_append_literal(" is not a type");
       }
       return 0;
     }
-    case Token_Type_Newline: {
+    case Token_Tag_Newline: {
       program_push_error_from_slice(
         context->program,
         token->source_range,
@@ -783,11 +787,9 @@ token_force_type(
       );
       return 0;
     }
-    case Token_Type_Operator:
-    case Token_Type_String:
-    case Token_Type_Paren:
-    case Token_Type_Curly:
-    case Token_Type_Value:
+    case Token_Tag_Operator:
+    case Token_Tag_String:
+    case Token_Tag_Value:
     default: {
       panic("TODO");
       break;
@@ -796,7 +798,7 @@ token_force_type(
   return descriptor;
 }
 
-typedef Array_Token_Ptr (*token_pattern_callback)(
+typedef Array_Const_Token_Ptr (*token_pattern_callback)(
   Compilation_Context *context,
   Token_View match,
   Scope *scope,
@@ -820,19 +822,19 @@ token_match_pattern(
   return true;
 }
 
-Array_Token_Ptr
+Array_Const_Token_Ptr
 token_apply_macro_replacements(
   Compilation_Context *context,
   Macro_Replacement_Map *map,
-  Array_Token_Ptr source
+  Array_Const_Token_Ptr source
 ) {
-  Array_Token_Ptr result = dyn_array_make(Array_Token_Ptr, .capacity = dyn_array_length(source));
+  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = dyn_array_length(source));
   for (u64 i = 0; i < dyn_array_length(source); ++i) {
     const Token *token = *dyn_array_get(source, i);
     Token *copy = allocator_allocate(context->allocator, Token);
     *copy = *token;
-    switch (token->type) {
-      case Token_Type_Id: {
+    switch (token->tag) {
+      case Token_Tag_Id: {
         Slice name = token->source;
         const Token **replacement_ptr = hash_map_get(map, name);
         if (replacement_ptr) {
@@ -840,21 +842,21 @@ token_apply_macro_replacements(
         }
         break;
       }
-      case Token_Type_Newline:
-      case Token_Type_Integer:
-      case Token_Type_Hex_Integer:
-      case Token_Type_Operator:
-      case Token_Type_String: {
+      case Token_Tag_Newline:
+      case Token_Tag_Integer:
+      case Token_Tag_Hex_Integer:
+      case Token_Tag_Operator:
+      case Token_Tag_String: {
         // Nothing to do
         break;
       }
-      case Token_Type_Square:
-      case Token_Type_Paren:
-      case Token_Type_Curly: {
-        copy->children = token_apply_macro_replacements(context, map, token->children);
+      case Token_Tag_Group: {
+        copy->Group.type = token->Group.type;
+        copy->Group.children =
+          token_apply_macro_replacements(context, map, token->Group.children);
         break;
       }
-      case Token_Type_Value: {
+      case Token_Tag_Value: {
         panic("Macro definitions should not contain semi-resolved tokens");
         break;
       }
@@ -864,7 +866,7 @@ token_apply_macro_replacements(
   return result;
 }
 
-Array_Token_Ptr
+Array_Const_Token_Ptr
 token_rewrite_macro_match(
   Compilation_Context *context,
   Token_View match,
@@ -880,7 +882,7 @@ token_rewrite_macro_match(
       hash_map_set(map, *name, token_view_get(match, i));
     }
   }
-  Array_Token_Ptr replacement = token_apply_macro_replacements(context, map, macro->replacement);
+  Array_Const_Token_Ptr replacement = token_apply_macro_replacements(context, map, macro->replacement);
   hash_map_destroy(map);
   return replacement;
 }
@@ -888,7 +890,7 @@ token_rewrite_macro_match(
 void
 token_rewrite_macros(
   Compilation_Context *context,
-  Array_Token_Ptr *tokens,
+  Array_Const_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder
 ) {
@@ -901,7 +903,7 @@ token_rewrite_macros(
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           if (token_match_pattern(sub_view, macro->pattern)) {
-            Array_Token_Ptr replacement = token_rewrite_macro_match(context, sub_view, macro);
+            Array_Const_Token_Ptr replacement = token_rewrite_macro_match(context, sub_view, macro);
             dyn_array_splice(*tokens, i, dyn_array_length(macro->pattern), replacement);
             dyn_array_destroy(replacement);
             goto start;
@@ -948,11 +950,11 @@ token_view_trim_newlines(
   const Token **tokens = view.tokens;
   u64 length = view.length;
   while (length) {
-    if (tokens[0]->type == Token_Type_Newline) {
+    if (tokens[0]->tag == Token_Tag_Newline) {
       tokens++;
       length--;
       continue;
-    } else if (tokens[length - 1]->type == Token_Type_Newline) {
+    } else if (tokens[length - 1]->tag == Token_Tag_Newline) {
       length--;
       continue;
     }
@@ -973,7 +975,7 @@ token_match_argument(
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id);
+  Token_Match(name, .type = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -987,7 +989,7 @@ token_match_argument(
 bool
 token_match_expression(
   Compilation_Context *context,
-  Array_Token_Ptr *tokens,
+  Array_Const_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder,
   Value *target
@@ -1037,20 +1039,20 @@ token_force_constant_value(
   Scope *scope,
   const Token *token
 ) {
-  switch(token->type) {
-    case Token_Type_Integer: {
+  switch(token->tag) {
+    case Token_Tag_Integer: {
       return value_from_integer_token(context, scope, token);
     }
-    case Token_Type_Hex_Integer: {
+    case Token_Tag_Hex_Integer: {
       return value_from_hex_integer_token(context, scope, token);
     }
-    case Token_Type_String: {
-      Slice string = token->string;
+    case Token_Tag_String: {
+      Slice string = token->String.slice;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
       // TODO make a proper string type
       return string_bytes;
     }
-    case Token_Type_Id: {
+    case Token_Tag_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, scope, name);
       if (!value) {
@@ -1061,26 +1063,23 @@ token_force_constant_value(
       }
       return value;
     }
-    case Token_Type_Value: {
-      return token->value;
+    case Token_Tag_Value: {
+      return token->Value.value;
     }
-    case Token_Type_Paren: {
-      Token_View children_view = token_view_from_token_array(token->children);
-      return token_rewrite_constant_expression(context, children_view, scope);
-    }
-    case Token_Type_Curly: {
-      panic("TODO support blocks in constant context");
+    case Token_Tag_Group: {
+      if (token->Group.type == Token_Group_Type_Paren) {
+        Token_View children_view = token_view_from_token_array(token->Group.children);
+        return token_rewrite_constant_expression(context, children_view, scope);
+      } else {
+        panic("TODO support other group types in constant context");
+      }
       return 0;
     }
-    case Token_Type_Square: {
-      panic("TODO support array access in constant context");
-      return 0;
-    }
-    case Token_Type_Operator: {
+    case Token_Tag_Operator: {
       panic("TODO support operator lookup in constant context");
       return 0;
     }
-    case Token_Type_Newline: {
+    case Token_Tag_Newline: {
       program_push_error_from_slice(
         context->program,
         token->source_range,
@@ -1101,25 +1100,25 @@ token_force_value(
   Function_Builder *builder,
   Value *result_value
 ) {
-  switch(token->type) {
-    case Token_Type_Integer: {
+  switch(token->tag) {
+    case Token_Tag_Integer: {
       Value *immediate = value_from_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
-    case Token_Type_Hex_Integer: {
+    case Token_Tag_Hex_Integer: {
       Value *immediate = value_from_hex_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
-    case Token_Type_String: {
-      Slice string = token->string;
+    case Token_Tag_String: {
+      Slice string = token->String.slice;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
       Value *c_string_pointer = value_pointer_to(context, builder, &token->source_range, string_bytes);
       move_value(context->allocator, builder, &token->source_range, result_value, c_string_pointer);
       return;
     }
-    case Token_Type_Id: {
+    case Token_Tag_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, scope, name);
       if (!value) {
@@ -1132,32 +1131,43 @@ token_force_value(
       }
       return;
     }
-    case Token_Type_Value: {
-      if (token->value) {
-        move_value(context->allocator, builder, &token->source_range, result_value, token->value);
+    case Token_Tag_Value: {
+      if (token->Value.value) {
+        move_value(
+          context->allocator, builder, &token->source_range, result_value, token->Value.value
+        );
       } else {
         // TODO consider what should happen here
       }
       return;
     }
-    case Token_Type_Paren: {
+    case Token_Tag_Group: {
       if (!builder) panic("Caller should only force (...) in a builder context");
-      Array_Token_Ptr expression_tokens = dyn_array_copy(Array_Token_Ptr, token->children);
-      token_match_expression(context, &expression_tokens, scope, builder, result_value);
-      dyn_array_destroy(expression_tokens);
-      return;
+      switch(token->Group.type) {
+        case Token_Group_Type_Paren: {
+          Array_Const_Token_Ptr expression_tokens =
+            dyn_array_copy(Array_Const_Token_Ptr, token->Group.children);
+          token_match_expression(context, &expression_tokens, scope, builder, result_value);
+          dyn_array_destroy(expression_tokens);
+          return;
+        }
+        case Token_Group_Type_Curly: {
+          token_parse_block(context, token, scope, builder, result_value);
+          return;
+        }
+        case Token_Group_Type_Square: {
+          panic("TODO");
+          return;
+        }
+      }
+      break;
     }
-    case Token_Type_Curly: {
-      if (!builder) panic("Caller should only force {...} in a builder context");
-      token_parse_block(context, token, scope, builder, result_value);
-      return;
-    }
-    case Token_Type_Square:
-    case Token_Type_Operator: {
+
+    case Token_Tag_Operator: {
       panic("TODO");
       return;
     }
-    case Token_Type_Newline: {
+    case Token_Tag_Newline: {
       program_push_error_from_slice(
         context->program,
         token->source_range,
@@ -1180,10 +1190,10 @@ token_match_call_arguments(
   Function_Builder *builder
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
-  if (dyn_array_length(token->children) != 0) {
-    Token_View children = token_view_from_token_array(token->children);
+  if (dyn_array_length(token->Group.children) != 0) {
+    Token_View children = token_view_from_token_array(token->Group.children);
     Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .type = Token_Type_Operator,
+      .type = Token_Tag_Operator,
       .source = slice_literal(","),
     });
     // TODO :TargetValue
@@ -1196,7 +1206,7 @@ token_match_call_arguments(
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_View view = *dyn_array_get(argument_states, i);
       Value *result_value = value_any(context->allocator);
-      Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, view);
+      Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, view);
       token_match_expression(context, &expression_tokens, scope, builder, result_value);
       dyn_array_destroy(expression_tokens);
       dyn_array_push(result, result_value);
@@ -1213,21 +1223,21 @@ token_value_make(
 ) {
   Token *result_token = allocator_allocate(context->allocator, Token);
   *result_token = (Token){
-    .type = Token_Type_Value,
+    .tag = Token_Tag_Value,
     .source_range = source_range,
     .source = slice_sub_range(source_range.file->text, source_range.offsets),
-    .value = result,
+    .Value = { result },
   };
   return result_token;
 }
 
 bool
 token_state_clear_newlines(
-  Array_Token_Ptr *tokens
+  Array_Const_Token_Ptr *tokens
 ) {
   for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
     const Token *token = *dyn_array_get(*tokens, i);
-    if (token->type == Token_Type_Newline) {
+    if (token->tag == Token_Tag_Newline) {
       dyn_array_delete(*tokens, i);
       --i;
     }
@@ -1253,29 +1263,29 @@ token_rewrite_macro_definitions(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id, .source = slice_literal("macro"));
-  Token_Match(pattern_token, .type = Token_Type_Paren);
-  Token_Match(replacement_token, .type = Token_Type_Paren);
+  Token_Match(name, .type = Token_Tag_Id, .source = slice_literal("macro"));
+  Token_Match(pattern_token, .group_type = Token_Group_Type_Paren);
+  Token_Match(replacement_token, .group_type = Token_Group_Type_Paren);
 
   Array_Token_Pattern pattern = dyn_array_make(Array_Token_Pattern);
   Array_Slice pattern_names = dyn_array_make(Array_Slice);
 
-  for (u64 i = 0; i < dyn_array_length(pattern_token->children); ++i) {
-    const Token *token = *dyn_array_get(pattern_token->children, i);
-    if (token->type == Token_Type_Id && slice_starts_with(token->source, slice_literal("_"))) {
+  for (u64 i = 0; i < dyn_array_length(pattern_token->Group.children); ++i) {
+    const Token *token = *dyn_array_get(pattern_token->Group.children, i);
+    if (token->tag == Token_Tag_Id && slice_starts_with(token->source, slice_literal("_"))) {
       Slice pattern_name = slice_sub(token->source, 1, token->source.length);
       dyn_array_push(pattern_names, pattern_name);
       dyn_array_push(pattern, (Token_Pattern) {0});
     } else {
       dyn_array_push(pattern_names, (Slice){0});
-      if (token->type == Token_Type_Id) {
+      if (token->tag == Token_Tag_Id) {
         dyn_array_push(pattern, (Token_Pattern) {
-          .type = token->type,
+          .type = token->tag,
           .source = token->source,
         });
       } else {
         dyn_array_push(pattern, (Token_Pattern) {
-          .type = token->type,
+          .type = token->tag,
         });
       }
     }
@@ -1285,7 +1295,7 @@ token_rewrite_macro_definitions(
   *macro = (Macro){
     .pattern = pattern,
     .pattern_names = pattern_names,
-    .replacement = replacement_token->children,
+    .replacement = replacement_token->Group.children,
   };
 
   scope_add_macro(scope, macro);
@@ -1301,7 +1311,7 @@ token_match_struct_field(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id);
+  Token_Match(name, .type = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -1321,9 +1331,9 @@ token_process_type_definition(
   const Token *layout_block = 0;
   Value *bit_size_value = 0;
 
-  Token_View children = token_view_from_token_array(layout_token->children);
+  Token_View children = token_view_from_token_array(layout_token->Group.children);
   Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-    .type = Token_Type_Operator,
+    .type = Token_Tag_Operator,
     .source = slice_literal(","),
   });
 
@@ -1345,7 +1355,7 @@ token_process_type_definition(
       }
       const Token *layout_type = token_view_get(layout_type_view, 0);
       if (
-        layout_type->type == Token_Type_Id &&
+        layout_type->tag == Token_Tag_Id &&
         slice_equal(layout_type->source, slice_literal("c_struct"))
       ) {
         Token_View layout_block_state = *dyn_array_get(argument_states, 1);
@@ -1392,8 +1402,9 @@ token_process_type_definition(
       },
     };
 
-    if (dyn_array_length(layout_block->children) != 0) {
-      Token_View layout_block_children = token_view_from_token_array(layout_block->children);
+    if (dyn_array_length(layout_block->Group.children) != 0) {
+      Token_View layout_block_children =
+        token_view_from_token_array(layout_block->Group.children);
       Array_Token_View definitions = token_split_by_newlines_and_semicolons(layout_block_children);
       for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
         Token_View field_view = *dyn_array_get(definitions, i);
@@ -1430,7 +1441,7 @@ token_maybe_split_on_operator(
   u64 rhs_start = 0;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
-    if (token->type == Token_Type_Operator && slice_equal(token->source, operator)) {
+    if (token->tag == Token_Tag_Operator && slice_equal(token->source, operator)) {
       *operator_token = token;
       lhs_end = i;
       rhs_start = i + 1;
@@ -1457,7 +1468,7 @@ token_import_match_arguments(
 ) {
   u64 peek_index = 0;
   const Token *library_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Type_String,
+    .type = Token_Tag_String,
   });
   if (!library_name_token) {
     program_push_error_from_slice(
@@ -1467,7 +1478,7 @@ token_import_match_arguments(
     return 0;
   }
   const Token *comma = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Type_Operator,
+    .type = Token_Tag_Operator,
     .source = slice_literal(","),
   });
   if (!comma) {
@@ -1478,7 +1489,7 @@ token_import_match_arguments(
     return 0;
   }
   const Token *symbol_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .type = Token_Type_String,
+    .type = Token_Tag_String,
   });
   if (!symbol_name_token) {
     program_push_error_from_slice(
@@ -1487,8 +1498,8 @@ token_import_match_arguments(
     );
     return 0;
   }
-  Slice library_name = library_name_token->string;
-  Slice symbol_name = symbol_name_token->string;
+  Slice library_name = library_name_token->String.slice;
+  Slice symbol_name = symbol_name_token->String.slice;
 
   Value *result = allocator_allocate(context->allocator, Value);
   *result = (const Value) {
@@ -1510,14 +1521,14 @@ typedef const Token *(*token_rewrite_expression_callback)(
 void
 token_rewrite_expression(
   Compilation_Context *context,
-  Array_Token_Ptr *tokens,
+  Array_Const_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   token_rewrite_expression_callback callback
 ) {
   // FIXME speed
-  Array_Token_Ptr replacement = dyn_array_make(Array_Token_Ptr);
+  Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
   start: for (;;) {
     for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
       Token_View rewrite_view = token_view_rest(token_view_from_token_array(*tokens), i);
@@ -1553,7 +1564,7 @@ token_process_function_literal(
   if(!body) return 0;
 
   // TODO think about a better way to distinguish imports
-  bool is_external = body->type == Token_Type_Value;
+  bool is_external = body->tag == Token_Tag_Value;
 
   if (is_external) {
     if (is_inline) {
@@ -1562,7 +1573,7 @@ token_process_function_literal(
       }
       is_inline = false;
     }
-    if(!body->value) return 0;
+    if(!body->Value.value) return 0;
     descriptor = allocator_allocate(context->allocator, Descriptor);
     *descriptor = (Descriptor) {
       .type = Descriptor_Type_Function,
@@ -1577,13 +1588,13 @@ token_process_function_literal(
     descriptor = builder->descriptor;
   }
 
-  switch (dyn_array_length(return_types->children)) {
+  switch (dyn_array_length(return_types->Group.children)) {
     case 0: {
       descriptor->function.returns = &void_value;
       break;
     }
     case 1: {
-      const Token *return_type_token = *dyn_array_get(return_types->children, 0);
+      const Token *return_type_token = *dyn_array_get(return_types->Group.children, 0);
       Descriptor *return_descriptor = token_force_type(context, function_scope, return_type_token);
       if (!return_descriptor) return 0;
       function_return_descriptor(context, &descriptor->function, return_descriptor);
@@ -1595,10 +1606,10 @@ token_process_function_literal(
     }
   }
 
-  if (dyn_array_length(args->children) != 0) {
-    Token_View children = token_view_from_token_array(args->children);
+  if (dyn_array_length(args->Group.children) != 0) {
+    Token_View children = token_view_from_token_array(args->Group.children);
     Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .type = Token_Type_Operator,
+      .type = Token_Tag_Operator,
       .source = slice_literal(","),
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
@@ -1621,8 +1632,8 @@ token_process_function_literal(
 
   Value *result = 0;
   if (is_external) {
-    body->value->descriptor = descriptor;
-    result = body->value;
+    body->Value.value->descriptor = descriptor;
+    result = body->Value.value;
   } else {
     descriptor->function.scope = function_scope;
     descriptor->function.body = body;
@@ -1648,7 +1659,7 @@ token_rewrite_negative_literal(
   u64 peek_index = 0;
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
-  Token_Match(integer, .type = Token_Type_Integer);
+  Token_Match(integer, .type = Token_Tag_Integer);
   Value *result = value_any(context->allocator);
   token_force_value(context, integer, scope, builder, result);
   if (result->operand.type == Operand_Type_Immediate_8) {
@@ -1700,7 +1711,7 @@ compile_time_eval(
   Function_Builder *eval_builder = fn_begin(&eval_context);
   function_return_descriptor(context, &eval_builder->descriptor->function, &descriptor_void);
 
-  Array_Token_Ptr tokens = token_array_from_view(allocator_system, view);
+  Array_Const_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
   token_match_expression(
     &eval_context, &tokens, eval_program.global_scope, eval_builder, expression_result_value
@@ -1821,7 +1832,7 @@ token_do_handle_operator(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Array_Token_Ptr *token_stack,
+  Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
 ) {
@@ -1852,13 +1863,13 @@ token_do_handle_operator(
     Token *result;
     // TODO turn `external` into a compile-time function call
     if (
-      function->type == Token_Type_Id &&
+      function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("external"))
     ) {
-      Token_View args_children = token_view_from_token_array(args->children);
+      Token_View args_children = token_view_from_token_array(args->Group.children);
       result = token_import_match_arguments(args->source_range, args_children, context);
     } else if (
-      function->type == Token_Type_Id &&
+      function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("type"))
     ) {
       result = token_process_type_definition(context, view, scope, args);
@@ -1878,7 +1889,7 @@ token_do_handle_operator(
     bool is_inline = false;
     if (
       maybe_inline &&
-      (*maybe_inline)->type == Token_Type_Id &&
+      (*maybe_inline)->tag == Token_Tag_Id &&
       slice_equal((*maybe_inline)->source, slice_literal("inline"))
     ) {
       is_inline = true;
@@ -1893,8 +1904,8 @@ token_do_handle_operator(
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = *dyn_array_pop(*token_stack);
     Token *result = 0;
-    if (body->type == Token_Type_Paren) {
-      Token_View eval_view = token_view_from_token_array(body->children);
+    if (body->tag == Token_Tag_Group && body->Group.type == Token_Group_Type_Paren) {
+      Token_View eval_view = token_view_from_token_array(body->Group.children);
       result = compile_time_eval(context, eval_view, scope);
     } else {
       program_error_builder(context, body->source_range) {
@@ -1913,7 +1924,7 @@ token_handle_operator(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  Array_Token_Ptr *token_stack,
+  Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice new_operator
 ) {
@@ -1941,47 +1952,55 @@ token_rewrite_constant_expression(
   if (!view.length) {
     return &void_value;
   }
-  Array_Token_Ptr token_stack = dyn_array_make(Array_Token_Ptr);
+  Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
   Array_Slice operator_stack = dyn_array_make(Array_Slice);
 
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
 
-    switch(token->type) {
-      case Token_Type_Newline: {
+    switch(token->tag) {
+      case Token_Tag_Newline: {
         continue;
       }
-      case Token_Type_Integer:
-      case Token_Type_Hex_Integer:
-      case Token_Type_String:
-      case Token_Type_Curly:
-      case Token_Type_Id:
-      case Token_Type_Value: {
+      case Token_Tag_Integer:
+      case Token_Tag_Hex_Integer:
+      case Token_Tag_String:
+      case Token_Tag_Id:
+      case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
         // TODO figure out how to handle this better
-        if (token->type != Token_Type_Id || !slice_equal(token->source, slice_literal("inline"))) {
+        if (token->tag != Token_Tag_Id || !slice_equal(token->source, slice_literal("inline"))) {
           is_previous_an_operator = false;
         } else {
           is_previous_an_operator = true;
         }
         break;
       }
-      case Token_Type_Paren: {
+      case Token_Tag_Group: {
         dyn_array_push(token_stack, token);
-        if (!is_previous_an_operator) {
-          token_handle_operator(
-            context, view, scope, &token_stack, &operator_stack, slice_literal("()")
-          );
+        switch (token->Group.type) {
+          case Token_Group_Type_Paren: {
+            if (!is_previous_an_operator) {
+              token_handle_operator(
+                context, view, scope, &token_stack, &operator_stack, slice_literal("()")
+              );
+            }
+            break;
+          }
+          case Token_Group_Type_Curly: {
+            // Nothing special to do for now?
+            break;
+          }
+          case Token_Group_Type_Square: {
+            panic("TODO support parsing [] in constant expressions");
+            break;
+          }
         }
         is_previous_an_operator = false;
         break;
       }
-      case Token_Type_Square: {
-        panic("TODO");
-        break;
-      }
-      case Token_Type_Operator: {
+      case Token_Tag_Operator: {
         Slice operator = token->source;
         // unary minus, i.e x + -5
         if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
@@ -2035,7 +2054,7 @@ token_rewrite_constant_definitions(
   // For now we support only single ID on the left
   if (lhs.length > 1) return false;
   const Token *name = token_view_get(lhs, 0);
-  if (name->type != Token_Type_Id) return false;
+  if (name->tag != Token_Tag_Id) return false;
   scope_define_lazy(scope, name->source, rhs);
   return true;
 }
@@ -2058,8 +2077,9 @@ token_parse_block(
   Function_Builder *builder,
   Value *block_result_value
 ) {
-  assert(block->type == Token_Type_Curly);
-  Array_Token_Ptr children = block->children;
+  assert(block->tag == Token_Tag_Group);
+  assert(block->Group.type == Token_Group_Type_Curly);
+  Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) return false;
   Scope *block_scope = scope_make(context->allocator, scope);
 
@@ -2068,7 +2088,7 @@ token_parse_block(
   // }
   // is being interpreted as:
   // { 42 ; }
-  while ((*dyn_array_last(children))->type == Token_Type_Newline) dyn_array_pop(children);
+  while ((*dyn_array_last(children))->tag == Token_Tag_Newline) dyn_array_pop(children);
 
   Token_View children_view = token_view_from_token_array(children);
   Array_Token_View block_statements = token_split_by_newlines_and_semicolons(children_view);
@@ -2101,7 +2121,7 @@ token_rewrite_statement_if(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("if"));
+  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("if"));
 
   Token_View rest = token_view_rest(view, peek_index);
 
@@ -2118,7 +2138,7 @@ token_rewrite_statement_if(
     .length = rest.length - 1,
   };
 
-  Array_Token_Ptr condition_tokens = token_array_from_view(allocator_system, condition_view);
+  Array_Const_Token_Ptr condition_tokens = token_array_from_view(allocator_system, condition_view);
   Value *condition_value = value_any(context->allocator);
   token_match_expression(context, &condition_tokens, scope, builder, condition_value);
   dyn_array_destroy(condition_tokens);
@@ -2148,9 +2168,9 @@ token_rewrite_goto(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("goto"));
+  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("goto"));
   // TODO improve error reporting here.
-  Token_Match(label_name, .type = Token_Type_Id);
+  Token_Match(label_name, .type = Token_Tag_Id);
   Value *value = scope_lookup_force(context, scope, label_name->source);
   if (value) {
     if (
@@ -2180,12 +2200,12 @@ token_rewrite_explicit_return(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("return"));
+  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
   Value *fn_return = builder->descriptor->function.returns;
 
-  Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
+  Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
   token_match_expression(context, &expression_tokens, scope, builder, fn_return);
   dyn_array_destroy(expression_tokens);
 
@@ -2235,11 +2255,11 @@ token_match_fixed_array_type(
   Scope *scope
 ) {
   u64 peek_index = 0;
-  Token_Match(type, .type = Token_Type_Id);
-  Token_Match(square_brace, .type = Token_Type_Square);
+  Token_Match(type, .type = Token_Tag_Id);
+  Token_Match(square_brace, .group_type = Token_Group_Type_Square);
   Descriptor *descriptor = scope_lookup_type(context, scope, type->source_range, type->source);
 
-  Token_View size_view = token_view_from_token_array(square_brace->children);
+  Token_View size_view = token_view_from_token_array(square_brace->Group.children);
   Value *size_value = token_rewrite_constant_expression(context, size_view, scope);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
@@ -2281,9 +2301,9 @@ token_rewrite_inline_machine_code_bytes(
   void *unused_payload
 ) {
   u64 peek_index = 0;
-  Token_Match(id_token, .type = Token_Type_Id, .source = slice_literal("inline_machine_code_bytes"));
+  Token_Match(id_token, .type = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
-  Token_Match(args_token, .type = Token_Type_Paren);
+  Token_Match(args_token, .group_type = Token_Group_Type_Paren);
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token, scope, builder);
 
@@ -2345,8 +2365,8 @@ token_rewrite_cast(
   u64 *replacement_count
 ) {
   u64 peek_index = 0;
-  Token_Match(cast, .type = Token_Type_Id, .source = slice_literal("cast"));
-  Token_Match(value_token, .type = Token_Type_Paren);
+  Token_Match(cast, .type = Token_Tag_Id, .source = slice_literal("cast"));
+  Token_Match(value_token, .group_type = Token_Group_Type_Paren);
 
   Array_Value_Ptr args = token_match_call_arguments(context, value_token, scope, builder);
   assert(dyn_array_length(args) == 2);
@@ -2388,7 +2408,7 @@ token_match_label(
   Function_Builder *builder
 ) {
   u64 peek_index = 0;
-  Token_Match(keyword, .type = Token_Type_Id, .source = slice_literal("label"));
+  Token_Match(keyword, .type = Token_Tag_Id, .source = slice_literal("label"));
 
   if (peek_index != view.length) {
     const Token *extra_token = token_view_get(view, peek_index);
@@ -2421,7 +2441,7 @@ token_parse_definition(
 ) {
   // TODO consider merging with argument matching
   u64 peek_index = 0;
-  Token_Match(name, .type = Token_Type_Id);
+  Token_Match(name, .type = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
@@ -2473,10 +2493,10 @@ token_rewrite_definition_and_assignment_statements(
   if (lhs.length > 1) return false;
   const Token *name = token_view_get(view, 0);
 
-  if (name->type != Token_Type_Id) return false;
+  if (name->tag != Token_Tag_Id) return false;
 
   Value *value = value_any(context->allocator);
-  Array_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rhs);
+  Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rhs);
   token_match_expression(context, &expression_tokens, scope, builder, value);
   dyn_array_destroy(expression_tokens);
 
@@ -2507,12 +2527,12 @@ token_rewrite_array_index(
 ) {
   u64 peek_index = 0;
   Token_Match(target_token, 0);
-  Token_Match(brackets, .type = Token_Type_Square);
+  Token_Match(brackets, .group_type = Token_Group_Type_Square);
 
   Value *array = value_any(context->allocator);
   token_force_value(context, target_token, scope, builder, array);
   Value *index_value = value_any(context->allocator);
-  Array_Token_Ptr index_tokens = dyn_array_copy(Array_Token_Ptr, brackets->children);
+  Array_Const_Token_Ptr index_tokens = dyn_array_copy(Array_Const_Token_Ptr, brackets->Group.children);
   token_match_expression(context, &index_tokens, scope, builder, index_value);
   dyn_array_destroy(index_tokens);
   assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
@@ -2587,7 +2607,7 @@ token_rewrite_struct_field(
   u64 peek_index = 0;
   Token_Match(struct_token, 0);
   Token_Match_Operator(dot, ".");
-  Token_Match(field_name, .type = Token_Type_Id);
+  Token_Match(field_name, .type = Token_Tag_Id);
 
   Value *struct_value = value_any(context->allocator);
   token_force_value(context, struct_token, scope, builder, struct_value);
@@ -2616,12 +2636,12 @@ token_rewrite_assignment(
   Value *target = token_parse_definition(context, lhs, scope, builder);
   if (!target) {
     target = value_any(context->allocator);
-    Array_Token_Ptr lhs_tokens = token_array_from_view(allocator_system, lhs);
+    Array_Const_Token_Ptr lhs_tokens = token_array_from_view(allocator_system, lhs);
     token_match_expression(context, &lhs_tokens, scope, builder, target);
     dyn_array_destroy(lhs_tokens);
   }
 
-  Array_Token_Ptr rhs_tokens = token_array_from_view(allocator_system, rhs);
+  Array_Const_Token_Ptr rhs_tokens = token_array_from_view(allocator_system, rhs);
   token_match_expression(context, &rhs_tokens, scope, builder, target);
   dyn_array_destroy(rhs_tokens);
 
@@ -2639,8 +2659,11 @@ token_rewrite_function_calls(
 ) {
   u64 peek_index = 0;
   Token_Match(target_token, 0);
-  Token_Match(args_token, .type = Token_Type_Paren);
-  if (target_token->type != Token_Type_Id && target_token->type != Token_Type_Paren) {
+  Token_Match(args_token, .group_type = Token_Group_Type_Paren);
+  if (
+    target_token->tag != Token_Tag_Id &&
+    !token_match(target_token, &(Token_Pattern){ .group_type = Token_Group_Type_Paren })
+  ) {
     return false;
   }
   *replacement_count = 2;
@@ -2857,7 +2880,7 @@ token_rewrite_compare(
 ) {
   u64 peek_index = 0;
   Token_Match(lhs, 0);
-  Token_Match(operator, .type = Token_Type_Operator);
+  Token_Match(operator, .type = Token_Tag_Operator);
   Compare_Type compare_type = 0;
   switch(operator->source.length) {
     case 1: {
@@ -3025,7 +3048,7 @@ token_parse_statement(
   Function_Builder *builder,
   Value *result_value
 ) {
-  Array_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
+  Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
   token_rewrite_macros(context, &statement_tokens, scope, builder);
   view = token_view_from_token_array(statement_tokens);
@@ -3054,7 +3077,7 @@ token_parse_statement(
 bool
 token_match_expression(
   Compilation_Context *context,
-  Array_Token_Ptr *tokens,
+  Array_Const_Token_Ptr *tokens,
   Scope *scope,
   Function_Builder *builder,
   Value *result_value
@@ -3139,17 +3162,16 @@ program_parse(
   Source_File *file
 ) {
   Tokenizer_Result tokenizer_result = tokenize(context->allocator, file);
-  if (tokenizer_result.type != Tokenizer_Result_Type_Success) {
+  if (tokenizer_result.tag != Tokenizer_Result_Tag_Success) {
     return (Parse_Result) {
-      .type = Parse_Result_Type_Error,
-      .errors = tokenizer_result.errors,
+      .tag = Parse_Result_Tag_Error,
+      .Error = { tokenizer_result.Error.errors },
     };
   }
-  ;
+  bool ok = token_parse(context, token_view_from_token_array(tokenizer_result.Success.tokens));
   return (Parse_Result) {
-    .type = token_parse(context, token_view_from_token_array(tokenizer_result.tokens))
-      ? Parse_Result_Type_Success
-      : Parse_Result_Type_Error
+    .tag = ok ? Parse_Result_Tag_Success
+      : Parse_Result_Tag_Error
   };
 }
 
@@ -3213,8 +3235,8 @@ program_import_file(
       },
     });
     return (Parse_Result) {
-      .type = Parse_Result_Type_Error,
-      .errors = errors,
+      .tag = Parse_Result_Tag_Error,
+      .Error = {errors},
     };
   }
   file->text = fixed_buffer_as_slice(buffer);

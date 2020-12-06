@@ -60,8 +60,8 @@ spec_check_and_print_program(
 #define test_program_inline_source_base(_source_, _fn_value_id_)\
   Slice source = slice_literal(_source_);\
   Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});\
-  check(result.type == Tokenizer_Result_Type_Success);\
-  token_parse(&test_context, token_view_from_token_array(result.tokens));\
+  check(result.tag == Tokenizer_Result_Tag_Success);\
+  token_parse(&test_context, token_view_from_token_array(result.Success.tokens));\
   Value *_fn_value_id_ = scope_lookup_force(\
     &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_)\
   );\
@@ -128,94 +128,97 @@ spec("source") {
   it("should be able to tokenize an empty string") {
     Slice source = slice_literal("");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 0);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 0);
   }
 
   it("should be able to tokenize a comment") {
     Slice source = slice_literal("// foo\n");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 0);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 0);
   }
 
   it("should be able to turn newlines into tokens") {
     Slice source = slice_literal("\n");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 1);
-    const Token *newline = *dyn_array_get(result.tokens, 0);
-    check(newline->type == Token_Type_Newline);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
+    const Token *newline = *dyn_array_get(result.Success.tokens, 0);
+    check(newline->tag == Token_Tag_Newline);
     check(slice_equal(newline->source, slice_literal("\n")));
   }
 
   it("should be able to turn hex digits") {
     Slice source = slice_literal("0xCAFE");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 1);
-    const Token *token = *dyn_array_get(result.tokens, 0);
-    check(token->type == Token_Type_Hex_Integer);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
+    const Token *token = *dyn_array_get(result.Success.tokens, 0);
+    check(token->tag == Token_Tag_Hex_Integer);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
   }
 
   it("should be able to tokenize a sum of integers") {
     Slice source = slice_literal("12 + foo123");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 3);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 3);
 
-    const Token *a_num = *dyn_array_get(result.tokens, 0);
-    check(a_num->type == Token_Type_Integer);
+    const Token *a_num = *dyn_array_get(result.Success.tokens, 0);
+    check(a_num->tag == Token_Tag_Integer);
     check(slice_equal(a_num->source, slice_literal("12")));
 
-    const Token *plus = *dyn_array_get(result.tokens, 1);
-    check(plus->type == Token_Type_Operator);
+    const Token *plus = *dyn_array_get(result.Success.tokens, 1);
+    check(plus->tag == Token_Tag_Operator);
     check(slice_equal(plus->source, slice_literal("+")));
 
-    const Token *id = *dyn_array_get(result.tokens, 2);
-    check(id->type == Token_Type_Id);
+    const Token *id = *dyn_array_get(result.Success.tokens, 2);
+    check(id->tag == Token_Tag_Id);
     check(slice_equal(id->source, slice_literal("foo123")));
   }
 
   it("should be able to tokenize groups") {
     Slice source = slice_literal("(x)");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 1);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
 
-    const Token *paren = *dyn_array_get(result.tokens, 0);
-    check(paren->type == Token_Type_Paren);
-    check(dyn_array_length(paren->children) == 1);
+    const Token *paren = *dyn_array_get(result.Success.tokens, 0);
+    check(paren->tag == Token_Tag_Group);
+    check(paren->Group.type == Token_Group_Type_Paren);
+    check(dyn_array_length(paren->Group.children) == 1);
     check(slice_equal(paren->source, slice_literal("(x)")));
 
-    const Token *id = *dyn_array_get(paren->children, 0);
-    check(id->type == Token_Type_Id);
+    const Token *id = *dyn_array_get(paren->Group.children, 0);
+    check(id->tag == Token_Tag_Id);
   }
 
   it("should be able to tokenize strings") {
     Slice source = slice_literal("\"foo 123\"");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 1);
-    const Token *string = *dyn_array_get(result.tokens, 0);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
+    const Token *string = *dyn_array_get(result.Success.tokens, 0);
     check(slice_equal(string->source, slice_literal("\"foo 123\"")));
   }
 
   it("should be able to tokenize nested groups with different braces") {
     Slice source = slice_literal("{[]}");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
-    check(dyn_array_length(result.tokens) == 1);
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
 
-    const Token *curly = *dyn_array_get(result.tokens, 0);
-    check(curly->type == Token_Type_Curly);
-    check(dyn_array_length(curly->children) == 1);
+    const Token *curly = *dyn_array_get(result.Success.tokens, 0);
+    check(curly->tag == Token_Tag_Group);
+    check(curly->Group.type == Token_Group_Type_Curly);
+    check(dyn_array_length(curly->Group.children) == 1);
     check(slice_equal(curly->source, slice_literal("{[]}")));
 
-    const Token *square = *dyn_array_get(curly->children, 0);
-    check(square->type == Token_Type_Square);
-    check(dyn_array_length(square->children) == 0);
+    const Token *square = *dyn_array_get(curly->Group.children, 0);
+    check(square->tag == Token_Tag_Group);
+    check(square->Group.type == Token_Group_Type_Square);
+    check(dyn_array_length(square->Group.children) == 0);
     check(slice_equal(square->source, slice_literal("[]")));
   }
 
@@ -226,15 +229,15 @@ spec("source") {
       "}"
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
+    check(result.tag == Tokenizer_Result_Tag_Success);
   }
 
   it("should report a failure when encountering a brace that is not closed") {
     Slice source = slice_literal("(foo");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Error);
-    check(dyn_array_length(result.errors) == 1);
-    Parse_Error *error = dyn_array_get(result.errors, 0);
+    check(result.tag == Tokenizer_Result_Tag_Error);
+    check(dyn_array_length(result.Error.errors) == 1);
+    Parse_Error *error = dyn_array_get(result.Error.errors, 0);
     check(slice_equal(error->source_range.file->path, test_file_name));
     check(error->source_range.offsets.from == 4);
     check(error->source_range.offsets.to == 4);
@@ -244,9 +247,9 @@ spec("source") {
   it("should report a failure when encountering a mismatched brace that") {
     Slice source = slice_literal("(foo}");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Error);
-    check(dyn_array_length(result.errors) == 1);
-    Parse_Error *error = dyn_array_get(result.errors, 0);
+    check(result.tag == Tokenizer_Result_Tag_Error);
+    check(dyn_array_length(result.Error.errors) == 1);
+    Parse_Error *error = dyn_array_get(result.Error.errors, 0);
     check(slice_equal(error->source_range.file->path, test_file_name));
     check(error->source_range.offsets.from == 4);
     check(error->source_range.offsets.to == 4);
@@ -272,13 +275,13 @@ spec("source") {
       "}"
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
+    check(result.tag == Tokenizer_Result_Tag_Success);
   }
 
   it("should be unwind stack on hardware exception") {
     Parse_Result result =
       program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
-    check(result.type == Parse_Result_Type_Success);
+    check(result.tag == Parse_Result_Tag_Success);
     Value *main =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(main);
@@ -417,9 +420,9 @@ spec("source") {
       "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
+    check(result.tag == Tokenizer_Result_Tag_Success);
 
-    token_parse(&test_context, token_view_from_token_array(result.tokens));
+    token_parse(&test_context, token_view_from_token_array(result.Success.tokens));
 
     Value *checker_s64 =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"));
@@ -674,9 +677,9 @@ spec("source") {
       "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
     );
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
-    check(result.type == Tokenizer_Result_Type_Success);
+    check(result.tag == Tokenizer_Result_Tag_Success);
 
-    token_parse(&test_context, token_view_from_token_array(result.tokens));
+    token_parse(&test_context, token_view_from_token_array(result.Success.tokens));
 
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
@@ -715,9 +718,9 @@ spec("source") {
 
   it("should be able to run fizz buzz") {
     Parse_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
-    check(result.type == Parse_Result_Type_Success);
+    check(result.tag == Parse_Result_Tag_Success);
     result = program_import_file(&test_context, slice_literal("fixtures\\fizz_buzz"));
-    check(result.type == Parse_Result_Type_Success);
+    check(result.tag == Parse_Result_Tag_Success);
 
     Value *fizz_buzz = scope_lookup_force(
       &test_context, test_context.program->global_scope, slice_literal("fizz_buzz")
@@ -793,7 +796,7 @@ spec("source") {
     it("should be reported when encountering unknown type") {
       Parse_Result result =
         program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
-      check(result.type == Parse_Result_Type_Success);
+      check(result.tag == Parse_Result_Tag_Success);
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);

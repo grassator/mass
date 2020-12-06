@@ -86,9 +86,13 @@ int main(s32 argc, char **argv) {
   };
 
   Parse_Result result = program_import_file(&context, slice_literal("lib\\prelude"));
-  if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
+  if(result.tag != Parse_Result_Tag_Success) {
+    return mass_cli_print_errors(result.Error.errors);
+  }
   result = program_import_file(&context, file_path);
-  if(result.type != Parse_Result_Type_Success) return mass_cli_print_errors(result.errors);
+  if(result.tag != Parse_Result_Tag_Success) {
+    return mass_cli_print_errors(result.Error.errors);
+  }
 
   context.program->entry_point =
     scope_lookup_force(&context, context.program->global_scope, slice_literal("main"));

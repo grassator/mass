@@ -554,7 +554,7 @@ allocator_reallocate(
     } \
     return result;\
   }
-PRELUDE_ENUMERATE_INTEGER_TYPES
+PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
 //////////////////////////////////////////////////////////////////////////////
@@ -772,7 +772,8 @@ typedef dyn_array_struct(s8) Dyn_Array_Internal;
   }
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  typedef dyn_array_type(_type_)  Array_##_type_;
+  typedef dyn_array_type(_type_)  Array_##_type_;\
+  typedef dyn_array_type(Range_##_type_)  Array_Range_##_type_;
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 

@@ -1,4 +1,5 @@
 #include "value.h"
+#include "encoding.h"
 
 typedef enum {
   MOD_Displacement_0   = 0b00,
@@ -115,7 +116,7 @@ encode_instruction_assembly(
         } else if (operand->type == Operand_Type_Sib) {
           displacement = operand->sib.displacement;
           needs_sib = true;
-          r_m = R_M_SIB;
+          r_m = 0b0100; // SIB
 
           if (operand->sib.index & 0b1000) {
             rex_byte |= REX_X;

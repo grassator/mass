@@ -3,33 +3,9 @@
 #include "prelude.h"
 #include "value.h"
 
-typedef enum {
-  Token_Type_Id = 1,
-  Token_Type_Newline,
-  Token_Type_Integer,
-  Token_Type_Hex_Integer,
-  Token_Type_Operator,
-  Token_Type_String,
-  Token_Type_Paren,
-  Token_Type_Square,
-  Token_Type_Curly,
-  Token_Type_Value,
-} Token_Type;
-
-typedef struct Token {
-  Token_Type type;
-  Source_Range source_range;
-  Slice source;
-  union {
-    Array_Token_Ptr children;
-    Value *value;
-    Slice string;
-  };
-} Token;
-typedef dyn_array_type(Token) Array_Token;
-
 typedef struct {
-  Token_Type type;
+  Token_Tag type;
+  Token_Group_Type group_type;
   Slice source;
 } Token_Pattern;
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
@@ -76,7 +52,7 @@ hash_map_slice_template(Macro_Replacement_Map, const Token *)
 
 typedef struct {
   Array_Token_Pattern pattern;
-  Array_Token_Ptr replacement;
+  Array_Const_Token_Ptr replacement;
   Array_Slice pattern_names;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;

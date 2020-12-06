@@ -1,86 +1,10 @@
 #ifndef VALUE_H
 #define VALUE_H
 #include "prelude.h"
+#include "types.h"
+#include "encoding.h"
 
 typedef void(*fn_type_opaque)();
-
-typedef enum {
-  Operand_Type_None,
-  Operand_Type_Any,
-  Operand_Type_Eflags,
-  Operand_Type_Register,
-  Operand_Type_Xmm,
-  Operand_Type_Immediate_8,
-  Operand_Type_Immediate_16,
-  Operand_Type_Immediate_32,
-  Operand_Type_Immediate_64,
-  Operand_Type_Memory_Indirect,
-  Operand_Type_Sib,
-  Operand_Type_RIP_Relative,
-  Operand_Type_RIP_Relative_Import,
-  Operand_Type_Label_32,
-} Operand_Type;
-
-typedef enum {
-  Section_Permissions_Read    = 1 << 0,
-  Section_Permissions_Write   = 1 << 1,
-  Section_Permissions_Execute = 1 << 2,
-} Section_Permissions;
-
-typedef struct {
-  Bucket_Buffer *buffer;
-  Slice name;
-  u32 base_rva;
-  Section_Permissions permissions;
-} Section;
-typedef dyn_array_type(Section *) Array_Section_Ptr;
-
-typedef enum {
-  Register_A   = 0b0000,
-  Register_C   = 0b0001,
-  Register_D   = 0b0010,
-  Register_B   = 0b0011,
-
-  Register_SP  = 0b0100,
-  Register_AH  = 0b0100,
-  R_M_SIB      = 0b0100,
-
-  Register_BP  = 0b0101,
-  Register_CH  = 0b0100,
-
-  Register_SI  = 0b0110,
-  Register_DH  = 0b0100,
-
-  Register_DI  = 0b0111,
-  Register_BH  = 0b0100,
-
-  Register_R8  = 0b1000,
-  Register_R9  = 0b1001,
-  Register_R10 = 0b1010,
-  Register_R11 = 0b1011,
-  Register_R12 = 0b1100,
-  Register_R13 = 0b1101,
-  Register_R14 = 0b1110,
-  Register_R15 = 0b1111,
-
-  Register_Xmm0 = 0b10000,
-  Register_Xmm1 = 0b10001,
-  Register_Xmm2 = 0b10010,
-  Register_Xmm3 = 0b10011,
-  Register_Xmm4 = 0b10100,
-  Register_Xmm5 = 0b10101,
-  Register_Xmm6 = 0b10110,
-  Register_Xmm7 = 0b10111,
-
-  Register_Xmm8  = 0b11000,
-  Register_Xmm9  = 0b11001,
-  Register_Xmm10 = 0b11010,
-  Register_Xmm11 = 0b11011,
-  Register_Xmm12 = 0b11100,
-  Register_Xmm13 = 0b11101,
-  Register_Xmm14 = 0b11110,
-  Register_Xmm15 = 0b11111,
-} Register;
 
 static inline bool
 register_is_xmm(
@@ -88,78 +12,6 @@ register_is_xmm(
 ) {
   return !!(reg & Register_Xmm0);
 }
-
-typedef struct {
-  Register reg;
-  s32 displacement;
-} Operand_Memory_Indirect;
-
-typedef enum {
-  SIB_Scale_1 = 0b00,
-  SIB_Scale_2 = 0b01,
-  SIB_Scale_4 = 0b10,
-  SIB_Scale_8 = 0b11,
-} SIB_Scale;
-
-typedef struct {
-  SIB_Scale scale;
-  Register index;
-  Register base;
-  s32 displacement;
-} Operand_Sib;
-
-typedef struct {
-  u64 value;
-} Label_Index;
-
-typedef struct {
-  Section *section;
-  u32 offset_in_section;
-} Label;
-typedef dyn_array_type(Label) Array_Label;
-
-typedef struct {
-  Label_Index target_label_index;
-  Label from;
-  s32 *patch_target;
-} Label_Location_Diff_Patch_Info;
-typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
-
-typedef struct {
-  Slice name;
-  u32 name_rva;
-  Label_Index label32;
-} Import_Symbol;
-typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
-
-typedef struct {
-  Slice name;
-  u32 name_rva;
-  u32 rva;
-  Array_Import_Symbol symbols;
-  u32 image_thunk_rva;
-} Import_Library;
-typedef dyn_array_type(Import_Library) Array_Import_Library;
-
-typedef struct {
-  Slice library_name;
-  Slice symbol_name;
-} Operand_RIP_Relative_Import;
-
-typedef enum {
-  Compare_Type_Equal = 1,
-  Compare_Type_Not_Equal,
-
-  Compare_Type_Unsigned_Below,
-  Compare_Type_Unsigned_Below_Equal,
-  Compare_Type_Unsigned_Above,
-  Compare_Type_Unsigned_Above_Equal,
-
-  Compare_Type_Signed_Less,
-  Compare_Type_Signed_Less_Equal,
-  Compare_Type_Signed_Greater,
-  Compare_Type_Signed_Greater_Equal,
-} Compare_Type;
 
 typedef struct {
   Operand_Type type;
@@ -211,15 +63,6 @@ register_bitset_get(
   Register reg
 );
 
-struct Descriptor;
-
-
-typedef struct {
-  const char *filename;
-  const char *function_name;
-  u32 line_number;
-} Compiler_Source_Location;
-
 #define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
   {\
     .filename = __FILE__,\
@@ -245,26 +88,9 @@ typedef struct Value {
 typedef dyn_array_type(Value) Array_Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 
-typedef enum {
-  Descriptor_Type_Void,
-  Descriptor_Type_Any,
-  Descriptor_Type_Opaque,
-  Descriptor_Type_Pointer,
-  Descriptor_Type_Fixed_Size_Array,
-  Descriptor_Type_Function,
-  Descriptor_Type_Struct,
-  Descriptor_Type_Tagged_Union,
-  Descriptor_Type_Type
-} Descriptor_Type;
-
 typedef struct Token Token;
 typedef struct Scope Scope;
-
-typedef enum {
-  Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Inline = 1 << 0,
-  Descriptor_Function_Flags_Pending_Body_Compilation = 1 << 1,
-} Descriptor_Function_Flags;
+typedef struct Descriptor Descriptor;
 
 typedef struct Function_Builder Function_Builder;
 
@@ -282,7 +108,7 @@ typedef struct Descriptor_Function {
 
 typedef struct {
   Slice name;
-  struct Descriptor *descriptor;
+  Descriptor *descriptor;
   s32 offset;
 } Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
@@ -455,68 +281,6 @@ same_value_type(
   Value *b
 );
 
-typedef enum {
-  Instruction_Extension_Type_None,
-  Instruction_Extension_Type_Register,
-  Instruction_Extension_Type_Op_Code,
-  Instruction_Extension_Type_Plus_Register,
-} Instruction_Extension_Type;
-
-typedef enum {
-  Operand_Encoding_Type_None,
-  Operand_Encoding_Type_Eflags,
-  Operand_Encoding_Type_Register,
-  Operand_Encoding_Type_Register_A,
-  Operand_Encoding_Type_Register_Memory,
-  Operand_Encoding_Type_Xmm,
-  Operand_Encoding_Type_Xmm_Memory,
-  Operand_Encoding_Type_Memory,
-  Operand_Encoding_Type_Immediate,
-} Operand_Encoding_Type;
-
-typedef enum {
-  Operand_Size_Any = 0,
-  Operand_Size_8 = 1,
-  Operand_Size_16 = 2,
-  Operand_Size_32 = 4,
-  Operand_Size_64 = 8,
-} Operand_Size;
-
-typedef struct {
-  Operand_Encoding_Type type;
-  Operand_Size size;
-} Operand_Encoding;
-
-typedef struct {
-  u8 op_code[4];
-  Instruction_Extension_Type extension_type;
-  u8 op_code_extension;
-  Operand_Encoding operands[3];
-} Instruction_Encoding;
-
-typedef struct {
-  const char *name;
-  const Instruction_Encoding *encoding_list;
-  u32 encoding_count;
-} X64_Mnemonic;
-
-typedef dyn_array_type(Range_u64) Array_Range_u64;
-typedef struct {
-  Slice path;
-  Slice text;
-  Array_Range_u64 lines;
-} Source_File;
-
-typedef struct {
-  u64 line;
-  u64 column;
-} Source_Position;
-
-typedef struct {
-  const Source_File *file;
-  Range_u64 offsets;
-} Source_Range;
-
 void
 source_range_print_start_position(
   const Source_Range *source_range
@@ -620,38 +384,6 @@ typedef struct {
 } UNWIND_INFO;
 
 typedef struct Scope Scope;
-
-typedef struct {
-  Slice message;
-  Source_Range source_range;
-} Parse_Error;
-typedef dyn_array_type(Parse_Error) Array_Parse_Error;
-
-typedef enum {
-  Tokenizer_Result_Type_Error,
-  Tokenizer_Result_Type_Success,
-} Tokenizer_Result_Type;
-
-typedef struct Token Token;
-typedef dyn_array_type(const Token *) Array_Token_Ptr;
-
-typedef struct {
-  Tokenizer_Result_Type type;
-  union {
-    Array_Token_Ptr tokens;
-    Array_Parse_Error errors;
-  };
-} Tokenizer_Result;
-
-typedef enum {
-  Parse_Result_Type_Success,
-  Parse_Result_Type_Error,
-} Parse_Result_Type;
-
-typedef struct {
-  Parse_Result_Type type;
-  Array_Parse_Error errors;
-} Parse_Result;
 
 typedef struct _Program {
   Fixed_Buffer *jit_buffer;
