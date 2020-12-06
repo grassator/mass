@@ -1371,7 +1371,7 @@ token_process_type_definition(
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   if (bit_size_value) {
-    if (bit_size_value->descriptor->type != Descriptor_Type_Integer) {
+    if (!descriptor_is_integer(bit_size_value->descriptor)) {
       // TODO err
       goto err;
     }
@@ -1748,31 +1748,6 @@ compile_time_eval(
     .descriptor = out_value->descriptor,
   };
   switch(out_value->descriptor->type) {
-    case Descriptor_Type_Integer: {
-      switch (result_byte_size) {
-        case 8: {
-          token_value->operand = imm64(*(s64 *)result);
-          break;
-        }
-        case 4: {
-          token_value->operand = imm32(*(s32 *)result);
-          break;
-        }
-        case 2: {
-          token_value->operand = imm16(*(s16 *)result);
-          break;
-        }
-        case 1: {
-          token_value->operand = imm8(*(s8 *)result);
-          break;
-        }
-        default: {
-          panic("Unsupported immediate size");
-          break;
-        }
-      }
-      break;
-    }
     case Descriptor_Type_Void: {
       token_value->operand = (Operand){0};
       break;
@@ -1788,7 +1763,33 @@ compile_time_eval(
       panic("TODO move to data section or maybe we should allocate from there right away above?");
       break;
     };
-    case Descriptor_Type_Opaque:
+    case Descriptor_Type_Opaque: {
+      if (descriptor_is_integer(out_value->descriptor)) {
+        switch (result_byte_size) {
+          case 8: {
+            token_value->operand = imm64(*(s64 *)result);
+            break;
+          }
+          case 4: {
+            token_value->operand = imm32(*(s32 *)result);
+            break;
+          }
+          case 2: {
+            token_value->operand = imm16(*(s16 *)result);
+            break;
+          }
+          case 1: {
+            token_value->operand = imm8(*(s8 *)result);
+            break;
+          }
+          default: {
+            panic("Unsupported immediate size");
+            break;
+          }
+        }
+      }
+      break;
+    }
     case Descriptor_Type_Function:
     case Descriptor_Type_Type: {
       panic("TODO figure out how that works");
@@ -1827,7 +1828,7 @@ token_do_handle_operator(
   if (slice_equal(operator, slice_literal("unary -"))) {
     const Token *token = *dyn_array_pop(*token_stack);
     Value *value = token_force_constant_value(context, scope, token);
-    if (value->descriptor->type == Descriptor_Type_Integer && operand_is_immediate(&value->operand)) {
+    if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
       if (value->operand.type == Operand_Type_Immediate_8) {
         value->operand.s8 = -value->operand.s8;
       } else if (value->operand.type == Operand_Type_Immediate_16) {
@@ -2241,7 +2242,7 @@ token_match_fixed_array_type(
   Token_View size_view = token_view_from_token_array(square_brace->children);
   Value *size_value = token_rewrite_constant_expression(context, size_view, scope);
   if (!size_value) return 0;
-  if (size_value->descriptor->type != Descriptor_Type_Integer) {
+  if (!descriptor_is_integer(size_value->descriptor)) {
     program_push_error_from_slice(
       context->program,
       square_brace->source_range,
@@ -2299,7 +2300,7 @@ token_rewrite_inline_machine_code_bytes(
   for (u64 i = 0; i < byte_count; ++i) {
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
-    if (value->descriptor->type != Descriptor_Type_Integer) {
+    if (!descriptor_is_integer(value->descriptor)) {
       program_error_builder(context, args_token->source_range) {
         program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
       }
@@ -2354,7 +2355,7 @@ token_rewrite_cast(
   assert(type->descriptor->type == Descriptor_Type_Type);
 
   Descriptor *cast_to_descriptor = type->descriptor->type_descriptor;
-  assert(cast_to_descriptor->type == Descriptor_Type_Integer);
+  assert(descriptor_is_integer(cast_to_descriptor));
   assert(value->descriptor->type == cast_to_descriptor->type);
 
   u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
@@ -2480,10 +2481,7 @@ token_rewrite_definition_and_assignment_statements(
   dyn_array_destroy(expression_tokens);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (
-    value->descriptor->type == Descriptor_Type_Integer &&
-    operand_is_immediate(&value->operand)
-  ) {
+  if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
     value = value_from_s64(context->allocator, operand_immediate_as_s64(&value->operand));
   } else if (
     value->descriptor->type == Descriptor_Type_Opaque &&
@@ -2902,8 +2900,8 @@ token_rewrite_compare(
 
   // FIXME add implicit unsigned to signed conversion
   if (
-    lhs_value->descriptor->type != Descriptor_Type_Integer ||
-    rhs_value->descriptor->type != Descriptor_Type_Integer
+    !descriptor_is_integer(lhs_value->descriptor) ||
+    !descriptor_is_integer(rhs_value->descriptor)
   ) {
     panic("FIXME handle errors here");
   }

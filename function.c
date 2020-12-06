@@ -750,12 +750,12 @@ plus_or_minus(
 ) {
   bool is_pointer_arithmetic = (
     a->descriptor->type == Descriptor_Type_Pointer &&
-    b->descriptor->type == Descriptor_Type_Integer &&
-    b->descriptor->integer.byte_size == 8
+    descriptor_is_integer(b->descriptor) &&
+    b->descriptor->opaque.bit_size == 64
   );
   bool both_operands_are_integers = (
-    a->descriptor->type == Descriptor_Type_Integer &&
-    b->descriptor->type == Descriptor_Type_Integer
+    descriptor_is_integer(a->descriptor) &&
+    descriptor_is_integer(b->descriptor)
   );
   assert(is_pointer_arithmetic || both_operands_are_integers);
 
@@ -870,7 +870,7 @@ multiply(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type(x, y));
-  assert(x->descriptor->type == Descriptor_Type_Integer);
+  assert(descriptor_is_integer(x->descriptor));
 
   assert_not_register_ax(x);
   assert_not_register_ax(y);
@@ -914,7 +914,7 @@ divide_or_remainder(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
-  assert(a->descriptor->type == Descriptor_Type_Integer);
+  assert(descriptor_is_integer(a->descriptor));
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
     s64 divident = operand_immediate_as_s64(&a->operand);
@@ -1032,8 +1032,8 @@ compare(
   Value *b
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
-  assert(a->descriptor->type == Descriptor_Type_Integer);
-  assert(b->descriptor->type == Descriptor_Type_Integer);
+  assert(descriptor_is_integer(a->descriptor));
+  assert(descriptor_is_integer(b->descriptor));
 
   switch(operation) {
     case Compare_Type_Equal: {

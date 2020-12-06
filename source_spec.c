@@ -580,7 +580,7 @@ spec("source") {
       &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
     );
     check(status);
-    check(status->descriptor->type == Descriptor_Type_Integer);
+    check(descriptor_is_integer(status->descriptor));
     check(status->operand.type == Operand_Type_Immediate_8);
     check(status->operand.s8 == 42);
   }
@@ -596,7 +596,7 @@ spec("source") {
       &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
     );
     check(status);
-    check(status->descriptor->type == Descriptor_Type_Integer);
+    check(descriptor_is_integer(status->descriptor));
     check(status->operand.type == Operand_Type_Immediate_8);
     check(status->operand.s8 == 42);
   }

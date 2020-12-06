@@ -249,7 +249,6 @@ typedef enum {
   Descriptor_Type_Void,
   Descriptor_Type_Any,
   Descriptor_Type_Opaque,
-  Descriptor_Type_Integer,
   Descriptor_Type_Pointer,
   Descriptor_Type_Fixed_Size_Array,
   Descriptor_Type_Function,
@@ -304,10 +303,6 @@ typedef struct {
 } Descriptor_Fixed_Size_Array;
 
 typedef struct {
-  u32 byte_size;
-} Descriptor_Integer;
-
-typedef struct {
   u64 bit_size;
 } Descriptor_Opaque;
 
@@ -315,7 +310,6 @@ typedef struct Descriptor {
   Descriptor_Type type;
   union {
     Descriptor_Opaque opaque;
-    Descriptor_Integer integer;
     Descriptor_Function function;
     Descriptor_Fixed_Size_Array array;
     Descriptor_Struct struct_;
@@ -327,38 +321,38 @@ typedef struct Descriptor {
 
 
 Descriptor descriptor_s8 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 8 },
 };
 Descriptor descriptor_s16 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 16 },
 };
 Descriptor descriptor_s32 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_s64 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 64 },
 };
 
 
 Descriptor descriptor_u8 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 8 },
 };
 Descriptor descriptor_u16 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 16 },
 };
 Descriptor descriptor_u32 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_u64 = {
-  .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8 },
+  .type = { Descriptor_Type_Opaque },
+  .opaque = { .bit_size = 64 },
 };
 
 

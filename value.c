@@ -43,6 +43,7 @@ same_type(
     case Descriptor_Type_Fixed_Size_Array: {
       return same_type(a->array.item, b->array.item) && a->array.length == b->array.length;
     }
+    case Descriptor_Type_Void:
     case Descriptor_Type_Opaque:
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Struct: {
@@ -64,10 +65,6 @@ same_type(
         }
       }
       return true;
-    }
-    case Descriptor_Type_Void:
-    case Descriptor_Type_Integer: {
-      return descriptor_byte_size(a) == descriptor_byte_size(b);
     }
     case Descriptor_Type_Any:
     case Descriptor_Type_Type:
@@ -135,9 +132,6 @@ descriptor_byte_size(
     case Descriptor_Type_Opaque: {
       u64 size_of_byte = 8;
       return u64_to_u32((descriptor->opaque.bit_size + (size_of_byte - 1)) / size_of_byte);
-    }
-    case Descriptor_Type_Integer: {
-      return descriptor->integer.byte_size;
     }
     case Descriptor_Type_Fixed_Size_Array: {
       return descriptor_byte_size(descriptor->array.item) * descriptor->array.length;
@@ -1196,13 +1190,19 @@ c_function_return_value(
       return &void_value;
     }
     case Descriptor_Type_Function:
-    case Descriptor_Type_Integer:
     case Descriptor_Type_Pointer: {
       Value *return_value = value_register_for_descriptor(allocator, Register_A, descriptor);
       return return_value;
     }
+    case Descriptor_Type_Opaque: {
+      if (descriptor_is_integer(descriptor)) {
+        Value *return_value = value_register_for_descriptor(allocator, Register_A, descriptor);
+        return return_value;
+      }
+      panic("Unknown opaque type");
+      break;
+    }
     case Descriptor_Type_Any:
-    case Descriptor_Type_Opaque:
     case Descriptor_Type_Tagged_Union:
     case Descriptor_Type_Fixed_Size_Array:
     case Descriptor_Type_Struct:
@@ -1782,14 +1782,15 @@ same_value_type_or_can_implicitly_move_cast(
   // Allow literal `0` to be cast to a pointer
   if (
     target->descriptor->type == Descriptor_Type_Pointer &&
-    source->descriptor->type == Descriptor_Type_Integer &&
+    descriptor_is_integer(source->descriptor) &&
     operand_is_immediate(&source->operand) &&
     operand_immediate_as_s64(&source->operand) == 0
   ) {
     return true;
   }
   if (target->descriptor->type != source->descriptor->type) return false;
-  if (target->descriptor->type == Descriptor_Type_Integer) {
+  // TODO deal with signess
+  if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
       return true;
     }
