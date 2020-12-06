@@ -343,6 +343,17 @@ tokenize(
   Allocator *allocator,
   Source_File *file
 ) {
+  enum Tokenizer_State {
+    Tokenizer_State_Default,
+    Tokenizer_State_Integer,
+    Tokenizer_State_Hex_Integer,
+    Tokenizer_State_Operator,
+    Tokenizer_State_Id,
+    Tokenizer_State_String,
+    Tokenizer_State_String_Escape,
+    Tokenizer_State_Single_Line_Comment,
+  };
+
   Array_Const_Token_Ptr parent_stack = dyn_array_make(Array_Const_Token_Ptr);
   Token *root = &(Token){0};
   root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
@@ -351,7 +362,7 @@ tokenize(
   file->lines = dyn_array_make(Array_Range_u64);
 
   Range_u64 current_line = {0};
-  Tokenizer_State state = Tokenizer_State_Default;
+  enum Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
   Token *parent = root;
   Fixed_Buffer *string_buffer = fixed_buffer_make(

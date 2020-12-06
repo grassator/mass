@@ -3,17 +3,6 @@
 #include "prelude.h"
 #include "value.h"
 
-typedef enum {
-  Tokenizer_State_Default,
-  Tokenizer_State_Integer,
-  Tokenizer_State_Hex_Integer,
-  Tokenizer_State_Operator,
-  Tokenizer_State_Id,
-  Tokenizer_State_String,
-  Tokenizer_State_String_Escape,
-  Tokenizer_State_Single_Line_Comment,
-} Tokenizer_State;
-
 typedef struct {
   const Token **tokens;
   u64 length;
