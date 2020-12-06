@@ -2694,6 +2694,7 @@ fixed_buffer_from_file_internal(
     *options->error = File_Read_Error_Failed_To_Read;
     goto handle_error;
   }
+  CloseHandle(file_handle);
   buffer->occupied = s32_to_u64(bytes_read);
   if (options->null_terminate) fixed_buffer_append_u8(buffer, 0);
   return buffer;
