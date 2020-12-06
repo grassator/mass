@@ -9,8 +9,3 @@ macro (while _condition _body) ({
 bool :: s8
 true :: 1
 false :: 0
-
-Slice :: struct {
-  s8[] : bytes
-  u64 : length
-}
