@@ -569,6 +569,11 @@ main(void) {
     { "Slice", "source" },
   }));
 
+  push_type(type_struct("Token_View", (Struct_Item[]){
+    { "const Token **", "tokens" },
+    { "u64", "length" },
+  }));
+
   push_type(type_struct("Token_Pattern", (Struct_Item[]){
     { "Token_Tag", "tag" },
     { "Token_Group_Type", "group_type" },

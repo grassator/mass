@@ -3,13 +3,6 @@
 #include "prelude.h"
 #include "value.h"
 
-typedef struct {
-  const Token **tokens;
-  u64 length;
-} Token_View;
-
-typedef dyn_array_type(Token_View) Array_Token_View;
-
 typedef enum {
   Scope_Entry_Type_Value = 1,
   Scope_Entry_Type_Lazy_Constant_Expression,

@@ -76,6 +76,10 @@ typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
 typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
 
+typedef struct Token_View Token_View;
+typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
+typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
+
 typedef struct Token_Pattern Token_Pattern;
 typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
 typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
@@ -325,6 +329,12 @@ typedef struct Token {
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
+typedef struct Token_View {
+  const Token ** tokens;
+  u64 length;
+} Token_View;
+typedef dyn_array_type(Token_View) Array_Token_View;
+
 typedef struct Token_Pattern {
   Token_Tag tag;
   Token_Group_Type group_type;

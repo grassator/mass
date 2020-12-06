@@ -168,6 +168,11 @@ Mass_Token_Group_Type_Paren :: 1
 Mass_Token_Group_Type_Square :: 2
 Mass_Token_Group_Type_Curly :: 3
 
+Mass_Token_View :: struct {
+  tokens : const Token **
+  length : u64
+}
+
 Mass_Token_Pattern :: struct {
   tag : Token_Tag
   group_type : Token_Group_Type
