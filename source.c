@@ -2908,9 +2908,14 @@ token_rewrite_compare(
     panic("FIXME handle errors here");
   }
 
-  if (lhs_value->descriptor->integer.is_signed != rhs_value->descriptor->integer.is_signed) {
+  bool is_lhs_signed = descriptor_is_signed_integer(lhs_value->descriptor);
+  bool is_rhs_signed = descriptor_is_signed_integer(rhs_value->descriptor);
+  if (is_lhs_signed != is_rhs_signed) {
     // FIXME solve generally
-    if (!rhs_value->descriptor->integer.is_signed && operand_is_immediate(&rhs_value->operand)) {
+    if (
+      descriptor_is_unsigned_integer(rhs_value->descriptor) &&
+      operand_is_immediate(&rhs_value->operand)
+    ) {
       switch(lhs_value->operand.byte_size) {
         case 1: {
           if (u8_fits_into_s8(rhs_value->operand.u8)) {
@@ -2966,7 +2971,7 @@ token_rewrite_compare(
     }
   }
 
-  if (!lhs_value->descriptor->integer.is_signed) {
+  if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
     switch(compare_type) {
       case Compare_Type_Equal:
       case Compare_Type_Not_Equal: {

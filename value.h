@@ -305,7 +305,6 @@ typedef struct {
 
 typedef struct {
   u32 byte_size;
-  bool is_signed;
 } Descriptor_Integer;
 
 typedef struct {
@@ -329,37 +328,37 @@ typedef struct Descriptor {
 
 Descriptor descriptor_s8 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1, .is_signed = true },
+  .integer = { .byte_size = 1 },
 };
 Descriptor descriptor_s16 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2, .is_signed = true },
+  .integer = { .byte_size = 2 },
 };
 Descriptor descriptor_s32 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4, .is_signed = true },
+  .integer = { .byte_size = 4 },
 };
 Descriptor descriptor_s64 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8, .is_signed = true },
+  .integer = { .byte_size = 8 },
 };
 
 
 Descriptor descriptor_u8 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 1, .is_signed = false },
+  .integer = { .byte_size = 1 },
 };
 Descriptor descriptor_u16 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 2, .is_signed = false },
+  .integer = { .byte_size = 2 },
 };
 Descriptor descriptor_u32 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 4, .is_signed = false },
+  .integer = { .byte_size = 4 },
 };
 Descriptor descriptor_u64 = {
   .type = { Descriptor_Type_Integer },
-  .integer = { .byte_size = 8, .is_signed = false },
+  .integer = { .byte_size = 8 },
 };
 
 
@@ -400,6 +399,37 @@ define_type_value(u8);
 
 define_type_value(f64);
 define_type_value(f32);
+
+static inline bool
+descriptor_is_unsigned_integer(
+  Descriptor *descriptor
+) {
+  return (
+    descriptor == &descriptor_u8  ||
+    descriptor == &descriptor_u16 ||
+    descriptor == &descriptor_u32 ||
+    descriptor == &descriptor_u64
+  );
+}
+
+static inline bool
+descriptor_is_signed_integer(
+  Descriptor *descriptor
+) {
+  return (
+    descriptor == &descriptor_s8  ||
+    descriptor == &descriptor_s16 ||
+    descriptor == &descriptor_s32 ||
+    descriptor == &descriptor_s64
+  );
+}
+
+static inline bool
+descriptor_is_integer(
+  Descriptor *descriptor
+) {
+  return descriptor_is_signed_integer(descriptor) || descriptor_is_unsigned_integer(descriptor);
+}
 
 bool
 descriptor_is_float(
