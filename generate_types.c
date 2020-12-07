@@ -492,6 +492,7 @@ main(void) {
       { "Function_Builder *", "builder" },
 
       { "Value *", "returns" },
+      // FIXME return multiple things from scope lookup instead
       { "Value *", "next_overload" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){

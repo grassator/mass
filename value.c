@@ -1,6 +1,7 @@
 #include "value.h"
 #include "function.h"
 #include "source.h"
+#include "win32.h"
 
 static inline Label *
 program_get_label(
@@ -1347,7 +1348,7 @@ program_test_exception_handler(
   u64 relative_instruction_byte_offset =
     DispatcherContext->ControlPc - absolute_function_begin_address;
 
-  Exception_Data *exception_data = DispatcherContext->HandlerData;
+  Win32_Exception_Data *exception_data = DispatcherContext->HandlerData;
 
   if (!exception_data->program->is_stack_unwinding_in_progress) {
     exception_data->program->is_stack_unwinding_in_progress = true;
@@ -1589,8 +1590,8 @@ program_jit(
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
       u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
       *exception_handler_address = trampoline_virtual_address;
-      Exception_Data *exception_data = (void *)(exception_handler_address + 1);
-      *exception_data = (Exception_Data) {
+      Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
+      *exception_data = (Win32_Exception_Data) {
         .builder = builder,
         .program = program,
       };
