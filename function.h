@@ -89,25 +89,6 @@ typedef struct {
   Struct_Builder_Field *field_list;
 } Struct_Builder;
 
-typedef struct {
-  bool done;
-  Label_Index label_start;
-  Label_Index label_end;
-} Loop_Builder;
-
-Loop_Builder
-loop_start(
-  Program *program,
-  Array_Instruction *instructions,
-  const Source_Range *source_range
-);
-
-void
-loop_end(
-  Array_Instruction *instructions,
-  const Source_Range *source_range,
-  Loop_Builder *loop
-);
 
 void
 plus(

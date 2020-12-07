@@ -696,24 +696,6 @@ make_if(
   return label;
 }
 
-Loop_Builder
-loop_start(
-  Program *program,
-  Array_Instruction *instructions,
-  const Source_Range *source_range
-) {
-  Label_Index label_start = make_label(program, &program->code_section);
-  push_instruction(instructions, source_range, (Instruction) {
-    .type = Instruction_Type_Label,
-    .label = label_start
-  });
-  return (Loop_Builder) {
-    .done = false,
-    .label_start = label_start,
-    .label_end = make_label(program, &program->code_section),
-  };
-}
-
 void
 assert_not_register_ax(
   Value *overload
