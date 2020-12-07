@@ -53,14 +53,6 @@ register_bitset_get(
 #define COMPILER_SOURCE_LOCATION\
   ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
 
-typedef struct Value {
-  struct Descriptor *descriptor;
-  Operand operand;
-  Compiler_Source_Location compiler_source_location;
-} Value;
-
-typedef dyn_array_type(Value) Array_Value;
-
 typedef struct Scope Scope;
 typedef struct Function_Builder Function_Builder;
 

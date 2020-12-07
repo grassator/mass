@@ -459,11 +459,11 @@ main(void) {
     { "u32", "line_number" },
   }));
 
-  //push_type(type_struct("Value", (Struct_Item[]){
-    //{ "Descriptor *", "descriptor" },
-    //{ "Operand", "operand" },
-    //{ "Compiler_Source_Location", "compiler_source_location" },
-  //}));
+  push_type(type_struct("Value", (Struct_Item[]){
+    { "Descriptor *", "descriptor" },
+    { "Operand", "operand" },
+    { "Compiler_Source_Location", "compiler_source_location" },
+  }));
 
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None",   0 },
@@ -607,8 +607,6 @@ main(void) {
     // Custom forward declarations
     // TODO would be great to not have these
     {
-      fprintf(file, "typedef struct Value Value;\n\n");
-      fprintf(file, "typedef dyn_array_type(Value *) Array_Value_Ptr;\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
     }

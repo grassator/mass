@@ -97,6 +97,12 @@ Mass_Compiler_Source_Location :: struct {
   line_number : u32
 }
 
+Mass_Value :: struct {
+  descriptor : Descriptor *
+  operand : Operand
+  compiler_source_location : Compiler_Source_Location
+}
+
 Mass_Descriptor_Function_Flags_None :: 0
 Mass_Descriptor_Function_Flags_Inline :: 1
 Mass_Descriptor_Function_Flags_Pending_Body_Compilation :: 2

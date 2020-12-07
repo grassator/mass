@@ -40,6 +40,10 @@ typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
 
+typedef struct Value Value;
+typedef dyn_array_type(Value *) Array_Value_Ptr;
+typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
+
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
 typedef struct Descriptor_Struct_Field Descriptor_Struct_Field;
@@ -87,10 +91,6 @@ typedef dyn_array_type(const Tokenizer_Result *) Array_Const_Tokenizer_Result_Pt
 typedef struct Parse_Result Parse_Result;
 typedef dyn_array_type(Parse_Result *) Array_Parse_Result_Ptr;
 typedef dyn_array_type(const Parse_Result *) Array_Const_Parse_Result_Ptr;
-
-typedef struct Value Value;
-
-typedef dyn_array_type(Value *) Array_Value_Ptr;
 
 typedef struct Scope Scope;
 
@@ -284,6 +284,13 @@ typedef struct Compiler_Source_Location {
   u32 line_number;
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
+
+typedef struct Value {
+  Descriptor * descriptor;
+  Operand operand;
+  Compiler_Source_Location compiler_source_location;
+} Value;
+typedef dyn_array_type(Value) Array_Value;
 
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
