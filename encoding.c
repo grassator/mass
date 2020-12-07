@@ -95,7 +95,7 @@ encode_instruction_assembly(
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
       mod_r_m_operand_index = operand_index;
-      if (operand->tag == Operand_Tag_RIP_Relative) {
+      if (operand->tag == Operand_Tag_Label) {
         r_m = 0b101;
         mod = 0;
       } else if (operand->tag == Operand_Tag_Register) {
@@ -183,17 +183,17 @@ encode_instruction_assembly(
   // we do not know what the diff should be before the immediate is
   // encoded as well. To solve this we store the patch locations and do
   // a loop over them after the instruction has been encoded.
-  Label_Location_Diff_Patch_Info *rip_relative_patch_info = 0;
+  Label_Location_Diff_Patch_Info *mod_r_m_patch_info = 0;
   Label_Location_Diff_Patch_Info *immediate_label_patch_info = 0;
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
     // :OperandNormalization
-    if (operand->tag == Operand_Tag_RIP_Relative) {
+    if (operand->tag == Operand_Tag_Label) {
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
-      rip_relative_patch_info =
+      mod_r_m_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
           .target_label_index = operand->Label.index,
           .from = {.section = &program->code_section},
@@ -220,7 +220,7 @@ encode_instruction_assembly(
       continue;
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
-    if (operand->tag == Operand_Tag_Label_32) {
+    if (operand->tag == Operand_Tag_Label) {
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
       immediate_label_patch_info =
@@ -246,8 +246,8 @@ encode_instruction_assembly(
 
   // :AfterInstructionPatch
   u32 next_instruction_offset = u64_to_u32(buffer->occupied);
-  if (rip_relative_patch_info) {
-    rip_relative_patch_info->from.offset_in_section = next_instruction_offset;
+  if (mod_r_m_patch_info) {
+    mod_r_m_patch_info->from.offset_in_section = next_instruction_offset;
   }
   if (immediate_label_patch_info) {
     immediate_label_patch_info->from.offset_in_section = next_instruction_offset;
@@ -320,13 +320,13 @@ encode_instruction(
         continue;
       }
       if (
-        operand->tag == Operand_Tag_RIP_Relative &&
+        operand->tag == Operand_Tag_Label &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->tag == Operand_Tag_RIP_Relative &&
+        operand->tag == Operand_Tag_Label &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
@@ -374,7 +374,7 @@ encode_instruction(
         continue;
       }
       if (
-        operand->tag == Operand_Tag_RIP_Relative &&
+        operand->tag == Operand_Tag_Label &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
@@ -383,7 +383,7 @@ encode_instruction(
         if (operand_is_immediate(operand)) {
           assert(encoding_size == operand->byte_size);
           continue;
-        } else if (operand->tag == Operand_Tag_Label_32) {
+        } else if (operand->tag == Operand_Tag_Label) {
           assert(encoding_size == Operand_Size_32);
           continue;
         }

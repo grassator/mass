@@ -306,9 +306,8 @@ main(void) {
       { "Immediate_64", value++ },
       { "Memory_Indirect", value++ },
       { "Sib", value++ },
-      { "RIP_Relative", value++ },
       { "Import", value++ },
-      { "Label_32", value++ },
+      { "Label", value++ },
     };
     push_type(type_enum("Operand_Tag", items));
   }

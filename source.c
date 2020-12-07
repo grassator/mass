@@ -2212,7 +2212,7 @@ token_rewrite_goto(
   if (value) {
     if (
       value->descriptor->tag == Descriptor_Tag_Void &&
-      value->operand.tag == Operand_Tag_Label_32
+      value->operand.tag == Operand_Tag_Label
     ) {
       push_instruction(
         &builder->code_block.instructions, &keyword->source_range,

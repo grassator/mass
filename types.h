@@ -121,9 +121,8 @@ typedef enum Operand_Tag {
   Operand_Tag_Immediate_64 = 8,
   Operand_Tag_Memory_Indirect = 9,
   Operand_Tag_Sib = 10,
-  Operand_Tag_RIP_Relative = 11,
-  Operand_Tag_Import = 12,
-  Operand_Tag_Label_32 = 13,
+  Operand_Tag_Import = 11,
+  Operand_Tag_Label = 12,
 } Operand_Tag;
 
 typedef enum Section_Permissions {

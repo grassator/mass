@@ -362,7 +362,7 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   if (last_instruction->type != Instruction_Type_Assembly) return;
   if (last_instruction->assembly.mnemonic != jmp) return;
   Operand op = last_instruction->assembly.operands[0];
-  if (op.tag != Operand_Tag_Label_32) return;
+  if (op.tag != Operand_Tag_Label) return;
   if (op.Label.index.value != builder->code_block.end_label.value) return;
   dyn_array_pop(builder->code_block.instructions);
 }
@@ -403,7 +403,7 @@ fn_normalize_instruction_operands(
         program, operand->Import.library_name, operand->Import.symbol_name
       );
       *operand = (Operand){
-        .tag = Operand_Tag_RIP_Relative,
+        .tag = Operand_Tag_Label,
         .byte_size = operand->byte_size,
         .Label = {.index = symbol->label32},
       };
@@ -448,7 +448,7 @@ fn_encode(
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
-  assert(operand->tag == Operand_Tag_Label_32);
+  assert(operand->tag == Operand_Tag_Label);
   Label *label = program_get_label(program, operand->Label.index);
 
   s64 code_base_rva = label->section->base_rva;
@@ -1119,7 +1119,7 @@ value_pointer_to(
   // TODO support immediates
   assert(
     value->operand.tag == Operand_Tag_Memory_Indirect ||
-    value->operand.tag == Operand_Tag_RIP_Relative
+    value->operand.tag == Operand_Tag_Label
   );
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
@@ -1208,7 +1208,7 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (to_call->operand.tag == Operand_Tag_Label_32) {
+  if (to_call->operand.tag == Operand_Tag_Label) {
     push_instruction(instructions, source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
   } else {
     Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, to_call->descriptor);

@@ -238,11 +238,6 @@ print_operand(
       printf("m%d", bits);
       break;
     }
-    case Operand_Tag_RIP_Relative: {
-      // FIXME unify with label
-      printf("[.rdata + UNIMPLEMENTED]");
-      break;
-    }
     case Operand_Tag_Import: {
       printf("rip_import(");
       slice_print(operand->Import.library_name);
@@ -251,7 +246,7 @@ print_operand(
       printf(")");
       break;
     }
-    case Operand_Tag_Label_32: {
+    case Operand_Tag_Label: {
       printf("rel....UNIMPLEMENTED");
       break;
     }
@@ -343,7 +338,7 @@ label32(
   Label_Index label
 ) {
   return (const Operand) {
-    .tag = Operand_Tag_Label_32,
+    .tag = Operand_Tag_Label,
     .byte_size = 4,
     .Label = {.index = label}
   };
@@ -518,7 +513,7 @@ operand_is_memory(
 ) {
   return (
     operand->tag == Operand_Tag_Memory_Indirect ||
-    operand->tag == Operand_Tag_RIP_Relative ||
+    operand->tag == Operand_Tag_Label ||
     operand->tag == Operand_Tag_Sib
   );
 }
@@ -564,8 +559,7 @@ operand_equal(
     case Operand_Tag_Immediate_64: {
       return a->Immediate_64.value == b->Immediate_64.value;
     }
-    case Operand_Tag_RIP_Relative:
-    case Operand_Tag_Label_32: {
+    case Operand_Tag_Label: {
       // TODO figure out if need some other way to compare labels
       return a->Label.index.value == b->Label.index.value;
     }
@@ -673,7 +667,7 @@ value_global_internal(
   *result = (Value) {
     .descriptor = descriptor,
     .operand = {
-      .tag = Operand_Tag_RIP_Relative,
+      .tag = Operand_Tag_Label,
       .byte_size = byte_size,
       .Label = {.index = label_index},
     },
@@ -971,7 +965,7 @@ rip_value_pointer(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.tag == Operand_Tag_RIP_Relative);
+  assert(value->operand.tag == Operand_Tag_Label);
   Label *label = program_get_label(program, value->operand.Label.index);
   return bucket_buffer_offset_to_pointer(label->section->buffer, label->offset_in_section);
 }
@@ -1036,7 +1030,7 @@ value_as_function(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.tag == Operand_Tag_Label_32);
+  assert(value->operand.tag == Operand_Tag_Label);
   assert(program->jit_buffer);
   Label *label = program_get_label(program, value->operand.Label.index);
   assert(label->section == &program->code_section);

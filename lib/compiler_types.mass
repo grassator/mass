@@ -9,9 +9,8 @@ Mass_Operand_Tag_Immediate_32 :: 7
 Mass_Operand_Tag_Immediate_64 :: 8
 Mass_Operand_Tag_Memory_Indirect :: 9
 Mass_Operand_Tag_Sib :: 10
-Mass_Operand_Tag_RIP_Relative :: 11
-Mass_Operand_Tag_Import :: 12
-Mass_Operand_Tag_Label_32 :: 13
+Mass_Operand_Tag_Import :: 11
+Mass_Operand_Tag_Label :: 12
 
 Mass_Section_Permissions_Read :: 1
 Mass_Section_Permissions_Write :: 2
