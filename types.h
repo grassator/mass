@@ -274,15 +274,15 @@ typedef struct Descriptor_Struct_Field {
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
 typedef enum {
-  Descriptor_Tag_Void = 1,
-  Descriptor_Tag_Any = 2,
-  Descriptor_Tag_Opaque = 3,
-  Descriptor_Tag_Function = 4,
-  Descriptor_Tag_Fixed_Size_Array = 5,
-  Descriptor_Tag_Struct = 6,
-  Descriptor_Tag_Tagged_Union = 7,
-  Descriptor_Tag_Pointer = 8,
-  Descriptor_Tag_Type = 9,
+  Descriptor_Tag_Void = 0,
+  Descriptor_Tag_Any = 1,
+  Descriptor_Tag_Opaque = 2,
+  Descriptor_Tag_Function = 3,
+  Descriptor_Tag_Fixed_Size_Array = 4,
+  Descriptor_Tag_Struct = 5,
+  Descriptor_Tag_Tagged_Union = 6,
+  Descriptor_Tag_Pointer = 7,
+  Descriptor_Tag_Type = 8,
 } Descriptor_Tag;
 
 typedef struct {
@@ -361,6 +361,7 @@ typedef enum Token_Group_Type {
 } Token_Group_Type;
 
 typedef enum {
+  Token_Tag_None = 0,
   Token_Tag_Id = 1,
   Token_Tag_Newline = 2,
   Token_Tag_Integer = 3,
@@ -406,8 +407,8 @@ typedef struct Token_Pattern {
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 
 typedef enum {
-  Tokenizer_Result_Tag_Success = 1,
-  Tokenizer_Result_Tag_Error = 2,
+  Tokenizer_Result_Tag_Success = 0,
+  Tokenizer_Result_Tag_Error = 1,
 } Tokenizer_Result_Tag;
 
 typedef struct {
@@ -425,8 +426,8 @@ typedef struct Tokenizer_Result {
 } Tokenizer_Result;
 typedef dyn_array_type(Tokenizer_Result) Array_Tokenizer_Result;
 typedef enum {
-  Parse_Result_Tag_Success = 1,
-  Parse_Result_Tag_Error = 2,
+  Parse_Result_Tag_Success = 0,
+  Parse_Result_Tag_Error = 1,
 } Parse_Result_Tag;
 
 typedef struct {

@@ -135,7 +135,7 @@ print_c_type(
         fprintf(file, "typedef enum {\n");
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct *item = &type->union_.items[i];
-          fprintf(file, "  %s_Tag_%s = %llu,\n", type->union_.name, item->name, i + 1);
+          fprintf(file, "  %s_Tag_%s = %llu,\n", type->union_.name, item->name, i);
         }
         fprintf(file, "} %s_Tag;\n\n", type->union_.name);
       }
@@ -541,6 +541,7 @@ main(void) {
   }
 
   push_type(add_common_fields(type_union("Token", (Struct[]){
+    struct_empty("None"),
     struct_empty("Id"),
     struct_empty("Newline"),
     struct_empty("Integer"),

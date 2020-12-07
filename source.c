@@ -16,6 +16,7 @@ token_clone_deep(
   Token *clone = allocator_allocate(allocator, Token);
   *clone = *token;
   switch (token->tag) {
+    case Token_Tag_None:
     case Token_Tag_Newline:
     case Token_Tag_Integer:
     case Token_Tag_Hex_Integer:
@@ -748,6 +749,10 @@ token_force_type(
 ) {
   Descriptor *descriptor = 0;
   switch (token->tag) {
+    case Token_Tag_None: {
+      panic("Internal Error: Encountered token with an uninitialized tag");
+      break;
+    }
     case Token_Tag_Id: {
       descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
@@ -845,6 +850,10 @@ token_apply_macro_replacements(
     Token *copy = allocator_allocate(context->allocator, Token);
     *copy = *token;
     switch (token->tag) {
+      case Token_Tag_None: {
+        panic("Internal Error: Encountered token with an uninitialized tag");
+        break;
+      }
       case Token_Tag_Id: {
         Slice name = token->source;
         const Token **replacement_ptr = hash_map_get(map, name);
@@ -1051,6 +1060,10 @@ token_force_constant_value(
   const Token *token
 ) {
   switch(token->tag) {
+    case Token_Tag_None: {
+      panic("Internal Error: Encountered token with an uninitialized tag");
+      break;
+    }
     case Token_Tag_Integer: {
       return value_from_integer_token(context, scope, token);
     }
@@ -1112,6 +1125,10 @@ token_force_value(
   Value *result_value
 ) {
   switch(token->tag) {
+    case Token_Tag_None: {
+      panic("Internal Error: Encountered token with an uninitialized tag");
+      break;
+    }
     case Token_Tag_Integer: {
       Value *immediate = value_from_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
@@ -1971,6 +1988,10 @@ token_rewrite_constant_expression(
     const Token *token = token_view_get(view, i);
 
     switch(token->tag) {
+      case Token_Tag_None: {
+        panic("Internal Error: Encountered token with an uninitialized tag");
+        break;
+      }
       case Token_Tag_Newline: {
         continue;
       }
