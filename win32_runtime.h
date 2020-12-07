@@ -1,7 +1,6 @@
 #ifndef WIN32_RUNTIME_H
 #define WIN32_RUNTIME_H
 
-#include "value.h"
 #include "win32_platform.h"
 
 static DWORD

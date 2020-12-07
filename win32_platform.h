@@ -1,6 +1,30 @@
 #ifndef WIN32_PLATFORM_H
 #define WIN32_PLATFORM_H
 
+#include "value.h"
+// Partial list of WIN32 API basic type definitions to allow for cross-platform
+// compilation while keeping MSDN reference code usable as is.
+// https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
+
+typedef int BOOL;
+typedef VOID *PVOID;
+typedef unsigned long DWORD;
+typedef PVOID HANDLE;
+typedef int HFILE;
+typedef unsigned char UBYTE;
+typedef unsigned short USHORT;
+typedef unsigned long ULONG;
+typedef LONG HRESULT;
+
+#ifndef _WIN32
+// https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-160#struct-runtime_function
+typedef struct RUNTIME_FUNCTION {
+  ULONG BeginAddress;
+  ULONG EndAddress;
+  ULONG UnwindData;
+} RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+#endif
+
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=vs-2019#unwind-data-definitions-in-c
 typedef enum _UNWIND_OP_CODES {
   UWOP_PUSH_NONVOL = 0, /* info == register number */
@@ -16,12 +40,12 @@ typedef enum _UNWIND_OP_CODES {
 
 typedef union {
   struct {
-    u8 CodeOffset;
-    u8 UnwindOp : 4;
-    u8 OpInfo   : 4;
+    UBYTE CodeOffset;
+    UBYTE UnwindOp : 4;
+    UBYTE OpInfo   : 4;
   };
-  u16 FrameOffset;
-  u16 DataForPreviousCode;
+  USHORT FrameOffset;
+  USHORT DataForPreviousCode;
 } UNWIND_CODE;
 
 #define UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE sizeof(void *) * 2
@@ -32,12 +56,12 @@ typedef union {
 #define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE / sizeof(UNWIND_CODE))
 
 typedef struct {
-  u8 Version       : 3;
-  u8 Flags         : 5;
-  u8 SizeOfProlog;
-  u8 CountOfCodes;
-  u8 FrameRegister : 4;
-  u8 FrameOffset   : 4;
+  UBYTE Version       : 3;
+  UBYTE Flags         : 5;
+  UBYTE SizeOfProlog;
+  UBYTE CountOfCodes;
+  UBYTE FrameRegister : 4;
+  UBYTE FrameOffset   : 4;
   // FIXME actually turn this into a variadic struct with getter functions
   // :RegisterAllocation need to add more reserved space for UnwindCode
   UNWIND_CODE UnwindCode[
