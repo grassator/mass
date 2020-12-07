@@ -65,17 +65,11 @@ move_value(
   Value *b
 );
 
-// FIXME Instead of passing win32 debug structures directly
-// `fn_encode` should return a struct with relevant information
-#include "win32.h"
 void
 fn_encode(
   Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder,
-  RUNTIME_FUNCTION *function_exception_info,
-  UNWIND_INFO *unwind_info,
-  u32 unwind_data_rva
+  Function_Builder *builder
 );
 
 void

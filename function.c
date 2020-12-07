@@ -441,10 +441,7 @@ void
 fn_encode(
   Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder,
-  RUNTIME_FUNCTION *function_exception_info,
-  UNWIND_INFO *unwind_info,
-  u32 unwind_data_rva
+  Function_Builder *builder
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
@@ -513,7 +510,7 @@ fn_encode(
   );
 
   // :RegisterPushPop
-  // Pop non-volatile registers (in reverse order)
+  // Pop non-volatile registers (in original order)
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
@@ -529,8 +526,6 @@ fn_encode(
   builder->layout.end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
-
-  win32_fn_init_unwind_info(builder, unwind_info, function_exception_info, unwind_data_rva);
 }
 
 void

@@ -2,6 +2,7 @@
 #include "assert.h"
 #include "value.h"
 #include "function.h"
+#include "win32.h"
 #include <time.h>
 
 #define PE32_FILE_ALIGNMENT 0x200
@@ -224,16 +225,22 @@ encode_text_section(
   program->code_section.base_rva = header->VirtualAddress;
 
   bool found_entry_point = false;
+
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     if (operand_equal(&builder->value->operand, &program->entry_point->operand)) {
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
+    fn_encode(program, result.buffer, builder);
+  }
+
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
     RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
     UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
     u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
-    fn_encode(program, result.buffer, builder, runtime_function, unwind_info, unwind_info_rva);
+    win32_fn_init_unwind_info(builder, unwind_info, runtime_function, unwind_info_rva);
   }
 
   // After all the functions are encoded we should know all the offsets
