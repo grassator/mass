@@ -190,8 +190,19 @@ typedef struct {
   u64 register_occupied_bitset;
 } Code_Block;
 
-typedef struct Function_Builder {
+
+
+typedef struct {
   s32 stack_reserve;
+  u8 size_of_prolog;
+  u32 begin_rva;
+  u32 end_rva;
+  u8 stack_allocation_offset_in_prolog;
+  u8 volatile_register_push_offsets[16];
+} Function_Layout;
+
+typedef struct Function_Builder {
+  Function_Layout layout;
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   Descriptor *descriptor;

@@ -7,9 +7,9 @@ reserve_stack(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
-  fn->stack_reserve += byte_size;
-  Operand operand = stack(-fn->stack_reserve, byte_size);
+  fn->layout.stack_reserve = s32_align(fn->layout.stack_reserve, byte_size);
+  fn->layout.stack_reserve += byte_size;
+  Operand operand = stack(-fn->layout.stack_reserve, byte_size);
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
@@ -302,7 +302,7 @@ fn_begin(
     .operand = label32(make_label(context->program, &context->program->code_section)),
   };
   Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
-    .stack_reserve = 0,
+    .layout = {0},
     .descriptor = descriptor,
     .value = fn_value,
     .code_block = {
@@ -334,8 +334,8 @@ fn_end(
   Function_Builder *builder
 ) {
   u8 alignment = 0x8;
-  builder->stack_reserve += builder->max_call_parameters_stack_size;
-  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
+  builder->layout.stack_reserve += builder->max_call_parameters_stack_size;
+  builder->layout.stack_reserve = s32_align(builder->layout.stack_reserve, 16) + alignment;
 }
 
 u32
@@ -374,14 +374,14 @@ fn_adjust_stack_displacement(
 ) {
   // Negative diplacement is used to encode local variables
   if (displacement < 0) {
-    displacement += builder->stack_reserve;
+    displacement += builder->layout.stack_reserve;
   } else
   // Positive values larger than max_call_parameters_stack_size
   if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
     s32 return_address_size = 8;
-    displacement += builder->stack_reserve + return_address_size;
+    displacement += builder->layout.stack_reserve + return_address_size;
   }
   return displacement;
 }
@@ -452,8 +452,8 @@ fn_encode(
   Label *label = program_get_label(program, operand->Label.index);
 
   s64 code_base_rva = label->section->base_rva;
-  u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
-  Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
+  builder->layout.begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
+  Operand stack_size_operand = imm_auto_8_or_32(builder->layout.stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,
@@ -461,22 +461,19 @@ fn_encode(
     }
   );
 
-  Array_UNWIND_CODE unwind_codes = dyn_array_make(Array_UNWIND_CODE);
-
-  #define fn_offset_in_prolog()\
-    u64_to_u8(code_base_rva + buffer->occupied - fn_start_rva)
-
+  // :RegisterPushPop
+  // :Win32UnwindCodes Must match what happens in the unwind code generation
   // Push non-volatile registers (in reverse order)
+  u8 push_index = 0;
   for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+        builder->layout.volatile_register_push_offsets[push_index++] =
+          u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
         Operand to_save = operand_register_for_descriptor(reg_index, &descriptor_s64);
-        encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {push, {to_save}}});
-        dyn_array_push(unwind_codes, (UNWIND_CODE) {
-          .CodeOffset = fn_offset_in_prolog(),
-          .UnwindOp = UWOP_PUSH_NONVOL,
-          .OpInfo = reg_index,
-        });
+        encode_instruction_with_compiler_location(
+          program, buffer, &(Instruction) {.assembly = {push, {to_save}}}
+        );
       }
     }
   }
@@ -484,10 +481,11 @@ fn_encode(
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {.assembly = {sub, {rsp, stack_size_operand}}}
   );
-  u32 stack_allocation_offset_in_prolog = fn_offset_in_prolog();
-  u32 size_of_prolog = u64_to_u32(code_base_rva + buffer->occupied) - fn_start_rva;
+  builder->layout.stack_allocation_offset_in_prolog =
+    u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
+  builder->layout.size_of_prolog =
+    u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
 
-  #undef fn_offset_in_prolog
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
@@ -514,68 +512,25 @@ fn_encode(
     program, buffer, &(Instruction) {.assembly = {add, {rsp, stack_size_operand}}}
   );
 
-  // Pop non-volatile registers
-  for (s64 i = dyn_array_length(unwind_codes) - 1; i >= 0; --i) {
-    Operand to_save = {
-      .tag = Operand_Tag_Register,
-      .byte_size = 8,
-      .Register.index = dyn_array_get(unwind_codes, i)->OpInfo,
-    };
-    encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {pop, {to_save}}});
+  // :RegisterPushPop
+  // Pop non-volatile registers (in reverse order)
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+        Operand to_save = operand_register_for_descriptor(reg_index, &descriptor_s64);
+        encode_instruction_with_compiler_location(
+          program, buffer, &(Instruction) {.assembly = {pop, {to_save}}}
+        );
+      }
+    }
   }
 
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {ret, {0}}});
-  u32 fn_end_rva = u64_to_u32(code_base_rva + buffer->occupied);
+  builder->layout.end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
 
-  if (function_exception_info || unwind_info) {
-    // Make sure either both or none are provided
-    assert(unwind_info);
-    assert(function_exception_info);
-    *unwind_info = (UNWIND_INFO) {
-      .Version = 1,
-      .Flags = 0,
-      .SizeOfProlog = u32_to_u8(size_of_prolog),
-      .CountOfCodes = 0,
-      .FrameRegister = 0,
-      .FrameOffset = 0,
-    };
-
-    u8 unwind_code_index = 0;
-    for (u64 i = 0; i < dyn_array_length(unwind_codes); ++i) {
-      unwind_info->UnwindCode[unwind_code_index++] = *dyn_array_get(unwind_codes, i);
-    }
-
-    if (builder->stack_reserve) {
-      assert(builder->stack_reserve >= 8);
-      assert(builder->stack_reserve % 8 == 0);
-      if (builder->stack_reserve <= 128) {
-        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
-          .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
-          .UnwindOp = UWOP_ALLOC_SMALL,
-          .OpInfo = (builder->stack_reserve - 8) / 8,
-        };
-      } else {
-        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
-          .CodeOffset = u32_to_u8(stack_allocation_offset_in_prolog),
-          .UnwindOp = UWOP_ALLOC_LARGE,
-          .OpInfo = 0,
-        };
-        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
-          .DataForPreviousCode = u32_to_u16(builder->stack_reserve / 8),
-        };
-        // TODO support 512k + allocations
-      }
-      unwind_info->CountOfCodes = unwind_code_index;
-    }
-    *function_exception_info = (RUNTIME_FUNCTION) {
-      .BeginAddress = fn_start_rva,
-      .EndAddress = fn_end_rva,
-      .UnwindData = unwind_data_rva,
-    };
-  }
-  dyn_array_destroy(unwind_codes);
+  win32_fn_init_unwind_info(builder, unwind_info, function_exception_info, unwind_data_rva);
 }
 
 void

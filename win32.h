@@ -1,6 +1,8 @@
 #ifndef WIN32_H
 #define WIN32_H
 
+#include "value.h"
+
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=vs-2019#unwind-data-definitions-in-c
 typedef enum _UNWIND_OP_CODES {
   UWOP_PUSH_NONVOL = 0, /* info == register number */
@@ -55,5 +57,68 @@ typedef struct {
     UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES
   ];
 } UNWIND_INFO;
+
+void
+win32_fn_init_unwind_info(
+  const Function_Builder *builder,
+  UNWIND_INFO *unwind_info,
+  RUNTIME_FUNCTION *function_exception_info,
+  u32 unwind_data_rva
+) {
+  const Function_Layout *layout = &builder->layout;
+  assert(unwind_info);
+  assert(function_exception_info);
+  *unwind_info = (UNWIND_INFO) {
+    .Version = 1,
+    .Flags = 0,
+    .SizeOfProlog = layout->size_of_prolog,
+    .CountOfCodes = 0,
+    .FrameRegister = 0,
+    .FrameOffset = 0,
+  };
+
+  // :Win32UnwindCodes Must match what happens in the function encoding
+  u8 unwind_code_index = 0;
+  for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE) {
+          .CodeOffset = builder->layout.volatile_register_push_offsets[unwind_code_index++],
+          .UnwindOp = UWOP_PUSH_NONVOL,
+          .OpInfo = s32_to_u8(reg_index),
+        };
+      }
+    }
+  }
+
+  if (layout->stack_reserve) {
+    assert(layout->stack_reserve >= 8);
+    assert(layout->stack_reserve % 8 == 0);
+    if (layout->stack_reserve <= 128) {
+      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+        .CodeOffset = layout->stack_allocation_offset_in_prolog,
+        .UnwindOp = UWOP_ALLOC_SMALL,
+        .OpInfo = (layout->stack_reserve - 8) / 8,
+      };
+    } else {
+      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+        .CodeOffset = layout->stack_allocation_offset_in_prolog,
+        .UnwindOp = UWOP_ALLOC_LARGE,
+        .OpInfo = 0,
+      };
+      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+        .DataForPreviousCode = u32_to_u16(layout->stack_reserve / 8),
+      };
+      // TODO support 512k + allocations
+    }
+    unwind_info->CountOfCodes = unwind_code_index;
+  }
+  // TODO do this on the outside
+  *function_exception_info = (RUNTIME_FUNCTION) {
+    .BeginAddress = layout->begin_rva,
+    .EndAddress = layout->end_rva,
+    .UnwindData = unwind_data_rva,
+  };
+}
 
 #endif
