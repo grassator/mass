@@ -13,56 +13,6 @@ register_is_xmm(
   return !!(reg & Register_Xmm0);
 }
 
-typedef struct {
-  Register index;
-} Operand_Register;
-
-typedef struct {
-  Register index;
-} Operand_Xmm;
-
-typedef struct {
-  Compare_Type compare_type;
-} Operand_Eflags;
-
-typedef struct {
-  Label_Index index;
-} Operand_Label;
-
-typedef struct {
-  s8 value;
-} Operand_Immediate_8;
-
-typedef struct {
-  s16 value;
-} Operand_Immediate_16;
-
-typedef struct {
-  s32 value;
-} Operand_Immediate_32;
-
-typedef struct {
-  s64 value;
-} Operand_Immediate_64;
-
-typedef struct {
-  Operand_Tag tag;
-  u32 byte_size;
-  union {
-    Operand_Register Register;
-    Operand_Xmm Xmm;
-    Operand_Immediate_8 Immediate_8;
-    Operand_Immediate_16 Immediate_16;
-    Operand_Immediate_32 Immediate_32;
-    Operand_Immediate_64 Immediate_64;
-    Operand_Label Label;
-    Operand_Memory_Indirect Memory_Indirect;
-    Operand_Sib Sib;
-    Operand_Import Import;
-    Operand_Eflags Eflags;
-  };
-} Operand;
-
 static inline bool
 operand_equal(
   const Operand *a,

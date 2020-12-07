@@ -292,26 +292,6 @@ main(void) {
       }\
     } while(0);
 
-  {
-    int32_t value = 0;
-    Enum_Item items[] = {
-      { "None", value++ },
-      { "Any", value++ },
-      { "Eflags", value++ },
-      { "Register", value++ },
-      { "Xmm", value++ },
-      { "Immediate_8", value++ },
-      { "Immediate_16", value++ },
-      { "Immediate_32", value++ },
-      { "Immediate_64", value++ },
-      { "Memory_Indirect", value++ },
-      { "Sib", value++ },
-      { "Import", value++ },
-      { "Label", value++ },
-    };
-    push_type(type_enum("Operand_Tag", items));
-  }
-
   push_type(type_enum("Section_Permissions", (Enum_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },
@@ -378,18 +358,6 @@ main(void) {
     { "8", 0b11 },
   }));
 
-  push_type(type_struct("Operand_Sib", (Struct_Item[]){
-    { "SIB_Scale", "scale" },
-    { "Register", "index" },
-    { "Register", "base" },
-    { "s32", "displacement" },
-  }));
-
-  push_type(type_struct("Operand_Memory_Indirect", (Struct_Item[]){
-    { "Register", "reg" },
-    { "s32", "displacement" },
-  }));
-
   push_type(type_struct("Label_Index", (Struct_Item[]){
     { "u64", "value" },
   }));
@@ -419,11 +387,6 @@ main(void) {
     { "u32", "image_thunk_rva" },
   }));
 
-  push_type(type_struct("Operand_Import", (Struct_Item[]){
-    { "Slice", "library_name" },
-    { "Slice", "symbol_name" },
-  }));
-
   {
     int32_t value = 1;
     Enum_Item items[] = {
@@ -445,27 +408,50 @@ main(void) {
     push_type(type_enum("Compare_Type", items));
   }
 
-  //push_type(add_common_fields(type_union("Operand", (Struct[]){
-    //struct_empty("None"),
-    //struct_empty("Id"),
-    //struct_empty("Newline"),
-    //struct_empty("Integer"),
-    //struct_empty("Hex_Integer"),
-    //struct_empty("Operator"),
-    //struct_fields("Value", (Struct_Item[]){
-      //{ "Value *", "value" },
-    //}),
-    //struct_fields("String", (Struct_Item[]){
-      //{ "Slice", "slice" },
-    //}),
-    //struct_fields("Group", (Struct_Item[]){
-      //{ "Token_Group_Type", "type" },
-      //{ "Array_Const_Token_Ptr", "children" },
-    //}),
-  //}), (Struct_Item[]){
-    //{ "Source_Range", "source_range" },
-    //{ "Slice", "source" },
-  //}));
+  push_type(add_common_fields(type_union("Operand", (Struct[]){
+    struct_empty("None"),
+    struct_empty("Any"),
+    struct_fields("Eflags", (Struct_Item[]){
+      { "Compare_Type", "compare_type" },
+    }),
+    struct_fields("Register", (Struct_Item[]){
+      { "Register", "index" },
+    }),
+    struct_fields("Xmm", (Struct_Item[]){
+      { "Register", "index" },
+    }),
+    struct_fields("Immediate_8", (Struct_Item[]){
+      { "s8", "value" },
+    }),
+    struct_fields("Immediate_16", (Struct_Item[]){
+      { "s16", "value" },
+    }),
+    struct_fields("Immediate_32", (Struct_Item[]){
+      { "s32", "value" },
+    }),
+    struct_fields("Immediate_64", (Struct_Item[]){
+      { "s64", "value" },
+    }),
+    struct_fields("Memory_Indirect", (Struct_Item[]){
+      { "Register", "reg" },
+      { "s32", "displacement" },
+    }),
+    struct_fields("Sib", (Struct_Item[]){
+      { "SIB_Scale", "scale" },
+      { "Register", "index" },
+      { "Register", "base" },
+      { "s32", "displacement" },
+    }),
+    struct_fields("Import", (Struct_Item[]){
+      { "Slice", "library_name" },
+      { "Slice", "symbol_name" },
+    }),
+    struct_fields("Label", (Struct_Item[]){
+      { "Label_Index", "index" },
+    }),
+  }), (Struct_Item[]){
+    { "u32", "byte_size" },
+  }));
 
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
     { "const char *", "filename" },
@@ -527,8 +513,6 @@ main(void) {
       { "Descriptor *", "descriptor" },
     }),
   }));
-
-  /////////////////////////
 
   push_type(type_struct("Source_File", (Struct_Item[]){
     { "Slice", "path" },

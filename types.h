@@ -1,7 +1,5 @@
 // Forward declarations
 
-typedef enum Operand_Tag Operand_Tag;
-
 typedef enum Section_Permissions Section_Permissions;
 
 typedef struct Section Section;
@@ -11,14 +9,6 @@ typedef dyn_array_type(const Section *) Array_Const_Section_Ptr;
 typedef enum Register Register;
 
 typedef enum SIB_Scale SIB_Scale;
-
-typedef struct Operand_Sib Operand_Sib;
-typedef dyn_array_type(Operand_Sib *) Array_Operand_Sib_Ptr;
-typedef dyn_array_type(const Operand_Sib *) Array_Const_Operand_Sib_Ptr;
-
-typedef struct Operand_Memory_Indirect Operand_Memory_Indirect;
-typedef dyn_array_type(Operand_Memory_Indirect *) Array_Operand_Memory_Indirect_Ptr;
-typedef dyn_array_type(const Operand_Memory_Indirect *) Array_Const_Operand_Memory_Indirect_Ptr;
 
 typedef struct Label_Index Label_Index;
 typedef dyn_array_type(Label_Index *) Array_Label_Index_Ptr;
@@ -40,11 +30,11 @@ typedef struct Import_Library Import_Library;
 typedef dyn_array_type(Import_Library *) Array_Import_Library_Ptr;
 typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
-typedef struct Operand_Import Operand_Import;
-typedef dyn_array_type(Operand_Import *) Array_Operand_Import_Ptr;
-typedef dyn_array_type(const Operand_Import *) Array_Const_Operand_Import_Ptr;
-
 typedef enum Compare_Type Compare_Type;
+
+typedef struct Operand Operand;
+typedef dyn_array_type(Operand *) Array_Operand_Ptr;
+typedef dyn_array_type(const Operand *) Array_Const_Operand_Ptr;
 
 typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
@@ -109,22 +99,6 @@ typedef struct Function_Builder Function_Builder;
 
 // Type Definitions
 
-typedef enum Operand_Tag {
-  Operand_Tag_None = 0,
-  Operand_Tag_Any = 1,
-  Operand_Tag_Eflags = 2,
-  Operand_Tag_Register = 3,
-  Operand_Tag_Xmm = 4,
-  Operand_Tag_Immediate_8 = 5,
-  Operand_Tag_Immediate_16 = 6,
-  Operand_Tag_Immediate_32 = 7,
-  Operand_Tag_Immediate_64 = 8,
-  Operand_Tag_Memory_Indirect = 9,
-  Operand_Tag_Sib = 10,
-  Operand_Tag_Import = 11,
-  Operand_Tag_Label = 12,
-} Operand_Tag;
-
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
   Section_Permissions_Write = 2,
@@ -185,20 +159,6 @@ typedef enum SIB_Scale {
   SIB_Scale_8 = 3,
 } SIB_Scale;
 
-typedef struct Operand_Sib {
-  SIB_Scale scale;
-  Register index;
-  Register base;
-  s32 displacement;
-} Operand_Sib;
-typedef dyn_array_type(Operand_Sib) Array_Operand_Sib;
-
-typedef struct Operand_Memory_Indirect {
-  Register reg;
-  s32 displacement;
-} Operand_Memory_Indirect;
-typedef dyn_array_type(Operand_Memory_Indirect) Array_Operand_Memory_Indirect;
-
 typedef struct Label_Index {
   u64 value;
 } Label_Index;
@@ -233,12 +193,6 @@ typedef struct Import_Library {
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 
-typedef struct Operand_Import {
-  Slice library_name;
-  Slice symbol_name;
-} Operand_Import;
-typedef dyn_array_type(Operand_Import) Array_Operand_Import;
-
 typedef enum Compare_Type {
   Compare_Type_Equal = 1,
   Compare_Type_Not_Equal = 2,
@@ -252,6 +206,78 @@ typedef enum Compare_Type {
   Compare_Type_Signed_Greater_Equal = 10,
 } Compare_Type;
 
+typedef enum {
+  Operand_Tag_None = 0,
+  Operand_Tag_Any = 1,
+  Operand_Tag_Eflags = 2,
+  Operand_Tag_Register = 3,
+  Operand_Tag_Xmm = 4,
+  Operand_Tag_Immediate_8 = 5,
+  Operand_Tag_Immediate_16 = 6,
+  Operand_Tag_Immediate_32 = 7,
+  Operand_Tag_Immediate_64 = 8,
+  Operand_Tag_Memory_Indirect = 9,
+  Operand_Tag_Sib = 10,
+  Operand_Tag_Import = 11,
+  Operand_Tag_Label = 12,
+} Operand_Tag;
+
+typedef struct {
+  Compare_Type compare_type;
+} Operand_Eflags;
+typedef struct {
+  Register index;
+} Operand_Register;
+typedef struct {
+  Register index;
+} Operand_Xmm;
+typedef struct {
+  s8 value;
+} Operand_Immediate_8;
+typedef struct {
+  s16 value;
+} Operand_Immediate_16;
+typedef struct {
+  s32 value;
+} Operand_Immediate_32;
+typedef struct {
+  s64 value;
+} Operand_Immediate_64;
+typedef struct {
+  Register reg;
+  s32 displacement;
+} Operand_Memory_Indirect;
+typedef struct {
+  SIB_Scale scale;
+  Register index;
+  Register base;
+  s32 displacement;
+} Operand_Sib;
+typedef struct {
+  Slice library_name;
+  Slice symbol_name;
+} Operand_Import;
+typedef struct {
+  Label_Index index;
+} Operand_Label;
+typedef struct Operand {
+  Operand_Tag tag;
+  u32 byte_size;
+  union {
+    Operand_Eflags Eflags;
+    Operand_Register Register;
+    Operand_Xmm Xmm;
+    Operand_Immediate_8 Immediate_8;
+    Operand_Immediate_16 Immediate_16;
+    Operand_Immediate_32 Immediate_32;
+    Operand_Immediate_64 Immediate_64;
+    Operand_Memory_Indirect Memory_Indirect;
+    Operand_Sib Sib;
+    Operand_Import Import;
+    Operand_Label Label;
+  };
+} Operand;
+typedef dyn_array_type(Operand) Array_Operand;
 typedef struct Compiler_Source_Location {
   const char * filename;
   const char * function_name;

@@ -1,17 +1,3 @@
-Mass_Operand_Tag_None :: 0
-Mass_Operand_Tag_Any :: 1
-Mass_Operand_Tag_Eflags :: 2
-Mass_Operand_Tag_Register :: 3
-Mass_Operand_Tag_Xmm :: 4
-Mass_Operand_Tag_Immediate_8 :: 5
-Mass_Operand_Tag_Immediate_16 :: 6
-Mass_Operand_Tag_Immediate_32 :: 7
-Mass_Operand_Tag_Immediate_64 :: 8
-Mass_Operand_Tag_Memory_Indirect :: 9
-Mass_Operand_Tag_Sib :: 10
-Mass_Operand_Tag_Import :: 11
-Mass_Operand_Tag_Label :: 12
-
 Mass_Section_Permissions_Read :: 1
 Mass_Section_Permissions_Write :: 2
 Mass_Section_Permissions_Execute :: 4
@@ -65,18 +51,6 @@ Mass_SIB_Scale_2 :: 1
 Mass_SIB_Scale_4 :: 2
 Mass_SIB_Scale_8 :: 3
 
-Mass_Operand_Sib :: struct {
-  scale : SIB_Scale
-  index : Register
-  base : Register
-  displacement : s32
-}
-
-Mass_Operand_Memory_Indirect :: struct {
-  reg : Register
-  displacement : s32
-}
-
 Mass_Label_Index :: struct {
   value : u64
 }
@@ -104,11 +78,6 @@ Mass_Import_Library :: struct {
   rva : u32
   symbols : Array_Import_Symbol
   image_thunk_rva : u32
-}
-
-Mass_Operand_Import :: struct {
-  library_name : Slice
-  symbol_name : Slice
 }
 
 Mass_Compare_Type_Equal :: 1
