@@ -2,7 +2,7 @@
 #include "assert.h"
 #include "value.h"
 #include "function.h"
-#include "win32.h"
+#include "win32_platform.h"
 #include <time.h>
 
 #define PE32_FILE_ALIGNMENT 0x200

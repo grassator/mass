@@ -1,7 +1,10 @@
 #include "value.h"
 #include "function.h"
 #include "source.h"
-#include "win32.h"
+
+#ifdef _WIN32
+#include "win32_runtime.h"
+#endif
 
 static inline Label *
 program_get_label(
