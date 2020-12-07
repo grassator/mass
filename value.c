@@ -1290,17 +1290,10 @@ program_init(
     },
   };
 
-  scope_define_value(program->global_scope, slice_literal("f64"), type_f64_value);
-  scope_define_value(program->global_scope, slice_literal("f32"), type_f32_value);
-  scope_define_value(program->global_scope, slice_literal("s64"), type_s64_value);
-  scope_define_value(program->global_scope, slice_literal("s32"), type_s32_value);
-  scope_define_value(program->global_scope, slice_literal("s16"), type_s16_value);
-  scope_define_value(program->global_scope, slice_literal("s8"), type_s8_value);
-
-  scope_define_value(program->global_scope, slice_literal("u64"), type_u64_value);
-  scope_define_value(program->global_scope, slice_literal("u32"), type_u32_value);
-  scope_define_value(program->global_scope, slice_literal("u16"), type_u16_value);
-  scope_define_value(program->global_scope, slice_literal("u8"), type_u8_value);
+  #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
+    scope_define_value(program->global_scope, slice_literal(#_NAME_), type_##_NAME_##_value);
+  MASS_ENUMERATE_BUILT_IN_TYPES
+  #undef MASS_PROCESS_BUILT_IN_TYPE
 
   {
     Array_Token_Statement_Matcher matchers =

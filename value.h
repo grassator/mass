@@ -56,40 +56,33 @@ register_bitset_get(
 typedef struct Scope Scope;
 typedef struct Function_Builder Function_Builder;
 
-Descriptor descriptor_s8 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 8 },
-};
-Descriptor descriptor_s16 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 16 },
-};
-Descriptor descriptor_s32 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 32 },
-};
-Descriptor descriptor_s64 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 64 },
-};
+#define MASS_ENUMERATE_BUILT_IN_TYPES\
+  MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\
+  MASS_PROCESS_BUILT_IN_TYPE(s16, 16)\
+  MASS_PROCESS_BUILT_IN_TYPE(s32, 32)\
+  MASS_PROCESS_BUILT_IN_TYPE(s64, 64)\
+  MASS_PROCESS_BUILT_IN_TYPE(u8, 8)\
+  MASS_PROCESS_BUILT_IN_TYPE(u16, 16)\
+  MASS_PROCESS_BUILT_IN_TYPE(u32, 32)\
+  MASS_PROCESS_BUILT_IN_TYPE(u64, 64)\
+  MASS_PROCESS_BUILT_IN_TYPE(f32, 32)\
+  MASS_PROCESS_BUILT_IN_TYPE(f64, 64)
 
-
-Descriptor descriptor_u8 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 8 },
-};
-Descriptor descriptor_u16 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 16 },
-};
-Descriptor descriptor_u32 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 32 },
-};
-Descriptor descriptor_u64 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 64 },
-};
+#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
+  Descriptor descriptor_##_NAME_ = {\
+    .tag = { Descriptor_Tag_Opaque },\
+    .Opaque = { .bit_size = (_BIT_SIZE_) },\
+  };\
+  Value *type_##_NAME_##_value = &(Value) {\
+    .descriptor = &(Descriptor) {\
+      .tag = Descriptor_Tag_Type,\
+      .Type = {.descriptor = &descriptor_##_NAME_ },\
+    },\
+    .operand = { .tag = Operand_Tag_None },\
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
+  };
+MASS_ENUMERATE_BUILT_IN_TYPES
+#undef MASS_PROCESS_BUILT_IN_TYPE
 
 
 Descriptor descriptor_void = {
@@ -98,37 +91,6 @@ Descriptor descriptor_void = {
 Descriptor descriptor_any = {
   .tag = Descriptor_Tag_Any,
 };
-Descriptor descriptor_f32 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 32 },
-};
-Descriptor descriptor_f64 = {
-  .tag = { Descriptor_Tag_Opaque },
-  .Opaque = { .bit_size = 64 },
-};
-
-#define define_type_value(_TYPE_)\
-  Value *type_##_TYPE_##_value = &(Value) {\
-    .descriptor = &(Descriptor) {\
-      .tag = Descriptor_Tag_Type,\
-      .Type = {.descriptor = &descriptor_##_TYPE_ },\
-    },\
-    .operand = {.tag = Operand_Tag_None },\
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
-  }
-
-define_type_value(s64);
-define_type_value(s32);
-define_type_value(s16);
-define_type_value(s8);
-
-define_type_value(u64);
-define_type_value(u32);
-define_type_value(u16);
-define_type_value(u8);
-
-define_type_value(f64);
-define_type_value(f32);
 
 static inline bool
 descriptor_is_unsigned_integer(
