@@ -21,53 +21,54 @@ same_type(
   Descriptor *a,
   Descriptor *b
 ) {
-  if (a->type != b->type) return false;
-  switch(a->type) {
-    case Descriptor_Type_Pointer: {
+  if (a->tag != b->tag) return false;
+  switch(a->tag) {
+    case Descriptor_Tag_Pointer: {
       if (
-        a->pointer_to->type == Descriptor_Type_Fixed_Size_Array &&
-        same_type(a->pointer_to->array.item, b->pointer_to)
+        a->Pointer.to->tag == Descriptor_Tag_Fixed_Size_Array &&
+        same_type(a->Pointer.to->Fixed_Size_Array.item, b->Pointer.to)
       ) return true;
       if (
-        b->pointer_to->type == Descriptor_Type_Fixed_Size_Array &&
-        same_type(b->pointer_to->array.item, a->pointer_to)
+        b->Pointer.to->tag == Descriptor_Tag_Fixed_Size_Array &&
+        same_type(b->Pointer.to->Fixed_Size_Array.item, a->Pointer.to)
       ) return true;
       if (
-        a->pointer_to->type == Descriptor_Type_Void ||
-        b->pointer_to->type == Descriptor_Type_Void
+        a->Pointer.to->tag == Descriptor_Tag_Void ||
+        b->Pointer.to->tag == Descriptor_Tag_Void
       ) {
         return true;
       }
-      return same_type(a->pointer_to, b->pointer_to);
+      return same_type(a->Pointer.to, b->Pointer.to);
     }
-    case Descriptor_Type_Fixed_Size_Array: {
-      return same_type(a->array.item, b->array.item) && a->array.length == b->array.length;
+    case Descriptor_Tag_Fixed_Size_Array: {
+      return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
+        a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
     }
-    case Descriptor_Type_Void:
-    case Descriptor_Type_Opaque:
-    case Descriptor_Type_Tagged_Union:
-    case Descriptor_Type_Struct: {
+    case Descriptor_Tag_Void:
+    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Tagged_Union:
+    case Descriptor_Tag_Struct: {
       return a == b;
     }
-    case Descriptor_Type_Function: {
-      if (!same_type(a->function.returns->descriptor, b->function.returns->descriptor)) {
+    case Descriptor_Tag_Function: {
+      if (!same_type(a->Function.returns->descriptor, b->Function.returns->descriptor)) {
         return false;
       }
-      if (dyn_array_length(a->function.arguments) != dyn_array_length(b->function.arguments)) {
+      if (dyn_array_length(a->Function.arguments) != dyn_array_length(b->Function.arguments)) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->function.arguments); ++i) {
+      for (u64 i = 0; i < dyn_array_length(a->Function.arguments); ++i) {
         if (!same_value_type(
-          *dyn_array_get(a->function.arguments, i),
-          *dyn_array_get(b->function.arguments, i)
+          *dyn_array_get(a->Function.arguments, i),
+          *dyn_array_get(b->Function.arguments, i)
         )) {
           return false;
         }
       }
       return true;
     }
-    case Descriptor_Type_Any:
-    case Descriptor_Type_Type:
+    case Descriptor_Tag_Any:
+    case Descriptor_Tag_Type:
     default: {
       assert(!"Unsupported descriptor type");
       return false;
@@ -79,22 +80,22 @@ u32
 descriptor_alignment(
   Descriptor *descriptor
 ) {
-  if (descriptor->type == Descriptor_Type_Fixed_Size_Array) {
-    return descriptor_alignment(descriptor->array.item);
+  if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    return descriptor_alignment(descriptor->Fixed_Size_Array.item);
   }
   return descriptor_byte_size(descriptor);
 }
 
 u32
 struct_byte_size(
-  const Descriptor_Struct *struct_
+  const Descriptor_Struct *Struct
 ) {
-  s64 count = dyn_array_length(struct_->fields);
+  s64 count = dyn_array_length(Struct->fields);
   assert(count);
   u32 alignment = 0;
   u32 raw_size = 0;
   for (s32 i = 0; i < count; ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(struct_->fields, i);
+    Descriptor_Struct_Field *field = dyn_array_get(Struct->fields, i);
     u32 field_alignment = descriptor_alignment(field->descriptor);
     alignment = max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
@@ -111,37 +112,38 @@ descriptor_byte_size(
   const Descriptor *descriptor
 ) {
   assert(descriptor);
-  switch(descriptor->type) {
-    case Descriptor_Type_Void: {
+  switch(descriptor->tag) {
+    case Descriptor_Tag_Void: {
       return 0;
     }
-    case Descriptor_Type_Tagged_Union: {
-      s64 count = descriptor->tagged_union.struct_count;
+    case Descriptor_Tag_Tagged_Union: {
+      s64 count = descriptor->Tagged_Union.struct_count;
       u32 tag_size = sizeof(s64);
       u32 body_size = 0;
       for (s32 i = 0; i < count; ++i) {
-        Descriptor_Struct *struct_ = &descriptor->tagged_union.struct_list[i];
-        u32 struct_size = struct_byte_size(struct_);
+        Descriptor_Struct *Struct = &descriptor->Tagged_Union.struct_list[i];
+        u32 struct_size = struct_byte_size(Struct);
         body_size = max(body_size, struct_size);
       }
       return tag_size + body_size;
     }
-    case Descriptor_Type_Struct: {
-      return struct_byte_size(&descriptor->struct_);
+    case Descriptor_Tag_Struct: {
+      return struct_byte_size(&descriptor->Struct);
     }
-    case Descriptor_Type_Opaque: {
+    case Descriptor_Tag_Opaque: {
       u64 size_of_byte = 8;
-      return u64_to_u32((descriptor->opaque.bit_size + (size_of_byte - 1)) / size_of_byte);
+      return u64_to_u32((descriptor->Opaque.bit_size + (size_of_byte - 1)) / size_of_byte);
     }
-    case Descriptor_Type_Fixed_Size_Array: {
-      return descriptor_byte_size(descriptor->array.item) * descriptor->array.length;
+    case Descriptor_Tag_Fixed_Size_Array: {
+      return descriptor_byte_size(descriptor->Fixed_Size_Array.item) *
+        descriptor->Fixed_Size_Array.length;
     }
-    case Descriptor_Type_Pointer:
-    case Descriptor_Type_Function: {
+    case Descriptor_Tag_Pointer:
+    case Descriptor_Tag_Function: {
       return 8;
     }
-    case Descriptor_Type_Any:
-    case Descriptor_Type_Type:
+    case Descriptor_Tag_Any:
+    case Descriptor_Tag_Type:
     default: {
       assert(!"Unknown Descriptor Type");
     }
@@ -443,8 +445,8 @@ descriptor_struct_make(
 ) {
   Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
   *descriptor = (Descriptor) {
-    .type = Descriptor_Type_Struct,
-    .struct_ = {
+    .tag = Descriptor_Tag_Struct,
+    .Struct = {
       .fields = dyn_array_make(Array_Descriptor_Struct_Field),
     }
   };
@@ -458,8 +460,8 @@ descriptor_struct_add_field(
   Slice field_name
 ) {
   u32 offset = 0;
-  for (u64 i = 0; i < dyn_array_length(struct_descriptor->struct_.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(struct_descriptor->struct_.fields, i);
+  for (u64 i = 0; i < dyn_array_length(struct_descriptor->Struct.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(struct_descriptor->Struct.fields, i);
     u32 size = descriptor_byte_size(field->descriptor);
     offset = u32_align(offset, size);
     offset += size;
@@ -467,7 +469,7 @@ descriptor_struct_add_field(
 
   u32 size = descriptor_byte_size(field_descriptor);
   offset = u32_align(offset, size);
-  dyn_array_push(struct_descriptor->struct_.fields, (Descriptor_Struct_Field) {
+  dyn_array_push(struct_descriptor->Struct.fields, (Descriptor_Struct_Field) {
     .name = field_name,
     .descriptor = field_descriptor,
     .offset = offset,
@@ -983,8 +985,8 @@ value_global_c_string_from_slice_internal(
   s32 length = (s32)slice.length + 1;
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
-    .type = Descriptor_Type_Fixed_Size_Array,
-    .array = {
+    .tag = Descriptor_Tag_Fixed_Size_Array,
+    .Fixed_Size_Array = {
       .item = &descriptor_s8,
       .length = length,
     },
@@ -1006,8 +1008,8 @@ descriptor_pointer_to(
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
-    .type = Descriptor_Type_Pointer,
-    .pointer_to = descriptor,
+    .tag = Descriptor_Tag_Pointer,
+    .Pointer = {.to = descriptor },
   };
   return result;
 }
@@ -1020,8 +1022,8 @@ descriptor_array_of(
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
-    .type = Descriptor_Type_Fixed_Size_Array,
-    .array = {
+    .tag = Descriptor_Tag_Fixed_Size_Array,
+    .Fixed_Size_Array = {
       .item = descriptor,
       .length = length,
     },
@@ -1153,8 +1155,8 @@ parse_c_type(
       Descriptor *previous_descriptor = descriptor;
       descriptor = allocator_allocate(allocator, Descriptor);
       *descriptor = (const Descriptor) {
-        .type = Descriptor_Type_Pointer,
-        .pointer_to = previous_descriptor,
+        .tag = Descriptor_Tag_Pointer,
+        .Pointer = { .to = previous_descriptor },
       };
     }
     start = ch + 1;
@@ -1185,16 +1187,16 @@ c_function_return_value(
   ++ch;
   Descriptor *descriptor = parse_c_type(allocator, forward_declaration, ch);
   assert(descriptor);
-  switch(descriptor->type) {
-    case Descriptor_Type_Void: {
+  switch(descriptor->tag) {
+    case Descriptor_Tag_Void: {
       return &void_value;
     }
-    case Descriptor_Type_Function:
-    case Descriptor_Type_Pointer: {
+    case Descriptor_Tag_Function:
+    case Descriptor_Tag_Pointer: {
       Value *return_value = value_register_for_descriptor(allocator, Register_A, descriptor);
       return return_value;
     }
-    case Descriptor_Type_Opaque: {
+    case Descriptor_Tag_Opaque: {
       if (descriptor_is_integer(descriptor)) {
         Value *return_value = value_register_for_descriptor(allocator, Register_A, descriptor);
         return return_value;
@@ -1202,11 +1204,11 @@ c_function_return_value(
       panic("Unknown opaque type");
       break;
     }
-    case Descriptor_Type_Any:
-    case Descriptor_Type_Tagged_Union:
-    case Descriptor_Type_Fixed_Size_Array:
-    case Descriptor_Type_Struct:
-    case Descriptor_Type_Type:
+    case Descriptor_Tag_Any:
+    case Descriptor_Tag_Tagged_Union:
+    case Descriptor_Tag_Fixed_Size_Array:
+    case Descriptor_Tag_Struct:
+    case Descriptor_Tag_Type:
     default: {
       assert(!"Unsupported return type");
     }
@@ -1221,14 +1223,14 @@ c_function_descriptor(
 ) {
   Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
   *descriptor = (const Descriptor) {
-    .type = Descriptor_Type_Function,
-    .function = {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
       .arguments = dyn_array_make(Array_Value_Ptr, .allocator = allocator),
       .returns = 0,
     },
   };
 
-  descriptor->function.returns = c_function_return_value(allocator, forward_declaration);
+  descriptor->Function.returns = c_function_return_value(allocator, forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;
@@ -1241,13 +1243,13 @@ c_function_descriptor(
         argument_descriptor = parse_c_type(allocator, start, ch);
         // support for foo(void) fn signature
         if (
-          dyn_array_length(descriptor->function.arguments) == 0 &&
-          argument_descriptor->type == Descriptor_Type_Void
+          dyn_array_length(descriptor->Function.arguments) == 0 &&
+          argument_descriptor->tag == Descriptor_Tag_Void
         ) {
           assert(*ch == ')');
           break;
         }
-        function_push_argument(allocator, &descriptor->function, argument_descriptor);
+        function_push_argument(allocator, &descriptor->Function, argument_descriptor);
         assert(argument_descriptor);
       }
       start = ch + 1;
@@ -1781,14 +1783,14 @@ same_value_type_or_can_implicitly_move_cast(
   if (same_value_type(target, source)) return true;
   // Allow literal `0` to be cast to a pointer
   if (
-    target->descriptor->type == Descriptor_Type_Pointer &&
+    target->descriptor->tag == Descriptor_Tag_Pointer &&
     descriptor_is_integer(source->descriptor) &&
     operand_is_immediate(&source->operand) &&
     operand_immediate_as_s64(&source->operand) == 0
   ) {
     return true;
   }
-  if (target->descriptor->type != source->descriptor->type) return false;
+  if (target->descriptor->tag != source->descriptor->tag) return false;
   // TODO deal with signess
   if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {

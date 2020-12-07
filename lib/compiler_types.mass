@@ -129,19 +129,15 @@ Mass_Compiler_Source_Location :: struct {
   line_number : u32
 }
 
-Mass_Descriptor_Type_Void :: 0
-Mass_Descriptor_Type_Any :: 1
-Mass_Descriptor_Type_Opaque :: 2
-Mass_Descriptor_Type_Pointer :: 3
-Mass_Descriptor_Type_Fixed_Size_Array :: 4
-Mass_Descriptor_Type_Function :: 5
-Mass_Descriptor_Type_Struct :: 6
-Mass_Descriptor_Type_Tagged_Union :: 7
-Mass_Descriptor_Type_Type :: 8
-
 Mass_Descriptor_Function_Flags_None :: 0
 Mass_Descriptor_Function_Flags_Inline :: 1
 Mass_Descriptor_Function_Flags_Pending_Body_Compilation :: 2
+
+Mass_Descriptor_Struct_Field :: struct {
+  name : Slice
+  descriptor : Descriptor *
+  offset : s32
+}
 
 Mass_Source_File :: struct {
   path : Slice

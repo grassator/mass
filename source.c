@@ -218,14 +218,14 @@ scope_lookup_force(
     // To support recursive functions without a hack like `self` we
     // do forcing of the lazy value in two steps. First creates a valid Value
     // the second one, here, actually processes function body
-    if (entry->value && entry->value->descriptor->type == Descriptor_Type_Function) {
-      Descriptor_Function *function = &entry->value->descriptor->function;
+    if (entry->value && entry->value->descriptor->tag == Descriptor_Tag_Function) {
+      Descriptor_Function *function = &entry->value->descriptor->Function;
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
         function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
         Token *body = token_clone_deep(context->allocator, function->body);
 
         Value *return_result_value =
-          function->returns->descriptor->type == Descriptor_Type_Void
+          function->returns->descriptor->tag == Descriptor_Tag_Void
           ? value_any(context->allocator)
           : function->returns;
         token_parse_block(context, body, function->scope, function->builder, return_result_value);
@@ -236,17 +236,17 @@ scope_lookup_force(
     if (!result) {
       result = entry->value;
     } else {
-      if (entry->value->descriptor->type != Descriptor_Type_Function) {
+      if (entry->value->descriptor->tag != Descriptor_Tag_Function) {
         panic("Only functions support overloading");
       }
       Value *overload = entry->value;
-      overload->descriptor->function.next_overload = result;
+      overload->descriptor->Function.next_overload = result;
       result = overload;
     }
   }
 
   // For functions we need to gather up overloads from all parent scopes
-  if (result && result->descriptor->type == Descriptor_Type_Function) {
+  if (result && result->descriptor->tag == Descriptor_Tag_Function) {
     Value *last = result;
     Scope *parent = scope;
     for (;;) {
@@ -255,13 +255,13 @@ scope_lookup_force(
       if (!hash_map_has(parent->map, name)) continue;
       Value *overload = scope_lookup_force(context, parent, name);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
-      if (overload->descriptor->type != Descriptor_Type_Function) {
+      if (overload->descriptor->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
-      while (last->descriptor->function.next_overload) {
-        last = last->descriptor->function.next_overload;
+      while (last->descriptor->Function.next_overload) {
+        last = last->descriptor->Function.next_overload;
       }
-      last->descriptor->function.next_overload = overload;
+      last->descriptor->Function.next_overload = overload;
     };
   }
   return result;
@@ -713,14 +713,14 @@ scope_lookup_type(
 ) {
   Value *value = scope_lookup_force(context, scope, type_name);
   if (!value) return 0;
-  if (value->descriptor->type != Descriptor_Type_Type) {
+  if (value->descriptor->tag != Descriptor_Tag_Type) {
     program_error_builder(context, source_range) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
     return 0;
   }
-  Descriptor *descriptor = value->descriptor->type_descriptor;
+  Descriptor *descriptor = value->descriptor->Type.descriptor;
   return descriptor;
 }
 
@@ -777,8 +777,8 @@ token_force_type(
       }
       descriptor = allocator_allocate(context->allocator, Descriptor);
       *descriptor = (Descriptor) {
-        .type = Descriptor_Type_Pointer,
-        .pointer_to = scope_lookup_type(context, scope, child->source_range, child->source),
+        .tag = Descriptor_Tag_Pointer,
+        .Pointer.to = scope_lookup_type(context, scope, child->source_range, child->source),
       };
       break;
     }
@@ -1402,13 +1402,13 @@ token_process_type_definition(
     }
     u64 bit_size = s64_to_u64(operand_immediate_as_s64(&bit_size_value->operand));
     *descriptor = (Descriptor) {
-      .type = Descriptor_Type_Opaque,
-      .opaque = { .bit_size = bit_size },
+      .tag = Descriptor_Tag_Opaque,
+      .Opaque = { .bit_size = bit_size },
     };
   } else {
     *descriptor = (Descriptor) {
-      .type = Descriptor_Type_Struct,
-      .struct_ = {
+      .tag = Descriptor_Tag_Struct,
+      .Struct = {
         .fields = dyn_array_make(Array_Descriptor_Struct_Field),
       },
     };
@@ -1427,8 +1427,8 @@ token_process_type_definition(
 
   Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
   *value_descriptor = (Descriptor) {
-    .type = Descriptor_Type_Type,
-    .type_descriptor = descriptor,
+    .tag = Descriptor_Tag_Type,
+    .Type = { .descriptor = descriptor },
   };
   *result = (Value) {
     .descriptor = value_descriptor,
@@ -1587,8 +1587,8 @@ token_process_function_literal(
     if(!body->Value.value) return 0;
     descriptor = allocator_allocate(context->allocator, Descriptor);
     *descriptor = (Descriptor) {
-      .type = Descriptor_Type_Function,
-      .function = {
+      .tag = Descriptor_Tag_Function,
+      .Function = {
         .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
         .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
         .returns = 0,
@@ -1601,14 +1601,14 @@ token_process_function_literal(
 
   switch (dyn_array_length(return_types->Group.children)) {
     case 0: {
-      descriptor->function.returns = &void_value;
+      descriptor->Function.returns = &void_value;
       break;
     }
     case 1: {
       const Token *return_type_token = *dyn_array_get(return_types->Group.children, 0);
       Descriptor *return_descriptor = token_force_type(context, function_scope, return_type_token);
       if (!return_descriptor) return 0;
-      function_return_descriptor(context, &descriptor->function, return_descriptor);
+      function_return_descriptor(context, &descriptor->Function, return_descriptor);
       break;
     }
     default: {
@@ -1628,16 +1628,16 @@ token_process_function_literal(
       Token_Match_Arg *arg = token_match_argument(context, arg_view, function_scope);
       if (!arg) return 0;
       Value *arg_value =
-        function_push_argument(context->allocator, &descriptor->function, arg->type_descriptor);
+        function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
       if (!is_external && arg_value->operand.type == Operand_Type_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
-      dyn_array_push(descriptor->function.argument_names, arg->arg_name);
+      dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
       scope_define_value(function_scope, arg->arg_name, arg_value);
     }
     assert(
-      dyn_array_length(descriptor->function.argument_names) ==
-      dyn_array_length(descriptor->function.arguments)
+      dyn_array_length(descriptor->Function.argument_names) ==
+      dyn_array_length(descriptor->Function.arguments)
     );
   }
 
@@ -1646,12 +1646,12 @@ token_process_function_literal(
     body->Value.value->descriptor = descriptor;
     result = body->Value.value;
   } else {
-    descriptor->function.scope = function_scope;
-    descriptor->function.body = body;
-    descriptor->function.builder = builder;
-    descriptor->function.flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
+    descriptor->Function.scope = function_scope;
+    descriptor->Function.body = body;
+    descriptor->Function.builder = builder;
+    descriptor->Function.flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
     if (is_inline) {
-      descriptor->function.flags |= Descriptor_Function_Flags_Inline;
+      descriptor->Function.flags |= Descriptor_Function_Flags_Inline;
     }
     result = builder->value;
   }
@@ -1720,7 +1720,7 @@ compile_time_eval(
   eval_context.program = &eval_program;
 
   Function_Builder *eval_builder = fn_begin(&eval_context);
-  function_return_descriptor(context, &eval_builder->descriptor->function, &descriptor_void);
+  function_return_descriptor(context, &eval_builder->descriptor->Function, &descriptor_void);
 
   Array_Const_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
@@ -1734,7 +1734,7 @@ compile_time_eval(
   // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
   Value *arg_value = function_push_argument(
     context->allocator,
-    &eval_builder->value->descriptor->function,
+    &eval_builder->value->descriptor->Function,
     descriptor_pointer_to(context->allocator, expression_result_value->descriptor)
   );
 
@@ -1769,23 +1769,23 @@ compile_time_eval(
   *token_value = (Value) {
     .descriptor = out_value->descriptor,
   };
-  switch(out_value->descriptor->type) {
-    case Descriptor_Type_Void: {
+  switch(out_value->descriptor->tag) {
+    case Descriptor_Tag_Void: {
       token_value->operand = (Operand){0};
       break;
     }
-    case Descriptor_Type_Any: {
+    case Descriptor_Tag_Any: {
       panic("Internal Error: We should never get Any type from comp time eval");
       break;
     }
-    case Descriptor_Type_Tagged_Union:
-    case Descriptor_Type_Fixed_Size_Array:
-    case Descriptor_Type_Pointer:
-    case Descriptor_Type_Struct: {
+    case Descriptor_Tag_Tagged_Union:
+    case Descriptor_Tag_Fixed_Size_Array:
+    case Descriptor_Tag_Pointer:
+    case Descriptor_Tag_Struct: {
       panic("TODO move to data section or maybe we should allocate from there right away above?");
       break;
     };
-    case Descriptor_Type_Opaque: {
+    case Descriptor_Tag_Opaque: {
       if (descriptor_is_integer(out_value->descriptor)) {
         switch (result_byte_size) {
           case 8: {
@@ -1812,8 +1812,8 @@ compile_time_eval(
       }
       break;
     }
-    case Descriptor_Type_Function:
-    case Descriptor_Type_Type: {
+    case Descriptor_Tag_Function:
+    case Descriptor_Tag_Type: {
       panic("TODO figure out how that works");
       break;
     }
@@ -2153,7 +2153,7 @@ token_rewrite_statement_if(
   Value *condition_value = value_any(context->allocator);
   token_match_expression(context, &condition_tokens, scope, builder, condition_value);
   dyn_array_destroy(condition_tokens);
-  if (condition_value->descriptor->type == Descriptor_Type_Any) {
+  if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
     goto err;
   }
 
@@ -2185,7 +2185,7 @@ token_rewrite_goto(
   Value *value = scope_lookup_force(context, scope, label_name->source);
   if (value) {
     if (
-      value->descriptor->type == Descriptor_Type_Void &&
+      value->descriptor->tag == Descriptor_Tag_Void &&
       value->operand.type == Operand_Type_Label_32
     ) {
       push_instruction(
@@ -2214,13 +2214,13 @@ token_rewrite_explicit_return(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
-  Value *fn_return = builder->descriptor->function.returns;
+  Value *fn_return = builder->descriptor->Function.returns;
 
   Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
   token_match_expression(context, &expression_tokens, scope, builder, fn_return);
   dyn_array_destroy(expression_tokens);
 
-  bool is_void = fn_return->descriptor->type == Descriptor_Type_Void;
+  bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
     program_push_error_from_slice(
       context->program, keyword->source_range,
@@ -2294,8 +2294,8 @@ token_match_fixed_array_type(
   // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
   *array_descriptor = (Descriptor) {
-    .type = Descriptor_Type_Fixed_Size_Array,
-    .array = {
+    .tag = Descriptor_Tag_Fixed_Size_Array,
+    .Fixed_Size_Array = {
       .item = descriptor,
       .length = length,
     },
@@ -2383,11 +2383,11 @@ token_rewrite_cast(
   assert(dyn_array_length(args) == 2);
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
-  assert(type->descriptor->type == Descriptor_Type_Type);
+  assert(type->descriptor->tag == Descriptor_Tag_Type);
 
-  Descriptor *cast_to_descriptor = type->descriptor->type_descriptor;
+  Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
   assert(descriptor_is_integer(cast_to_descriptor));
-  assert(value->descriptor->type == cast_to_descriptor->type);
+  assert(value->descriptor->tag == cast_to_descriptor->tag);
 
   u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
   u32 original_byte_size = descriptor_byte_size(value->descriptor);
@@ -2515,7 +2515,7 @@ token_rewrite_definition_and_assignment_statements(
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
     value = value_from_s64(context->allocator, operand_immediate_as_s64(&value->operand));
   } else if (
-    value->descriptor->type == Descriptor_Type_Opaque &&
+    value->descriptor->tag == Descriptor_Tag_Opaque &&
     operand_is_immediate(&value->operand)
   ) {
     panic("TODO decide how to handle opaque types");
@@ -2546,10 +2546,10 @@ token_rewrite_array_index(
   Array_Const_Token_Ptr index_tokens = dyn_array_copy(Array_Const_Token_Ptr, brackets->Group.children);
   token_match_expression(context, &index_tokens, scope, builder, index_value);
   dyn_array_destroy(index_tokens);
-  assert(array->descriptor->type == Descriptor_Type_Fixed_Size_Array);
+  assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
   assert(array->operand.type == Operand_Type_Memory_Indirect);
 
-  Descriptor *item_descriptor = array->descriptor->array.item;
+  Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
   Value *result = allocator_allocate(context->allocator, Value);
@@ -2712,7 +2712,7 @@ token_rewrite_function_calls(
     }
   }
 
-  if (target->descriptor->type != Descriptor_Type_Function) {
+  if (target->descriptor->tag != Descriptor_Tag_Function) {
     program_error_builder(context, target_token->source_range) {
       program_error_append_slice(target_token->source);
       program_error_append_literal(" is not a function");
@@ -2724,7 +2724,7 @@ token_rewrite_function_calls(
   Value *overload = find_matching_function_overload(builder, target, args);
   if (overload) {
     Value *return_value;
-    Descriptor_Function *function = &overload->descriptor->function;
+    Descriptor_Function *function = &overload->descriptor->Function;
     if (function->flags & Descriptor_Function_Flags_Inline) {
       assert(function->scope->parent);
       // We make a nested scope based on function's original parent scope
@@ -2747,7 +2747,7 @@ token_rewrite_function_calls(
           make_label(context->program, &context->program->code_section);
         inline_builder.descriptor = &(Descriptor) {0};
         *inline_builder.descriptor = *builder->descriptor;
-        inline_builder.descriptor->function.returns = result_value;
+        inline_builder.descriptor->Function.returns = result_value;
       }
       Token *body = token_clone_deep(context->allocator, function->body);
       token_parse_block(context, body, body_scope, &inline_builder, return_value);

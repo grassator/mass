@@ -458,62 +458,54 @@ main(void) {
     //{ "Compiler_Source_Location", "compiler_source_location" },
   //}));
 
-  {
-    int32_t value = 0;
-    Enum_Item items[] = {
-      { "Void", value++ },
-      { "Any", value++ },
-      { "Opaque", value++ },
-      { "Pointer", value++ },
-      { "Fixed_Size_Array", value++ },
-      { "Function", value++ },
-      { "Struct", value++ },
-      { "Tagged_Union", value++ },
-      { "Type", value++ },
-    };
-    push_type(type_enum("Descriptor_Type", items));
-  }
-
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None",   0 },
     { "Inline", 1 << 0 },
     { "Pending_Body_Compilation", 1 << 1 },
   }));
 
-  //push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
-    //{ "Slice", "name" },
-    //{ "Descriptor *", "descriptor" },
-    //{ "s32", "offset" },
-  //}));
+  push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
+    { "Slice", "name" },
+    { "Descriptor *", "descriptor" },
+    { "s32", "offset" },
+  }));
 
-  //push_type(type_union("Descriptor", (Struct[]){
-    //struct_fields("Opaque", (Struct_Item[]){
-      //{ "u64", "bit_size" },
-    //}),
-    //struct_fields("Fixed_Size_Array", (Struct_Item[]){
-      //{ "Descriptor *", "item" },
-      //{ "u32", "length" },
-    //}),
-    //struct_fields("Struct", (Struct_Item[]){
-      //{ "Slice", "name" },
-      //{ "Array_Descriptor_Struct_Field", "fields" },
-    //}),
-    //struct_fields("Tagged_Union", (Struct_Item[]){
-      //{ "Descriptor_Struct *", "struct_list" },
-      //{ "s32", "struct_count" },
-    //}),
-    //struct_fields("Function", (Struct_Item[]){
-      //{ "Descriptor_Function_Flags", "flags" },
-      //{ "Array_Value_Ptr", "arguments" },
-      //{ "Array_Slice", "argument_names" },
-      //{ "const Token *", "body" },
-      //{ "Scope *", "scope" },
-      //{ "Function_Builder *", "builder" },
-//
-      //{ "Value *", "returns" },
-      //{ "Value *", "next_overload" },
-    //}),
-  //}));
+  push_type(type_union("Descriptor", (Struct[]){
+    struct_empty("Void"),
+    struct_empty("Any"),
+    struct_fields("Opaque", (Struct_Item[]){
+      { "u64", "bit_size" },
+    }),
+    struct_fields("Function", (Struct_Item[]){
+      { "Descriptor_Function_Flags", "flags" },
+      { "Array_Value_Ptr", "arguments" },
+      { "Array_Slice", "argument_names" },
+      { "const Token *", "body" },
+      { "Scope *", "scope" },
+      { "Function_Builder *", "builder" },
+
+      { "Value *", "returns" },
+      { "Value *", "next_overload" },
+    }),
+    struct_fields("Fixed_Size_Array", (Struct_Item[]){
+      { "Descriptor *", "item" },
+      { "u32", "length" },
+    }),
+    struct_fields("Struct", (Struct_Item[]){
+      { "Slice", "name" },
+      { "Array_Descriptor_Struct_Field", "fields" },
+    }),
+    struct_fields("Tagged_Union", (Struct_Item[]){
+      { "Descriptor_Struct *", "struct_list" },
+      { "s32", "struct_count" },
+    }),
+    struct_fields("Pointer", (Struct_Item[]){
+      { "Descriptor *", "to" },
+    }),
+    struct_fields("Type", (Struct_Item[]){
+      { "Descriptor *", "descriptor" },
+    }),
+  }));
 
   /////////////////////////
 
@@ -610,6 +602,9 @@ main(void) {
     // TODO would be great to not have these
     {
       fprintf(file, "typedef struct Value Value;\n\n");
+      fprintf(file, "typedef dyn_array_type(Value *) Array_Value_Ptr;\n\n");
+      fprintf(file, "typedef struct Scope Scope;\n\n");
+      fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
     }
 
     fprintf(file, "\n// Type Definitions\n\n");

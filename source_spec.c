@@ -683,7 +683,7 @@ spec("source") {
 
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
-    check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
+    check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
     write_executable(L"build\\test_parsed.exe", test_context.program, Executable_Type_Cli);
@@ -694,7 +694,7 @@ spec("source") {
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point);
-    check(test_context.program->entry_point->descriptor->type != Descriptor_Type_Any);
+    check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
     write_executable(L"build\\hello_world.exe", test_context.program, Executable_Type_Cli);

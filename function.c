@@ -65,7 +65,7 @@ move_value(
   if (target == source) return;
   if (operand_equal(&target->operand, &source->operand)) return;
 
-  if (target->descriptor->type == Descriptor_Type_Any) {
+  if (target->descriptor->tag == Descriptor_Tag_Any) {
     target->descriptor = source->descriptor;
   }
   if (target->operand.type == Operand_Type_Any) {
@@ -78,7 +78,7 @@ move_value(
 
   if (descriptor_is_float(target->descriptor) || descriptor_is_float(source->descriptor)) {
     assert(target_size == source_size);
-    assert(target->descriptor->type == source->descriptor->type);
+    assert(target->descriptor->tag == source->descriptor->tag);
     if (
       target->operand.type == Operand_Type_Xmm ||
       source->operand.type == Operand_Type_Xmm
@@ -287,8 +287,8 @@ fn_begin(
 ) {
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (const Descriptor) {
-    .type = Descriptor_Type_Function,
-    .function = {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
       .flags = 0,
       .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
       .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
@@ -495,7 +495,7 @@ fn_encode(
   );
 
   // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->value->descriptor->function.returns->descriptor) > 8) {
+  if(descriptor_byte_size(builder->value->descriptor->Function.returns->descriptor) > 8) {
     // FIXME :RegisterAllocation
     //       make sure that return value is always available in RCX at this point
     encode_instruction_with_compiler_location(
@@ -578,7 +578,7 @@ function_return_descriptor(
   Descriptor *descriptor
 ) {
   if (!function->returns) {
-    if (descriptor->type != Descriptor_Type_Void) {
+    if (descriptor->tag != Descriptor_Tag_Void) {
       // TODO handle 16 bit non-float return values are returned in XMM0
       if (descriptor_is_float(descriptor)) {
         function->returns = value_register_for_descriptor(context->allocator, Register_Xmm0, descriptor);
@@ -749,9 +749,9 @@ plus_or_minus(
   Value *b
 ) {
   bool is_pointer_arithmetic = (
-    a->descriptor->type == Descriptor_Type_Pointer &&
+    a->descriptor->tag == Descriptor_Tag_Pointer &&
     descriptor_is_integer(b->descriptor) &&
-    b->descriptor->opaque.bit_size == 64
+    b->descriptor->Opaque.bit_size == 64
   );
   bool both_operands_are_integers = (
     descriptor_is_integer(a->descriptor) &&
@@ -1148,8 +1148,8 @@ call_function_overload(
   Array_Value_Ptr arguments
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
-  assert(to_call->descriptor->type == Descriptor_Type_Function);
-  Descriptor_Function *descriptor = &to_call->descriptor->function;
+  assert(to_call->descriptor->tag == Descriptor_Tag_Function);
+  Descriptor_Function *descriptor = &to_call->descriptor->Function;
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
 
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
@@ -1264,8 +1264,8 @@ find_matching_function_overload(
   Array_Value_Ptr arguments
 ) {
   Overload_Match match = {.score = -1};
-  for (;to_call; to_call = to_call->descriptor->function.next_overload) {
-    Descriptor_Function *descriptor = &to_call->descriptor->function;
+  for (;to_call; to_call = to_call->descriptor->Function.next_overload) {
+    Descriptor_Function *descriptor = &to_call->descriptor->Function;
     if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, arguments);
     if (score > match.score) {
@@ -1362,10 +1362,10 @@ ensure_memory(
   Operand operand = value->operand;
   if (operand.type == Operand_Type_Memory_Indirect) return value;
   Value *result = allocator_allocate(allocator, Value);
-  if (value->descriptor->type != Descriptor_Type_Pointer) assert(!"Not implemented");
+  if (value->descriptor->tag != Descriptor_Tag_Pointer) assert(!"Not implemented");
   if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
   *result = (const Value) {
-    .descriptor = value->descriptor->pointer_to,
+    .descriptor = value->descriptor->Pointer.to,
     .operand = {
       .type = Operand_Type_Memory_Indirect,
       .indirect = {
@@ -1385,9 +1385,9 @@ struct_get_field(
 ) {
   Value *struct_value = ensure_memory(allocator, raw_value);
   Descriptor *descriptor = struct_value->descriptor;
-  assert(descriptor->type == Descriptor_Type_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->struct_.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(descriptor->struct_.fields, i);
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
     if (slice_equal(name, field->name)) {
       Value *result = allocator_allocate(allocator, Value);
       Operand operand = struct_value->operand;

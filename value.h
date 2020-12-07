@@ -86,122 +86,66 @@ typedef struct Value {
 } Value;
 
 typedef dyn_array_type(Value) Array_Value;
-typedef dyn_array_type(Value *) Array_Value_Ptr;
 
-typedef struct Token Token;
 typedef struct Scope Scope;
-typedef struct Descriptor Descriptor;
-
 typedef struct Function_Builder Function_Builder;
 
-typedef struct Descriptor_Function {
-  Descriptor_Function_Flags flags;
-  Array_Value_Ptr arguments;
-  Array_Slice argument_names;
-  const Token *body;
-  Scope *scope;
-  Function_Builder *builder;
-
-  Value *returns;
-  Value *next_overload;
-} Descriptor_Function;
-
-typedef struct {
-  Slice name;
-  Descriptor *descriptor;
-  s32 offset;
-} Descriptor_Struct_Field;
-typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
-
-typedef struct {
-  Slice name;
-  Array_Descriptor_Struct_Field fields;
-} Descriptor_Struct;
-
-typedef struct {
-  Descriptor_Struct *struct_list;
-  s32 struct_count;
-} Descriptor_Tagged_Union;
-
-typedef struct {
-  struct Descriptor *item;
-  u32 length;
-} Descriptor_Fixed_Size_Array;
-
-typedef struct {
-  u64 bit_size;
-} Descriptor_Opaque;
-
-typedef struct Descriptor {
-  Descriptor_Type type;
-  union {
-    Descriptor_Opaque opaque;
-    Descriptor_Function function;
-    Descriptor_Fixed_Size_Array array;
-    Descriptor_Struct struct_;
-    Descriptor_Tagged_Union tagged_union;
-    struct Descriptor *pointer_to;
-    struct Descriptor *type_descriptor;
-  };
-} Descriptor;
-
-
 Descriptor descriptor_s8 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 8 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 8 },
 };
 Descriptor descriptor_s16 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 16 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 16 },
 };
 Descriptor descriptor_s32 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 32 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_s64 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 64 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 64 },
 };
 
 
 Descriptor descriptor_u8 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 8 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 8 },
 };
 Descriptor descriptor_u16 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 16 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 16 },
 };
 Descriptor descriptor_u32 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 32 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_u64 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 64 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 64 },
 };
 
 
 Descriptor descriptor_void = {
-  .type = Descriptor_Type_Void,
+  .tag = Descriptor_Tag_Void,
 };
 Descriptor descriptor_any = {
-  .type = Descriptor_Type_Any,
+  .tag = Descriptor_Tag_Any,
 };
 Descriptor descriptor_f32 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 32 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 32 },
 };
 Descriptor descriptor_f64 = {
-  .type = { Descriptor_Type_Opaque },
-  .opaque = { .bit_size = 64 },
+  .tag = { Descriptor_Tag_Opaque },
+  .Opaque = { .bit_size = 64 },
 };
 
 #define define_type_value(_TYPE_)\
   Value *type_##_TYPE_##_value = &(Value) {\
     .descriptor = &(Descriptor) {\
-      .type = Descriptor_Type_Type,\
-      .type_descriptor = &descriptor_##_TYPE_,\
+      .tag = Descriptor_Tag_Type,\
+      .Type = {.descriptor = &descriptor_##_TYPE_ },\
     },\
     .operand = {.type = Operand_Type_None },\
     .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\

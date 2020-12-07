@@ -50,9 +50,15 @@ typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
 
-typedef enum Descriptor_Type Descriptor_Type;
-
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
+
+typedef struct Descriptor_Struct_Field Descriptor_Struct_Field;
+typedef dyn_array_type(Descriptor_Struct_Field *) Array_Descriptor_Struct_Field_Ptr;
+typedef dyn_array_type(const Descriptor_Struct_Field *) Array_Const_Descriptor_Struct_Field_Ptr;
+
+typedef struct Descriptor Descriptor;
+typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
+typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
 typedef struct Source_File Source_File;
 typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
@@ -93,6 +99,12 @@ typedef dyn_array_type(Parse_Result *) Array_Parse_Result_Ptr;
 typedef dyn_array_type(const Parse_Result *) Array_Const_Parse_Result_Ptr;
 
 typedef struct Value Value;
+
+typedef dyn_array_type(Value *) Array_Value_Ptr;
+
+typedef struct Scope Scope;
+
+typedef struct Function_Builder Function_Builder;
 
 
 // Type Definitions
@@ -248,24 +260,75 @@ typedef struct Compiler_Source_Location {
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
-typedef enum Descriptor_Type {
-  Descriptor_Type_Void = 0,
-  Descriptor_Type_Any = 1,
-  Descriptor_Type_Opaque = 2,
-  Descriptor_Type_Pointer = 3,
-  Descriptor_Type_Fixed_Size_Array = 4,
-  Descriptor_Type_Function = 5,
-  Descriptor_Type_Struct = 6,
-  Descriptor_Type_Tagged_Union = 7,
-  Descriptor_Type_Type = 8,
-} Descriptor_Type;
-
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Inline = 1,
   Descriptor_Function_Flags_Pending_Body_Compilation = 2,
 } Descriptor_Function_Flags;
 
+typedef struct Descriptor_Struct_Field {
+  Slice name;
+  Descriptor * descriptor;
+  s32 offset;
+} Descriptor_Struct_Field;
+typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
+
+typedef enum {
+  Descriptor_Tag_Void = 1,
+  Descriptor_Tag_Any = 2,
+  Descriptor_Tag_Opaque = 3,
+  Descriptor_Tag_Function = 4,
+  Descriptor_Tag_Fixed_Size_Array = 5,
+  Descriptor_Tag_Struct = 6,
+  Descriptor_Tag_Tagged_Union = 7,
+  Descriptor_Tag_Pointer = 8,
+  Descriptor_Tag_Type = 9,
+} Descriptor_Tag;
+
+typedef struct {
+  u64 bit_size;
+} Descriptor_Opaque;
+typedef struct {
+  Descriptor_Function_Flags flags;
+  Array_Value_Ptr arguments;
+  Array_Slice argument_names;
+  const Token * body;
+  Scope * scope;
+  Function_Builder * builder;
+  Value * returns;
+  Value * next_overload;
+} Descriptor_Function;
+typedef struct {
+  Descriptor * item;
+  u32 length;
+} Descriptor_Fixed_Size_Array;
+typedef struct {
+  Slice name;
+  Array_Descriptor_Struct_Field fields;
+} Descriptor_Struct;
+typedef struct {
+  Descriptor_Struct * struct_list;
+  s32 struct_count;
+} Descriptor_Tagged_Union;
+typedef struct {
+  Descriptor * to;
+} Descriptor_Pointer;
+typedef struct {
+  Descriptor * descriptor;
+} Descriptor_Type;
+typedef struct Descriptor {
+  Descriptor_Tag tag;
+  union {
+    Descriptor_Opaque Opaque;
+    Descriptor_Function Function;
+    Descriptor_Fixed_Size_Array Fixed_Size_Array;
+    Descriptor_Struct Struct;
+    Descriptor_Tagged_Union Tagged_Union;
+    Descriptor_Pointer Pointer;
+    Descriptor_Type Type;
+  };
+} Descriptor;
+typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef struct Source_File {
   Slice path;
   Slice text;

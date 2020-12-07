@@ -3387,7 +3387,7 @@ typedef struct {
   const Allocator *allocator;
   u64 size_in_bytes;
   u64 alignment;
-  const char *function;
+  const char *Function;
   const char *file;
   u64 line;
   void *result;
