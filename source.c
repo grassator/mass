@@ -1647,7 +1647,10 @@ token_process_function_literal(
       Value *arg_value =
         function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
       if (!is_external && arg_value->operand.tag == Operand_Tag_Register) {
-        register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
+        register_bitset_set(
+          &builder->code_block.register_occupied_bitset,
+          arg_value->operand.Register.index
+        );
       }
       dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
       scope_define_value(function_scope, arg->arg_name, arg_value);
@@ -1763,7 +1766,7 @@ compile_time_eval(
     .operand = (Operand){
       .tag = Operand_Tag_Memory_Indirect,
       .byte_size = expression_result_value->operand.byte_size,
-      .indirect = { .reg = arg_value->operand.reg },
+      .Memory_Indirect = { .reg = arg_value->operand.Register.index },
     },
   };
 
@@ -2134,8 +2137,10 @@ token_parse_block(
     // as temporary when evaluating last statement. This definitely can happen with
     // the function returns but should be safe to do all the time.
     if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
-      if (!register_bitset_get(builder->used_register_bitset, result_value->operand.reg)) {
-        register_acquire(builder, result_value->operand.reg);
+      if (
+        !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
+      ) {
+        register_acquire(builder, result_value->operand.Register.index);
       }
     }
 
@@ -2581,9 +2586,9 @@ token_rewrite_array_index(
       .operand = {
         .tag = Operand_Tag_Memory_Indirect,
         .byte_size = item_byte_size,
-        .indirect = (Operand_Memory_Indirect) {
-          .reg = array->operand.indirect.reg,
-          .displacement = array->operand.indirect.displacement + index * item_byte_size,
+        .Memory_Indirect = (Operand_Memory_Indirect) {
+          .reg = array->operand.Memory_Indirect.reg,
+          .displacement = array->operand.Memory_Indirect.displacement + index * item_byte_size,
         }
       }
     };
@@ -2610,11 +2615,11 @@ token_rewrite_array_index(
       .operand = {
         .tag = Operand_Tag_Sib,
         .byte_size = item_byte_size,
-        .sib = (Operand_Sib) {
+        .Sib = (Operand_Sib) {
           .scale = scale,
-          .index = index_value_in_register->operand.reg,
-          .base = array->operand.indirect.reg,
-          .displacement = array->operand.indirect.displacement,
+          .index = index_value_in_register->operand.Register.index,
+          .base = array->operand.Memory_Indirect.reg,
+          .displacement = array->operand.Memory_Indirect.displacement,
         }
       }
     };

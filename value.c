@@ -243,11 +243,11 @@ print_operand(
       printf("[.rdata + UNIMPLEMENTED]");
       break;
     }
-    case Operand_Tag_RIP_Relative_Import: {
+    case Operand_Tag_Import: {
       printf("rip_import(");
-      slice_print(operand->import.library_name);
+      slice_print(operand->Import.library_name);
       printf(":");
-      slice_print(operand->import.library_name);
+      slice_print(operand->Import.library_name);
       printf(")");
       break;
     }
@@ -266,7 +266,7 @@ print_operand(
 const Operand reg_name = { \
   .tag = Operand_Tag_Register, \
   .byte_size = (reg_byte_size), \
-  .reg = (reg_index), \
+  .Register = {.index = (reg_index)}, \
 };
 define_register(al, 0b0000, 1);
 
@@ -311,12 +311,12 @@ define_register(r15d, 0b1111, 4);
 const Operand reg_name##_32 = { \
   .tag = Operand_Tag_Xmm, \
   .byte_size = 4, \
-  .reg = (reg_index), \
+  .Register = {.index = (reg_index)}, \
 };\
 const Operand reg_name##_64 = { \
   .tag = Operand_Tag_Xmm, \
   .byte_size = 8, \
-  .reg = (reg_index), \
+  .Register = {.index = (reg_index)}, \
 };
 define_xmm_register(xmm0, 0b000);
 define_xmm_register(xmm1, 0b001);
@@ -432,8 +432,8 @@ stack(
   return (const Operand) {
     .tag = Operand_Tag_Memory_Indirect,
     .byte_size = byte_size,
-    .indirect = (const Operand_Memory_Indirect) {
-      .reg = rsp.reg,
+    .Memory_Indirect = (Operand_Memory_Indirect) {
+      .reg = rsp.Register.index,
       .displacement = offset,
     }
   };
@@ -571,7 +571,7 @@ operand_equal(
     }
     case Operand_Tag_Xmm:
     case Operand_Tag_Register: {
-      return a->reg == b->reg;
+      return a->Register.index == b->Register.index;
     }
     case Operand_Tag_Any: {
       return false; // Is this the semantics I want though?
@@ -581,21 +581,21 @@ operand_equal(
     }
     case Operand_Tag_Sib: {
       return (
-        a->sib.scale == b->sib.scale &&
-        a->sib.index == b->sib.index &&
-        a->sib.base == b->sib.base
+        a->Sib.scale == b->Sib.scale &&
+        a->Sib.index == b->Sib.index &&
+        a->Sib.base == b->Sib.base
       );
     }
     case Operand_Tag_Memory_Indirect: {
       return (
-        a->indirect.reg == b->indirect.reg &&
-        a->indirect.displacement == b->indirect.displacement
+        a->Memory_Indirect.reg == b->Memory_Indirect.reg &&
+        a->Memory_Indirect.displacement == b->Memory_Indirect.displacement
       );
     }
-    case Operand_Tag_RIP_Relative_Import: {
+    case Operand_Tag_Import: {
       return (
-        slice_equal(a->import.library_name, b->import.library_name) &&
-        slice_equal(a->import.symbol_name, b->import.symbol_name)
+        slice_equal(a->Import.library_name, b->Import.library_name) &&
+        slice_equal(a->Import.symbol_name, b->Import.symbol_name)
       );
     }
   }
@@ -942,7 +942,7 @@ operand_register_for_descriptor(
 
   Operand result = {
     .tag = register_is_xmm(reg) ? Operand_Tag_Xmm : Operand_Tag_Register,
-    .reg = reg,
+    .Register.index = reg,
     .byte_size = byte_size,
   };
   return result;
@@ -1711,9 +1711,9 @@ import_symbol(
   }
 
   return (Operand) {
-    .tag = Operand_Tag_RIP_Relative_Import,
+    .tag = Operand_Tag_Import,
     .byte_size = 8, // Size of the pointer
-    .import = {
+    .Import = {
       .library_name = library_name,
       .symbol_name = symbol_name
     },

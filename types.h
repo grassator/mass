@@ -40,9 +40,9 @@ typedef struct Import_Library Import_Library;
 typedef dyn_array_type(Import_Library *) Array_Import_Library_Ptr;
 typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
-typedef struct Operand_RIP_Relative_Import Operand_RIP_Relative_Import;
-typedef dyn_array_type(Operand_RIP_Relative_Import *) Array_Operand_RIP_Relative_Import_Ptr;
-typedef dyn_array_type(const Operand_RIP_Relative_Import *) Array_Const_Operand_RIP_Relative_Import_Ptr;
+typedef struct Operand_Import Operand_Import;
+typedef dyn_array_type(Operand_Import *) Array_Operand_Import_Ptr;
+typedef dyn_array_type(const Operand_Import *) Array_Const_Operand_Import_Ptr;
 
 typedef enum Compare_Type Compare_Type;
 
@@ -122,7 +122,7 @@ typedef enum Operand_Tag {
   Operand_Tag_Memory_Indirect = 9,
   Operand_Tag_Sib = 10,
   Operand_Tag_RIP_Relative = 11,
-  Operand_Tag_RIP_Relative_Import = 12,
+  Operand_Tag_Import = 12,
   Operand_Tag_Label_32 = 13,
 } Operand_Tag;
 
@@ -234,11 +234,11 @@ typedef struct Import_Library {
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 
-typedef struct Operand_RIP_Relative_Import {
+typedef struct Operand_Import {
   Slice library_name;
   Slice symbol_name;
-} Operand_RIP_Relative_Import;
-typedef dyn_array_type(Operand_RIP_Relative_Import) Array_Operand_RIP_Relative_Import;
+} Operand_Import;
+typedef dyn_array_type(Operand_Import) Array_Operand_Import;
 
 typedef enum Compare_Type {
   Compare_Type_Equal = 1,

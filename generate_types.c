@@ -307,7 +307,7 @@ main(void) {
       { "Memory_Indirect", value++ },
       { "Sib", value++ },
       { "RIP_Relative", value++ },
-      { "RIP_Relative_Import", value++ },
+      { "Import", value++ },
       { "Label_32", value++ },
     };
     push_type(type_enum("Operand_Tag", items));
@@ -420,7 +420,7 @@ main(void) {
     { "u32", "image_thunk_rva" },
   }));
 
-  push_type(type_struct("Operand_RIP_Relative_Import", (Struct_Item[]){
+  push_type(type_struct("Operand_Import", (Struct_Item[]){
     { "Slice", "library_name" },
     { "Slice", "symbol_name" },
   }));
@@ -445,6 +445,28 @@ main(void) {
     };
     push_type(type_enum("Compare_Type", items));
   }
+
+  //push_type(add_common_fields(type_union("Operand", (Struct[]){
+    //struct_empty("None"),
+    //struct_empty("Id"),
+    //struct_empty("Newline"),
+    //struct_empty("Integer"),
+    //struct_empty("Hex_Integer"),
+    //struct_empty("Operator"),
+    //struct_fields("Value", (Struct_Item[]){
+      //{ "Value *", "value" },
+    //}),
+    //struct_fields("String", (Struct_Item[]){
+      //{ "Slice", "slice" },
+    //}),
+    //struct_fields("Group", (Struct_Item[]){
+      //{ "Token_Group_Type", "type" },
+      //{ "Array_Const_Token_Ptr", "children" },
+    //}),
+  //}), (Struct_Item[]){
+    //{ "Source_Range", "source_range" },
+    //{ "Slice", "source" },
+  //}));
 
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
     { "const char *", "filename" },

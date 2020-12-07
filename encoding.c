@@ -64,14 +64,14 @@ encode_instruction_assembly(
     if (operand->tag == Operand_Tag_Register) {
       if (operand_encoding->type == Operand_Encoding_Type_Register) {
         if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
-          op_code[3] += operand->reg & 0b111;
-          if (operand->reg & 0b1000) {
+          op_code[3] += operand->Register.index & 0b111;
+          if (operand->Register.index & 0b1000) {
             rex_byte |= REX_B;
           }
         } else {
           assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
-          reg_or_op_code = operand->reg;
-          if (operand->reg & 0b1000) {
+          reg_or_op_code = operand->Register.index;
+          if (operand->Register.index & 0b1000) {
             rex_byte |= REX_R;
           }
         }
@@ -83,7 +83,7 @@ encode_instruction_assembly(
       operand_encoding->type == Operand_Encoding_Type_Xmm &&
       encoding->extension_type == Instruction_Extension_Type_Register
     ) {
-      reg_or_op_code = operand->reg;
+      reg_or_op_code = operand->Register.index;
     }
 
     if(
@@ -99,32 +99,32 @@ encode_instruction_assembly(
         r_m = 0b101;
         mod = 0;
       } else if (operand->tag == Operand_Tag_Register) {
-        r_m = operand->reg;
-        if (operand->reg & 0b1000) {
+        r_m = operand->Register.index;
+        if (operand->Register.index & 0b1000) {
           rex_byte |= REX_B;
         }
         mod = MOD_Register;
       } else if (operand->tag == Operand_Tag_Xmm) {
-        r_m = operand->reg;
+        r_m = operand->Register.index;
         mod = MOD_Register;
       } else {
         if (operand->tag == Operand_Tag_Memory_Indirect) {
           // :OperandNormalization
-          assert(operand->indirect.reg != rsp.reg);
-          displacement = operand->indirect.displacement;
-          r_m = operand->indirect.reg;
+          assert(operand->Memory_Indirect.reg != Register_SP);
+          displacement = operand->Memory_Indirect.displacement;
+          r_m = operand->Memory_Indirect.reg;
         } else if (operand->tag == Operand_Tag_Sib) {
-          displacement = operand->sib.displacement;
+          displacement = operand->Sib.displacement;
           needs_sib = true;
           r_m = 0b0100; // SIB
 
-          if (operand->sib.index & 0b1000) {
+          if (operand->Sib.index & 0b1000) {
             rex_byte |= REX_X;
           }
           sib_byte = (
-            ((operand->sib.scale & 0b11) << 6) |
-            ((operand->sib.index & 0b111) << 3) |
-            ((operand->sib.base & 0b111) << 0)
+            ((operand->Sib.scale & 0b11) << 6) |
+            ((operand->Sib.index & 0b111) << 3) |
+            ((operand->Sib.base & 0b111) << 0)
           );
         } else {
           assert(!"Unsupported operand type");
@@ -302,7 +302,7 @@ encode_instruction(
       }
       if (
         operand->tag == Operand_Tag_Register &&
-        operand->reg == Register_A &&
+        operand->Register.index == Register_A &&
         operand_encoding->type == Operand_Encoding_Type_Register_A
       ) {
         continue;

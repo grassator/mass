@@ -14,6 +14,14 @@ register_is_xmm(
 }
 
 typedef struct {
+  Register index;
+} Operand_Register;
+
+typedef struct {
+  Register index;
+} Operand_Xmm;
+
+typedef struct {
   Compare_Type compare_type;
 } Operand_Eflags;
 
@@ -41,23 +49,19 @@ typedef struct {
   Operand_Tag tag;
   u32 byte_size;
   union {
-    Register reg;
+    Operand_Register Register;
+    Operand_Xmm Xmm;
     Operand_Immediate_8 Immediate_8;
     Operand_Immediate_16 Immediate_16;
     Operand_Immediate_32 Immediate_32;
     Operand_Immediate_64 Immediate_64;
     Operand_Label Label;
-    Operand_Memory_Indirect indirect;
-    Operand_Sib sib;
-    Operand_RIP_Relative_Import import;
+    Operand_Memory_Indirect Memory_Indirect;
+    Operand_Sib Sib;
+    Operand_Import Import;
     Operand_Eflags Eflags;
   };
 } Operand;
-
-const char *
-operand_type_string(
-  Operand_Tag type
-);
 
 static inline bool
 operand_equal(

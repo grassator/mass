@@ -157,10 +157,11 @@ move_value(
     }
     if (temp != target) {
       assert(temp->operand.tag == Operand_Tag_Register);
-      Operand resized_temp = operand_register_for_descriptor(temp->operand.reg, target->descriptor);
+      Operand resized_temp =
+        operand_register_for_descriptor(temp->operand.Register.index, target->descriptor);
       push_instruction(instructions, source_range, (Instruction) {.assembly = {movsx, {resized_temp, temp->operand}}});
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, resized_temp}}});
-      register_release(builder, temp->operand.reg);
+      register_release(builder, temp->operand.Register.index);
     }
     return;
   }
@@ -202,7 +203,7 @@ move_value(
       Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {temp, adjusted_source->operand}}});
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, temp}}});
-      register_release(builder, temp.reg);
+      register_release(builder, temp.Register.index);
     } else {
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, adjusted_source->operand}}});
     }
@@ -219,7 +220,7 @@ move_value(
           // TODO check whether this correctly sign extends
           Operand adjusted_target = {
             .tag = Operand_Tag_Register,
-            .reg = target->operand.reg,
+            .Register = target->operand.Register,
             .byte_size = 4,
           };
           push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {adjusted_target, source->operand}}});
@@ -230,7 +231,7 @@ move_value(
         Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
         push_instruction(instructions, source_range, (Instruction) {.assembly = {movsx, {temp, source->operand}}});
         push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, temp}}});
-        register_release(builder, temp.reg);
+        register_release(builder, temp.Register.index);
       }
       return;
     } else {
@@ -266,14 +267,14 @@ move_value(
         move_value(allocator, builder, source_range, reg_rdi, temp_rdi);
         move_value(allocator, builder, source_range, reg_rcx, temp_rcx);
       }
-      register_release(builder, temp_rsi->operand.reg);
-      register_release(builder, temp_rdi->operand.reg);
-      register_release(builder, temp_rcx->operand.reg);
+      register_release(builder, temp_rsi->operand.Register.index);
+      register_release(builder, temp_rdi->operand.Register.index);
+      register_release(builder, temp_rcx->operand.Register.index);
     } else {
       Value *temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), target->descriptor);
       move_value(allocator, builder, source_range, temp, source);
       move_value(allocator, builder, source_range, target, temp);
-      register_release(builder, temp->operand.reg);
+      register_release(builder, temp->operand.Register.index);
     }
     return;
   }
@@ -397,9 +398,9 @@ fn_normalize_instruction_operands(
     Operand *operand = &instruction->assembly.operands[operand_index];
     // RIP-relative imports are regular RIP-relative operands that we only know
     // target offset of at the point of encoding
-    if (operand->tag == Operand_Tag_RIP_Relative_Import) {
+    if (operand->tag == Operand_Tag_Import) {
       Import_Symbol *symbol = program_find_import(
-        program, operand->import.library_name, operand->import.symbol_name
+        program, operand->Import.library_name, operand->Import.symbol_name
       );
       *operand = (Operand){
         .tag = Operand_Tag_RIP_Relative,
@@ -409,21 +410,24 @@ fn_normalize_instruction_operands(
     }
     // [RSP + X] always needs to be encoded as SIB because RSP register index
     // in MOD R/M is occupied by RIP-relative encoding
-    else if (operand->tag == Operand_Tag_Memory_Indirect && operand->indirect.reg == rsp.reg) {
+    else if (
+      operand->tag == Operand_Tag_Memory_Indirect &&
+      operand->Memory_Indirect.reg == rsp.Register.index
+    ) {
       *operand = (Operand){
         .tag = Operand_Tag_Sib,
         .byte_size = operand->byte_size,
-        .sib = {
+        .Sib = {
           .scale = SIB_Scale_1,
           .base = Register_SP,
           .index = Register_SP,
-          .displacement = operand->indirect.displacement,
+          .displacement = operand->Memory_Indirect.displacement,
         },
       };
     }
-    bool is_stack_operand = operand->tag == Operand_Tag_Sib && operand->sib.base == Register_SP;
+    bool is_stack_operand = operand->tag == Operand_Tag_Sib && operand->Sib.base == Register_SP;
     if (is_stack_operand) {
-      operand->sib.displacement = fn_adjust_stack_displacement(builder, operand->sib.displacement);
+      operand->Sib.displacement = fn_adjust_stack_displacement(builder, operand->Sib.displacement);
     }
   }
 }
@@ -515,7 +519,7 @@ fn_encode(
     Operand to_save = {
       .tag = Operand_Tag_Register,
       .byte_size = 8,
-      .reg = dyn_array_get(unwind_codes, i)->OpInfo,
+      .Register.index = dyn_array_get(unwind_codes, i)->OpInfo,
     };
     encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {pop, {to_save}}});
   }
@@ -595,7 +599,7 @@ function_return_descriptor(
             .operand = {
               .tag = Operand_Tag_Memory_Indirect,
               .byte_size = byte_size,
-              .indirect = {
+              .Memory_Indirect = {
                 .reg = Register_C,
                 .displacement = 0,
               },
@@ -716,7 +720,7 @@ assert_not_register_ax(
 ) {
   assert(overload);
   if (overload->operand.tag == Operand_Tag_Register) {
-    assert(overload->operand.reg != Register_A);
+    assert(overload->operand.Register.index != Register_A);
   }
 }
 
@@ -834,7 +838,7 @@ plus_or_minus(
   if (temp != result_value) {
     move_value(allocator, builder, source_range, result_value, temp);
     assert(temp->operand.tag == Operand_Tag_Register);
-    register_release(builder, temp->operand.reg);
+    register_release(builder, temp->operand.Register.index);
   }
 }
 
@@ -1165,7 +1169,7 @@ call_function_overload(
           .operand = {
             .tag = Operand_Tag_Register,
             .byte_size = 8,
-            .reg = reg_index,
+            .Register.index = reg_index,
           }
         };
         Operand source = operand_register_for_descriptor(reg_index, &descriptor_s64);
@@ -1371,8 +1375,8 @@ ensure_memory(
     .descriptor = value->descriptor->Pointer.to,
     .operand = {
       .tag = Operand_Tag_Memory_Indirect,
-      .indirect = {
-        .reg = value->operand.reg,
+      .Memory_Indirect = {
+        .reg = value->operand.Register.index,
         .displacement = 0,
       },
     },
@@ -1397,7 +1401,7 @@ struct_get_field(
       // FIXME support more operands
       assert(operand.tag == Operand_Tag_Memory_Indirect);
       operand.byte_size = descriptor_byte_size(field->descriptor);
-      operand.indirect.displacement += field->offset;
+      operand.Memory_Indirect.displacement += field->offset;
       *result = (const Value) {
         .descriptor = field->descriptor,
         .operand = operand,
