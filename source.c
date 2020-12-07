@@ -1432,7 +1432,7 @@ token_process_type_definition(
   };
   *result = (Value) {
     .descriptor = value_descriptor,
-    .operand = {.type = Operand_Type_None },
+    .operand = {.tag = Operand_Tag_None },
   };
   return token_value_make(context, result, layout_token->source_range);
 
@@ -1629,7 +1629,7 @@ token_process_function_literal(
       if (!arg) return 0;
       Value *arg_value =
         function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
-      if (!is_external && arg_value->operand.type == Operand_Type_Register) {
+      if (!is_external && arg_value->operand.tag == Operand_Tag_Register) {
         register_bitset_set(&builder->code_block.register_occupied_bitset, arg_value->operand.reg);
       }
       dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
@@ -1671,22 +1671,22 @@ token_rewrite_negative_literal(
   // FIXME Allow unary minus on any expression
   Token_Match_Operator(define, "-");
   Token_Match(integer, .tag = Token_Tag_Integer);
-  Value *result = value_any(context->allocator);
-  token_force_value(context, integer, scope, builder, result);
-  if (result->operand.type == Operand_Type_Immediate_8) {
-    result->operand.s8 = -result->operand.s8;
-  } else if (result->operand.type == Operand_Type_Immediate_16) {
-    result->operand.s16 = -result->operand.s16;
-  } else if (result->operand.type == Operand_Type_Immediate_32) {
-    result->operand.s32 = -result->operand.s32;
-  } else if (result->operand.type == Operand_Type_Immediate_64) {
-    result->operand.s64 = -result->operand.s64;
+  Value *value = value_any(context->allocator);
+  token_force_value(context, integer, scope, builder, value);
+  if (value->operand.tag == Operand_Tag_Immediate_8) {
+    value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
+  } else if (value->operand.tag == Operand_Tag_Immediate_16) {
+    value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
+  } else if (value->operand.tag == Operand_Tag_Immediate_32) {
+    value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
+  } else if (value->operand.tag == Operand_Tag_Immediate_64) {
+    value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
   } else {
     panic("Internal error, expected an immediate");
   }
 
   *replacement_count = 2;
-  Token *value_token = token_value_make(context, result, source_range_from_token_view(view));
+  Token *value_token = token_value_make(context, value, source_range_from_token_view(view));
   return value_token;
 }
 
@@ -1739,12 +1739,12 @@ compile_time_eval(
   );
 
   // Create a reference Value
-  assert(arg_value->operand.type == Operand_Type_Register);
+  assert(arg_value->operand.tag == Operand_Tag_Register);
   Value *out_value = allocator_allocate(context->allocator, Value);
   *out_value = (Value) {
     .descriptor = expression_result_value->descriptor,
     .operand = (Operand){
-      .type = Operand_Type_Memory_Indirect,
+      .tag = Operand_Tag_Memory_Indirect,
       .byte_size = expression_result_value->operand.byte_size,
       .indirect = { .reg = arg_value->operand.reg },
     },
@@ -1851,14 +1851,14 @@ token_do_handle_operator(
     const Token *token = *dyn_array_pop(*token_stack);
     Value *value = token_force_constant_value(context, scope, token);
     if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
-      if (value->operand.type == Operand_Type_Immediate_8) {
-        value->operand.s8 = -value->operand.s8;
-      } else if (value->operand.type == Operand_Type_Immediate_16) {
-        value->operand.s16 = -value->operand.s16;
-      } else if (value->operand.type == Operand_Type_Immediate_32) {
-        value->operand.s32 = -value->operand.s32;
-      } else if (value->operand.type == Operand_Type_Immediate_64) {
-        value->operand.s64 = -value->operand.s64;
+      if (value->operand.tag == Operand_Tag_Immediate_8) {
+        value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_16) {
+        value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_32) {
+        value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_64) {
+        value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
       } else {
         panic("Internal error, expected an immediate");
       }
@@ -2112,7 +2112,7 @@ token_parse_block(
     // If result is a register we need to make sure it is acquired to avoid it being used
     // as temporary when evaluating last statement. This definitely can happen with
     // the function returns but should be safe to do all the time.
-    if (is_last_statement && result_value->operand.type == Operand_Type_Register) {
+    if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
       if (!register_bitset_get(builder->used_register_bitset, result_value->operand.reg)) {
         register_acquire(builder, result_value->operand.reg);
       }
@@ -2186,7 +2186,7 @@ token_rewrite_goto(
   if (value) {
     if (
       value->descriptor->tag == Descriptor_Tag_Void &&
-      value->operand.type == Operand_Type_Label_32
+      value->operand.tag == Operand_Tag_Label_32
     ) {
       push_instruction(
         &builder->code_block.instructions, &keyword->source_range,
@@ -2547,7 +2547,7 @@ token_rewrite_array_index(
   token_match_expression(context, &index_tokens, scope, builder, index_value);
   dyn_array_destroy(index_tokens);
   assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-  assert(array->operand.type == Operand_Type_Memory_Indirect);
+  assert(array->operand.tag == Operand_Tag_Memory_Indirect);
 
   Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
   u32 item_byte_size = descriptor_byte_size(item_descriptor);
@@ -2558,7 +2558,7 @@ token_rewrite_array_index(
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
-        .type = Operand_Type_Memory_Indirect,
+        .tag = Operand_Tag_Memory_Indirect,
         .byte_size = item_byte_size,
         .indirect = (Operand_Memory_Indirect) {
           .reg = array->operand.indirect.reg,
@@ -2587,7 +2587,7 @@ token_rewrite_array_index(
     *result = (Value){
       .descriptor = item_descriptor,
       .operand = {
-        .type = Operand_Type_Sib,
+        .tag = Operand_Tag_Sib,
         .byte_size = item_byte_size,
         .sib = (Operand_Sib) {
           .scale = scale,
@@ -2950,7 +2950,7 @@ token_rewrite_compare(
     ) {
       switch(lhs_value->operand.byte_size) {
         case 1: {
-          if (u8_fits_into_s8(rhs_value->operand.u8)) {
+          if (u8_fits_into_s8((u8)rhs_value->operand.Immediate_8.value)) {
             Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s8;
@@ -2961,7 +2961,7 @@ token_rewrite_compare(
           break;
         }
         case 2: {
-          if (u16_fits_into_s16(rhs_value->operand.u16)) {
+          if (u16_fits_into_s16((u16)rhs_value->operand.Immediate_16.value)) {
             Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s16;
@@ -2972,7 +2972,7 @@ token_rewrite_compare(
           break;
         }
         case 4: {
-          if (u32_fits_into_s32(rhs_value->operand.u32)) {
+          if (u32_fits_into_s32((u32)rhs_value->operand.Immediate_32.value)) {
             Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s32;
@@ -2983,7 +2983,7 @@ token_rewrite_compare(
           break;
         }
         case 8: {
-          if (u64_fits_into_s64(rhs_value->operand.u64)) {
+          if (u64_fits_into_s64((u64)rhs_value->operand.Immediate_64.value)) {
             Value *adjusted = allocator_allocate(context->allocator, Value);
             *adjusted = *rhs_value;
             adjusted->descriptor = &descriptor_s64;

@@ -193,57 +193,57 @@ void
 print_operand(
   const Operand *operand
 ) {
-  switch (operand->type) {
-    case Operand_Type_None: {
+  switch (operand->tag) {
+    case Operand_Tag_None: {
       printf("_");
       break;
     }
-    case Operand_Type_Any: {
+    case Operand_Tag_Any: {
       printf("any");
       break;
     }
-    case Operand_Type_Eflags: {
+    case Operand_Tag_Eflags: {
       printf("eflags");
       break;
     }
-    case Operand_Type_Register: {
+    case Operand_Tag_Register: {
       u32 bits = operand->byte_size * 8;
       printf("r%d", bits);
       break;
     }
-    case Operand_Type_Xmm: {
+    case Operand_Tag_Xmm: {
       u32 bits = operand->byte_size * 8;
       printf("xmm%d", bits);
       break;
     }
-    case Operand_Type_Immediate_8: {
-      printf("imm8(0x%02x)", operand->s8);
+    case Operand_Tag_Immediate_8: {
+      printf("imm8(0x%02x)", operand->Immediate_8.value);
       break;
     }
-    case Operand_Type_Immediate_16: {
-      printf("imm16(0x%04x)", operand->s16);
+    case Operand_Tag_Immediate_16: {
+      printf("imm16(0x%04x)", operand->Immediate_16.value);
       break;
     }
-    case Operand_Type_Immediate_32: {
-      printf("imm32(0x%08x)", operand->s32);
+    case Operand_Tag_Immediate_32: {
+      printf("imm32(0x%08x)", operand->Immediate_32.value);
       break;
     }
-    case Operand_Type_Immediate_64: {
-      printf("imm64(0x%016llx)", operand->s64);
+    case Operand_Tag_Immediate_64: {
+      printf("imm64(0x%016llx)", operand->Immediate_64.value);
       break;
     }
-    case Operand_Type_Sib:
-    case Operand_Type_Memory_Indirect: {
+    case Operand_Tag_Sib:
+    case Operand_Tag_Memory_Indirect: {
       u32 bits = operand->byte_size * 8;
       printf("m%d", bits);
       break;
     }
-    case Operand_Type_RIP_Relative: {
+    case Operand_Tag_RIP_Relative: {
       // FIXME unify with label
       printf("[.rdata + UNIMPLEMENTED]");
       break;
     }
-    case Operand_Type_RIP_Relative_Import: {
+    case Operand_Tag_RIP_Relative_Import: {
       printf("rip_import(");
       slice_print(operand->import.library_name);
       printf(":");
@@ -251,7 +251,7 @@ print_operand(
       printf(")");
       break;
     }
-    case Operand_Type_Label_32: {
+    case Operand_Tag_Label_32: {
       printf("rel....UNIMPLEMENTED");
       break;
     }
@@ -264,7 +264,7 @@ print_operand(
 
 #define define_register(reg_name, reg_index, reg_byte_size) \
 const Operand reg_name = { \
-  .type = Operand_Type_Register, \
+  .tag = Operand_Tag_Register, \
   .byte_size = (reg_byte_size), \
   .reg = (reg_index), \
 };
@@ -309,12 +309,12 @@ define_register(r15d, 0b1111, 4);
 
 #define define_xmm_register(reg_name, reg_index) \
 const Operand reg_name##_32 = { \
-  .type = Operand_Type_Xmm, \
+  .tag = Operand_Tag_Xmm, \
   .byte_size = 4, \
   .reg = (reg_index), \
 };\
 const Operand reg_name##_64 = { \
-  .type = Operand_Type_Xmm, \
+  .tag = Operand_Tag_Xmm, \
   .byte_size = 8, \
   .reg = (reg_index), \
 };
@@ -343,9 +343,9 @@ label32(
   Label_Index label
 ) {
   return (const Operand) {
-    .type = Operand_Type_Label_32,
+    .tag = Operand_Tag_Label_32,
     .byte_size = 4,
-    .label32 = label
+    .Label = {.index = label}
   };
 }
 
@@ -354,9 +354,9 @@ imm8(
   s8 value
 ) {
   return (const Operand) {
-    .type = Operand_Type_Immediate_8,
+    .tag = Operand_Tag_Immediate_8,
     .byte_size = 1,
-    .s8 = value
+    .Immediate_8.value = value
   };
 }
 
@@ -365,9 +365,9 @@ imm16(
   s16 value
 ) {
   return (const Operand) {
-    .type = Operand_Type_Immediate_16,
+    .tag = Operand_Tag_Immediate_16,
     .byte_size = 2,
-    .s16 = value
+    .Immediate_16.value = value
   };
 }
 
@@ -376,9 +376,9 @@ imm32(
   s32 value
 ) {
   return (const Operand) {
-    .type = Operand_Type_Immediate_32,
+    .tag = Operand_Tag_Immediate_32,
     .byte_size = 4,
-    .s32 = value
+    .Immediate_32.value = value
   };
 }
 
@@ -387,9 +387,9 @@ imm64(
   s64 value
 ) {
   return (const Operand) {
-    .type = Operand_Type_Immediate_64,
+    .tag = Operand_Tag_Immediate_64,
     .byte_size = 8,
-    .s64 = value
+    .Immediate_64.value = value
   };
 }
 
@@ -430,7 +430,7 @@ stack(
 ) {
   assert(byte_size);
   return (const Operand) {
-    .type = Operand_Type_Memory_Indirect,
+    .tag = Operand_Tag_Memory_Indirect,
     .byte_size = byte_size,
     .indirect = (const Operand_Memory_Indirect) {
       .reg = rsp.reg,
@@ -504,10 +504,10 @@ s64
 operand_immediate_as_s64(
   Operand *operand
 ) {
-  if (operand->type == Operand_Type_Immediate_8) return operand->s8;
-  if (operand->type == Operand_Type_Immediate_16) return operand->s16;
-  if (operand->type == Operand_Type_Immediate_32) return operand->s32;
-  if (operand->type == Operand_Type_Immediate_64) return operand->s64;
+  if (operand->tag == Operand_Tag_Immediate_8) return operand->Immediate_8.value;
+  if (operand->tag == Operand_Tag_Immediate_16) return operand->Immediate_16.value;
+  if (operand->tag == Operand_Tag_Immediate_32) return operand->Immediate_32.value;
+  if (operand->tag == Operand_Tag_Immediate_64) return operand->Immediate_64.value;
   assert(!"Expected and immediate operand");
   return 0;
 }
@@ -517,9 +517,9 @@ operand_is_memory(
   Operand *operand
 ) {
   return (
-    operand->type == Operand_Type_Memory_Indirect ||
-    operand->type == Operand_Type_RIP_Relative ||
-    operand->type == Operand_Type_Sib
+    operand->tag == Operand_Tag_Memory_Indirect ||
+    operand->tag == Operand_Tag_RIP_Relative ||
+    operand->tag == Operand_Tag_Sib
   );
 }
 
@@ -527,17 +527,17 @@ static inline bool
 operand_is_register_or_memory(
   Operand *operand
 ) {
-  return operand->type == Operand_Type_Register || operand_is_memory(operand);
+  return operand->tag == Operand_Tag_Register || operand_is_memory(operand);
 }
 
 bool
 operand_is_immediate(
   Operand *operand
 ) {
-  if (operand->type == Operand_Type_Immediate_8) return true;
-  if (operand->type == Operand_Type_Immediate_16) return true;
-  if (operand->type == Operand_Type_Immediate_32) return true;
-  if (operand->type == Operand_Type_Immediate_64) return true;
+  if (operand->tag == Operand_Tag_Immediate_8) return true;
+  if (operand->tag == Operand_Tag_Immediate_16) return true;
+  if (operand->tag == Operand_Tag_Immediate_32) return true;
+  if (operand->tag == Operand_Tag_Immediate_64) return true;
   return false;
 }
 
@@ -546,53 +546,53 @@ operand_equal(
   const Operand *a,
   const Operand *b
 ) {
-  if (a->type != b->type) return false;
+  if (a->tag != b->tag) return false;
   if (a->byte_size != b->byte_size) return false;
-  switch(a->type) {
-    case Operand_Type_Eflags: {
-      return a->compare_type == b->compare_type;
+  switch(a->tag) {
+    case Operand_Tag_Eflags: {
+      return a->Eflags.compare_type == b->Eflags.compare_type;
     }
-    case Operand_Type_Immediate_8: {
-      return a->s8 == b->s8;
+    case Operand_Tag_Immediate_8: {
+      return a->Immediate_8.value == b->Immediate_8.value;
     }
-    case Operand_Type_Immediate_16: {
-      return a->s16 == b->s16;
+    case Operand_Tag_Immediate_16: {
+      return a->Immediate_16.value == b->Immediate_16.value;
     }
-    case Operand_Type_Immediate_32: {
-      return a->s32 == b->s32;
+    case Operand_Tag_Immediate_32: {
+      return a->Immediate_32.value == b->Immediate_32.value;
     }
-    case Operand_Type_Immediate_64: {
-      return a->s64 == b->s64;
+    case Operand_Tag_Immediate_64: {
+      return a->Immediate_64.value == b->Immediate_64.value;
     }
-    case Operand_Type_RIP_Relative:
-    case Operand_Type_Label_32: {
+    case Operand_Tag_RIP_Relative:
+    case Operand_Tag_Label_32: {
       // TODO figure out if need some other way to compare labels
-      return a->label32.value == b->label32.value;
+      return a->Label.index.value == b->Label.index.value;
     }
-    case Operand_Type_Xmm:
-    case Operand_Type_Register: {
+    case Operand_Tag_Xmm:
+    case Operand_Tag_Register: {
       return a->reg == b->reg;
     }
-    case Operand_Type_Any: {
+    case Operand_Tag_Any: {
       return false; // Is this the semantics I want though?
     }
-    case Operand_Type_None: {
+    case Operand_Tag_None: {
       return true;
     }
-    case Operand_Type_Sib: {
+    case Operand_Tag_Sib: {
       return (
         a->sib.scale == b->sib.scale &&
         a->sib.index == b->sib.index &&
         a->sib.base == b->sib.base
       );
     }
-    case Operand_Type_Memory_Indirect: {
+    case Operand_Tag_Memory_Indirect: {
       return (
         a->indirect.reg == b->indirect.reg &&
         a->indirect.displacement == b->indirect.displacement
       );
     }
-    case Operand_Type_RIP_Relative_Import: {
+    case Operand_Tag_RIP_Relative_Import: {
       return (
         slice_equal(a->import.library_name, b->import.library_name) &&
         slice_equal(a->import.symbol_name, b->import.symbol_name)
@@ -640,9 +640,9 @@ value_from_compare_internal(
     // TODO consider adding explicit boolean descriptor type
     .descriptor = &descriptor_s8,
     .operand = {
-      .type = Operand_Type_Eflags,
+      .tag = Operand_Tag_Eflags,
       .byte_size = 1,
-      .compare_type = compare_type,
+      .Eflags = {.compare_type = compare_type },
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -673,9 +673,9 @@ value_global_internal(
   *result = (Value) {
     .descriptor = descriptor,
     .operand = {
-      .type = Operand_Type_RIP_Relative,
+      .tag = Operand_Tag_RIP_Relative,
       .byte_size = byte_size,
-      .label32 = label_index,
+      .Label = {.index = label_index},
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -690,7 +690,7 @@ value_any_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_any,
-    .operand = {.type = Operand_Type_Any},
+    .operand = {.tag = Operand_Tag_Any},
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -808,9 +808,9 @@ value_from_u64_internal(
   *result = (Value) {
     .descriptor = &descriptor_u64,
     .operand = {
-      .type = Operand_Type_Immediate_64,
+      .tag = Operand_Tag_Immediate_64,
       .byte_size = 8,
-      .u64 = integer,
+      .Immediate_64.value = integer,
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -828,9 +828,9 @@ value_from_u32_internal(
   *result = (Value) {
     .descriptor = &descriptor_u32,
     .operand = {
-      .type = Operand_Type_Immediate_32,
+      .tag = Operand_Tag_Immediate_32,
       .byte_size = 4,
-      .u32 = integer,
+      .Immediate_32.value = integer,
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -848,9 +848,9 @@ value_from_u16_internal(
   *result = (Value) {
     .descriptor = &descriptor_u16,
     .operand = {
-      .type = Operand_Type_Immediate_16,
+      .tag = Operand_Tag_Immediate_16,
       .byte_size = 2,
-      .u16 = integer,
+      .Immediate_16.value = integer,
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -868,9 +868,9 @@ value_from_u8_internal(
   *result = (Value) {
     .descriptor = &descriptor_u8,
     .operand = {
-      .type = Operand_Type_Immediate_8,
+      .tag = Operand_Tag_Immediate_8,
       .byte_size = 1,
-      .u8 = integer,
+      .Immediate_8.value = integer,
     },
     .compiler_source_location = compiler_source_location,
   };
@@ -941,7 +941,7 @@ operand_register_for_descriptor(
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
   Operand result = {
-    .type = register_is_xmm(reg) ? Operand_Type_Xmm : Operand_Type_Register,
+    .tag = register_is_xmm(reg) ? Operand_Tag_Xmm : Operand_Tag_Register,
     .reg = reg,
     .byte_size = byte_size,
   };
@@ -971,8 +971,8 @@ rip_value_pointer(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.type == Operand_Type_RIP_Relative);
-  Label *label = program_get_label(program, value->operand.label32);
+  assert(value->operand.tag == Operand_Tag_RIP_Relative);
+  Label *label = program_get_label(program, value->operand.Label.index);
   return bucket_buffer_offset_to_pointer(label->section->buffer, label->offset_in_section);
 }
 
@@ -1036,9 +1036,9 @@ value_as_function(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.type == Operand_Type_Label_32);
+  assert(value->operand.tag == Operand_Tag_Label_32);
   assert(program->jit_buffer);
-  Label *label = program_get_label(program, value->operand.label32);
+  Label *label = program_get_label(program, value->operand.Label.index);
   assert(label->section == &program->code_section);
   s8 *target = program->jit_buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
@@ -1711,7 +1711,7 @@ import_symbol(
   }
 
   return (Operand) {
-    .type = Operand_Type_RIP_Relative_Import,
+    .tag = Operand_Tag_RIP_Relative_Import,
     .byte_size = 8, // Size of the pointer
     .import = {
       .library_name = library_name,

@@ -310,7 +310,7 @@ main(void) {
       { "RIP_Relative_Import", value++ },
       { "Label_32", value++ },
     };
-    push_type(type_enum("Operand_Type", items));
+    push_type(type_enum("Operand_Tag", items));
   }
 
   push_type(type_enum("Section_Permissions", (Enum_Item[]){

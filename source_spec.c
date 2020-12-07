@@ -584,8 +584,8 @@ spec("source") {
     );
     check(status);
     check(descriptor_is_integer(status->descriptor));
-    check(status->operand.type == Operand_Type_Immediate_8);
-    check(status->operand.s8 == 42);
+    check(status->operand.tag == Operand_Tag_Immediate_8);
+    check(status->operand.Immediate_8.value == 42);
   }
 
   it("should be able to execute arbitrary expression at compile time") {
@@ -600,8 +600,8 @@ spec("source") {
     );
     check(status);
     check(descriptor_is_integer(status->descriptor));
-    check(status->operand.type == Operand_Type_Immediate_8);
-    check(status->operand.s8 == 42);
+    check(status->operand.tag == Operand_Tag_Immediate_8);
+    check(status->operand.Immediate_8.value == 42);
   }
 
   it("should be able to return structs while accepting other arguments") {

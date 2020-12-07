@@ -1,6 +1,6 @@
 // Forward declarations
 
-typedef enum Operand_Type Operand_Type;
+typedef enum Operand_Tag Operand_Tag;
 
 typedef enum Section_Permissions Section_Permissions;
 
@@ -109,22 +109,22 @@ typedef struct Function_Builder Function_Builder;
 
 // Type Definitions
 
-typedef enum Operand_Type {
-  Operand_Type_None = 0,
-  Operand_Type_Any = 1,
-  Operand_Type_Eflags = 2,
-  Operand_Type_Register = 3,
-  Operand_Type_Xmm = 4,
-  Operand_Type_Immediate_8 = 5,
-  Operand_Type_Immediate_16 = 6,
-  Operand_Type_Immediate_32 = 7,
-  Operand_Type_Immediate_64 = 8,
-  Operand_Type_Memory_Indirect = 9,
-  Operand_Type_Sib = 10,
-  Operand_Type_RIP_Relative = 11,
-  Operand_Type_RIP_Relative_Import = 12,
-  Operand_Type_Label_32 = 13,
-} Operand_Type;
+typedef enum Operand_Tag {
+  Operand_Tag_None = 0,
+  Operand_Tag_Any = 1,
+  Operand_Tag_Eflags = 2,
+  Operand_Tag_Register = 3,
+  Operand_Tag_Xmm = 4,
+  Operand_Tag_Immediate_8 = 5,
+  Operand_Tag_Immediate_16 = 6,
+  Operand_Tag_Immediate_32 = 7,
+  Operand_Tag_Immediate_64 = 8,
+  Operand_Tag_Memory_Indirect = 9,
+  Operand_Tag_Sib = 10,
+  Operand_Tag_RIP_Relative = 11,
+  Operand_Tag_RIP_Relative_Import = 12,
+  Operand_Tag_Label_32 = 13,
+} Operand_Tag;
 
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,

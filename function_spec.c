@@ -61,7 +61,7 @@ spec("function") {
     it("should just set the operand of `target` to be the same as operand of `source`") {
       Value *reg_a = &(Value){
         .descriptor = &descriptor_s8,
-        .operand = { .type = Operand_Type_Any },
+        .operand = { .tag = Operand_Tag_Any },
       };
       Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s8);
       move_value(temp_allocator, builder, &test_range, reg_a, reg_b);

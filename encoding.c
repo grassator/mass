@@ -61,7 +61,7 @@ encode_instruction_assembly(
       rex_byte |= REX_W;
     }
 
-    if (operand->type == Operand_Type_Register) {
+    if (operand->tag == Operand_Tag_Register) {
       if (operand_encoding->type == Operand_Encoding_Type_Register) {
         if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
           op_code[3] += operand->reg & 0b111;
@@ -79,7 +79,7 @@ encode_instruction_assembly(
     }
 
     if (
-      operand->type == Operand_Type_Xmm &&
+      operand->tag == Operand_Tag_Xmm &&
       operand_encoding->type == Operand_Encoding_Type_Xmm &&
       encoding->extension_type == Instruction_Extension_Type_Register
     ) {
@@ -95,25 +95,25 @@ encode_instruction_assembly(
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
       mod_r_m_operand_index = operand_index;
-      if (operand->type == Operand_Type_RIP_Relative) {
+      if (operand->tag == Operand_Tag_RIP_Relative) {
         r_m = 0b101;
         mod = 0;
-      } else if (operand->type == Operand_Type_Register) {
+      } else if (operand->tag == Operand_Tag_Register) {
         r_m = operand->reg;
         if (operand->reg & 0b1000) {
           rex_byte |= REX_B;
         }
         mod = MOD_Register;
-      } else if (operand->type == Operand_Type_Xmm) {
+      } else if (operand->tag == Operand_Tag_Xmm) {
         r_m = operand->reg;
         mod = MOD_Register;
       } else {
-        if (operand->type == Operand_Type_Memory_Indirect) {
+        if (operand->tag == Operand_Tag_Memory_Indirect) {
           // :OperandNormalization
           assert(operand->indirect.reg != rsp.reg);
           displacement = operand->indirect.displacement;
           r_m = operand->indirect.reg;
-        } else if (operand->type == Operand_Type_Sib) {
+        } else if (operand->tag == Operand_Tag_Sib) {
           displacement = operand->sib.displacement;
           needs_sib = true;
           r_m = 0b0100; // SIB
@@ -190,18 +190,18 @@ encode_instruction_assembly(
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
     // :OperandNormalization
-    if (operand->type == Operand_Type_RIP_Relative) {
+    if (operand->tag == Operand_Tag_RIP_Relative) {
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
       rip_relative_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          .target_label_index = operand->label32,
+          .target_label_index = operand->Label.index,
           .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
     } else if (
-      operand->type == Operand_Type_Memory_Indirect ||
-      operand->type == Operand_Type_Sib
+      operand->tag == Operand_Tag_Memory_Indirect ||
+      operand->tag == Operand_Tag_Sib
     ) {
       if (mod == MOD_Displacement_s32) {
         fixed_buffer_append_s32(buffer, displacement);
@@ -220,23 +220,23 @@ encode_instruction_assembly(
       continue;
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
-    if (operand->type == Operand_Type_Label_32) {
+    if (operand->tag == Operand_Tag_Label_32) {
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
       immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          .target_label_index = operand->label32,
+          .target_label_index = operand->Label.index,
           .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
-    } else if (operand->type == Operand_Type_Immediate_8) {
-      fixed_buffer_append_s8(buffer, operand->s8);
-    } else if (operand->type == Operand_Type_Immediate_16) {
-      fixed_buffer_append_s16(buffer, operand->s16);
-    } else if (operand->type == Operand_Type_Immediate_32) {
-      fixed_buffer_append_s32(buffer, operand->s32);
-    } else if (operand->type == Operand_Type_Immediate_64) {
-      fixed_buffer_append_s64(buffer, operand->s64);
+    } else if (operand->tag == Operand_Tag_Immediate_8) {
+      fixed_buffer_append_s8(buffer, operand->Immediate_8.value);
+    } else if (operand->tag == Operand_Tag_Immediate_16) {
+      fixed_buffer_append_s16(buffer, operand->Immediate_16.value);
+    } else if (operand->tag == Operand_Tag_Immediate_32) {
+      fixed_buffer_append_s32(buffer, operand->Immediate_32.value);
+    } else if (operand->tag == Operand_Tag_Immediate_64) {
+      fixed_buffer_append_s64(buffer, operand->Immediate_64.value);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }
@@ -288,93 +288,93 @@ encode_instruction(
         }
       }
       if (
-        operand->type == Operand_Type_Eflags &&
+        operand->tag == Operand_Tag_Eflags &&
         operand_encoding->type == Operand_Encoding_Type_Eflags
       ) {
         continue;
       }
 
       if (
-        operand->type == Operand_Type_None &&
+        operand->tag == Operand_Tag_None &&
         operand_encoding->type == Operand_Encoding_Type_None
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Register &&
+        operand->tag == Operand_Tag_Register &&
         operand->reg == Register_A &&
         operand_encoding->type == Operand_Encoding_Type_Register_A
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Register &&
+        operand->tag == Operand_Tag_Register &&
         operand_encoding->type == Operand_Encoding_Type_Register
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Register &&
+        operand->tag == Operand_Tag_Register &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_RIP_Relative &&
+        operand->tag == Operand_Tag_RIP_Relative &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_RIP_Relative &&
+        operand->tag == Operand_Tag_RIP_Relative &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Memory_Indirect &&
+        operand->tag == Operand_Tag_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Memory_Indirect &&
+        operand->tag == Operand_Tag_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Sib &&
+        operand->tag == Operand_Tag_Sib &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Sib &&
+        operand->tag == Operand_Tag_Sib &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Xmm &&
+        operand->tag == Operand_Tag_Xmm &&
         operand_encoding->type == Operand_Encoding_Type_Xmm
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Xmm &&
+        operand->tag == Operand_Tag_Xmm &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_Memory_Indirect &&
+        operand->tag == Operand_Tag_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
       }
       if (
-        operand->type == Operand_Type_RIP_Relative &&
+        operand->tag == Operand_Tag_RIP_Relative &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
@@ -383,7 +383,7 @@ encode_instruction(
         if (operand_is_immediate(operand)) {
           assert(encoding_size == operand->byte_size);
           continue;
-        } else if (operand->type == Operand_Type_Label_32) {
+        } else if (operand->tag == Operand_Tag_Label_32) {
           assert(encoding_size == Operand_Size_32);
           continue;
         }

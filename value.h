@@ -14,29 +14,49 @@ register_is_xmm(
 }
 
 typedef struct {
-  Operand_Type type;
+  Compare_Type compare_type;
+} Operand_Eflags;
+
+typedef struct {
+  Label_Index index;
+} Operand_Label;
+
+typedef struct {
+  s8 value;
+} Operand_Immediate_8;
+
+typedef struct {
+  s16 value;
+} Operand_Immediate_16;
+
+typedef struct {
+  s32 value;
+} Operand_Immediate_32;
+
+typedef struct {
+  s64 value;
+} Operand_Immediate_64;
+
+typedef struct {
+  Operand_Tag tag;
   u32 byte_size;
   union {
     Register reg;
-    s8 s8;
-    s16 s16;
-    s32 s32;
-    s64 s64;
-    u8 u8;
-    u16 u16;
-    u32 u32;
-    u64 u64;
-    Label_Index label32;
+    Operand_Immediate_8 Immediate_8;
+    Operand_Immediate_16 Immediate_16;
+    Operand_Immediate_32 Immediate_32;
+    Operand_Immediate_64 Immediate_64;
+    Operand_Label Label;
     Operand_Memory_Indirect indirect;
     Operand_Sib sib;
     Operand_RIP_Relative_Import import;
-    Compare_Type compare_type;
+    Operand_Eflags Eflags;
   };
 } Operand;
 
 const char *
 operand_type_string(
-  Operand_Type type
+  Operand_Tag type
 );
 
 static inline bool
@@ -147,7 +167,7 @@ Descriptor descriptor_f64 = {
       .tag = Descriptor_Tag_Type,\
       .Type = {.descriptor = &descriptor_##_TYPE_ },\
     },\
-    .operand = {.type = Operand_Type_None },\
+    .operand = {.tag = Operand_Tag_None },\
     .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
   }
 
@@ -204,7 +224,7 @@ descriptor_is_float(
 
 Value void_value = {
   .descriptor = &descriptor_void,
-  .operand = { .type = Operand_Type_None },
+  .operand = { .tag = Operand_Tag_None },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 

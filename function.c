@@ -68,7 +68,7 @@ move_value(
   if (target->descriptor->tag == Descriptor_Tag_Any) {
     target->descriptor = source->descriptor;
   }
-  if (target->operand.type == Operand_Type_Any) {
+  if (target->operand.tag == Operand_Tag_Any) {
     target->operand = source->operand;
     return;
   }
@@ -80,8 +80,8 @@ move_value(
     assert(target_size == source_size);
     assert(target->descriptor->tag == source->descriptor->tag);
     if (
-      target->operand.type == Operand_Type_Xmm ||
-      source->operand.type == Operand_Type_Xmm
+      target->operand.tag == Operand_Tag_Xmm ||
+      source->operand.tag == Operand_Tag_Xmm
     ) {
       if (target_size == 4) {
         push_instruction(instructions, source_range, (Instruction) {.assembly = {movss, {target->operand, source->operand, 0}}});
@@ -102,13 +102,13 @@ move_value(
     }
   }
 
-  if (source->operand.type == Operand_Type_Eflags) {
+  if (source->operand.tag == Operand_Tag_Eflags) {
     assert(operand_is_register_or_memory(&target->operand));
     Value *temp = target;
     if (descriptor_byte_size(temp->descriptor) != 1) {
       temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s8);
     }
-    switch(source->operand.compare_type) {
+    switch(source->operand.Eflags.compare_type) {
       case Compare_Type_Equal: {
         push_instruction(instructions, source_range, (Instruction) {.assembly = {sete, {temp->operand, source->operand}}});
         break;
@@ -156,7 +156,7 @@ move_value(
       }
     }
     if (temp != target) {
-      assert(temp->operand.type == Operand_Type_Register);
+      assert(temp->operand.tag == Operand_Tag_Register);
       Operand resized_temp = operand_register_for_descriptor(temp->operand.reg, target->descriptor);
       push_instruction(instructions, source_range, (Instruction) {.assembly = {movsx, {resized_temp, temp->operand}}});
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, resized_temp}}});
@@ -167,7 +167,7 @@ move_value(
 
   if (operand_is_immediate(&source->operand)) {
     s64 immediate = operand_immediate_as_s64(&source->operand);
-    if (immediate == 0 && target->operand.type == Operand_Type_Register) {
+    if (immediate == 0 && target->operand.tag == Operand_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_instruction(instructions, source_range, (Instruction) {.assembly = {xor, {target->operand, target->operand}}});
       return;
@@ -198,7 +198,7 @@ move_value(
     // Because of 15 byte instruction limit on x86 there is no way to move 64bit immediate
     // to a memory location. In which case we do a move through a temp register
     bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
-    if (is_64bit_immediate && target->operand.type != Operand_Type_Register) {
+    if (is_64bit_immediate && target->operand.tag != Operand_Tag_Register) {
       Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {temp, adjusted_source->operand}}});
       push_instruction(instructions, source_range, (Instruction) {.assembly = {mov, {target->operand, temp}}});
@@ -214,11 +214,11 @@ move_value(
   if (target_size != source_size) {
     if (source_size < target_size) {
       // TODO deal with unsigned numbers
-      if (target->operand.type == Operand_Type_Register) {
+      if (target->operand.tag == Operand_Tag_Register) {
         if (source_size == 4) {
           // TODO check whether this correctly sign extends
           Operand adjusted_target = {
-            .type = Operand_Type_Register,
+            .tag = Operand_Tag_Register,
             .reg = target->operand.reg,
             .byte_size = 4,
           };
@@ -361,8 +361,8 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   if (last_instruction->type != Instruction_Type_Assembly) return;
   if (last_instruction->assembly.mnemonic != jmp) return;
   Operand op = last_instruction->assembly.operands[0];
-  if (op.type != Operand_Type_Label_32) return;
-  if (op.label32.value != builder->code_block.end_label.value) return;
+  if (op.tag != Operand_Tag_Label_32) return;
+  if (op.Label.index.value != builder->code_block.end_label.value) return;
   dyn_array_pop(builder->code_block.instructions);
 }
 
@@ -397,21 +397,21 @@ fn_normalize_instruction_operands(
     Operand *operand = &instruction->assembly.operands[operand_index];
     // RIP-relative imports are regular RIP-relative operands that we only know
     // target offset of at the point of encoding
-    if (operand->type == Operand_Type_RIP_Relative_Import) {
+    if (operand->tag == Operand_Tag_RIP_Relative_Import) {
       Import_Symbol *symbol = program_find_import(
         program, operand->import.library_name, operand->import.symbol_name
       );
       *operand = (Operand){
-        .type = Operand_Type_RIP_Relative,
+        .tag = Operand_Tag_RIP_Relative,
         .byte_size = operand->byte_size,
-        .label32 = symbol->label32,
+        .Label = {.index = symbol->label32},
       };
     }
     // [RSP + X] always needs to be encoded as SIB because RSP register index
     // in MOD R/M is occupied by RIP-relative encoding
-    else if (operand->type == Operand_Type_Memory_Indirect && operand->indirect.reg == rsp.reg) {
+    else if (operand->tag == Operand_Tag_Memory_Indirect && operand->indirect.reg == rsp.reg) {
       *operand = (Operand){
-        .type = Operand_Type_Sib,
+        .tag = Operand_Tag_Sib,
         .byte_size = operand->byte_size,
         .sib = {
           .scale = SIB_Scale_1,
@@ -421,7 +421,7 @@ fn_normalize_instruction_operands(
         },
       };
     }
-    bool is_stack_operand = operand->type == Operand_Type_Sib && operand->sib.base == Register_SP;
+    bool is_stack_operand = operand->tag == Operand_Tag_Sib && operand->sib.base == Register_SP;
     if (is_stack_operand) {
       operand->sib.displacement = fn_adjust_stack_displacement(builder, operand->sib.displacement);
     }
@@ -444,14 +444,17 @@ fn_encode(
 ) {
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
-  assert(operand->type == Operand_Type_Label_32);
-  Label *label = program_get_label(program, operand->label32);
+  assert(operand->tag == Operand_Tag_Label_32);
+  Label *label = program_get_label(program, operand->Label.index);
 
   s64 code_base_rva = label->section->base_rva;
   u32 fn_start_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Operand stack_size_operand = imm_auto_8_or_32(builder->stack_reserve);
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.type = Instruction_Type_Label, .label = operand->label32}
+    program, buffer, &(Instruction) {
+      .type = Instruction_Type_Label,
+      .label = operand->Label.index
+    }
   );
 
   Array_UNWIND_CODE unwind_codes = dyn_array_make(Array_UNWIND_CODE);
@@ -510,7 +513,7 @@ fn_encode(
   // Pop non-volatile registers
   for (s64 i = dyn_array_length(unwind_codes) - 1; i >= 0; --i) {
     Operand to_save = {
-      .type = Operand_Type_Register,
+      .tag = Operand_Tag_Register,
       .byte_size = 8,
       .reg = dyn_array_get(unwind_codes, i)->OpInfo,
     };
@@ -590,7 +593,7 @@ function_return_descriptor(
           *function->returns = (Value){
             .descriptor = descriptor,
             .operand = {
-              .type = Operand_Type_Memory_Indirect,
+              .tag = Operand_Tag_Memory_Indirect,
               .byte_size = byte_size,
               .indirect = {
                 .reg = Register_C,
@@ -625,8 +628,8 @@ make_if(
   }
 
   if (!is_always_true) {
-    if (value->operand.type == Operand_Type_Eflags) {
-      switch(value->operand.compare_type) {
+    if (value->operand.tag == Operand_Tag_Eflags) {
+      switch(value->operand.Eflags.compare_type) {
         case Compare_Type_Equal: {
           push_instruction(instructions, source_range, (Instruction) {.assembly = {jne, {label32(label), value->operand, 0}}});
           break;
@@ -712,7 +715,7 @@ assert_not_register_ax(
   Value *overload
 ) {
   assert(overload);
-  if (overload->operand.type == Operand_Type_Register) {
+  if (overload->operand.tag == Operand_Tag_Register) {
     assert(overload->operand.reg != Register_A);
   }
 }
@@ -810,7 +813,7 @@ plus_or_minus(
   }
 
   bool can_reuse_result_as_temp = (
-    result_value->operand.type == Operand_Type_Register &&
+    result_value->operand.tag == Operand_Tag_Register &&
     !operand_equal(&result_value->operand, &b->operand)
   );
   Value *temp = 0;
@@ -830,7 +833,7 @@ plus_or_minus(
   );
   if (temp != result_value) {
     move_value(allocator, builder, source_range, result_value, temp);
-    assert(temp->operand.type == Operand_Type_Register);
+    assert(temp->operand.tag == Operand_Tag_Register);
     register_release(builder, temp->operand.reg);
   }
 }
@@ -1111,8 +1114,8 @@ value_pointer_to(
   // TODO support register
   // TODO support immediates
   assert(
-    value->operand.type == Operand_Type_Memory_Indirect ||
-    value->operand.type == Operand_Type_RIP_Relative
+    value->operand.tag == Operand_Tag_Memory_Indirect ||
+    value->operand.tag == Operand_Tag_RIP_Relative
   );
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
@@ -1160,7 +1163,7 @@ call_function_overload(
         Value to_save = {
           .descriptor = &descriptor_s64,
           .operand = {
-            .type = Operand_Type_Register,
+            .tag = Operand_Tag_Register,
             .byte_size = 8,
             .reg = reg_index,
           }
@@ -1201,7 +1204,7 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (to_call->operand.type == Operand_Type_Label_32) {
+  if (to_call->operand.tag == Operand_Tag_Label_32) {
     push_instruction(instructions, source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
   } else {
     Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, to_call->descriptor);
@@ -1360,14 +1363,14 @@ ensure_memory(
   Value *value
 ) {
   Operand operand = value->operand;
-  if (operand.type == Operand_Type_Memory_Indirect) return value;
+  if (operand.tag == Operand_Tag_Memory_Indirect) return value;
   Value *result = allocator_allocate(allocator, Value);
   if (value->descriptor->tag != Descriptor_Tag_Pointer) assert(!"Not implemented");
-  if (value->operand.type != Operand_Type_Register) assert(!"Not implemented");
+  if (value->operand.tag != Operand_Tag_Register) assert(!"Not implemented");
   *result = (const Value) {
     .descriptor = value->descriptor->Pointer.to,
     .operand = {
-      .type = Operand_Type_Memory_Indirect,
+      .tag = Operand_Tag_Memory_Indirect,
       .indirect = {
         .reg = value->operand.reg,
         .displacement = 0,
@@ -1392,7 +1395,7 @@ struct_get_field(
       Value *result = allocator_allocate(allocator, Value);
       Operand operand = struct_value->operand;
       // FIXME support more operands
-      assert(operand.type == Operand_Type_Memory_Indirect);
+      assert(operand.tag == Operand_Tag_Memory_Indirect);
       operand.byte_size = descriptor_byte_size(field->descriptor);
       operand.indirect.displacement += field->offset;
       *result = (const Value) {
