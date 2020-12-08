@@ -1396,51 +1396,25 @@ token_process_bit_type_definition(
 }
 
 Token *
-token_process_type_definition(
+token_process_c_struct_definition(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  const Token *layout_token
+  const Token *args
 ) {
-
-  Token_View children = token_view_from_token_array(layout_token->Group.children);
-  Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-    .tag = Token_Tag_Operator,
-    .source = slice_literal(","),
-  });
-
-  const Token *layout_block = 0;
-  switch(dyn_array_length(argument_states)) {
-    case 2: {
-      Token_View layout_type_view = *dyn_array_get(argument_states, 0);
-      if (layout_type_view.length != 1) {
-        // TODO print error
-        goto err;
-      }
-      const Token *layout_type = token_view_get(layout_type_view, 0);
-      if (
-        layout_type->tag == Token_Tag_Id &&
-        slice_equal(layout_type->source, slice_literal("c_struct"))
-      ) {
-        Token_View layout_block_state = *dyn_array_get(argument_states, 1);
-        if (layout_block_state.length != 1) {
-          // TODO print error
-          goto err;
-        }
-        layout_block = token_view_get(layout_block_state, 0);
-      } else {
-        // TODO print error
-        goto err;
-      }
-      break;
-    }
-    default: {
-      // TODO print error
-      goto err;
-    }
+  if (!token_match(args, &(Token_Pattern) { .group_type = Token_Group_Type_Paren })) {
+    // TODO print error
+    goto err;
   }
-
-  assert(layout_block);
+  if (dyn_array_length(args->Group.children) != 1) {
+    // TODO print error
+    goto err;
+  }
+  const Token *layout_block = *dyn_array_get(args->Group.children, 0);
+  if (!token_match(layout_block, &(Token_Pattern) { .group_type = Token_Group_Type_Curly })) {
+    // TODO print error
+    goto err;
+  }
 
   Value *result = allocator_allocate(context->allocator, Value);
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -1472,7 +1446,7 @@ token_process_type_definition(
     .descriptor = value_descriptor,
     .operand = {.tag = Operand_Tag_None },
   };
-  return token_value_make(context, result, layout_token->source_range);
+  return token_value_make(context, result, args->source_range);
 
   err:
   return 0;
@@ -1927,9 +1901,9 @@ token_do_handle_operator(
       result = token_process_bit_type_definition(context, view, scope, args);
     } else if (
       function->tag == Token_Tag_Id &&
-      slice_equal(function->source, slice_literal("type"))
+      slice_equal(function->source, slice_literal("c_struct"))
     ) {
-      result = token_process_type_definition(context, view, scope, args);
+      result = token_process_c_struct_definition(context, view, scope, args);
     } else {
       Token_View call_view = {
         .tokens = (const Token *[]){function, args},

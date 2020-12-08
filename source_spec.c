@@ -559,7 +559,7 @@ spec("source") {
 
   it("should be able to parse struct definitions") {
     test_program_inline_source(
-      "Point :: type(c_struct, { x : s32; y : s32; });"
+      "Point :: c_struct({ x : s32; y : s32; });"
       "test :: () -> (s32) {"
         "p : Point; p.x = 20; p.y = 22;"
         "p.x + p.y"
@@ -606,7 +606,7 @@ spec("source") {
 
   it("should be able to return structs while accepting other arguments") {
     test_program_inline_source(
-      "Test_128bit :: type(c_struct, { x : s64; y : s64 });"
+      "Test_128bit :: c_struct({ x : s64; y : s64 });"
       "return_struct :: (x : s64) -> (Test_128bit) {"
         "result : Test_128bit;"
         "result.x = x;"
