@@ -545,7 +545,7 @@ spec("source") {
 
   it("should be able to parse fixed-bit sized type definitions") {
     test_program_inline_source(
-      "int8 :: type(8);"
+      "int8 :: bit_type(8);"
       "test :: () -> () {"
         "x : int8;"
       "}",

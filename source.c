@@ -1350,14 +1350,58 @@ token_match_struct_field(
 }
 
 Token *
+token_process_bit_type_definition(
+  Compilation_Context *context,
+  Token_View view,
+  Scope *scope,
+  const Token *args
+) {
+
+  Token_View args_view = { .tokens = &args, .length = 1 };
+  Value *bit_size_value = token_rewrite_constant_expression(context, args_view, scope);
+  if (!bit_size_value) {
+    // TODO print error
+    goto err;
+  }
+
+  if (!descriptor_is_integer(bit_size_value->descriptor)) {
+    // TODO err
+    goto err;
+  }
+  if (!operand_is_immediate(&bit_size_value->operand)) {
+    // TODO err
+    goto err;
+  }
+  u64 bit_size = s64_to_u64(operand_immediate_as_s64(&bit_size_value->operand));
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Opaque,
+    .Opaque = { .bit_size = bit_size },
+  };
+
+  Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
+  *value_descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Type,
+    .Type = { .descriptor = descriptor },
+  };
+  Value *result = allocator_allocate(context->allocator, Value);
+  *result = (Value) {
+    .descriptor = value_descriptor,
+    .operand = {.tag = Operand_Tag_None },
+  };
+  return token_value_make(context, result, args->source_range);
+
+  err:
+  return 0;
+}
+
+Token *
 token_process_type_definition(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
   const Token *layout_token
 ) {
-  const Token *layout_block = 0;
-  Value *bit_size_value = 0;
 
   Token_View children = token_view_from_token_array(layout_token->Group.children);
   Array_Token_View argument_states = token_split(children, &(Token_Pattern){
@@ -1365,16 +1409,8 @@ token_process_type_definition(
     .source = slice_literal(","),
   });
 
+  const Token *layout_block = 0;
   switch(dyn_array_length(argument_states)) {
-    case 1: {
-      Token_View bit_size_view = *dyn_array_get(argument_states, 0);
-      bit_size_value = token_rewrite_constant_expression(context, bit_size_view, scope);
-      if (!bit_size_value) {
-        // TODO print error
-        goto err;
-      }
-      break;
-    }
     case 2: {
       Token_View layout_type_view = *dyn_array_get(argument_states, 0);
       if (layout_type_view.length != 1) {
@@ -1404,42 +1440,27 @@ token_process_type_definition(
     }
   }
 
-  assert(layout_block || bit_size_value);
+  assert(layout_block);
+
   Value *result = allocator_allocate(context->allocator, Value);
-
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  if (bit_size_value) {
-    if (!descriptor_is_integer(bit_size_value->descriptor)) {
-      // TODO err
-      goto err;
-    }
-    if (!operand_is_immediate(&bit_size_value->operand)) {
-      // TODO err
-      goto err;
-    }
-    u64 bit_size = s64_to_u64(operand_immediate_as_s64(&bit_size_value->operand));
-    *descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Opaque,
-      .Opaque = { .bit_size = bit_size },
-    };
-  } else {
-    *descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Struct,
-      .Struct = {
-        .fields = dyn_array_make(Array_Descriptor_Struct_Field),
-      },
-    };
 
-    if (dyn_array_length(layout_block->Group.children) != 0) {
-      Token_View layout_block_children =
-        token_view_from_token_array(layout_block->Group.children);
-      Array_Token_View definitions = token_split_by_newlines_and_semicolons(layout_block_children);
-      for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
-        Token_View field_view = *dyn_array_get(definitions, i);
-        token_match_struct_field(context, descriptor, field_view, scope);
-      }
-      dyn_array_destroy(definitions);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Struct,
+    .Struct = {
+      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+    },
+  };
+
+  if (dyn_array_length(layout_block->Group.children) != 0) {
+    Token_View layout_block_children =
+      token_view_from_token_array(layout_block->Group.children);
+    Array_Token_View definitions = token_split_by_newlines_and_semicolons(layout_block_children);
+    for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
+      Token_View field_view = *dyn_array_get(definitions, i);
+      token_match_struct_field(context, descriptor, field_view, scope);
     }
+    dyn_array_destroy(definitions);
   }
 
   Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -1899,6 +1920,11 @@ token_do_handle_operator(
     ) {
       Token_View args_children = token_view_from_token_array(args->Group.children);
       result = token_import_match_arguments(args->source_range, args_children, context);
+    } else if (
+      function->tag == Token_Tag_Id &&
+      slice_equal(function->source, slice_literal("bit_type"))
+    ) {
+      result = token_process_bit_type_definition(context, view, scope, args);
     } else if (
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("type"))
