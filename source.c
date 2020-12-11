@@ -1606,6 +1606,12 @@ token_process_function_literal(
   } else {
     builder = fn_begin(context);
     descriptor = builder->value->descriptor;
+    Value *return_label_value = allocator_allocate(context->allocator, Value);
+    *return_label_value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = label32(builder->code_block.end_label),
+    };
+    scope_define_value(function_scope, MASS_RETURN_LABEL_NAME, return_label_value);
   }
 
   switch (dyn_array_length(return_types->Group.children)) {
@@ -2245,10 +2251,15 @@ token_rewrite_explicit_return(
     );
   }
 
+  Value *return_label = scope_lookup_force(context, context->scope, MASS_RETURN_LABEL_NAME);
+  assert(return_label);
+  assert(return_label->descriptor == &descriptor_void);
+  assert(return_label->operand.tag == Operand_Tag_Label);
+
   push_instruction(
     &builder->code_block.instructions,
     &keyword->source_range,
-    (Instruction) {.assembly = {jmp, {label32(builder->code_block.end_label), 0, 0}}}
+    (Instruction) {.assembly = {jmp, {return_label->operand, 0, 0}}}
   );
 
   return true;
@@ -2746,32 +2757,27 @@ token_rewrite_function_calls(
       }
       return_value = result_value;
 
-      // We need to have a fake builder so that return target label and
-      // the return types are correct
-      Function_Builder inline_builder = *builder;
-      {
-        inline_builder.code_block.end_label =
-          make_label(context->program, &context->program->code_section);
-        inline_builder.value->descriptor = allocator_allocate(context->allocator, Descriptor);
-        *inline_builder.value->descriptor = *builder->value->descriptor;
-        inline_builder.value->descriptor->Function.returns = result_value;
-      }
+      // Define a new return target label so that explicit return
+      // statements jump to the end of inlined block, not the end
+      // of the main function.
+      Operand fake_return_label =
+        label32(make_label(context->program, &context->program->data_section));
+      scope_define_value(body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
+        .descriptor = &descriptor_void,
+        .operand = fake_return_label,
+      });
+
       Token *body = token_clone_deep(context->allocator, function->body);
       WITH_SCOPE(context, body_scope) {
-        token_parse_block(context, body, &inline_builder, return_value);
+        token_parse_block(context, body, builder, return_value);
       }
-
-      // Because instructions are stored in a dynamic array it might have been
-      // reallocated which means we need to copy it. It might be better to
-      // switch to a bucket array.
-      builder->code_block.instructions = inline_builder.code_block.instructions;
 
       push_instruction(
         &builder->code_block.instructions,
         &target_token->source_range,
         (Instruction) {
           .type = Instruction_Type_Label,
-          .label = inline_builder.code_block.end_label
+          .label = fake_return_label.Label.index
         }
       );
     } else {

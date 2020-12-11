@@ -3,6 +3,8 @@
 #include "prelude.h"
 #include "value.h"
 
+
+#define MASS_RETURN_LABEL_NAME slice_literal("@return")
 typedef enum {
   Scope_Entry_Type_Value = 1,
   Scope_Entry_Type_Lazy_Constant_Expression,
