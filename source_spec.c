@@ -499,6 +499,22 @@ spec("source") {
     check(sum_up_to_fn(3) == 6);
   }
 
+  it("should be able to goto a label defined after the goto") {
+    test_program_inline_source(
+      "test :: () -> (s32) {"
+        "x : s32 = 42;"
+        "goto skip;"
+        "x = 0;"
+        "label skip;"
+        "x"
+      "}",
+      test
+    );
+    fn_type_void_to_s32 checker =
+      (fn_type_void_to_s32)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
   it("should be able to define and use a macro without a capture") {
     test_program_inline_source(
       "macro (the answer) (42);"

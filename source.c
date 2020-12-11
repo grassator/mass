@@ -2167,23 +2167,51 @@ token_parse_statement_label(
     program_error_builder(context, keyword->source_range) {
       program_error_append_literal("`label` must be followed by an identifier");
     }
+    goto err;
   }
 
   const Token *id = token_view_get(rest, 0);
 
+  // :ForwardLabelRef
+  // First try to lookup a label that might have been declared by `goto`
+  // FIXME make sure we don't double declare label
+  Value *value = scope_lookup_force(
+    context,
+    builder->value->descriptor->Function.scope,
+    id->source
+  );
 
-  Label_Index label = make_label(context->program, &context->program->code_section);
+  if (!value) {
+    Label_Index label = make_label(context->program, &context->program->code_section);
+    value = allocator_allocate(context->allocator, Value);
+    *value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = label32(label),
+    };
+    // FIXME this should define a label in the function scope, but because
+    // the macros are not hygienic we can not do that yet
+    //scope_define_value(builder->value->descriptor->Function.scope, id->source, value);
+    scope_define_value(context->scope, id->source, value);
+  }
+
+  if (
+    value->descriptor != &descriptor_void ||
+    value->operand.tag != Operand_Tag_Label
+  ) {
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_literal("Trying to redefine variable ");
+      program_error_append_slice(id->source);
+      program_error_append_literal(" as a label");
+    }
+    goto err;
+  }
+
   push_instruction(
     &builder->code_block.instructions, &keyword->source_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = label }
+    (Instruction) { .type = Instruction_Type_Label, .label = value->operand.Label.index }
   );
-  Value *value = allocator_allocate(context->allocator, Value);
-  *value = (Value) {
-    .descriptor = &descriptor_void,
-    .operand = label32(label),
-  };
-  scope_define_value(context->scope, id->source, value);
 
+  err:
   return true;
 }
 
@@ -2242,25 +2270,63 @@ token_rewrite_goto(
 ) {
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
-  // TODO improve error reporting here.
-  Token_Match(label_name, .tag = Token_Tag_Id);
-  Value *value = scope_lookup_force(context, context->scope, label_name->source);
-  if (value) {
-    if (
-      value->descriptor->tag == Descriptor_Tag_Void &&
-      value->operand.tag == Operand_Tag_Label
-    ) {
-      push_instruction(
-        &builder->code_block.instructions, &keyword->source_range,
-        (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
-      );
-    } else {
-      program_error_builder(context, label_name->source_range) {
-        program_error_append_slice(label_name->source);
-        program_error_append_literal(" is not a label");
-      }
+  Token_View rest = token_view_rest(view, peek_index);
+  if (rest.length == 0) {
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_literal("`goto` keyword must be followed by an identifier");
     }
+    goto err;
   }
+
+  if (rest.length > 1) {
+    program_error_builder(context, token_view_get(rest, 1)->source_range) {
+      program_error_append_literal("Unexpected token");
+    }
+    goto err;
+  }
+  const Token *id = token_view_get(rest, 0);
+  if (!token_match(id, &(Token_Pattern){.tag = Token_Tag_Id})) {
+    program_error_builder(context, id->source_range) {
+      program_error_append_literal("`goto` keyword must be followed by an identifier");
+    }
+    goto err;
+  }
+
+  Value *value = scope_lookup_force(context, context->scope, id->source);
+
+  // :ForwardLabelRef
+  // If we didn't find an identifier with this name, declare one and hope
+  // that some label will resolve it
+  // FIXME somehow report unresolved labels
+  if (!value) {
+    Label_Index label = make_label(context->program, &context->program->code_section);
+    value = allocator_allocate(context->allocator, Value);
+    *value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = label32(label),
+    };
+    // Label declarations are always done in the function scope as they
+    // might need to jump out of a nested block.
+    scope_define_value(builder->value->descriptor->Function.scope, id->source, value);
+  }
+
+  if (
+    value->descriptor != &descriptor_void ||
+    value->operand.tag != Operand_Tag_Label
+  ) {
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_slice(id->source);
+      program_error_append_literal(" is not a label");
+    }
+    goto err;
+  }
+
+  push_instruction(
+    &builder->code_block.instructions, &keyword->source_range,
+    (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
+  );
+
+  err:
   return true;
 }
 
