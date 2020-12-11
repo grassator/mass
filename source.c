@@ -1605,7 +1605,7 @@ token_process_function_literal(
     };
   } else {
     builder = fn_begin(context);
-    descriptor = builder->descriptor;
+    descriptor = builder->value->descriptor;
   }
 
   switch (dyn_array_length(return_types->Group.children)) {
@@ -1732,7 +1732,7 @@ compile_time_eval(
   eval_context.program = &eval_program;
 
   Function_Builder *eval_builder = fn_begin(&eval_context);
-  function_return_descriptor(context, &eval_builder->descriptor->Function, &descriptor_void);
+  function_return_descriptor(context, &eval_builder->value->descriptor->Function, &descriptor_void);
 
   Array_Const_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
@@ -2231,7 +2231,7 @@ token_rewrite_explicit_return(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
-  Value *fn_return = builder->descriptor->Function.returns;
+  Value *fn_return = builder->value->descriptor->Function.returns;
 
   Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
   token_match_expression(context, &expression_tokens, builder, fn_return);
@@ -2752,9 +2752,9 @@ token_rewrite_function_calls(
       {
         inline_builder.code_block.end_label =
           make_label(context->program, &context->program->code_section);
-        inline_builder.descriptor = &(Descriptor) {0};
-        *inline_builder.descriptor = *builder->descriptor;
-        inline_builder.descriptor->Function.returns = result_value;
+        inline_builder.value->descriptor = allocator_allocate(context->allocator, Descriptor);
+        *inline_builder.value->descriptor = *builder->value->descriptor;
+        inline_builder.value->descriptor->Function.returns = result_value;
       }
       Token *body = token_clone_deep(context->allocator, function->body);
       WITH_SCOPE(context, body_scope) {

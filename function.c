@@ -303,7 +303,6 @@ fn_begin(
   };
   Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
     .layout = {0},
-    .descriptor = descriptor,
     .value = fn_value,
     .code_block = {
       .end_label = make_label(context->program, &context->program->code_section),
@@ -336,6 +335,7 @@ fn_end(
   u8 alignment = 0x8;
   builder->layout.stack_reserve += builder->max_call_parameters_stack_size;
   builder->layout.stack_reserve = s32_align(builder->layout.stack_reserve, 16) + alignment;
+  assert(builder->value->descriptor->Function.returns);
 }
 
 u32
