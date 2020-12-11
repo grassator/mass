@@ -1,5 +1,5 @@
 macro (while _condition _body) ({
-  loop : label;
+  label loop;
   if condition {
     body;
     goto loop;

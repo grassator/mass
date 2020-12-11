@@ -483,7 +483,7 @@ spec("source") {
       "sum_up_to :: (x : s32) -> (s32) {"
         "sum : s32;"
         "sum = 0;"
-        "loop : label;"
+        "label loop;"
         "if (x < 0) { return sum };"
         "sum = sum + x;"
         "x = x + (-1);"
@@ -747,12 +747,6 @@ spec("source") {
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not parse the expression"), error->message));
-    }
-    it("should report an error for extra tokens after `label`") {
-      test_program_inline_source_base("main :: () -> () { bar: label foo; }", main);
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
-      check(slice_equal(slice_literal("Unexpected token"), error->message));
     }
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);

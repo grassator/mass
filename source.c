@@ -2150,6 +2150,44 @@ token_parse_block(
 }
 
 bool
+token_parse_statement_label(
+  Compilation_Context *context,
+  Token_View view,
+  Function_Builder *builder,
+  void *unused_payload
+) {
+  u64 peek_index = 0;
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
+  Token_View rest = token_view_rest(view, peek_index);
+
+  if (
+    rest.length != 1 ||
+    !token_match(token_view_get(rest, 0), &(Token_Pattern){ .tag = Token_Tag_Id })
+  ) {
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_literal("`label` must be followed by an identifier");
+    }
+  }
+
+  const Token *id = token_view_get(rest, 0);
+
+
+  Label_Index label = make_label(context->program, &context->program->code_section);
+  push_instruction(
+    &builder->code_block.instructions, &keyword->source_range,
+    (Instruction) {.type = Instruction_Type_Label, .label = label }
+  );
+  Value *value = allocator_allocate(context->allocator, Value);
+  *value = (Value) {
+    .descriptor = &descriptor_void,
+    .operand = label32(label),
+  };
+  scope_define_value(context->scope, id->source, value);
+
+  return true;
+}
+
+bool
 token_rewrite_statement_if(
   Compilation_Context *context,
   Token_View view,
@@ -2437,38 +2475,6 @@ token_rewrite_cast(
 }
 
 Value *
-token_match_label(
-  Compilation_Context *context,
-  Token_View view,
-  Scope *scope,
-  Function_Builder *builder
-) {
-  u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
-
-  if (peek_index != view.length) {
-    const Token *extra_token = token_view_get(view, peek_index);
-    program_error_builder(context, extra_token->source_range) {
-      program_error_append_literal("Unexpected token");
-    }
-    return 0;
-  }
-
-  Label_Index label = make_label(context->program, &context->program->code_section);
-  push_instruction(
-    &builder->code_block.instructions, &keyword->source_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = label }
-  );
-  Value *value = allocator_allocate(context->allocator, Value);
-  *value = (Value) {
-    .descriptor = &descriptor_void,
-    .operand = label32(label),
-  };
-
-  return value;
-}
-
-Value *
 token_parse_definition(
   Compilation_Context *context,
   Token_View view,
@@ -2480,17 +2486,14 @@ token_parse_definition(
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
-  Value *value = token_match_label(context, rest, context->scope, builder);
-  if (!value) {
-    Descriptor *descriptor = token_match_type(context, rest, context->scope);
-    if (!descriptor) {
-      program_error_builder(context, define->source_range) {
-        program_error_append_literal("Could not find type");
-      }
-      goto err;
+  Descriptor *descriptor = token_match_type(context, rest, context->scope);
+  if (!descriptor) {
+    program_error_builder(context, define->source_range) {
+      program_error_append_literal("Could not find type");
     }
-    value = reserve_stack(context->allocator, builder, descriptor);
+    goto err;
   }
+  Value *value = reserve_stack(context->allocator, builder, descriptor);
   scope_define_value(context->scope, name->source, value);
   return value;
 

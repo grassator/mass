@@ -72,6 +72,13 @@ token_parse_block(
 );
 
 bool
+token_parse_statement_label(
+  Compilation_Context *program,
+  Token_View state,
+  Function_Builder *builder,
+  void *unused_payload
+);
+bool
 token_rewrite_statement_if(
   Compilation_Context *program,
   Token_View state,

@@ -1301,6 +1301,7 @@ program_init(
   {
     Array_Token_Statement_Matcher matchers =
       dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_rewrite_statement_if});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_rewrite_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_rewrite_assignment});
