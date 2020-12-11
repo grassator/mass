@@ -939,17 +939,15 @@ token_rewrite_macros(
 Descriptor *
 token_match_fixed_array_type(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 );
 
 Descriptor *
 token_match_type(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
-  Descriptor *descriptor = token_match_fixed_array_type(context, view, scope);
+  Descriptor *descriptor = token_match_fixed_array_type(context, view);
   if (descriptor) return descriptor;
   if (!view.length) panic("Caller must not call token_match_type with empty token list");
   const Token *token = token_view_get(view, 0);
@@ -961,7 +959,7 @@ token_match_type(
     );
     return 0;
   }
-  return token_force_type(context, scope, token);
+  return token_force_type(context, context->scope, token);
 }
 
 static inline Token_View
@@ -990,8 +988,7 @@ token_view_trim_newlines(
 Token_Match_Arg *
 token_match_argument(
   Compilation_Context *context,
-  Token_View raw_view,
-  Scope *scope
+  Token_View raw_view
 ) {
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
@@ -1000,7 +997,7 @@ token_match_argument(
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
-  Descriptor *type_descriptor = token_match_type(context, rest, scope);
+  Descriptor *type_descriptor = token_match_type(context, rest);
   if (!type_descriptor) return 0;
   Token_Match_Arg *arg = allocator_allocate(context->allocator, Token_Match_Arg);
   *arg = (Token_Match_Arg){name->source, type_descriptor};
@@ -1334,15 +1331,14 @@ bool
 token_match_struct_field(
   Compilation_Context *context,
   Descriptor *struct_descriptor,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
-  Descriptor *descriptor = token_match_type(context, rest, scope);
+  Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
   return true;
@@ -1398,7 +1394,6 @@ Token *
 token_process_c_struct_definition(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   const Token *args
 ) {
   if (!token_match(args, &(Token_Pattern) { .group_type = Token_Group_Type_Paren })) {
@@ -1431,7 +1426,7 @@ token_process_c_struct_definition(
     Array_Token_View definitions = token_split_by_newlines_and_semicolons(layout_block_children);
     for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
       Token_View field_view = *dyn_array_get(definitions, i);
-      token_match_struct_field(context, descriptor, field_view, scope);
+      token_match_struct_field(context, descriptor, field_view);
     }
     dyn_array_destroy(definitions);
   }
@@ -1640,7 +1635,10 @@ token_process_function_literal(
     });
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_View arg_view = *dyn_array_get(argument_states, i);
-      Token_Match_Arg *arg = token_match_argument(context, arg_view, function_scope);
+      Token_Match_Arg *arg = 0;
+      WITH_SCOPE(context, function_scope) {
+        arg = token_match_argument(context, arg_view);
+      }
       if (!arg) return 0;
       Value *arg_value =
         function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
@@ -1904,7 +1902,7 @@ token_do_handle_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("c_struct"))
     ) {
-      result = token_process_c_struct_definition(context, view, scope, args);
+      result = token_process_c_struct_definition(context, view, args);
     } else {
       Token_View call_view = {
         .tokens = (const Token *[]){function, args},
@@ -2393,16 +2391,16 @@ token_rewrite_pointer_to(
 Descriptor *
 token_match_fixed_array_type(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Tag_Id);
   Token_Match(square_brace, .group_type = Token_Group_Type_Square);
-  Descriptor *descriptor = scope_lookup_type(context, scope, type->source_range, type->source);
+  Descriptor *descriptor =
+    scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_token_array(square_brace->Group.children);
-  Value *size_value = token_rewrite_constant_expression(context, size_view, scope);
+  Value *size_value = token_rewrite_constant_expression(context, size_view, context->scope);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
     program_push_error_from_slice(
@@ -2552,7 +2550,7 @@ token_parse_definition(
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
-  Descriptor *descriptor = token_match_type(context, rest, context->scope);
+  Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) {
     program_error_builder(context, define->source_range) {
       program_error_append_literal("Could not find type");
