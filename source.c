@@ -176,7 +176,6 @@ void
 token_force_value(
   Compilation_Context *context,
   const Token *token,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 );
@@ -229,7 +228,9 @@ scope_lookup_force(
           function->returns->descriptor->tag == Descriptor_Tag_Void
           ? value_any(context->allocator)
           : function->returns;
-        token_parse_block(context, body, function->scope, function->builder, return_result_value);
+        WITH_SCOPE(context, function->scope) {
+          token_parse_block(context, body, function->builder, return_result_value);
+        }
         fn_end(function->builder);
       }
     }
@@ -1010,7 +1011,6 @@ bool
 token_match_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
-  Scope *scope,
   Function_Builder *builder,
   Value *target
 );
@@ -1120,10 +1120,10 @@ void
 token_force_value(
   Compilation_Context *context,
   const Token *token,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 ) {
+  Scope *scope = context->scope;
   switch(token->tag) {
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
@@ -1175,12 +1175,12 @@ token_force_value(
         case Token_Group_Type_Paren: {
           Array_Const_Token_Ptr expression_tokens =
             dyn_array_copy(Array_Const_Token_Ptr, token->Group.children);
-          token_match_expression(context, &expression_tokens, scope, builder, result_value);
+          token_match_expression(context, &expression_tokens, builder, result_value);
           dyn_array_destroy(expression_tokens);
           return;
         }
         case Token_Group_Type_Curly: {
-          token_parse_block(context, token, scope, builder, result_value);
+          token_parse_block(context, token, builder, result_value);
           return;
         }
         case Token_Group_Type_Square: {
@@ -1214,7 +1214,6 @@ Array_Value_Ptr
 token_match_call_arguments(
   Compilation_Context *context,
   const Token *token,
-  Scope *scope,
   Function_Builder *builder
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
@@ -1235,7 +1234,7 @@ token_match_call_arguments(
       Token_View view = *dyn_array_get(argument_states, i);
       Value *result_value = value_any(context->allocator);
       Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, view);
-      token_match_expression(context, &expression_tokens, scope, builder, result_value);
+      token_match_expression(context, &expression_tokens, builder, result_value);
       dyn_array_destroy(expression_tokens);
       dyn_array_push(result, result_value);
     }
@@ -1535,7 +1534,6 @@ token_import_match_arguments(
 typedef const Token *(*token_rewrite_expression_callback)(
   Compilation_Context *context,
   Token_View,
-  Scope *,
   Function_Builder *,
   Value *result_value,
   u64 *replacement_count
@@ -1545,7 +1543,6 @@ void
 token_rewrite_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   token_rewrite_expression_callback callback
@@ -1556,7 +1553,7 @@ token_rewrite_expression(
     for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
       Token_View rewrite_view = token_view_rest(token_view_from_token_array(*tokens), i);
       u64 replacement_count = 0;
-      const Token *token = callback(context, rewrite_view, scope, builder, result_value, &replacement_count);
+      const Token *token = callback(context, rewrite_view, builder, result_value, &replacement_count);
       if (replacement_count) {
         if (token) dyn_array_push(replacement, token);
         dyn_array_splice(*tokens, i, replacement_count, replacement);
@@ -1677,7 +1674,6 @@ const Token *
 token_rewrite_negative_literal(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *unused_result_value, // FIXME actually use this
   u64 *replacement_count
@@ -1687,7 +1683,7 @@ token_rewrite_negative_literal(
   Token_Match_Operator(define, "-");
   Token_Match(integer, .tag = Token_Tag_Integer);
   Value *value = value_any(context->allocator);
-  token_force_value(context, integer, scope, builder, value);
+  token_force_value(context, integer, builder, value);
   if (value->operand.tag == Operand_Tag_Immediate_8) {
     value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
   } else if (value->operand.tag == Operand_Tag_Immediate_16) {
@@ -1732,6 +1728,7 @@ compile_time_eval(
   };
 
   Compilation_Context eval_context = *context;
+  eval_context.scope = eval_program.global_scope;
   eval_context.program = &eval_program;
 
   Function_Builder *eval_builder = fn_begin(&eval_context);
@@ -1739,9 +1736,7 @@ compile_time_eval(
 
   Array_Const_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
-  token_match_expression(
-    &eval_context, &tokens, eval_program.global_scope, eval_builder, expression_result_value
-  );
+  token_match_expression(&eval_context, &tokens, eval_builder, expression_result_value);
 
   // We use a something like a C++ reference out parameter for the
   // result to have a consitent function signature on this C side of things.
@@ -2075,7 +2070,6 @@ bool
 token_rewrite_constant_definitions(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2090,7 +2084,7 @@ token_rewrite_constant_definitions(
   if (lhs.length > 1) return false;
   const Token *name = token_view_get(lhs, 0);
   if (name->tag != Token_Tag_Id) return false;
-  scope_define_lazy(scope, name->source, rhs);
+  scope_define_lazy(context->scope, name->source, rhs);
   return true;
 }
 
@@ -2099,7 +2093,6 @@ token_parse_statement(
   Compilation_Context *context,
   Token_View view,
   const Source_Range *source_range,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 );
@@ -2108,7 +2101,6 @@ bool
 token_parse_block(
   Compilation_Context *context,
   const Token *block,
-  Scope *scope,
   Function_Builder *builder,
   Value *block_result_value
 ) {
@@ -2116,7 +2108,7 @@ token_parse_block(
   assert(block->Group.type == Token_Group_Type_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) return false;
-  Scope *block_scope = scope_make(context->allocator, scope);
+  //Scope *block_scope = scope_make(context->allocator, scope);
 
   // Newlines at the end of the block do not count as semicolons otherwise this:
   // { 42
@@ -2127,24 +2119,26 @@ token_parse_block(
 
   Token_View children_view = token_view_from_token_array(children);
   Array_Token_View block_statements = token_split_by_newlines_and_semicolons(children_view);
-  for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
-    Token_View view = *dyn_array_get(block_statements, i);
-    if (!view.length) continue;
-    bool is_last_statement = i + 1 == dyn_array_length(block_statements);
-    Value *result_value = is_last_statement ? block_result_value : value_any(context->allocator);
+  WITH_SCOPE(context, scope_make(context->allocator, context->scope)) {
+    for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
+      Token_View view = *dyn_array_get(block_statements, i);
+      if (!view.length) continue;
+      bool is_last_statement = i + 1 == dyn_array_length(block_statements);
+      Value *result_value = is_last_statement ? block_result_value : value_any(context->allocator);
 
-    // If result is a register we need to make sure it is acquired to avoid it being used
-    // as temporary when evaluating last statement. This definitely can happen with
-    // the function returns but should be safe to do all the time.
-    if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
-      if (
-        !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
-      ) {
-        register_acquire(builder, result_value->operand.Register.index);
+      // If result is a register we need to make sure it is acquired to avoid it being used
+      // as temporary when evaluating last statement. This definitely can happen with
+      // the function returns but should be safe to do all the time.
+      if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
+        if (
+          !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
+        ) {
+          register_acquire(builder, result_value->operand.Register.index);
+        }
       }
-    }
 
-    token_parse_statement(context, view, &block->source_range, block_scope, builder, result_value);
+      token_parse_statement(context, view, &block->source_range, builder, result_value);
+    }
   }
   return true;
 }
@@ -2153,7 +2147,6 @@ bool
 token_rewrite_statement_if(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2177,7 +2170,7 @@ token_rewrite_statement_if(
 
   Array_Const_Token_Ptr condition_tokens = token_array_from_view(allocator_system, condition_view);
   Value *condition_value = value_any(context->allocator);
-  token_match_expression(context, &condition_tokens, scope, builder, condition_value);
+  token_match_expression(context, &condition_tokens, builder, condition_value);
   dyn_array_destroy(condition_tokens);
   if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
     goto err;
@@ -2186,7 +2179,7 @@ token_rewrite_statement_if(
   Label_Index else_label = make_if(
     context, &builder->code_block.instructions, &keyword->source_range, condition_value
   );
-  token_parse_block(context, body, scope, builder, value_any(context->allocator));
+  token_parse_block(context, body, builder, value_any(context->allocator));
   push_instruction(
     &builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
@@ -2200,7 +2193,6 @@ bool
 token_rewrite_goto(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2208,7 +2200,7 @@ token_rewrite_goto(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
   // TODO improve error reporting here.
   Token_Match(label_name, .tag = Token_Tag_Id);
-  Value *value = scope_lookup_force(context, scope, label_name->source);
+  Value *value = scope_lookup_force(context, context->scope, label_name->source);
   if (value) {
     if (
       value->descriptor->tag == Descriptor_Tag_Void &&
@@ -2232,7 +2224,6 @@ bool
 token_rewrite_explicit_return(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2243,7 +2234,7 @@ token_rewrite_explicit_return(
   Value *fn_return = builder->descriptor->Function.returns;
 
   Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
-  token_match_expression(context, &expression_tokens, scope, builder, fn_return);
+  token_match_expression(context, &expression_tokens, builder, fn_return);
   dyn_array_destroy(expression_tokens);
 
   bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
@@ -2267,7 +2258,6 @@ const Token *
 token_rewrite_pointer_to(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *unused_result_value, // FIXME actually use this
   u64 *replacement_count
@@ -2277,7 +2267,7 @@ token_rewrite_pointer_to(
   Token_Match(value_token, 0);
 
   Value *pointee = value_any(context->allocator);
-  token_force_value(context, value_token, scope, builder, pointee);
+  token_force_value(context, value_token, builder, pointee);
   Value *result = value_pointer_to(context, builder, &operator->source_range, pointee);
 
   *replacement_count = 2;
@@ -2333,7 +2323,6 @@ bool
 token_rewrite_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2342,7 +2331,7 @@ token_rewrite_inline_machine_code_bytes(
   // TODO improve error reporting and / or transition to compile time functions when available
   Token_Match(args_token, .group_type = Token_Group_Type_Paren);
 
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token, scope, builder);
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
 
   u64 byte_count = dyn_array_length(args);
   if (byte_count > 15) {
@@ -2396,7 +2385,6 @@ const Token *
 token_rewrite_cast(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *unused_result_value, // FIXME use this
   u64 *replacement_count
@@ -2405,7 +2393,7 @@ token_rewrite_cast(
   Token_Match(cast, .tag = Token_Tag_Id, .source = slice_literal("cast"));
   Token_Match(value_token, .group_type = Token_Group_Type_Paren);
 
-  Array_Value_Ptr args = token_match_call_arguments(context, value_token, scope, builder);
+  Array_Value_Ptr args = token_match_call_arguments(context, value_token, builder);
   assert(dyn_array_length(args) == 2);
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
@@ -2473,7 +2461,6 @@ Value *
 token_parse_definition(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder
 ) {
   // TODO consider merging with argument matching
@@ -2482,9 +2469,9 @@ token_parse_definition(
   Token_Match_Operator(define, ":");
 
   Token_View rest = token_view_rest(view, peek_index);
-  Value *value = token_match_label(context, rest, scope, builder);
+  Value *value = token_match_label(context, rest, context->scope, builder);
   if (!value) {
-    Descriptor *descriptor = token_match_type(context, rest, scope);
+    Descriptor *descriptor = token_match_type(context, rest, context->scope);
     if (!descriptor) {
       program_error_builder(context, define->source_range) {
         program_error_append_literal("Could not find type");
@@ -2493,7 +2480,7 @@ token_parse_definition(
     }
     value = reserve_stack(context->allocator, builder, descriptor);
   }
-  scope_define_value(scope, name->source, value);
+  scope_define_value(context->scope, name->source, value);
   return value;
 
   err:
@@ -2504,18 +2491,16 @@ bool
 token_rewrite_definitions(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
-  return !!token_parse_definition(program, state, scope, builder);
+  return !!token_parse_definition(program, state, builder);
 }
 
 bool
 token_rewrite_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2534,7 +2519,7 @@ token_rewrite_definition_and_assignment_statements(
 
   Value *value = value_any(context->allocator);
   Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, &expression_tokens, scope, builder, value);
+  token_match_expression(context, &expression_tokens, builder, value);
   dyn_array_destroy(expression_tokens);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -2549,7 +2534,7 @@ token_rewrite_definition_and_assignment_statements(
   Value *on_stack = reserve_stack(context->allocator, builder, value->descriptor);
   move_value(context->allocator, builder, &name->source_range, on_stack, value);
 
-  scope_define_value(scope, name->source, on_stack);
+  scope_define_value(context->scope, name->source, on_stack);
   return true;
 }
 
@@ -2557,7 +2542,6 @@ const Token *
 token_rewrite_array_index(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *target,
   u64 *replacement_count
@@ -2567,10 +2551,10 @@ token_rewrite_array_index(
   Token_Match(brackets, .group_type = Token_Group_Type_Square);
 
   Value *array = value_any(context->allocator);
-  token_force_value(context, target_token, scope, builder, array);
+  token_force_value(context, target_token, builder, array);
   Value *index_value = value_any(context->allocator);
   Array_Const_Token_Ptr index_tokens = dyn_array_copy(Array_Const_Token_Ptr, brackets->Group.children);
-  token_match_expression(context, &index_tokens, scope, builder, index_value);
+  token_match_expression(context, &index_tokens, builder, index_value);
   dyn_array_destroy(index_tokens);
   assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
   assert(array->operand.tag == Operand_Tag_Memory_Indirect);
@@ -2636,7 +2620,6 @@ const Token *
 token_rewrite_struct_field(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *unused_result_value, // FIXME actually use this
   u64 *replacement_count
@@ -2647,7 +2630,7 @@ token_rewrite_struct_field(
   Token_Match(field_name, .tag = Token_Tag_Id);
 
   Value *struct_value = value_any(context->allocator);
-  token_force_value(context, struct_token, scope, builder, struct_value);
+  token_force_value(context, struct_token, builder, struct_value);
   Value *result = struct_get_field(context->allocator, struct_value, field_name->source);
 
   *replacement_count = 3;
@@ -2659,7 +2642,6 @@ bool
 token_rewrite_assignment(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 ) {
@@ -2670,16 +2652,16 @@ token_rewrite_assignment(
     return false;
   }
 
-  Value *target = token_parse_definition(context, lhs, scope, builder);
+  Value *target = token_parse_definition(context, lhs, builder);
   if (!target) {
     target = value_any(context->allocator);
     Array_Const_Token_Ptr lhs_tokens = token_array_from_view(allocator_system, lhs);
-    token_match_expression(context, &lhs_tokens, scope, builder, target);
+    token_match_expression(context, &lhs_tokens, builder, target);
     dyn_array_destroy(lhs_tokens);
   }
 
   Array_Const_Token_Ptr rhs_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, &rhs_tokens, scope, builder, target);
+  token_match_expression(context, &rhs_tokens, builder, target);
   dyn_array_destroy(rhs_tokens);
 
   return true;
@@ -2689,7 +2671,6 @@ const Token *
 token_rewrite_function_calls(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2706,7 +2687,7 @@ token_rewrite_function_calls(
   *replacement_count = 2;
 
   Value *target = value_any(context->allocator);
-  token_force_value(context, target_token, scope, builder, target);
+  token_force_value(context, target_token, builder, target);
 
   Array_Value_Ptr args;
 
@@ -2726,7 +2707,7 @@ token_rewrite_function_calls(
       }
     }
 
-    args = token_match_call_arguments(context, args_token, scope, builder);
+    args = token_match_call_arguments(context, args_token, builder);
 
     // Release any registers that we fake acquired to make sure that the actual call
     // does not unnecessarily store them to stack
@@ -2776,7 +2757,9 @@ token_rewrite_function_calls(
         inline_builder.descriptor->Function.returns = result_value;
       }
       Token *body = token_clone_deep(context->allocator, function->body);
-      token_parse_block(context, body, body_scope, &inline_builder, return_value);
+      WITH_SCOPE(context, body_scope) {
+        token_parse_block(context, body, &inline_builder, return_value);
+      }
 
       // Because instructions are stored in a dynamic array it might have been
       // reallocated which means we need to copy it. It might be better to
@@ -2809,7 +2792,6 @@ const Token *
 token_rewrite_plus(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2820,9 +2802,9 @@ token_rewrite_plus(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, builder, lhs_value);
   Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, builder, rhs_value);
   plus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
 
   *replacement_count = 3;
@@ -2834,7 +2816,6 @@ const Token *
 token_rewrite_minus(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2845,9 +2826,9 @@ token_rewrite_minus(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, builder, lhs_value);
   Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, builder, rhs_value);
   minus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
 
   *replacement_count = 3;
@@ -2859,7 +2840,6 @@ const Token *
 token_rewrite_divide(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2870,9 +2850,9 @@ token_rewrite_divide(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, builder, lhs_value);
   Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, builder, rhs_value);
   divide(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
 
   *replacement_count = 3;
@@ -2884,7 +2864,6 @@ const Token *
 token_rewrite_remainder(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2895,9 +2874,9 @@ token_rewrite_remainder(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, builder, lhs_value);
   Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, builder, rhs_value);
   Value *temp = reserve_stack(context->allocator, builder, lhs_value->descriptor);
   value_remainder(context->allocator, builder, &op_token->source_range, temp, lhs_value, rhs_value);
 
@@ -2910,7 +2889,6 @@ const Token *
 token_rewrite_compare(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value,
   u64 *replacement_count
@@ -2954,9 +2932,9 @@ token_rewrite_compare(
   Token_Match(rhs, 0);
 
   Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, scope, builder, lhs_value);
+  token_force_value(context, lhs, builder, lhs_value);
   Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, scope, builder, rhs_value);
+  token_force_value(context, rhs, builder, rhs_value);
 
   // FIXME add implicit unsigned to signed conversion
   if (
@@ -3081,16 +3059,15 @@ token_parse_statement(
   Compilation_Context *context,
   Token_View view,
   const Source_Range *source_range,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 ) {
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
-  token_rewrite_macros(context, &statement_tokens, scope, builder);
+  token_rewrite_macros(context, &statement_tokens, context->scope, builder);
   view = token_view_from_token_array(statement_tokens);
   for (
-    Scope *statement_matcher_scope = scope;
+    Scope *statement_matcher_scope = context->scope;
     statement_matcher_scope;
     statement_matcher_scope = statement_matcher_scope->parent
   ) {
@@ -3100,13 +3077,13 @@ token_parse_statement(
     for (u64 i = 0 ; i < dyn_array_length(statement_matcher_scope->statement_matchers); ++i) {
       Token_Statement_Matcher matcher =
         *dyn_array_get(statement_matcher_scope->statement_matchers, i);
-      if (matcher.proc(context, view, scope, builder, matcher.payload)) {
+      if (matcher.proc(context, view, builder, matcher.payload)) {
         return true;
       }
     }
   }
 
-  bool result = token_match_expression(context, &statement_tokens, scope, builder, result_value);
+  bool result = token_match_expression(context, &statement_tokens, builder, result_value);
   dyn_array_destroy(statement_tokens);
   return result;
 }
@@ -3115,26 +3092,25 @@ bool
 token_match_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 ) {
   token_state_clear_newlines(tokens);
 
   if (dyn_array_length(*tokens)) {
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_cast);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_struct_field);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_negative_literal);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_function_calls);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_array_index);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_pointer_to);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_cast);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_struct_field);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_negative_literal);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_function_calls);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_array_index);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_pointer_to);
 
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_divide);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_remainder);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_plus);
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_minus);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_divide);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_remainder);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_plus);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_minus);
 
-    token_rewrite_expression(context, tokens, scope, builder, result_value, token_rewrite_compare);
+    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_compare);
   }
 
   bool full_match = true;
@@ -3145,7 +3121,7 @@ token_match_expression(
     }
     case 1: {
       const Token *token = *dyn_array_get(*tokens, 0);
-      token_force_value(context, token, scope, builder, result_value);
+      token_force_value(context, token, builder, result_value);
       break;
     }
     default: {
@@ -3168,6 +3144,7 @@ token_parse(
   if (!view.length) return true;
 
   Function_Builder global_builder = { 0 };
+  context->scope = context->program->global_scope;
 
   Array_Token_View module_statements = token_split_by_newlines_and_semicolons(view);
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
@@ -3177,7 +3154,7 @@ token_parse(
       continue;
     }
     if (token_rewrite_constant_definitions(
-      context, statement, context->program->global_scope, &global_builder, 0
+      context, statement, &global_builder, 0
     )) {
       continue;
     }

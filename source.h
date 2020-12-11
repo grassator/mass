@@ -33,7 +33,7 @@ typedef struct {
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
 typedef bool (*Token_Statement_Matcher_Proc)
-(Compilation_Context *context, Token_View, Scope *, Function_Builder *, void *payload);
+(Compilation_Context *context, Token_View, Function_Builder *, void *payload);
 typedef struct {
   Token_Statement_Matcher_Proc proc;
   void *payload;
@@ -65,7 +65,6 @@ bool
 token_parse_block(
   Compilation_Context *program,
   const Token *block,
-  Scope *scope,
   Function_Builder *builder,
   Value *result_value
 );
@@ -74,7 +73,6 @@ bool
 token_rewrite_statement_if(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -82,7 +80,6 @@ bool
 token_rewrite_inline_machine_code_bytes(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -90,7 +87,6 @@ bool
 token_rewrite_assignment(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -98,7 +94,6 @@ bool
 token_rewrite_definition_and_assignment_statements(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -106,7 +101,6 @@ bool
 token_rewrite_definitions(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -114,7 +108,6 @@ bool
 token_rewrite_explicit_return(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -122,7 +115,6 @@ bool
 token_rewrite_goto(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );
@@ -130,7 +122,6 @@ bool
 token_rewrite_constant_definitions(
   Compilation_Context *program,
   Token_View state,
-  Scope *scope,
   Function_Builder *builder,
   void *unused_payload
 );

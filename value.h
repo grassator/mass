@@ -232,7 +232,12 @@ typedef struct {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Program *program;
+  Scope *scope;
 } Compilation_Context;
+
+#define WITH_SCOPE(_CONTEXT_, _SCOPE_)\
+  for (Scope *saved = (_CONTEXT_)->scope; saved; saved = 0)\
+  for ((_CONTEXT_)->scope = (_SCOPE_); (_CONTEXT_)->scope != saved; (_CONTEXT_)->scope = saved)
 
 void *
 rip_value_pointer(
