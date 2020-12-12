@@ -166,7 +166,7 @@ scope_lookup(
 }
 
 Value *
-token_rewrite_constant_expression(
+token_parse_constant_expression(
   Compilation_Context *context,
   Token_View view,
   Scope *scope
@@ -202,7 +202,7 @@ scope_lookup_force(
     Scope_Entry *entry = dyn_array_get(*entries, i);
     if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
       Scope_Lazy_Constant_Expression *expr = &entry->lazy_constant_expression;
-      Value *result = token_rewrite_constant_expression(context, expr->tokens, expr->scope);
+      Value *result = token_parse_constant_expression(context, expr->tokens, expr->scope);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -888,7 +888,7 @@ token_apply_macro_replacements(
 }
 
 Array_Const_Token_Ptr
-token_rewrite_macro_match(
+token_parse_macro_match(
   Compilation_Context *context,
   Token_View match,
   Macro *macro
@@ -909,7 +909,7 @@ token_rewrite_macro_match(
 }
 
 void
-token_rewrite_macros(
+token_parse_macros(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
   Scope *scope,
@@ -924,7 +924,7 @@ token_rewrite_macros(
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           if (token_match_pattern(sub_view, macro->pattern)) {
-            Array_Const_Token_Ptr replacement = token_rewrite_macro_match(context, sub_view, macro);
+            Array_Const_Token_Ptr replacement = token_parse_macro_match(context, sub_view, macro);
             dyn_array_splice(*tokens, i, dyn_array_length(macro->pattern), replacement);
             dyn_array_destroy(replacement);
             goto start;
@@ -1090,7 +1090,7 @@ token_force_constant_value(
     case Token_Tag_Group: {
       if (token->Group.type == Token_Group_Type_Paren) {
         Token_View children_view = token_view_from_token_array(token->Group.children);
-        return token_rewrite_constant_expression(context, children_view, scope);
+        return token_parse_constant_expression(context, children_view, scope);
       } else {
         panic("TODO support other group types in constant context");
       }
@@ -1281,7 +1281,7 @@ scope_add_macro(
 }
 
 bool
-token_rewrite_macro_definitions(
+token_parse_macro_definitions(
   Compilation_Context *context,
   Token_View view,
   Scope *scope
@@ -1353,7 +1353,7 @@ token_process_bit_type_definition(
 ) {
 
   Token_View args_view = { .tokens = &args, .length = 1 };
-  Value *bit_size_value = token_rewrite_constant_expression(context, args_view, scope);
+  Value *bit_size_value = token_parse_constant_expression(context, args_view, scope);
   if (!bit_size_value) {
     // TODO print error
     goto err;
@@ -1526,7 +1526,7 @@ token_import_match_arguments(
   return token_value_make(context, result, source_range_from_token_view(view));
 }
 
-typedef const Token *(*token_rewrite_expression_callback)(
+typedef const Token *(*token_parse_expression_callback)(
   Compilation_Context *context,
   Token_View,
   Function_Builder *,
@@ -1535,12 +1535,12 @@ typedef const Token *(*token_rewrite_expression_callback)(
 );
 
 void
-token_rewrite_expression(
+token_parse_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
   Function_Builder *builder,
   Value *result_value,
-  token_rewrite_expression_callback callback
+  token_parse_expression_callback callback
 ) {
   // FIXME speed
   Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
@@ -1675,7 +1675,7 @@ token_process_function_literal(
 }
 
 const Token *
-token_rewrite_negative_literal(
+token_parse_negative_literal(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -1974,7 +1974,7 @@ token_handle_operator(
 }
 
 Value *
-token_rewrite_constant_expression(
+token_parse_constant_expression(
   Compilation_Context *context,
   Token_View view,
   Scope *scope
@@ -2071,7 +2071,7 @@ token_rewrite_constant_expression(
 }
 
 bool
-token_rewrite_constant_definitions(
+token_parse_constant_definitions(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2214,7 +2214,7 @@ token_parse_statement_label(
 }
 
 bool
-token_rewrite_statement_if(
+token_parse_statement_if(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2260,7 +2260,7 @@ token_rewrite_statement_if(
 }
 
 bool
-token_rewrite_goto(
+token_parse_goto(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2329,7 +2329,7 @@ token_rewrite_goto(
 }
 
 bool
-token_rewrite_explicit_return(
+token_parse_explicit_return(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2368,7 +2368,7 @@ token_rewrite_explicit_return(
 }
 
 const Token *
-token_rewrite_pointer_to(
+token_parse_pointer_to(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2400,7 +2400,7 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_token_array(square_brace->Group.children);
-  Value *size_value = token_rewrite_constant_expression(context, size_view, context->scope);
+  Value *size_value = token_parse_constant_expression(context, size_view, context->scope);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
     program_push_error_from_slice(
@@ -2433,7 +2433,7 @@ token_match_fixed_array_type(
 }
 
 bool
-token_rewrite_inline_machine_code_bytes(
+token_parse_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2495,7 +2495,7 @@ token_rewrite_inline_machine_code_bytes(
 }
 
 const Token *
-token_rewrite_cast(
+token_parse_cast(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2566,7 +2566,7 @@ token_parse_definition(
 }
 
 bool
-token_rewrite_definitions(
+token_parse_definitions(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
@@ -2576,7 +2576,7 @@ token_rewrite_definitions(
 }
 
 bool
-token_rewrite_definition_and_assignment_statements(
+token_parse_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2617,7 +2617,7 @@ token_rewrite_definition_and_assignment_statements(
 }
 
 const Token *
-token_rewrite_array_index(
+token_parse_array_index(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2695,7 +2695,7 @@ token_rewrite_array_index(
 }
 
 const Token *
-token_rewrite_struct_field(
+token_parse_struct_field(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2717,7 +2717,7 @@ token_rewrite_struct_field(
 }
 
 bool
-token_rewrite_assignment(
+token_parse_assignment(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2746,7 +2746,7 @@ token_rewrite_assignment(
 }
 
 const Token *
-token_rewrite_function_calls(
+token_parse_function_calls(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2862,7 +2862,7 @@ token_rewrite_function_calls(
 }
 
 const Token *
-token_rewrite_plus(
+token_parse_plus(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2886,7 +2886,7 @@ token_rewrite_plus(
 }
 
 const Token *
-token_rewrite_minus(
+token_parse_minus(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2910,7 +2910,7 @@ token_rewrite_minus(
 }
 
 const Token *
-token_rewrite_divide(
+token_parse_divide(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2934,7 +2934,7 @@ token_rewrite_divide(
 }
 
 const Token *
-token_rewrite_remainder(
+token_parse_remainder(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -2959,7 +2959,7 @@ token_rewrite_remainder(
 }
 
 const Token *
-token_rewrite_compare(
+token_parse_compare(
   Compilation_Context *context,
   Token_View view,
   Function_Builder *builder,
@@ -3137,7 +3137,7 @@ token_parse_statement(
 ) {
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
-  token_rewrite_macros(context, &statement_tokens, context->scope, builder);
+  token_parse_macros(context, &statement_tokens, context->scope, builder);
   view = token_view_from_token_array(statement_tokens);
   for (
     Scope *statement_matcher_scope = context->scope;
@@ -3171,19 +3171,19 @@ token_match_expression(
   token_state_clear_newlines(tokens);
 
   if (dyn_array_length(*tokens)) {
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_cast);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_struct_field);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_negative_literal);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_function_calls);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_array_index);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_pointer_to);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_cast);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_struct_field);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_negative_literal);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_function_calls);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_array_index);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_pointer_to);
 
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_divide);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_remainder);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_plus);
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_minus);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_divide);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_remainder);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_plus);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_minus);
 
-    token_rewrite_expression(context, tokens, builder, result_value, token_rewrite_compare);
+    token_parse_expression(context, tokens, builder, result_value, token_parse_compare);
   }
 
   bool full_match = true;
@@ -3223,10 +3223,10 @@ token_parse(
   for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
     Token_View statement = *dyn_array_get(module_statements, i);
     if (!statement.length) continue;
-    if (token_rewrite_macro_definitions(context, statement, context->program->global_scope)) {
+    if (token_parse_macro_definitions(context, statement, context->program->global_scope)) {
       continue;
     }
-    if (token_rewrite_constant_definitions(
+    if (token_parse_constant_definitions(
       context, statement, &global_builder, 0
     )) {
       continue;

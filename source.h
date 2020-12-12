@@ -79,56 +79,56 @@ token_parse_statement_label(
   void *unused_payload
 );
 bool
-token_rewrite_statement_if(
+token_parse_statement_if(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_inline_machine_code_bytes(
+token_parse_inline_machine_code_bytes(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_assignment(
+token_parse_assignment(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_definition_and_assignment_statements(
+token_parse_definition_and_assignment_statements(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_definitions(
+token_parse_definitions(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_explicit_return(
+token_parse_explicit_return(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_goto(
+token_parse_goto(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 );
 bool
-token_rewrite_constant_definitions(
+token_parse_constant_definitions(
   Compilation_Context *program,
   Token_View state,
   Function_Builder *builder,
