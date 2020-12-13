@@ -3003,6 +3003,12 @@ token_parse_inline_machine_code_bytes(
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->operand.tag == Operand_Tag_Label) {
+      if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
+        program_error_builder(context, args_token->source_range) {
+          program_error_append_literal("inline_machine_code_bytes only supports one label");
+        }
+        goto err;
+      }
       bytes.label_index = value->operand.Label.index;
       bytes.label_offset_in_instruction = u64_to_u8(i);
       bytes.memory[bytes.length++] = 0;
