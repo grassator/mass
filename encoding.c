@@ -268,12 +268,26 @@ encode_instruction(
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {
+    u32 instruction_start_offset = u64_to_u32(buffer->occupied);
     Slice slice = {
       .bytes = instruction->Bytes.memory,
       .length = instruction->Bytes.length,
     };
     fixed_buffer_append_slice(buffer, slice);
-    instruction->encoded_byte_size = u64_to_u8(slice.length);
+
+    if (instruction->Bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
+      u64 patch_offset_in_buffer =
+        instruction_start_offset + instruction->Bytes.label_offset_in_instruction;
+      dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+        .target_label_index = instruction->Bytes.label_index,
+        .from = {
+          .section = &program->code_section,
+          .offset_in_section = u64_to_u32(buffer->occupied),
+        },
+        .patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer),
+      });
+    }
+
     return;
   }
 

@@ -269,6 +269,26 @@ spec("source") {
     check(checker() == 42);
   }
 
+  it("should be able to reference a declared label in raw machine code bytes") {
+    // :WindowsOnly
+    test_program_inline_source(
+      // FIXME return type here should be s64, but then it will expect a value to return
+      //       which does not exist as we are dealing with machine code bytes directly
+      "foo :: () -> (s64) {"
+        "goto start;"
+        "label from_machine_code;"
+        "return 42;"
+        "label start;"
+        // "goto from_machine_code;"
+        "inline_machine_code_bytes(0xE9, from_machine_code);"
+        "10"
+      "}",
+      foo
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
+    check(checker() == 42);
+  }
+
   it("should be able to tokenize complex input") {
     Slice source = slice_literal(
       "foo :: (x: s8) -> {\n"

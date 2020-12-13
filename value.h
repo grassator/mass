@@ -169,6 +169,7 @@ typedef struct {
   Operand operands[3];
 } Instruction_Assembly;
 
+#define INSTRUCTION_BYTES_NO_LABEL 255
 typedef struct {
   u8 memory[15];
   u8 length;

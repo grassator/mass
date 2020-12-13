@@ -2990,43 +2990,48 @@ token_parse_inline_machine_code_bytes(
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
 
-  u64 byte_count = dyn_array_length(args);
-  if (byte_count > 15) {
-    program_error_builder(context, args_token->source_range) {
-      program_error_append_literal("Expected a maximum of 15 arguments, got ");
-      program_error_append_number("%lld", byte_count);
-    }
-    goto err;
-  }
-
   Instruction_Bytes bytes = {
-    .length = u64_to_u8(byte_count),
+    .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
   };
 
-  for (u64 i = 0; i < byte_count; ++i) {
+  for (u64 i = 0; i < dyn_array_length(args); ++i) {
+    if (bytes.length >= 15) {
+      program_error_builder(context, args_token->source_range) {
+        program_error_append_literal("Expected a maximum of 15 bytes");
+      }
+    }
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
-    if (!descriptor_is_integer(value->descriptor)) {
-      program_error_builder(context, args_token->source_range) {
-        program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
+    if (value->operand.tag == Operand_Tag_Label) {
+      bytes.label_index = value->operand.Label.index;
+      bytes.label_offset_in_instruction = u64_to_u8(i);
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+    } else {
+      if (!descriptor_is_integer(value->descriptor)) {
+        program_error_builder(context, args_token->source_range) {
+          program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
+        }
+        goto err;
       }
-      goto err;
-    }
-    if (!operand_is_immediate(&value->operand)) {
-      program_error_builder(context, args_token->source_range) {
-        program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
+      if (!operand_is_immediate(&value->operand)) {
+        program_error_builder(context, args_token->source_range) {
+          program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
+        }
+        goto err;
       }
-      goto err;
-    }
-    s64 byte = operand_immediate_as_s64(&value->operand);
-    if (!u64_fits_into_u8(byte)) {
-      program_error_builder(context, args_token->source_range) {
-        program_error_append_literal("Expected integer between 0 and 255, got ");
-        program_error_append_number("%lld", byte);
+      s64 byte = operand_immediate_as_s64(&value->operand);
+      if (!u64_fits_into_u8(byte)) {
+        program_error_builder(context, args_token->source_range) {
+          program_error_append_literal("Expected integer between 0 and 255, got ");
+          program_error_append_number("%lld", byte);
+        }
+        goto err;
       }
-      goto err;
+      bytes.memory[bytes.length++] = s64_to_u8(byte);
     }
-    bytes.memory[i] = s64_to_u8(byte);
   }
 
   push_instruction(
