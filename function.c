@@ -878,7 +878,7 @@ divide_or_remainder(
   // Save RDX as it will be used for the remainder
   Value *rdx_temp = reserve_stack(allocator, builder, &descriptor_s64);
 
-  Value *reg_rdx = value_register_for_descriptor(allocator, Register_A, &descriptor_s64);
+  Value *reg_rdx = value_register_for_descriptor(allocator, Register_D, &descriptor_s64);
   move_value(allocator, builder, source_range, rdx_temp, reg_rdx);
 
   Descriptor *larger_descriptor =
