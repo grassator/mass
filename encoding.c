@@ -268,8 +268,12 @@ encode_instruction(
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {
-    fixed_buffer_append_slice(buffer, instruction->bytes);
-    instruction->encoded_byte_size = u64_to_u8(instruction->bytes.length);
+    Slice slice = {
+      .bytes = instruction->Bytes.memory,
+      .length = instruction->Bytes.length,
+    };
+    fixed_buffer_append_slice(buffer, slice);
+    instruction->encoded_byte_size = u64_to_u8(slice.length);
     return;
   }
 

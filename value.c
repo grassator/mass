@@ -607,7 +607,8 @@ instruction_equal(
       return a->label.value == b->label.value;
     }
     case Instruction_Type_Bytes: {
-      return slice_equal(a->bytes, b->bytes);
+      if (a->Bytes.length != b->Bytes.length) return false;
+      return !!memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length);
     }
   }
   return true;

@@ -170,11 +170,18 @@ typedef struct {
 } Instruction_Assembly;
 
 typedef struct {
+  u8 memory[15];
+  u8 length;
+  Label_Index label_index;
+  u8 label_offset_in_instruction;
+} Instruction_Bytes;
+
+typedef struct {
   Instruction_Type type;
   union {
     Instruction_Assembly assembly;
     Label_Index label;
-    Slice bytes;
+    Instruction_Bytes Bytes;
   };
   Compiler_Source_Location compiler_source_location;
   const Source_Range *source_range;

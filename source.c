@@ -2999,7 +2999,10 @@ token_parse_inline_machine_code_bytes(
     goto err;
   }
 
-  Fixed_Buffer *buffer = fixed_buffer_make(.allocator = context->allocator, .capacity = byte_count);
+  Instruction_Bytes bytes = {
+    .length = u64_to_u8(byte_count),
+  };
+
   for (u64 i = 0; i < byte_count; ++i) {
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
@@ -3023,14 +3026,14 @@ token_parse_inline_machine_code_bytes(
       }
       goto err;
     }
-    fixed_buffer_append_u8(buffer, s64_to_u8(byte));
+    bytes.memory[i] = s64_to_u8(byte);
   }
 
   push_instruction(
     &builder->code_block.instructions, &id_token->source_range,
     (Instruction) {
       .type = Instruction_Type_Bytes,
-      .bytes = fixed_buffer_as_slice(buffer),
+      .Bytes = bytes,
      }
   );
 
