@@ -4,7 +4,8 @@
 #include "value.h"
 
 
-#define MASS_RETURN_LABEL_NAME slice_literal("@return")
+#define MASS_RETURN_LABEL_NAME slice_literal("@return_label")
+#define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
 typedef enum {
   Scope_Entry_Type_Value = 1,
   Scope_Entry_Type_Lazy_Constant_Expression,

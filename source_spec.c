@@ -374,7 +374,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should be able to parse and run inline id with an explicit return function") {
+  it("should be able to parse and run inline id with an explicit return and an immediate arg") {
     test_program_inline_source(
       "id :: inline (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
       "test :: () -> (s64) { id(42) + 1 }",

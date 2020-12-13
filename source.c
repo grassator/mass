@@ -1038,14 +1038,6 @@ token_match_argument(
   return arg;
 }
 
-bool
-token_match_expression(
-  Compilation_Context *context,
-  Array_Const_Token_Ptr *tokens,
-  Function_Builder *builder,
-  Value *target
-);
-
 Value *
 value_from_integer_token(
   Compilation_Context *context,
@@ -1147,6 +1139,14 @@ token_force_constant_value(
   return 0;
 }
 
+bool
+token_parse_expression(
+  Compilation_Context *context,
+  Token_View view,
+  Function_Builder *builder,
+  Value *result_value
+);
+
 void
 token_force_value(
   Compilation_Context *context,
@@ -1204,10 +1204,8 @@ token_force_value(
       if (!builder) panic("Caller should only force (...) in a builder context");
       switch(token->Group.type) {
         case Token_Group_Type_Paren: {
-          Array_Const_Token_Ptr expression_tokens =
-            dyn_array_copy(Array_Const_Token_Ptr, token->Group.children);
-          token_match_expression(context, &expression_tokens, builder, result_value);
-          dyn_array_destroy(expression_tokens);
+          Token_View expression_tokens = token_view_from_token_array(token->Group.children);
+          token_parse_expression(context, expression_tokens, builder, result_value);
           return;
         }
         case Token_Group_Type_Curly: {
@@ -1264,9 +1262,7 @@ token_match_call_arguments(
     for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
       Token_View view = *dyn_array_get(argument_states, i);
       Value *result_value = value_any(context->allocator);
-      Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, view);
-      token_match_expression(context, &expression_tokens, builder, result_value);
-      dyn_array_destroy(expression_tokens);
+      token_parse_expression(context, view, builder, result_value);
       dyn_array_push(result, result_value);
     }
   }
@@ -1560,7 +1556,7 @@ token_import_match_arguments(
   return token_value_make(context, result, source_range_from_token_view(view));
 }
 
-typedef const Token *(*token_parse_expression_callback)(
+typedef const Token *(*token_rewrite_expression_callback)(
   Compilation_Context *context,
   Token_View,
   Function_Builder *,
@@ -1569,12 +1565,12 @@ typedef const Token *(*token_parse_expression_callback)(
 );
 
 void
-token_parse_expression(
+token_rewrite_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
   Function_Builder *builder,
   Value *result_value,
-  token_parse_expression_callback callback
+  token_rewrite_expression_callback callback
 ) {
   // FIXME speed
   Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
@@ -1660,6 +1656,7 @@ token_process_function_literal(
       break;
     }
   }
+  scope_define_value(function_scope, MASS_RETURN_VALUE_NAME, descriptor->Function.returns);
 
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
@@ -1708,37 +1705,6 @@ token_process_function_literal(
   return result;
 }
 
-const Token *
-token_parse_negative_literal(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *unused_result_value, // FIXME actually use this
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  // FIXME Allow unary minus on any expression
-  Token_Match_Operator(define, "-");
-  Token_Match(integer, .tag = Token_Tag_Integer);
-  Value *value = value_any(context->allocator);
-  token_force_value(context, integer, builder, value);
-  if (value->operand.tag == Operand_Tag_Immediate_8) {
-    value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
-  } else if (value->operand.tag == Operand_Tag_Immediate_16) {
-    value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
-  } else if (value->operand.tag == Operand_Tag_Immediate_32) {
-    value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
-  } else if (value->operand.tag == Operand_Tag_Immediate_64) {
-    value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
-  } else {
-    panic("Internal error, expected an immediate");
-  }
-
-  *replacement_count = 2;
-  Token *value_token = token_value_make(context, value, source_range_from_token_view(view));
-  return value_token;
-}
-
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
 Token *
@@ -1772,9 +1738,8 @@ compile_time_eval(
   Function_Builder *eval_builder = fn_begin(&eval_context);
   function_return_descriptor(context, &eval_builder->value->descriptor->Function, &descriptor_void);
 
-  Array_Const_Token_Ptr tokens = token_array_from_view(allocator_system, view);
   Value *expression_result_value = value_any(context->allocator);
-  token_match_expression(&eval_context, &tokens, eval_builder, expression_result_value);
+  token_parse_expression(&eval_context, view, eval_builder, expression_result_value);
 
   // We use a something like a C++ reference out parameter for the
   // result to have a consitent function signature on this C side of things.
@@ -1866,22 +1831,30 @@ compile_time_eval(
       break;
     }
   }
-  dyn_array_destroy(tokens);
   return token_value_make(context, token_value, source_range_from_token_view(view));
 }
 
+typedef void (*Operator_Dispatch_Proc)(
+  Compilation_Context *,
+  Token_View,
+  Function_Builder *,
+  Array_Const_Token_Ptr *token_stack,
+  Array_Slice *operator_stack,
+  Slice operator
+);
+
 void
-token_do_handle_operator(
+token_dispatch_constant_operator(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
+  Function_Builder *builder,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
 ) {
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
-    Value *value = token_force_constant_value(context, scope, token);
+    Value *value = token_force_constant_value(context, context->scope, token);
     if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
       if (value->operand.tag == Operand_Tag_Immediate_8) {
         value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
@@ -1915,7 +1888,7 @@ token_do_handle_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("bit_type"))
     ) {
-      result = token_process_bit_type_definition(context, view, scope, args);
+      result = token_process_bit_type_definition(context, view, context->scope, args);
     } else if (
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("c_struct"))
@@ -1926,7 +1899,7 @@ token_do_handle_operator(
         .tokens = (const Token *[]){function, args},
         .length = 2,
       };
-      result = compile_time_eval(context, call_view, scope);
+      result = compile_time_eval(context, call_view, context->scope);
     }
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("->"))) {
@@ -1944,7 +1917,7 @@ token_do_handle_operator(
       dyn_array_pop(*token_stack);
     }
     Value *function_value = token_process_function_literal(
-      context, view, scope,
+      context, view, context->scope,
       is_inline, arguments, return_types, body
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
@@ -1954,7 +1927,7 @@ token_do_handle_operator(
     Token *result = 0;
     if (body->tag == Token_Tag_Group && body->Group.type == Token_Group_Type_Paren) {
       Token_View eval_view = token_view_from_token_array(body->Group.children);
-      result = compile_time_eval(context, eval_view, scope);
+      result = compile_time_eval(context, eval_view, context->scope);
     } else {
       program_error_builder(context, body->source_range) {
         program_error_append_literal("@ operator must be followed by a parenthesized expression");
@@ -1971,12 +1944,13 @@ bool
 token_handle_operator(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
+  Function_Builder *builder,
+  Operator_Dispatch_Proc dispatch_proc,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice new_operator
 ) {
-  s64 precedence = scope_lookup_operator_precedence(scope, new_operator);
+  s64 precedence = scope_lookup_operator_precedence(context->scope, new_operator);
   if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
     Source_Range source_range = source_range_from_token_view(view);
     program_error_builder(context, source_range) {
@@ -1987,17 +1961,14 @@ token_handle_operator(
   }
   while (dyn_array_length(*operator_stack)) {
     Slice last_operator = *dyn_array_last(*operator_stack);
-    s64 last_operator_precedence = scope_lookup_operator_precedence(scope, last_operator);
+    s64 last_operator_precedence = scope_lookup_operator_precedence(context->scope, last_operator);
     if (last_operator_precedence <= precedence) {
       break;
     }
 
     // apply the operator on the stack
     Slice popped_operator = *dyn_array_pop(*operator_stack);
-    token_do_handle_operator(
-      context, view, scope,
-      token_stack, operator_stack, popped_operator
-    );
+    dispatch_proc(context, view, builder, token_stack, operator_stack, popped_operator);
   }
   dyn_array_push(*operator_stack, new_operator);
   return true;
@@ -2048,7 +2019,8 @@ token_parse_constant_expression(
           case Token_Group_Type_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, scope, &token_stack, &operator_stack, slice_literal("()")
+                context, view, 0, token_dispatch_constant_operator,
+                &token_stack, &operator_stack, slice_literal("()")
               )) goto err;
             }
             break;
@@ -2072,7 +2044,8 @@ token_parse_constant_expression(
           operator = slice_literal("-x");
         }
         if (!token_handle_operator(
-          context, view, scope, &token_stack, &operator_stack, operator
+          context, view, 0, token_dispatch_constant_operator,
+          &token_stack, &operator_stack, operator
         )) goto err;
         is_previous_an_operator = true;
         break;
@@ -2082,8 +2055,8 @@ token_parse_constant_expression(
 
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
-    token_do_handle_operator(
-      context, view, scope, &token_stack, &operator_stack, operator
+    token_dispatch_constant_operator(
+      context, view, 0, &token_stack, &operator_stack, operator
     );
   }
   if (dyn_array_length(token_stack) == 1) {
@@ -2123,6 +2096,558 @@ token_parse_constant_definitions(
   return true;
 }
 
+const Token *
+token_handle_function_call(
+  Compilation_Context *context,
+  const Token *target_token,
+  const Token *args_token,
+  Function_Builder *builder,
+  Value *result_value
+) {
+  Value *target = value_any(context->allocator);
+  token_force_value(context, target_token, builder, target);
+
+  Array_Value_Ptr args;
+
+  // FIXME this is a bit of hack to make sure we don't use argument registers for
+  //       computing arguments as it might end up in the wrong one and overwrite.
+  //       The right fix for that is to add type-only evaluation to figure out the
+  //       correct target register for each argument and use it during mathcing.
+  //       We will need type-only eval anyway for things like `typeof(some expression)`.
+  {
+    Register arg_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
+    bool acquired_registers[countof(arg_registers)] = {0};
+    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
+      Register reg_index = arg_registers[i];
+      if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+        register_acquire(builder, reg_index);
+        acquired_registers[i] = true;
+      }
+    }
+
+    args = token_match_call_arguments(context, args_token, builder);
+
+    // Release any registers that we fake acquired to make sure that the actual call
+    // does not unnecessarily store them to stack
+    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
+      if (acquired_registers[i]) {
+        Register reg_index = arg_registers[i];
+        register_release(builder, reg_index);
+      }
+    }
+  }
+
+  if (target->descriptor->tag != Descriptor_Tag_Function) {
+    program_error_builder(context, target_token->source_range) {
+      program_error_append_slice(target_token->source);
+      program_error_append_literal(" is not a function");
+    }
+    return false;
+  }
+  Token *result = 0;
+  const Source_Range *source_range = &target_token->source_range;
+  Value *overload = find_matching_function_overload(builder, target, args);
+  if (overload) {
+    Value *return_value;
+    Descriptor_Function *function = &overload->descriptor->Function;
+    if (function->flags & Descriptor_Function_Flags_Inline) {
+      assert(function->scope->parent);
+      // We make a nested scope based on function's original parent scope
+      // instead of current scope for hygiene reasons. I.e. function body
+      // should not have access to locals inside the call scope.
+      Scope *body_scope = scope_make(context->allocator, function->scope->parent);
+
+      for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+        Slice arg_name = *dyn_array_get(function->argument_names, i);
+        Value *arg_value = *dyn_array_get(args, i);
+        scope_define_value(body_scope, arg_name, arg_value);
+      }
+      return_value = result_value;
+
+      // Define a new return target label and value so that explicit return statements
+      // jump to correct location and put value in the right place
+      Operand fake_return_label =
+        label32(make_label(context->program, &context->program->data_section));
+      {
+        scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
+          .descriptor = &descriptor_void,
+          .operand = fake_return_label,
+        });
+        assert(return_value);
+        scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, return_value);
+      }
+
+      Token *body = token_clone_deep(context->allocator, function->body);
+      WITH_SCOPE(context, body_scope) {
+        token_parse_block(context, body, builder, return_value);
+      }
+
+      push_instruction(
+        &builder->code_block.instructions,
+        &target_token->source_range,
+        (Instruction) {
+          .type = Instruction_Type_Label,
+          .label = fake_return_label.Label.index
+        }
+      );
+    } else {
+      return_value = call_function_overload(context, builder, source_range, overload, args);
+    }
+    result = token_value_make(context, return_value, target_token->source_range);
+  } else {
+    program_error_builder(context, target_token->source_range) {
+      // TODO add better error message
+      program_error_append_literal("Could not find matching overload");
+    }
+  }
+  dyn_array_destroy(args);
+  return result;
+}
+
+void
+token_dispatch_operator(
+  Compilation_Context *context,
+  Token_View view,
+  Function_Builder *builder,
+  Array_Const_Token_Ptr *token_stack,
+  Array_Slice *operator_stack,
+  Slice operator
+) {
+  const Token *result_token;
+  if (slice_equal(operator, slice_literal("-x"))) {
+    const Token *token = *dyn_array_pop(*token_stack);
+    Value *value = token_force_constant_value(context, context->scope, token);
+    if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
+      if (value->operand.tag == Operand_Tag_Immediate_8) {
+        value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_16) {
+        value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_32) {
+        value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
+      } else if (value->operand.tag == Operand_Tag_Immediate_64) {
+        value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
+      } else {
+        panic("Internal error, expected an immediate");
+      }
+    } else {
+      panic("TODO");
+    }
+    result_token = token_value_make(context, value, token->source_range);
+  } else if (slice_equal(operator, slice_literal("[]"))) {
+    const Token *brackets = *dyn_array_pop(*token_stack);
+    const Token *target_token = *dyn_array_pop(*token_stack);
+
+    Value *array = value_any(context->allocator);
+    token_force_value(context, target_token, builder, array);
+    Value *index_value = value_any(context->allocator);
+    Token_View index_tokens = token_view_from_token_array(brackets->Group.children);
+    token_parse_expression(context, index_tokens, builder, index_value);
+    assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+    assert(array->operand.tag == Operand_Tag_Memory_Indirect);
+
+    Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
+    u32 item_byte_size = descriptor_byte_size(item_descriptor);
+
+    Value *result = allocator_allocate(context->allocator, Value);
+    if (operand_is_immediate(&index_value->operand)) {
+      s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+      *result = (Value){
+        .descriptor = item_descriptor,
+        .operand = {
+          .tag = Operand_Tag_Memory_Indirect,
+          .byte_size = item_byte_size,
+          .Memory_Indirect = (Operand_Memory_Indirect) {
+            .reg = array->operand.Memory_Indirect.reg,
+            .displacement = array->operand.Memory_Indirect.displacement + index * item_byte_size,
+          }
+        }
+      };
+
+    } else if(
+      item_byte_size == 1 ||
+      item_byte_size == 2 ||
+      item_byte_size == 4 ||
+      item_byte_size == 8
+    ) {
+      SIB_Scale scale = SIB_Scale_1;
+      if (item_byte_size == 2) {
+        scale = SIB_Scale_2;
+      } else if (item_byte_size == 4) {
+        scale = SIB_Scale_4;
+      } else if (item_byte_size == 8) {
+        scale = SIB_Scale_8;
+      }
+      Value *index_value_in_register =
+        value_register_for_descriptor(context->allocator, Register_R10, index_value->descriptor);
+      move_value(context->allocator, builder, &target_token->source_range, index_value_in_register, index_value);
+      *result = (Value){
+        .descriptor = item_descriptor,
+        .operand = {
+          .tag = Operand_Tag_Sib,
+          .byte_size = item_byte_size,
+          .Sib = (Operand_Sib) {
+            .scale = scale,
+            .index = index_value_in_register->operand.Register.index,
+            .base = array->operand.Memory_Indirect.reg,
+            .displacement = array->operand.Memory_Indirect.displacement,
+          }
+        }
+      };
+    } else {
+      panic("TODO");
+    }
+    result_token = token_value_make(context, result, brackets->source_range);
+  } else if (slice_equal(operator, slice_literal("()"))) {
+    const Token *args_token = *dyn_array_pop(*token_stack);
+    const Token *target = *dyn_array_pop(*token_stack);
+    // TODO turn `cast` into a compile-time function call / macro
+    if (
+      target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("cast"))
+    ) {
+      Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
+      Value *type = *dyn_array_get(args, 0);
+      Value *value = *dyn_array_get(args, 1);
+      assert(type->descriptor->tag == Descriptor_Tag_Type);
+
+      Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
+      assert(descriptor_is_integer(cast_to_descriptor));
+      assert(value->descriptor->tag == cast_to_descriptor->tag);
+
+      u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
+      u32 original_byte_size = descriptor_byte_size(value->descriptor);
+      Value *result = value;
+      if (cast_to_byte_size != original_byte_size) {
+        result = allocator_allocate(context->allocator, Value);
+        if (cast_to_byte_size < original_byte_size) {
+          *result = (Value) {
+            .descriptor = cast_to_descriptor,
+            .operand = value->operand,
+          };
+          result->operand.byte_size = cast_to_byte_size;
+        } else if (cast_to_byte_size > original_byte_size) {
+          result = reserve_stack(context->allocator, builder, cast_to_descriptor);
+          move_value(context->allocator, builder, &args_token->source_range, result, value);
+        }
+      }
+      result_token = token_value_make(context, result, args_token->source_range);
+
+      dyn_array_destroy(args);
+    } else {
+      result_token = token_handle_function_call(
+        context, target, args_token, builder, value_any(context->allocator)
+      );
+    }
+  } else if (slice_equal(operator, slice_literal("&"))) {
+    const Token *pointee_token = *dyn_array_pop(*token_stack);
+
+    Value *pointee = value_any(context->allocator);
+    token_force_value(context, pointee_token, builder, pointee);
+    Value *result_value = value_pointer_to(context, builder, &pointee_token->source_range, pointee);
+
+    result_token = token_value_make(context, result_value, pointee_token->source_range);
+  } else if (slice_equal(operator, slice_literal("."))) {
+    const Token *rhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = *dyn_array_pop(*token_stack);
+    Value *result_value = 0;
+    if (rhs->tag == Token_Tag_Id) {
+      Value *struct_value = value_any(context->allocator);
+      token_force_value(context, lhs, builder, struct_value);
+      result_value = struct_get_field(context->allocator, struct_value, rhs->source);
+    } else {
+      panic("FIXME user error");
+    }
+    result_token = token_value_make(context, result_value, lhs->source_range);
+  } else if (
+    slice_equal(operator, slice_literal("+")) ||
+    slice_equal(operator, slice_literal("-")) ||
+    slice_equal(operator, slice_literal("*")) ||
+    slice_equal(operator, slice_literal("/")) ||
+    slice_equal(operator, slice_literal("%"))
+  ) {
+    const Token *rhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = *dyn_array_pop(*token_stack);
+
+    Value *lhs_value = value_any(context->allocator);
+    token_force_value(context, lhs, builder, lhs_value);
+    Value *rhs_value = value_any(context->allocator);
+    token_force_value(context, rhs, builder, rhs_value);
+
+    Descriptor *larger_descriptor =
+      descriptor_byte_size(lhs_value->descriptor) > descriptor_byte_size(rhs_value->descriptor)
+      ? lhs_value->descriptor
+      : rhs_value->descriptor;
+
+    // FIXME figure out how to avoid this
+    Value *result_value = reserve_stack(context->allocator, builder, larger_descriptor);
+    if (slice_equal(operator, slice_literal("+"))) {
+      plus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+    } else if (slice_equal(operator, slice_literal("-"))) {
+      minus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+    } else if (slice_equal(operator, slice_literal("*"))) {
+      multiply(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+    } else if (slice_equal(operator, slice_literal("/"))) {
+      divide(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+    } else if (slice_equal(operator, slice_literal("%"))) {
+      value_remainder(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+    } else {
+      panic("Internal error: Unexpected operator");
+    }
+    result_token = token_value_make(context, result_value, lhs->source_range);
+  } else if (
+    slice_equal(operator, slice_literal(">")) ||
+    slice_equal(operator, slice_literal("<")) ||
+    slice_equal(operator, slice_literal(">=")) ||
+    slice_equal(operator, slice_literal("<=")) ||
+    slice_equal(operator, slice_literal("==")) ||
+    slice_equal(operator, slice_literal("!="))
+  ) {
+    const Token *rhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = *dyn_array_pop(*token_stack);
+
+    Value *lhs_value = value_any(context->allocator);
+    token_force_value(context, lhs, builder, lhs_value);
+    Value *rhs_value = value_any(context->allocator);
+    token_force_value(context, rhs, builder, rhs_value);
+
+    // FIXME add implicit unsigned to signed conversion
+    if (
+      !descriptor_is_integer(lhs_value->descriptor) ||
+      !descriptor_is_integer(rhs_value->descriptor)
+    ) {
+      panic("FIXME handle errors here");
+    }
+
+    Compare_Type compare_type = 0;
+
+    if (slice_equal(operator, slice_literal(">"))) compare_type = Compare_Type_Signed_Greater;
+    else if (slice_equal(operator, slice_literal("<"))) compare_type = Compare_Type_Signed_Less;
+    else if (slice_equal(operator, slice_literal(">="))) compare_type = Compare_Type_Signed_Greater_Equal;
+    else if (slice_equal(operator, slice_literal("<="))) compare_type = Compare_Type_Signed_Less_Equal;
+    else if (slice_equal(operator, slice_literal("=="))) compare_type = Compare_Type_Equal;
+    else if (slice_equal(operator, slice_literal("!="))) compare_type = Compare_Type_Not_Equal;
+
+    bool is_lhs_signed = descriptor_is_signed_integer(lhs_value->descriptor);
+    bool is_rhs_signed = descriptor_is_signed_integer(rhs_value->descriptor);
+    if (is_lhs_signed != is_rhs_signed) {
+      // FIXME solve generally
+      if (
+        descriptor_is_unsigned_integer(rhs_value->descriptor) &&
+        operand_is_immediate(&rhs_value->operand)
+      ) {
+        switch(lhs_value->operand.byte_size) {
+          case 1: {
+            if (u8_fits_into_s8((u8)rhs_value->operand.Immediate_8.value)) {
+              Value *adjusted = allocator_allocate(context->allocator, Value);
+              *adjusted = *rhs_value;
+              adjusted->descriptor = &descriptor_s8;
+              rhs_value = adjusted;
+            } else {
+              panic("FIXME report immediate overflow");
+            }
+            break;
+          }
+          case 2: {
+            if (u16_fits_into_s16((u16)rhs_value->operand.Immediate_16.value)) {
+              Value *adjusted = allocator_allocate(context->allocator, Value);
+              *adjusted = *rhs_value;
+              adjusted->descriptor = &descriptor_s16;
+              rhs_value = adjusted;
+            } else {
+              panic("FIXME report immediate overflow");
+            }
+            break;
+          }
+          case 4: {
+            if (u32_fits_into_s32((u32)rhs_value->operand.Immediate_32.value)) {
+              Value *adjusted = allocator_allocate(context->allocator, Value);
+              *adjusted = *rhs_value;
+              adjusted->descriptor = &descriptor_s32;
+              rhs_value = adjusted;
+            } else {
+              panic("FIXME report immediate overflow");
+            }
+            break;
+          }
+          case 8: {
+            if (u64_fits_into_s64((u64)rhs_value->operand.Immediate_64.value)) {
+              Value *adjusted = allocator_allocate(context->allocator, Value);
+              *adjusted = *rhs_value;
+              adjusted->descriptor = &descriptor_s64;
+              rhs_value = adjusted;
+            } else {
+              panic("FIXME report immediate overflow");
+            }
+            break;
+          }
+          default: {
+            panic("Internal Error: Unexpected integer size");
+            break;
+          }
+        }
+      } else {
+        panic("FIXME handle errors here");
+      }
+    }
+
+    if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
+      switch(compare_type) {
+        case Compare_Type_Equal:
+        case Compare_Type_Not_Equal: {
+          break;
+        }
+
+        case Compare_Type_Unsigned_Below:
+        case Compare_Type_Unsigned_Below_Equal:
+        case Compare_Type_Unsigned_Above:
+        case Compare_Type_Unsigned_Above_Equal: {
+          panic("Internal error. Expected to parse operators as signed compares");
+          break;
+        }
+
+        case Compare_Type_Signed_Less: {
+          compare_type = Compare_Type_Unsigned_Below;
+          break;
+        }
+        case Compare_Type_Signed_Less_Equal: {
+          compare_type = Compare_Type_Unsigned_Below_Equal;
+          break;
+        }
+        case Compare_Type_Signed_Greater: {
+          compare_type = Compare_Type_Unsigned_Above;
+          break;
+        }
+        case Compare_Type_Signed_Greater_Equal: {
+          compare_type = Compare_Type_Unsigned_Above_Equal;
+          break;
+        }
+        default: {
+          assert(!"Unsupported comparison");
+        }
+      }
+    }
+
+    Value *raw = value_any(context->allocator);
+    compare(
+      context->allocator, compare_type, builder,
+      &lhs->source_range, raw, lhs_value, rhs_value
+    );
+
+    // FIXME figure out how to avoid this
+    Value *result_value = reserve_stack(context->allocator, builder, raw->descriptor);
+    move_value(context->allocator, builder, &lhs->source_range, result_value, raw);
+    result_token = token_value_make(context, result_value, lhs->source_range);
+  } else {
+    panic("TODO: Unknown operator");
+    result_token = 0;
+  }
+  dyn_array_push(*token_stack, result_token);
+}
+
+bool
+token_parse_expression(
+  Compilation_Context *context,
+  Token_View view,
+  Function_Builder *builder,
+  Value *result_value
+) {
+  if (!view.length) {
+    return &void_value;
+  }
+
+  Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
+  Array_Slice operator_stack = dyn_array_make(Array_Slice);
+
+  bool is_previous_an_operator = true;
+  for (u64 i = 0; i < view.length; ++i) {
+    const Token *token = token_view_get(view, i);
+
+    switch(token->tag) {
+      case Token_Tag_None: {
+        panic("Internal Error: Encountered token with an uninitialized tag");
+        break;
+      }
+      case Token_Tag_Newline: {
+        continue;
+      }
+      case Token_Tag_Integer:
+      case Token_Tag_Hex_Integer:
+      case Token_Tag_String:
+      case Token_Tag_Id:
+      case Token_Tag_Value: {
+        dyn_array_push(token_stack, token);
+        is_previous_an_operator = false;
+        break;
+      }
+      case Token_Tag_Group: {
+        dyn_array_push(token_stack, token);
+        switch (token->Group.type) {
+          case Token_Group_Type_Paren: {
+            if (!is_previous_an_operator) {
+              if (!token_handle_operator(
+                context, view, builder, token_dispatch_operator,
+                &token_stack, &operator_stack, slice_literal("()")
+              )) goto err;
+            }
+            break;
+          }
+          case Token_Group_Type_Curly: {
+            // Nothing special to do for now?
+            break;
+          }
+          case Token_Group_Type_Square: {
+            if (!is_previous_an_operator) {
+              if (!token_handle_operator(
+                context, view, builder, token_dispatch_operator,
+                &token_stack, &operator_stack, slice_literal("[]")
+              )) goto err;
+            }
+            break;
+          }
+        }
+        is_previous_an_operator = false;
+        break;
+      }
+      case Token_Tag_Operator: {
+        Slice operator = token->source;
+        // unary minus, i.e x + -5
+        if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
+          operator = slice_literal("-x");
+        }
+        if (!token_handle_operator(
+          context, view, builder, token_dispatch_operator,
+          &token_stack, &operator_stack, operator
+        )) goto err;
+        is_previous_an_operator = true;
+        break;
+      }
+    }
+  }
+
+  while (dyn_array_length(operator_stack)) {
+    Slice operator = *dyn_array_pop(operator_stack);
+    token_dispatch_operator(
+      context, view, builder, &token_stack, &operator_stack, operator
+    );
+  }
+  if (dyn_array_length(token_stack) == 1) {
+    const Token *token = *dyn_array_last(token_stack);
+    assert(token);
+    token_force_value(context, token, builder, result_value);
+  } else {
+    program_error_builder(context, source_range_from_token_view(view)) {
+      program_error_append_literal("Could not parse the expression");
+    }
+  }
+
+  err:
+
+  dyn_array_destroy(token_stack);
+  dyn_array_destroy(operator_stack);
+
+  return true;
+}
+
 bool
 token_parse_statement(
   Compilation_Context *context,
@@ -2150,7 +2675,9 @@ token_parse_block(
   // }
   // is being interpreted as:
   // { 42 ; }
-  while ((*dyn_array_last(children))->tag == Token_Tag_Newline) dyn_array_pop(children);
+  while (dyn_array_length(children) &&(*dyn_array_last(children))->tag == Token_Tag_Newline) {
+    dyn_array_pop(children);
+  }
 
   Token_View children_view = token_view_from_token_array(children);
   Array_Token_View block_statements = token_split_by_newlines_and_semicolons(children_view);
@@ -2269,10 +2796,8 @@ token_parse_statement_if(
     .length = rest.length - 1,
   };
 
-  Array_Const_Token_Ptr condition_tokens = token_array_from_view(allocator_system, condition_view);
   Value *condition_value = value_any(context->allocator);
-  token_match_expression(context, &condition_tokens, builder, condition_value);
-  dyn_array_destroy(condition_tokens);
+  token_parse_expression(context, condition_view, builder, condition_value);
   if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
     goto err;
   }
@@ -2370,11 +2895,20 @@ token_parse_explicit_return(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
-  Value *fn_return = builder->value->descriptor->Function.returns;
 
-  Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rest);
-  token_match_expression(context, &expression_tokens, builder, fn_return);
-  dyn_array_destroy(expression_tokens);
+  Value *fn_return = scope_lookup_force(context, context->scope, MASS_RETURN_VALUE_NAME);
+  assert(fn_return);
+
+  bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
+  token_parse_expression(context, rest, builder, fn_return);
+
+  // FIXME with inline functions and explicit returns we can end up with multiple immediate
+  //       values that are trying to be moved in the same return value
+  if (is_any_return) {
+    Value *stack_return = reserve_stack(context->allocator, builder, fn_return->descriptor);
+    move_value(context->allocator, builder, &keyword->source_range, stack_return, fn_return);
+    *fn_return = *stack_return;
+  }
 
   bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
@@ -2396,27 +2930,6 @@ token_parse_explicit_return(
   );
 
   return true;
-}
-
-const Token *
-token_parse_pointer_to(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *unused_result_value, // FIXME actually use this
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match_Operator(operator, "&");
-  Token_Match(value_token, 0);
-
-  Value *pointee = value_any(context->allocator);
-  token_force_value(context, value_token, builder, pointee);
-  Value *result = value_pointer_to(context, builder, &operator->source_range, pointee);
-
-  *replacement_count = 2;
-  Token *token_value = token_value_make(context, result, source_range_from_token_view(view));
-  return token_value;
 }
 
 Descriptor *
@@ -2525,50 +3038,6 @@ token_parse_inline_machine_code_bytes(
   return true;
 }
 
-const Token *
-token_parse_cast(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *unused_result_value, // FIXME use this
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(cast, .tag = Token_Tag_Id, .source = slice_literal("cast"));
-  Token_Match(value_token, .group_type = Token_Group_Type_Paren);
-
-  Array_Value_Ptr args = token_match_call_arguments(context, value_token, builder);
-  assert(dyn_array_length(args) == 2);
-  Value *type = *dyn_array_get(args, 0);
-  Value *value = *dyn_array_get(args, 1);
-  assert(type->descriptor->tag == Descriptor_Tag_Type);
-
-  Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
-  assert(descriptor_is_integer(cast_to_descriptor));
-  assert(value->descriptor->tag == cast_to_descriptor->tag);
-
-  u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
-  u32 original_byte_size = descriptor_byte_size(value->descriptor);
-  Value *result = value;
-  if (cast_to_byte_size != original_byte_size) {
-    result = allocator_allocate(context->allocator, Value);
-    if (cast_to_byte_size < original_byte_size) {
-      *result = (Value) {
-        .descriptor = cast_to_descriptor,
-        .operand = value->operand,
-      };
-      result->operand.byte_size = cast_to_byte_size;
-    } else if (cast_to_byte_size > original_byte_size) {
-      result = reserve_stack(context->allocator, builder, cast_to_descriptor);
-      move_value(context->allocator, builder, &cast->source_range, result, value);
-    }
-  }
-
-  *replacement_count = 2;
-  Token *token_value = token_value_make(context, result, source_range_from_token_view(view));
-  return token_value;
-}
-
 Value *
 token_parse_definition(
   Compilation_Context *context,
@@ -2627,9 +3096,7 @@ token_parse_definition_and_assignment_statements(
   if (name->tag != Token_Tag_Id) return false;
 
   Value *value = value_any(context->allocator);
-  Array_Const_Token_Ptr expression_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, &expression_tokens, builder, value);
-  dyn_array_destroy(expression_tokens);
+  token_parse_expression(context, rhs, builder, value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
@@ -2645,106 +3112,6 @@ token_parse_definition_and_assignment_statements(
 
   scope_define_value(context->scope, name->source, on_stack);
   return true;
-}
-
-const Token *
-token_parse_array_index(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *target,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(target_token, 0);
-  Token_Match(brackets, .group_type = Token_Group_Type_Square);
-
-  Value *array = value_any(context->allocator);
-  token_force_value(context, target_token, builder, array);
-  Value *index_value = value_any(context->allocator);
-  Array_Const_Token_Ptr index_tokens = dyn_array_copy(Array_Const_Token_Ptr, brackets->Group.children);
-  token_match_expression(context, &index_tokens, builder, index_value);
-  dyn_array_destroy(index_tokens);
-  assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-  assert(array->operand.tag == Operand_Tag_Memory_Indirect);
-
-  Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
-  u32 item_byte_size = descriptor_byte_size(item_descriptor);
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  if (operand_is_immediate(&index_value->operand)) {
-    s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
-    *result = (Value){
-      .descriptor = item_descriptor,
-      .operand = {
-        .tag = Operand_Tag_Memory_Indirect,
-        .byte_size = item_byte_size,
-        .Memory_Indirect = (Operand_Memory_Indirect) {
-          .reg = array->operand.Memory_Indirect.reg,
-          .displacement = array->operand.Memory_Indirect.displacement + index * item_byte_size,
-        }
-      }
-    };
-
-  } else if(
-    item_byte_size == 1 ||
-    item_byte_size == 2 ||
-    item_byte_size == 4 ||
-    item_byte_size == 8
-  ) {
-    SIB_Scale scale = SIB_Scale_1;
-    if (item_byte_size == 2) {
-      scale = SIB_Scale_2;
-    } else if (item_byte_size == 4) {
-      scale = SIB_Scale_4;
-    } else if (item_byte_size == 8) {
-      scale = SIB_Scale_8;
-    }
-    Value *index_value_in_register =
-      value_register_for_descriptor(context->allocator, Register_R10, index_value->descriptor);
-    move_value(context->allocator, builder, &target_token->source_range, index_value_in_register, index_value);
-    *result = (Value){
-      .descriptor = item_descriptor,
-      .operand = {
-        .tag = Operand_Tag_Sib,
-        .byte_size = item_byte_size,
-        .Sib = (Operand_Sib) {
-          .scale = scale,
-          .index = index_value_in_register->operand.Register.index,
-          .base = array->operand.Memory_Indirect.reg,
-          .displacement = array->operand.Memory_Indirect.displacement,
-        }
-      }
-    };
-  } else {
-    panic("TODO");
-  }
-
-  *replacement_count = 2;
-  Token *token_value = token_value_make(context, result, source_range_from_token_view(view));
-  return token_value;
-}
-
-const Token *
-token_parse_struct_field(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *unused_result_value, // FIXME actually use this
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(struct_token, 0);
-  Token_Match_Operator(dot, ".");
-  Token_Match(field_name, .tag = Token_Tag_Id);
-
-  Value *struct_value = value_any(context->allocator);
-  token_force_value(context, struct_token, builder, struct_value);
-  Value *result = struct_get_field(context->allocator, struct_value, field_name->source);
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, result, source_range_from_token_view(view));
-  return token_value;
 }
 
 bool
@@ -2764,398 +3131,10 @@ token_parse_assignment(
   Value *target = token_parse_definition(context, lhs, builder);
   if (!target) {
     target = value_any(context->allocator);
-    Array_Const_Token_Ptr lhs_tokens = token_array_from_view(allocator_system, lhs);
-    token_match_expression(context, &lhs_tokens, builder, target);
-    dyn_array_destroy(lhs_tokens);
+    token_parse_expression(context, lhs, builder, target);
   }
-
-  Array_Const_Token_Ptr rhs_tokens = token_array_from_view(allocator_system, rhs);
-  token_match_expression(context, &rhs_tokens, builder, target);
-  dyn_array_destroy(rhs_tokens);
-
+  token_parse_expression(context, rhs, builder, target);
   return true;
-}
-
-const Token *
-token_parse_function_calls(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(target_token, 0);
-  Token_Match(args_token, .group_type = Token_Group_Type_Paren);
-  if (
-    target_token->tag != Token_Tag_Id &&
-    !token_match(target_token, &(Token_Pattern){ .group_type = Token_Group_Type_Paren })
-  ) {
-    return false;
-  }
-  *replacement_count = 2;
-
-  Value *target = value_any(context->allocator);
-  token_force_value(context, target_token, builder, target);
-
-  Array_Value_Ptr args;
-
-  // FIXME this is a bit of hack to make sure we don't use argument registers for
-  //       computing arguments as it might end up in the wrong one and overwrite.
-  //       The right fix for that is to add type-only evaluation to figure out the
-  //       correct target register for each argument and use it during mathcing.
-  //       We will need type-only eval anyway for things like `typeof(some expression)`.
-  {
-    Register arg_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
-    bool acquired_registers[countof(arg_registers)] = {0};
-    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
-      Register reg_index = arg_registers[i];
-      if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-        register_acquire(builder, reg_index);
-        acquired_registers[i] = true;
-      }
-    }
-
-    args = token_match_call_arguments(context, args_token, builder);
-
-    // Release any registers that we fake acquired to make sure that the actual call
-    // does not unnecessarily store them to stack
-    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
-      if (acquired_registers[i]) {
-        Register reg_index = arg_registers[i];
-        register_release(builder, reg_index);
-      }
-    }
-  }
-
-  if (target->descriptor->tag != Descriptor_Tag_Function) {
-    program_error_builder(context, target_token->source_range) {
-      program_error_append_slice(target_token->source);
-      program_error_append_literal(" is not a function");
-    }
-    return false;
-  }
-  Token *result = 0;
-  const Source_Range *source_range = &target_token->source_range;
-  Value *overload = find_matching_function_overload(builder, target, args);
-  if (overload) {
-    Value *return_value;
-    Descriptor_Function *function = &overload->descriptor->Function;
-    if (function->flags & Descriptor_Function_Flags_Inline) {
-      assert(function->scope->parent);
-      // We make a nested scope based on function's original parent scope
-      // instead of current scope for hygiene reasons. I.e. function body
-      // should not have access to locals inside the call scope.
-      Scope *body_scope = scope_make(context->allocator, function->scope->parent);
-
-      for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
-        Slice arg_name = *dyn_array_get(function->argument_names, i);
-        Value *arg_value = *dyn_array_get(args, i);
-        scope_define_value(body_scope, arg_name, arg_value);
-      }
-      return_value = result_value;
-
-      // Define a new return target label so that explicit return
-      // statements jump to the end of inlined block, not the end
-      // of the main function.
-      Operand fake_return_label =
-        label32(make_label(context->program, &context->program->data_section));
-      scope_define_value(body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
-        .descriptor = &descriptor_void,
-        .operand = fake_return_label,
-      });
-
-      Token *body = token_clone_deep(context->allocator, function->body);
-      WITH_SCOPE(context, body_scope) {
-        token_parse_block(context, body, builder, return_value);
-      }
-
-      push_instruction(
-        &builder->code_block.instructions,
-        &target_token->source_range,
-        (Instruction) {
-          .type = Instruction_Type_Label,
-          .label = fake_return_label.Label.index
-        }
-      );
-    } else {
-      return_value = call_function_overload(context, builder, source_range, overload, args);
-    }
-    result = token_value_make(context, return_value, source_range_from_token_view(view));
-  } else {
-    program_error_builder(context, target_token->source_range) {
-      // TODO add better error message
-      program_error_append_literal("Could not find matching overload");
-    }
-  }
-  dyn_array_destroy(args);
-  return result;
-}
-
-const Token *
-token_parse_plus(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(op_token, "+");
-  Token_Match(rhs, 0);
-
-  Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, builder, lhs_value);
-  Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, builder, rhs_value);
-  plus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, result_value, source_range_from_token_view(view));
-  return token_value;
-}
-
-const Token *
-token_parse_minus(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(op_token, "-");
-  Token_Match(rhs, 0);
-
-  Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, builder, lhs_value);
-  Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, builder, rhs_value);
-  minus(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, result_value, source_range_from_token_view(view));
-  return token_value;
-}
-
-const Token *
-token_parse_divide(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(op_token, "/");
-  Token_Match(rhs, 0);
-
-  Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, builder, lhs_value);
-  Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, builder, rhs_value);
-  divide(context->allocator, builder, &op_token->source_range, result_value, lhs_value, rhs_value);
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, result_value, source_range_from_token_view(view));
-  return token_value;
-}
-
-const Token *
-token_parse_remainder(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match_Operator(op_token, "%");
-  Token_Match(rhs, 0);
-
-  Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, builder, lhs_value);
-  Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, builder, rhs_value);
-  Value *temp = reserve_stack(context->allocator, builder, lhs_value->descriptor);
-  value_remainder(context->allocator, builder, &op_token->source_range, temp, lhs_value, rhs_value);
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, temp, source_range_from_token_view(view));
-  return token_value;
-}
-
-const Token *
-token_parse_compare(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value,
-  u64 *replacement_count
-) {
-  u64 peek_index = 0;
-  Token_Match(lhs, 0);
-  Token_Match(operator, .tag = Token_Tag_Operator);
-  Compare_Type compare_type = 0;
-  switch(operator->source.length) {
-    case 1: {
-      s8 byte1 = operator->source.bytes[0];
-      if (byte1 == '<') {
-        compare_type = Compare_Type_Signed_Less;
-      } else if (byte1 == '>') {
-        compare_type = Compare_Type_Signed_Greater;
-      } else {
-        return 0;
-      }
-      break;
-    }
-    case 2: {
-      s8 byte1 = operator->source.bytes[0];
-      s8 byte2 = operator->source.bytes[1];
-      if (byte1 == '<' && byte2 == '=') {
-        compare_type = Compare_Type_Signed_Less_Equal;
-      } else if (byte1 == '>' && byte2 == '=') {
-        compare_type = Compare_Type_Signed_Greater_Equal;
-      } else if (byte1 == '=' && byte2 == '=') {
-        compare_type = Compare_Type_Equal;
-      } else if (byte1 == '!' && byte2 == '=') {
-        compare_type = Compare_Type_Equal;
-      } else {
-        return 0;
-      }
-      break;
-    }
-    default: {
-      return 0;
-    }
-  }
-  Token_Match(rhs, 0);
-
-  Value *lhs_value = value_any(context->allocator);
-  token_force_value(context, lhs, builder, lhs_value);
-  Value *rhs_value = value_any(context->allocator);
-  token_force_value(context, rhs, builder, rhs_value);
-
-  // FIXME add implicit unsigned to signed conversion
-  if (
-    !descriptor_is_integer(lhs_value->descriptor) ||
-    !descriptor_is_integer(rhs_value->descriptor)
-  ) {
-    panic("FIXME handle errors here");
-  }
-
-  bool is_lhs_signed = descriptor_is_signed_integer(lhs_value->descriptor);
-  bool is_rhs_signed = descriptor_is_signed_integer(rhs_value->descriptor);
-  if (is_lhs_signed != is_rhs_signed) {
-    // FIXME solve generally
-    if (
-      descriptor_is_unsigned_integer(rhs_value->descriptor) &&
-      operand_is_immediate(&rhs_value->operand)
-    ) {
-      switch(lhs_value->operand.byte_size) {
-        case 1: {
-          if (u8_fits_into_s8((u8)rhs_value->operand.Immediate_8.value)) {
-            Value *adjusted = allocator_allocate(context->allocator, Value);
-            *adjusted = *rhs_value;
-            adjusted->descriptor = &descriptor_s8;
-            rhs_value = adjusted;
-          } else {
-            panic("FIXME report immediate overflow");
-          }
-          break;
-        }
-        case 2: {
-          if (u16_fits_into_s16((u16)rhs_value->operand.Immediate_16.value)) {
-            Value *adjusted = allocator_allocate(context->allocator, Value);
-            *adjusted = *rhs_value;
-            adjusted->descriptor = &descriptor_s16;
-            rhs_value = adjusted;
-          } else {
-            panic("FIXME report immediate overflow");
-          }
-          break;
-        }
-        case 4: {
-          if (u32_fits_into_s32((u32)rhs_value->operand.Immediate_32.value)) {
-            Value *adjusted = allocator_allocate(context->allocator, Value);
-            *adjusted = *rhs_value;
-            adjusted->descriptor = &descriptor_s32;
-            rhs_value = adjusted;
-          } else {
-            panic("FIXME report immediate overflow");
-          }
-          break;
-        }
-        case 8: {
-          if (u64_fits_into_s64((u64)rhs_value->operand.Immediate_64.value)) {
-            Value *adjusted = allocator_allocate(context->allocator, Value);
-            *adjusted = *rhs_value;
-            adjusted->descriptor = &descriptor_s64;
-            rhs_value = adjusted;
-          } else {
-            panic("FIXME report immediate overflow");
-          }
-          break;
-        }
-        default: {
-          panic("Internal Error: Unexpected integer size");
-          break;
-        }
-      }
-    } else {
-      panic("FIXME handle errors here");
-    }
-  }
-
-  if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
-    switch(compare_type) {
-      case Compare_Type_Equal:
-      case Compare_Type_Not_Equal: {
-        break;
-      }
-
-      case Compare_Type_Unsigned_Below:
-      case Compare_Type_Unsigned_Below_Equal:
-      case Compare_Type_Unsigned_Above:
-      case Compare_Type_Unsigned_Above_Equal: {
-        panic("Internal error. Expected to parse operators as signed compares");
-        break;
-      }
-
-      case Compare_Type_Signed_Less: {
-        compare_type = Compare_Type_Unsigned_Below;
-        break;
-      }
-      case Compare_Type_Signed_Less_Equal: {
-        compare_type = Compare_Type_Unsigned_Below_Equal;
-        break;
-      }
-      case Compare_Type_Signed_Greater: {
-        compare_type = Compare_Type_Unsigned_Above;
-        break;
-      }
-      case Compare_Type_Signed_Greater_Equal: {
-        compare_type = Compare_Type_Unsigned_Above_Equal;
-        break;
-      }
-      default: {
-        assert(!"Unsupported comparison");
-      }
-    }
-  }
-
-  compare(
-    context->allocator, compare_type, builder,
-    &operator->source_range, result_value, lhs_value, rhs_value
-  );
-
-  *replacement_count = 3;
-  Token *token_value = token_value_make(context, result_value, source_range_from_token_view(view));
-  return token_value;
 }
 
 bool
@@ -3187,57 +3166,9 @@ token_parse_statement(
     }
   }
 
-  bool result = token_match_expression(context, &statement_tokens, builder, result_value);
+  bool result = token_parse_expression(context, view, builder, result_value);
   dyn_array_destroy(statement_tokens);
   return result;
-}
-
-bool
-token_match_expression(
-  Compilation_Context *context,
-  Array_Const_Token_Ptr *tokens,
-  Function_Builder *builder,
-  Value *result_value
-) {
-  token_state_clear_newlines(tokens);
-
-  if (dyn_array_length(*tokens)) {
-    token_parse_expression(context, tokens, builder, result_value, token_parse_cast);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_struct_field);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_negative_literal);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_function_calls);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_array_index);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_pointer_to);
-
-    token_parse_expression(context, tokens, builder, result_value, token_parse_divide);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_remainder);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_plus);
-    token_parse_expression(context, tokens, builder, result_value, token_parse_minus);
-
-    token_parse_expression(context, tokens, builder, result_value, token_parse_compare);
-  }
-
-  bool full_match = true;
-  switch(dyn_array_length(*tokens)) {
-    case 0: {
-      // What should happen here?
-      break;
-    }
-    case 1: {
-      const Token *token = *dyn_array_get(*tokens, 0);
-      token_force_value(context, token, builder, result_value);
-      break;
-    }
-    default: {
-      const Token *token = *dyn_array_get(*tokens, 0);
-      program_error_builder(context, token->source_range) {
-        program_error_append_literal("Could not parse the expression");
-      }
-      full_match = false;
-      break;
-    }
-  }
-  return full_match;
 }
 
 bool
