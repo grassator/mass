@@ -309,6 +309,40 @@ scope_define_lazy(
   });
 }
 
+#define SCOPE_OPERATOR_NOT_FOUND (-1)
+
+s64
+scope_lookup_operator_precedence(
+  Scope *scope,
+  Slice name
+) {
+  Array_Scope_Entry *entries = 0;
+  while (scope) {
+    entries = hash_map_get(scope->map, name);
+    if (entries) break;
+    scope = scope->parent;
+  }
+  if (!entries) {
+    return SCOPE_OPERATOR_NOT_FOUND;
+  }
+  assert(dyn_array_length(*entries) == 1);
+  Scope_Entry *entry = dyn_array_get(*entries, 0);
+  assert(entry->type == Scope_Entry_Type_Operator);
+  return entry->Operator.precedence;
+}
+
+void
+scope_define_operator(
+  Scope *scope,
+  Slice name,
+  s64 precedence
+) {
+  scope_define_internal(scope, name, (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = precedence }
+  });
+}
+
 bool
 code_point_is_operator(
   s32 code_point
@@ -1836,22 +1870,6 @@ compile_time_eval(
   return token_value_make(context, token_value, source_range_from_token_view(view));
 }
 
-u32
-precedence_for_operator(
-  Slice operator
-) {
-  assert(operator.length);
-  if (slice_equal(operator, slice_literal("()"))) {
-    return 20;
-  } else if (slice_equal(operator, slice_literal("@"))) {
-    return 15;
-  } else if (slice_equal(operator, slice_literal("unary -"))) {
-    return 10;
-  } else {
-    return 1;
-  }
-}
-
 void
 token_do_handle_operator(
   Compilation_Context *context,
@@ -1861,7 +1879,7 @@ token_do_handle_operator(
   Array_Slice *operator_stack,
   Slice operator
 ) {
-  if (slice_equal(operator, slice_literal("unary -"))) {
+  if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
     Value *value = token_force_constant_value(context, scope, token);
     if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
@@ -1949,7 +1967,7 @@ token_do_handle_operator(
   }
 }
 
-void
+bool
 token_handle_operator(
   Compilation_Context *context,
   Token_View view,
@@ -1958,11 +1976,22 @@ token_handle_operator(
   Array_Slice *operator_stack,
   Slice new_operator
 ) {
-  u32 precedence = precedence_for_operator(new_operator);
-  while (
-    dyn_array_length(*operator_stack) &&
-    precedence_for_operator(*dyn_array_last(*operator_stack)) > precedence
-  ) {
+  s64 precedence = scope_lookup_operator_precedence(scope, new_operator);
+  if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
+    Source_Range source_range = source_range_from_token_view(view);
+    program_error_builder(context, source_range) {
+      program_error_append_literal("Unknown operator ");
+      program_error_append_slice(new_operator);
+    }
+    return false;
+  }
+  while (dyn_array_length(*operator_stack)) {
+    Slice last_operator = *dyn_array_last(*operator_stack);
+    s64 last_operator_precedence = scope_lookup_operator_precedence(scope, last_operator);
+    if (last_operator_precedence <= precedence) {
+      break;
+    }
+
     // apply the operator on the stack
     Slice popped_operator = *dyn_array_pop(*operator_stack);
     token_do_handle_operator(
@@ -1971,6 +2000,7 @@ token_handle_operator(
     );
   }
   dyn_array_push(*operator_stack, new_operator);
+  return true;
 }
 
 Value *
@@ -1985,6 +2015,7 @@ token_parse_constant_expression(
   Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
   Array_Slice operator_stack = dyn_array_make(Array_Slice);
 
+  Value *result = 0;
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
@@ -2016,9 +2047,9 @@ token_parse_constant_expression(
         switch (token->Group.type) {
           case Token_Group_Type_Paren: {
             if (!is_previous_an_operator) {
-              token_handle_operator(
+              if (!token_handle_operator(
                 context, view, scope, &token_stack, &operator_stack, slice_literal("()")
-              );
+              )) goto err;
             }
             break;
           }
@@ -2038,11 +2069,11 @@ token_parse_constant_expression(
         Slice operator = token->source;
         // unary minus, i.e x + -5
         if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
-          operator = slice_literal("unary -");
+          operator = slice_literal("-x");
         }
-        token_handle_operator(
+        if (!token_handle_operator(
           context, view, scope, &token_stack, &operator_stack, operator
-        );
+        )) goto err;
         is_previous_an_operator = true;
         break;
       }
@@ -2055,14 +2086,14 @@ token_parse_constant_expression(
       context, view, scope, &token_stack, &operator_stack, operator
     );
   }
-
-  Value *result = 0;
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
     result = token_force_constant_value(context, scope, token);
   } else {
     // FIXME user error
   }
+
+  err:
 
   dyn_array_destroy(token_stack);
   dyn_array_destroy(operator_stack);

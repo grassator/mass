@@ -8,6 +8,7 @@
 typedef enum {
   Scope_Entry_Type_Value = 1,
   Scope_Entry_Type_Lazy_Constant_Expression,
+  Scope_Entry_Type_Operator,
 } Scope_Entry_Type;
 
 typedef struct {
@@ -16,10 +17,15 @@ typedef struct {
 } Scope_Lazy_Constant_Expression;
 
 typedef struct {
+  s64 precedence;
+} Scope_Entry_Operator;
+
+typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
     Scope_Lazy_Constant_Expression lazy_constant_expression;
+    Scope_Entry_Operator Operator;
   };
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
@@ -61,6 +67,13 @@ scope_define_value(
   Scope *scope,
   Slice name,
   Value *value
+);
+
+void
+scope_define_operator(
+  Scope *scope,
+  Slice name,
+  s64 precedence
 );
 
 bool

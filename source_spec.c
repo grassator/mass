@@ -69,6 +69,7 @@ spec_check_and_print_program(
 
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
+  check(!spec_check_and_print_program(test_context.program));\
   check(_fn_value_id_);\
   program_jit(&test_context);\
   check(!spec_check_and_print_program(test_context.program))
