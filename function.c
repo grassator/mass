@@ -396,21 +396,9 @@ fn_normalize_instruction_operands(
   // Normalizing operands to simplify future handling in the encoder
   for (u8 operand_index = 0; operand_index < countof(instruction->assembly.operands); ++operand_index) {
     Operand *operand = &instruction->assembly.operands[operand_index];
-    // RIP-relative imports are regular RIP-relative operands that we only know
-    // target offset of at the point of encoding
-    if (operand->tag == Operand_Tag_Import) {
-      Import_Symbol *symbol = program_find_import(
-        program, operand->Import.library_name, operand->Import.symbol_name
-      );
-      *operand = (Operand){
-        .tag = Operand_Tag_Label,
-        .byte_size = operand->byte_size,
-        .Label = {.index = symbol->label32},
-      };
-    }
     // [RSP + X] always needs to be encoded as SIB because RSP register index
     // in MOD R/M is occupied by RIP-relative encoding
-    else if (
+    if (
       operand->tag == Operand_Tag_Memory_Indirect &&
       operand->Memory_Indirect.reg == rsp.Register.index
     ) {

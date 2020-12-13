@@ -218,8 +218,7 @@ typedef enum {
   Operand_Tag_Immediate_64 = 8,
   Operand_Tag_Memory_Indirect = 9,
   Operand_Tag_Sib = 10,
-  Operand_Tag_Import = 11,
-  Operand_Tag_Label = 12,
+  Operand_Tag_Label = 11,
 } Operand_Tag;
 
 typedef struct {
@@ -254,10 +253,6 @@ typedef struct {
   s32 displacement;
 } Operand_Sib;
 typedef struct {
-  Slice library_name;
-  Slice symbol_name;
-} Operand_Import;
-typedef struct {
   Label_Index index;
 } Operand_Label;
 typedef struct Operand {
@@ -273,7 +268,6 @@ typedef struct Operand {
     Operand_Immediate_64 Immediate_64;
     Operand_Memory_Indirect Memory_Indirect;
     Operand_Sib Sib;
-    Operand_Import Import;
     Operand_Label Label;
   };
 } Operand;

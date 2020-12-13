@@ -242,14 +242,6 @@ print_operand(
       printf("m%d", bits);
       break;
     }
-    case Operand_Tag_Import: {
-      printf("rip_import(");
-      slice_print(operand->Import.library_name);
-      printf(":");
-      slice_print(operand->Import.library_name);
-      printf(")");
-      break;
-    }
     case Operand_Tag_Label: {
       printf("rel....UNIMPLEMENTED");
       break;
@@ -588,12 +580,6 @@ operand_equal(
       return (
         a->Memory_Indirect.reg == b->Memory_Indirect.reg &&
         a->Memory_Indirect.displacement == b->Memory_Indirect.displacement
-      );
-    }
-    case Operand_Tag_Import: {
-      return (
-        slice_equal(a->Import.library_name, b->Import.library_name) &&
-        slice_equal(a->Import.symbol_name, b->Import.symbol_name)
       );
     }
   }
@@ -1499,12 +1485,9 @@ import_symbol(
   }
 
   return (Operand) {
-    .tag = Operand_Tag_Import,
-    .byte_size = 8, // Size of the pointer
-    .Import = {
-      .library_name = library_name,
-      .symbol_name = symbol_name
-    },
+    .tag = Operand_Tag_Label,
+    .byte_size = 8,
+    .Label = {.index = symbol->label32},
   };
 }
 

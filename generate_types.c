@@ -442,10 +442,6 @@ main(void) {
       { "Register", "base" },
       { "s32", "displacement" },
     }),
-    struct_fields("Import", (Struct_Item[]){
-      { "Slice", "library_name" },
-      { "Slice", "symbol_name" },
-    }),
     struct_fields("Label", (Struct_Item[]){
       { "Label_Index", "index" },
     }),
