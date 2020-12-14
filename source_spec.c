@@ -374,9 +374,9 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should be able to parse and run inline id function") {
+  it("should be able to parse and run macro id function") {
     test_program_inline_source(
-      "id :: inline (x : s64) -> (s64) { x }\n"
+      "id :: macro (x : s64) -> (s64) { x }\n"
       "test :: () -> (s64) { id(42) }",
       test
     );
@@ -384,9 +384,9 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should be able to parse and run inline id with an explicit return and an immediate arg") {
+  it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
     test_program_inline_source(
-      "id :: inline (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
+      "id :: macro (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
       "test :: () -> (s64) { id(42) + 1 }",
       test
     );
@@ -394,7 +394,17 @@ spec("source") {
     check(checker() == 21);
   }
 
-  xit("should not change the passed arguments to inline function") {
+  it("should allow changes to the passed arguments to macro function") {
+    test_program_inline_source(
+      "process :: macro (y : s64) -> () { y = 42; }\n"
+      "test :: () -> (s64) { x := 20; process(x); x }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
+  xit("should allow changes to the passed arguments to inline function") {
     test_program_inline_source(
       "process :: inline (y : s64) -> () { y = 20; }\n"
       "test :: () -> (s64) { x := 42; process(x); x }",
@@ -841,9 +851,9 @@ spec("source") {
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not parse a top level statement"), error->message));
     }
-    it("should report an error for inline external functions") {
+    it("should report an error for macro external functions") {
       test_program_inline_source_base(
-        "ExitProcess :: inline (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
+        "ExitProcess :: macro (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
         "test :: () -> (s64) { ExitProcess(42) }",
         test
       );

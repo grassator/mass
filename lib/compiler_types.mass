@@ -105,7 +105,7 @@ Mass_Value :: struct {
 
 Mass_Descriptor_Function_Flags_None :: 0
 Mass_Descriptor_Function_Flags_Pending_Body_Compilation :: 1
-Mass_Descriptor_Function_Flags_Inline :: 2
+Mass_Descriptor_Function_Flags_Macro :: 2
 Mass_Descriptor_Function_Flags_External :: 4
 
 Mass_Descriptor_Struct_Field :: struct {

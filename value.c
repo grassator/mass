@@ -1285,7 +1285,7 @@ program_init(
   scope_define_operator(program->global_scope, slice_literal("."), 20);
 
   scope_define_operator(program->global_scope, slice_literal("->"), 19);
-  scope_define_operator(program->global_scope, slice_literal("inline"), 19);
+  scope_define_operator(program->global_scope, slice_literal("macro"), 19);
 
   scope_define_operator(program->global_scope, slice_literal("@"), 18);
   scope_define_operator(program->global_scope, slice_literal("-x"), 17);

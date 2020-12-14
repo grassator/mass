@@ -1904,7 +1904,7 @@ token_dispatch_constant_operator(
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
     dyn_array_push(*token_stack, result);
-  } else if (slice_equal(operator, slice_literal("inline"))) {
+  } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = *dyn_array_last(*token_stack);
     Value *function_value = token_force_constant_value(context, context->scope, function);
     if (function_value) {
@@ -1912,10 +1912,10 @@ token_dispatch_constant_operator(
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
         if (descriptor->flags & Descriptor_Function_Flags_External) {
           program_error_builder(context, function->source_range) {
-            program_error_append_literal("External functions can not be inline");
+            program_error_append_literal("External functions can not be macro");
           }
         } else {
-          descriptor->flags |= Descriptor_Function_Flags_Inline;
+          descriptor->flags |= Descriptor_Function_Flags_Macro;
         }
       } else {
         program_error_builder(context, function->source_range) {
@@ -2167,7 +2167,7 @@ token_handle_function_call(
     Value *return_value;
     Descriptor_Function *function = &overload->descriptor->Function;
 
-    if (function->flags & Descriptor_Function_Flags_Inline) {
+    if (function->flags & Descriptor_Function_Flags_Macro) {
       assert(function->scope->parent);
       // We make a nested scope based on function's original parent scope
       // instead of current scope for hygiene reasons. I.e. function body

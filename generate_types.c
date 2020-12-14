@@ -464,7 +464,7 @@ main(void) {
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None",   0 },
     { "Pending_Body_Compilation", 1 << 0 },
-    { "Inline", 1 << 1 },
+    { "Macro", 1 << 1 },
     { "External", 1 << 2 },
   }));
 
