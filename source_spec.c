@@ -374,16 +374,6 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should report an error for inline external functions") {
-      int i = 0; (void)i;
-    test_program_inline_source_base(
-      "ExitProcess :: inline (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
-      "test :: () -> (s64) { ExitProcess(42) }",
-      test
-    );
-    check(dyn_array_length(test_context.program->errors));
-  }
-
   it("should be able to parse and run inline id function") {
     test_program_inline_source(
       "id :: inline (x : s64) -> (s64) { x }\n"
@@ -840,6 +830,14 @@ spec("source") {
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
       check(slice_equal(slice_literal("Could not parse a top level statement"), error->message));
+    }
+    it("should report an error for inline external functions") {
+      test_program_inline_source_base(
+        "ExitProcess :: inline (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
+        "test :: () -> (s64) { ExitProcess(42) }",
+        test
+      );
+      check(dyn_array_length(test_context.program->errors));
     }
   }
 }
