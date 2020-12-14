@@ -327,7 +327,9 @@ scope_lookup_operator_precedence(
   }
   assert(dyn_array_length(*entries) == 1);
   Scope_Entry *entry = dyn_array_get(*entries, 0);
-  assert(entry->type == Scope_Entry_Type_Operator);
+  if (entry->type != Scope_Entry_Type_Operator) {
+    return SCOPE_OPERATOR_NOT_FOUND;
+  }
   return entry->Operator.precedence;
 }
 
@@ -1897,33 +1899,30 @@ token_dispatch_constant_operator(
     const Token *body = *dyn_array_pop(*token_stack);
     const Token *return_types = *dyn_array_pop(*token_stack);
     const Token *arguments = *dyn_array_pop(*token_stack);
-    const Token **maybe_inline = dyn_array_last(*token_stack);
-    bool is_inline = false;
-    if (
-      maybe_inline &&
-      (*maybe_inline)->tag == Token_Tag_Id &&
-      slice_equal((*maybe_inline)->source, slice_literal("inline"))
-    ) {
-      is_inline = true;
-      dyn_array_pop(*token_stack);
-    }
     Value *function_value = token_process_function_literal(
       context, view, context->scope, arguments, return_types, body
     );
-    if (function_value) {
-      Descriptor_Function *descriptor = &function_value->descriptor->Function;
-      if (is_inline && (descriptor->flags & Descriptor_Function_Flags_External)) {
-        program_error_builder(context, body->source_range) {
-          program_error_append_literal("External functions can not be inline");
-        }
-        is_inline = false;
-      }
-      if (is_inline) {
-        descriptor->flags |= Descriptor_Function_Flags_Inline;
-      }
-    }
     Token *result = token_value_make(context, function_value, arguments->source_range);
     dyn_array_push(*token_stack, result);
+  } else if (slice_equal(operator, slice_literal("inline"))) {
+    const Token *function = *dyn_array_last(*token_stack);
+    Value *function_value = token_force_constant_value(context, context->scope, function);
+    if (function_value) {
+      if (function_value->descriptor->tag == Descriptor_Tag_Function) {
+        Descriptor_Function *descriptor = &function_value->descriptor->Function;
+        if (descriptor->flags & Descriptor_Function_Flags_External) {
+          program_error_builder(context, function->source_range) {
+            program_error_append_literal("External functions can not be inline");
+          }
+        } else {
+          descriptor->flags |= Descriptor_Function_Flags_Inline;
+        }
+      } else {
+        program_error_builder(context, function->source_range) {
+          program_error_append_literal("Trying to mark a non-function as inline");
+        }
+      }
+    }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = *dyn_array_pop(*token_stack);
     Token *result = 0;
@@ -2004,9 +2003,10 @@ token_parse_constant_expression(
       case Token_Tag_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_String:
-      case Token_Tag_Id:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
+        is_previous_an_operator = false;
+
         // TODO figure out how to handle this better
         if (token->tag != Token_Tag_Id || !slice_equal(token->source, slice_literal("inline"))) {
           is_previous_an_operator = false;
@@ -2037,6 +2037,20 @@ token_parse_constant_expression(
           }
         }
         is_previous_an_operator = false;
+        break;
+      }
+      case Token_Tag_Id: {
+        s64 precedence = scope_lookup_operator_precedence(context->scope, token->source);
+        if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
+          is_previous_an_operator = false;
+          dyn_array_push(token_stack, token);
+        } else {
+          if (!token_handle_operator(
+            context, view, 0, token_dispatch_constant_operator,
+            &token_stack, &operator_stack, token->source
+          )) goto err;
+          is_previous_an_operator = true;
+        }
         break;
       }
       case Token_Tag_Operator: {
