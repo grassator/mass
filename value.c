@@ -1309,6 +1309,9 @@ program_init(
   scope_define_operator(program->global_scope, slice_literal("&&"), 5);
   scope_define_operator(program->global_scope, slice_literal("||"), 4);
 
+
+  scope_define_value(program->global_scope, slice_literal("any"), type_any_value);
+
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
     scope_define_value(program->global_scope, slice_literal(#_NAME_), type_##_NAME_##_value);
   MASS_ENUMERATE_BUILT_IN_TYPES

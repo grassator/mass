@@ -92,6 +92,15 @@ Descriptor descriptor_any = {
   .tag = Descriptor_Tag_Any,
 };
 
+Value *type_any_value = &(Value) {
+  .descriptor = &(Descriptor) {
+    .tag = Descriptor_Tag_Type,
+    .Type = {.descriptor = &descriptor_any },
+  },
+  .operand = { .tag = Operand_Tag_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
+};
+
 static inline bool
 descriptor_is_unsigned_integer(
   Descriptor *descriptor

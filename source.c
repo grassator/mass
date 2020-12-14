@@ -200,9 +200,17 @@ scope_lookup_force(
   // Force lazy entries
   for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
     Scope_Entry *entry = dyn_array_get(*entries, i);
-    if (entry->type == Scope_Entry_Type_Lazy_Constant_Expression) {
-      Scope_Lazy_Constant_Expression *expr = &entry->lazy_constant_expression;
-      Value *result = token_parse_constant_expression(context, expr->tokens, expr->scope);
+    if (entry->type == Scope_Entry_Type_Lazy_Expression) {
+      Scope_Lazy_Expression *expr = &entry->lazy_expression;
+      Value *result;
+      if (expr->maybe_builder) {
+        result = value_any(context->allocator);
+        WITH_SCOPE(context, expr->scope) {
+          token_parse_expression(context, expr->tokens, expr->maybe_builder, result);
+        }
+      } else {
+        result = token_parse_constant_expression(context, expr->tokens, expr->scope);
+      }
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
@@ -270,7 +278,7 @@ scope_lookup_force(
 }
 
 static inline void
-scope_define_internal(
+scope_define(
   Scope *scope,
   Slice name,
   Scope_Entry entry
@@ -288,24 +296,9 @@ scope_define_value(
   Slice name,
   Value *value
 ) {
-  scope_define_internal(scope, name, (Scope_Entry) {
+  scope_define(scope, name, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
     .value = value,
-  });
-}
-
-void
-scope_define_lazy(
-  Scope *scope,
-  Slice name,
-  Token_View tokens
-) {
-  scope_define_internal(scope, name, (Scope_Entry) {
-    .type = Scope_Entry_Type_Lazy_Constant_Expression,
-    .lazy_constant_expression = {
-      .tokens = tokens,
-      .scope = scope,
-    },
   });
 }
 
@@ -339,7 +332,7 @@ scope_define_operator(
   Slice name,
   s64 precedence
 ) {
-  scope_define_internal(scope, name, (Scope_Entry) {
+  scope_define(scope, name, (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
     .Operator = { .precedence = precedence }
   });
@@ -1141,14 +1134,6 @@ token_force_constant_value(
   return 0;
 }
 
-bool
-token_parse_expression(
-  Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder,
-  Value *result_value
-);
-
 void
 token_force_value(
   Compilation_Context *context,
@@ -1667,16 +1652,23 @@ token_process_function_literal(
         arg = token_match_argument(context, arg_view);
       }
       if (!arg) return 0;
-      Value *arg_value =
-        function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
-      if (!is_external && arg_value->operand.tag == Operand_Tag_Register) {
-        register_bitset_set(
-          &builder->code_block.register_occupied_bitset,
-          arg_value->operand.Register.index
-        );
+      Value *arg_value;
+      if (arg->type_descriptor == &descriptor_any) {
+        // TODO figure out what should happen here or not use any type for macros
+        arg_value = value_any(context->allocator);
+        dyn_array_push(descriptor->Function.arguments, arg_value);
+      } else {
+        arg_value =
+          function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
+        if (!is_external && arg_value->operand.tag == Operand_Tag_Register) {
+          register_bitset_set(
+            &builder->code_block.register_occupied_bitset,
+            arg_value->operand.Register.index
+          );
+        }
       }
-      dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
       scope_define_value(function_scope, arg->arg_name, arg_value);
+      dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
     }
     assert(
       dyn_array_length(descriptor->Function.argument_names) ==
@@ -2108,7 +2100,13 @@ token_parse_constant_definitions(
   if (lhs.length > 1) return false;
   const Token *name = token_view_get(lhs, 0);
   if (name->tag != Token_Tag_Id) return false;
-  scope_define_lazy(context->scope, name->source, rhs);
+  scope_define(context->scope, name->source, (Scope_Entry) {
+    .type = Scope_Entry_Type_Lazy_Expression,
+    .lazy_expression = {
+      .tokens = rhs,
+      .scope = context->scope,
+    },
+  });
   return true;
 }
 
@@ -2122,6 +2120,66 @@ token_handle_function_call(
 ) {
   Value *target = value_any(context->allocator);
   token_force_value(context, target_token, builder, target);
+
+  Array_Token_View raw_args = token_split(
+    token_view_from_token_array(args_token->Group.children),
+    &(Token_Pattern) {
+      .tag = Token_Tag_Operator,
+      .source = slice_literal(","),
+    }
+  );
+
+  Value *maybe_macro_overload = find_matching_macro_overload(builder, target, raw_args);
+  if (maybe_macro_overload) {
+    Descriptor_Function *function = &maybe_macro_overload->descriptor->Function;
+    assert(function->scope->parent);
+    // We make a nested scope based on function's original parent scope
+    // instead of current scope for hygiene reasons. I.e. function body
+    // should not have access to locals inside the call scope.
+    Scope *body_scope = scope_make(context->allocator, function->scope->parent);
+
+    for (u64 i = 0; i < dyn_array_length(function->argument_names); ++i) {
+      Slice arg_name = *dyn_array_get(function->argument_names, i);
+      Token_View arg_expr = *dyn_array_get(raw_args, i);
+      scope_define(body_scope, arg_name, (Scope_Entry) {
+        .type = Scope_Entry_Type_Lazy_Expression,
+        .lazy_expression = {
+          .tokens = arg_expr,
+          .scope = context->scope,
+          .maybe_builder = builder,
+        },
+      });
+    }
+
+    // Define a new return target label and value so that explicit return statements
+    // jump to correct location and put value in the right place
+    Operand fake_return_label =
+      label32(make_label(context->program, &context->program->data_section));
+    {
+      scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
+        .descriptor = &descriptor_void,
+        .operand = fake_return_label,
+      });
+      assert(result_value);
+      scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
+    }
+
+    Token *body = token_clone_deep(context->allocator, function->body);
+    WITH_SCOPE(context, body_scope) {
+      token_parse_block(context, body, builder, result_value);
+    }
+
+    push_instruction(
+      &builder->code_block.instructions,
+      &target_token->source_range,
+      (Instruction) {
+        .type = Instruction_Type_Label,
+        .label = fake_return_label.Label.index
+      }
+    );
+    return token_value_make(context, result_value, target_token->source_range);
+  }
+
 
   Array_Value_Ptr args;
 
@@ -2164,52 +2222,55 @@ token_handle_function_call(
   const Source_Range *source_range = &target_token->source_range;
   Value *overload = find_matching_function_overload(builder, target, args);
   if (overload) {
-    Value *return_value;
-    Descriptor_Function *function = &overload->descriptor->Function;
+    //Value *return_value;
 
-    if (function->flags & Descriptor_Function_Flags_Macro) {
-      assert(function->scope->parent);
-      // We make a nested scope based on function's original parent scope
-      // instead of current scope for hygiene reasons. I.e. function body
-      // should not have access to locals inside the call scope.
-      Scope *body_scope = scope_make(context->allocator, function->scope->parent);
+    //if (function->flags & Descriptor_Function_Flags_Macro) {
+      //assert(function->scope->parent);
+      //// We make a nested scope based on function's original parent scope
+      //// instead of current scope for hygiene reasons. I.e. function body
+      //// should not have access to locals inside the call scope.
+      //Scope *body_scope = scope_make(context->allocator, function->scope->parent);
+//
+      //for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+        //Slice arg_name = *dyn_array_get(function->argument_names, i);
+        //Value *arg_value = *dyn_array_get(args, i);
+        //scope_define_value(body_scope, arg_name, arg_value);
+      //}
+      //return_value = result_value;
+//
+      //// Define a new return target label and value so that explicit return statements
+      //// jump to correct location and put value in the right place
+      //Operand fake_return_label =
+        //label32(make_label(context->program, &context->program->data_section));
+      //{
+        //scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
+          //.descriptor = &descriptor_void,
+          //.operand = fake_return_label,
+        //});
+        //assert(return_value);
+        //scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, return_value);
+      //}
+//
+      //Token *body = token_clone_deep(context->allocator, function->body);
+      //WITH_SCOPE(context, body_scope) {
+        //token_parse_block(context, body, builder, return_value);
+      //}
+//
+      //push_instruction(
+        //&builder->code_block.instructions,
+        //&target_token->source_range,
+        //(Instruction) {
+          //.type = Instruction_Type_Label,
+          //.label = fake_return_label.Label.index
+        //}
+      //);
+    //} else {
+      //return_value = call_function_overload(context, builder, source_range, overload, args);
+    //}
 
-      for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
-        Slice arg_name = *dyn_array_get(function->argument_names, i);
-        Value *arg_value = *dyn_array_get(args, i);
-        scope_define_value(body_scope, arg_name, arg_value);
-      }
-      return_value = result_value;
 
-      // Define a new return target label and value so that explicit return statements
-      // jump to correct location and put value in the right place
-      Operand fake_return_label =
-        label32(make_label(context->program, &context->program->data_section));
-      {
-        scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
-          .descriptor = &descriptor_void,
-          .operand = fake_return_label,
-        });
-        assert(return_value);
-        scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, return_value);
-      }
+    Value *return_value = call_function_overload(context, builder, source_range, overload, args);
 
-      Token *body = token_clone_deep(context->allocator, function->body);
-      WITH_SCOPE(context, body_scope) {
-        token_parse_block(context, body, builder, return_value);
-      }
-
-      push_instruction(
-        &builder->code_block.instructions,
-        &target_token->source_range,
-        (Instruction) {
-          .type = Instruction_Type_Label,
-          .label = fake_return_label.Label.index
-        }
-      );
-    } else {
-      return_value = call_function_overload(context, builder, source_range, overload, args);
-    }
     result = token_value_make(context, return_value, target_token->source_range);
   } else {
     program_error_builder(context, target_token->source_range) {

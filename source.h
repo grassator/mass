@@ -8,14 +8,15 @@
 #define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
 typedef enum {
   Scope_Entry_Type_Value = 1,
-  Scope_Entry_Type_Lazy_Constant_Expression,
+  Scope_Entry_Type_Lazy_Expression,
   Scope_Entry_Type_Operator,
 } Scope_Entry_Type;
 
 typedef struct {
   Token_View tokens;
   Scope *scope;
-} Scope_Lazy_Constant_Expression;
+  Function_Builder *maybe_builder;
+} Scope_Lazy_Expression;
 
 typedef struct {
   s64 precedence;
@@ -25,7 +26,7 @@ typedef struct {
   Scope_Entry_Type type;
   union {
     Value *value;
-    Scope_Lazy_Constant_Expression lazy_constant_expression;
+    Scope_Lazy_Expression lazy_expression;
     Scope_Entry_Operator Operator;
   };
 } Scope_Entry;
@@ -75,6 +76,14 @@ scope_define_operator(
   Scope *scope,
   Slice name,
   s64 precedence
+);
+
+bool
+token_parse_expression(
+  Compilation_Context *context,
+  Token_View view,
+  Function_Builder *builder,
+  Value *result_value
 );
 
 bool
