@@ -1596,7 +1596,6 @@ token_process_function_literal(
   Compilation_Context *context,
   Token_View view,
   Scope *scope,
-  bool is_inline,
   const Token *args,
   const Token *return_types,
   const Token *body
@@ -1612,12 +1611,6 @@ token_process_function_literal(
   bool is_external = body->tag == Token_Tag_Value;
 
   if (is_external) {
-    if (is_inline) {
-      program_error_builder(context, body->source_range) {
-        program_error_append_literal("External functions can not be inline");
-      }
-      is_inline = false;
-    }
     if(!body->Value.value) return 0;
     descriptor = allocator_allocate(context->allocator, Descriptor);
     *descriptor = (Descriptor) {
@@ -1628,6 +1621,7 @@ token_process_function_literal(
         .returns = 0,
       },
     };
+    descriptor->Function.flags |= Descriptor_Function_Flags_External;
   } else {
     builder = fn_begin(context);
     descriptor = builder->value->descriptor;
@@ -1697,9 +1691,6 @@ token_process_function_literal(
     descriptor->Function.body = body;
     descriptor->Function.builder = builder;
     descriptor->Function.flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
-    if (is_inline) {
-      descriptor->Function.flags |= Descriptor_Function_Flags_Inline;
-    }
     result = builder->value;
   }
   return result;
@@ -1917,9 +1908,20 @@ token_dispatch_constant_operator(
       dyn_array_pop(*token_stack);
     }
     Value *function_value = token_process_function_literal(
-      context, view, context->scope,
-      is_inline, arguments, return_types, body
+      context, view, context->scope, arguments, return_types, body
     );
+    if (function_value) {
+      Descriptor_Function *descriptor = &function_value->descriptor->Function;
+      if (is_inline && (descriptor->flags & Descriptor_Function_Flags_External)) {
+        program_error_builder(context, body->source_range) {
+          program_error_append_literal("External functions can not be inline");
+        }
+        is_inline = false;
+      }
+      if (is_inline) {
+        descriptor->flags |= Descriptor_Function_Flags_Inline;
+      }
+    }
     Token *result = token_value_make(context, function_value, arguments->source_range);
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("@"))) {
@@ -2150,6 +2152,7 @@ token_handle_function_call(
   if (overload) {
     Value *return_value;
     Descriptor_Function *function = &overload->descriptor->Function;
+
     if (function->flags & Descriptor_Function_Flags_Inline) {
       assert(function->scope->parent);
       // We make a nested scope based on function's original parent scope

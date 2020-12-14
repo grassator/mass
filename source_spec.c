@@ -394,6 +394,16 @@ spec("source") {
     check(checker() == 21);
   }
 
+  xit("should not change the passed arguments to inline function") {
+    test_program_inline_source(
+      "process :: inline (y : s64) -> () { y = 20; }\n"
+      "test :: () -> (s64) { x := 42; process(x); x }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
   it("should be able to parse negation inside a constant expression") {
     test_program_inline_source(
       "THE_ANSWER :: -(-42);"

@@ -463,8 +463,9 @@ main(void) {
 
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None",   0 },
-    { "Inline", 1 << 0 },
-    { "Pending_Body_Compilation", 1 << 1 },
+    { "Pending_Body_Compilation", 1 << 0 },
+    { "Inline", 1 << 1 },
+    { "External", 1 << 2 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){

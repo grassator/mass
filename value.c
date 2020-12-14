@@ -1283,10 +1283,13 @@ program_init(
   scope_define_operator(program->global_scope, slice_literal("[]"), 20);
   scope_define_operator(program->global_scope, slice_literal("()"), 20);
   scope_define_operator(program->global_scope, slice_literal("."), 20);
-  scope_define_operator(program->global_scope, slice_literal("@"), 19);
-  scope_define_operator(program->global_scope, slice_literal("-x"), 18);
-  scope_define_operator(program->global_scope, slice_literal("&"), 17);
-  scope_define_operator(program->global_scope, slice_literal("->"), 1);
+
+  scope_define_operator(program->global_scope, slice_literal("->"), 19);
+  scope_define_operator(program->global_scope, slice_literal("inline"), 19);
+
+  scope_define_operator(program->global_scope, slice_literal("@"), 18);
+  scope_define_operator(program->global_scope, slice_literal("-x"), 17);
+  scope_define_operator(program->global_scope, slice_literal("&"), 16);
 
   scope_define_operator(program->global_scope, slice_literal("*"), 15);
   scope_define_operator(program->global_scope, slice_literal("/"), 15);
