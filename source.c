@@ -224,7 +224,7 @@ scope_lookup_force(
     assert(entry->type == Scope_Entry_Type_Value);
 
     // To support recursive functions without a hack like `self` we
-    // do forcing of the lazy value in two steps. First creates a valid Value
+    // force the lazy value in two steps. First creates a valid Value
     // the second one, here, actually processes function body
     if (entry->value && entry->value->descriptor->tag == Descriptor_Tag_Function) {
       Descriptor_Function *function = &entry->value->descriptor->Function;
@@ -683,26 +683,37 @@ token_view_array_push(
   return view;
 }
 
-Array_Token_View
-token_split(
-  Token_View view,
-  const Token_Pattern *separator
-) {
-  Array_Token_View result = dyn_array_make(Array_Token_View);
+typedef struct {
+  Token_View view;
+  Token_Pattern separator;
+  u64 index;
+  bool done;
+} Token_Split_Iterator;
 
-  u64 start_index = 0;
-  for (u64 i = 0; i < view.length; ++i) {
-    const Token *token = token_view_get(view, i);
-    if (token_match(token, separator)) {
-      token_view_array_push(&result, (Token_View) {
-        .tokens = view.tokens + start_index,
-        .length = i - start_index,
-      });
-      start_index = i + 1;
+Token_View
+token_split_next(
+  Token_Split_Iterator *it
+) {
+  if (it->done) return (Token_View){0};
+  u64 start_index = it->index;
+  for (
+    ;
+    it->index < it->view.length;
+    it->index++
+  ) {
+    const Token *token = token_view_get(it->view, it->index);
+    if (token_match(token, &it->separator)) {
+      Token_View result = {
+        .tokens = it->view.tokens + start_index,
+        .length = it->index - start_index,
+      };
+      // Skip over the separator
+      it->index++;
+      return result;
     }
   }
-  token_view_array_push(&result, token_view_rest(view, start_index));
-  return result;
+  it->done = true;
+  return token_view_rest(it->view, start_index);
 }
 
 Array_Token_View
@@ -1235,19 +1246,23 @@ token_match_call_arguments(
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
-    Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .tag = Token_Tag_Operator,
-      .source = slice_literal(","),
-    });
-    // TODO :TargetValue
-    // There is an interesting conundrum here that we need to know the types of the
-    // arguments for overload resolution, but then we need the exact function definition
-    // to know the result_value definition to do the evaluation. Proper solution would
-    // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
-    // target value that can be anything that will behave like type inference and is
-    // needed regardless for something like x := (...)
-    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
-      Token_View view = *dyn_array_get(argument_states, i);
+    Token_Split_Iterator it = {
+      .view = children,
+      .separator = {
+        .tag = Token_Tag_Operator,
+        .source = slice_literal(","),
+      }
+    };
+
+    while (!it.done) {
+      Token_View view = token_split_next(&it);
+      // TODO :TargetValue
+      // There is an interesting conundrum here that we need to know the types of the
+      // arguments for overload resolution, but then we need the exact function definition
+      // to know the result_value definition to do the evaluation. Proper solution would
+      // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
+      // target value that can be anything that will behave like type inference and is
+      // needed regardless for something like x := (...)
       Value *result_value = value_any(context->allocator);
       token_parse_expression(context, view, builder, result_value);
       dyn_array_push(result, result_value);
@@ -1641,12 +1656,16 @@ token_process_function_literal(
 
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
-    Array_Token_View argument_states = token_split(children, &(Token_Pattern){
-      .tag = Token_Tag_Operator,
-      .source = slice_literal(","),
-    });
-    for (u64 i = 0; i < dyn_array_length(argument_states); ++i) {
-      Token_View arg_view = *dyn_array_get(argument_states, i);
+    Token_Split_Iterator it = {
+      .view = children,
+      .separator = {
+        .tag = Token_Tag_Operator,
+        .source = slice_literal(","),
+      }
+    };
+
+    while (!it.done) {
+      Token_View arg_view = token_split_next(&it);
       Token_Match_Arg *arg = 0;
       WITH_SCOPE(context, function_scope) {
         arg = token_match_argument(context, arg_view);
@@ -2121,13 +2140,18 @@ token_handle_function_call(
   Value *target = value_any(context->allocator);
   token_force_value(context, target_token, builder, target);
 
-  Array_Token_View raw_args = token_split(
-    token_view_from_token_array(args_token->Group.children),
-    &(Token_Pattern) {
+  Token_Split_Iterator it = {
+    .view = token_view_from_token_array(args_token->Group.children),
+    .separator = {
       .tag = Token_Tag_Operator,
       .source = slice_literal(","),
     }
-  );
+  };
+
+  Array_Token_View raw_args = dyn_array_make(Array_Token_View);
+  while (!it.done) {
+    dyn_array_push(raw_args, token_split_next(&it));
+  }
 
   Value *maybe_macro_overload = find_matching_macro_overload(builder, target, raw_args);
   if (maybe_macro_overload) {
@@ -2177,8 +2201,10 @@ token_handle_function_call(
         .label = fake_return_label.Label.index
       }
     );
+    dyn_array_destroy(raw_args);
     return token_value_make(context, result_value, target_token->source_range);
   }
+  dyn_array_destroy(raw_args);
 
 
   Array_Value_Ptr args;
