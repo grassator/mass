@@ -685,14 +685,14 @@ token_view_array_push(
 
 typedef struct {
   Token_View view;
-  Token_Pattern separator;
   u64 index;
   bool done;
-} Token_Split_Iterator;
+} Token_View_Split_Iterator;
 
 Token_View
 token_split_next(
-  Token_Split_Iterator *it
+  Token_View_Split_Iterator *it,
+  const Token_Pattern *separator
 ) {
   if (it->done) return (Token_View){0};
   u64 start_index = it->index;
@@ -702,7 +702,7 @@ token_split_next(
     it->index++
   ) {
     const Token *token = token_view_get(it->view, it->index);
-    if (token_match(token, &it->separator)) {
+    if (token_match(token, separator)) {
       Token_View result = {
         .tokens = it->view.tokens + start_index,
         .length = it->index - start_index,
@@ -1246,16 +1246,11 @@ token_match_call_arguments(
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
-    Token_Split_Iterator it = {
-      .view = children,
-      .separator = {
-        .tag = Token_Tag_Operator,
-        .source = slice_literal(","),
-      }
-    };
+    Token_View_Split_Iterator it = { .view = children };
+    Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
     while (!it.done) {
-      Token_View view = token_split_next(&it);
+      Token_View view = token_split_next(&it, &separator);
       // TODO :TargetValue
       // There is an interesting conundrum here that we need to know the types of the
       // arguments for overload resolution, but then we need the exact function definition
@@ -1656,16 +1651,11 @@ token_process_function_literal(
 
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
-    Token_Split_Iterator it = {
-      .view = children,
-      .separator = {
-        .tag = Token_Tag_Operator,
-        .source = slice_literal(","),
-      }
-    };
+    Token_View_Split_Iterator it = { .view = children };
+    Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
     while (!it.done) {
-      Token_View arg_view = token_split_next(&it);
+      Token_View arg_view = token_split_next(&it, &separator);
       Token_Match_Arg *arg = 0;
       WITH_SCOPE(context, function_scope) {
         arg = token_match_argument(context, arg_view);
@@ -2140,17 +2130,12 @@ token_handle_function_call(
   Value *target = value_any(context->allocator);
   token_force_value(context, target_token, builder, target);
 
-  Token_Split_Iterator it = {
-    .view = token_view_from_token_array(args_token->Group.children),
-    .separator = {
-      .tag = Token_Tag_Operator,
-      .source = slice_literal(","),
-    }
-  };
+  Token_View_Split_Iterator it = {.view = token_view_from_token_array(args_token->Group.children)};
+  Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
   Array_Token_View raw_args = dyn_array_make(Array_Token_View);
   while (!it.done) {
-    dyn_array_push(raw_args, token_split_next(&it));
+    dyn_array_push(raw_args, token_split_next(&it, &separator));
   }
 
   Value *maybe_macro_overload = find_matching_macro_overload(builder, target, raw_args);
