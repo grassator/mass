@@ -1993,13 +1993,6 @@ token_parse_constant_expression(
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
         is_previous_an_operator = false;
-
-        // TODO figure out how to handle this better
-        if (token->tag != Token_Tag_Id || !slice_equal(token->source, slice_literal("inline"))) {
-          is_previous_an_operator = false;
-        } else {
-          is_previous_an_operator = true;
-        }
         break;
       }
       case Token_Tag_Group: {
