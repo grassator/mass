@@ -148,5 +148,6 @@ Mass_Token_Pattern :: struct {
   tag : Token_Tag
   group_type : Token_Group_Type
   source : Slice
+  or : const Token_Pattern *
 }
 

@@ -644,7 +644,7 @@ token_peek(
 }
 
 bool
-token_match(
+token_match_internal(
   const Token *token,
   const Token_Pattern *pattern
 ) {
@@ -657,6 +657,18 @@ token_match(
     return slice_equal(token->source, pattern->source);
   }
   return true;
+}
+
+bool
+token_match(
+  const Token *token,
+  const Token_Pattern *pattern
+) {
+  bool result = token_match_internal(token, pattern);
+  if (!result && pattern->or) {
+    return token_match(token, pattern->or);
+  }
+  return result;
 }
 
 const Token *
@@ -682,6 +694,19 @@ token_view_array_push(
   *(Token_View *)view = to_push;
   return view;
 }
+
+const Token_Pattern token_pattern_comma_operator = {
+  .tag = Token_Tag_Operator,
+  .source = slice_literal_fields(","),
+};
+
+const Token_Pattern token_pattern_newline_or_semicolon = {
+  .tag = Token_Tag_Newline,
+  .or = &(const Token_Pattern) {
+    .tag = Token_Tag_Operator,
+    .source = slice_literal_fields(";"),
+  },
+};
 
 typedef struct {
   Token_View view;
@@ -714,36 +739,6 @@ token_split_next(
   }
   it->done = true;
   return token_view_rest(it->view, start_index);
-}
-
-Array_Token_View
-token_split_by_newlines_and_semicolons(
-  Token_View view
-) {
-  Array_Token_View result = dyn_array_make(Array_Token_View);
-
-  u64 start_index = 0;
-  for (u64 i = 0; i < view.length; ++i) {
-    const Token *token = token_view_get(view, i);
-    if (
-      token->tag == Token_Tag_Newline ||
-      (token->tag == Token_Tag_Operator && slice_equal(token->source, slice_literal(";")))
-    ) {
-      if (start_index != i) {
-        assert(i > start_index);
-        token_view_array_push(&result, (Token_View) {
-          .tokens = view.tokens + start_index,
-          .length = i - start_index,
-        });
-      }
-      start_index = i + 1;
-    }
-  }
-  token_view_array_push(&result, (Token_View) {
-    .tokens = view.tokens + start_index,
-    .length = view.length - start_index,
-  });
-  return result;
 }
 
 Descriptor *
@@ -1247,10 +1242,9 @@ token_match_call_arguments(
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
     Token_View_Split_Iterator it = { .view = children };
-    Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
     while (!it.done) {
-      Token_View view = token_split_next(&it, &separator);
+      Token_View view = token_split_next(&it, &token_pattern_comma_operator);
       // TODO :TargetValue
       // There is an interesting conundrum here that we need to know the types of the
       // arguments for overload resolution, but then we need the exact function definition
@@ -1450,12 +1444,12 @@ token_process_c_struct_definition(
   if (dyn_array_length(layout_block->Group.children) != 0) {
     Token_View layout_block_children =
       token_view_from_token_array(layout_block->Group.children);
-    Array_Token_View definitions = token_split_by_newlines_and_semicolons(layout_block_children);
-    for (u64 i = 0; i < dyn_array_length(definitions); ++i) {
-      Token_View field_view = *dyn_array_get(definitions, i);
+
+    Token_View_Split_Iterator it = { .view = layout_block_children };
+    while (!it.done) {
+      Token_View field_view = token_split_next(&it, &token_pattern_newline_or_semicolon);
       token_match_struct_field(context, descriptor, field_view);
     }
-    dyn_array_destroy(definitions);
   }
 
   Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -1652,10 +1646,9 @@ token_process_function_literal(
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
     Token_View_Split_Iterator it = { .view = children };
-    Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
     while (!it.done) {
-      Token_View arg_view = token_split_next(&it, &separator);
+      Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Token_Match_Arg *arg = 0;
       WITH_SCOPE(context, function_scope) {
         arg = token_match_argument(context, arg_view);
@@ -2131,11 +2124,10 @@ token_handle_function_call(
   token_force_value(context, target_token, builder, target);
 
   Token_View_Split_Iterator it = {.view = token_view_from_token_array(args_token->Group.children)};
-  Token_Pattern separator = { .tag = Token_Tag_Operator, .source = slice_literal(",") };
 
   Array_Token_View raw_args = dyn_array_make(Array_Token_View);
   while (!it.done) {
-    dyn_array_push(raw_args, token_split_next(&it, &separator));
+    dyn_array_push(raw_args, token_split_next(&it, &token_pattern_comma_operator));
   }
 
   Value *maybe_macro_overload = find_matching_macro_overload(builder, target, raw_args);
@@ -2769,12 +2761,12 @@ token_parse_block(
   }
 
   Token_View children_view = token_view_from_token_array(children);
-  Array_Token_View block_statements = token_split_by_newlines_and_semicolons(children_view);
+  Token_View_Split_Iterator it = { .view = children_view };
   WITH_SCOPE(context, scope_make(context->allocator, context->scope)) {
-    for (u64 i = 0; i < dyn_array_length(block_statements); ++i) {
-      Token_View view = *dyn_array_get(block_statements, i);
+    while (!it.done) {
+      Token_View view = token_split_next(&it, &token_pattern_newline_or_semicolon);
       if (!view.length) continue;
-      bool is_last_statement = i + 1 == dyn_array_length(block_statements);
+      bool is_last_statement = it.done;
       Value *result_value = is_last_statement ? block_result_value : value_any(context->allocator);
 
       // If result is a register we need to make sure it is acquired to avoid it being used
@@ -3284,9 +3276,9 @@ token_parse(
   Function_Builder global_builder = { 0 };
   context->scope = context->program->global_scope;
 
-  Array_Token_View module_statements = token_split_by_newlines_and_semicolons(view);
-  for (u64 i = 0; i < dyn_array_length(module_statements); ++i) {
-    Token_View statement = *dyn_array_get(module_statements, i);
+  Token_View_Split_Iterator it = { .view = view };
+  while (!it.done) {
+    Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
     if (!statement.length) continue;
     if (token_parse_macro_definitions(context, statement, context->program->global_scope)) {
       continue;

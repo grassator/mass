@@ -574,6 +574,7 @@ main(void) {
     { "Token_Tag", "tag" },
     { "Token_Group_Type", "group_type" },
     { "Slice", "source" },
+    { "const Token_Pattern *", "or" },
   }));
 
   push_type(type_union("Tokenizer_Result", (Struct[]){

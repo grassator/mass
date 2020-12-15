@@ -430,6 +430,7 @@ typedef struct Token_Pattern {
   Token_Tag tag;
   Token_Group_Type group_type;
   Slice source;
+  const Token_Pattern * or;
 } Token_Pattern;
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 
