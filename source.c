@@ -1404,16 +1404,23 @@ token_process_c_struct_definition(
   const Token *args
 ) {
   if (!token_match(args, &(Token_Pattern) { .group_type = Token_Group_Type_Paren })) {
-    // TODO print error
+    program_error_builder(context, args->source_range) {
+      program_error_append_literal("c_struct must be followed by ()");
+    }
     goto err;
   }
   if (dyn_array_length(args->Group.children) != 1) {
-    // TODO print error
+    program_error_builder(context, args->source_range) {
+      program_error_append_literal("c_struct expects 1 argument, got ");
+      program_error_append_number("%llu", dyn_array_length(args->Group.children));
+    }
     goto err;
   }
   const Token *layout_block = *dyn_array_get(args->Group.children, 0);
   if (!token_match(layout_block, &(Token_Pattern) { .group_type = Token_Group_Type_Curly })) {
-    // TODO print error
+    program_error_builder(context, args->source_range) {
+      program_error_append_literal("c_struct expects a {} block as the argument");
+    }
     goto err;
   }
 
