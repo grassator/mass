@@ -2735,18 +2735,15 @@ token_parse_block(
   assert(block->Group.type == Token_Group_Type_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) return false;
-  //Scope *block_scope = scope_make(context->allocator, scope);
+  Token_View children_view = token_view_from_token_array(children);
 
   // Newlines at the end of the block do not count as semicolons otherwise this:
   // { 42
   // }
   // is being interpreted as:
   // { 42 ; }
-  while (dyn_array_length(children) &&(*dyn_array_last(children))->tag == Token_Tag_Newline) {
-    dyn_array_pop(children);
-  }
+  children_view = token_view_trim_newlines(children_view);
 
-  Token_View children_view = token_view_from_token_array(children);
   Token_View_Split_Iterator it = { .view = children_view };
   WITH_SCOPE(context, scope_make(context->allocator, context->scope)) {
     while (!it.done) {
