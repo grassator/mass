@@ -1276,20 +1276,6 @@ token_value_make(
   return result_token;
 }
 
-bool
-token_state_clear_newlines(
-  Array_Const_Token_Ptr *tokens
-) {
-  for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
-    const Token *token = *dyn_array_get(*tokens, i);
-    if (token->tag == Token_Tag_Newline) {
-      dyn_array_delete(*tokens, i);
-      --i;
-    }
-  }
-  return true;
-}
-
 void
 scope_add_macro(
   Scope *scope,
