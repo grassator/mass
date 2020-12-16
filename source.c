@@ -152,13 +152,13 @@ scope_print_names(
   printf("\n");
 }
 
-Array_Scope_Entry *
+Scope_Entry *
 scope_lookup(
   Scope *scope,
   Slice name
 ) {
   while (scope) {
-    Array_Scope_Entry *result = hash_map_get(scope->map, name);
+    Scope_Entry *result = hash_map_get(scope->map, name);
     if (result) return result;
     scope = scope->parent;
   }
@@ -186,22 +186,20 @@ scope_lookup_force(
   Scope *scope,
   Slice name
 ) {
-  Array_Scope_Entry *entries = 0;
+  Scope_Entry *entry = 0;
   while (scope) {
-    entries = hash_map_get(scope->map, name);
-    if (entries) break;
+    entry = hash_map_get(scope->map, name);
+    if (entry) break;
     scope = scope->parent;
   }
-  if (!entries) {
+  if (!entry) {
     return 0;
   }
-  assert(dyn_array_length(*entries));
 
   // Force lazy entries
-  for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
-    Scope_Entry *entry = dyn_array_get(*entries, i);
-    if (entry->type == Scope_Entry_Type_Lazy_Expression) {
-      Scope_Lazy_Expression *expr = &entry->lazy_expression;
+  for (Scope_Entry *it = entry; it; it = it->next_overload) {
+    if (it->type == Scope_Entry_Type_Lazy_Expression) {
+      Scope_Lazy_Expression *expr = &it->lazy_expression;
       Value *result;
       if (expr->maybe_builder) {
         result = value_any(context->allocator);
@@ -211,23 +209,23 @@ scope_lookup_force(
       } else {
         result = token_parse_constant_expression(context, expr->tokens, expr->scope);
       }
-      *entry = (Scope_Entry) {
+      *it = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,
+        .next_overload = it->next_overload,
       };
     }
   }
 
   Value *result = 0;
-  for (u64 i = 0; i < dyn_array_length(*entries); ++i) {
-    Scope_Entry *entry = dyn_array_get(*entries, i);
-    assert(entry->type == Scope_Entry_Type_Value);
+  for (Scope_Entry *it = entry; it; it = it->next_overload) {
+    assert(it->type == Scope_Entry_Type_Value);
 
     // To support recursive functions without a hack like `self` we
     // force the lazy value in two steps. First creates a valid Value
     // the second one, here, actually processes function body
-    if (entry->value && entry->value->descriptor->tag == Descriptor_Tag_Function) {
-      Descriptor_Function *function = &entry->value->descriptor->Function;
+    if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
+      Descriptor_Function *function = &it->value->descriptor->Function;
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
         function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
         Token *body = token_clone_deep(context->allocator, function->body);
@@ -244,12 +242,12 @@ scope_lookup_force(
     }
 
     if (!result) {
-      result = entry->value;
+      result = it->value;
     } else {
-      if (entry->value->descriptor->tag != Descriptor_Tag_Function) {
+      if (it->value->descriptor->tag != Descriptor_Tag_Function) {
         panic("Only functions support overloading");
       }
-      Value *overload = entry->value;
+      Value *overload = it->value;
       overload->descriptor->Function.next_overload = result;
       result = overload;
     }
@@ -284,10 +282,17 @@ scope_define(
   Scope_Entry entry
 ) {
   if (!hash_map_has(scope->map, name)) {
-    hash_map_set(scope->map, name, dyn_array_make(Array_Scope_Entry));
+    hash_map_set(scope->map, name, entry);
+  } else {
+    // TODO Consider using a hash map that allows multiple values instead
+    Scope_Entry *it = hash_map_get(scope->map, name);
+    while (it->next_overload) {
+      it = it->next_overload;
+    }
+    Scope_Entry *allocated = allocator_allocate(scope->map->allocator, Scope_Entry);
+    *allocated = entry;
+    it->next_overload = allocated;
   }
-  Array_Scope_Entry *entries = hash_map_get(scope->map, name);
-  dyn_array_push(*entries, entry);
 }
 
 void
@@ -309,18 +314,13 @@ scope_lookup_operator_precedence(
   Scope *scope,
   Slice name
 ) {
-  Array_Scope_Entry *entries = 0;
+  Scope_Entry *entry = 0;
   while (scope) {
-    entries = hash_map_get(scope->map, name);
-    if (entries) break;
+    entry = hash_map_get(scope->map, name);
+    if (entry) break;
     scope = scope->parent;
   }
-  if (!entries) {
-    return SCOPE_OPERATOR_NOT_FOUND;
-  }
-  assert(dyn_array_length(*entries) == 1);
-  Scope_Entry *entry = dyn_array_get(*entries, 0);
-  if (entry->type != Scope_Entry_Type_Operator) {
+  if (!entry || entry->type != Scope_Entry_Type_Operator) {
     return SCOPE_OPERATOR_NOT_FOUND;
   }
   return entry->Operator.precedence;

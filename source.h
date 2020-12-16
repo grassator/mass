@@ -21,17 +21,18 @@ typedef struct {
   s64 precedence;
 } Scope_Entry_Operator;
 
-typedef struct {
+typedef struct Scope_Entry Scope_Entry;
+typedef struct Scope_Entry{
   Scope_Entry_Type type;
+  Scope_Entry *next_overload;
   union {
     Value *value;
     Scope_Lazy_Expression lazy_expression;
     Scope_Entry_Operator Operator;
   };
 } Scope_Entry;
-typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
-hash_map_slice_template(Scope_Map, Array_Scope_Entry)
+hash_map_slice_template(Scope_Map, Scope_Entry)
 hash_map_slice_template(Macro_Replacement_Map, const Token *)
 
 typedef struct {
