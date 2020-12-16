@@ -187,40 +187,6 @@ print_c_type(
   }
 }
 
-void
-print_mass_type(
-  FILE *file,
-  Type *type
-) {
-  switch(type->tag) {
-    case Type_Tag_Struct: {
-      fprintf(file, "Mass_%s :: struct {\n", type->struct_.name);
-      for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
-        Struct_Item *item = &type->struct_.items[i];
-        fprintf(file, "  %s : %s\n", item->name, item->type);
-      }
-      fprintf(file, "}\n\n");
-      break;
-    }
-    case Type_Tag_Enum: {
-      for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Item *item = &type->enum_.items[i];
-        fprintf(file, "Mass_%s_%s :: %d\n", type->enum_.name, item->name, item->value);
-      }
-      fprintf(file, "\n");
-      break;
-    }
-    case Type_Tag_Tagged_Union: {
-      // TODO
-      break;
-    }
-    case Type_Tag_Function: {
-      assert(!"Not implemented");
-      break;
-    }
-  }
-}
-
 #define struct_empty(_NAME_STRING_)\
   {\
     .name = _NAME_STRING_,\
@@ -618,19 +584,6 @@ main(void) {
 
     fclose(file);
     printf("C Types Generated at: %s\n", filename);
-  }
-  {
-    const char *filename = "..\\lib\\compiler_types.mass";
-    #pragma warning(disable : 4996)
-    FILE *file = fopen(filename, "w");
-    if (!file) exit(1);
-
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_mass_type(file, types[i]);
-    }
-
-    fclose(file);
-    printf("Mass Types Generated at: %s\n", filename);
   }
   return 0;
 }
