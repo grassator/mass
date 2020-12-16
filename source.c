@@ -2209,7 +2209,20 @@ token_handle_function_call(
   }
   Token *result = 0;
   const Source_Range *source_range = &target_token->source_range;
-  Value *overload = find_matching_function_overload(builder, target, args);
+
+  struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
+  for (Value *to_call = target; to_call; to_call = to_call->descriptor->Function.next_overload) {
+    Descriptor_Function *descriptor = &to_call->descriptor->Function;
+    if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
+    s64 score = calculate_arguments_match_score(descriptor, args);
+    if (score > match.score) {
+      // FIXME think about same scores
+      match.value = to_call;
+      match.score = score;
+    }
+  }
+
+  Value *overload = match.value;
   if (overload) {
     //Value *return_value;
 

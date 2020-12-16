@@ -1155,10 +1155,6 @@ call_function_overload(
   return result;
 }
 
-typedef struct {
-  Value *value;
-  s64 score;
-} Overload_Match;
 
 s64
 calculate_arguments_match_score(
@@ -1182,26 +1178,6 @@ calculate_arguments_match_score(
     }
   }
   return score;
-}
-
-Value *
-find_matching_function_overload(
-  Function_Builder *builder,
-  Value *to_call,
-  Array_Value_Ptr arguments
-) {
-  Overload_Match match = {.score = -1};
-  for (;to_call; to_call = to_call->descriptor->Function.next_overload) {
-    Descriptor_Function *descriptor = &to_call->descriptor->Function;
-    if (dyn_array_length(arguments) != dyn_array_length(descriptor->arguments)) continue;
-    s64 score = calculate_arguments_match_score(descriptor, arguments);
-    if (score > match.score) {
-      // FIXME think about same scores
-      match.value = to_call;
-      match.score = score;
-    }
-  }
-  return match.value;
 }
 
 Value *
