@@ -1181,22 +1181,6 @@ calculate_arguments_match_score(
 }
 
 Value *
-find_matching_macro_overload(
-  Function_Builder *builder,
-  Value *to_call,
-  Array_Token_View raw_arguments
-) {
-  for (;to_call; to_call = to_call->descriptor->Function.next_overload) {
-    Descriptor_Function *descriptor = &to_call->descriptor->Function;
-    if (!(descriptor->flags & Descriptor_Function_Flags_Macro)) continue;
-    if (dyn_array_length(raw_arguments) != dyn_array_length(descriptor->argument_names)) continue;
-    // TODO check for overlapping matches
-    return to_call;
-  }
-  return 0;
-}
-
-Value *
 make_and(
   Compilation_Context *context,
   Function_Builder *builder,
