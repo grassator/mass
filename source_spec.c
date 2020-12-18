@@ -370,7 +370,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  xit("should be able to parse and run macro id function") {
+  it("should be able to parse and run macro id function") {
     test_program_inline_source(
       "id :: macro (x : s64) -> (s64) { x }\n"
       "test :: () -> (s64) { id(42) }",
@@ -380,7 +380,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  xit("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
+  it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
     test_program_inline_source(
       "id :: macro (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
       "test :: () -> (s64) { id(42) + 1 }",
@@ -390,7 +390,7 @@ spec("source") {
     check(checker() == 21);
   }
 
-  it("should allow changes to the passed arguments to macro function") {
+  xit("should allow changes to the passed arguments to macro function") {
     test_program_inline_source(
       "process :: macro (y : any) -> () { y = 42; }\n"
       "test :: () -> (s64) { x := 20; process(x); x }",
