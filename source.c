@@ -1020,6 +1020,37 @@ token_view_trim_newlines(
   };
 }
 
+bool
+token_maybe_split_on_operator(
+  Token_View view,
+  Slice operator,
+  Token_View *lhs,
+  Token_View *rhs,
+  const Token **operator_token
+) {
+  u64 lhs_end = 0;
+  u64 rhs_start = 0;
+  for (u64 i = 0; i < view.length; ++i) {
+    const Token *token = token_view_get(view, i);
+    if (token->tag == Token_Tag_Operator && slice_equal(token->source, operator)) {
+      *operator_token = token;
+      lhs_end = i;
+      rhs_start = i + 1;
+      break;
+    }
+  }
+
+  if (lhs_end == 0) {
+    *lhs = *rhs = (Token_View){0};
+    return false;
+  }
+
+  *lhs = (Token_View) { .tokens = view.tokens, .length = lhs_end };
+  *rhs = token_view_rest(view, rhs_start);
+
+  return true;
+}
+
 Token_Match_Arg *
 token_match_argument(
   Compilation_Context *context,
@@ -1027,15 +1058,38 @@ token_match_argument(
 ) {
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
-  u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Tag_Id);
-  Token_Match_Operator(define, ":");
 
-  Token_View rest = token_view_rest(view, peek_index);
-  Descriptor *type_descriptor = token_match_type(context, rest);
-  if (!type_descriptor) return 0;
-  Token_Match_Arg *arg = allocator_allocate(context->allocator, Token_Match_Arg);
-  *arg = (Token_Match_Arg){name->source, type_descriptor};
+  Token_Match_Arg *arg = 0;
+
+  Token_View lhs;
+  Token_View rhs;
+  Token *operator;
+  if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
+    if (lhs.length == 0) {
+      program_error_builder(context, operator->source_range) {
+        program_error_append_literal("':' operator expects an identifier on the left hand side");
+      }
+      goto err;
+    }
+    if (lhs.length > 1 || !token_match(lhs.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })) {
+      program_error_builder(context, operator->source_range) {
+        program_error_append_literal("':' operator expects only a single identifier on the left hand side");
+      }
+      goto err;
+    }
+    Slice name = lhs.tokens[0]->source;
+    Descriptor *type_descriptor = token_match_type(context, rhs);
+    if (!type_descriptor) {
+      goto err;
+    }
+
+    arg = allocator_allocate(context->allocator, Token_Match_Arg);
+    *arg = (Token_Match_Arg){name, type_descriptor};
+  } else {
+    panic("TODO literal types");
+  }
+
+  err:
   return arg;
 }
 
@@ -1458,37 +1512,6 @@ token_process_c_struct_definition(
 
   err:
   return 0;
-}
-
-bool
-token_maybe_split_on_operator(
-  Token_View view,
-  Slice operator,
-  Token_View *lhs,
-  Token_View *rhs,
-  const Token **operator_token
-) {
-  u64 lhs_end = 0;
-  u64 rhs_start = 0;
-  for (u64 i = 0; i < view.length; ++i) {
-    const Token *token = token_view_get(view, i);
-    if (token->tag == Token_Tag_Operator && slice_equal(token->source, operator)) {
-      *operator_token = token;
-      lhs_end = i;
-      rhs_start = i + 1;
-      break;
-    }
-  }
-
-  if (lhs_end == 0) {
-    *lhs = *rhs = (Token_View){0};
-    return false;
-  }
-
-  *lhs = (Token_View) { .tokens = view.tokens, .length = lhs_end };
-  *rhs = token_view_rest(view, rhs_start);
-
-  return true;
 }
 
 Token *
