@@ -2461,7 +2461,6 @@ token_handle_function_call(
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == match.score) {
-      // TODO add a test for this case
       program_error_builder(context, target_token->source_range) {
         // TODO improve error message
         program_error_append_literal("Could not decide which overload to pick");

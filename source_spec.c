@@ -866,5 +866,16 @@ spec("source") {
       );
       check(dyn_array_length(test_context.program->errors));
     }
+    it("should report an overload overlap") {
+      test_program_inline_source_base(
+        "overload :: (x : s64, y : s32) -> () { }\n"
+        "overload :: (x : s32, y : s64) -> () { }\n"
+        "test :: () -> () { overload(1, 2) }",
+        test
+      );
+      check(dyn_array_length(test_context.program->errors));
+      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(slice_equal(slice_literal("Could not decide which overload to pick"), error->message));
+    }
   }
 }
