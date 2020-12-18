@@ -773,8 +773,8 @@ scope_lookup_type(
   Token_Match(_id_, .tag = Token_Tag_Operator, .source = slice_literal(_op_))
 
 typedef struct {
-  Slice arg_name;
-  Descriptor *type_descriptor;
+  Slice name;
+  Value *value;
 } Token_Match_Arg;
 
 Descriptor *
@@ -1054,7 +1054,8 @@ token_maybe_split_on_operator(
 Token_Match_Arg *
 token_match_argument(
   Compilation_Context *context,
-  Token_View raw_view
+  Token_View raw_view,
+  Descriptor_Function *function
 ) {
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
@@ -1077,16 +1078,29 @@ token_match_argument(
       }
       goto err;
     }
-    Slice name = lhs.tokens[0]->source;
     Descriptor *type_descriptor = token_match_type(context, rhs);
     if (!type_descriptor) {
       goto err;
     }
 
     arg = allocator_allocate(context->allocator, Token_Match_Arg);
-    *arg = (Token_Match_Arg){name, type_descriptor};
+    *arg = (Token_Match_Arg){.name = lhs.tokens[0]->source};
+
+    if (type_descriptor == &descriptor_any) {
+      // TODO figure out what should happen here or not use any type for macros
+      arg->value = value_any(context->allocator);
+    } else {
+      arg->value = function_next_argument_value(
+        context->allocator, function, type_descriptor
+      );
+    }
   } else {
-    panic("TODO literal types");
+    Value *literal_value_type = token_parse_constant_expression(context, view, context->scope);
+    arg = allocator_allocate(context->allocator, Token_Match_Arg);
+    *arg = (Token_Match_Arg){
+      .name = {0},
+      .value = literal_value_type,
+    };
   }
 
   err:
@@ -1308,6 +1322,33 @@ token_match_call_arguments(
       // needed regardless for something like x := (...)
       Value *result_value = value_any(context->allocator);
       token_parse_expression(context, view, builder, result_value);
+      dyn_array_push(result, result_value);
+    }
+  }
+  return result;
+}
+
+// FIXME pass in the function definition
+Array_Value_Ptr
+token_match_constant_call_arguments(
+  Compilation_Context *context,
+  const Token *token
+) {
+  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
+  if (dyn_array_length(token->Group.children) != 0) {
+    Token_View children = token_view_from_token_array(token->Group.children);
+    Token_View_Split_Iterator it = { .view = children };
+
+    while (!it.done) {
+      Token_View view = token_split_next(&it, &token_pattern_comma_operator);
+      // TODO :TargetValue
+      // There is an interesting conundrum here that we need to know the types of the
+      // arguments for overload resolution, but then we need the exact function definition
+      // to know the result_value definition to do the evaluation. Proper solution would
+      // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
+      // target value that can be anything that will behave like type inference and is
+      // needed regardless for something like x := (...)
+      Value *result_value = token_parse_constant_expression(context, view, context->scope);
       dyn_array_push(result, result_value);
     }
   }
@@ -1667,26 +1708,23 @@ token_process_function_literal(
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Token_Match_Arg *arg = 0;
       WITH_SCOPE(context, function_scope) {
-        arg = token_match_argument(context, arg_view);
+        arg = token_match_argument(context, arg_view, &descriptor->Function);
       }
       if (!arg) return 0;
-      Value *arg_value;
-      if (arg->type_descriptor == &descriptor_any) {
-        // TODO figure out what should happen here or not use any type for macros
-        arg_value = value_any(context->allocator);
-        dyn_array_push(descriptor->Function.arguments, arg_value);
-      } else {
-        arg_value =
-          function_push_argument(context->allocator, &descriptor->Function, arg->type_descriptor);
-        if (!is_external && arg_value->operand.tag == Operand_Tag_Register) {
-          register_bitset_set(
-            &builder->code_block.register_occupied_bitset,
-            arg_value->operand.Register.index
-          );
-        }
+
+      // Literal values do not have a name ATM
+      if (arg->name.length) {
+        scope_define_value(function_scope, arg->name, arg->value);
       }
-      scope_define_value(function_scope, arg->arg_name, arg_value);
-      dyn_array_push(descriptor->Function.argument_names, arg->arg_name);
+      dyn_array_push(descriptor->Function.argument_names, arg->name);
+      dyn_array_push(descriptor->Function.arguments, arg->value);
+
+      if (!is_external && arg->value->operand.tag == Operand_Tag_Register) {
+        register_bitset_set(
+          &builder->code_block.register_occupied_bitset,
+          arg->value->operand.Register.index
+        );
+      }
     }
     assert(
       dyn_array_length(descriptor->Function.argument_names) ==
@@ -1748,11 +1786,12 @@ compile_time_eval(
   // result to have a consitent function signature on this C side of things.
 
   // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
-  Value *arg_value = function_push_argument(
+  Value *arg_value = function_next_argument_value(
     context->allocator,
     &eval_builder->value->descriptor->Function,
     descriptor_pointer_to(context->allocator, expression_result_value->descriptor)
   );
+  dyn_array_push(eval_builder->value->descriptor->Function.arguments, arg_value);
 
   // Create a reference Value
   assert(arg_value->operand.tag == Operand_Tag_Register);
@@ -1846,6 +1885,149 @@ typedef void (*Operator_Dispatch_Proc)(
   Slice operator
 );
 
+const Token *
+token_handle_cast(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Array_Value_Ptr args
+) {
+  Value *type = *dyn_array_get(args, 0);
+  Value *value = *dyn_array_get(args, 1);
+  assert(type->descriptor->tag == Descriptor_Tag_Type);
+
+  Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
+  assert(descriptor_is_integer(cast_to_descriptor));
+  assert(value->descriptor->tag == cast_to_descriptor->tag);
+
+  u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
+  u32 original_byte_size = descriptor_byte_size(value->descriptor);
+  Value *result = value;
+  if (cast_to_byte_size != original_byte_size) {
+    result = allocator_allocate(context->allocator, Value);
+
+    if (operand_is_immediate(&value->operand)) {
+      if (descriptor_is_signed_integer(cast_to_descriptor)) {
+        s64 integer = operand_immediate_as_s64(&value->operand);
+        switch(cast_to_byte_size) {
+          case 1: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_8,
+                .byte_size = cast_to_byte_size,
+                .Immediate_8 = (s8)integer,
+              },
+            };
+            break;
+          }
+          case 2: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_16,
+                .byte_size = cast_to_byte_size,
+                .Immediate_16 = (s16)integer,
+              },
+            };
+            break;
+          }
+          case 4: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_32,
+                .byte_size = cast_to_byte_size,
+                .Immediate_32 = (s32)integer,
+              },
+            };
+            break;
+          }
+          case 8: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_64,
+                .byte_size = cast_to_byte_size,
+                .Immediate_64 = (s64)integer,
+              },
+            };
+            break;
+          }
+          default: {
+            panic("Unsupported integer size when casting");
+            break;
+          }
+        }
+      } else {
+        u64 integer = (u64)operand_immediate_as_s64(&value->operand);
+        switch(cast_to_byte_size) {
+          case 1: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_8,
+                .byte_size = cast_to_byte_size,
+                .Immediate_8 = (u8)integer,
+              },
+            };
+            break;
+          }
+          case 2: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_16,
+                .byte_size = cast_to_byte_size,
+                .Immediate_16 = (u16)integer,
+              },
+            };
+            break;
+          }
+          case 4: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_32,
+                .byte_size = cast_to_byte_size,
+                .Immediate_32 = (u32)integer,
+              },
+            };
+            break;
+          }
+          case 8: {
+            *result = (Value) {
+              .descriptor = cast_to_descriptor,
+              .operand = {
+                .tag = Operand_Tag_Immediate_64,
+                .byte_size = cast_to_byte_size,
+                .Immediate_64 = (u64)integer,
+              },
+            };
+            break;
+          }
+          default: {
+            panic("Unsupported integer size when casting");
+            break;
+          }
+        }
+      }
+    } else if (cast_to_byte_size < original_byte_size) {
+      *result = (Value) {
+        .descriptor = cast_to_descriptor,
+        .operand = value->operand,
+      };
+      result->operand.byte_size = cast_to_byte_size;
+    } else if (cast_to_byte_size > original_byte_size) {
+      panic("Not implemented cast to a larger type");
+      //result = reserve_stack(context->allocator, builder, cast_to_descriptor);
+      //move_value(context->allocator, builder, source_range, result, value);
+    }
+  }
+  const Token *result_token = token_value_make(context, result, *source_range);
+
+  return result_token;
+}
+
 void
 token_dispatch_constant_operator(
   Compilation_Context *context,
@@ -1879,7 +2061,7 @@ token_dispatch_constant_operator(
     const Token *args = *dyn_array_pop(*token_stack);
     const Token *function = *dyn_array_pop(*token_stack);
 
-    Token *result;
+    const Token *result;
     // TODO turn `external` into a compile-time function call
     if (
       function->tag == Token_Tag_Id &&
@@ -1897,7 +2079,15 @@ token_dispatch_constant_operator(
       slice_equal(function->source, slice_literal("c_struct"))
     ) {
       result = token_process_c_struct_definition(context, view, args);
-    } else {
+    } else if (
+      function->tag == Token_Tag_Id &&
+      slice_equal(function->source, slice_literal("cast"))
+    ) {
+      // TODO turn `cast` into a compile-time function call / macro
+      Array_Value_Ptr arg_values = token_match_constant_call_arguments(context, args);
+      result = token_handle_cast(context, &args->source_range, arg_values);
+      dyn_array_destroy(arg_values);
+    }  else {
       Token_View call_view = {
         .tokens = (const Token *[]){function, args},
         .length = 2,
@@ -2270,10 +2460,19 @@ token_handle_function_call(
     Descriptor_Function *descriptor = &to_call->descriptor->Function;
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
-    if (score > match.score) {
-      // FIXME think about same scores
+    if (score == match.score) {
+      // TODO add a test for this case
+      program_error_builder(context, target_token->source_range) {
+        // TODO improve error message
+        program_error_append_literal("Could not decide which overload to pick");
+        // TODO provide names of matched overloads
+      }
+      return token_value_make(context, 0, target_token->source_range);
+    } else if (score > match.score) {
       match.value = to_call;
       match.score = score;
+    } else {
+      // Skip a worse match
     }
   }
 
@@ -2439,32 +2638,7 @@ token_dispatch_operator(
       slice_equal(target->source, slice_literal("cast"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
-      Value *type = *dyn_array_get(args, 0);
-      Value *value = *dyn_array_get(args, 1);
-      assert(type->descriptor->tag == Descriptor_Tag_Type);
-
-      Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
-      assert(descriptor_is_integer(cast_to_descriptor));
-      assert(value->descriptor->tag == cast_to_descriptor->tag);
-
-      u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
-      u32 original_byte_size = descriptor_byte_size(value->descriptor);
-      Value *result = value;
-      if (cast_to_byte_size != original_byte_size) {
-        result = allocator_allocate(context->allocator, Value);
-        if (cast_to_byte_size < original_byte_size) {
-          *result = (Value) {
-            .descriptor = cast_to_descriptor,
-            .operand = value->operand,
-          };
-          result->operand.byte_size = cast_to_byte_size;
-        } else if (cast_to_byte_size > original_byte_size) {
-          result = reserve_stack(context->allocator, builder, cast_to_descriptor);
-          move_value(context->allocator, builder, &args_token->source_range, result, value);
-        }
-      }
-      result_token = token_value_make(context, result, args_token->source_range);
-
+      result_token = token_handle_cast(context, &args_token->source_range, args);
       dyn_array_destroy(args);
     } else {
       result_token = token_handle_function_call(

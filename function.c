@@ -1162,15 +1162,25 @@ calculate_arguments_match_score(
   Array_Value_Ptr arguments
 ) {
   enum {
-    Score_Exact = 100000,
+    // TODO consider relationship between casts and literal types
+    Score_Exact_Literal = 1000000,
+    Score_Exact_Type = 1000,
     Score_Cast = 1,
   };
+  assert(dyn_array_length(arguments) < 1000);
   s64 score = 0;
   for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
     Value *source_arg = *dyn_array_get(arguments, arg_index);
     Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
     if (same_value_type(target_arg, source_arg)) {
-      score += Score_Exact;
+      if (
+        operand_is_immediate(&target_arg->operand) &&
+        operand_equal(&target_arg->operand, &source_arg->operand)
+      ) {
+        score += Score_Exact_Literal;
+      } else {
+        score += Score_Exact_Type;
+      }
     } else if(same_value_type_or_can_implicitly_move_cast(target_arg, source_arg)) {
       score += Score_Cast;
     } else {

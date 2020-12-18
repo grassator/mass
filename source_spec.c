@@ -390,6 +390,17 @@ spec("source") {
     check(checker() == 21);
   }
 
+  it("should be able to parse and run macro with a literal s64 type") {
+    test_program_inline_source(
+      "broken_plus :: macro (x : s64, cast(s64, 0)) -> (s64) { x + 1 }\n"
+      "broken_plus :: macro (x : s64, y : s64) -> (s64) { x + y }\n"
+      "test :: () -> (s64) { broken_plus(cast(s64, 41), cast(s64, 0)) }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
   xit("should allow changes to the passed arguments to macro function") {
     test_program_inline_source(
       "process :: macro (y : any) -> () { y = 42; }\n"

@@ -1043,7 +1043,7 @@ memory_range_equal_to_c_string(
 }
 
 Value *
-function_push_argument_internal(
+function_next_argument_value_internal(
   Compiler_Source_Location compiler_source_location,
   Allocator *allocator,
   Descriptor_Function *function,
@@ -1065,25 +1065,25 @@ function_push_argument_internal(
       Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm0, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_C, arg_descriptor);
-      return *dyn_array_push(function->arguments, value);
+      return value;
     }
     case 1: {
       Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm1, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_D, arg_descriptor);
-      return *dyn_array_push(function->arguments, value);
+      return value;
     }
     case 2: {
       Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm2, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R8, arg_descriptor);
-      return *dyn_array_push(function->arguments, value);
+      return value;
     }
     case 3: {
       Value *value = descriptor_is_float(arg_descriptor)
         ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm3, arg_descriptor)
         : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R9, arg_descriptor);
-      return *dyn_array_push(function->arguments, value);
+      return value;
     }
     default: {
       s32 offset = u64_to_s32(dyn_array_length(function->arguments) * 8);
@@ -1093,12 +1093,12 @@ function_push_argument_internal(
         .descriptor = arg_descriptor,
         .operand = operand,
       };
-      return *dyn_array_push(function->arguments, value);
+      return value;
     }
   }
 }
-#define function_push_argument(...)\
-  function_push_argument_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define function_next_argument_value(...)\
+  function_next_argument_value_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 Descriptor *
 parse_c_type(
@@ -1234,7 +1234,9 @@ c_function_descriptor(
           assert(*ch == ')');
           break;
         }
-        function_push_argument(allocator, &descriptor->Function, argument_descriptor);
+        Value *arg_value =
+          function_next_argument_value(allocator, &descriptor->Function, argument_descriptor);
+        dyn_array_push(descriptor->Function.arguments, arg_value);
         assert(argument_descriptor);
       }
       start = ch + 1;
