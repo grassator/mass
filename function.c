@@ -340,15 +340,19 @@ fn_end(
 
 u32
 make_trampoline(
-  Program *program,
+  Compilation_Context *context,
   Fixed_Buffer *buffer,
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.assembly = {mov, {rax, imm64(address)}}}
+    context->program, buffer,
+    &(Instruction) {.assembly = {mov, {rax, imm64(context->allocator, address)}}}
   );
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {jmp, {rax}}});
+  encode_instruction_with_compiler_location(
+    context->program, buffer,
+    &(Instruction) {.assembly = {jmp, {rax}}}
+  );
   return result;
 }
 
@@ -427,10 +431,11 @@ typedef struct {
 
 void
 fn_encode(
-  Program *program,
+  Compilation_Context *context,
   Fixed_Buffer *buffer,
   Function_Builder *builder
 ) {
+  Program *program = context->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand->tag == Operand_Tag_Label);
@@ -438,7 +443,7 @@ fn_encode(
 
   s64 code_base_rva = label->section->base_rva;
   builder->layout.begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
-  Operand stack_size_operand = imm_auto_8_or_32(builder->layout.stack_reserve);
+  Operand stack_size_operand = imm_auto_8_or_32(context->allocator, builder->layout.stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,
@@ -621,9 +626,15 @@ make_if(
     } else {
       u32 byte_size = descriptor_byte_size(value->descriptor);
       if (byte_size == 4 || byte_size == 8) {
-        push_instruction(instructions, source_range, (Instruction) {.assembly = {cmp, {value->operand, imm32(0), 0}}});
+        push_instruction(
+          instructions, source_range,
+          (Instruction) {.assembly = {cmp, {value->operand, imm32(context->allocator, 0), 0}}}
+        );
       } else if (byte_size == 1) {
-        push_instruction(instructions, source_range, (Instruction) {.assembly = {cmp, {value->operand, imm8(0), 0}}});
+        push_instruction(
+          instructions, source_range,
+          (Instruction) {.assembly = {cmp, {value->operand, imm8(context->allocator, 0), 0}}}
+        );
       } else {
         assert(!"Unsupported value inside `if`");
       }
@@ -1205,7 +1216,7 @@ make_and(
 
   Value zero = {
     .descriptor = &descriptor_s8,
-    .operand = imm8(0),
+    .operand = imm8(context->allocator, 0),
   };
 
   Label_Index else_label = make_if(context, instructions, source_range, a);
@@ -1241,7 +1252,7 @@ make_or(
 
   Value zero = {
     .descriptor = &descriptor_s8,
-    .operand = imm8(0),
+    .operand = imm8(context->allocator, 0),
   };
 
   compare(context->allocator, Compare_Type_Equal, builder, source_range, result, a, &zero);
@@ -1257,7 +1268,7 @@ make_or(
 
   Value one = {
     .descriptor = &descriptor_s8,
-    .operand = imm8(1),
+    .operand = imm8(context->allocator, 1),
   };
   move_value(context->allocator, builder, source_range, result, &one);
   push_instruction(instructions, source_range, (Instruction) {

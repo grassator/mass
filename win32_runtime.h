@@ -215,11 +215,11 @@ win32_program_jit(
 
   s8 *code_memory = result_buffer->memory + result_buffer->occupied;
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
-  u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
+  u32 trampoline_virtual_address = make_trampoline(context, result_buffer, trampoline_target);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(program, result_buffer, builder);
+    fn_encode(context, result_buffer, builder);
   }
 
   for (u64 i = 0; i < function_count; ++i) {

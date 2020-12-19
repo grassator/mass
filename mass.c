@@ -122,7 +122,7 @@ int main(s32 argc, char **argv) {
         allocator_default,
         fixed_buffer_as_slice(path_buffer)
       );
-      write_executable(exe_path_wide, context.program, win32_executable_type);
+      write_executable(exe_path_wide, &context, win32_executable_type);
       bucket_buffer_destroy(path_builder);
       break;
     }

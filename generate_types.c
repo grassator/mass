@@ -386,17 +386,8 @@ main(void) {
     struct_fields("Xmm", (Struct_Item[]){
       { "Register", "index" },
     }),
-    struct_fields("Immediate_8", (Struct_Item[]){
-      { "s8", "value" },
-    }),
-    struct_fields("Immediate_16", (Struct_Item[]){
-      { "s16", "value" },
-    }),
-    struct_fields("Immediate_32", (Struct_Item[]){
-      { "s32", "value" },
-    }),
-    struct_fields("Immediate_64", (Struct_Item[]){
-      { "s64", "value" },
+    struct_fields("Immediate", (Struct_Item[]){
+      { "void *", "memory" },
     }),
     struct_fields("Memory_Indirect", (Struct_Item[]){
       { "Register", "reg" },
@@ -412,6 +403,7 @@ main(void) {
       { "Label_Index", "index" },
     }),
   }), (Struct_Item[]){
+    // TODO change to bit_size
     { "u32", "byte_size" },
   }));
 

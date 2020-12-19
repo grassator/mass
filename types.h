@@ -212,13 +212,10 @@ typedef enum {
   Operand_Tag_Eflags = 2,
   Operand_Tag_Register = 3,
   Operand_Tag_Xmm = 4,
-  Operand_Tag_Immediate_8 = 5,
-  Operand_Tag_Immediate_16 = 6,
-  Operand_Tag_Immediate_32 = 7,
-  Operand_Tag_Immediate_64 = 8,
-  Operand_Tag_Memory_Indirect = 9,
-  Operand_Tag_Sib = 10,
-  Operand_Tag_Label = 11,
+  Operand_Tag_Immediate = 5,
+  Operand_Tag_Memory_Indirect = 6,
+  Operand_Tag_Sib = 7,
+  Operand_Tag_Label = 8,
 } Operand_Tag;
 
 typedef struct {
@@ -231,17 +228,8 @@ typedef struct {
   Register index;
 } Operand_Xmm;
 typedef struct {
-  s8 value;
-} Operand_Immediate_8;
-typedef struct {
-  s16 value;
-} Operand_Immediate_16;
-typedef struct {
-  s32 value;
-} Operand_Immediate_32;
-typedef struct {
-  s64 value;
-} Operand_Immediate_64;
+  void * memory;
+} Operand_Immediate;
 typedef struct {
   Register reg;
   s32 displacement;
@@ -262,10 +250,7 @@ typedef struct Operand {
     Operand_Eflags Eflags;
     Operand_Register Register;
     Operand_Xmm Xmm;
-    Operand_Immediate_8 Immediate_8;
-    Operand_Immediate_16 Immediate_16;
-    Operand_Immediate_32 Immediate_32;
-    Operand_Immediate_64 Immediate_64;
+    Operand_Immediate Immediate;
     Operand_Memory_Indirect Memory_Indirect;
     Operand_Sib Sib;
     Operand_Label Label;

@@ -210,10 +210,11 @@ typedef struct {
 
 Encoded_Text_Section
 encode_text_section(
-  Program *program,
+  Compilation_Context *context,
   IMAGE_SECTION_HEADER *header,
   Encoded_Rdata_Section *encoded_rdata_section
 ) {
+  Program *program = context->program;
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
 
@@ -232,7 +233,7 @@ encode_text_section(
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
-    fn_encode(program, result.buffer, builder);
+    fn_encode(context, result.buffer, builder);
   }
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
@@ -286,9 +287,10 @@ typedef enum {
 void
 write_executable(
   wchar_t *file_path,
-  Program *program,
+  Compilation_Context *context,
   Executable_Type executable_type
 ) {
+  Program *program = context->program;
   assert(program->entry_point);
   // Sections
   IMAGE_SECTION_HEADER sections[] = {
@@ -342,7 +344,7 @@ write_executable(
     rdata_section_header->VirtualAddress +
     s32_align(rdata_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
   Encoded_Text_Section encoded_text_section = encode_text_section(
-    program, text_section_header, &encoded_rdata_section
+    context, text_section_header, &encoded_rdata_section
   );
   Fixed_Buffer *text_section_buffer = encoded_text_section.buffer;
 

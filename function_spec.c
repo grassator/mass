@@ -227,7 +227,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, reg_a->operand, imm8(42)}}
+        instruction, &(Instruction){.assembly = {mov, reg_a->operand, imm8(temp_allocator, 42)}}
       ));
     }
     it("should move `a` to result and add `b` to it when result is neither `a` or `b`") {
@@ -316,7 +316,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, reg_a->operand, imm8(42)}}
+        instruction, &(Instruction){.assembly = {mov, reg_a->operand, imm8(temp_allocator, 42)}}
       ));
     }
     it("should move `a` to result and sub `b` from it when result is neither `a` or `b`") {

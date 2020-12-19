@@ -193,6 +193,56 @@ source_range_print_start_position(
   printf(":(%llu:%llu)\n", from_position.line, from_position.column);
 }
 
+#define OPERAND_IMMEDIATE_CAST(_TYPE_)\
+  static inline _TYPE_\
+  operand_immediate_memory_as_##_TYPE_(\
+    const Operand *operand\
+  ) {\
+    assert(operand->byte_size == sizeof(_TYPE_));\
+    return *((_TYPE_ *)operand->Immediate.memory);\
+  }
+
+OPERAND_IMMEDIATE_CAST(u8)
+OPERAND_IMMEDIATE_CAST(s8)
+OPERAND_IMMEDIATE_CAST(u16)
+OPERAND_IMMEDIATE_CAST(s16)
+OPERAND_IMMEDIATE_CAST(u32)
+OPERAND_IMMEDIATE_CAST(s32)
+OPERAND_IMMEDIATE_CAST(u64)
+OPERAND_IMMEDIATE_CAST(s64)
+
+s64
+operand_immediate_as_s64(
+  const Operand *operand
+) {
+  switch(operand->byte_size) {
+    case 1: return operand_immediate_memory_as_s8(operand);
+    case 2: return operand_immediate_memory_as_s16(operand);
+    case 4: return operand_immediate_memory_as_s32(operand);
+    case 8: return operand_immediate_memory_as_s64(operand);
+    default: {
+      panic("Unsupported integer immediate size");
+      return 0;
+    }
+  }
+}
+
+u64
+operand_immediate_as_u64(
+  const Operand *operand
+) {
+  switch(operand->byte_size) {
+    case 1: return operand_immediate_memory_as_u8(operand);
+    case 2: return operand_immediate_memory_as_u16(operand);
+    case 4: return operand_immediate_memory_as_u32(operand);
+    case 8: return operand_immediate_memory_as_u64(operand);
+    default: {
+      panic("Unsupported integer immediate size");
+      return 0;
+    }
+  }
+}
+
 void
 print_operand(
   const Operand *operand
@@ -220,20 +270,29 @@ print_operand(
       printf("xmm%d", bits);
       break;
     }
-    case Operand_Tag_Immediate_8: {
-      printf("imm8(0x%02x)", operand->Immediate_8.value);
-      break;
-    }
-    case Operand_Tag_Immediate_16: {
-      printf("imm16(0x%04x)", operand->Immediate_16.value);
-      break;
-    }
-    case Operand_Tag_Immediate_32: {
-      printf("imm32(0x%08x)", operand->Immediate_32.value);
-      break;
-    }
-    case Operand_Tag_Immediate_64: {
-      printf("imm64(0x%016llx)", operand->Immediate_64.value);
+    case Operand_Tag_Immediate: {
+      switch(operand->byte_size) {
+        case 1: {
+          printf("imm8(0x%02x)", operand_immediate_memory_as_u8(operand));
+          break;
+        }
+        case 2: {
+          printf("imm16(0x%04x)", operand_immediate_memory_as_u16(operand));
+          break;
+        }
+        case 4: {
+          printf("imm32(0x%08x)", operand_immediate_memory_as_u32(operand));
+          break;
+        }
+        case 8: {
+          printf("imm64(0x%016llx)", operand_immediate_memory_as_u64(operand));
+          break;
+        }
+        default: {
+          panic("Unsupported immediate size when printing");
+          break;
+        }
+      }
       break;
     }
     case Operand_Tag_Sib:
@@ -342,57 +401,70 @@ label32(
 
 inline Operand
 imm8(
-  s8 value
+  const Allocator *allocator,
+  u8 value
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Immediate_8,
-    .byte_size = 1,
-    .Immediate_8.value = value
+  return (Operand) {
+    .tag = Operand_Tag_Immediate,
+    .byte_size = sizeof(value),
+    .Immediate.memory = memcpy(
+      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
+    ),
   };
 }
 
 inline Operand
 imm16(
-  s16 value
+  const Allocator *allocator,
+  u16 value
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Immediate_16,
-    .byte_size = 2,
-    .Immediate_16.value = value
+  return (Operand) {
+    .tag = Operand_Tag_Immediate,
+    .byte_size = sizeof(value),
+    .Immediate.memory = memcpy(
+      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
+    ),
   };
 }
 
 inline Operand
 imm32(
-  s32 value
+  const Allocator *allocator,
+  u32 value
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Immediate_32,
-    .byte_size = 4,
-    .Immediate_32.value = value
+  return (Operand) {
+    .tag = Operand_Tag_Immediate,
+    .byte_size = sizeof(value),
+    .Immediate.memory = memcpy(
+      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
+    ),
   };
 }
 
 inline Operand
 imm64(
-  s64 value
+  const Allocator *allocator,
+  u64 value
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Immediate_64,
-    .byte_size = 8,
-    .Immediate_64.value = value
+  return (Operand) {
+    .tag = Operand_Tag_Immediate,
+    .byte_size = sizeof(value),
+    .Immediate.memory = memcpy(
+      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
+    ),
   };
 }
 
 inline Operand
 imm_auto_8_or_32(
+  const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return imm8((s8) value);
+    return imm8(allocator, (s8) value);
   }
   if (s64_fits_into_s32(value)) {
-    return imm32((s32) value);
+    return imm32(allocator, (s32) value);
   }
   panic("Operand is does not fit into either s8 or s32");
   return (Operand){0};
@@ -400,18 +472,19 @@ imm_auto_8_or_32(
 
 inline Operand
 imm_auto(
+  const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return imm8((s8) value);
+    return imm8(allocator, (s8) value);
   }
   if (s64_fits_into_s16(value)) {
-    return imm16((s16) value);
+    return imm16(allocator, (s16) value);
   }
   if (s64_fits_into_s32(value)) {
-    return imm32((s32) value);
+    return imm32(allocator, (s32) value);
   }
-  return imm64(value);
+  return imm64(allocator, value);
 }
 
 inline Operand
@@ -491,18 +564,6 @@ register_bitset_get(
   return !!(bitset & (1llu << reg));
 }
 
-s64
-operand_immediate_as_s64(
-  Operand *operand
-) {
-  if (operand->tag == Operand_Tag_Immediate_8) return operand->Immediate_8.value;
-  if (operand->tag == Operand_Tag_Immediate_16) return operand->Immediate_16.value;
-  if (operand->tag == Operand_Tag_Immediate_32) return operand->Immediate_32.value;
-  if (operand->tag == Operand_Tag_Immediate_64) return operand->Immediate_64.value;
-  assert(!"Expected and immediate operand");
-  return 0;
-}
-
 static inline bool
 operand_is_memory(
   Operand *operand
@@ -521,15 +582,11 @@ operand_is_register_or_memory(
   return operand->tag == Operand_Tag_Register || operand_is_memory(operand);
 }
 
-bool
+static inline bool
 operand_is_immediate(
   Operand *operand
 ) {
-  if (operand->tag == Operand_Tag_Immediate_8) return true;
-  if (operand->tag == Operand_Tag_Immediate_16) return true;
-  if (operand->tag == Operand_Tag_Immediate_32) return true;
-  if (operand->tag == Operand_Tag_Immediate_64) return true;
-  return false;
+  return operand->tag == Operand_Tag_Immediate;
 }
 
 static inline bool
@@ -543,17 +600,8 @@ operand_equal(
     case Operand_Tag_Eflags: {
       return a->Eflags.compare_type == b->Eflags.compare_type;
     }
-    case Operand_Tag_Immediate_8: {
-      return a->Immediate_8.value == b->Immediate_8.value;
-    }
-    case Operand_Tag_Immediate_16: {
-      return a->Immediate_16.value == b->Immediate_16.value;
-    }
-    case Operand_Tag_Immediate_32: {
-      return a->Immediate_32.value == b->Immediate_32.value;
-    }
-    case Operand_Tag_Immediate_64: {
-      return a->Immediate_64.value == b->Immediate_64.value;
+    case Operand_Tag_Immediate: {
+      return !memcmp(a->Immediate.memory, b->Immediate.memory, a->byte_size);
     }
     case Operand_Tag_Label: {
       // TODO figure out if need some other way to compare labels
@@ -723,7 +771,7 @@ value_from_s64_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_s64,
-    .operand = imm64(integer),
+    .operand = imm64(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -739,7 +787,7 @@ value_from_s32_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (const Value) {
     .descriptor = &descriptor_s32,
-    .operand = imm32(integer),
+    .operand = imm32(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -756,7 +804,7 @@ value_from_s16_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (const Value) {
     .descriptor = &descriptor_s16,
-    .operand = imm16(integer),
+    .operand = imm16(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -773,7 +821,7 @@ value_from_s8_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (const Value) {
     .descriptor = &descriptor_s8,
-    .operand = imm8(integer),
+    .operand = imm8(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -792,11 +840,7 @@ value_from_u64_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_u64,
-    .operand = {
-      .tag = Operand_Tag_Immediate_64,
-      .byte_size = 8,
-      .Immediate_64.value = integer,
-    },
+    .operand = imm64(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -812,11 +856,7 @@ value_from_u32_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_u32,
-    .operand = {
-      .tag = Operand_Tag_Immediate_32,
-      .byte_size = 4,
-      .Immediate_32.value = integer,
-    },
+    .operand = imm32(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -832,11 +872,7 @@ value_from_u16_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_u16,
-    .operand = {
-      .tag = Operand_Tag_Immediate_16,
-      .byte_size = 2,
-      .Immediate_16.value = integer,
-    },
+    .operand = imm16(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -852,11 +888,7 @@ value_from_u8_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = &descriptor_u8,
-    .operand = {
-      .tag = Operand_Tag_Immediate_8,
-      .byte_size = 1,
-      .Immediate_8.value = integer,
-    },
+    .operand = imm8(allocator, integer),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -1255,7 +1287,7 @@ c_function_value(
   Value *result = allocator_allocate(allocator, Value);
   *result = (const Value) {
     .descriptor = c_function_descriptor(allocator, forward_declaration),
-    .operand = imm64((s64) fn),
+    .operand = imm64(allocator, (u64) fn),
   };
   return result;
 }

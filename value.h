@@ -88,6 +88,13 @@ MASS_ENUMERATE_BUILT_IN_TYPES
 Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Void,
 };
+
+Value void_value = {
+  .descriptor = &descriptor_void,
+  .operand = { .tag = Operand_Tag_None },
+  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
+};
+
 Descriptor descriptor_any = {
   .tag = Descriptor_Tag_Any,
 };
@@ -138,12 +145,6 @@ descriptor_is_float(
 ) {
   return descriptor == &descriptor_f32 || descriptor == &descriptor_f64;
 }
-
-Value void_value = {
-  .descriptor = &descriptor_void,
-  .operand = { .tag = Operand_Tag_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
 
 u32
 descriptor_byte_size(

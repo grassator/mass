@@ -229,14 +229,12 @@ encode_instruction_assembly(
           .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
-    } else if (operand->tag == Operand_Tag_Immediate_8) {
-      fixed_buffer_append_s8(buffer, operand->Immediate_8.value);
-    } else if (operand->tag == Operand_Tag_Immediate_16) {
-      fixed_buffer_append_s16(buffer, operand->Immediate_16.value);
-    } else if (operand->tag == Operand_Tag_Immediate_32) {
-      fixed_buffer_append_s32(buffer, operand->Immediate_32.value);
-    } else if (operand->tag == Operand_Tag_Immediate_64) {
-      fixed_buffer_append_s64(buffer, operand->Immediate_64.value);
+    } else if (operand->tag == Operand_Tag_Immediate) {
+      Slice slice = {
+        .bytes = operand->Immediate.memory,
+        .length = operand->byte_size,
+      };
+      fixed_buffer_append_slice(buffer, slice);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }

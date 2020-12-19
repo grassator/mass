@@ -638,8 +638,9 @@ spec("source") {
     );
     check(status);
     check(descriptor_is_integer(status->descriptor));
-    check(status->operand.tag == Operand_Tag_Immediate_8);
-    check(status->operand.Immediate_8.value == 42);
+    check(status->operand.tag == Operand_Tag_Immediate);
+    check(status->operand.byte_size == 1);
+    check(operand_immediate_memory_as_s8(&status->operand) == 42);
   }
 
   it("should be able to execute arbitrary expression at compile time") {
@@ -654,8 +655,9 @@ spec("source") {
     );
     check(status);
     check(descriptor_is_integer(status->descriptor));
-    check(status->operand.tag == Operand_Tag_Immediate_8);
-    check(status->operand.Immediate_8.value == 42);
+    check(status->operand.tag == Operand_Tag_Immediate);
+    check(status->operand.byte_size == 1);
+    check(operand_immediate_memory_as_s8(&status->operand) == 42);
   }
 
   it("should be able to return structs while accepting other arguments") {
@@ -740,7 +742,7 @@ spec("source") {
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\test_parsed.exe", test_context.program, Executable_Type_Cli);
+    write_executable(L"build\\test_parsed.exe", &test_context, Executable_Type_Cli);
   }
 
   it("should parse and write an executable that prints Hello, world!") {
@@ -751,7 +753,7 @@ spec("source") {
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\hello_world.exe", test_context.program, Executable_Type_Cli);
+    write_executable(L"build\\hello_world.exe", &test_context, Executable_Type_Cli);
   }
 
   it("should be able to run fibonnacii") {

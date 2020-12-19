@@ -1841,30 +1841,37 @@ compile_time_eval(
       break;
     };
     case Descriptor_Tag_Opaque: {
-      if (descriptor_is_integer(out_value->descriptor)) {
-        switch (result_byte_size) {
-          case 8: {
-            token_value->operand = imm64(*(s64 *)result);
-            break;
-          }
-          case 4: {
-            token_value->operand = imm32(*(s32 *)result);
-            break;
-          }
-          case 2: {
-            token_value->operand = imm16(*(s16 *)result);
-            break;
-          }
-          case 1: {
-            token_value->operand = imm8(*(s8 *)result);
-            break;
-          }
-          default: {
-            panic("Unsupported immediate size");
-            break;
-          }
-        }
-      }
+      token_value->operand = (Operand){
+        .tag = Operand_Tag_Immediate,
+        .byte_size = result_byte_size,
+        .Immediate = {
+          .memory = result,
+        },
+      };
+      //if (descriptor_is_integer(out_value->descriptor)) {
+        //switch (result_byte_size) {
+          //case 8: {
+            //token_value->operand = imm64(*(s64 *)result);
+            //break;
+          //}
+          //case 4: {
+            //token_value->operand = imm32(*(s32 *)result);
+            //break;
+          //}
+          //case 2: {
+            //token_value->operand = imm16(*(s16 *)result);
+            //break;
+          //}
+          //case 1: {
+            //token_value->operand = imm8(*(s8 *)result);
+            //break;
+          //}
+          //default: {
+            //panic("Unsupported immediate size");
+            //break;
+          //}
+        //}
+      //}
       break;
     }
     case Descriptor_Tag_Function:
@@ -1912,44 +1919,28 @@ token_handle_cast(
           case 1: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_8,
-                .byte_size = cast_to_byte_size,
-                .Immediate_8 = (s8)integer,
-              },
+              .operand = imm8(context->allocator, (s8)integer),
             };
             break;
           }
           case 2: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_16,
-                .byte_size = cast_to_byte_size,
-                .Immediate_16 = (s16)integer,
-              },
+              .operand = imm16(context->allocator, (s16)integer),
             };
             break;
           }
           case 4: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_32,
-                .byte_size = cast_to_byte_size,
-                .Immediate_32 = (s32)integer,
-              },
+              .operand = imm32(context->allocator, (s32)integer),
             };
             break;
           }
           case 8: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_64,
-                .byte_size = cast_to_byte_size,
-                .Immediate_64 = (s64)integer,
-              },
+              .operand = imm64(context->allocator, (s64)integer),
             };
             break;
           }
@@ -1964,44 +1955,28 @@ token_handle_cast(
           case 1: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_8,
-                .byte_size = cast_to_byte_size,
-                .Immediate_8 = (u8)integer,
-              },
+              .operand = imm8(context->allocator, (u8)integer),
             };
             break;
           }
           case 2: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_16,
-                .byte_size = cast_to_byte_size,
-                .Immediate_16 = (u16)integer,
-              },
+              .operand = imm16(context->allocator, (u16)integer),
             };
             break;
           }
           case 4: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_32,
-                .byte_size = cast_to_byte_size,
-                .Immediate_32 = (u32)integer,
-              },
+              .operand = imm32(context->allocator, (u32)integer),
             };
             break;
           }
           case 8: {
             *result = (Value) {
               .descriptor = cast_to_descriptor,
-              .operand = {
-                .tag = Operand_Tag_Immediate_64,
-                .byte_size = cast_to_byte_size,
-                .Immediate_64 = (u64)integer,
-              },
+              .operand = imm64(context->allocator, (u64)integer),
             };
             break;
           }
@@ -2028,6 +2003,42 @@ token_handle_cast(
   return result_token;
 }
 
+const Token *
+token_handle_negation(
+  Compilation_Context *context,
+  const Token *token
+) {
+  Value *value = token_force_constant_value(context, context->scope, token);
+  if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
+    switch(value->operand.byte_size) {
+      case 1: {
+        value->operand = imm8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
+        break;
+      }
+      case 2: {
+        value->operand = imm16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
+        break;
+      }
+      case 4: {
+        value->operand = imm32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
+        break;
+      }
+      case 8: {
+        value->operand = imm64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
+        break;
+      }
+      default: {
+        panic("Internal error, unexpected integer immediate size");
+        break;
+      }
+    }
+  } else {
+    panic("TODO");
+  }
+  Token *new_token = token_value_make(context, value, token->source_range);
+  return new_token;
+}
+
 void
 token_dispatch_constant_operator(
   Compilation_Context *context,
@@ -2039,23 +2050,7 @@ token_dispatch_constant_operator(
 ) {
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
-    Value *value = token_force_constant_value(context, context->scope, token);
-    if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
-      if (value->operand.tag == Operand_Tag_Immediate_8) {
-        value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_16) {
-        value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_32) {
-        value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_64) {
-        value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
-      } else {
-        panic("Internal error, expected an immediate");
-      }
-    } else {
-      panic("TODO");
-    }
-    Token *new_token = token_value_make(context, value, token->source_range);
+    const Token *new_token = token_handle_negation(context, token);
     dyn_array_push(*token_stack, new_token);
   } else if (slice_equal(operator, slice_literal("()"))) {
     const Token *args = *dyn_array_pop(*token_stack);
@@ -2547,23 +2542,7 @@ token_dispatch_operator(
   const Token *result_token;
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
-    Value *value = token_force_constant_value(context, context->scope, token);
-    if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
-      if (value->operand.tag == Operand_Tag_Immediate_8) {
-        value->operand.Immediate_8.value = -value->operand.Immediate_8.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_16) {
-        value->operand.Immediate_16.value = -value->operand.Immediate_16.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_32) {
-        value->operand.Immediate_32.value = -value->operand.Immediate_32.value;
-      } else if (value->operand.tag == Operand_Tag_Immediate_64) {
-        value->operand.Immediate_64.value = -value->operand.Immediate_64.value;
-      } else {
-        panic("Internal error, expected an immediate");
-      }
-    } else {
-      panic("TODO");
-    }
-    result_token = token_value_make(context, value, token->source_range);
+    result_token = token_handle_negation(context, token);
   } else if (slice_equal(operator, slice_literal("[]"))) {
     const Token *brackets = *dyn_array_pop(*token_stack);
     const Token *target_token = *dyn_array_pop(*token_stack);
@@ -2743,7 +2722,7 @@ token_dispatch_operator(
       ) {
         switch(lhs_value->operand.byte_size) {
           case 1: {
-            if (u8_fits_into_s8((u8)rhs_value->operand.Immediate_8.value)) {
+            if (u64_fits_into_s8(operand_immediate_as_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s8;
@@ -2754,7 +2733,7 @@ token_dispatch_operator(
             break;
           }
           case 2: {
-            if (u16_fits_into_s16((u16)rhs_value->operand.Immediate_16.value)) {
+            if (u64_fits_into_s16(operand_immediate_as_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s16;
@@ -2765,7 +2744,7 @@ token_dispatch_operator(
             break;
           }
           case 4: {
-            if (u32_fits_into_s32((u32)rhs_value->operand.Immediate_32.value)) {
+            if (u64_fits_into_s32(operand_immediate_as_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s32;
@@ -2776,7 +2755,7 @@ token_dispatch_operator(
             break;
           }
           case 8: {
-            if (u64_fits_into_s64((u64)rhs_value->operand.Immediate_64.value)) {
+            if (u64_fits_into_s64(operand_immediate_as_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s64;

@@ -51,7 +51,7 @@ instruction_add_source_location_internal(
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 u32
 make_trampoline(
-  Program *program,
+  Compilation_Context *context,
   Fixed_Buffer *buffer,
   s64 address
 );
@@ -67,7 +67,7 @@ move_value(
 
 void
 fn_encode(
-  Program *program,
+  Compilation_Context *context,
   Fixed_Buffer *buffer,
   Function_Builder *builder
 );
