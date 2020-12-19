@@ -167,7 +167,7 @@ move_value(
   }
 
   if (operand_is_immediate(&source->operand)) {
-    s64 immediate = operand_immediate_as_s64(&source->operand);
+    s64 immediate = operand_immediate_value_up_to_s64(&source->operand);
     if (immediate == 0 && target->operand.tag == Operand_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_instruction(instructions, source_range, (Instruction) {.assembly = {xor, {target->operand, target->operand}}});
@@ -569,7 +569,7 @@ make_if(
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->code_section);
   if(operand_is_immediate(&value->operand)) {
-    s64 imm = operand_immediate_as_s64(&value->operand);
+    s64 imm = operand_immediate_value_up_to_s64(&value->operand);
     if (imm == 0) return label;
     is_always_true = true;
   }
@@ -666,8 +666,8 @@ typedef enum {
     Operand *a_operand = &(_a_)->operand;\
     Operand *b_operand = &(_b_)->operand;\
     if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {\
-      s64 a_s64 = operand_immediate_as_s64(a_operand);\
-      s64 b_s64 = operand_immediate_as_s64(b_operand);\
+      s64 a_s64 = operand_immediate_value_up_to_s64(a_operand);\
+      s64 b_s64 = operand_immediate_value_up_to_s64(b_operand);\
       move_value(\
         allocator, (_builder_), (_loc_), (_result_),\
         value_from_signed_immediate(allocator, a_s64 _operator_ b_s64)\
@@ -698,8 +698,8 @@ plus_or_minus(
   assert(is_pointer_arithmetic || both_operands_are_integers);
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&b->operand)) {
-    s64 a_s64 = operand_immediate_as_s64(&a->operand);
-    s64 b_s64 = operand_immediate_as_s64(&b->operand);
+    s64 a_s64 = operand_immediate_value_up_to_s64(&a->operand);
+    s64 b_s64 = operand_immediate_value_up_to_s64(&b->operand);
     s64 folded = 0;
     switch(operation) {
       case Arithmetic_Operation_Plus: folded = a_s64 + b_s64; break;
@@ -855,8 +855,8 @@ divide_or_remainder(
   assert(descriptor_is_integer(a->descriptor));
 
   if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
-    s64 divident = operand_immediate_as_s64(&a->operand);
-    s64 divisor = operand_immediate_as_s64(&b->operand);
+    s64 divident = operand_immediate_value_up_to_s64(&a->operand);
+    s64 divisor = operand_immediate_value_up_to_s64(&b->operand);
     assert(divisor != 0);
     s64 folded = 0;
     switch(operation) {

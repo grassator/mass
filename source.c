@@ -1469,7 +1469,7 @@ token_process_bit_type_definition(
     // TODO err
     goto err;
   }
-  u64 bit_size = s64_to_u64(operand_immediate_as_s64(&bit_size_value->operand));
+  u64 bit_size = s64_to_u64(operand_immediate_value_up_to_s64(&bit_size_value->operand));
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Opaque,
@@ -1848,30 +1848,6 @@ compile_time_eval(
           .memory = result,
         },
       };
-      //if (descriptor_is_integer(out_value->descriptor)) {
-        //switch (result_byte_size) {
-          //case 8: {
-            //token_value->operand = imm64(*(s64 *)result);
-            //break;
-          //}
-          //case 4: {
-            //token_value->operand = imm32(*(s32 *)result);
-            //break;
-          //}
-          //case 2: {
-            //token_value->operand = imm16(*(s16 *)result);
-            //break;
-          //}
-          //case 1: {
-            //token_value->operand = imm8(*(s8 *)result);
-            //break;
-          //}
-          //default: {
-            //panic("Unsupported immediate size");
-            //break;
-          //}
-        //}
-      //}
       break;
     }
     case Descriptor_Tag_Function:
@@ -1914,7 +1890,7 @@ token_handle_cast(
 
     if (operand_is_immediate(&value->operand)) {
       if (descriptor_is_signed_integer(cast_to_descriptor)) {
-        s64 integer = operand_immediate_as_s64(&value->operand);
+        s64 integer = operand_immediate_value_up_to_s64(&value->operand);
         switch(cast_to_byte_size) {
           case 1: {
             *result = (Value) {
@@ -1950,7 +1926,7 @@ token_handle_cast(
           }
         }
       } else {
-        u64 integer = (u64)operand_immediate_as_s64(&value->operand);
+        u64 integer = operand_immediate_value_up_to_u64(&value->operand);
         switch(cast_to_byte_size) {
           case 1: {
             *result = (Value) {
@@ -2560,7 +2536,7 @@ token_dispatch_operator(
 
     Value *result = allocator_allocate(context->allocator, Value);
     if (operand_is_immediate(&index_value->operand)) {
-      s32 index = s64_to_s32(operand_immediate_as_s64(&index_value->operand));
+      s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
       *result = (Value){
         .descriptor = item_descriptor,
         .operand = {
@@ -2722,7 +2698,7 @@ token_dispatch_operator(
       ) {
         switch(lhs_value->operand.byte_size) {
           case 1: {
-            if (u64_fits_into_s8(operand_immediate_as_u64(&rhs_value->operand))) {
+            if (u64_fits_into_s8(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s8;
@@ -2733,7 +2709,7 @@ token_dispatch_operator(
             break;
           }
           case 2: {
-            if (u64_fits_into_s16(operand_immediate_as_u64(&rhs_value->operand))) {
+            if (u64_fits_into_s16(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s16;
@@ -2744,7 +2720,7 @@ token_dispatch_operator(
             break;
           }
           case 4: {
-            if (u64_fits_into_s32(operand_immediate_as_u64(&rhs_value->operand))) {
+            if (u64_fits_into_s32(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s32;
@@ -2755,7 +2731,7 @@ token_dispatch_operator(
             break;
           }
           case 8: {
-            if (u64_fits_into_s64(operand_immediate_as_u64(&rhs_value->operand))) {
+            if (u64_fits_into_s64(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
               Value *adjusted = allocator_allocate(context->allocator, Value);
               *adjusted = *rhs_value;
               adjusted->descriptor = &descriptor_s64;
@@ -3244,7 +3220,7 @@ token_match_fixed_array_type(
     );
     return 0;
   }
-  u32 length = s64_to_u32(operand_immediate_as_s64(&size_value->operand));
+  u32 length = s64_to_u32(operand_immediate_value_up_to_s64(&size_value->operand));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -3310,7 +3286,7 @@ token_parse_inline_machine_code_bytes(
         }
         goto err;
       }
-      s64 byte = operand_immediate_as_s64(&value->operand);
+      s64 byte = operand_immediate_value_up_to_s64(&value->operand);
       if (!u64_fits_into_u8(byte)) {
         program_error_builder(context, args_token->source_range) {
           program_error_append_literal("Expected integer between 0 and 255, got ");
@@ -3396,7 +3372,7 @@ token_parse_definition_and_assignment_statements(
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
-    value = value_from_s64(context->allocator, operand_immediate_as_s64(&value->operand));
+    value = value_from_s64(context->allocator, operand_immediate_value_up_to_s64(&value->operand));
   } else if (
     value->descriptor->tag == Descriptor_Tag_Opaque &&
     operand_is_immediate(&value->operand)

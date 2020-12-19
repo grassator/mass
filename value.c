@@ -212,7 +212,7 @@ OPERAND_IMMEDIATE_CAST(u64)
 OPERAND_IMMEDIATE_CAST(s64)
 
 s64
-operand_immediate_as_s64(
+operand_immediate_value_up_to_s64(
   const Operand *operand
 ) {
   switch(operand->byte_size) {
@@ -228,7 +228,7 @@ operand_immediate_as_s64(
 }
 
 u64
-operand_immediate_as_u64(
+operand_immediate_value_up_to_u64(
   const Operand *operand
 ) {
   switch(operand->byte_size) {
@@ -730,37 +730,6 @@ value_any_internal(
 }
 
 #define value_any(...) value_any_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
-
-
-Value *
-value_from_f64_internal(
-  Compiler_Source_Location compiler_source_location,
-  Compilation_Context *context,
-  f32 float_value
-) {
-  Value *result =
-    value_global_internal(compiler_source_location, context, &descriptor_f64);
-  f64 *memory = rip_value_pointer(context->program, result);
-  *memory = float_value;
-  return result;
-}
-
-#define value_from_f64(...) value_from_f64_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
-
-Value *
-value_from_f32_internal(
-  Compiler_Source_Location compiler_source_location,
-  Compilation_Context *context,
-  f32 float_value
-) {
-  Value *result =
-    value_global_internal(compiler_source_location, context, &descriptor_f32);
-  f32 *memory = rip_value_pointer(context->program, result);
-  *memory = float_value;
-  return result;
-}
-
-#define value_from_f32(...) value_from_f32_internal(COMPILER_SOURCE_LOCATION, #__VA_ARGS__)
 
 Value *
 value_from_s64_internal(
@@ -1598,7 +1567,7 @@ same_value_type_or_can_implicitly_move_cast(
     target->descriptor->tag == Descriptor_Tag_Pointer &&
     descriptor_is_integer(source->descriptor) &&
     operand_is_immediate(&source->operand) &&
-    operand_immediate_as_s64(&source->operand) == 0
+    operand_immediate_value_up_to_s64(&source->operand) == 0
   ) {
     return true;
   }
@@ -1611,12 +1580,5 @@ same_value_type_or_can_implicitly_move_cast(
   }
   return false;
 }
-
-
-
-
-
-
-
 
 
