@@ -878,11 +878,11 @@ Array_Const_Token_Ptr
 token_apply_macro_replacements(
   Compilation_Context *context,
   Macro_Replacement_Map *map,
-  Array_Const_Token_Ptr source
+  Token_View source
 ) {
-  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = dyn_array_length(source));
-  for (u64 i = 0; i < dyn_array_length(source); ++i) {
-    const Token *token = *dyn_array_get(source, i);
+  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = source.length);
+  for (u64 i = 0; i < source.length; ++i) {
+    const Token *token = source.tokens[i];
     Token *copy = allocator_allocate(context->allocator, Token);
     *copy = *token;
     switch (token->tag) {
@@ -908,8 +908,9 @@ token_apply_macro_replacements(
       }
       case Token_Tag_Group: {
         copy->Group.type = token->Group.type;
-        copy->Group.children =
-          token_apply_macro_replacements(context, map, token->Group.children);
+        copy->Group.children = token_apply_macro_replacements(
+          context, map, token_view_from_token_array(token->Group.children)
+        );
         break;
       }
       case Token_Tag_Value: {
@@ -1421,7 +1422,83 @@ token_parse_macro_definitions(
   *macro = (Macro){
     .pattern = pattern,
     .pattern_names = pattern_names,
-    .replacement = replacement_token->Group.children,
+    .replacement = token_view_from_token_array(replacement_token->Group.children),
+  };
+
+  scope_add_macro(scope, macro);
+
+  return true;
+}
+
+bool
+token_parse_syntax_definition(
+  Compilation_Context *context,
+  Token_View view,
+  Scope *scope
+) {
+  u64 peek_index = 0;
+  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
+
+  Token_Maybe_Match(pattern_token, .group_type = Token_Group_Type_Paren);
+
+  if (!pattern_token) {
+    panic("TODO user error");
+  }
+
+  Token_View replacement = token_view_rest(view, peek_index);
+  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
+
+  Array_Token_Pattern pattern = dyn_array_make(Array_Token_Pattern);
+  Array_Slice pattern_names = dyn_array_make(Array_Slice);
+
+  for (u64 i = 0; i < definition.length; ++i) {
+    const Token *token = token_view_get(definition, i);
+    switch(token->tag) {
+      case Token_Tag_None: {
+        panic("Unexpected None Token");
+        break;
+      }
+      case Token_Tag_String: {
+        // FIXME maybe combine a pattern with name?
+        dyn_array_push(pattern_names, (Slice){0});
+        dyn_array_push(pattern, (Token_Pattern) {
+          .source = token->String.slice,
+        });
+        break;
+      }
+      case Token_Tag_Operator: {
+        if (slice_equal(token->source, slice_literal(".@"))) {
+          if (i + 1 >= definition.length) {
+            panic("TODO user error for syntax declaration parsing");
+          }
+          const Token *pattern_name = token_view_get(definition, ++i);
+          if (pattern_name->tag != Token_Tag_Id) {
+            panic("TODO user error");
+          }
+          dyn_array_push(pattern_names, pattern_name->source);
+          dyn_array_push(pattern, (Token_Pattern) {0});
+        } else {
+          panic("Unsupported operator in a syntax definition");
+        }
+        break;
+      }
+      case Token_Tag_Id:
+      case Token_Tag_Group:
+      case Token_Tag_Integer:
+      case Token_Tag_Hex_Integer:
+      case Token_Tag_Newline:
+      case Token_Tag_Value: {
+        panic("Unsupported token tag in a syntax definition");
+        break;
+      }
+    }
+  }
+
+  Macro *macro = allocator_allocate(context->allocator, Macro);
+  *macro = (Macro){
+    .pattern = pattern,
+    .pattern_names = pattern_names,
+    .replacement = replacement,
   };
 
   scope_add_macro(scope, macro);
@@ -3458,6 +3535,9 @@ token_parse(
     Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
     if (!statement.length) continue;
     if (token_parse_macro_definitions(context, statement, context->program->global_scope)) {
+      continue;
+    }
+    if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
     if (token_parse_constant_definitions(

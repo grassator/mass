@@ -555,7 +555,7 @@ spec("source") {
 
   it("should be able to define and use a macro without a capture") {
     test_program_inline_source(
-      "macro (the answer) (42);"
+      "syntax (\"the\" \"answer\") 42;"
       "checker :: () -> (s32) { the answer }",
       checker
     );
@@ -566,7 +566,7 @@ spec("source") {
 
   it("should be able to define and use a macro with a capture") {
     test_program_inline_source(
-      "macro (negative _x) (- x);"
+      "syntax (\"negative\" .@x) (-x);"
       "checker :: () -> (s32) { negative 42 }",
       checker
     );

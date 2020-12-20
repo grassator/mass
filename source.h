@@ -37,8 +37,8 @@ hash_map_slice_template(Macro_Replacement_Map, const Token *)
 
 typedef struct {
   Array_Token_Pattern pattern;
-  Array_Const_Token_Ptr replacement;
   Array_Slice pattern_names;
+  Token_View replacement;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
