@@ -887,12 +887,19 @@ token_match_pattern(
       }
       case Macro_Pattern_Tag_Any_Token_Sequence: {
         u64 any_token_start_view_index = view_index;
+        Macro_Pattern *peek = pattern_index + 1 < pattern_length
+          ? dyn_array_get(macro->pattern, pattern_index + 1)
+          : 0;
+        assert(!peek || peek->tag == Macro_Pattern_Tag_Single_Token);
         for (; view_index < view.length; ++view_index) {
-          // do nothing
+          const Token *token = token_view_get(view, view_index);
+          if (peek && token_match(token, &peek->Single_Token.token_pattern)) {
+            break;
+          }
         }
         dyn_array_push(*out_match, (Token_View){
           .tokens = view.tokens + any_token_start_view_index,
-          .length = view.length - any_token_start_view_index,
+          .length = view_index - any_token_start_view_index,
         });
         break;
       }

@@ -597,6 +597,17 @@ spec("source") {
     check(checker_fn() == 42);
   }
 
+  it("should be able to define and use a syntax macro matching a sequence in the middle") {
+    test_program_inline_source(
+      "syntax (\"comment_start\" ..@ignore \"comment_end\");"
+      "checker :: () -> (s64) { x := 42; x = x comment_start + 1 comment_end; x }",
+      checker
+    );
+    fn_type_void_to_s64 checker_fn =
+      (fn_type_void_to_s64)value_as_function(test_context.program, checker);
+    check(checker_fn() == 42);
+  }
+
   it("should be able to define and use a syntax macro with a capture") {
     test_program_inline_source(
       "syntax (\"negative\" .@x) (-x);"
