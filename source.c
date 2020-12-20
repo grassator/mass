@@ -1505,8 +1505,44 @@ token_parse_syntax_definition(
         });
         break;
       }
+      case Token_Tag_Group: {
+        if (dyn_array_length(token->Group.children)) {
+          panic("TODO: Nested group matches are not supported yet.");
+        }
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .group_type = token->Group.type,
+            }
+          },
+        });
+        break;
+      }
       case Token_Tag_Operator: {
-        if (slice_equal(token->source, slice_literal(".@"))) {
+        if (slice_equal(token->source, slice_literal("@"))) {
+          if (i + 1 >= definition.length) {
+            panic("TODO user error for syntax declaration parsing");
+          }
+          const Token *pattern_name = token_view_get(definition, ++i);
+          if (pattern_name->tag != Token_Tag_Id) {
+            panic("TODO user error");
+          }
+          Macro_Pattern *last_pattern = dyn_array_last(pattern);
+          if (!last_pattern) {
+            panic("TODO user error");
+          }
+          switch(last_pattern->tag) {
+            case Macro_Pattern_Tag_Single_Token: {
+              last_pattern->Single_Token.capture_name = pattern_name->source;
+              break;
+            }
+            case Macro_Pattern_Tag_Any_Token_Sequence: {
+              last_pattern->Any_Token_Sequence.capture_name = pattern_name->source;
+              break;
+            }
+          }
+        } else if (slice_equal(token->source, slice_literal(".@"))) {
           if (i + 1 >= definition.length) {
             panic("TODO user error for syntax declaration parsing");
           }
@@ -1533,7 +1569,6 @@ token_parse_syntax_definition(
         break;
       }
       case Token_Tag_Id:
-      case Token_Tag_Group:
       case Token_Tag_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_Newline:
