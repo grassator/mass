@@ -857,34 +857,64 @@ typedef Array_Const_Token_Ptr (*token_pattern_callback)(
   Function_Builder *builder_
 );
 
-bool
+u64
 token_match_pattern(
   Token_View view,
-  Macro *macro
+  Macro *macro,
+  Array_Token_View *out_match
 ) {
   u64 pattern_length = dyn_array_length(macro->pattern);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
-  u64 i = 0;
-  for (; i < pattern_length; ++i) {
-    Macro_Pattern *pattern = dyn_array_get(macro->pattern, i);
+
+  dyn_array_clear(*out_match);
+  u64 pattern_index = 0;
+  u64 view_index = 0;
+
+  for (; pattern_index < pattern_length && view_index < view.length; pattern_index++) {
+    Macro_Pattern *pattern = dyn_array_get(macro->pattern, pattern_index);
     switch(pattern->tag) {
       case Macro_Pattern_Tag_Single_Token: {
-        const Token *token = token_peek_match(view, i, &pattern->Single_Token.token_pattern);
+        const Token *token = token_peek_match(view, view_index, &pattern->Single_Token.token_pattern);
         if (!token) {
-          return false;
+          return 0;
         }
+        dyn_array_push(*out_match, (Token_View){
+          .tokens = view.tokens + view_index,
+          .length = 1
+        });
+        view_index++;
         break;
       }
       case Macro_Pattern_Tag_Any_Token_Sequence: {
-        panic("TODO define capture for a token sequence");
+        u64 any_token_start_view_index = view_index;
+        for (; view_index < view.length; ++view_index) {
+          // do nothing
+        }
+        dyn_array_push(*out_match, (Token_View){
+          .tokens = view.tokens + any_token_start_view_index,
+          .length = view.length - any_token_start_view_index,
+        });
         break;
       }
     }
   }
-  if (macro->statement_end && i != view.length) {
-    return false;
+
+  // Did not match full pattern
+  if (
+    pattern_index != pattern_length &&
+    !(
+      pattern_index == pattern_length - 1 &&
+      dyn_array_last(macro->pattern)->tag == Macro_Pattern_Tag_Any_Token_Sequence
+    )
+  ) {
+    return 0;
   }
-  return true;
+
+  // There are tokens remaining in the statement after the match
+  if (macro->statement_end && view_index != view.length) {
+    return 0;
+  }
+  return view_index;
 }
 
 Array_Const_Token_Ptr
@@ -896,8 +926,6 @@ token_apply_macro_replacements(
   Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = source.length);
   for (u64 i = 0; i < source.length; ++i) {
     const Token *token = source.tokens[i];
-    Token *copy = allocator_allocate(context->allocator, Token);
-    *copy = *token;
     switch (token->tag) {
       case Token_Tag_None: {
         panic("Internal Error: Encountered token with an uninitialized tag");
@@ -905,25 +933,38 @@ token_apply_macro_replacements(
       }
       case Token_Tag_Id: {
         Slice name = token->source;
-        const Token **replacement_ptr = hash_map_get(map, name);
-        if (replacement_ptr) {
-          *copy = **replacement_ptr;
+        Token_View *view = hash_map_get(map, name);
+        if (view) {
+          for (u64 view_index = 0; view_index < view->length; ++view_index) {
+            Token *copy = allocator_allocate(context->allocator, Token);
+            *copy = *token_view_get(*view, view_index);
+            dyn_array_push(result, copy);
+          }
+        } else {
+          Token *copy = allocator_allocate(context->allocator, Token);
+          *copy = *token;
+          dyn_array_push(result, copy);
         }
-        break;
+        continue;
       }
       case Token_Tag_Newline:
       case Token_Tag_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_Operator:
       case Token_Tag_String: {
-        // Nothing to do
+        Token *copy = allocator_allocate(context->allocator, Token);
+        *copy = *token;
+        dyn_array_push(result, copy);
         break;
       }
       case Token_Tag_Group: {
+        Token *copy = allocator_allocate(context->allocator, Token);
+        *copy = *token;
         copy->Group.type = token->Group.type;
         copy->Group.children = token_apply_macro_replacements(
           context, map, token_view_from_token_array(token->Group.children)
         );
+        dyn_array_push(result, copy);
         break;
       }
       case Token_Tag_Value: {
@@ -931,7 +972,6 @@ token_apply_macro_replacements(
         break;
       }
     }
-    dyn_array_push(result, copy);
   }
   return result;
 }
@@ -939,24 +979,30 @@ token_apply_macro_replacements(
 Array_Const_Token_Ptr
 token_parse_macro_match(
   Compilation_Context *context,
-  Token_View match,
+  Array_Token_View match,
   Macro *macro
 ) {
   Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
-  if (dyn_array_length(macro->pattern) != match.length) {
-    panic("Should not have chosen the macro if pattern length do not match");
+  if (dyn_array_length(macro->pattern) != dyn_array_length(match)) {
+    panic("Internal Error: Should not have chosen the macro if pattern length do not match");
   }
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
     switch(item->tag) {
       case Macro_Pattern_Tag_Single_Token: {
+        Token_View single_token_view = *dyn_array_get(match, i);
+        if (single_token_view.length != 1) {
+          panic("Internal Error: Single Token matches should have a single token");
+        }
         if (item->Single_Token.capture_name.length) {
-          hash_map_set(map, item->Single_Token.capture_name, token_view_get(match, i));
+          hash_map_set(map, item->Single_Token.capture_name, single_token_view);
         }
         break;
       }
       case Macro_Pattern_Tag_Any_Token_Sequence: {
-        panic("TODO define capture for a token sequence");
+        if (item->Single_Token.capture_name.length) {
+          hash_map_set(map, item->Single_Token.capture_name, *dyn_array_get(match, i));
+        }
         break;
       }
     }
@@ -973,6 +1019,7 @@ token_parse_macros(
   Scope *scope,
   Function_Builder *builder
 ) {
+  Array_Token_View match = dyn_array_make(Array_Token_View);
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
@@ -982,9 +1029,10 @@ token_parse_macros(
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
           if (macro->statement_start && i != 0) break;
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
-          if (token_match_pattern(sub_view, macro)) {
-            Array_Const_Token_Ptr replacement = token_parse_macro_match(context, sub_view, macro);
-            dyn_array_splice(*tokens, i, dyn_array_length(macro->pattern), replacement);
+          u64 match_length = token_match_pattern(sub_view, macro, &match);
+          if (match_length) {
+            Array_Const_Token_Ptr replacement = token_parse_macro_match(context, match, macro);
+            dyn_array_splice(*tokens, i, match_length, replacement);
             dyn_array_destroy(replacement);
             goto start;
           }
@@ -993,6 +1041,7 @@ token_parse_macros(
       }
     }
   }
+  dyn_array_destroy(match);
 }
 
 Descriptor *
@@ -1555,6 +1604,20 @@ token_parse_syntax_definition(
             .Single_Token = {
               .capture_name = pattern_name->source,
               .token_pattern = {0}
+            },
+          });
+        } else if (slice_equal(token->source, slice_literal("..@"))) {
+          if (i + 1 >= definition.length) {
+            panic("TODO user error for syntax declaration parsing");
+          }
+          const Token *pattern_name = token_view_get(definition, ++i);
+          if (pattern_name->tag != Token_Tag_Id) {
+            panic("TODO user error");
+          }
+          dyn_array_push(pattern, (Macro_Pattern) {
+            .tag = Macro_Pattern_Tag_Any_Token_Sequence,
+            .Single_Token = {
+              .capture_name = pattern_name->source,
             },
           });
         } else if (slice_equal(token->source, slice_literal("^"))) {

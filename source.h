@@ -33,7 +33,7 @@ typedef struct Scope_Entry{
 } Scope_Entry;
 
 hash_map_slice_template(Scope_Map, Scope_Entry)
-hash_map_slice_template(Macro_Replacement_Map, const Token *)
+hash_map_slice_template(Macro_Replacement_Map, Token_View)
 
 typedef enum {
   Macro_Pattern_Tag_Single_Token,
