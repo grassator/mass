@@ -860,16 +860,29 @@ typedef Array_Const_Token_Ptr (*token_pattern_callback)(
 bool
 token_match_pattern(
   Token_View view,
-  Array_Token_Pattern pattern_array
+  Macro *macro
 ) {
-  u64 pattern_length = dyn_array_length(pattern_array);
+  u64 pattern_length = dyn_array_length(macro->pattern);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
-  for (u64 i = 0; i < pattern_length; ++i) {
-    Token_Pattern *pattern = dyn_array_get(pattern_array, i);
-    const Token *token = token_peek_match(view, i, pattern);
-    if (!token) {
-      return false;
+  u64 i = 0;
+  for (; i < pattern_length; ++i) {
+    Macro_Pattern *pattern = dyn_array_get(macro->pattern, i);
+    switch(pattern->tag) {
+      case Macro_Pattern_Tag_Single_Token: {
+        const Token *token = token_peek_match(view, i, &pattern->Single_Token.token_pattern);
+        if (!token) {
+          return false;
+        }
+        break;
+      }
+      case Macro_Pattern_Tag_Any_Token_Sequence: {
+        panic("TODO define capture for a token sequence");
+        break;
+      }
     }
+  }
+  if (macro->statement_end && i != view.length) {
+    return false;
   }
   return true;
 }
@@ -930,13 +943,22 @@ token_parse_macro_match(
   Macro *macro
 ) {
   Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
-  if (dyn_array_length(macro->pattern_names) != match.length) {
+  if (dyn_array_length(macro->pattern) != match.length) {
     panic("Should not have chosen the macro if pattern length do not match");
   }
-  for (u64 i = 0; i < dyn_array_length(macro->pattern_names); ++i) {
-    Slice *name = dyn_array_get(macro->pattern_names, i);
-    if (name->length) {
-      hash_map_set(map, *name, token_view_get(match, i));
+  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
+    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
+    switch(item->tag) {
+      case Macro_Pattern_Tag_Single_Token: {
+        if (item->Single_Token.capture_name.length) {
+          hash_map_set(map, item->Single_Token.capture_name, token_view_get(match, i));
+        }
+        break;
+      }
+      case Macro_Pattern_Tag_Any_Token_Sequence: {
+        panic("TODO define capture for a token sequence");
+        break;
+      }
     }
   }
   Array_Const_Token_Ptr replacement = token_apply_macro_replacements(context, map, macro->replacement);
@@ -958,8 +980,9 @@ token_parse_macros(
 
       start: for (;;) {
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
+          if (macro->statement_start && i != 0) break;
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
-          if (token_match_pattern(sub_view, macro->pattern)) {
+          if (token_match_pattern(sub_view, macro)) {
             Array_Const_Token_Ptr replacement = token_parse_macro_match(context, sub_view, macro);
             dyn_array_splice(*tokens, i, dyn_array_length(macro->pattern), replacement);
             dyn_array_destroy(replacement);
@@ -1394,25 +1417,38 @@ token_parse_macro_definitions(
   Token_Match(pattern_token, .group_type = Token_Group_Type_Paren);
   Token_Match(replacement_token, .group_type = Token_Group_Type_Paren);
 
-  Array_Token_Pattern pattern = dyn_array_make(Array_Token_Pattern);
-  Array_Slice pattern_names = dyn_array_make(Array_Slice);
+  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
 
   for (u64 i = 0; i < dyn_array_length(pattern_token->Group.children); ++i) {
     const Token *token = *dyn_array_get(pattern_token->Group.children, i);
     if (token->tag == Token_Tag_Id && slice_starts_with(token->source, slice_literal("_"))) {
       Slice pattern_name = slice_sub(token->source, 1, token->source.length);
-      dyn_array_push(pattern_names, pattern_name);
-      dyn_array_push(pattern, (Token_Pattern) {0});
+      dyn_array_push(pattern, (Macro_Pattern) {
+        .tag = Macro_Pattern_Tag_Single_Token,
+        .Single_Token = {
+          .capture_name = pattern_name,
+          .token_pattern = {0}
+        },
+      });
     } else {
-      dyn_array_push(pattern_names, (Slice){0});
       if (token->tag == Token_Tag_Id) {
-        dyn_array_push(pattern, (Token_Pattern) {
-          .tag = token->tag,
-          .source = token->source,
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .tag = token->tag,
+              .source = token->source,
+            }
+          },
         });
       } else {
-        dyn_array_push(pattern, (Token_Pattern) {
-          .tag = token->tag,
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .tag = token->tag,
+            }
+          },
         });
       }
     }
@@ -1421,7 +1457,6 @@ token_parse_macro_definitions(
   Macro *macro = allocator_allocate(context->allocator, Macro);
   *macro = (Macro){
     .pattern = pattern,
-    .pattern_names = pattern_names,
     .replacement = token_view_from_token_array(replacement_token->Group.children),
   };
 
@@ -1448,8 +1483,9 @@ token_parse_syntax_definition(
   Token_View replacement = token_view_rest(view, peek_index);
   Token_View definition = token_view_from_token_array(pattern_token->Group.children);
 
-  Array_Token_Pattern pattern = dyn_array_make(Array_Token_Pattern);
-  Array_Slice pattern_names = dyn_array_make(Array_Slice);
+  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
+  bool statement_start = false;
+  bool statement_end = false;
 
   for (u64 i = 0; i < definition.length; ++i) {
     const Token *token = token_view_get(definition, i);
@@ -1459,10 +1495,13 @@ token_parse_syntax_definition(
         break;
       }
       case Token_Tag_String: {
-        // FIXME maybe combine a pattern with name?
-        dyn_array_push(pattern_names, (Slice){0});
-        dyn_array_push(pattern, (Token_Pattern) {
-          .source = token->String.slice,
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .source = token->String.slice,
+            }
+          },
         });
         break;
       }
@@ -1475,8 +1514,19 @@ token_parse_syntax_definition(
           if (pattern_name->tag != Token_Tag_Id) {
             panic("TODO user error");
           }
-          dyn_array_push(pattern_names, pattern_name->source);
-          dyn_array_push(pattern, (Token_Pattern) {0});
+          dyn_array_push(pattern, (Macro_Pattern) {
+            .tag = Macro_Pattern_Tag_Single_Token,
+            .Single_Token = {
+              .capture_name = pattern_name->source,
+              .token_pattern = {0}
+            },
+          });
+        } else if (slice_equal(token->source, slice_literal("^"))) {
+          // TODO verify that this operator is first
+          statement_start = true;
+        } else if (slice_equal(token->source, slice_literal("$"))) {
+          // TODO verify that this operator is last
+          statement_end = true;
         } else {
           panic("Unsupported operator in a syntax definition");
         }
@@ -1497,8 +1547,9 @@ token_parse_syntax_definition(
   Macro *macro = allocator_allocate(context->allocator, Macro);
   *macro = (Macro){
     .pattern = pattern,
-    .pattern_names = pattern_names,
     .replacement = replacement,
+    .statement_start = statement_start,
+    .statement_end = statement_end,
   };
 
   scope_add_macro(scope, macro);

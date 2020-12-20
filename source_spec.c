@@ -553,7 +553,7 @@ spec("source") {
     check(checker() == 42);
   }
 
-  it("should be able to define and use a macro without a capture") {
+  it("should be able to define and use a syntax macro without a capture") {
     test_program_inline_source(
       "syntax (\"the\" \"answer\") 42;"
       "checker :: () -> (s32) { the answer }",
@@ -564,7 +564,18 @@ spec("source") {
     check(checker_fn() == 42);
   }
 
-  it("should be able to define and use a macro with a capture") {
+  it("should be able to define and use a syntax macro matching start and end of statement") {
+    test_program_inline_source(
+      "syntax (^ \"foo\" $) 42;"
+      "checker :: () -> (s64) { foo := 20; foo }",
+      checker
+    );
+    fn_type_void_to_s64 checker_fn =
+      (fn_type_void_to_s64)value_as_function(test_context.program, checker);
+    check(checker_fn() == 42);
+  }
+
+  it("should be able to define and use a syntax macro with a capture") {
     test_program_inline_source(
       "syntax (\"negative\" .@x) (-x);"
       "checker :: () -> (s32) { negative 42 }",

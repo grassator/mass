@@ -35,10 +35,34 @@ typedef struct Scope_Entry{
 hash_map_slice_template(Scope_Map, Scope_Entry)
 hash_map_slice_template(Macro_Replacement_Map, const Token *)
 
+typedef enum {
+  Macro_Pattern_Tag_Single_Token,
+  Macro_Pattern_Tag_Any_Token_Sequence,
+} Macro_Pattern_Tag;
+
 typedef struct {
-  Array_Token_Pattern pattern;
-  Array_Slice pattern_names;
+  Token_Pattern token_pattern;
+  Slice capture_name;
+} Macro_Pattern_Single_Token;
+
+typedef struct {
+  Slice capture_name;
+} Macro_Pattern_Any_Token_Sequence;
+
+typedef struct {
+  Macro_Pattern_Tag tag;
+  union {
+    Macro_Pattern_Any_Token_Sequence Any_Token_Sequence;
+    Macro_Pattern_Single_Token Single_Token;
+  };
+} Macro_Pattern;
+typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
+
+typedef struct {
+  Array_Macro_Pattern pattern;
   Token_View replacement;
+  bool statement_start;
+  bool statement_end;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
