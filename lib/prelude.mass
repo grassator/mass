@@ -1,18 +1,10 @@
-macro (while _condition _body) ({
+syntax (^ "while" ..@condition {}@body $) {
   label loop;
   if condition {
     body;
     goto loop;
   }
-})
-
-//syntax (^ "while" ..@condition {}@body $) {
-  //label loop;
-  //if condition {
-    //body;
-    //goto loop;
-  //}
-//}
+}
 
 bool :: s8
 true :: 1

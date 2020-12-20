@@ -1463,65 +1463,6 @@ scope_add_macro(
 }
 
 bool
-token_parse_macro_definitions(
-  Compilation_Context *context,
-  Token_View view,
-  Scope *scope
-) {
-  u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("macro"));
-  Token_Match(pattern_token, .group_type = Token_Group_Type_Paren);
-  Token_Match(replacement_token, .group_type = Token_Group_Type_Paren);
-
-  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
-
-  for (u64 i = 0; i < dyn_array_length(pattern_token->Group.children); ++i) {
-    const Token *token = *dyn_array_get(pattern_token->Group.children, i);
-    if (token->tag == Token_Tag_Id && slice_starts_with(token->source, slice_literal("_"))) {
-      Slice pattern_name = slice_sub(token->source, 1, token->source.length);
-      dyn_array_push(pattern, (Macro_Pattern) {
-        .tag = Macro_Pattern_Tag_Single_Token,
-        .Single_Token = {
-          .capture_name = pattern_name,
-          .token_pattern = {0}
-        },
-      });
-    } else {
-      if (token->tag == Token_Tag_Id) {
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .tag = token->tag,
-              .source = token->source,
-            }
-          },
-        });
-      } else {
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .tag = token->tag,
-            }
-          },
-        });
-      }
-    }
-  }
-
-  Macro *macro = allocator_allocate(context->allocator, Macro);
-  *macro = (Macro){
-    .pattern = pattern,
-    .replacement = token_view_from_token_array(replacement_token->Group.children),
-  };
-
-  scope_add_macro(scope, macro);
-
-  return true;
-}
-
-bool
 token_parse_syntax_definition(
   Compilation_Context *context,
   Token_View view,
@@ -3690,9 +3631,6 @@ token_parse(
   while (!it.done) {
     Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
     if (!statement.length) continue;
-    if (token_parse_macro_definitions(context, statement, context->program->global_scope)) {
-      continue;
-    }
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
