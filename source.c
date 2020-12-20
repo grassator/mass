@@ -63,6 +63,14 @@ token_view_get(
 }
 
 static inline const Token *
+token_view_peek(
+  Token_View view,
+  u64 index
+) {
+  return index < view.length ? view.tokens[index] : 0;
+}
+
+static inline const Token *
 token_view_last(
   Token_View view
 ) {
@@ -1007,8 +1015,8 @@ token_parse_macro_match(
         break;
       }
       case Macro_Pattern_Tag_Any_Token_Sequence: {
-        if (item->Single_Token.capture_name.length) {
-          hash_map_set(map, item->Single_Token.capture_name, *dyn_array_get(match, i));
+        if (item->Any_Token_Sequence.capture_name.length) {
+          hash_map_set(map, item->Any_Token_Sequence.capture_name, *dyn_array_get(match, i));
         }
         break;
       }
@@ -1504,7 +1512,12 @@ token_parse_syntax_definition(
       }
       case Token_Tag_Group: {
         if (dyn_array_length(token->Group.children)) {
-          panic("TODO: Nested group matches are not supported yet.");
+          program_error_builder(context, token->source_range) {
+            program_error_append_literal(
+              "Nested group matches are not supported in syntax declarations (yet)"
+            );
+          }
+          goto err;
         }
         dyn_array_push(pattern, (Macro_Pattern) {
           .tag = Macro_Pattern_Tag_Single_Token,
@@ -1517,17 +1530,39 @@ token_parse_syntax_definition(
         break;
       }
       case Token_Tag_Operator: {
-        if (slice_equal(token->source, slice_literal("@"))) {
-          if (i + 1 >= definition.length) {
-            panic("TODO user error for syntax declaration parsing");
+        if (
+          slice_equal(token->source, slice_literal("..@")) ||
+          slice_equal(token->source, slice_literal(".@")) ||
+          slice_equal(token->source, slice_literal("@"))
+        ) {
+          const Token *pattern_name = token_view_peek(definition, ++i);
+          if (!pattern_name || pattern_name->tag != Token_Tag_Id) {
+            program_error_builder(context, token->source_range) {
+              program_error_append_literal(
+                "@ operator in a syntax definition requires an id after it"
+              );
+            }
+            goto err;
           }
-          const Token *pattern_name = token_view_get(definition, ++i);
-          if (pattern_name->tag != Token_Tag_Id) {
-            panic("TODO user error");
+          Macro_Pattern *last_pattern = 0;
+          if (slice_equal(token->source, slice_literal("@"))) {
+            last_pattern = dyn_array_last(pattern);
+          } else if (slice_equal(token->source, slice_literal(".@"))) {
+            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
+              .tag = Macro_Pattern_Tag_Single_Token,
+            });
+          } else if (slice_equal(token->source, slice_literal("..@"))) {
+            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
+              .tag = Macro_Pattern_Tag_Any_Token_Sequence,
+            });
+          } else {
+            panic("Internal Error: Unexpected @-like operator");
           }
-          Macro_Pattern *last_pattern = dyn_array_last(pattern);
           if (!last_pattern) {
-            panic("TODO user error");
+            program_error_builder(context, token->source_range) {
+              program_error_append_literal("@ requires a valid pattern before it");
+            }
+            goto err;
           }
           switch(last_pattern->tag) {
             case Macro_Pattern_Tag_Single_Token: {
@@ -1539,43 +1574,33 @@ token_parse_syntax_definition(
               break;
             }
           }
-        } else if (slice_equal(token->source, slice_literal(".@"))) {
-          if (i + 1 >= definition.length) {
-            panic("TODO user error for syntax declaration parsing");
-          }
-          const Token *pattern_name = token_view_get(definition, ++i);
-          if (pattern_name->tag != Token_Tag_Id) {
-            panic("TODO user error");
-          }
-          dyn_array_push(pattern, (Macro_Pattern) {
-            .tag = Macro_Pattern_Tag_Single_Token,
-            .Single_Token = {
-              .capture_name = pattern_name->source,
-              .token_pattern = {0}
-            },
-          });
-        } else if (slice_equal(token->source, slice_literal("..@"))) {
-          if (i + 1 >= definition.length) {
-            panic("TODO user error for syntax declaration parsing");
-          }
-          const Token *pattern_name = token_view_get(definition, ++i);
-          if (pattern_name->tag != Token_Tag_Id) {
-            panic("TODO user error");
-          }
-          dyn_array_push(pattern, (Macro_Pattern) {
-            .tag = Macro_Pattern_Tag_Any_Token_Sequence,
-            .Single_Token = {
-              .capture_name = pattern_name->source,
-            },
-          });
         } else if (slice_equal(token->source, slice_literal("^"))) {
-          // TODO verify that this operator is first
+          if (i != 0) {
+            program_error_builder(context, token->source_range) {
+              program_error_append_literal(
+                "^ operator (statement start match) can only appear at the start of the pattern."
+              );
+            }
+            goto err;
+          }
           statement_start = true;
         } else if (slice_equal(token->source, slice_literal("$"))) {
-          // TODO verify that this operator is last
+          if (i != definition.length - 1) {
+            program_error_builder(context, token->source_range) {
+              program_error_append_literal(
+                "$ operator (statement end match) can only appear at the end of the pattern."
+              );
+            }
+            goto err;
+          }
           statement_end = true;
         } else {
-          panic("Unsupported operator in a syntax definition");
+          program_error_builder(context, token->source_range) {
+            program_error_append_literal("Unsupported operator ");
+            program_error_append_slice(token->source);
+            program_error_append_literal(" in a syntax definition");
+          }
+          goto err;
         }
         break;
       }
@@ -1584,7 +1609,10 @@ token_parse_syntax_definition(
       case Token_Tag_Hex_Integer:
       case Token_Tag_Newline:
       case Token_Tag_Value: {
-        panic("Unsupported token tag in a syntax definition");
+        program_error_builder(context, token->source_range) {
+          program_error_append_literal("Unsupported token tag in a syntax definition");
+        }
+        goto err;
         break;
       }
     }
@@ -1600,6 +1628,11 @@ token_parse_syntax_definition(
 
   scope_add_macro(scope, macro);
 
+
+  return true;
+
+  err:
+  dyn_array_destroy(pattern);
   return true;
 }
 
