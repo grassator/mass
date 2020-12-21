@@ -2,25 +2,6 @@
 #define WIN32_PLATFORM_H
 
 #include "value.h"
-// Partial list of WIN32 API basic type definitions to allow for cross-platform
-// compilation while keeping MSDN reference code usable as is.
-// https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
-
-// FIXME windows treats `long` as 32bit while linux treats it as 64bit
-// probably best to not use these types at all
-typedef int BOOL;
-typedef long LONG;
-typedef void *PVOID;
-typedef unsigned short WORD;
-typedef unsigned long DWORD;
-typedef PVOID HANDLE;
-typedef int HFILE;
-typedef unsigned char BYTE;
-typedef unsigned char UBYTE;
-typedef unsigned short USHORT;
-typedef unsigned long ULONG;
-typedef unsigned long long ULONGLONG;
-typedef LONG HRESULT;
 
 #ifndef _WIN32
 
@@ -51,112 +32,112 @@ typedef LONG HRESULT;
 #define IMAGE_NT_OPTIONAL_HDR64_MAGIC 0x20b
 
 typedef struct _IMAGE_DATA_DIRECTORY {
-    DWORD   VirtualAddress;
-    DWORD   Size;
+    u32   VirtualAddress;
+    u32   Size;
 } IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
 
 #define IMAGE_NUMBEROF_DIRECTORY_ENTRIES 16
 
 typedef struct _IMAGE_FILE_HEADER {
-  WORD Machine;
-  WORD NumberOfSections;
-  DWORD TimeDateStamp;
-  DWORD PointerToSymbolTable;
-  DWORD NumberOfSymbols;
-  WORD SizeOfOptionalHeader;
-  WORD Characteristics;
+  u16 Machine;
+  u16 NumberOfSections;
+  u32 TimeDateStamp;
+  u32 PointerToSymbolTable;
+  u32 NumberOfSymbols;
+  u16 SizeOfOptionalHeader;
+  u16 Characteristics;
 } IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;
 
 typedef struct _IMAGE_OPTIONAL_HEADER64 {
-  WORD  Magic;
-  BYTE  MajorLinkerVersion;
-  BYTE  MinorLinkerVersion;
-  DWORD SizeOfCode;
-  DWORD SizeOfInitializedData;
-  DWORD SizeOfUninitializedData;
-  DWORD AddressOfEntryPoint;
-  DWORD BaseOfCode;
-  ULONGLONG ImageBase;
-  DWORD SectionAlignment;
-  DWORD FileAlignment;
-  WORD MajorOperatingSystemVersion;
-  WORD MinorOperatingSystemVersion;
-  WORD MajorImageVersion;
-  WORD MinorImageVersion;
-  WORD MajorSubsystemVersion;
-  WORD MinorSubsystemVersion;
-  DWORD Win32VersionValue;
-  DWORD SizeOfImage;
-  DWORD SizeOfHeaders;
-  DWORD CheckSum;
-  WORD Subsystem;
-  WORD DllCharacteristics;
-  ULONGLONG SizeOfStackReserve;
-  ULONGLONG SizeOfStackCommit;
-  ULONGLONG SizeOfHeapReserve;
-  ULONGLONG SizeOfHeapCommit;
-  DWORD LoaderFlags;
-  DWORD NumberOfRvaAndSizes;
+  u16  Magic;
+  u8  MajorLinkerVersion;
+  u8  MinorLinkerVersion;
+  u32 SizeOfCode;
+  u32 SizeOfInitializedData;
+  u32 SizeOfUninitializedData;
+  u32 AddressOfEntryPoint;
+  u32 BaseOfCode;
+  u64 ImageBase;
+  u32 SectionAlignment;
+  u32 FileAlignment;
+  u16 MajorOperatingSystemVersion;
+  u16 MinorOperatingSystemVersion;
+  u16 MajorImageVersion;
+  u16 MinorImageVersion;
+  u16 MajorSubsystemVersion;
+  u16 MinorSubsystemVersion;
+  u32 Win32VersionValue;
+  u32 SizeOfImage;
+  u32 SizeOfHeaders;
+  u32 CheckSum;
+  u16 Subsystem;
+  u16 DllCharacteristics;
+  u64 SizeOfStackReserve;
+  u64 SizeOfStackCommit;
+  u64 SizeOfHeapReserve;
+  u64 SizeOfHeapCommit;
+  u32 LoaderFlags;
+  u32 NumberOfRvaAndSizes;
   IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
 } IMAGE_OPTIONAL_HEADER64, *PIMAGE_OPTIONAL_HEADER64;
 
 typedef struct _IMAGE_IMPORT_DESCRIPTOR {
   union {
-    DWORD Characteristics;
-    DWORD OriginalFirstThunk;
+    u32 Characteristics;
+    u32 OriginalFirstThunk;
   };
-  DWORD TimeDateStamp;
-  DWORD ForwarderChain;
-  DWORD Name;
-  DWORD FirstThunk;
+  u32 TimeDateStamp;
+  u32 ForwarderChain;
+  u32 Name;
+  u32 FirstThunk;
 } IMAGE_IMPORT_DESCRIPTOR;
 typedef IMAGE_IMPORT_DESCRIPTOR *PIMAGE_IMPORT_DESCRIPTOR;
 
 typedef struct _IMAGE_DOS_HEADER {
-  WORD e_magic;
-  WORD e_cblp;
-  WORD e_cp;
-  WORD e_crlc;
-  WORD e_cparhdr;
-  WORD e_minalloc;
-  WORD e_maxalloc;
-  WORD e_ss;
-  WORD e_sp;
-  WORD e_csum;
-  WORD e_ip;
-  WORD e_cs;
-  WORD e_lfarlc;
-  WORD e_ovno;
-  WORD e_res[4];
-  WORD e_oemid;
-  WORD e_oeminfo;
-  WORD e_res2[10];
-  LONG e_lfanew;
+  u16 e_magic;
+  u16 e_cblp;
+  u16 e_cp;
+  u16 e_crlc;
+  u16 e_cparhdr;
+  u16 e_minalloc;
+  u16 e_maxalloc;
+  u16 e_ss;
+  u16 e_sp;
+  u16 e_csum;
+  u16 e_ip;
+  u16 e_cs;
+  u16 e_lfarlc;
+  u16 e_ovno;
+  u16 e_res[4];
+  u16 e_oemid;
+  u16 e_oeminfo;
+  u16 e_res2[10];
+  s32 e_lfanew;
 } IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;
 
 #define IMAGE_SIZEOF_SHORT_NAME 8
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-image_section_header
 typedef struct _IMAGE_SECTION_HEADER {
-  BYTE Name[IMAGE_SIZEOF_SHORT_NAME];
+  u8 Name[IMAGE_SIZEOF_SHORT_NAME];
   union {
-    DWORD PhysicalAddress;
-    DWORD VirtualSize;
+    u32 PhysicalAddress;
+    u32 VirtualSize;
   } Misc;
-  DWORD VirtualAddress;
-  DWORD SizeOfRawData;
-  DWORD PointerToRawData;
-  DWORD PointerToRelocations;
-  DWORD PointerToLinenumbers;
-  WORD NumberOfRelocations;
-  WORD NumberOfLinenumbers;
-  DWORD Characteristics;
+  u32 VirtualAddress;
+  u32 SizeOfRawData;
+  u32 PointerToRawData;
+  u32 PointerToRelocations;
+  u32 PointerToLinenumbers;
+  u16 NumberOfRelocations;
+  u16 NumberOfLinenumbers;
+  u32 Characteristics;
 } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-160#struct-runtime_function
 typedef struct RUNTIME_FUNCTION {
-  ULONG BeginAddress;
-  ULONG EndAddress;
-  ULONG UnwindData;
+  u32 BeginAddress;
+  u32 EndAddress;
+  u32 UnwindData;
 } RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
 #endif
 
@@ -175,12 +156,12 @@ typedef enum _UNWIND_OP_CODES {
 
 typedef union {
   struct {
-    UBYTE CodeOffset;
-    UBYTE UnwindOp : 4;
-    UBYTE OpInfo   : 4;
+    u8 CodeOffset;
+    u8 UnwindOp : 4;
+    u8 OpInfo   : 4;
   };
-  USHORT FrameOffset;
-  USHORT DataForPreviousCode;
+  u16 FrameOffset;
+  u16 DataForPreviousCode;
 } UNWIND_CODE;
 
 #define UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE sizeof(void *) * 2
@@ -191,12 +172,12 @@ typedef union {
 #define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE / sizeof(UNWIND_CODE))
 
 typedef struct {
-  UBYTE Version       : 3;
-  UBYTE Flags         : 5;
-  UBYTE SizeOfProlog;
-  UBYTE CountOfCodes;
-  UBYTE FrameRegister : 4;
-  UBYTE FrameOffset   : 4;
+  u8 Version       : 3;
+  u8 Flags         : 5;
+  u8 SizeOfProlog;
+  u8 CountOfCodes;
+  u8 FrameRegister : 4;
+  u8 FrameOffset   : 4;
   // FIXME actually turn this into a variadic struct with getter functions
   // :RegisterAllocation need to add more reserved space for UnwindCode
   UNWIND_CODE UnwindCode[

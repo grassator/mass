@@ -83,8 +83,8 @@ encode_rdata_section(
     // Exception Directory Entry
     expected_encoded_size += sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
 
-    // :UnwindInfoAlignment Unwind Info must be DWORD aligned
-    expected_encoded_size = u64_align(expected_encoded_size, sizeof(DWORD));
+    // :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
+    expected_encoded_size = u64_align(expected_encoded_size, sizeof(u32));
 
     // Unwind Info
     expected_encoded_size += sizeof(UNWIND_INFO) * dyn_array_length(program->functions);
@@ -187,8 +187,8 @@ encode_rdata_section(
   );
   result.exception_directory_size = get_rva() - result.exception_directory_rva;
 
-  // :UnwindInfoAlignment Unwind Info must be DWORD aligned
-  buffer->occupied = u64_align(buffer->occupied, sizeof(DWORD));
+  // :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
+  buffer->occupied = u64_align(buffer->occupied, sizeof(u32));
 
   result.unwind_info_base_rva = get_rva();
   result.unwind_info_array = fixed_buffer_allocate_bytes(
@@ -259,11 +259,11 @@ encode_text_section(
   return result;
 }
 
-static DWORD
+static u32
 win32_section_permissions_to_pe32_section_characteristics(
   Section_Permissions permissions
 ) {
-  DWORD result = 0;
+  u32 result = 0;
   if (permissions & Section_Permissions_Execute) {
     // TODO What does CNT_CODE actually do?
     result |= IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_EXECUTE;
@@ -375,7 +375,7 @@ write_executable(
   *file_header = (IMAGE_FILE_HEADER) {
     .Machine = IMAGE_FILE_MACHINE_AMD64,
     .NumberOfSections = countof(sections) - 1,
-    .TimeDateStamp = (DWORD)time(0),
+    .TimeDateStamp = (u32)time(0),
     .SizeOfOptionalHeader = sizeof(IMAGE_OPTIONAL_HEADER64),
     .Characteristics = IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_LARGE_ADDRESS_AWARE,
   };
