@@ -1,30 +1,19 @@
 #!/bin/bash
 set -e
 
-function compile {
-  if cc -v 2>&1 | grep -c "clang version"
-  then
-    cc -std=c11 -g -O0 -pthread \
-      -Wno-tautological-constant-out-of-range-compare \
-      -Wno-initializer-overrides \
-      $1.c -o build/$1 \
-      -lm
-  else
-    # TODO cleanup to use -Wall
-    cc -std=c11 -g -O0 -pthread \
-      $1.c -o build/$1 \
-      -lm
-  fi
-}
+FLAGS="-std=c11 -g -O0 -pthread"
 
-
+if [[ $(cc -v 2>&1) == *"clang version"* ]]
+then
+  FLAGS="-std=c11 -g -O0 -pthread -Wno-tautological-constant-out-of-range-compare -Wno-initializer-overrides"
+fi
 
 mkdir -p build
 
-compile generate_types
+cc $FLAGS generate_types.c -o build/generate_types -lm
 
 # cd build
 # ./generate_types
 # cd ..
 
-compile function_spec
+cc $FLAGS function_spec.c -o build/function_spec -lm
