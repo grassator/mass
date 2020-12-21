@@ -116,13 +116,10 @@ int main(s32 argc, char **argv) {
       }
       bucket_buffer_append_slice(path_builder, base_name);
       bucket_buffer_append_slice(path_builder, slice_literal(".exe"));
+      bucket_buffer_append_u8(path_builder, 0);
       Fixed_Buffer *path_buffer =
         bucket_buffer_to_fixed_buffer(allocator_default, path_builder); // @Leak
-      wchar_t *exe_path_wide = utf8_to_utf16_null_terminated( // @Leak
-        allocator_default,
-        fixed_buffer_as_slice(path_buffer)
-      );
-      write_executable(exe_path_wide, &context, win32_executable_type);
+      write_executable(path_buffer->memory, &context, win32_executable_type);
       bucket_buffer_destroy(path_builder);
       break;
     }

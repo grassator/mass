@@ -286,7 +286,7 @@ typedef enum {
 
 void
 write_executable(
-  wchar_t *file_path,
+  const char *file_path,
   Compilation_Context *context,
   Executable_Type executable_type
 ) {
@@ -454,28 +454,11 @@ write_executable(
 
   /////////
 
-  HANDLE file = CreateFile(
-    file_path,    // name of the write
-    GENERIC_WRITE,         // open for writing
-    0,                     // do not share
-    0,                     // default security
-    CREATE_ALWAYS,         // create new file only
-    FILE_ATTRIBUTE_NORMAL, // normal file
-    0                      // no attr. template
-  );
-
-  assert(file != INVALID_HANDLE_VALUE);
-
-  DWORD bytes_written = 0;
-  WriteFile(
-    file,                 // open file handle
-    exe_buffer->memory,    // start of data to write
-    (DWORD) exe_buffer->occupied,  // number of bytes to write
-    &bytes_written,       // number of bytes that were written
-    0
-  );
-
-  CloseHandle(file);
+  FILE *file;
+  fopen_s(&file, file_path, "w");
+  assert(file);
+  fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
+  fclose(file);
 
   fixed_buffer_destroy(text_section_buffer);
   fixed_buffer_destroy(rdata_section_buffer);
