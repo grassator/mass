@@ -4,9 +4,24 @@ name: Build & Test
 on: push
 
 jobs:
-  build-and-test:
+  linux:
     # Name the Job
-    name: Build & Test
+    name: Linux Build & Test
+    # Set the type of machine to run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: List working directory
+        run: ls -l
+      - name: Test
+        run: ./test.sh
+
+  windows:
+    # Name the Job
+    name: Windows Build & Test
     # Set the type of machine to run on
     runs-on: windows-latest
 
