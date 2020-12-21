@@ -397,8 +397,8 @@ tokenize(
   Token *root = &(Token){0};
   root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
 
-  assert(!dyn_array_is_initialized(file->lines));
-  file->lines = dyn_array_make(Array_Range_u64);
+  assert(!dyn_array_is_initialized(file->line_ranges));
+  file->line_ranges = dyn_array_make(Array_Range_u64);
 
   Range_u64 current_line = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
@@ -455,7 +455,7 @@ tokenize(
 #define push_line()\
   do {\
     current_line.to = i + 1;\
-    dyn_array_push(file->lines, current_line);\
+    dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
   } while(0)
 
@@ -608,7 +608,7 @@ tokenize(
   }
 
   current_line.to = file->text.length;
-  dyn_array_push(file->lines, current_line);
+  dyn_array_push(file->line_ranges, current_line);
 
   if (parent != root) {
     push_error("Unexpected end of file. Expected a closing brace.");
@@ -1715,7 +1715,7 @@ token_process_c_struct_definition(
   if (dyn_array_length(args->Group.children) != 1) {
     program_error_builder(context, args->source_range) {
       program_error_append_literal("c_struct expects 1 argument, got ");
-      program_error_append_number("%llu", dyn_array_length(args->Group.children));
+      program_error_append_number("%" PRIu64, dyn_array_length(args->Group.children));
     }
     goto err;
   }
@@ -3452,7 +3452,7 @@ token_parse_inline_machine_code_bytes(
       if (!u64_fits_into_u8(byte)) {
         program_error_builder(context, args_token->source_range) {
           program_error_append_literal("Expected integer between 0 and 255, got ");
-          program_error_append_number("%lld", byte);
+          program_error_append_number("%" PRIi64, byte);
         }
         goto err;
       }

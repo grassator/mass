@@ -1,6 +1,7 @@
 #ifndef VALUE_H
 #define VALUE_H
 #include "prelude.h"
+#include <inttypes.h>
 #include "types.h"
 #include "encoding.h"
 
@@ -70,7 +71,7 @@ typedef struct Function_Builder Function_Builder;
 
 #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
   Descriptor descriptor_##_NAME_ = {\
-    .tag = { Descriptor_Tag_Opaque },\
+    .tag = Descriptor_Tag_Opaque,\
     .Opaque = { .bit_size = (_BIT_SIZE_) },\
   };\
   Value *type_##_NAME_##_value = &(Value) {\
@@ -284,4 +285,4 @@ program_set_label_offset(
   u32 offset_in_section
 );
 
-#endif VALUE_H
+#endif

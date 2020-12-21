@@ -101,9 +101,9 @@ struct_byte_size(
   for (s32 i = 0; i < count; ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(Struct->fields, i);
     u32 field_alignment = descriptor_alignment(field->descriptor);
-    alignment = max(alignment, field_alignment);
+    alignment = u32_max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
-    u32 field_size_with_alignment = max(field_alignment, descriptor_byte_size(field->descriptor));
+    u32 field_size_with_alignment = u32_max(field_alignment, descriptor_byte_size(field->descriptor));
     if (is_last_field) {
       raw_size = field->offset + field_size_with_alignment;
     }
@@ -127,7 +127,7 @@ descriptor_byte_size(
       for (s32 i = 0; i < count; ++i) {
         Descriptor_Struct *Struct = &descriptor->Tagged_Union.struct_list[i];
         u32 struct_size = struct_byte_size(Struct);
-        body_size = max(body_size, struct_size);
+        body_size = u32_max(body_size, struct_size);
       }
       return tag_size + body_size;
     }
@@ -162,11 +162,11 @@ source_file_offset_to_position(
 ) {
   // Binary search in lines
   s64 left_bound = 0;
-  s64 right_bound = dyn_array_length(file->lines) - 1;
+  s64 right_bound = dyn_array_length(file->line_ranges) - 1;
   s64 line_index = 0;
   while (left_bound <= right_bound) {
     line_index = left_bound + (right_bound - left_bound) / 2;
-    Range_u64 *line = dyn_array_get(file->lines, line_index);
+    Range_u64 *line = dyn_array_get(file->line_ranges, line_index);
     if (offset < line->from) {
       right_bound = line_index - 1;
     } else if (offset >= line->to) {
@@ -176,7 +176,7 @@ source_file_offset_to_position(
     }
   }
 
-  u64 column = offset - dyn_array_get(file->lines, line_index)->from;
+  u64 column = offset - dyn_array_get(file->line_ranges, line_index)->from;
   return (Source_Position) {
     .line = line_index + 1,
     .column = column,
@@ -190,7 +190,7 @@ source_range_print_start_position(
   Source_Position from_position =
     source_file_offset_to_position(source_range->file, source_range->offsets.from);
   slice_print(source_range->file->path);
-  printf(":(%llu:%llu)\n", from_position.line, from_position.column);
+  printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
 
 #define OPERAND_IMMEDIATE_CAST(_TYPE_)\
@@ -285,7 +285,7 @@ print_operand(
           break;
         }
         case 8: {
-          printf("imm64(0x%016llx)", operand_immediate_memory_as_u64(operand));
+          printf("imm64(0x%016" PRIx64 ")", operand_immediate_memory_as_u64(operand));
           break;
         }
         default: {
@@ -378,7 +378,7 @@ define_xmm_register(xmm6, 0b110);
 define_xmm_register(xmm7, 0b111);
 #undef define_xmm_register
 
-inline Label_Index
+static inline Label_Index
 make_label(
   Program *program,
   Section *section
@@ -388,7 +388,7 @@ make_label(
   return index;
 }
 
-inline Operand
+static inline Operand
 label32(
   Label_Index label
 ) {
@@ -399,7 +399,7 @@ label32(
   };
 }
 
-inline Operand
+static inline Operand
 imm8(
   const Allocator *allocator,
   u8 value
@@ -413,7 +413,7 @@ imm8(
   };
 }
 
-inline Operand
+static inline Operand
 imm16(
   const Allocator *allocator,
   u16 value
@@ -427,7 +427,7 @@ imm16(
   };
 }
 
-inline Operand
+static inline Operand
 imm32(
   const Allocator *allocator,
   u32 value
@@ -441,7 +441,7 @@ imm32(
   };
 }
 
-inline Operand
+static inline Operand
 imm64(
   const Allocator *allocator,
   u64 value
@@ -455,7 +455,7 @@ imm64(
   };
 }
 
-inline Operand
+static inline Operand
 imm_auto_8_or_32(
   const Allocator *allocator,
   s64 value
@@ -470,7 +470,7 @@ imm_auto_8_or_32(
   return (Operand){0};
 }
 
-inline Operand
+static inline Operand
 imm_auto(
   const Allocator *allocator,
   s64 value
@@ -487,7 +487,7 @@ imm_auto(
   return imm64(allocator, value);
 }
 
-inline Operand
+static inline Operand
 stack(
   s32 offset,
   u32 byte_size
@@ -866,7 +866,7 @@ value_from_u8_internal(
 
 
 
-inline Value *
+static inline Value *
 value_from_signed_immediate_internal(
   Compiler_Source_Location compiler_source_location,
   Allocator *allocator,
@@ -886,7 +886,7 @@ value_from_signed_immediate_internal(
 #define value_from_signed_immediate(...)\
   value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-inline Value *
+static inline Value *
 value_from_unsigned_immediate_internal(
   Compiler_Source_Location compiler_source_location,
   Allocator *allocator,

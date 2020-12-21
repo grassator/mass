@@ -226,4 +226,4 @@ program_push_error_from_slice(
 #define program_error_append_literal(_message_)\
   program_error_append_slice(slice_literal(_message_))
 
-#endif SOURCE_H
+#endif

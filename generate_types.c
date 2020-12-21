@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include <assert.h>
 
 #ifndef countof
@@ -135,7 +136,7 @@ print_c_type(
         fprintf(file, "typedef enum {\n");
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct *item = &type->union_.items[i];
-          fprintf(file, "  %s_Tag_%s = %llu,\n", type->union_.name, item->name, i);
+          fprintf(file, "  %s_Tag_%s = %" PRIu64  ",\n", type->union_.name, item->name, i);
         }
         fprintf(file, "} %s_Tag;\n\n", type->union_.name);
       }
@@ -246,7 +247,7 @@ add_common_fields_internal(
 int
 main(void) {
 
-  Type *types[4096];
+  Type *types[4096] = {0};
   uint32_t type_count = 0;
 
   #define push_type(_TYPE_)\
@@ -470,15 +471,15 @@ main(void) {
     }),
   }));
 
-  push_type(type_struct("Source_File", (Struct_Item[]){
-    { "Slice", "path" },
-    { "Slice", "text" },
-    { "Array_Range_u64", "lines" },
-  }));
-
   push_type(type_struct("Source_Position", (Struct_Item[]){
     { "u64", "line" },
     { "u64", "column" },
+  }));
+
+  push_type(type_struct("Source_File", (Struct_Item[]){
+    { "Slice", "path" },
+    { "Slice", "text" },
+    { "Array_Range_u64", "line_ranges" },
   }));
 
   push_type(type_struct("Source_Range", (Struct_Item[]){
@@ -552,7 +553,7 @@ main(void) {
   }));
 
   {
-    const char *filename = "..\\types.h";
+    const char *filename = "../types.h";
     #pragma warning(disable : 4996)
     FILE *file = fopen(filename, "w");
     if (!file) exit(1);

@@ -54,13 +54,13 @@ typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
-typedef struct Source_File Source_File;
-typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
-typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
-
 typedef struct Source_Position Source_Position;
 typedef dyn_array_type(Source_Position *) Array_Source_Position_Ptr;
 typedef dyn_array_type(const Source_Position *) Array_Const_Source_Position_Ptr;
+
+typedef struct Source_File Source_File;
+typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
+typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
 
 typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
@@ -341,18 +341,18 @@ typedef struct Descriptor {
   };
 } Descriptor;
 typedef dyn_array_type(Descriptor) Array_Descriptor;
-typedef struct Source_File {
-  Slice path;
-  Slice text;
-  Array_Range_u64 lines;
-} Source_File;
-typedef dyn_array_type(Source_File) Array_Source_File;
-
 typedef struct Source_Position {
   u64 line;
   u64 column;
 } Source_Position;
 typedef dyn_array_type(Source_Position) Array_Source_Position;
+
+typedef struct Source_File {
+  Slice path;
+  Slice text;
+  Array_Range_u64 line_ranges;
+} Source_File;
+typedef dyn_array_type(Source_File) Array_Source_File;
 
 typedef struct Source_Range {
   const Source_File * file;
