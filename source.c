@@ -2896,6 +2896,13 @@ token_dispatch_operator(
       return;
     }
 
+    if (!(same_value_type_or_can_implicitly_move_cast(lhs_value, rhs_value))) {
+      program_error_builder(context, lhs->source_range) {
+        program_error_append_literal("Incompatible integer types in comparison");
+      }
+      return;
+    }
+
     Compare_Type compare_type = 0;
 
     if (slice_equal(operator, slice_literal(">"))) compare_type = Compare_Type_Signed_Greater;
@@ -2904,69 +2911,6 @@ token_dispatch_operator(
     else if (slice_equal(operator, slice_literal("<="))) compare_type = Compare_Type_Signed_Less_Equal;
     else if (slice_equal(operator, slice_literal("=="))) compare_type = Compare_Type_Equal;
     else if (slice_equal(operator, slice_literal("!="))) compare_type = Compare_Type_Not_Equal;
-
-    bool is_lhs_signed = descriptor_is_signed_integer(lhs_value->descriptor);
-    bool is_rhs_signed = descriptor_is_signed_integer(rhs_value->descriptor);
-    if (is_lhs_signed != is_rhs_signed) {
-      // FIXME solve generally
-      if (
-        descriptor_is_unsigned_integer(rhs_value->descriptor) &&
-        operand_is_immediate(&rhs_value->operand)
-      ) {
-        switch(lhs_value->operand.byte_size) {
-          case 1: {
-            if (u64_fits_into_s8(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
-              Value *adjusted = allocator_allocate(context->allocator, Value);
-              *adjusted = *rhs_value;
-              adjusted->descriptor = &descriptor_s8;
-              rhs_value = adjusted;
-            } else {
-              panic("FIXME report immediate overflow");
-            }
-            break;
-          }
-          case 2: {
-            if (u64_fits_into_s16(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
-              Value *adjusted = allocator_allocate(context->allocator, Value);
-              *adjusted = *rhs_value;
-              adjusted->descriptor = &descriptor_s16;
-              rhs_value = adjusted;
-            } else {
-              panic("FIXME report immediate overflow");
-            }
-            break;
-          }
-          case 4: {
-            if (u64_fits_into_s32(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
-              Value *adjusted = allocator_allocate(context->allocator, Value);
-              *adjusted = *rhs_value;
-              adjusted->descriptor = &descriptor_s32;
-              rhs_value = adjusted;
-            } else {
-              panic("FIXME report immediate overflow");
-            }
-            break;
-          }
-          case 8: {
-            if (u64_fits_into_s64(operand_immediate_value_up_to_u64(&rhs_value->operand))) {
-              Value *adjusted = allocator_allocate(context->allocator, Value);
-              *adjusted = *rhs_value;
-              adjusted->descriptor = &descriptor_s64;
-              rhs_value = adjusted;
-            } else {
-              panic("FIXME report immediate overflow");
-            }
-            break;
-          }
-          default: {
-            panic("Internal Error: Unexpected integer size");
-            break;
-          }
-        }
-      } else {
-        panic("FIXME handle errors here");
-      }
-    }
 
     if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
       switch(compare_type) {
