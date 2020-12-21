@@ -971,7 +971,7 @@ compare(
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(descriptor_is_integer(a->descriptor));
-  assert(descriptor_is_integer(b->descriptor));
+  assert(same_value_type_or_can_implicitly_move_cast(a, b));
 
   switch(operation) {
     case Compare_Type_Equal: {

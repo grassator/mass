@@ -1577,6 +1577,31 @@ same_value_type_or_can_implicitly_move_cast(
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
       return true;
     }
+    if (operand_is_immediate(&source->operand)) {
+
+      #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_TYPE_, _TARGET_TYPE_)\
+        if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
+          assert(target->descriptor == &descriptor_##_TARGET_TYPE_);\
+          return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(\
+            operand_immediate_memory_as_##_SOURCE_TYPE_(&source->operand)\
+          );\
+        }
+
+      if (descriptor_is_signed_integer(target->descriptor)) {
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u8, s8)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u16, s16)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u32, s32)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u64, s64)
+      } else {
+        assert(descriptor_is_unsigned_integer(target->descriptor));
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s8, u8)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s16, u16)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s32, u32)
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s64, u64)
+      }
+
+      #undef ACCEPT_IF_INTEGER_IMMEDIATE_FITS
+    }
   }
   return false;
 }
