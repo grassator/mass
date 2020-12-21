@@ -6,10 +6,26 @@ series of videos on YouTube.
 
 ## Build
 
-The code has been tested with MSVC 14.0+ compiler but should work with CLang or GCC with minor
-mofidications, although it is only designed to work on Windows at this moment. To build the code
-open up MSVC Command Prompt and run `build.bat` in the repository folder. Tests can be executed
-by running `test.bat`.
+### Windows
+
+The code has been tested with MSVC 14.0+ compiler with. To build the code
+open up MSVC Command Prompt and run `build.bat` in the repository folder.
+Tests can be executed by running `test.bat`.
+
+### Mac / Linux
+
+> While the compiler itself can be built and run on non-Windows systems,
+there is currently **no support for generating Linux or Mac binaries**, nor
+support JIT-compilations on these platforms. Cross-compiled to Windows
+executables that the compiler outputs can be run using Wine.
+
+You can build the code by running `./build.sh` and tests are run with
+`./test.sh`. Both gcc and clang compilers are supported and you can
+set which one to use by providing a `CC` environment variable:
+
+```
+CC=clang ./build.sh
+```
 
 ## License
 
