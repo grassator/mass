@@ -50,3 +50,18 @@ jobs:
         run: ls -l
       - name: Test
         run: CC=clang ./test.sh
+
+  mac:
+    # Name the Job
+    name: Mac Build & Test
+    # Set the type of machine to run on
+    runs-on: macos-latest
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: List working directory
+        run: ls -l
+      - name: Test
+        run: ./test.sh
