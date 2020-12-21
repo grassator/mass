@@ -6,6 +6,16 @@ syntax (^ "while" ..@condition {}@body $) {
   }
 }
 
+syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
+  pre;
+  label loop;
+  if condition {
+    body;
+    post;
+    goto loop;
+  }
+}
+
 bool :: s8
 true :: 1
 false :: 0

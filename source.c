@@ -1494,6 +1494,7 @@ token_parse_syntax_definition(
 
   for (u64 i = 0; i < definition.length; ++i) {
     const Token *token = token_view_get(definition, i);
+
     switch(token->tag) {
       case Token_Tag_None: {
         panic("Unexpected None Token");
@@ -2878,12 +2879,21 @@ token_dispatch_operator(
     Value *rhs_value = value_any(context->allocator);
     token_force_value(context, rhs, builder, rhs_value);
 
-    // FIXME add implicit unsigned to signed conversion
-    if (
-      !descriptor_is_integer(lhs_value->descriptor) ||
-      !descriptor_is_integer(rhs_value->descriptor)
-    ) {
-      panic("FIXME handle errors here");
+    if (!descriptor_is_integer(lhs_value->descriptor)) {
+      program_error_builder(context, lhs->source_range) {
+        program_error_append_literal("Left hand side of the ");
+        program_error_append_slice(operator);
+        program_error_append_literal(" is not an integer");
+      }
+      return;
+    }
+    if (!descriptor_is_integer(rhs_value->descriptor)) {
+      program_error_builder(context, lhs->source_range) {
+        program_error_append_literal("Right hand side of the ");
+        program_error_append_slice(operator);
+        program_error_append_literal(" is not an integer");
+      }
+      return;
     }
 
     Compare_Type compare_type = 0;
@@ -3009,6 +3019,7 @@ token_dispatch_operator(
     panic("TODO: Unknown operator");
     result_token = 0;
   }
+
   dyn_array_push(*token_stack, result_token);
 }
 
