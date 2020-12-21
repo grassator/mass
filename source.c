@@ -1152,7 +1152,7 @@ token_match_argument(
 
   Token_View lhs;
   Token_View rhs;
-  Token *operator;
+  const Token *operator;
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
       program_error_builder(context, operator->source_range) {
@@ -2471,7 +2471,7 @@ token_parse_constant_definitions(
 ) {
   Token_View lhs;
   Token_View rhs;
-  Token *operator;
+  const Token *operator;
 
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return false;
@@ -3518,7 +3518,7 @@ token_parse_definition_and_assignment_statements(
 ) {
   Token_View lhs;
   Token_View rhs;
-  Token *operator;
+  const Token *operator;
 
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return false;
@@ -3557,7 +3557,7 @@ token_parse_assignment(
 ) {
   Token_View lhs;
   Token_View rhs;
-  Token *operator;
+  const Token *operator;
   if (!token_maybe_split_on_operator(view, slice_literal("="), &lhs, &rhs, &operator)) {
     return false;
   }
