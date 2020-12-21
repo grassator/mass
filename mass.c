@@ -85,7 +85,7 @@ int main(s32 argc, char **argv) {
     .program = program_init(compilation_allocator, &(Program) {0}),
   };
 
-  Parse_Result result = program_import_file(&context, slice_literal("lib\\prelude"));
+  Parse_Result result = program_import_file(&context, slice_literal("lib/prelude"));
   if(result.tag != Parse_Result_Tag_Success) {
     return mass_cli_print_errors(result.Error.errors);
   }
@@ -106,10 +106,10 @@ int main(s32 argc, char **argv) {
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
-      Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("\\"));
+      Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("/"));
       Slice base_name = *dyn_array_pop(parts);
       Bucket_Buffer *path_builder = bucket_buffer_make();
-      bucket_buffer_append_slice(path_builder, slice_literal("build\\"));
+      bucket_buffer_append_slice(path_builder, slice_literal("build/"));
       Slice extension = slice_literal(".mass");
       if (slice_ends_with(base_name, extension)) {
         base_name.length -= extension.length;

@@ -31,6 +31,8 @@
 #define IMAGE_NT_SIGNATURE 0x4550
 #define IMAGE_NT_OPTIONAL_HDR64_MAGIC 0x20b
 
+#pragma pack(push,1)
+
 typedef struct _IMAGE_DATA_DIRECTORY {
     u32   VirtualAddress;
     u32   Size;
@@ -133,6 +135,9 @@ typedef struct _IMAGE_SECTION_HEADER {
   u32 Characteristics;
 } IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
 
+
+#pragma pack(pop)
+
 // https://docs.microsoft.com/en-us/cpp/build/exception-handling-x64?view=msvc-160#struct-runtime_function
 typedef struct RUNTIME_FUNCTION {
   u32 BeginAddress;
@@ -209,7 +214,7 @@ win32_fn_init_unwind_info(
 
   // :Win32UnwindCodes Must match what happens in the function encoding
   u8 unwind_code_index = 0;
-  for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+  for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
         unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE) {

@@ -17,6 +17,8 @@ cd build
 ./generate_types
 cd ..
 
+cc $FLAGS mass.c -o build/mass -lm
+
 cc $FLAGS function_spec.c -o build/function_spec -lm
 
 # We can compile but not yet run source_spec so adding a suffix _norun to the binary

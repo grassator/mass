@@ -455,7 +455,7 @@ fn_encode(
   // :Win32UnwindCodes Must match what happens in the unwind code generation
   // Push non-volatile registers (in reverse order)
   u8 push_index = 0;
-  for (Register reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+  for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
         builder->layout.volatile_register_push_offsets[push_index++] =

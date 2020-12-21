@@ -187,6 +187,10 @@ void
 source_range_print_start_position(
   const Source_Range *source_range
 ) {
+  if (!dyn_array_is_initialized(source_range->file->line_ranges)) {
+    printf(":(0:0)\n");
+    return;
+  }
   Source_Position from_position =
     source_file_offset_to_position(source_range->file, source_range->offsets.from);
   slice_print(source_range->file->path);
