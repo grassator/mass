@@ -195,7 +195,7 @@ typedef struct {
     Instruction_Bytes Bytes;
   };
   Compiler_Source_Location compiler_source_location;
-  const Source_Range *source_range;
+  Source_Range source_range;
   u8 encoded_byte_size;
 } Instruction;
 

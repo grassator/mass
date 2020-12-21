@@ -424,7 +424,7 @@ encode_instruction(
   } else {
     printf("Unknown compiler location\n");
   }
-  const Source_Range *source_range = instruction->source_range;
+  const Source_Range *source_range = &instruction->source_range;
   if (source_range) {
     printf("Source code at ");
     source_range_print_start_position(source_range);

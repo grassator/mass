@@ -25,7 +25,7 @@ instruction_add_source_location_internal(
   const Source_Range *source_range,
   Instruction *instruction
 ) {
-  instruction->source_range = source_range;
+  instruction->source_range = *source_range;
   return instruction;
 }
 

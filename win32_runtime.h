@@ -147,7 +147,7 @@ win32_program_test_exception_handler(
     current_offset += instruction->encoded_byte_size;
     if (current_offset == relative_instruction_byte_offset) {
       printf("  at ");
-      source_range_print_start_position(instruction->source_range);
+      source_range_print_start_position(&instruction->source_range);
     }
   }
 
