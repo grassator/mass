@@ -454,8 +454,7 @@ write_executable(
 
   /////////
 
-  FILE *file;
-  fopen_s(&file, file_path, "w");
+  FILE *file = fopen(file_path, "w");
   assert(file);
   fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
   fclose(file);

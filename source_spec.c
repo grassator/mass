@@ -141,9 +141,9 @@ spec("source") {
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.tag == Tokenizer_Result_Tag_Success);
     check(dyn_array_length(result.Success.tokens) == 1);
-    const Token *newline = *dyn_array_get(result.Success.tokens, 0);
-    check(newline->tag == Token_Tag_Newline);
-    check(slice_equal(newline->source, slice_literal("\n")));
+    const Token *new_line = *dyn_array_get(result.Success.tokens, 0);
+    check(new_line->tag == Token_Tag_Newline);
+    check(slice_equal(new_line->source, slice_literal("\n")));
   }
 
   it("should be able to turn hex digits") {
@@ -295,7 +295,8 @@ spec("source") {
     check(result.tag == Tokenizer_Result_Tag_Success);
   }
 
-  it("should be unwind stack on hardware exception") {
+  #ifdef _WIN32
+  it("should be unwind stack on hardware exception on Windows") {
     Parse_Result result =
       program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
     check(result.tag == Parse_Result_Tag_Success);
@@ -317,6 +318,7 @@ spec("source") {
     }
     check(caught_exception);
   }
+  #endif
 
   it("should be able to parse and run a void -> s64 function") {
     test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
@@ -796,7 +798,7 @@ spec("source") {
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\test_parsed.exe", &test_context, Executable_Type_Cli);
+    write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
   }
 
   it("should parse and write an executable that prints Hello, world!") {
@@ -807,7 +809,7 @@ spec("source") {
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
     check(!spec_check_and_print_program(test_context.program));
 
-    write_executable(L"build\\hello_world.exe", &test_context, Executable_Type_Cli);
+    write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
   }
 
   it("should be able to run fibonnacii") {

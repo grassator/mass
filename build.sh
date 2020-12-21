@@ -8,6 +8,7 @@ then
   FLAGS="-std=c11 -g -O0 -pthread -Wno-tautological-constant-out-of-range-compare -Wno-initializer-overrides"
 fi
 
+rm -rf build
 mkdir -p build
 
 cc $FLAGS generate_types.c -o build/generate_types -lm
@@ -17,3 +18,6 @@ cd build
 cd ..
 
 cc $FLAGS function_spec.c -o build/function_spec -lm
+
+# We can compile but not yet run source_spec so adding a suffix _norun to the binary
+cc $FLAGS source_spec.c -o build/source_spec_norun -lm
