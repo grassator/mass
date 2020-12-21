@@ -4,21 +4,6 @@ name: Build & Test
 on: push
 
 jobs:
-  linux:
-    # Name the Job
-    name: Linux Build & Test
-    # Set the type of machine to run on
-    runs-on: ubuntu-latest
-
-    steps:
-      # Checks out a copy of your repository on the ubuntu-latest machine
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: List working directory
-        run: ls -l
-      - name: Test
-        run: ./test.sh
-
   windows:
     # Name the Job
     name: Windows Build & Test
@@ -35,3 +20,33 @@ jobs:
         run: dir
       - name: Test
         run: .\test.bat
+
+  linux-gcc:
+    # Name the Job
+    name: Linux (GCC) Build & Test
+    # Set the type of machine to run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: List working directory
+        run: ls -l
+      - name: Test
+        run: CC=gcc ./test.sh
+
+  linux-clang:
+    # Name the Job
+    name: Linux (Clang) Build & Test
+    # Set the type of machine to run on
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks out a copy of your repository on the ubuntu-latest machine
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: List working directory
+        run: ls -l
+      - name: Test
+        run: CC=clang ./test.sh
