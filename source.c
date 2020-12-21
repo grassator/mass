@@ -3659,10 +3659,12 @@ program_parse(
 }
 
 Fixed_Buffer *
-win32_absolute_path(
+program_absolute_path(
   Slice raw_path
 ) {
   Slice result_path = raw_path;
+
+  #ifdef _WIN32
   bool is_relative_path = raw_path.length < 2 || raw_path.bytes[1] != ':';
 
   Fixed_Buffer *sys_buffer = 0;
@@ -3680,6 +3682,23 @@ win32_absolute_path(
     wchar_t *wide_string = (wchar_t *)sys_buffer->memory;
     result_path = utf16_null_terminated_to_utf8(convert_allocator, wide_string);
   }
+  #else
+  bool is_relative_path = !slice_starts_with(raw_path, slice_literal("/"));
+  Fixed_Buffer *sys_buffer = 0;
+  if (is_relative_path) {
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != 0) {
+      sys_buffer = fixed_buffer_make(
+        .allocator = allocator_system,
+        .capacity = 10 * 1024
+      );
+      fixed_buffer_append_slice(sys_buffer, slice_from_c_string(cwd));
+      fixed_buffer_append_u8(sys_buffer, '/');
+      fixed_buffer_append_slice(sys_buffer, raw_path);
+      result_path = fixed_buffer_as_slice(sys_buffer);
+    }
+  }
+  #endif
   Fixed_Buffer *result_buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = result_path.length + 1024
@@ -3697,7 +3716,7 @@ program_import_file(
   Slice file_path
 ) {
   Slice extension = slice_literal(".mass");
-  Fixed_Buffer *absolute_path = win32_absolute_path(file_path);
+  Fixed_Buffer *absolute_path = program_absolute_path(file_path);
 
   if (!slice_ends_with(fixed_buffer_as_slice(absolute_path), extension)) {
     fixed_buffer_append_slice(absolute_path, extension);

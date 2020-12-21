@@ -4,14 +4,14 @@ set -e
 function compile {
   if cc -v 2>&1 | grep -c "clang version"
   then
-    cc -std=c17 -g -O0 -pthread \
+    cc -std=c11 -g -O0 -pthread \
       -Wno-tautological-constant-out-of-range-compare \
       -Wno-initializer-overrides \
       $1.c -o build/$1 \
       -lm
   else
     # TODO cleanup to use -Wall
-    cc -std=c17 -g -O0 -pthread \
+    cc -std=c11 -g -O0 -pthread \
       $1.c -o build/$1 \
       -lm
   fi
