@@ -360,6 +360,16 @@ spec("source") {
     check(checker(30, 10, 2) == 42);
   }
 
+  it("should be able to parse and run a subtraction of a negative number") {
+    test_program_inline_source(
+      "plus_one :: (x : s64) -> (s64) { x - -1 }",
+      plus_one
+    );
+    fn_type_s64_to_s64 checker =
+      (fn_type_s64_to_s64)value_as_function(test_context.program, plus_one);
+    check(checker(41) == 42);
+  }
+
   it("should be able to parse and run a sum passed to another function as an argument") {
     test_program_inline_source(
       "id :: (ignored : s64, x : s64) -> (s64) { x }\n"
@@ -524,7 +534,7 @@ spec("source") {
         "label loop;"
         "if (x < 0) { return sum };"
         "sum = sum + x;"
-        "x = x + (-1);"
+        "x = x - 1;"
         "goto loop;"
       "}",
       sum_up_to

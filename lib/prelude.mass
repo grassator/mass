@@ -1,9 +1,12 @@
+syntax (^ "continue" $) goto _loop_end
+
 syntax (^ "while" ..@condition {}@body $) {
-  label loop;
+  label _loop_start;
   if condition {
     body;
-    goto loop;
+    goto _loop_start;
   }
+  label _loop_end;
 }
 
 syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
