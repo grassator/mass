@@ -12,8 +12,8 @@ mkdir -p build
 
 cc $FLAGS generate_types.c -o build/generate_types -lm
 
-# cd build
-# ./generate_types
-# cd ..
+cd build
+./generate_types
+cd ..
 
 cc $FLAGS function_spec.c -o build/function_spec -lm

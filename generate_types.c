@@ -34,7 +34,7 @@ typedef struct {
 
 typedef struct {
   const char *name;
-  Struct *common;
+  Struct common;
   Struct *items;
   uint64_t item_count;
 } Tagged_Union;
@@ -160,11 +160,9 @@ print_c_type(
       {
         fprintf(file, "typedef struct %s {\n", type->union_.name);
         fprintf(file, "  %s_Tag tag;\n", type->union_.name);
-        if (type->union_.common) {
-          for (uint64_t i = 0; i < type->union_.common->item_count; ++i) {
-            Struct_Item *item = &type->union_.common->items[i];
-            fprintf(file, "  %s %s;\n", item->type, item->name);
-          }
+        for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
+          Struct_Item *item = &type->union_.common.items[i];
+          fprintf(file, "  %s %s;\n", item->type, item->name);
         }
         fprintf(file, "  union {\n");
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
@@ -203,7 +201,7 @@ print_c_type(
   }
 
 #define type_enum(_NAME_STRING_, ...)\
-  &(Type){\
+  (Type){\
     .tag = Type_Tag_Enum,\
     .enum_ = {\
       .name = _NAME_STRING_,\
@@ -213,7 +211,7 @@ print_c_type(
   }
 
 #define type_union(_NAME_STRING_, ...)\
-  &(Type){\
+  (Type){\
     .tag = Type_Tag_Tagged_Union,\
     .union_ = {\
       .name = _NAME_STRING_,\
@@ -222,43 +220,46 @@ print_c_type(
     }\
   }
 
-static inline Type *
+static inline Type
 add_common_fields_internal(
-  Type *type,
-  Struct *common
+  Type type,
+  Struct common
 ) {
-  assert(type->tag == Type_Tag_Tagged_Union);
-  type->union_.common = common;
+  assert(type.tag == Type_Tag_Tagged_Union);
+  type.union_.common = common;
   return type;
 }
 
 #define add_common_fields(_TYPE_, ...)\
   add_common_fields_internal(\
     _TYPE_,\
-    &(Struct)struct_fields("", __VA_ARGS__)\
+    (Struct)struct_fields("", __VA_ARGS__)\
   )
 
 #define type_struct(_NAME_STRING_, ...)\
-  &(Type){\
+  (Type){\
     .tag = Type_Tag_Struct,\
     .struct_ = struct_fields(_NAME_STRING_, __VA_ARGS__)\
   }
 
+
+Type types[4096] = {0};
+uint32_t type_count = 0;
+int32_t enum_index = 0;
+
+static inline void
+push_type(
+  Type type
+) {
+  if (type_count >= countof(types)) {
+    fprintf(stderr, "Too many types defined");
+    exit(1);
+  }
+  types[type_count++] = type;
+}
+
 int
 main(void) {
-
-  Type *types[4096] = {0};
-  uint32_t type_count = 0;
-
-  #define push_type(_TYPE_)\
-    do {\
-      if (type_count >= countof(types)) {\
-        fprintf(stderr, "Too many types defined");\
-      } else {\
-        types[type_count++] = (_TYPE_);\
-      }\
-    } while(0);
-
   push_type(type_enum("Section_Permissions", (Enum_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },
@@ -354,26 +355,23 @@ main(void) {
     { "u32", "image_thunk_rva" },
   }));
 
-  {
-    int32_t value = 1;
-    Enum_Item items[] = {
-      { "Equal", value++ },
-      { "Not_Equal", value++ },
+  enum_index = 1;
+  push_type(type_enum("Compare_Type", (Enum_Item[]){
+    { "Equal", enum_index++ },
+    { "Not_Equal", enum_index++ },
 
-      { "Unsigned_Below", value++ },
-      { "Unsigned_Below_Equal", value++ },
+    { "Unsigned_Below", enum_index++ },
+    { "Unsigned_Below_Equal", enum_index++ },
 
-      { "Unsigned_Above", value++ },
-      { "Unsigned_Above_Equal", value++ },
+    { "Unsigned_Above", enum_index++ },
+    { "Unsigned_Above_Equal", enum_index++ },
 
-      { "Signed_Less", value++ },
-      { "Signed_Less_Equal", value++ },
+    { "Signed_Less", enum_index++ },
+    { "Signed_Less_Equal", enum_index++ },
 
-      { "Signed_Greater", value++ },
-      { "Signed_Greater_Equal", value++ },
-    };
-    push_type(type_enum("Compare_Type", items));
-  }
+    { "Signed_Greater", enum_index++ },
+    { "Signed_Greater_Equal", enum_index++ },
+  }));
 
   push_type(add_common_fields(type_union("Operand", (Struct[]){
     struct_empty("None"),
@@ -492,15 +490,12 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  {
-    int32_t value = 1;
-    Enum_Item items[] = {
-      { "Paren", value++ },
-      { "Square", value++ },
-      { "Curly", value++ },
-    };
-    push_type(type_enum("Token_Group_Type", items));
-  }
+  enum_index = 1;
+  push_type(type_enum("Token_Group_Type", (Enum_Item[]){
+    { "Paren", 1 },
+    { "Square", 2 },
+    { "Curly", 3 },
+  }));
 
   push_type(add_common_fields(type_union("Token", (Struct[]){
     struct_empty("None"),
@@ -560,7 +555,7 @@ main(void) {
 
     fprintf(file, "// Forward declarations\n\n");
     for (uint32_t i = 0; i < type_count; ++i) {
-      print_c_type_forward_declaration(file, types[i]);
+      print_c_type_forward_declaration(file, &types[i]);
     }
     // Custom forward declarations
     // TODO would be great to not have these
@@ -572,7 +567,7 @@ main(void) {
     fprintf(file, "\n// Type Definitions\n\n");
 
     for (uint32_t i = 0; i < type_count; ++i) {
-      print_c_type(file, types[i]);
+      print_c_type(file, &types[i]);
     }
 
     fclose(file);
