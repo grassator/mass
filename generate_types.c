@@ -245,7 +245,6 @@ add_common_fields_internal(
 
 Type types[4096] = {0};
 uint32_t type_count = 0;
-int32_t enum_index = 0;
 
 static inline void
 push_type(
@@ -355,22 +354,21 @@ main(void) {
     { "u32", "image_thunk_rva" },
   }));
 
-  enum_index = 1;
   push_type(type_enum("Compare_Type", (Enum_Item[]){
-    { "Equal", enum_index++ },
-    { "Not_Equal", enum_index++ },
+    { "Equal", 1 },
+    { "Not_Equal", 2 },
 
-    { "Unsigned_Below", enum_index++ },
-    { "Unsigned_Below_Equal", enum_index++ },
+    { "Unsigned_Below", 3 },
+    { "Unsigned_Below_Equal", 4 },
 
-    { "Unsigned_Above", enum_index++ },
-    { "Unsigned_Above_Equal", enum_index++ },
+    { "Unsigned_Above", 5 },
+    { "Unsigned_Above_Equal", 6 },
 
-    { "Signed_Less", enum_index++ },
-    { "Signed_Less_Equal", enum_index++ },
+    { "Signed_Less", 7 },
+    { "Signed_Less_Equal", 8 },
 
-    { "Signed_Greater", enum_index++ },
-    { "Signed_Greater_Equal", enum_index++ },
+    { "Signed_Greater", 9 },
+    { "Signed_Greater_Equal", 10 },
   }));
 
   push_type(add_common_fields(type_union("Operand", (Struct[]){
@@ -490,7 +488,6 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  enum_index = 1;
   push_type(type_enum("Token_Group_Type", (Enum_Item[]){
     { "Paren", 1 },
     { "Square", 2 },

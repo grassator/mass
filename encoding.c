@@ -268,7 +268,7 @@ encode_instruction(
   } else if (instruction->type == Instruction_Type_Bytes) {
     u32 instruction_start_offset = u64_to_u32(buffer->occupied);
     Slice slice = {
-      .bytes = instruction->Bytes.memory,
+      .bytes = (char *)instruction->Bytes.memory,
       .length = instruction->Bytes.length,
     };
     fixed_buffer_append_slice(buffer, slice);

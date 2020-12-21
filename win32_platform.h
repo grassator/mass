@@ -217,11 +217,12 @@ win32_fn_init_unwind_info(
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
-        unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE) {
-          .CodeOffset = builder->layout.volatile_register_push_offsets[unwind_code_index++],
+        unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE) {
+          .CodeOffset = builder->layout.volatile_register_push_offsets[unwind_code_index],
           .UnwindOp = UWOP_PUSH_NONVOL,
           .OpInfo = s32_to_u8(reg_index),
         };
+        unwind_code_index++;
       }
     }
   }
@@ -230,20 +231,23 @@ win32_fn_init_unwind_info(
     assert(layout->stack_reserve >= 8);
     assert(layout->stack_reserve % 8 == 0);
     if (layout->stack_reserve <= 128) {
-      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
         .CodeOffset = layout->stack_allocation_offset_in_prolog,
         .UnwindOp = UWOP_ALLOC_SMALL,
         .OpInfo = (layout->stack_reserve - 8) / 8,
       };
+      unwind_code_index++;
     } else {
-      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
         .CodeOffset = layout->stack_allocation_offset_in_prolog,
         .UnwindOp = UWOP_ALLOC_LARGE,
         .OpInfo = 0,
       };
-      unwind_info->UnwindCode[unwind_code_index++] = (UNWIND_CODE){
+      unwind_code_index++;
+      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
         .DataForPreviousCode = u32_to_u16(layout->stack_reserve / 8),
       };
+      unwind_code_index++;
       // TODO support 512k + allocations
     }
     unwind_info->CountOfCodes = unwind_code_index;

@@ -119,7 +119,7 @@ int main(s32 argc, char **argv) {
       bucket_buffer_append_u8(path_builder, 0);
       Fixed_Buffer *path_buffer =
         bucket_buffer_to_fixed_buffer(allocator_default, path_builder); // @Leak
-      write_executable(path_buffer->memory, &context, win32_executable_type);
+      write_executable((char *)path_buffer->memory, &context, win32_executable_type);
       bucket_buffer_destroy(path_builder);
       break;
     }

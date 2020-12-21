@@ -1519,7 +1519,7 @@ c_function_import(
   }
   ++symbol_name_start;
   u64 length = symbol_name_end - symbol_name_start;
-  char *symbol_name = allocator_allocate_array(context->allocator, s8, length + 1);
+  char *symbol_name = allocator_allocate_array(context->allocator, char, length + 1);
   memcpy(symbol_name, symbol_name_start, length);
   symbol_name[length] = 0;
 

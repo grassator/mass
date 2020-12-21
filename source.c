@@ -575,7 +575,7 @@ tokenize(
         if (ch == '\\') {
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
-          u8 *string = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
+          char *string = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
           memcpy(string, string_buffer->memory, string_buffer->occupied);
           current_token->String.slice = (Slice){string, string_buffer->occupied};
           accept_and_push;
@@ -2975,7 +2975,9 @@ token_parse_expression(
   Value *result_value
 ) {
   if (!view.length) {
-    return &void_value;
+    // FIXME provide a source range
+    move_value(context->allocator, builder, &(Source_Range){0}, result_value, &void_value);
+    return true;
   }
 
   Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);

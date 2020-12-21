@@ -196,12 +196,14 @@ program_push_error_from_slice(
   Slice message
 );
 
+typedef struct {
+  Bucket_Buffer *buffer;
+  char number_print_buffer[32];
+} Program_Error_Builder;
+
 #define program_error_builder(_program_, _location_)\
   for(\
-    struct {\
-      Bucket_Buffer *buffer;\
-      u8 number_print_buffer[32];\
-    } _error_builder = {\
+    Program_Error_Builder _error_builder = {\
       .buffer = bucket_buffer_make(.allocator = allocator_system),\
     };\
     _error_builder.buffer;\
