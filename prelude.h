@@ -11,6 +11,12 @@
 #include <ctype.h> // isspace, isdigit etc
 #include <math.h> // ceilf, etc
 
+#ifdef _MSC_VER
+#define PRELUDE_NO_DISCARD _Must_inspect_result_
+#else
+#define PRELUDE_NO_DISCARD __attribute__ ((warn_unused_result))
+#endif
+
 #ifndef countof
 #define countof(...)\
   (sizeof(__VA_ARGS__) / sizeof((__VA_ARGS__)[0]))
@@ -412,7 +418,9 @@ allocator_system_deallocate(
 #else
 
 // __USE_MISC is required for MAP_ANONYMOUS to be defined on Ubuntu
-#define __USE_MISC
+#ifndef __USE_MISC
+#define __USE_MISC 1
+#endif
 #include <sys/mman.h>
 
 static inline void *
@@ -772,8 +780,8 @@ typedef dyn_array_struct(s8) Dyn_Array_Internal;
   }
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  typedef dyn_array_type(_type_) Array_##_type_;\
-  typedef dyn_array_type(Range_##_type_) Array_Range_##_type_;
+  typedef dyn_array_type(_type_)  Array_##_type_;\
+  typedef dyn_array_type(Range_##_type_)  Array_Range_##_type_;
 PRELUDE_ENUMERATE_NUMERIC_TYPES
 #undef PRELUDE_PROCESS_TYPE
 
@@ -2683,13 +2691,13 @@ fixed_buffer_from_file_internal(
   }
 
   // FIXME use 64bit version
-  s32 buffer_size = GetFileSize(file_handle, 0);
+  DWORD buffer_size = GetFileSize(file_handle, 0);
   if (options->null_terminate) buffer_size++;
   buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = s32_to_u64(buffer_size),
   );
-  s32 bytes_read = 0;
+  DWORD bytes_read = 0;
   BOOL is_success = ReadFile(file_handle, buffer->memory, buffer_size, &bytes_read, 0);
   if (!is_success || bytes_read != buffer_size)  {
     *options->error = File_Read_Error_Failed_To_Read;
@@ -3387,7 +3395,7 @@ typedef struct {
   const Allocator *allocator;
   u64 size_in_bytes;
   u64 alignment;
-  const char *Function;
+  const char *function;
   const char *file;
   u64 line;
   void *result;
