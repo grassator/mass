@@ -76,14 +76,8 @@ int main(s32 argc, char **argv) {
 
   Slice file_path = slice_from_c_string(raw_file_path);
 
-  Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
-  Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
-
-  Compilation_Context context = {
-    .allocation_buffer = compilation_buffer,
-    .allocator = compilation_allocator,
-    .program = program_init(compilation_allocator, &(Program) {0}),
-  };
+  Compilation_Context context;
+  compilation_context_init(allocator_system, &context);
 
   Parse_Result result = program_import_file(&context, slice_literal("lib/prelude"));
   if(result.tag != Parse_Result_Tag_Success) {

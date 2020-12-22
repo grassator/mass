@@ -3679,7 +3679,6 @@ token_parse(
   if (!view.length) return true;
 
   Function_Builder global_builder = { 0 };
-  context->scope = context->program->global_scope;
 
   Token_View_Split_Iterator it = { .view = view };
   while (!it.done) {

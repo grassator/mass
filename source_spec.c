@@ -76,21 +76,15 @@ spec_check_and_print_program(
 
 
 spec("source") {
-  static Program test_program = {0};
   static Slice test_file_name = slice_literal_fields("_test_.mass");
-  static Compilation_Context test_context = {
-    .program = &test_program
-  };
+  static Compilation_Context test_context = {0};
 
   before_each() {
-    test_context.allocation_buffer = bucket_buffer_make(.allocator = allocator_system);
-    test_context.allocator = bucket_buffer_allocator_make(test_context.allocation_buffer);
-    program_init(test_context.allocator, &test_program);
+    compilation_context_init(allocator_system, &test_context);
   }
 
   after_each() {
-    program_deinit(&test_program);
-    bucket_buffer_destroy(test_context.allocation_buffer);
+    compilation_context_deinit(&test_context);
   }
 
   // Scope

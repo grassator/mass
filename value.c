@@ -1360,6 +1360,31 @@ program_deinit(
 }
 
 void
+compilation_context_init(
+  const Allocator *allocator,
+  Compilation_Context *context
+) {
+  Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
+  Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
+  Program *program = allocator_allocate(compilation_allocator, Program);
+  program_init(compilation_allocator, program);
+  *context = (Compilation_Context) {
+    .allocation_buffer = compilation_buffer,
+    .allocator = compilation_allocator,
+    .program = program,
+    .scope = program->global_scope,
+  };
+}
+
+void
+compilation_context_deinit(
+  Compilation_Context *context
+) {
+  program_deinit(context->program);
+  bucket_buffer_destroy(context->allocation_buffer);
+}
+
+void
 program_set_label_offset(
   Program *program,
   Label_Index label_index,
