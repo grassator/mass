@@ -255,7 +255,7 @@ typedef struct {
 
 #define WITH_SCOPE(_CONTEXT_, _SCOPE_)\
   for (Scope *saved = (_CONTEXT_)->scope; saved; saved = 0)\
-  for ((_CONTEXT_)->scope = (_SCOPE_); (_CONTEXT_)->scope != saved; (_CONTEXT_)->scope = saved)
+  for ((_CONTEXT_)->scope = (_SCOPE_); saved; (_CONTEXT_)->scope = saved, saved = 0)
 
 void *
 rip_value_pointer(

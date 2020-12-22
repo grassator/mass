@@ -177,8 +177,7 @@ scope_lookup(
 Value *
 token_parse_constant_expression(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 );
 
 void
@@ -209,14 +208,16 @@ scope_lookup_force(
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
     if (it->type == Scope_Entry_Type_Lazy_Expression) {
       Scope_Lazy_Expression *expr = &it->lazy_expression;
-      Value *result;
+      Value *result = 0;
       if (expr->maybe_builder) {
         result = value_any(context->allocator);
         WITH_SCOPE(context, expr->scope) {
           token_parse_expression(context, expr->tokens, expr->maybe_builder, result);
         }
       } else {
-        result = token_parse_constant_expression(context, expr->tokens, expr->scope);
+        WITH_SCOPE(context, expr->scope) {
+          result = token_parse_constant_expression(context, expr->tokens);
+        }
       }
       *it = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
@@ -1198,7 +1199,7 @@ token_match_argument(
       );
     }
   } else {
-    Value *literal_value_type = token_parse_constant_expression(context, view, context->scope);
+    Value *literal_value_type = token_parse_constant_expression(context, view);
     arg = allocator_allocate(context->allocator, Token_Match_Arg);
     *arg = (Token_Match_Arg){
       .name = {0},
@@ -1213,7 +1214,6 @@ token_match_argument(
 Value *
 value_from_integer_token(
   Compilation_Context *context,
-  Scope *scope,
   const Token *token
 ) {
   bool ok = false;
@@ -1231,7 +1231,6 @@ value_from_integer_token(
 Value *
 value_from_hex_integer_token(
   Compilation_Context *context,
-  Scope *scope,
   const Token *token
 ) {
   bool ok = false;
@@ -1275,7 +1274,6 @@ slice_parse_binary(
 Value *
 value_from_binary_integer_token(
   Compilation_Context *context,
-  Scope *scope,
   const Token *token
 ) {
   bool ok = false;
@@ -1294,7 +1292,6 @@ value_from_binary_integer_token(
 Value *
 token_force_constant_value(
   Compilation_Context *context,
-  Scope *scope,
   const Token *token
 ) {
   switch(token->tag) {
@@ -1303,13 +1300,13 @@ token_force_constant_value(
       break;
     }
     case Token_Tag_Integer: {
-      return value_from_integer_token(context, scope, token);
+      return value_from_integer_token(context, token);
     }
     case Token_Tag_Hex_Integer: {
-      return value_from_hex_integer_token(context, scope, token);
+      return value_from_hex_integer_token(context, token);
     }
     case Token_Tag_Binary_Integer: {
-      return value_from_binary_integer_token(context, scope, token);
+      return value_from_binary_integer_token(context, token);
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
@@ -1319,7 +1316,7 @@ token_force_constant_value(
     }
     case Token_Tag_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(context, scope, name);
+      Value *value = scope_lookup_force(context, context->scope, name);
       if (!value) {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Undefined variable ");
@@ -1334,7 +1331,7 @@ token_force_constant_value(
     case Token_Tag_Group: {
       if (token->Group.type == Token_Group_Type_Paren) {
         Token_View children_view = token_view_from_token_array(token->Group.children);
-        return token_parse_constant_expression(context, children_view, scope);
+        return token_parse_constant_expression(context, children_view);
       } else {
         panic("TODO support other group types in constant context");
       }
@@ -1371,17 +1368,17 @@ token_force_value(
       break;
     }
     case Token_Tag_Integer: {
-      Value *immediate = value_from_integer_token(context, scope, token);
+      Value *immediate = value_from_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Tag_Hex_Integer: {
-      Value *immediate = value_from_hex_integer_token(context, scope, token);
+      Value *immediate = value_from_hex_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
     case Token_Tag_Binary_Integer: {
-      Value *immediate = value_from_binary_integer_token(context, scope, token);
+      Value *immediate = value_from_binary_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
@@ -1502,7 +1499,7 @@ token_match_constant_call_arguments(
       // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
-      Value *result_value = token_parse_constant_expression(context, view, context->scope);
+      Value *result_value = token_parse_constant_expression(context, view);
       dyn_array_push(result, result_value);
     }
   }
@@ -1725,12 +1722,11 @@ Token *
 token_process_bit_type_definition(
   Compilation_Context *context,
   Token_View view,
-  Scope *scope,
   const Token *args
 ) {
 
   Token_View args_view = { .tokens = &args, .length = 1 };
-  Value *bit_size_value = token_parse_constant_expression(context, args_view, scope);
+  Value *bit_size_value = token_parse_constant_expression(context, args_view);
   if (!bit_size_value) {
     // TODO print error
     goto err;
@@ -2259,7 +2255,7 @@ token_handle_negation(
   Compilation_Context *context,
   const Token *token
 ) {
-  Value *value = token_force_constant_value(context, context->scope, token);
+  Value *value = token_force_constant_value(context, token);
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
     switch(value->operand.byte_size) {
       case 1: {
@@ -2319,7 +2315,7 @@ token_dispatch_constant_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("bit_type"))
     ) {
-      result = token_process_bit_type_definition(context, view, context->scope, args);
+      result = token_process_bit_type_definition(context, view, args);
     } else if (
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("c_struct"))
@@ -2352,7 +2348,7 @@ token_dispatch_constant_operator(
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = *dyn_array_last(*token_stack);
-    Value *function_value = token_force_constant_value(context, context->scope, function);
+    Value *function_value = token_force_constant_value(context, function);
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
@@ -2424,8 +2420,7 @@ token_handle_operator(
 Value *
 token_parse_constant_expression(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   if (!view.length) {
     return &void_value;
@@ -2517,7 +2512,7 @@ token_parse_constant_expression(
   }
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
-    result = token_force_constant_value(context, scope, token);
+    result = token_force_constant_value(context, token);
   } else {
     // FIXME user error
   }
@@ -3435,7 +3430,7 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_token_array(square_brace->Group.children);
-  Value *size_value = token_parse_constant_expression(context, size_view, context->scope);
+  Value *size_value = token_parse_constant_expression(context, size_view);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
     program_push_error_from_slice(
