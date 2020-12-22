@@ -2529,7 +2529,7 @@ bool
 token_parse_constant_definitions(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
+  Function_Builder *unused_builder,
   void *unused_payload
 ) {
   Token_View lhs;
@@ -3678,8 +3678,6 @@ token_parse(
 ) {
   if (!view.length) return true;
 
-  Function_Builder global_builder = { 0 };
-
   Token_View_Split_Iterator it = { .view = view };
   while (!it.done) {
     Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
@@ -3687,9 +3685,7 @@ token_parse(
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
-    if (token_parse_constant_definitions(
-      context, statement, &global_builder, 0
-    )) {
+    if (token_parse_constant_definitions(context, statement, 0, 0)) {
       continue;
     }
 
