@@ -38,6 +38,12 @@ register_bitset_get(
   Register reg
 );
 
+#define MASS_TRY(...)\
+  for (\
+    Mass_Result _result = (__VA_ARGS__);\
+    _result.tag != Mass_Result_Tag_Success;\
+  ) return _result;
+
 #define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
   {\
     .filename = __FILE__,\

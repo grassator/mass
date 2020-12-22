@@ -84,10 +84,6 @@ typedef struct Token_Pattern Token_Pattern;
 typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
 typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
 
-typedef struct Tokenizer_Result Tokenizer_Result;
-typedef dyn_array_type(Tokenizer_Result *) Array_Tokenizer_Result_Ptr;
-typedef dyn_array_type(const Tokenizer_Result *) Array_Const_Tokenizer_Result_Ptr;
-
 typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
@@ -420,25 +416,6 @@ typedef struct Token_Pattern {
 } Token_Pattern;
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 
-typedef enum {
-  Tokenizer_Result_Tag_Success = 0,
-  Tokenizer_Result_Tag_Error = 1,
-} Tokenizer_Result_Tag;
-
-typedef struct {
-  Array_Const_Token_Ptr tokens;
-} Tokenizer_Result_Success;
-typedef struct {
-  Array_Parse_Error errors;
-} Tokenizer_Result_Error;
-typedef struct Tokenizer_Result {
-  Tokenizer_Result_Tag tag;
-  union {
-    Tokenizer_Result_Success Success;
-    Tokenizer_Result_Error Error;
-  };
-} Tokenizer_Result;
-typedef dyn_array_type(Tokenizer_Result) Array_Tokenizer_Result;
 typedef enum {
   Mass_Result_Tag_Success = 0,
   Mass_Result_Tag_Error = 1,

@@ -529,15 +529,6 @@ main(void) {
     { "const Token_Pattern *", "or" },
   }));
 
-  push_type(type_union("Tokenizer_Result", (Struct[]){
-    struct_fields("Success", (Struct_Item[]){
-      { "Array_Const_Token_Ptr", "tokens" },
-    }),
-    struct_fields("Error", (Struct_Item[]){
-      { "Array_Parse_Error", "errors" },
-    })
-  }));
-
   push_type(type_union("Mass_Result", (Struct[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){

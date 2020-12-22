@@ -379,10 +379,11 @@ code_point_is_operator(
   }
 }
 
-Tokenizer_Result
+PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Allocator *allocator,
-  Source_File *file
+  Source_File *file,
+  Array_Const_Token_Ptr *out_tokens
 ) {
   enum Tokenizer_State {
     Tokenizer_State_Default,
@@ -412,7 +413,7 @@ tokenize(
     .capacity = 4096,
   );
 
-  Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
+  Mass_Result result = {.tag = Mass_Result_Tag_Success};
 
 #define start_token(_type_)\
   do {\
@@ -447,14 +448,20 @@ tokenize(
     do_push;\
   } while(0)
 
-#define push_error(_MESSAGE_)\
-  dyn_array_push(errors, (Parse_Error) {\
-    .message = slice_literal(_MESSAGE_),\
-    .source_range = {\
-      .file = file,\
-      .offsets = {.from = i, .to = i},\
-    }\
-  })
+#define TOKENIZER_HANDLE_ERROR(_MESSAGE_)\
+  do {\
+    result = (const Mass_Result) {\
+      .tag = Mass_Result_Tag_Error,\
+      .Error.details = {\
+        .message = slice_literal(_MESSAGE_),\
+        .source_range = {\
+          .file = file,\
+          .offsets = {.from = i, .to = i},\
+        }\
+      }\
+    };\
+    goto err;\
+  } while (0)
 #define push_line()\
   do {\
     current_line.to = i + 1;\
@@ -533,20 +540,17 @@ tokenize(
             }
           }
           if (ch != expected_paren) {
-            push_error("Mismatched closing brace");
-            goto end;
+            TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
           parent->source_range.offsets.to = i + 1;
           parent->source = slice_sub_range(file->text, parent->source_range.offsets);
           if (!dyn_array_length(parent_stack)) {
-            push_error("Encountered a closing brace without a matching open one");
-            goto end;
+            TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
           }
           parent = (Token *)*dyn_array_pop(parent_stack);
           current_token = 0;
         } else {
-          push_error("Unpexpected input");
-          goto end;
+          TOKENIZER_HANDLE_ERROR("Unpexpected input");
         }
         break;
       }
@@ -625,33 +629,30 @@ tokenize(
   dyn_array_push(file->line_ranges, current_line);
 
   if (parent != root) {
-    push_error("Unexpected end of file. Expected a closing brace.");
+    TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
   // current_token can be null in case of an empty input
   if (current_token) {
     // Strings need to be terminated with a '"'
     if (state == Tokenizer_State_String) {
-      push_error("Unexpected end of file. Expected a \".");
+      TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a \".");
     } else {
       accept_and_push;
     }
   }
-  end:
-#undef push_error
+
+  err:
+#undef tokenizer_error
 #undef start_token
 #undef push_and_retry
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
-  if (dyn_array_length(errors)) {
-    return (Tokenizer_Result){
-      .tag = Tokenizer_Result_Tag_Error,
-      .Error = { errors },
-    };
+  if (result.tag == Mass_Result_Tag_Success) {
+    *out_tokens = root->Group.children;
+  } else {
+    // TODO @Leak cleanup token memory
   }
-  return (Tokenizer_Result){
-    .tag = Tokenizer_Result_Tag_Success,
-    .Success = {root->Group.children}
-  };
+  return result;
 }
 
 const Token *
@@ -3712,15 +3713,10 @@ program_parse(
   Compilation_Context *context,
   Source_File *file
 ) {
-  Tokenizer_Result tokenizer_result = tokenize(context->allocator, file);
-  if (tokenizer_result.tag != Tokenizer_Result_Tag_Success) {
-    return (Mass_Result) {
-      .tag = Mass_Result_Tag_Error,
-      // FIXME should have a single error
-      .Error.details = *dyn_array_get(tokenizer_result.Error.errors, 0),
-    };
-  }
-  bool ok = token_parse(context, token_view_from_token_array(tokenizer_result.Success.tokens));
+  Array_Const_Token_Ptr tokens;
+  MASS_TRY(tokenize(context->allocator, file, &tokens));
+
+  bool ok = token_parse(context, token_view_from_token_array(tokens));
   return (Mass_Result) {
     .tag = ok ? Mass_Result_Tag_Success
       : Mass_Result_Tag_Error
