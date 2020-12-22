@@ -301,9 +301,9 @@ spec("source") {
 
   #ifdef _WIN32
   it("should be unwind stack on hardware exception on Windows") {
-    Parse_Result result =
+    Mass_Result result =
       program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
-    check(result.tag == Parse_Result_Tag_Success);
+    check(result.tag == Mass_Result_Tag_Success);
     Value *main =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(main);
@@ -839,10 +839,10 @@ spec("source") {
   }
 
   it("should be able to run fizz buzz") {
-    Parse_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
-    check(result.tag == Parse_Result_Tag_Success);
+    Mass_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
+    check(result.tag == Mass_Result_Tag_Success);
     result = program_import_file(&test_context, slice_literal("fixtures\\fizz_buzz"));
-    check(result.tag == Parse_Result_Tag_Success);
+    check(result.tag == Mass_Result_Tag_Success);
 
     Value *fizz_buzz = scope_lookup_force(
       &test_context, test_context.program->global_scope, slice_literal("fizz_buzz")
@@ -910,9 +910,9 @@ spec("source") {
       check(slice_equal(slice_literal("42 is not a type"), error->message));
     }
     it("should be reported when encountering unknown type") {
-      Parse_Result result =
+      Mass_Result result =
         program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
-      check(result.tag == Parse_Result_Tag_Success);
+      check(result.tag == Mass_Result_Tag_Success);
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
       check(dyn_array_length(test_context.program->errors));
       Parse_Error *error = dyn_array_get(test_context.program->errors, 0);

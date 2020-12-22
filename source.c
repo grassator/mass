@@ -3707,23 +3707,23 @@ token_parse(
   return true;
 }
 
-Parse_Result
+Mass_Result
 program_parse(
   Compilation_Context *context,
   Source_File *file
 ) {
   Tokenizer_Result tokenizer_result = tokenize(context->allocator, file);
   if (tokenizer_result.tag != Tokenizer_Result_Tag_Success) {
-    return (Parse_Result) {
-      .tag = Parse_Result_Tag_Error,
+    return (Mass_Result) {
+      .tag = Mass_Result_Tag_Error,
       // FIXME should have a single error
       .Error.details = *dyn_array_get(tokenizer_result.Error.errors, 0),
     };
   }
   bool ok = token_parse(context, token_view_from_token_array(tokenizer_result.Success.tokens));
-  return (Parse_Result) {
-    .tag = ok ? Parse_Result_Tag_Success
-      : Parse_Result_Tag_Error
+  return (Mass_Result) {
+    .tag = ok ? Mass_Result_Tag_Success
+      : Mass_Result_Tag_Error
   };
 }
 
@@ -3779,7 +3779,7 @@ program_absolute_path(
   return result_buffer;
 }
 
-Parse_Result
+Mass_Result
 program_import_file(
   Compilation_Context *context,
   Slice file_path
@@ -3798,8 +3798,8 @@ program_import_file(
   };
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
-    return (Parse_Result) {
-      .tag = Parse_Result_Tag_Error,
+    return (Mass_Result) {
+      .tag = Mass_Result_Tag_Error,
       .Error.details = {
         .message = slice_literal("Unable to open the file"),
         .source_range = {

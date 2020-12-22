@@ -538,7 +538,7 @@ main(void) {
     })
   }));
 
-  push_type(type_union("Parse_Result", (Struct[]){
+  push_type(type_union("Mass_Result", (Struct[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
       { "Parse_Error", "details" },

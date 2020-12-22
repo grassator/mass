@@ -76,12 +76,12 @@ int main(s32 argc, char **argv) {
   Compilation_Context context;
   compilation_context_init(allocator_system, &context);
 
-  Parse_Result result = program_import_file(&context, slice_literal("lib/prelude"));
-  if(result.tag != Parse_Result_Tag_Success) {
+  Mass_Result result = program_import_file(&context, slice_literal("lib/prelude"));
+  if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&result.Error.details);
   }
   result = program_import_file(&context, file_path);
-  if(result.tag != Parse_Result_Tag_Success) {
+  if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&result.Error.details);
   }
 

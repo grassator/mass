@@ -88,9 +88,9 @@ typedef struct Tokenizer_Result Tokenizer_Result;
 typedef dyn_array_type(Tokenizer_Result *) Array_Tokenizer_Result_Ptr;
 typedef dyn_array_type(const Tokenizer_Result *) Array_Const_Tokenizer_Result_Ptr;
 
-typedef struct Parse_Result Parse_Result;
-typedef dyn_array_type(Parse_Result *) Array_Parse_Result_Ptr;
-typedef dyn_array_type(const Parse_Result *) Array_Const_Parse_Result_Ptr;
+typedef struct Mass_Result Mass_Result;
+typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
+typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
 typedef struct Scope Scope;
 
@@ -440,17 +440,17 @@ typedef struct Tokenizer_Result {
 } Tokenizer_Result;
 typedef dyn_array_type(Tokenizer_Result) Array_Tokenizer_Result;
 typedef enum {
-  Parse_Result_Tag_Success = 0,
-  Parse_Result_Tag_Error = 1,
-} Parse_Result_Tag;
+  Mass_Result_Tag_Success = 0,
+  Mass_Result_Tag_Error = 1,
+} Mass_Result_Tag;
 
 typedef struct {
   Parse_Error details;
-} Parse_Result_Error;
-typedef struct Parse_Result {
-  Parse_Result_Tag tag;
+} Mass_Result_Error;
+typedef struct Mass_Result {
+  Mass_Result_Tag tag;
   union {
-    Parse_Result_Error Error;
+    Mass_Result_Error Error;
   };
-} Parse_Result;
-typedef dyn_array_type(Parse_Result) Array_Parse_Result;
+} Mass_Result;
+typedef dyn_array_type(Mass_Result) Array_Mass_Result;
