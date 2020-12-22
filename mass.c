@@ -28,15 +28,12 @@ mass_cli_print_usage() {
 }
 
 s32
-mass_cli_print_errors(
-  Array_Parse_Error errors
+mass_cli_print_error(
+  Parse_Error *error
 ) {
-  for (u64 i = 0; i < dyn_array_length(errors); ++i) {
-    Parse_Error *error = dyn_array_get(errors, i);
-    slice_print(error->message);
-    printf("  at ");
-    source_range_print_start_position(&error->source_range);
-  }
+  slice_print(error->message);
+  printf("  at ");
+  source_range_print_start_position(&error->source_range);
   return -1;
 }
 
@@ -81,11 +78,11 @@ int main(s32 argc, char **argv) {
 
   Parse_Result result = program_import_file(&context, slice_literal("lib/prelude"));
   if(result.tag != Parse_Result_Tag_Success) {
-    return mass_cli_print_errors(result.Error.errors);
+    return mass_cli_print_error(&result.Error.details);
   }
   result = program_import_file(&context, file_path);
   if(result.tag != Parse_Result_Tag_Success) {
-    return mass_cli_print_errors(result.Error.errors);
+    return mass_cli_print_error(&result.Error.details);
   }
 
   context.program->entry_point =
@@ -95,7 +92,10 @@ int main(s32 argc, char **argv) {
     return -1;
   }
   if (dyn_array_length(context.program->errors)) {
-    return mass_cli_print_errors(context.program->errors);
+    for (u64 i = 0; i < dyn_array_length(context.program->errors); ++i) {
+      mass_cli_print_error(dyn_array_get(context.program->errors, i));
+    }
+    return -1;
   }
 
   switch(mode) {

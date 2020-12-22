@@ -3716,7 +3716,8 @@ program_parse(
   if (tokenizer_result.tag != Tokenizer_Result_Tag_Success) {
     return (Parse_Result) {
       .tag = Parse_Result_Tag_Error,
-      .Error = { tokenizer_result.Error.errors },
+      // FIXME should have a single error
+      .Error.details = *dyn_array_get(tokenizer_result.Error.errors, 0),
     };
   }
   bool ok = token_parse(context, token_view_from_token_array(tokenizer_result.Success.tokens));
@@ -3797,16 +3798,14 @@ program_import_file(
   };
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
-    Array_Parse_Error errors = dyn_array_make(Array_Parse_Error);
-    dyn_array_push(errors, (Parse_Error) {
-      .message = slice_literal("Unable to open the file"),
-      .source_range = {
-        .file = file,
-      },
-    });
     return (Parse_Result) {
       .tag = Parse_Result_Tag_Error,
-      .Error = {errors},
+      .Error.details = {
+        .message = slice_literal("Unable to open the file"),
+        .source_range = {
+          .file = file,
+        },
+      },
     };
   }
   file->text = fixed_buffer_as_slice(buffer);

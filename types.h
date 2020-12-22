@@ -445,7 +445,7 @@ typedef enum {
 } Parse_Result_Tag;
 
 typedef struct {
-  Array_Parse_Error errors;
+  Parse_Error details;
 } Parse_Result_Error;
 typedef struct Parse_Result {
   Parse_Result_Tag tag;

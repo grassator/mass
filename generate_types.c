@@ -541,7 +541,7 @@ main(void) {
   push_type(type_union("Parse_Result", (Struct[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
-      { "Array_Parse_Error", "errors" },
+      { "Parse_Error", "details" },
     })
   }));
 
