@@ -253,14 +253,6 @@ typedef struct {
   Scope *scope;
 } Compilation_Context;
 
-#define TEMP_CHANGE(_TYPE_, _TARGET_VALUE_, _NEW_VALUE_)\
-  for (_TYPE_ with_saved_value = (_TARGET_VALUE_); with_saved_value; with_saved_value = 0)\
-  for (\
-    (_TARGET_VALUE_) = (_NEW_VALUE_); \
-    with_saved_value; \
-    (_TARGET_VALUE_) = with_saved_value, with_saved_value = 0\
-  )
-
 void *
 rip_value_pointer(
   Program *program,

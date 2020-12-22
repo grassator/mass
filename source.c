@@ -209,15 +209,13 @@ scope_lookup_force(
     if (it->type == Scope_Entry_Type_Lazy_Expression) {
       Scope_Lazy_Expression *expr = &it->lazy_expression;
       Value *result = 0;
+      Compilation_Context lazy_context = *context;
+      lazy_context.scope = expr->scope;
       if (expr->maybe_builder) {
         result = value_any(context->allocator);
-        TEMP_CHANGE(Scope *, context->scope, expr->scope) {
-          token_parse_expression(context, expr->tokens, expr->maybe_builder, result);
-        }
+        token_parse_expression(&lazy_context, expr->tokens, expr->maybe_builder, result);
       } else {
-        TEMP_CHANGE(Scope *, context->scope, expr->scope) {
-          result = token_parse_constant_expression(context, expr->tokens);
-        }
+        result = token_parse_constant_expression(&lazy_context, expr->tokens);
       }
       *it = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
@@ -244,8 +242,10 @@ scope_lookup_force(
           function->returns->descriptor->tag == Descriptor_Tag_Void
           ? value_any(context->allocator)
           : function->returns;
-        TEMP_CHANGE(Scope *, context->scope, function->scope) {
-          token_parse_block(context, body, function->builder, return_result_value);
+        {
+          Compilation_Context body_context = *context;
+          body_context.scope = function->scope;
+          token_parse_block(&body_context, body, function->builder, return_result_value);
         }
         fn_end(function->builder);
       }
@@ -1977,10 +1977,9 @@ token_process_function_literal(
 
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-      Token_Match_Arg *arg = 0;
-      TEMP_CHANGE(Scope *, context->scope, function_scope) {
-        arg = token_match_argument(context, arg_view, &descriptor->Function);
-      }
+      Compilation_Context arg_context = *context;
+      arg_context.scope = function_scope;
+      Token_Match_Arg *arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
       if (!arg) return 0;
 
       // Literal values do not have a name ATM
@@ -2621,8 +2620,10 @@ token_maybe_macro_call_with_lazy_arguments(
   }
 
   Token *body = token_clone_deep(context->allocator, function->body);
-  TEMP_CHANGE(Scope *, context->scope, body_scope) {
-    token_parse_block(context, body, builder, result_value);
+  {
+    Compilation_Context body_context = *context;
+    body_context.scope = body_scope;
+    token_parse_block(&body_context, body, builder, result_value);
   }
 
   push_instruction(
@@ -2750,8 +2751,10 @@ token_handle_function_call(
       }
 
       Token *body = token_clone_deep(context->allocator, function->body);
-      TEMP_CHANGE(Scope *, context->scope, body_scope) {
-        token_parse_block(context, body, builder, return_value);
+      {
+        Compilation_Context body_context = *context;
+        body_context.scope = body_scope;
+        token_parse_block(&body_context, body, builder, return_value);
       }
 
       push_instruction(
@@ -3167,26 +3170,30 @@ token_parse_block(
   children_view = token_view_trim_newlines(children_view);
 
   Token_View_Split_Iterator it = { .view = children_view };
-  TEMP_CHANGE(Scope *, context->scope, scope_make(context->allocator, context->scope)) {
-    while (!it.done) {
-      Token_View view = token_split_next(&it, &token_pattern_newline_or_semicolon);
-      if (!view.length) continue;
-      bool is_last_statement = it.done;
-      Value *result_value = is_last_statement ? block_result_value : value_any(context->allocator);
 
-      // If result is a register we need to make sure it is acquired to avoid it being used
-      // as temporary when evaluating last statement. This definitely can happen with
-      // the function returns but should be safe to do all the time.
-      if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
-        if (
-          !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
-        ) {
-          register_acquire(builder, result_value->operand.Register.index);
-        }
+  Compilation_Context body_context = *context;
+  body_context.scope = scope_make(context->allocator, context->scope);
+
+  while (!it.done) {
+    Token_View view = token_split_next(&it, &token_pattern_newline_or_semicolon);
+    if (!view.length) continue;
+    bool is_last_statement = it.done;
+    Value *result_value = is_last_statement
+      ? block_result_value
+      : value_any(body_context.allocator);
+
+    // If result is a register we need to make sure it is acquired to avoid it being used
+    // as temporary when evaluating last statement. This definitely can happen with
+    // the function returns but should be safe to do all the time.
+    if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
+      if (
+        !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
+      ) {
+        register_acquire(builder, result_value->operand.Register.index);
       }
-
-      token_parse_statement(context, view, &block->source_range, builder, result_value);
     }
+
+    token_parse_statement(&body_context, view, &block->source_range, builder, result_value);
   }
   return true;
 }
