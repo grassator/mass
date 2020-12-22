@@ -253,9 +253,13 @@ typedef struct {
   Scope *scope;
 } Compilation_Context;
 
-#define WITH_SCOPE(_CONTEXT_, _SCOPE_)\
-  for (Scope *saved = (_CONTEXT_)->scope; saved; saved = 0)\
-  for ((_CONTEXT_)->scope = (_SCOPE_); saved; (_CONTEXT_)->scope = saved, saved = 0)
+#define TEMP_CHANGE(_TYPE_, _TARGET_VALUE_, _NEW_VALUE_)\
+  for (_TYPE_ with_saved_value = (_TARGET_VALUE_); with_saved_value; with_saved_value = 0)\
+  for (\
+    (_TARGET_VALUE_) = (_NEW_VALUE_); \
+    with_saved_value; \
+    (_TARGET_VALUE_) = with_saved_value, with_saved_value = 0\
+  )
 
 void *
 rip_value_pointer(

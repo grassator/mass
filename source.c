@@ -211,11 +211,11 @@ scope_lookup_force(
       Value *result = 0;
       if (expr->maybe_builder) {
         result = value_any(context->allocator);
-        WITH_SCOPE(context, expr->scope) {
+        TEMP_CHANGE(Scope *, context->scope, expr->scope) {
           token_parse_expression(context, expr->tokens, expr->maybe_builder, result);
         }
       } else {
-        WITH_SCOPE(context, expr->scope) {
+        TEMP_CHANGE(Scope *, context->scope, expr->scope) {
           result = token_parse_constant_expression(context, expr->tokens);
         }
       }
@@ -244,7 +244,7 @@ scope_lookup_force(
           function->returns->descriptor->tag == Descriptor_Tag_Void
           ? value_any(context->allocator)
           : function->returns;
-        WITH_SCOPE(context, function->scope) {
+        TEMP_CHANGE(Scope *, context->scope, function->scope) {
           token_parse_block(context, body, function->builder, return_result_value);
         }
         fn_end(function->builder);
@@ -1978,7 +1978,7 @@ token_process_function_literal(
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Token_Match_Arg *arg = 0;
-      WITH_SCOPE(context, function_scope) {
+      TEMP_CHANGE(Scope *, context->scope, function_scope) {
         arg = token_match_argument(context, arg_view, &descriptor->Function);
       }
       if (!arg) return 0;
@@ -2621,7 +2621,7 @@ token_maybe_macro_call_with_lazy_arguments(
   }
 
   Token *body = token_clone_deep(context->allocator, function->body);
-  WITH_SCOPE(context, body_scope) {
+  TEMP_CHANGE(Scope *, context->scope, body_scope) {
     token_parse_block(context, body, builder, result_value);
   }
 
@@ -2750,7 +2750,7 @@ token_handle_function_call(
       }
 
       Token *body = token_clone_deep(context->allocator, function->body);
-      WITH_SCOPE(context, body_scope) {
+      TEMP_CHANGE(Scope *, context->scope, body_scope) {
         token_parse_block(context, body, builder, return_value);
       }
 
@@ -3167,7 +3167,7 @@ token_parse_block(
   children_view = token_view_trim_newlines(children_view);
 
   Token_View_Split_Iterator it = { .view = children_view };
-  WITH_SCOPE(context, scope_make(context->allocator, context->scope)) {
+  TEMP_CHANGE(Scope *, context->scope, scope_make(context->allocator, context->scope)) {
     while (!it.done) {
       Token_View view = token_split_next(&it, &token_pattern_newline_or_semicolon);
       if (!view.length) continue;
