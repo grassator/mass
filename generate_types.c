@@ -500,6 +500,7 @@ main(void) {
     struct_empty("Newline"),
     struct_empty("Integer"),
     struct_empty("Hex_Integer"),
+    struct_empty("Binary_Integer"),
     struct_empty("Operator"),
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },

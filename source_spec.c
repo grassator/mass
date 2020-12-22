@@ -146,7 +146,7 @@ spec("source") {
     check(slice_equal(new_line->source, slice_literal("\n")));
   }
 
-  it("should be able to turn hex digits") {
+  it("should be able to parse hex integers") {
     Slice source = slice_literal("0xCAFE");
     Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
     check(result.tag == Tokenizer_Result_Tag_Success);
@@ -154,6 +154,16 @@ spec("source") {
     const Token *token = *dyn_array_get(result.Success.tokens, 0);
     check(token->tag == Token_Tag_Hex_Integer);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
+  }
+
+  it("should be able to parse binary integers") {
+    Slice source = slice_literal("0b100");
+    Tokenizer_Result result = tokenize(test_context.allocator, &(Source_File){test_file_name, source});
+    check(result.tag == Tokenizer_Result_Tag_Success);
+    check(dyn_array_length(result.Success.tokens) == 1);
+    const Token *token = *dyn_array_get(result.Success.tokens, 0);
+    check(token->tag == Token_Tag_Binary_Integer);
+    check(slice_equal(token->source, slice_literal("0b100")));
   }
 
   it("should be able to tokenize a sum of integers") {
@@ -322,6 +332,12 @@ spec("source") {
 
   it("should be able to parse and run a void -> s64 function") {
     test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
+    check(checker() == 42);
+  }
+
+  it("should be able to turn binary literals into integers") {
+    test_program_inline_source("foo :: () -> (s64) { 0b00101010 }", foo);
     fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
     check(checker() == 42);
   }

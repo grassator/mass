@@ -20,6 +20,7 @@ token_clone_deep(
     case Token_Tag_Newline:
     case Token_Tag_Integer:
     case Token_Tag_Hex_Integer:
+    case Token_Tag_Binary_Integer:
     case Token_Tag_Operator:
     case Token_Tag_String:
     case Token_Tag_Id: {
@@ -385,6 +386,7 @@ tokenize(
   enum Tokenizer_State {
     Tokenizer_State_Default,
     Tokenizer_State_Integer,
+    Tokenizer_State_Binary_Integer,
     Tokenizer_State_Hex_Integer,
     Tokenizer_State_Operator,
     Tokenizer_State_Id,
@@ -481,6 +483,10 @@ tokenize(
           start_token(Token_Tag_Hex_Integer);
           i++;
           state = Tokenizer_State_Hex_Integer;
+        } else if (ch == '0' && peek == 'b') {
+          start_token(Token_Tag_Binary_Integer);
+          i++;
+          state = Tokenizer_State_Binary_Integer;
         } else if (isdigit(ch)) {
           start_token(Token_Tag_Integer);
           state = Tokenizer_State_Integer;
@@ -552,6 +558,13 @@ tokenize(
       }
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
+          reject_and_push;
+          goto retry;
+        }
+        break;
+      }
+      case Tokenizer_State_Binary_Integer: {
+        if (ch != '0' && ch != '1') {
           reject_and_push;
           goto retry;
         }
@@ -831,6 +844,7 @@ token_force_type(
       };
       break;
     }
+    case Token_Tag_Binary_Integer:
     case Token_Tag_Hex_Integer:
     case Token_Tag_Integer: {
       program_error_builder(context, token->source_range) {
@@ -964,6 +978,7 @@ token_apply_macro_replacements(
       }
       case Token_Tag_Newline:
       case Token_Tag_Integer:
+      case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_Operator:
       case Token_Tag_String: {
@@ -1233,6 +1248,49 @@ value_from_hex_integer_token(
   return value_from_signed_immediate(context->allocator, number);
 }
 
+u64
+slice_parse_binary(
+  Slice slice,
+  bool *ok
+) {
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+
+  u64 integer = 0;
+  for (u64 index = 0; index < slice.length; ++index) {
+    u64 byte_index = slice.length - index - 1;
+    s8 byte = slice.bytes[byte_index];
+    u64 digit = 0;
+    if (byte == '1') {
+      digit = 1;
+    } else if (byte != '0') {
+      *ok = false;
+      return 0;
+    }
+    integer += digit << index;
+  }
+  return integer;
+}
+
+Value *
+value_from_binary_integer_token(
+  Compilation_Context *context,
+  Scope *scope,
+  const Token *token
+) {
+  bool ok = false;
+  Slice digits = slice_sub(token->source, 2, token->source.length);
+  u64 number = slice_parse_binary(digits, &ok);
+  if (!ok) {
+    program_error_builder(context, token->source_range) {
+      program_error_append_literal("Invalid integer binary literal: ");
+      program_error_append_slice(token->source);
+    }
+    return 0;
+  }
+  return value_from_unsigned_immediate(context->allocator, number);
+}
+
 Value *
 token_force_constant_value(
   Compilation_Context *context,
@@ -1249,6 +1307,9 @@ token_force_constant_value(
     }
     case Token_Tag_Hex_Integer: {
       return value_from_hex_integer_token(context, scope, token);
+    }
+    case Token_Tag_Binary_Integer: {
+      return value_from_binary_integer_token(context, scope, token);
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
@@ -1316,6 +1377,11 @@ token_force_value(
     }
     case Token_Tag_Hex_Integer: {
       Value *immediate = value_from_hex_integer_token(context, scope, token);
+      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
+      return;
+    }
+    case Token_Tag_Binary_Integer: {
+      Value *immediate = value_from_binary_integer_token(context, scope, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
       return;
     }
@@ -1607,6 +1673,7 @@ token_parse_syntax_definition(
       }
       case Token_Tag_Id:
       case Token_Tag_Integer:
+      case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_Newline:
       case Token_Tag_Value: {
@@ -2380,6 +2447,7 @@ token_parse_constant_expression(
         continue;
       }
       case Token_Tag_Integer:
+      case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_String:
       case Token_Tag_Value: {
@@ -2996,6 +3064,7 @@ token_parse_expression(
         continue;
       }
       case Token_Tag_Integer:
+      case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
       case Token_Tag_String:
       case Token_Tag_Id:

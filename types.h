@@ -378,10 +378,11 @@ typedef enum {
   Token_Tag_Newline = 2,
   Token_Tag_Integer = 3,
   Token_Tag_Hex_Integer = 4,
-  Token_Tag_Operator = 5,
-  Token_Tag_Value = 6,
-  Token_Tag_String = 7,
-  Token_Tag_Group = 8,
+  Token_Tag_Binary_Integer = 5,
+  Token_Tag_Operator = 6,
+  Token_Tag_Value = 7,
+  Token_Tag_String = 8,
+  Token_Tag_Group = 9,
 } Token_Tag;
 
 typedef struct {
