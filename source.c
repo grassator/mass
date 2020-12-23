@@ -875,13 +875,6 @@ token_force_type(
   return descriptor;
 }
 
-typedef Array_Const_Token_Ptr (*token_pattern_callback)(
-  Compilation_Context *context,
-  Token_View match,
-  Scope *scope,
-  Function_Builder *builder_
-);
-
 u64
 token_match_pattern(
   Token_View view,
@@ -2014,6 +2007,7 @@ token_process_function_literal(
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
       arg_context.scope = function_scope;
+      arg_context.builder = builder;
       Token_Match_Arg *arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
       if (!arg) return 0;
 
@@ -2969,8 +2963,9 @@ token_dispatch_operator(
       ? lhs_value->descriptor
       : rhs_value->descriptor;
 
-    // FIXME figure out how to avoid this
     Function_Builder *builder = context->builder;
+
+    // FIXME figure out how to avoid this
     Value *result_value = reserve_stack(context->allocator, builder, larger_descriptor);
     if (slice_equal(operator, slice_literal("+"))) {
       plus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
