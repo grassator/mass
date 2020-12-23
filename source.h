@@ -17,8 +17,12 @@ typedef struct {
   Function_Builder *maybe_builder;
 } Scope_Lazy_Expression;
 
+typedef void (*Token_Handle_Operator_Proc)
+(Compilation_Context *context, Token_View, void *payload);
+
 typedef struct {
   s64 precedence;
+  Token_Handle_Operator_Proc handler;
 } Scope_Entry_Operator;
 
 typedef struct Scope_Entry Scope_Entry;

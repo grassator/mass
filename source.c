@@ -317,10 +317,11 @@ scope_define_value(
 
 #define SCOPE_OPERATOR_NOT_FOUND (-1)
 
-s64
-scope_lookup_operator_precedence(
+bool
+scope_lookup_operator(
   Scope *scope,
-  Slice name
+  Slice name,
+  Scope_Entry_Operator *out_entry
 ) {
   Scope_Entry *entry = 0;
   while (scope) {
@@ -329,9 +330,11 @@ scope_lookup_operator_precedence(
     scope = scope->parent;
   }
   if (!entry || entry->type != Scope_Entry_Type_Operator) {
-    return SCOPE_OPERATOR_NOT_FOUND;
+    return false;
   }
-  return entry->Operator.precedence;
+
+  *out_entry = entry->Operator;
+  return true;
 }
 
 void
@@ -2385,8 +2388,9 @@ token_handle_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  s64 precedence = scope_lookup_operator_precedence(context->scope, new_operator);
-  if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
+  Scope_Entry_Operator operator_entry;
+
+  if (!scope_lookup_operator(context->scope, new_operator, &operator_entry)) {
     Source_Range source_range = source_range_from_token_view(view);
     program_error_builder(context, source_range) {
       program_error_append_literal("Unknown operator ");
@@ -2395,9 +2399,14 @@ token_handle_operator(
     return false;
   }
   while (dyn_array_length(*operator_stack)) {
+    // TODO Have a special struct here to avoid lookups
     Slice last_operator = *dyn_array_last(*operator_stack);
-    s64 last_operator_precedence = scope_lookup_operator_precedence(context->scope, last_operator);
-    if (last_operator_precedence <= precedence) {
+    Scope_Entry_Operator last_operator_entry;
+    if (!scope_lookup_operator(context->scope, last_operator, &last_operator_entry)) {
+      panic("Internal Error: Expecting operators on the stack to be resolvable");
+    }
+
+    if (last_operator_entry.precedence <= operator_entry.precedence) {
       break;
     }
 
@@ -2464,17 +2473,17 @@ token_parse_constant_expression(
         break;
       }
       case Token_Tag_Id: {
-        s64 precedence = scope_lookup_operator_precedence(context->scope, token->source);
-        if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
-          is_previous_an_operator = false;
-          dyn_array_push(token_stack, token);
-        } else {
+        if (scope_lookup_operator(context->scope, token->source, &(Scope_Entry_Operator){0})) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
             &token_stack, &operator_stack, token->source
           )) goto err;
           is_previous_an_operator = true;
+        } else {
+          is_previous_an_operator = false;
+          dyn_array_push(token_stack, token);
         }
+
         break;
       }
       case Token_Tag_Operator: {
