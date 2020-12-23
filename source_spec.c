@@ -132,16 +132,16 @@ spec("source") {
     check(dyn_array_length(tokens) == 0);
   }
 
-  it("should be able to turn newlines into tokens") {
-    Slice source = slice_literal("\n");
+  it("should be able to turn newlines into fake semicolon tokens on top level") {
+    Slice source = slice_literal("foo\n");
     Array_Const_Token_Ptr tokens;
     Mass_Result result =
       tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
     check(result.tag == Mass_Result_Tag_Success);
-    check(dyn_array_length(tokens) == 1);
-    const Token *new_line = *dyn_array_get(tokens, 0);
-    check(new_line->tag == Token_Tag_Newline);
-    check(slice_equal(new_line->source, slice_literal("\n")));
+    check(dyn_array_length(tokens) == 2);
+    const Token *new_line = *dyn_array_get(tokens, 1);
+    check(new_line->tag == Token_Tag_Operator);
+    check(slice_equal(new_line->source, slice_literal(";")));
   }
 
   it("should be able to parse hex integers") {

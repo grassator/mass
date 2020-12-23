@@ -497,7 +497,6 @@ main(void) {
   push_type(add_common_fields(type_union("Token", (Struct[]){
     struct_empty("None"),
     struct_empty("Id"),
-    struct_empty("Newline"),
     struct_empty("Integer"),
     struct_empty("Hex_Integer"),
     struct_empty("Binary_Integer"),

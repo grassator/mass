@@ -17,7 +17,6 @@ token_clone_deep(
   *clone = *token;
   switch (token->tag) {
     case Token_Tag_None:
-    case Token_Tag_Newline:
     case Token_Tag_Integer:
     case Token_Tag_Hex_Integer:
     case Token_Tag_Binary_Integer:
@@ -380,6 +379,44 @@ code_point_is_operator(
   }
 }
 
+const Token_Pattern token_pattern_comma_operator = {
+  .tag = Token_Tag_Operator,
+  .source = slice_literal_fields(","),
+};
+
+const Token_Pattern token_pattern_semicolon = {
+  .tag = Token_Tag_Operator,
+  .source = slice_literal_fields(";"),
+};
+
+bool
+token_match_internal(
+  const Token *token,
+  const Token_Pattern *pattern
+) {
+  if (pattern->group_type) {
+    if (token->tag != Token_Tag_Group) return false;
+    return token->Group.type == pattern->group_type;
+  }
+  if (pattern->tag && pattern->tag != token->tag) return false;
+  if (pattern->source.length) {
+    return slice_equal(token->source, pattern->source);
+  }
+  return true;
+}
+
+bool
+token_match(
+  const Token *token,
+  const Token_Pattern *pattern
+) {
+  bool result = token_match_internal(token, pattern);
+  if (!result && pattern->or) {
+    return token_match(token, pattern->or);
+  }
+  return result;
+}
+
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Allocator *allocator,
@@ -468,6 +505,17 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
+    if (parent->tag == Token_Tag_None || parent->Group.type == Token_Group_Type_Curly) {\
+      /* Do not treating leading newlines as semicolons */ \
+      if (dyn_array_length(parent->Group.children)) {\
+        start_token(Token_Tag_Operator);\
+        current_token->source_range.offsets = (Range_u64){ i + 1, i + 1 };\
+        current_token->source = slice_literal(";");\
+        dyn_array_push(parent->Group.children, current_token);\
+      }\
+    }\
+    current_token = 0;\
+    state = Tokenizer_State_Default;\
   } while(0)
 
   u64 i = 0;
@@ -478,14 +526,10 @@ tokenize(
     retry: switch(state) {
       case Tokenizer_State_Default: {
         if (ch == '\n') {
-          start_token(Token_Tag_Newline);
           push_line();
-          accept_and_push;
         } else if (ch == '\r') {
-          start_token(Token_Tag_Newline);
           if (peek == '\n') i++;
           push_line();
-          accept_and_push;
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
@@ -532,6 +576,21 @@ tokenize(
               break;
             }
             case Token_Group_Type_Curly: {
+              // Newlines at the end of the block do not count as semicolons otherwise this:
+              // { 42
+              // }
+              // is being interpreted as:
+              // { 42 ; }
+              while (dyn_array_length(parent->Group.children)) {
+                const Token *last_token = *dyn_array_last(parent->Group.children);
+                bool is_last_token_a_fake_semicolon = (
+                  token_match(last_token, &token_pattern_semicolon) &&
+                  range_length(last_token->source_range.offsets) == 0
+                );
+                if (!is_last_token_a_fake_semicolon) break;
+                dyn_array_pop(parent->Group.children);
+              }
+
               expected_paren = '}';
               break;
             }
@@ -667,34 +726,6 @@ token_peek(
   return 0;
 }
 
-bool
-token_match_internal(
-  const Token *token,
-  const Token_Pattern *pattern
-) {
-  if (pattern->group_type) {
-    if (token->tag != Token_Tag_Group) return false;
-    return token->Group.type == pattern->group_type;
-  }
-  if (pattern->tag && pattern->tag != token->tag) return false;
-  if (pattern->source.length) {
-    return slice_equal(token->source, pattern->source);
-  }
-  return true;
-}
-
-bool
-token_match(
-  const Token *token,
-  const Token_Pattern *pattern
-) {
-  bool result = token_match_internal(token, pattern);
-  if (!result && pattern->or) {
-    return token_match(token, pattern->or);
-  }
-  return result;
-}
-
 const Token *
 token_peek_match(
   Token_View view,
@@ -718,19 +749,6 @@ token_view_array_push(
   *(Token_View *)view = to_push;
   return view;
 }
-
-const Token_Pattern token_pattern_comma_operator = {
-  .tag = Token_Tag_Operator,
-  .source = slice_literal_fields(","),
-};
-
-const Token_Pattern token_pattern_newline_or_semicolon = {
-  .tag = Token_Tag_Newline,
-  .or = &(const Token_Pattern) {
-    .tag = Token_Tag_Operator,
-    .source = slice_literal_fields(";"),
-  },
-};
 
 typedef struct {
   Token_View view;
@@ -858,12 +876,6 @@ token_force_type(
       }
       return 0;
     }
-    case Token_Tag_Newline: {
-      program_error_builder(context, token->source_range) {
-        program_error_append_literal("Unexpected newline token");
-      }
-      return 0;
-    }
     case Token_Tag_Operator:
     case Token_Tag_String:
     case Token_Tag_Value:
@@ -974,7 +986,6 @@ token_apply_macro_replacements(
         }
         continue;
       }
-      case Token_Tag_Newline:
       case Token_Tag_Integer:
       case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
@@ -1102,29 +1113,6 @@ token_match_type(
   return token_force_type(context, context->scope, token);
 }
 
-static inline Token_View
-token_view_trim_newlines(
-  Token_View view
-) {
-  const Token **tokens = view.tokens;
-  u64 length = view.length;
-  while (length) {
-    if (tokens[0]->tag == Token_Tag_Newline) {
-      tokens++;
-      length--;
-      continue;
-    } else if (tokens[length - 1]->tag == Token_Tag_Newline) {
-      length--;
-      continue;
-    }
-    break;
-  }
-  return (Token_View) {
-    .tokens = tokens,
-    .length = length,
-  };
-}
-
 bool
 token_maybe_split_on_operator(
   Token_View view,
@@ -1159,13 +1147,10 @@ token_maybe_split_on_operator(
 Token_Match_Arg *
 token_match_argument(
   Compilation_Context *context,
-  Token_View raw_view,
+  Token_View view,
   Descriptor_Function *function
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  // FIXME take care of this in proper parser
-  Token_View view = token_view_trim_newlines(raw_view);
 
   Token_Match_Arg *arg = 0;
 
@@ -1353,12 +1338,6 @@ token_force_constant_value(
       panic("TODO support operator lookup in constant context");
       return 0;
     }
-    case Token_Tag_Newline: {
-      program_error_builder(context, token->source_range) {
-        program_error_append_literal("Unexpected newline token");
-      }
-      return 0;
-    }
   }
   panic("Internal Error: Unknown token type");
   return 0;
@@ -1449,12 +1428,6 @@ token_force_value(
 
     case Token_Tag_Operator: {
       panic("TODO");
-      return *context->result;
-    }
-    case Token_Tag_Newline: {
-      program_error_builder(context, token->source_range) {
-        program_error_append_literal("Unexpected newline token");
-      }
       return *context->result;
     }
   }
@@ -1694,7 +1667,6 @@ token_parse_syntax_definition(
       case Token_Tag_Integer:
       case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
-      case Token_Tag_Newline:
       case Token_Tag_Value: {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Unsupported token tag in a syntax definition");
@@ -1833,7 +1805,7 @@ token_process_c_struct_definition(
 
     Token_View_Split_Iterator it = { .view = layout_block_children };
     while (!it.done) {
-      Token_View field_view = token_split_next(&it, &token_pattern_newline_or_semicolon);
+      Token_View field_view = token_split_next(&it, &token_pattern_semicolon);
       token_match_struct_field(context, descriptor, field_view);
     }
   }
@@ -2475,9 +2447,6 @@ token_parse_constant_expression(
         panic("Internal Error: Encountered token with an uninitialized tag");
         break;
       }
-      case Token_Tag_Newline: {
-        continue;
-      }
       case Token_Tag_Integer:
       case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
@@ -3115,9 +3084,6 @@ token_parse_expression(
         panic("Internal Error: Encountered token with an uninitialized tag");
         break;
       }
-      case Token_Tag_Newline: {
-        continue;
-      }
       case Token_Tag_Integer:
       case Token_Tag_Binary_Integer:
       case Token_Tag_Hex_Integer:
@@ -3218,21 +3184,13 @@ token_parse_block(
   Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) return false;
   Token_View children_view = token_view_from_token_array(children);
-
-  // Newlines at the end of the block do not count as semicolons otherwise this:
-  // { 42
-  // }
-  // is being interpreted as:
-  // { 42 ; }
-  children_view = token_view_trim_newlines(children_view);
-
   Token_View_Split_Iterator it = { .view = children_view };
 
   Compilation_Context body_context = *context;
   body_context.scope = scope_make(context->allocator, context->scope);
 
   while (!it.done) {
-    Token_View view = token_split_next(&it, &token_pattern_newline_or_semicolon);
+    Token_View view = token_split_next(&it, &token_pattern_semicolon);
     if (!view.length) continue;
     bool is_last_statement = it.done;
     Value *result_value = is_last_statement
@@ -3752,7 +3710,7 @@ token_parse(
   Token_View_Split_Iterator it = { .view = view };
   while (!it.done) {
     MASS_TRY(*context->result);
-    Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
+    Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
