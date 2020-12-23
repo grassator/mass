@@ -2108,13 +2108,18 @@ compile_time_eval(
   return token_value_make(context, token_value, source_range_from_token_view(view));
 }
 
+typedef struct {
+  Slice source;
+  Source_Range source_range;
+  Scope_Entry_Operator scope_entry;
+} Operator_Stack_Entry;
+typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
+
 typedef void (*Operator_Dispatch_Proc)(
   Compilation_Context *,
   Token_View,
   Array_Const_Token_Ptr *token_stack,
-  Array_Slice *operator_stack,
-  Slice operator,
-  Scope_Entry_Operator *operator_entry
+  Operator_Stack_Entry *operator
 );
 
 const Token *
@@ -2276,11 +2281,11 @@ token_dispatch_constant_operator(
   Compilation_Context *context,
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
-  Array_Slice *operator_stack,
-  Slice operator,
-  Scope_Entry_Operator *operator_entry
+  Operator_Stack_Entry *operator_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
+
+  Slice operator = operator_entry->source;
 
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
@@ -2380,15 +2385,15 @@ token_handle_operator(
   Token_View view,
   Operator_Dispatch_Proc dispatch_proc,
   Array_Const_Token_Ptr *token_stack,
-  Array_Slice *operator_stack,
-  Slice new_operator
+  Array_Operator_Stack_Entry *operator_stack,
+  Slice new_operator,
+  Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Scope_Entry_Operator operator_entry;
 
   if (!scope_lookup_operator(context->scope, new_operator, &operator_entry)) {
-    Source_Range source_range = source_range_from_token_view(view);
     program_error_builder(context, source_range) {
       program_error_append_literal("Unknown operator ");
       program_error_append_slice(new_operator);
@@ -2396,23 +2401,22 @@ token_handle_operator(
     return false;
   }
   while (dyn_array_length(*operator_stack)) {
-    // TODO Have a special struct here to avoid lookups
-    Slice last_operator = *dyn_array_last(*operator_stack);
-    Scope_Entry_Operator last_operator_entry;
-    if (!scope_lookup_operator(context->scope, last_operator, &last_operator_entry)) {
-      panic("Internal Error: Expecting operators on the stack to be resolvable");
-    }
+    Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
-    if (last_operator_entry.precedence <= operator_entry.precedence) {
+    if (last_operator->scope_entry.precedence <= operator_entry.precedence) {
       break;
     }
 
     dyn_array_pop(*operator_stack);
 
     // apply the operator on the stack
-    dispatch_proc(context, view, token_stack, operator_stack, last_operator, &last_operator_entry);
+    dispatch_proc(context, view, token_stack, last_operator);
   }
-  dyn_array_push(*operator_stack, new_operator);
+  dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
+    .source = new_operator,
+    .source_range = source_range,
+    .scope_entry = operator_entry,
+  });
   return true;
 }
 
@@ -2427,7 +2431,7 @@ token_parse_constant_expression(
     return &void_value;
   }
   Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
-  Array_Slice operator_stack = dyn_array_make(Array_Slice);
+  Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
 
   Value *result = 0;
   bool is_previous_an_operator = true;
@@ -2453,7 +2457,7 @@ token_parse_constant_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_constant_operator,
-                &token_stack, &operator_stack, slice_literal("()")
+                &token_stack, &operator_stack, slice_literal("()"), token->source_range
               )) goto err;
             }
             break;
@@ -2474,7 +2478,7 @@ token_parse_constant_expression(
         if (scope_lookup_operator(context->scope, token->source, &(Scope_Entry_Operator){0})) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
-            &token_stack, &operator_stack, token->source
+            &token_stack, &operator_stack, token->source, token->source_range
           )) goto err;
           is_previous_an_operator = true;
         } else {
@@ -2492,7 +2496,7 @@ token_parse_constant_expression(
         }
         if (!token_handle_operator(
           context, view, token_dispatch_constant_operator,
-          &token_stack, &operator_stack, operator
+          &token_stack, &operator_stack, operator, token->source_range
         )) goto err;
         is_previous_an_operator = true;
         break;
@@ -2501,14 +2505,8 @@ token_parse_constant_expression(
   }
 
   while (dyn_array_length(operator_stack)) {
-    Slice operator = *dyn_array_pop(operator_stack);
-    Scope_Entry_Operator last_operator_entry;
-    if (!scope_lookup_operator(context->scope, operator, &last_operator_entry)) {
-      panic("Internal Error: Expecting operators on the stack to be resolvable");
-    }
-    token_dispatch_constant_operator(
-      context, view, &token_stack, &operator_stack, operator, &last_operator_entry
-    );
+    Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
+    token_dispatch_constant_operator(context, view, &token_stack, entry);
   }
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
@@ -2789,19 +2787,18 @@ token_dispatch_operator(
   Compilation_Context *context,
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
-  Array_Slice *operator_stack,
-  Slice operator,
-  Scope_Entry_Operator *operator_entry
+  Operator_Stack_Entry *operator_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
+  Slice operator = operator_entry->source;
   const Token *result_token;
 
-  if (operator_entry->handler) {
-    u64 argument_count = operator_entry->argument_count;
+  if (operator_entry->scope_entry.handler) {
+    u64 argument_count = operator_entry->scope_entry.argument_count;
     if (dyn_array_length(*token_stack) < argument_count) {
       // FIXME provide source range
-      program_error_builder(context, (Source_Range){0}) {
+      program_error_builder(context, operator_entry->source_range) {
         program_error_append_literal("Operator ");
         program_error_append_slice(operator);
         program_error_append_literal(" required ");
@@ -2820,7 +2817,7 @@ token_dispatch_operator(
     }
 
     Token_View args_view = token_view_from_token_array(args);
-    result_token = operator_entry->handler(context, args_view, 0);
+    result_token = operator_entry->scope_entry.handler(context, args_view, 0);
     dyn_array_destroy(args);
   } else if (slice_equal(operator, slice_literal("[]"))) {
     const Token *brackets = *dyn_array_pop(*token_stack);
@@ -3091,7 +3088,7 @@ token_parse_expression(
   }
 
   Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
-  Array_Slice operator_stack = dyn_array_make(Array_Slice);
+  Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
 
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
@@ -3117,7 +3114,7 @@ token_parse_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("()")
+                &token_stack, &operator_stack, slice_literal("()"), token->source_range
               )) goto err;
             }
             break;
@@ -3130,7 +3127,7 @@ token_parse_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("[]")
+                &token_stack, &operator_stack, slice_literal("[]"), token->source_range
               )) goto err;
             }
             break;
@@ -3147,7 +3144,7 @@ token_parse_expression(
         }
         if (!token_handle_operator(
           context, view, token_dispatch_operator,
-          &token_stack, &operator_stack, operator
+          &token_stack, &operator_stack, operator, token->source_range
         )) goto err;
         is_previous_an_operator = true;
         break;
@@ -3156,12 +3153,8 @@ token_parse_expression(
   }
 
   while (dyn_array_length(operator_stack)) {
-    Slice operator = *dyn_array_pop(operator_stack);
-    Scope_Entry_Operator last_operator_entry;
-    if (!scope_lookup_operator(context->scope, operator, &last_operator_entry)) {
-      panic("Internal Error: Expecting operators on the stack to be resolvable");
-    }
-    token_dispatch_operator(context, view, &token_stack, &operator_stack, operator, &last_operator_entry);
+    Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
+    token_dispatch_operator(context, view, &token_stack, entry);
   }
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(token_stack) == 1) {
