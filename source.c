@@ -184,7 +184,6 @@ PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
   const Token *token,
-  Function_Builder *builder,
   Value *result_value
 );
 
@@ -211,9 +210,10 @@ scope_lookup_force(
       Value *result = 0;
       Compilation_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
+      lazy_context.builder = expr->maybe_builder;
       if (expr->maybe_builder) {
         result = value_any(context->allocator);
-        token_parse_expression(&lazy_context, expr->tokens, expr->maybe_builder, result);
+        token_parse_expression(&lazy_context, expr->tokens, result);
       } else {
         result = token_parse_constant_expression(&lazy_context, expr->tokens);
       }
@@ -245,7 +245,8 @@ scope_lookup_force(
         {
           Compilation_Context body_context = *context;
           body_context.scope = function->scope;
-          token_parse_block(&body_context, body, function->builder, return_result_value);
+          body_context.builder = function->builder;
+          token_parse_block(&body_context, body, return_result_value);
         }
         fn_end(function->builder);
       }
@@ -1053,8 +1054,7 @@ void
 token_parse_macros(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
-  Scope *scope,
-  Function_Builder *builder
+  Scope *scope
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
@@ -1375,10 +1375,10 @@ PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
   const Token *token,
-  Function_Builder *builder,
   Value *result_value
 ) {
   MASS_TRY(*context->result);
+  assert(context->builder);
 
   Scope *scope = context->scope;
   switch(token->tag) {
@@ -1388,24 +1388,26 @@ token_force_value(
     }
     case Token_Tag_Integer: {
       Value *immediate = value_from_integer_token(context, token);
-      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
+      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
       return *context->result;
     }
     case Token_Tag_Hex_Integer: {
       Value *immediate = value_from_hex_integer_token(context, token);
-      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
+      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
       return *context->result;
     }
     case Token_Tag_Binary_Integer: {
       Value *immediate = value_from_binary_integer_token(context, token);
-      move_value(context->allocator, builder, &token->source_range, result_value, immediate);
+      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
       return *context->result;
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
-      Value *c_string_pointer = value_pointer_to(context, builder, &token->source_range, string_bytes);
-      move_value(context->allocator, builder, &token->source_range, result_value, c_string_pointer);
+      Value *c_string_pointer = value_pointer_to(
+        context, context->builder, &token->source_range, string_bytes
+      );
+      move_value(context->allocator, context->builder, &token->source_range, result_value, c_string_pointer);
       return *context->result;
     }
     case Token_Tag_Id: {
@@ -1419,14 +1421,14 @@ token_force_value(
         }
         return *context->result;
       } else {
-        move_value(context->allocator, builder, &token->source_range, result_value, value);
+        move_value(context->allocator, context->builder, &token->source_range, result_value, value);
       }
       return *context->result;
     }
     case Token_Tag_Value: {
       if (token->Value.value) {
         move_value(
-          context->allocator, builder, &token->source_range, result_value, token->Value.value
+          context->allocator, context->builder, &token->source_range, result_value, token->Value.value
         );
       } else {
         // TODO consider what should happen here
@@ -1434,15 +1436,14 @@ token_force_value(
       return *context->result;
     }
     case Token_Tag_Group: {
-      if (!builder) panic("Caller should only force (...) in a builder context");
       switch(token->Group.type) {
         case Token_Group_Type_Paren: {
           Token_View expression_tokens = token_view_from_token_array(token->Group.children);
-          token_parse_expression(context, expression_tokens, builder, result_value);
+          token_parse_expression(context, expression_tokens, result_value);
           return *context->result;
         }
         case Token_Group_Type_Curly: {
-          token_parse_block(context, token, builder, result_value);
+          token_parse_block(context, token, result_value);
           return *context->result;
         }
         case Token_Group_Type_Square: {
@@ -1473,8 +1474,7 @@ token_force_value(
 Array_Value_Ptr
 token_match_call_arguments(
   Compilation_Context *context,
-  const Token *token,
-  Function_Builder *builder
+  const Token *token
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (context->result->tag != Mass_Result_Tag_Success) return result;
@@ -1494,7 +1494,7 @@ token_match_call_arguments(
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
       Value *result_value = value_any(context->allocator);
-      token_parse_expression(context, view, builder, result_value);
+      token_parse_expression(context, view, result_value);
       dyn_array_push(result, result_value);
     }
   }
@@ -1911,7 +1911,6 @@ token_import_match_arguments(
 typedef const Token *(*token_rewrite_expression_callback)(
   Compilation_Context *context,
   Token_View,
-  Function_Builder *,
   Value *result_value,
   u64 *replacement_count
 );
@@ -1920,7 +1919,6 @@ void
 token_rewrite_expression(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
-  Function_Builder *builder,
   Value *result_value,
   token_rewrite_expression_callback callback
 ) {
@@ -1932,7 +1930,7 @@ token_rewrite_expression(
     for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
       Token_View rewrite_view = token_view_rest(token_view_from_token_array(*tokens), i);
       u64 replacement_count = 0;
-      const Token *token = callback(context, rewrite_view, builder, result_value, &replacement_count);
+      const Token *token = callback(context, rewrite_view, result_value, &replacement_count);
       if (replacement_count) {
         if (token) dyn_array_push(replacement, token);
         dyn_array_splice(*tokens, i, replacement_count, replacement);
@@ -2083,12 +2081,13 @@ compile_time_eval(
   Compilation_Context eval_context = *context;
   eval_context.scope = eval_program.global_scope;
   eval_context.program = &eval_program;
-
-  Function_Builder *eval_builder = fn_begin(&eval_context);
-  function_return_descriptor(context, &eval_builder->value->descriptor->Function, &descriptor_void);
+  eval_context.builder = fn_begin(&eval_context);
+  function_return_descriptor(
+    context, &eval_context.builder->value->descriptor->Function, &descriptor_void
+  );
 
   Value *expression_result_value = value_any(context->allocator);
-  token_parse_expression(&eval_context, view, eval_builder, expression_result_value);
+  token_parse_expression(&eval_context, view, expression_result_value);
 
   // We use a something like a C++ reference out parameter for the
   // result to have a consitent function signature on this C side of things.
@@ -2096,10 +2095,10 @@ compile_time_eval(
   // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
   Value *arg_value = function_next_argument_value(
     context->allocator,
-    &eval_builder->value->descriptor->Function,
+    &eval_context.builder->value->descriptor->Function,
     descriptor_pointer_to(context->allocator, expression_result_value->descriptor)
   );
-  dyn_array_push(eval_builder->value->descriptor->Function.arguments, arg_value);
+  dyn_array_push(eval_context.builder->value->descriptor->Function.arguments, arg_value);
 
   // Create a reference Value
   assert(arg_value->operand.tag == Operand_Tag_Register);
@@ -2113,8 +2112,8 @@ compile_time_eval(
     },
   };
 
-  move_value(context->allocator, eval_builder, &first_token->source_range, out_value, expression_result_value);
-  fn_end(eval_builder);
+  move_value(context->allocator, eval_context.builder, &first_token->source_range, out_value, expression_result_value);
+  fn_end(eval_context.builder);
 
   program_jit(&eval_context);
 
@@ -2125,7 +2124,7 @@ compile_time_eval(
   void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
 
   Compile_Time_Eval_Proc jitted_code =
-    (Compile_Time_Eval_Proc)value_as_function(&eval_program, eval_builder->value);
+    (Compile_Time_Eval_Proc)value_as_function(&eval_program, eval_context.builder->value);
 
   jitted_code(result);
   Value *token_value = allocator_allocate(context->allocator, Value);
@@ -2170,7 +2169,6 @@ compile_time_eval(
 typedef void (*Operator_Dispatch_Proc)(
   Compilation_Context *,
   Token_View,
-  Function_Builder *,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
@@ -2331,7 +2329,6 @@ void
 token_dispatch_constant_operator(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
@@ -2430,7 +2427,6 @@ bool
 token_handle_operator(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   Operator_Dispatch_Proc dispatch_proc,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
@@ -2456,7 +2452,7 @@ token_handle_operator(
 
     // apply the operator on the stack
     Slice popped_operator = *dyn_array_pop(*operator_stack);
-    dispatch_proc(context, view, builder, token_stack, operator_stack, popped_operator);
+    dispatch_proc(context, view, token_stack, operator_stack, popped_operator);
   }
   dyn_array_push(*operator_stack, new_operator);
   return true;
@@ -2503,7 +2499,7 @@ token_parse_constant_expression(
           case Token_Group_Type_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, 0, token_dispatch_constant_operator,
+                context, view, token_dispatch_constant_operator,
                 &token_stack, &operator_stack, slice_literal("()")
               )) goto err;
             }
@@ -2528,7 +2524,7 @@ token_parse_constant_expression(
           dyn_array_push(token_stack, token);
         } else {
           if (!token_handle_operator(
-            context, view, 0, token_dispatch_constant_operator,
+            context, view, token_dispatch_constant_operator,
             &token_stack, &operator_stack, token->source
           )) goto err;
           is_previous_an_operator = true;
@@ -2542,7 +2538,7 @@ token_parse_constant_expression(
           operator = slice_literal("-x");
         }
         if (!token_handle_operator(
-          context, view, 0, token_dispatch_constant_operator,
+          context, view, token_dispatch_constant_operator,
           &token_stack, &operator_stack, operator
         )) goto err;
         is_previous_an_operator = true;
@@ -2554,7 +2550,7 @@ token_parse_constant_expression(
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
     token_dispatch_constant_operator(
-      context, view, 0, &token_stack, &operator_stack, operator
+      context, view, &token_stack, &operator_stack, operator
     );
   }
   if (dyn_array_length(token_stack) == 1) {
@@ -2576,7 +2572,6 @@ bool
 token_parse_constant_definitions(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *unused_builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2608,7 +2603,6 @@ token_maybe_macro_call_with_lazy_arguments(
   Value *target,
   Token_View args_view,
   const Source_Range *call_source_range,
-  Function_Builder *builder,
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2653,7 +2647,7 @@ token_maybe_macro_call_with_lazy_arguments(
       .lazy_expression = {
         .tokens = arg_expr,
         .scope = context->scope,
-        .maybe_builder = builder,
+        .maybe_builder = context->builder,
       },
     });
   }
@@ -2675,11 +2669,11 @@ token_maybe_macro_call_with_lazy_arguments(
   {
     Compilation_Context body_context = *context;
     body_context.scope = body_scope;
-    token_parse_block(&body_context, body, builder, result_value);
+    token_parse_block(&body_context, body, result_value);
   }
 
   push_instruction(
-    &builder->code_block.instructions,
+    &context->builder->code_block.instructions,
     call_source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
@@ -2694,13 +2688,12 @@ token_handle_function_call(
   Compilation_Context *context,
   const Token *target_token,
   const Token *args_token,
-  Function_Builder *builder,
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Value *target = value_any(context->allocator);
-  MASS_ON_ERROR(token_force_value(context, target_token, builder, target)) return 0;
+  MASS_ON_ERROR(token_force_value(context, target_token, target)) return 0;
   assert(token_match(args_token, &(Token_Pattern){.group_type = Token_Group_Type_Paren}));
 
   // TODO consider how this should be exposed in the syntax
@@ -2724,20 +2717,20 @@ token_handle_function_call(
     bool acquired_registers[countof(arg_registers)] = {0};
     for (uint64_t i = 0; i < countof(arg_registers); ++i) {
       Register reg_index = arg_registers[i];
-      if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-        register_acquire(builder, reg_index);
+      if (!register_bitset_get(context->builder->code_block.register_occupied_bitset, reg_index)) {
+        register_acquire(context->builder, reg_index);
         acquired_registers[i] = true;
       }
     }
 
-    args = token_match_call_arguments(context, args_token, builder);
+    args = token_match_call_arguments(context, args_token);
 
     // Release any registers that we fake acquired to make sure that the actual call
     // does not unnecessarily store them to stack
     for (uint64_t i = 0; i < countof(arg_registers); ++i) {
       if (acquired_registers[i]) {
         Register reg_index = arg_registers[i];
-        register_release(builder, reg_index);
+        register_release(context->builder, reg_index);
       }
     }
   }
@@ -2808,11 +2801,11 @@ token_handle_function_call(
       {
         Compilation_Context body_context = *context;
         body_context.scope = body_scope;
-        token_parse_block(&body_context, body, builder, return_value);
+        token_parse_block(&body_context, body, return_value);
       }
 
       push_instruction(
-        &builder->code_block.instructions,
+        &context->builder->code_block.instructions,
         &target_token->source_range,
         (Instruction) {
           .type = Instruction_Type_Label,
@@ -2820,7 +2813,7 @@ token_handle_function_call(
         }
       );
     } else {
-      return_value = call_function_overload(context, builder, source_range, overload, args);
+      return_value = call_function_overload(context, source_range, overload, args);
     }
 
     result = token_value_make(context, return_value, target_token->source_range);
@@ -2838,7 +2831,6 @@ void
 token_dispatch_operator(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
   Slice operator
@@ -2854,10 +2846,10 @@ token_dispatch_operator(
     const Token *target_token = *dyn_array_pop(*token_stack);
 
     Value *array = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, target_token, builder, array)) return;
+    MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
     Value *index_value = value_any(context->allocator);
     Token_View index_tokens = token_view_from_token_array(brackets->Group.children);
-    token_parse_expression(context, index_tokens, builder, index_value);
+    token_parse_expression(context, index_tokens, index_value);
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory_Indirect);
 
@@ -2895,7 +2887,13 @@ token_dispatch_operator(
       }
       Value *index_value_in_register =
         value_register_for_descriptor(context->allocator, Register_R10, index_value->descriptor);
-      move_value(context->allocator, builder, &target_token->source_range, index_value_in_register, index_value);
+      move_value(
+        context->allocator,
+        context->builder,
+        &target_token->source_range,
+        index_value_in_register,
+        index_value
+      );
       *result = (Value){
         .descriptor = item_descriptor,
         .operand = {
@@ -2921,20 +2919,22 @@ token_dispatch_operator(
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("cast"))
     ) {
-      Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
+      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
       result_token = token_handle_cast(context, &args_token->source_range, args);
       dyn_array_destroy(args);
     } else {
       result_token = token_handle_function_call(
-        context, target, args_token, builder, value_any(context->allocator)
+        context, target, args_token, value_any(context->allocator)
       );
     }
   } else if (slice_equal(operator, slice_literal("&"))) {
     const Token *pointee_token = *dyn_array_pop(*token_stack);
 
     Value *pointee = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, pointee_token, builder, pointee)) return;
-    Value *result_value = value_pointer_to(context, builder, &pointee_token->source_range, pointee);
+    MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
+    Value *result_value = value_pointer_to(
+      context, context->builder, &pointee_token->source_range, pointee
+    );
 
     result_token = token_value_make(context, result_value, pointee_token->source_range);
   } else if (slice_equal(operator, slice_literal("."))) {
@@ -2943,7 +2943,7 @@ token_dispatch_operator(
     Value *result_value = 0;
     if (rhs->tag == Token_Tag_Id) {
       Value *struct_value = value_any(context->allocator);
-      MASS_ON_ERROR(token_force_value(context, lhs, builder, struct_value)) return;
+      MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
       result_value = struct_get_field(context->allocator, struct_value, rhs->source);
     } else {
       panic("FIXME user error");
@@ -2960,9 +2960,9 @@ token_dispatch_operator(
     const Token *lhs = *dyn_array_pop(*token_stack);
 
     Value *lhs_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, lhs, builder, lhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
     Value *rhs_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, rhs, builder, rhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     Descriptor *larger_descriptor =
       descriptor_byte_size(lhs_value->descriptor) > descriptor_byte_size(rhs_value->descriptor)
@@ -2970,6 +2970,7 @@ token_dispatch_operator(
       : rhs_value->descriptor;
 
     // FIXME figure out how to avoid this
+    Function_Builder *builder = context->builder;
     Value *result_value = reserve_stack(context->allocator, builder, larger_descriptor);
     if (slice_equal(operator, slice_literal("+"))) {
       plus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
@@ -2997,9 +2998,9 @@ token_dispatch_operator(
     const Token *lhs = *dyn_array_pop(*token_stack);
 
     Value *lhs_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, lhs, builder, lhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
     Value *rhs_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, rhs, builder, rhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     if (!descriptor_is_integer(lhs_value->descriptor)) {
       program_error_builder(context, lhs->source_range) {
@@ -3073,13 +3074,13 @@ token_dispatch_operator(
 
     Value *raw = value_any(context->allocator);
     compare(
-      context->allocator, compare_type, builder,
+      context->allocator, compare_type, context->builder,
       &lhs->source_range, raw, lhs_value, rhs_value
     );
 
     // FIXME figure out how to avoid this
-    Value *result_value = reserve_stack(context->allocator, builder, raw->descriptor);
-    move_value(context->allocator, builder, &lhs->source_range, result_value, raw);
+    Value *result_value = reserve_stack(context->allocator, context->builder, raw->descriptor);
+    move_value(context->allocator, context->builder, &lhs->source_range, result_value, raw);
     result_token = token_value_make(context, result_value, lhs->source_range);
   } else {
     panic("TODO: Unknown operator");
@@ -3093,14 +3094,13 @@ bool
 token_parse_expression(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if (!view.length) {
     // FIXME provide a source range
-    move_value(context->allocator, builder, &(Source_Range){0}, result_value, &void_value);
+    move_value(context->allocator, context->builder, &(Source_Range){0}, result_value, &void_value);
     return true;
   }
 
@@ -3135,7 +3135,7 @@ token_parse_expression(
           case Token_Group_Type_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, builder, token_dispatch_operator,
+                context, view, token_dispatch_operator,
                 &token_stack, &operator_stack, slice_literal("()")
               )) goto err;
             }
@@ -3148,7 +3148,7 @@ token_parse_expression(
           case Token_Group_Type_Square: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, builder, token_dispatch_operator,
+                context, view, token_dispatch_operator,
                 &token_stack, &operator_stack, slice_literal("[]")
               )) goto err;
             }
@@ -3165,7 +3165,7 @@ token_parse_expression(
           operator = slice_literal("-x");
         }
         if (!token_handle_operator(
-          context, view, builder, token_dispatch_operator,
+          context, view, token_dispatch_operator,
           &token_stack, &operator_stack, operator
         )) goto err;
         is_previous_an_operator = true;
@@ -3176,15 +3176,13 @@ token_parse_expression(
 
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
-    token_dispatch_operator(
-      context, view, builder, &token_stack, &operator_stack, operator
-    );
+    token_dispatch_operator(context, view, &token_stack, &operator_stack, operator);
   }
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(token_stack) == 1) {
       const Token *token = *dyn_array_last(token_stack);
       assert(token);
-      MASS_ON_ERROR(token_force_value(context, token, builder, result_value)) goto err;
+      MASS_ON_ERROR(token_force_value(context, token, result_value)) goto err;
     } else {
       program_error_builder(context, source_range_from_token_view(view)) {
         program_error_append_literal("Could not parse the expression");
@@ -3205,7 +3203,6 @@ token_parse_statement(
   Compilation_Context *context,
   Token_View view,
   const Source_Range *source_range,
-  Function_Builder *builder,
   Value *result_value
 );
 
@@ -3213,7 +3210,6 @@ bool
 token_parse_block(
   Compilation_Context *context,
   const Token *block,
-  Function_Builder *builder,
   Value *block_result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3248,14 +3244,14 @@ token_parse_block(
     // as temporary when evaluating last statement. This definitely can happen with
     // the function returns but should be safe to do all the time.
     if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
-      if (
-        !register_bitset_get(builder->used_register_bitset, result_value->operand.Register.index)
-      ) {
-        register_acquire(builder, result_value->operand.Register.index);
+      if (!register_bitset_get(
+        context->builder->used_register_bitset, result_value->operand.Register.index
+      )) {
+        register_acquire(context->builder, result_value->operand.Register.index);
       }
     }
 
-    token_parse_statement(&body_context, view, &block->source_range, builder, result_value);
+    token_parse_statement(&body_context, view, &block->source_range, result_value);
   }
   return true;
 }
@@ -3264,7 +3260,6 @@ bool
 token_parse_statement_label(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3290,7 +3285,7 @@ token_parse_statement_label(
   // FIXME make sure we don't double declare label
   Value *value = scope_lookup_force(
     context,
-    builder->value->descriptor->Function.scope,
+    context->builder->value->descriptor->Function.scope,
     id->source
   );
 
@@ -3320,7 +3315,7 @@ token_parse_statement_label(
   }
 
   push_instruction(
-    &builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, &keyword->source_range,
     (Instruction) { .type = Instruction_Type_Label, .label = value->operand.Label.index }
   );
 
@@ -3332,7 +3327,6 @@ bool
 token_parse_statement_if(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3356,17 +3350,17 @@ token_parse_statement_if(
   };
 
   Value *condition_value = value_any(context->allocator);
-  token_parse_expression(context, condition_view, builder, condition_value);
+  token_parse_expression(context, condition_view, condition_value);
   if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
     goto err;
   }
 
   Label_Index else_label = make_if(
-    context, &builder->code_block.instructions, &keyword->source_range, condition_value
+    context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
   );
-  token_parse_block(context, body, builder, value_any(context->allocator));
+  token_parse_block(context, body, value_any(context->allocator));
   push_instruction(
-    &builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
@@ -3378,7 +3372,6 @@ bool
 token_parse_goto(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3422,7 +3415,7 @@ token_parse_goto(
     };
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
-    scope_define_value(builder->value->descriptor->Function.scope, id->source, value);
+    scope_define_value(context->builder->value->descriptor->Function.scope, id->source, value);
   }
 
   if (
@@ -3437,7 +3430,7 @@ token_parse_goto(
   }
 
   push_instruction(
-    &builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, &keyword->source_range,
     (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
   );
 
@@ -3449,7 +3442,6 @@ bool
 token_parse_explicit_return(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3463,13 +3455,13 @@ token_parse_explicit_return(
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
-  token_parse_expression(context, rest, builder, fn_return);
+  token_parse_expression(context, rest, fn_return);
 
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
   if (is_any_return) {
-    Value *stack_return = reserve_stack(context->allocator, builder, fn_return->descriptor);
-    move_value(context->allocator, builder, &keyword->source_range, stack_return, fn_return);
+    Value *stack_return = reserve_stack(context->allocator, context->builder, fn_return->descriptor);
+    move_value(context->allocator, context->builder, &keyword->source_range, stack_return, fn_return);
     *fn_return = *stack_return;
   }
 
@@ -3486,7 +3478,7 @@ token_parse_explicit_return(
   assert(return_label->operand.tag == Operand_Tag_Label);
 
   push_instruction(
-    &builder->code_block.instructions,
+    &context->builder->code_block.instructions,
     &keyword->source_range,
     (Instruction) {.assembly = {jmp, {return_label->operand, 0, 0}}}
   );
@@ -3540,7 +3532,6 @@ bool
 token_parse_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3550,7 +3541,7 @@ token_parse_inline_machine_code_bytes(
   // TODO improve error reporting and / or transition to compile time functions when available
   Token_Match(args_token, .group_type = Token_Group_Type_Paren);
 
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token, builder);
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
 
   Instruction_Bytes bytes = {
     .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
@@ -3603,7 +3594,7 @@ token_parse_inline_machine_code_bytes(
   }
 
   push_instruction(
-    &builder->code_block.instructions, &id_token->source_range,
+    &context->builder->code_block.instructions, &id_token->source_range,
     (Instruction) {
       .type = Instruction_Type_Bytes,
       .Bytes = bytes,
@@ -3617,8 +3608,7 @@ token_parse_inline_machine_code_bytes(
 Value *
 token_parse_definition(
   Compilation_Context *context,
-  Token_View view,
-  Function_Builder *builder
+  Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -3635,7 +3625,7 @@ token_parse_definition(
     }
     goto err;
   }
-  Value *value = reserve_stack(context->allocator, builder, descriptor);
+  Value *value = reserve_stack(context->allocator, context->builder, descriptor);
   scope_define_value(context->scope, name->source, value);
   return value;
 
@@ -3647,19 +3637,17 @@ bool
 token_parse_definitions(
   Compilation_Context *context,
   Token_View state,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  return !!token_parse_definition(context, state, builder);
+  return !!token_parse_definition(context, state);
 }
 
 bool
 token_parse_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3678,7 +3666,7 @@ token_parse_definition_and_assignment_statements(
   if (name->tag != Token_Tag_Id) return false;
 
   Value *value = value_any(context->allocator);
-  token_parse_expression(context, rhs, builder, value);
+  token_parse_expression(context, rhs, value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
@@ -3689,8 +3677,8 @@ token_parse_definition_and_assignment_statements(
   ) {
     panic("TODO decide how to handle opaque types");
   }
-  Value *on_stack = reserve_stack(context->allocator, builder, value->descriptor);
-  move_value(context->allocator, builder, &name->source_range, on_stack, value);
+  Value *on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
+  move_value(context->allocator, context->builder, &name->source_range, on_stack, value);
 
   scope_define_value(context->scope, name->source, on_stack);
   return true;
@@ -3700,7 +3688,6 @@ bool
 token_parse_assignment(
   Compilation_Context *context,
   Token_View view,
-  Function_Builder *builder,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3712,12 +3699,12 @@ token_parse_assignment(
     return false;
   }
 
-  Value *target = token_parse_definition(context, lhs, builder);
+  Value *target = token_parse_definition(context, lhs);
   if (!target) {
     target = value_any(context->allocator);
-    token_parse_expression(context, lhs, builder, target);
+    token_parse_expression(context, lhs, target);
   }
-  token_parse_expression(context, rhs, builder, target);
+  token_parse_expression(context, rhs, target);
   return true;
 }
 
@@ -3726,14 +3713,13 @@ token_parse_statement(
   Compilation_Context *context,
   Token_View view,
   const Source_Range *source_range,
-  Function_Builder *builder,
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
-  token_parse_macros(context, &statement_tokens, context->scope, builder);
+  token_parse_macros(context, &statement_tokens, context->scope);
   view = token_view_from_token_array(statement_tokens);
   for (
     Scope *statement_matcher_scope = context->scope;
@@ -3746,13 +3732,13 @@ token_parse_statement(
     for (u64 i = 0 ; i < dyn_array_length(statement_matcher_scope->statement_matchers); ++i) {
       Token_Statement_Matcher matcher =
         *dyn_array_get(statement_matcher_scope->statement_matchers, i);
-      if (matcher.proc(context, view, builder, matcher.payload)) {
+      if (matcher.proc(context, view, matcher.payload)) {
         return true;
       }
     }
   }
 
-  bool result = token_parse_expression(context, view, builder, result_value);
+  bool result = token_parse_expression(context, view, result_value);
   dyn_array_destroy(statement_tokens);
   return result;
 }
@@ -3772,7 +3758,7 @@ token_parse(
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
-    if (token_parse_constant_definitions(context, statement, 0, 0)) {
+    if (token_parse_constant_definitions(context, statement, 0)) {
       continue;
     }
 

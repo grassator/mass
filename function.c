@@ -1080,11 +1080,11 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 Value *
 call_function_overload(
   Compilation_Context *context,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *to_call,
   Array_Value_Ptr arguments
 ) {
+  Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(to_call->descriptor->tag == Descriptor_Tag_Function);
   Descriptor_Function *descriptor = &to_call->descriptor->Function;

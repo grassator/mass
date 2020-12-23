@@ -274,6 +274,7 @@ typedef struct {
   Allocator *allocator;
   Program *program;
   Scope *scope;
+  Function_Builder *builder;
   Mass_Result *result;
 } Compilation_Context;
 
