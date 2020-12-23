@@ -337,18 +337,6 @@ scope_lookup_operator(
   return true;
 }
 
-void
-scope_define_operator(
-  Scope *scope,
-  Slice name,
-  s64 precedence
-) {
-  scope_define(scope, name, (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = precedence }
-  });
-}
-
 bool
 code_point_is_operator(
   s32 code_point
@@ -2125,7 +2113,8 @@ typedef void (*Operator_Dispatch_Proc)(
   Token_View,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
-  Slice operator
+  Slice operator,
+  Scope_Entry_Operator *operator_entry
 );
 
 const Token *
@@ -2244,9 +2233,12 @@ token_handle_cast(
 const Token *
 token_handle_negation(
   Compilation_Context *context,
-  const Token *token
+  Token_View view,
+  void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  assert(view.length == 1);
+  const Token *token = token_view_get(view, 0);
 
   Value *value = token_force_constant_value(context, token);
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
@@ -2285,13 +2277,18 @@ token_dispatch_constant_operator(
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
-  Slice operator
+  Slice operator,
+  Scope_Entry_Operator *operator_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
-    const Token *new_token = token_handle_negation(context, token);
+    Token_View args_view = {
+      .tokens = &token,
+      .length = 1,
+    };
+    const Token *new_token = token_handle_negation(context, args_view, 0);
     dyn_array_push(*token_stack, new_token);
   } else if (slice_equal(operator, slice_literal("()"))) {
     const Token *args = *dyn_array_pop(*token_stack);
@@ -2410,9 +2407,10 @@ token_handle_operator(
       break;
     }
 
+    dyn_array_pop(*operator_stack);
+
     // apply the operator on the stack
-    Slice popped_operator = *dyn_array_pop(*operator_stack);
-    dispatch_proc(context, view, token_stack, operator_stack, popped_operator);
+    dispatch_proc(context, view, token_stack, operator_stack, last_operator, &last_operator_entry);
   }
   dyn_array_push(*operator_stack, new_operator);
   return true;
@@ -2504,8 +2502,12 @@ token_parse_constant_expression(
 
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
+    Scope_Entry_Operator last_operator_entry;
+    if (!scope_lookup_operator(context->scope, operator, &last_operator_entry)) {
+      panic("Internal Error: Expecting operators on the stack to be resolvable");
+    }
     token_dispatch_constant_operator(
-      context, view, &token_stack, &operator_stack, operator
+      context, view, &token_stack, &operator_stack, operator, &last_operator_entry
     );
   }
   if (dyn_array_length(token_stack) == 1) {
@@ -2788,14 +2790,38 @@ token_dispatch_operator(
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Array_Slice *operator_stack,
-  Slice operator
+  Slice operator,
+  Scope_Entry_Operator *operator_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   const Token *result_token;
-  if (slice_equal(operator, slice_literal("-x"))) {
-    const Token *token = *dyn_array_pop(*token_stack);
-    result_token = token_handle_negation(context, token);
+
+  if (operator_entry->handler) {
+    u64 argument_count = operator_entry->argument_count;
+    if (dyn_array_length(*token_stack) < argument_count) {
+      // FIXME provide source range
+      program_error_builder(context, (Source_Range){0}) {
+        program_error_append_literal("Operator ");
+        program_error_append_slice(operator);
+        program_error_append_literal(" required ");
+        program_error_append_number("%" PRIu64, argument_count);
+        program_error_append_literal(" get ");
+        program_error_append_number("%" PRIu64, dyn_array_length(*token_stack));
+      }
+      return;
+    }
+    // TODO maybe reverse the arguments in place on the stack @Speed
+    Array_Const_Token_Ptr args = dyn_array_make(
+      Array_Const_Token_Ptr, .capacity = argument_count
+    );
+    for (u64 i = 0; i < argument_count; ++i) {
+      dyn_array_push(args, *dyn_array_pop(*token_stack));
+    }
+
+    Token_View args_view = token_view_from_token_array(args);
+    result_token = operator_entry->handler(context, args_view, 0);
+    dyn_array_destroy(args);
   } else if (slice_equal(operator, slice_literal("[]"))) {
     const Token *brackets = *dyn_array_pop(*token_stack);
     const Token *target_token = *dyn_array_pop(*token_stack);
@@ -3131,7 +3157,11 @@ token_parse_expression(
 
   while (dyn_array_length(operator_stack)) {
     Slice operator = *dyn_array_pop(operator_stack);
-    token_dispatch_operator(context, view, &token_stack, &operator_stack, operator);
+    Scope_Entry_Operator last_operator_entry;
+    if (!scope_lookup_operator(context->scope, operator, &last_operator_entry)) {
+      panic("Internal Error: Expecting operators on the stack to be resolvable");
+    }
+    token_dispatch_operator(context, view, &token_stack, &operator_stack, operator, &last_operator_entry);
   }
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(token_stack) == 1) {

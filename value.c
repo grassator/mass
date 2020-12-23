@@ -1286,34 +1286,104 @@ program_init(
     },
   };
 
-  scope_define_operator(program->global_scope, slice_literal("[]"), 20);
-  scope_define_operator(program->global_scope, slice_literal("()"), 20);
-  scope_define_operator(program->global_scope, slice_literal("."), 20);
+  scope_define(program->global_scope, slice_literal("[]"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 20 }
+  });
+  scope_define(program->global_scope, slice_literal("()"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 20 }
+  });
+  scope_define(program->global_scope, slice_literal("."), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 19 }
+  });
+  scope_define(program->global_scope, slice_literal("->"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 19 }
+  });
+  scope_define(program->global_scope, slice_literal("macro"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 19 }
+  });
+  scope_define(program->global_scope, slice_literal("@"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 18 }
+  });
 
-  scope_define_operator(program->global_scope, slice_literal("->"), 19);
-  scope_define_operator(program->global_scope, slice_literal("macro"), 19);
 
-  scope_define_operator(program->global_scope, slice_literal("@"), 18);
-  scope_define_operator(program->global_scope, slice_literal("-x"), 17);
-  scope_define_operator(program->global_scope, slice_literal("&"), 16);
+  scope_define(program->global_scope, slice_literal("-x"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = {
+      .precedence = 17,
+      .handler = token_handle_negation,
+      .argument_count = 1,
+    }
+  });
 
-  scope_define_operator(program->global_scope, slice_literal("*"), 15);
-  scope_define_operator(program->global_scope, slice_literal("/"), 15);
-  scope_define_operator(program->global_scope, slice_literal("%"), 15);
 
-  scope_define_operator(program->global_scope, slice_literal("+"), 10);
-  scope_define_operator(program->global_scope, slice_literal("-"), 10);
+  scope_define(program->global_scope, slice_literal("&"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 16 }
+  });
+  scope_define(program->global_scope, slice_literal("*"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 15 }
+  });
+  scope_define(program->global_scope, slice_literal("/"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 15 }
+  });
+  scope_define(program->global_scope, slice_literal("%"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 15 }
+  });
 
-  scope_define_operator(program->global_scope, slice_literal("<"), 8);
-  scope_define_operator(program->global_scope, slice_literal(">"), 8);
-  scope_define_operator(program->global_scope, slice_literal("<="), 8);
-  scope_define_operator(program->global_scope, slice_literal(">="), 8);
+  scope_define(program->global_scope, slice_literal("+"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 10 }
+  });
+  scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 10 }
+  });
 
-  scope_define_operator(program->global_scope, slice_literal("=="), 7);
-  scope_define_operator(program->global_scope, slice_literal("!="), 7);
 
-  scope_define_operator(program->global_scope, slice_literal("&&"), 5);
-  scope_define_operator(program->global_scope, slice_literal("||"), 4);
+  scope_define(program->global_scope, slice_literal("<"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 8 }
+  });
+  scope_define(program->global_scope, slice_literal(">"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 8 }
+  });
+  scope_define(program->global_scope, slice_literal("<="), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 8 }
+  });
+  scope_define(program->global_scope, slice_literal(">="), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 8 }
+  });
+
+  scope_define(program->global_scope, slice_literal("=="), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 7}
+  });
+  scope_define(program->global_scope, slice_literal("!="), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 7 }
+  });
+
+
+  scope_define(program->global_scope, slice_literal("&&"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 5 }
+  });
+  scope_define(program->global_scope, slice_literal("||"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Operator,
+    .Operator = { .precedence = 4 }
+  });
 
 
   scope_define_value(program->global_scope, slice_literal("any"), type_any_value);

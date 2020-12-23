@@ -17,11 +17,12 @@ typedef struct {
   Function_Builder *maybe_builder;
 } Scope_Lazy_Expression;
 
-typedef void (*Token_Handle_Operator_Proc)
+typedef const Token *(*Token_Handle_Operator_Proc)
 (Compilation_Context *context, Token_View, void *payload);
 
 typedef struct {
   s64 precedence;
+  u64 argument_count;
   Token_Handle_Operator_Proc handler;
 } Scope_Entry_Operator;
 
@@ -92,6 +93,13 @@ scope_make(
   Scope *parent
 );
 
+static inline void
+scope_define(
+  Scope *scope,
+  Slice name,
+  Scope_Entry entry
+);
+
 void
 scope_define_value(
   Scope *scope,
@@ -99,11 +107,11 @@ scope_define_value(
   Value *value
 );
 
-void
-scope_define_operator(
-  Scope *scope,
-  Slice name,
-  s64 precedence
+const Token *
+token_handle_negation(
+  Compilation_Context *context,
+  Token_View view,
+  void *unused_payload
 );
 
 bool
