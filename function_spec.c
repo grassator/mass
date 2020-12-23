@@ -39,6 +39,17 @@ spec("function") {
     bucket_buffer_destroy(temp_buffer);
   }
 
+  describe("stack") {
+    it("should correctly align allocated values") {
+      Value *a = reserve_stack(temp_allocator, builder, &descriptor_s8);
+      check(a->operand.tag == Operand_Tag_Memory_Indirect);
+      check(a->operand.Memory_Indirect.displacement == -1);
+      Value *b = reserve_stack(temp_allocator, builder, &descriptor_s32);
+      check(b->operand.tag == Operand_Tag_Memory_Indirect);
+      check(b->operand.Memory_Indirect.displacement == -8);
+    }
+  }
+
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
       Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
