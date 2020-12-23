@@ -18,8 +18,6 @@ token_clone_deep(
   switch (token->tag) {
     case Token_Tag_None:
     case Token_Tag_Integer:
-    case Token_Tag_Hex_Integer:
-    case Token_Tag_Binary_Integer:
     case Token_Tag_Operator:
     case Token_Tag_String:
     case Token_Tag_Id: {
@@ -417,15 +415,73 @@ token_match(
   return result;
 }
 
+void
+tokenizer_handle_decimal_integer_end(
+  const Source_File *file,
+  Token *current_token,
+  u64 index
+) {
+  u64 from = current_token->source_range.offsets.from;
+  u64 to = index;
+  Slice digits = slice_sub(file->text, from, to);
+  bool ok = true;
+  current_token->Integer.bits = slice_parse_u64(digits, &ok);
+  if (!ok) {
+    panic("Internal Error: Mismatch between tokenizer and decimal integer parser");
+  }
+}
+
+void
+tokenizer_handle_hex_integer_end(
+  const Source_File *file,
+  Token *current_token,
+  u64 index
+) {
+  u64 from = current_token->source_range.offsets.from;
+  from += slice_literal("0x").length;
+  u64 to = index;
+  Slice digits = slice_sub(file->text, from, to);
+  bool ok = true;
+  current_token->Integer.bits = slice_parse_hex(digits, &ok);
+  if (!ok) {
+    panic("Internal Error: Mismatch between tokenizer and hex integer parser");
+  }
+}
+
+void
+tokenizer_handle_binary_integer_end(
+  const Source_File *file,
+  Token *current_token,
+  u64 index
+) {
+  u64 from = current_token->source_range.offsets.from;
+  from += slice_literal("0b").length;
+  u64 to = index;
+  Slice digits = slice_sub(file->text, from, to);
+  bool ok = true;
+  current_token->Integer.bits = slice_parse_binary(digits, &ok);
+  if (!ok) {
+    panic("Internal Error: Mismatch between tokenizer and binary integer parser");
+  }
+}
+
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   Allocator *allocator,
   Source_File *file,
   Array_Const_Token_Ptr *out_tokens
 ) {
+
+  Array_Const_Token_Ptr parent_stack = dyn_array_make(Array_Const_Token_Ptr);
+  Token *root = &(Token){0};
+  root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
+
+  assert(!dyn_array_is_initialized(file->line_ranges));
+  file->line_ranges = dyn_array_make(Array_Range_u64);
+
   enum Tokenizer_State {
     Tokenizer_State_Default,
-    Tokenizer_State_Integer,
+    Tokenizer_State_Decimal_Integer,
     Tokenizer_State_Binary_Integer,
     Tokenizer_State_Hex_Integer,
     Tokenizer_State_Operator,
@@ -434,13 +490,6 @@ tokenize(
     Tokenizer_State_String_Escape,
     Tokenizer_State_Single_Line_Comment,
   };
-
-  Array_Const_Token_Ptr parent_stack = dyn_array_make(Array_Const_Token_Ptr);
-  Token *root = &(Token){0};
-  root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
-
-  assert(!dyn_array_is_initialized(file->line_ranges));
-  file->line_ranges = dyn_array_make(Array_Range_u64);
 
   Range_u64 current_line = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
@@ -533,16 +582,16 @@ tokenize(
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
-          start_token(Token_Tag_Hex_Integer);
+          start_token(Token_Tag_Integer);
           i++;
           state = Tokenizer_State_Hex_Integer;
         } else if (ch == '0' && peek == 'b') {
-          start_token(Token_Tag_Binary_Integer);
+          start_token(Token_Tag_Integer);
           i++;
           state = Tokenizer_State_Binary_Integer;
         } else if (isdigit(ch)) {
           start_token(Token_Tag_Integer);
-          state = Tokenizer_State_Integer;
+          state = Tokenizer_State_Decimal_Integer;
         } else if (isalpha(ch) || ch == '_') {
           start_token(Token_Tag_Id);
           state = Tokenizer_State_Id;
@@ -614,8 +663,9 @@ tokenize(
         }
         break;
       }
-      case Tokenizer_State_Integer: {
+      case Tokenizer_State_Decimal_Integer: {
         if (!isdigit(ch)) {
+          tokenizer_handle_decimal_integer_end(file, current_token, i);
           reject_and_push;
           goto retry;
         }
@@ -623,6 +673,7 @@ tokenize(
       }
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
+          tokenizer_handle_hex_integer_end(file, current_token, i);
           reject_and_push;
           goto retry;
         }
@@ -630,6 +681,7 @@ tokenize(
       }
       case Tokenizer_State_Binary_Integer: {
         if (ch != '0' && ch != '1') {
+          tokenizer_handle_binary_integer_end(file, current_token, i);
           reject_and_push;
           goto retry;
         }
@@ -682,6 +734,35 @@ tokenize(
         }
         break;
       }
+    }
+  }
+
+  // Handle end of file
+  switch(state) {
+    case Tokenizer_State_Id:
+    case Tokenizer_State_Default:
+    case Tokenizer_State_Operator:
+    case Tokenizer_State_Single_Line_Comment: {
+      // Nothing to do
+      break;
+    }
+
+    case Tokenizer_State_Decimal_Integer: {
+      tokenizer_handle_decimal_integer_end(file, current_token, i);
+      break;
+    }
+    case Tokenizer_State_Hex_Integer: {
+      tokenizer_handle_hex_integer_end(file, current_token, i);
+      break;
+    }
+    case Tokenizer_State_Binary_Integer: {
+      tokenizer_handle_binary_integer_end(file, current_token, i);
+      break;
+    }
+    case Tokenizer_State_String:
+    case Tokenizer_State_String_Escape: {
+      TOKENIZER_HANDLE_ERROR("String without closing quote");
+      break;
     }
   }
 
@@ -867,8 +948,6 @@ token_force_type(
       };
       break;
     }
-    case Token_Tag_Binary_Integer:
-    case Token_Tag_Hex_Integer:
     case Token_Tag_Integer: {
       program_error_builder(context, token->source_range) {
         program_error_append_slice(token->source);
@@ -987,8 +1066,6 @@ token_apply_macro_replacements(
         continue;
       }
       case Token_Tag_Integer:
-      case Token_Tag_Binary_Integer:
-      case Token_Tag_Hex_Integer:
       case Token_Tag_Operator:
       case Token_Tag_String: {
         Token *copy = allocator_allocate(context->allocator, Token);
@@ -1205,82 +1282,8 @@ value_from_integer_token(
   const Token *token
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  bool ok = false;
-  u64 number = slice_parse_u64(token->source, &ok);
-  if (!ok) {
-    program_error_builder(context, token->source_range) {
-      program_error_append_literal("Invalid integer literal: ");
-      program_error_append_slice(token->source);
-    }
-    return 0;
-  }
-  return value_from_unsigned_immediate(context->allocator, number);
-}
-
-Value *
-value_from_hex_integer_token(
-  Compilation_Context *context,
-  const Token *token
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  bool ok = false;
-  Slice digits = slice_sub(token->source, 2, token->source.length);
-  u64 number = slice_parse_hex(digits, &ok);
-  if (!ok) {
-    program_error_builder(context, token->source_range) {
-      program_error_append_literal("Invalid integer hex literal: ");
-      program_error_append_slice(token->source);
-    }
-    return 0;
-  }
-  // TODO should be unsigned
-  return value_from_signed_immediate(context->allocator, number);
-}
-
-u64
-slice_parse_binary(
-  Slice slice,
-  bool *ok
-) {
-  if (!ok) ok = &(bool){0};
-  *ok = true;
-
-  u64 integer = 0;
-  for (u64 index = 0; index < slice.length; ++index) {
-    u64 byte_index = slice.length - index - 1;
-    s8 byte = slice.bytes[byte_index];
-    u64 digit = 0;
-    if (byte == '1') {
-      digit = 1;
-    } else if (byte != '0') {
-      *ok = false;
-      return 0;
-    }
-    integer += digit << index;
-  }
-  return integer;
-}
-
-Value *
-value_from_binary_integer_token(
-  Compilation_Context *context,
-  const Token *token
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  bool ok = false;
-  Slice digits = slice_sub(token->source, 2, token->source.length);
-  u64 number = slice_parse_binary(digits, &ok);
-  if (!ok) {
-    program_error_builder(context, token->source_range) {
-      program_error_append_literal("Invalid integer binary literal: ");
-      program_error_append_slice(token->source);
-    }
-    return 0;
-  }
-  return value_from_unsigned_immediate(context->allocator, number);
+  assert(token->tag == Token_Tag_Integer);
+  return value_from_unsigned_immediate(context->allocator, token->Integer.bits);
 }
 
 Value *
@@ -1297,12 +1300,6 @@ token_force_constant_value(
     }
     case Token_Tag_Integer: {
       return value_from_integer_token(context, token);
-    }
-    case Token_Tag_Hex_Integer: {
-      return value_from_hex_integer_token(context, token);
-    }
-    case Token_Tag_Binary_Integer: {
-      return value_from_binary_integer_token(context, token);
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
@@ -1360,16 +1357,6 @@ token_force_value(
     }
     case Token_Tag_Integer: {
       Value *immediate = value_from_integer_token(context, token);
-      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
-      return *context->result;
-    }
-    case Token_Tag_Hex_Integer: {
-      Value *immediate = value_from_hex_integer_token(context, token);
-      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
-      return *context->result;
-    }
-    case Token_Tag_Binary_Integer: {
-      Value *immediate = value_from_binary_integer_token(context, token);
       move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
       return *context->result;
     }
@@ -1665,8 +1652,6 @@ token_parse_syntax_definition(
       }
       case Token_Tag_Id:
       case Token_Tag_Integer:
-      case Token_Tag_Binary_Integer:
-      case Token_Tag_Hex_Integer:
       case Token_Tag_Value: {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Unsupported token tag in a syntax definition");
@@ -2448,8 +2433,6 @@ token_parse_constant_expression(
         break;
       }
       case Token_Tag_Integer:
-      case Token_Tag_Binary_Integer:
-      case Token_Tag_Hex_Integer:
       case Token_Tag_String:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
@@ -3085,8 +3068,6 @@ token_parse_expression(
         break;
       }
       case Token_Tag_Integer:
-      case Token_Tag_Binary_Integer:
-      case Token_Tag_Hex_Integer:
       case Token_Tag_String:
       case Token_Tag_Id:
       case Token_Tag_Value: {
@@ -3538,11 +3519,11 @@ token_parse_inline_machine_code_bytes(
         }
         goto err;
       }
-      s64 byte = operand_immediate_value_up_to_s64(&value->operand);
+      u64 byte = operand_immediate_value_up_to_u64(&value->operand);
       if (!u64_fits_into_u8(byte)) {
         program_error_builder(context, args_token->source_range) {
           program_error_append_literal("Expected integer between 0 and 255, got ");
-          program_error_append_number("%" PRIi64, byte);
+          program_error_append_number("%" PRIu64, byte);
         }
         goto err;
       }

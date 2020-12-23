@@ -497,10 +497,10 @@ main(void) {
   push_type(add_common_fields(type_union("Token", (Struct[]){
     struct_empty("None"),
     struct_empty("Id"),
-    struct_empty("Integer"),
-    struct_empty("Hex_Integer"),
-    struct_empty("Binary_Integer"),
     struct_empty("Operator"),
+    struct_fields("Integer", (Struct_Item[]){
+      { "u64", "bits" },
+    }),
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),

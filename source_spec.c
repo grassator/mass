@@ -152,8 +152,9 @@ spec("source") {
     check(result.tag == Mass_Result_Tag_Success);
     check(dyn_array_length(tokens) == 1);
     const Token *token = *dyn_array_get(tokens, 0);
-    check(token->tag == Token_Tag_Hex_Integer);
+    check(token->tag == Token_Tag_Integer);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
+    check(token->Integer.bits == 0xCAFE, "Expected 0xCAFE, got 0x%" PRIx64, token->Integer.bits);
   }
 
   it("should be able to parse binary integers") {
@@ -164,8 +165,9 @@ spec("source") {
     check(result.tag == Mass_Result_Tag_Success);
     check(dyn_array_length(tokens) == 1);
     const Token *token = *dyn_array_get(tokens, 0);
-    check(token->tag == Token_Tag_Binary_Integer);
+    check(token->tag == Token_Tag_Integer);
     check(slice_equal(token->source, slice_literal("0b100")));
+    check(token->Integer.bits == 0b100, "Expected 0x8, got 0x%" PRIx64, token->Integer.bits);
   }
 
   it("should be able to tokenize a sum of integers") {

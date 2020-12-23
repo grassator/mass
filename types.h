@@ -371,15 +371,16 @@ typedef enum Token_Group_Type {
 typedef enum {
   Token_Tag_None = 0,
   Token_Tag_Id = 1,
-  Token_Tag_Integer = 2,
-  Token_Tag_Hex_Integer = 3,
-  Token_Tag_Binary_Integer = 4,
-  Token_Tag_Operator = 5,
-  Token_Tag_Value = 6,
-  Token_Tag_String = 7,
-  Token_Tag_Group = 8,
+  Token_Tag_Operator = 2,
+  Token_Tag_Integer = 3,
+  Token_Tag_Value = 4,
+  Token_Tag_String = 5,
+  Token_Tag_Group = 6,
 } Token_Tag;
 
+typedef struct {
+  u64 bits;
+} Token_Integer;
 typedef struct {
   Value * value;
 } Token_Value;
@@ -395,6 +396,7 @@ typedef struct Token {
   Source_Range source_range;
   Slice source;
   union {
+    Token_Integer Integer;
     Token_Value Value;
     Token_String String;
     Token_Group Group;
