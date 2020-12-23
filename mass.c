@@ -91,11 +91,8 @@ int main(s32 argc, char **argv) {
     printf("Could not find entry point function `main`");
     return -1;
   }
-  if (dyn_array_length(context.program->errors)) {
-    for (u64 i = 0; i < dyn_array_length(context.program->errors); ++i) {
-      mass_cli_print_error(dyn_array_get(context.program->errors, i));
-    }
-    return -1;
+  if(context.result->tag != Mass_Result_Tag_Success) {
+    return mass_cli_print_error(&context.result->Error.details);
   }
 
   switch(mode) {

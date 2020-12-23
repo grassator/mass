@@ -42,24 +42,8 @@ typedef struct {
 typedef Test_128bit (*fn_type_s64_to_test_128bit_struct)(s64);
 
 bool
-spec_check_and_print_program(
-  Program *program
-) {
-  bool success = true;
-  for (u64 i = 0; i < dyn_array_length(program->errors); ++i) {
-    success = false;
-    Parse_Error *error = dyn_array_get(program->errors, i);
-
-    slice_print(error->message);
-    printf("\n  at ");
-    source_range_print_start_position(&error->source_range);
-  }
-  return success;
-}
-
-bool
 spec_check_mass_result(
-  Mass_Result *result
+  const Mass_Result *result
 ) {
   if (result->tag == Mass_Result_Tag_Success) return true;
   slice_print(result->Error.details.message);
@@ -82,10 +66,10 @@ spec_check_mass_result(
 
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
-  check(spec_check_and_print_program(test_context.program));\
+  check(spec_check_mass_result(test_context.result));\
   check(_fn_value_id_);\
   program_jit(&test_context);\
-  check(spec_check_and_print_program(test_context.program))
+  check(spec_check_mass_result(test_context.result));
 
 
 spec("source") {
@@ -335,7 +319,7 @@ spec("source") {
     check(main);
 
     program_jit(&test_context);
-    check(!dyn_array_length(test_context.program->errors))
+    check(spec_check_mass_result(test_context.result));
 
     fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(test_context.program, main);
 
@@ -510,7 +494,9 @@ spec("source") {
       tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
     check(result.tag == Mass_Result_Tag_Success);
 
-    token_parse(&test_context, token_view_from_token_array(tokens));
+    MASS_ON_ERROR(token_parse(&test_context, token_view_from_token_array(tokens))) {
+      check(false, "Failed parsing");
+    }
 
     Value *checker_s64 =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"));
@@ -831,12 +817,14 @@ spec("source") {
       tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
     check(result.tag == Mass_Result_Tag_Success);
 
-    token_parse(&test_context, token_view_from_token_array(tokens));
+    MASS_ON_ERROR(token_parse(&test_context, token_view_from_token_array(tokens))) {
+      check(false, "Failed parsing");
+    }
 
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
-    check(spec_check_and_print_program(test_context.program));
+    check(spec_check_mass_result(test_context.result));
 
     write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
   }
@@ -847,7 +835,7 @@ spec("source") {
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point);
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
-    check(spec_check_and_print_program(test_context.program));
+    check(spec_check_mass_result(test_context.result));
 
     write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
   }
@@ -880,7 +868,7 @@ spec("source") {
     check(fizz_buzz);
 
     program_jit(&test_context);
-    check(spec_check_and_print_program(test_context.program));
+    check(spec_check_mass_result(test_context.result));
 
     fn_type_void_to_void checker =
       (fn_type_void_to_void)value_as_function(test_context.program, fizz_buzz);
@@ -890,36 +878,36 @@ spec("source") {
   describe("User Error") {
     it("should report an error for an `if` statement without a body or a condition") {
       test_program_inline_source_base("main :: () -> () { if; }", main);
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
     }
     it("should report an error for an `if` statement with an incorrect condition") {
       test_program_inline_source_base("main :: () -> () { if (1 < 0) { 0 } 42; }", main);
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Could not parse the expression"), error->message));
     }
     it("should be reported when encountering invalid pointer type") {
       test_program_inline_source_base("main :: (arg : [s32 s32]) -> () {}", main);
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
     }
     it("should be report wrong argument type to external()") {
       test_program_inline_source_base(
         "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", exit
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
     }
     it("should be wrong type of label identifier") {
       test_program_inline_source_base(
         "main :: (status: s32) -> () { x : s32; goto x; }", main
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("x is not a label"), error->message));
     }
     it("should be reported when non-type id is being used as type") {
@@ -927,16 +915,16 @@ spec("source") {
         "foo :: () -> () {};"
         "main :: (arg : foo) -> () {}", main
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("foo is not a type"), error->message));
     }
     it("should be reported when non-type token is being used as type") {
       test_program_inline_source_base(
         "main :: (arg : 42) -> () {}", main
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("42 is not a type"), error->message));
     }
     it("should be reported when encountering unknown type") {
@@ -944,8 +932,8 @@ spec("source") {
         program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
       check(result.tag == Mass_Result_Tag_Success);
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
     }
     it("should be reported when encountering unknown top level statement") {
@@ -964,7 +952,7 @@ spec("source") {
         "test :: () -> (s64) { ExitProcess(42) }",
         test
       );
-      check(dyn_array_length(test_context.program->errors));
+      check(test_context.result->tag == Mass_Result_Tag_Error);
     }
     it("should report an overload overlap") {
       test_program_inline_source_base(
@@ -973,8 +961,8 @@ spec("source") {
         "test :: () -> () { overload(1, 2) }",
         test
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Could not decide which overload to pick"), error->message));
     }
 
@@ -984,8 +972,8 @@ spec("source") {
         "dummy :: () -> () {}",
         dummy
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(
         slice_literal("^ operator (statement start match) can only appear at the start of the pattern."),
         error->message
@@ -998,8 +986,8 @@ spec("source") {
         "dummy :: () -> () {}",
         dummy
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(
         slice_literal("$ operator (statement end match) can only appear at the end of the pattern."),
         error->message

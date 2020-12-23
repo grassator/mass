@@ -180,7 +180,7 @@ token_parse_constant_expression(
   Token_View view
 );
 
-void
+PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
   const Token *token,
@@ -771,6 +771,8 @@ scope_lookup_type(
   Source_Range source_range,
   Slice type_name
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Value *value = scope_lookup_force(context, scope, type_name);
   if (!value) return 0;
   if (value->descriptor->tag != Descriptor_Tag_Type) {
@@ -806,6 +808,8 @@ token_force_type(
   Scope *scope,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Descriptor *descriptor = 0;
   switch (token->tag) {
     case Token_Tag_None: {
@@ -815,11 +819,11 @@ token_force_type(
     case Token_Tag_Id: {
       descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
+        MASS_ON_ERROR(*context->result) return 0;
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Could not find type ");
           program_error_append_slice(token->source);
         }
-        return 0;
       }
       break;
     }
@@ -828,11 +832,9 @@ token_force_type(
         panic("TODO");
       }
       if (dyn_array_length(token->Group.children) != 1) {
-        program_push_error_from_slice(
-          context->program,
-          token->source_range,
-          slice_literal("Pointer type must have a single type inside")
-        );
+        program_error_builder(context, token->source_range) {
+          program_error_append_literal("Pointer type must have a single type inside");
+        }
         return 0;
       }
       const Token *child = *dyn_array_get(token->Group.children, 0);
@@ -856,11 +858,9 @@ token_force_type(
       return 0;
     }
     case Token_Tag_Newline: {
-      program_push_error_from_slice(
-        context->program,
-        token->source_range,
-        slice_literal("Unexpected newline token")
-      );
+      program_error_builder(context, token->source_range) {
+        program_error_append_literal("Unexpected newline token");
+      }
       return 0;
     }
     case Token_Tag_Operator:
@@ -954,6 +954,8 @@ token_apply_macro_replacements(
   Macro_Replacement_Map *map,
   Token_View source
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
+
   Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = source.length);
   for (u64 i = 0; i < source.length; ++i) {
     const Token *token = source.tokens[i];
@@ -1014,6 +1016,9 @@ token_parse_macro_match(
   Array_Token_View match,
   Macro *macro
 ) {
+  // FIXME switch to an out parameter
+  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
+
   Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
   if (dyn_array_length(macro->pattern) != dyn_array_length(match)) {
     panic("Internal Error: Should not have chosen the macro if pattern length do not match");
@@ -1051,6 +1056,8 @@ token_parse_macros(
   Scope *scope,
   Function_Builder *builder
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
   Array_Token_View match = dyn_array_make(Array_Token_View);
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
@@ -1087,16 +1094,16 @@ token_match_type(
   Compilation_Context *context,
   Token_View view
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Descriptor *descriptor = token_match_fixed_array_type(context, view);
   if (descriptor) return descriptor;
   if (!view.length) panic("Caller must not call token_match_type with empty token list");
   const Token *token = token_view_get(view, 0);
   if (view.length > 1) {
-    program_push_error_from_slice(
-      context->program,
-      token->source_range,
-      slice_literal("Can not resolve type")
-    );
+    program_error_builder(context, token->source_range) {
+      program_error_append_literal("Can not resolve type");
+    }
     return 0;
   }
   return token_force_type(context, context->scope, token);
@@ -1162,6 +1169,8 @@ token_match_argument(
   Token_View raw_view,
   Descriptor_Function *function
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   // FIXME take care of this in proper parser
   Token_View view = token_view_trim_newlines(raw_view);
 
@@ -1217,6 +1226,8 @@ value_from_integer_token(
   Compilation_Context *context,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   bool ok = false;
   u64 number = slice_parse_u64(token->source, &ok);
   if (!ok) {
@@ -1234,6 +1245,8 @@ value_from_hex_integer_token(
   Compilation_Context *context,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   bool ok = false;
   Slice digits = slice_sub(token->source, 2, token->source.length);
   u64 number = slice_parse_hex(digits, &ok);
@@ -1277,6 +1290,8 @@ value_from_binary_integer_token(
   Compilation_Context *context,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   bool ok = false;
   Slice digits = slice_sub(token->source, 2, token->source.length);
   u64 number = slice_parse_binary(digits, &ok);
@@ -1295,6 +1310,8 @@ token_force_constant_value(
   Compilation_Context *context,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   switch(token->tag) {
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
@@ -1319,6 +1336,7 @@ token_force_constant_value(
       Slice name = token->source;
       Value *value = scope_lookup_force(context, context->scope, name);
       if (!value) {
+        MASS_ON_ERROR(*context->result) return 0;
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Undefined variable ");
           program_error_append_slice(name);
@@ -1343,11 +1361,9 @@ token_force_constant_value(
       return 0;
     }
     case Token_Tag_Newline: {
-      program_push_error_from_slice(
-        context->program,
-        token->source_range,
-        slice_literal("Unexpected newline token")
-      );
+      program_error_builder(context, token->source_range) {
+        program_error_append_literal("Unexpected newline token");
+      }
       return 0;
     }
   }
@@ -1355,13 +1371,15 @@ token_force_constant_value(
   return 0;
 }
 
-void
+PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
   const Token *token,
   Function_Builder *builder,
   Value *result_value
 ) {
+  MASS_TRY(*context->result);
+
   Scope *scope = context->scope;
   switch(token->tag) {
     case Token_Tag_None: {
@@ -1371,37 +1389,39 @@ token_force_value(
     case Token_Tag_Integer: {
       Value *immediate = value_from_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
-      return;
+      return *context->result;
     }
     case Token_Tag_Hex_Integer: {
       Value *immediate = value_from_hex_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
-      return;
+      return *context->result;
     }
     case Token_Tag_Binary_Integer: {
       Value *immediate = value_from_binary_integer_token(context, token);
       move_value(context->allocator, builder, &token->source_range, result_value, immediate);
-      return;
+      return *context->result;
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
       Value *c_string_pointer = value_pointer_to(context, builder, &token->source_range, string_bytes);
       move_value(context->allocator, builder, &token->source_range, result_value, c_string_pointer);
-      return;
+      return *context->result;
     }
     case Token_Tag_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, scope, name);
       if (!value) {
+        MASS_TRY(*context->result);
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Undefined variable ");
           program_error_append_slice(name);
         }
+        return *context->result;
       } else {
         move_value(context->allocator, builder, &token->source_range, result_value, value);
       }
-      return;
+      return *context->result;
     }
     case Token_Tag_Value: {
       if (token->Value.value) {
@@ -1411,7 +1431,7 @@ token_force_value(
       } else {
         // TODO consider what should happen here
       }
-      return;
+      return *context->result;
     }
     case Token_Tag_Group: {
       if (!builder) panic("Caller should only force (...) in a builder context");
@@ -1419,15 +1439,15 @@ token_force_value(
         case Token_Group_Type_Paren: {
           Token_View expression_tokens = token_view_from_token_array(token->Group.children);
           token_parse_expression(context, expression_tokens, builder, result_value);
-          return;
+          return *context->result;
         }
         case Token_Group_Type_Curly: {
           token_parse_block(context, token, builder, result_value);
-          return;
+          return *context->result;
         }
         case Token_Group_Type_Square: {
           panic("TODO");
-          return;
+          return *context->result;
         }
       }
       break;
@@ -1435,19 +1455,17 @@ token_force_value(
 
     case Token_Tag_Operator: {
       panic("TODO");
-      return;
+      return *context->result;
     }
     case Token_Tag_Newline: {
-      program_push_error_from_slice(
-        context->program,
-        token->source_range,
-        slice_literal("Unexpected newline token")
-      );
-      return;
+      program_error_builder(context, token->source_range) {
+        program_error_append_literal("Unexpected newline token");
+      }
+      return *context->result;
     }
   }
   panic("Not reached");
-  return;
+  return *context->result;
 }
 
 
@@ -1459,11 +1477,14 @@ token_match_call_arguments(
   Function_Builder *builder
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
+  if (context->result->tag != Mass_Result_Tag_Success) return result;
+
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
     Token_View_Split_Iterator it = { .view = children };
 
     while (!it.done) {
+      if (context->result->tag != Mass_Result_Tag_Success) return result;
       Token_View view = token_split_next(&it, &token_pattern_comma_operator);
       // TODO :TargetValue
       // There is an interesting conundrum here that we need to know the types of the
@@ -1487,11 +1508,14 @@ token_match_constant_call_arguments(
   const Token *token
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
+  if (context->result->tag != Mass_Result_Tag_Success) return result;
+
   if (dyn_array_length(token->Group.children) != 0) {
     Token_View children = token_view_from_token_array(token->Group.children);
     Token_View_Split_Iterator it = { .view = children };
 
     while (!it.done) {
+      if (context->result->tag != Mass_Result_Tag_Success) return result;
       Token_View view = token_split_next(&it, &token_pattern_comma_operator);
       // TODO :TargetValue
       // There is an interesting conundrum here that we need to know the types of the
@@ -1513,6 +1537,8 @@ token_value_make(
   Value *result,
   Source_Range source_range
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Token *result_token = allocator_allocate(context->allocator, Token);
   *result_token = (Token){
     .tag = Token_Tag_Value,
@@ -1540,6 +1566,8 @@ token_parse_syntax_definition(
   Token_View view,
   Scope *scope
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
 
@@ -1708,6 +1736,8 @@ token_match_struct_field(
   Descriptor *struct_descriptor,
   Token_View view
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
@@ -1725,6 +1755,7 @@ token_process_bit_type_definition(
   Token_View view,
   const Token *args
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Token_View args_view = { .tokens = &args, .length = 1 };
   Value *bit_size_value = token_parse_constant_expression(context, args_view);
@@ -1770,6 +1801,8 @@ token_process_c_struct_definition(
   Token_View view,
   const Token *args
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   if (!token_match(args, &(Token_Pattern) { .group_type = Token_Group_Type_Paren })) {
     program_error_builder(context, args->source_range) {
       program_error_append_literal("c_struct must be followed by ()");
@@ -1833,15 +1866,16 @@ token_import_match_arguments(
   Token_View view,
   Compilation_Context *context
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   const Token *library_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
     .tag = Token_Tag_String,
   });
   if (!library_name_token) {
-    program_push_error_from_slice(
-      context->program, source_range,
-      slice_literal("First argument to external() must be a literal string")
-    );
+    program_error_builder(context, source_range) {
+      program_error_append_literal("First argument to external() must be a literal string");
+    }
     return 0;
   }
   const Token *comma = token_peek_match(view, peek_index++, &(Token_Pattern) {
@@ -1849,20 +1883,18 @@ token_import_match_arguments(
     .source = slice_literal(","),
   });
   if (!comma) {
-    program_push_error_from_slice(
-      context->program, source_range,
-      slice_literal("external(\"library_name\", \"symbol_name\") requires two arguments")
-    );
+    program_error_builder(context, source_range) {
+      program_error_append_literal("external(\"library_name\", \"symbol_name\") requires two arguments");
+    }
     return 0;
   }
   const Token *symbol_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
     .tag = Token_Tag_String,
   });
   if (!symbol_name_token) {
-    program_push_error_from_slice(
-      context->program, source_range,
-      slice_literal("Second argument to external() must be a literal string")
-    );
+    program_error_builder(context, source_range) {
+      program_error_append_literal("Second argument to external() must be a literal string");
+    }
     return 0;
   }
   Slice library_name = library_name_token->String.slice;
@@ -1892,6 +1924,8 @@ token_rewrite_expression(
   Value *result_value,
   token_rewrite_expression_callback callback
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
   // FIXME speed
   Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
   start: for (;;) {
@@ -1920,6 +1954,8 @@ token_process_function_literal(
   const Token *return_types,
   const Token *body
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Scope *function_scope = scope_make(context->allocator, context->program->global_scope);
 
   Function_Builder *builder = 0;
@@ -2025,6 +2061,8 @@ compile_time_eval(
   Token_View view,
   Scope *scope
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   const Token *first_token = token_view_get(view, 0);
 
   Program eval_program = {
@@ -2035,7 +2073,6 @@ compile_time_eval(
       dyn_array_copy(Array_Label_Location_Diff_Patch_Info, context->program->patch_info_array),
     .functions = dyn_array_copy(Array_Function_Builder, context->program->functions),
     .global_scope = scope_make(context->allocator, context->program->global_scope),
-    .errors = dyn_array_make(Array_Parse_Error),
     .data_section = context->program->data_section,
     .code_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
@@ -2145,6 +2182,8 @@ token_handle_cast(
   const Source_Range *source_range,
   Array_Value_Ptr args
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
   assert(type->descriptor->tag == Descriptor_Tag_Type);
@@ -2255,6 +2294,8 @@ token_handle_negation(
   Compilation_Context *context,
   const Token *token
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Value *value = token_force_constant_value(context, token);
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
     switch(value->operand.byte_size) {
@@ -2295,6 +2336,8 @@ token_dispatch_constant_operator(
   Array_Slice *operator_stack,
   Slice operator
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
     const Token *new_token = token_handle_negation(context, token);
@@ -2393,6 +2436,8 @@ token_handle_operator(
   Array_Slice *operator_stack,
   Slice new_operator
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   s64 precedence = scope_lookup_operator_precedence(context->scope, new_operator);
   if (precedence == SCOPE_OPERATOR_NOT_FOUND) {
     Source_Range source_range = source_range_from_token_view(view);
@@ -2422,6 +2467,8 @@ token_parse_constant_expression(
   Compilation_Context *context,
   Token_View view
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   if (!view.length) {
     return &void_value;
   }
@@ -2532,6 +2579,8 @@ token_parse_constant_definitions(
   Function_Builder *unused_builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Token_View lhs;
   Token_View rhs;
   const Token *operator;
@@ -2562,6 +2611,8 @@ token_maybe_macro_call_with_lazy_arguments(
   Function_Builder *builder,
   Value *result_value
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 arg_count = 0;
   for (
     Token_View_Split_Iterator it = {.view = args_view};
@@ -2646,8 +2697,10 @@ token_handle_function_call(
   Function_Builder *builder,
   Value *result_value
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Value *target = value_any(context->allocator);
-  token_force_value(context, target_token, builder, target);
+  MASS_ON_ERROR(token_force_value(context, target_token, builder, target)) return 0;
   assert(token_match(args_token, &(Token_Pattern){.group_type = Token_Group_Type_Paren}));
 
   // TODO consider how this should be exposed in the syntax
@@ -2710,7 +2763,7 @@ token_handle_function_call(
         program_error_append_literal("Could not decide which overload to pick");
         // TODO provide names of matched overloads
       }
-      return token_value_make(context, 0, target_token->source_range);
+      return 0;
     } else if (score > match.score) {
       match.value = to_call;
       match.score = score;
@@ -2790,6 +2843,8 @@ token_dispatch_operator(
   Array_Slice *operator_stack,
   Slice operator
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
   const Token *result_token;
   if (slice_equal(operator, slice_literal("-x"))) {
     const Token *token = *dyn_array_pop(*token_stack);
@@ -2799,7 +2854,7 @@ token_dispatch_operator(
     const Token *target_token = *dyn_array_pop(*token_stack);
 
     Value *array = value_any(context->allocator);
-    token_force_value(context, target_token, builder, array);
+    MASS_ON_ERROR(token_force_value(context, target_token, builder, array)) return;
     Value *index_value = value_any(context->allocator);
     Token_View index_tokens = token_view_from_token_array(brackets->Group.children);
     token_parse_expression(context, index_tokens, builder, index_value);
@@ -2878,7 +2933,7 @@ token_dispatch_operator(
     const Token *pointee_token = *dyn_array_pop(*token_stack);
 
     Value *pointee = value_any(context->allocator);
-    token_force_value(context, pointee_token, builder, pointee);
+    MASS_ON_ERROR(token_force_value(context, pointee_token, builder, pointee)) return;
     Value *result_value = value_pointer_to(context, builder, &pointee_token->source_range, pointee);
 
     result_token = token_value_make(context, result_value, pointee_token->source_range);
@@ -2888,7 +2943,7 @@ token_dispatch_operator(
     Value *result_value = 0;
     if (rhs->tag == Token_Tag_Id) {
       Value *struct_value = value_any(context->allocator);
-      token_force_value(context, lhs, builder, struct_value);
+      MASS_ON_ERROR(token_force_value(context, lhs, builder, struct_value)) return;
       result_value = struct_get_field(context->allocator, struct_value, rhs->source);
     } else {
       panic("FIXME user error");
@@ -2905,9 +2960,9 @@ token_dispatch_operator(
     const Token *lhs = *dyn_array_pop(*token_stack);
 
     Value *lhs_value = value_any(context->allocator);
-    token_force_value(context, lhs, builder, lhs_value);
+    MASS_ON_ERROR(token_force_value(context, lhs, builder, lhs_value)) return;
     Value *rhs_value = value_any(context->allocator);
-    token_force_value(context, rhs, builder, rhs_value);
+    MASS_ON_ERROR(token_force_value(context, rhs, builder, rhs_value)) return;
 
     Descriptor *larger_descriptor =
       descriptor_byte_size(lhs_value->descriptor) > descriptor_byte_size(rhs_value->descriptor)
@@ -2942,9 +2997,9 @@ token_dispatch_operator(
     const Token *lhs = *dyn_array_pop(*token_stack);
 
     Value *lhs_value = value_any(context->allocator);
-    token_force_value(context, lhs, builder, lhs_value);
+    MASS_ON_ERROR(token_force_value(context, lhs, builder, lhs_value)) return;
     Value *rhs_value = value_any(context->allocator);
-    token_force_value(context, rhs, builder, rhs_value);
+    MASS_ON_ERROR(token_force_value(context, rhs, builder, rhs_value)) return;
 
     if (!descriptor_is_integer(lhs_value->descriptor)) {
       program_error_builder(context, lhs->source_range) {
@@ -3041,6 +3096,8 @@ token_parse_expression(
   Function_Builder *builder,
   Value *result_value
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   if (!view.length) {
     // FIXME provide a source range
     move_value(context->allocator, builder, &(Source_Range){0}, result_value, &void_value);
@@ -3123,13 +3180,15 @@ token_parse_expression(
       context, view, builder, &token_stack, &operator_stack, operator
     );
   }
-  if (dyn_array_length(token_stack) == 1) {
-    const Token *token = *dyn_array_last(token_stack);
-    assert(token);
-    token_force_value(context, token, builder, result_value);
-  } else {
-    program_error_builder(context, source_range_from_token_view(view)) {
-      program_error_append_literal("Could not parse the expression");
+  if (context->result->tag == Mass_Result_Tag_Success) {
+    if (dyn_array_length(token_stack) == 1) {
+      const Token *token = *dyn_array_last(token_stack);
+      assert(token);
+      MASS_ON_ERROR(token_force_value(context, token, builder, result_value)) goto err;
+    } else {
+      program_error_builder(context, source_range_from_token_view(view)) {
+        program_error_append_literal("Could not parse the expression");
+      }
     }
   }
 
@@ -3157,6 +3216,8 @@ token_parse_block(
   Function_Builder *builder,
   Value *block_result_value
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   assert(block->tag == Token_Tag_Group);
   assert(block->Group.type == Token_Group_Type_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
@@ -3206,6 +3267,8 @@ token_parse_statement_label(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
   Token_View rest = token_view_rest(view, peek_index);
@@ -3272,6 +3335,8 @@ token_parse_statement_if(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
 
@@ -3316,6 +3381,8 @@ token_parse_goto(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
   Token_View rest = token_view_rest(view, peek_index);
@@ -3385,6 +3452,8 @@ token_parse_explicit_return(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
   Token_View rest = token_view_rest(view, peek_index);
@@ -3406,10 +3475,9 @@ token_parse_explicit_return(
 
   bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
-    program_push_error_from_slice(
-      context->program, keyword->source_range,
-      slice_literal("Explicit return from a non-void function requires a value")
-    );
+    program_error_builder(context, keyword->source_range) {
+      program_error_append_literal("Explicit return from a non-void function requires a value");
+    }
   }
 
   Value *return_label = scope_lookup_force(context, context->scope, MASS_RETURN_LABEL_NAME);
@@ -3431,6 +3499,8 @@ token_match_fixed_array_type(
   Compilation_Context *context,
   Token_View view
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Tag_Id);
   Token_Match(square_brace, .group_type = Token_Group_Type_Square);
@@ -3441,19 +3511,15 @@ token_match_fixed_array_type(
   Value *size_value = token_parse_constant_expression(context, size_view);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
-    program_push_error_from_slice(
-      context->program,
-      square_brace->source_range,
-      slice_literal("Fixed size array size is not an integer")
-    );
+    program_error_builder(context, square_brace->source_range) {
+      program_error_append_literal("Fixed size array size is not an integer");
+    }
     return 0;
   }
   if (!operand_is_immediate(&size_value->operand)) {
-    program_push_error_from_slice(
-      context->program,
-      square_brace->source_range,
-      slice_literal("Fixed size array size must be known at compile time")
-    );
+    program_error_builder(context, square_brace->source_range) {
+      program_error_append_literal("Fixed size array size must be known at compile time");
+    }
     return 0;
   }
   u32 length = s64_to_u32(operand_immediate_value_up_to_s64(&size_value->operand));
@@ -3477,6 +3543,8 @@ token_parse_inline_machine_code_bytes(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   u64 peek_index = 0;
   Token_Match(id_token, .tag = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
@@ -3552,6 +3620,8 @@ token_parse_definition(
   Token_View view,
   Function_Builder *builder
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   // TODO consider merging with argument matching
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id);
@@ -3575,12 +3645,14 @@ token_parse_definition(
 
 bool
 token_parse_definitions(
-  Compilation_Context *program,
+  Compilation_Context *context,
   Token_View state,
   Function_Builder *builder,
   void *unused_payload
 ) {
-  return !!token_parse_definition(program, state, builder);
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  return !!token_parse_definition(context, state, builder);
 }
 
 bool
@@ -3590,6 +3662,8 @@ token_parse_definition_and_assignment_statements(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Token_View lhs;
   Token_View rhs;
   const Token *operator;
@@ -3629,6 +3703,8 @@ token_parse_assignment(
   Function_Builder *builder,
   void *unused_payload
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Token_View lhs;
   Token_View rhs;
   const Token *operator;
@@ -3653,6 +3729,8 @@ token_parse_statement(
   Function_Builder *builder,
   Value *result_value
 ) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
   token_parse_macros(context, &statement_tokens, context->scope, builder);
@@ -3684,10 +3762,11 @@ token_parse(
   Compilation_Context *context,
   Token_View view
 ) {
-  if (!view.length) return MASS_SUCCESS();
+  if (!view.length) return *context->result;
 
   Token_View_Split_Iterator it = { .view = view };
   while (!it.done) {
+    MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_newline_or_semicolon);
     if (!statement.length) continue;
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
@@ -3699,10 +3778,13 @@ token_parse(
 
     // Report unmatched statements
     Source_Range source_range = source_range_from_token_view(statement);
-    return MASS_ERROR(slice_literal("Could not parse a top level statement"), source_range);
+    program_error_builder(context, source_range) {
+      program_error_append_literal("Could not parse a top level statement");
+    }
+    break;
   }
 
-  return MASS_SUCCESS();
+  return *context->result;
 }
 
 Mass_Result
@@ -3713,7 +3795,7 @@ program_parse(
   Array_Const_Token_Ptr tokens;
   MASS_TRY(tokenize(context->allocator, file, &tokens));
   MASS_TRY(token_parse(context, token_view_from_token_array(tokens)));
-  return MASS_SUCCESS();
+  return *context->result;
 }
 
 Fixed_Buffer *

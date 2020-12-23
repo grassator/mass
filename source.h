@@ -189,13 +189,6 @@ program_push_error_from_bucket_buffer(
   Bucket_Buffer *buffer
 );
 
-void
-program_push_error_from_slice(
-  Program *program,
-  Source_Range source_range,
-  Slice message
-);
-
 typedef struct {
   Bucket_Buffer *buffer;
   char number_print_buffer[32];

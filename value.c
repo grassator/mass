@@ -1275,7 +1275,6 @@ program_init(
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
-    .errors = dyn_array_make(Array_Parse_Error, .capacity = 16, .allocator = allocator),
     .global_scope = scope_make(allocator, 0),
     .data_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
@@ -1356,7 +1355,6 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
-  dyn_array_destroy(program->errors);
 }
 
 void
@@ -1373,6 +1371,7 @@ compilation_context_init(
     .allocator = compilation_allocator,
     .program = program,
     .scope = program->global_scope,
+    .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 }
 
@@ -1434,23 +1433,18 @@ program_jit(
 }
 
 void
-program_push_error_from_slice(
-  Program *program,
-  Source_Range source_range,
-  Slice message
-) {
-  dyn_array_push(program->errors, (Parse_Error) { message,  source_range });
-}
-
-void
 program_push_error_from_bucket_buffer(
   Compilation_Context *context,
   Source_Range source_range,
   Bucket_Buffer *buffer
 ) {
+  assert(context->result->tag == Mass_Result_Tag_Success);
   Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(context->allocator, buffer);
   Slice message = fixed_buffer_as_slice(message_buffer);
-  program_push_error_from_slice(context->program, source_range, message);
+  *context->result = (Mass_Result) {
+    .tag = Mass_Result_Tag_Error,
+    .Error.details = { message, source_range }
+  };
   bucket_buffer_destroy(buffer);
 }
 

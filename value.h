@@ -38,11 +38,13 @@ register_bitset_get(
   Register reg
 );
 
-#define MASS_TRY(...)\
+#define MASS_ON_ERROR(...)\
   for (\
     Mass_Result _result = (__VA_ARGS__);\
     _result.tag != Mass_Result_Tag_Success;\
-  ) return _result;
+  )
+
+#define MASS_TRY(...) MASS_ON_ERROR(__VA_ARGS__) return _result;
 
 PRELUDE_NO_DISCARD static inline Mass_Result
 MASS_SUCCESS() {
@@ -264,7 +266,6 @@ typedef struct Program {
   Section data_section;
   Section code_section;
   Scope *global_scope;
-  Array_Parse_Error errors;
   bool is_stack_unwinding_in_progress;
 } Program;
 
@@ -273,6 +274,7 @@ typedef struct {
   Allocator *allocator;
   Program *program;
   Scope *scope;
+  Mass_Result *result;
 } Compilation_Context;
 
 void *
