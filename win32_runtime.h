@@ -166,8 +166,8 @@ win32_program_jit(
       HINSTANCE dll_handle = LoadLibraryA(library_name);
       assert(dll_handle);
 
-      for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-        Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
+      for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+        Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
 
         const char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
         fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);

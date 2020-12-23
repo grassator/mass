@@ -61,13 +61,13 @@ encode_rdata_section(
 
       expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
-      for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-        Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
+      for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+        Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
         expected_encoded_size += sizeof(s16); // Ordinal Hint
 
         // Symbol names
-        u64 aligned_name_size = u64_align(symbol->name.length + 1, 2);
-        expected_encoded_size += aligned_name_size;
+        u64 aligned_symbol_name_size = u64_align(symbol->name.length + 1, 2);
+        expected_encoded_size += aligned_symbol_name_size;
 
         expected_encoded_size += sizeof(u64); // IAT
         expected_encoded_size += sizeof(u64); // Image thunk
@@ -104,8 +104,8 @@ encode_rdata_section(
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, i);
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       symbol->name_rva = get_rva();
       fixed_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
       u64 name_size = symbol->name.length;
@@ -123,8 +123,8 @@ encode_rdata_section(
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     lib->rva = get_rva();
-    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-      Import_Symbol *fn = dyn_array_get(lib->symbols, i);
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *fn = dyn_array_get(lib->symbols, symbol_index);
       u32 offset = get_rva() - header->VirtualAddress;
       program_set_label_offset(program, fn->label32, offset);
       fixed_buffer_append_u64(buffer, fn->name_rva);
@@ -139,8 +139,8 @@ encode_rdata_section(
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     lib->image_thunk_rva = get_rva();
 
-    for (u64 i = 0; i < dyn_array_length(lib->symbols); ++i) {
-      Import_Symbol *fn = dyn_array_get(lib->symbols, i);
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *fn = dyn_array_get(lib->symbols, symbol_index);
       fixed_buffer_append_u64(buffer, fn->name_rva);
     }
     // End of Image thunks list

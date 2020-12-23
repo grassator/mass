@@ -471,8 +471,8 @@ tokenize(
 
   u64 i = 0;
   for (; i < file->text.length; ++i) {
-    s8 ch = file->text.bytes[i];
-    s8 peek = i + 1 < file->text.length ? file->text.bytes[i + 1] : 0;
+    u8 ch = file->text.bytes[i];
+    u8 peek = i + 1 < file->text.length ? file->text.bytes[i + 1] : 0;
 
     retry: switch(state) {
       case Tokenizer_State_Default: {

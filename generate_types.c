@@ -7,7 +7,7 @@
 
 #ifndef countof
 #define countof(...)\
-  (sizeof(__VA_ARGS__) / sizeof((__VA_ARGS__)[0]))
+  ((sizeof(__VA_ARGS__)) / (sizeof((__VA_ARGS__)[0])))
 #endif
 
 typedef struct {
@@ -147,8 +147,8 @@ print_c_type(
           Struct *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
             fprintf(file, "typedef struct {\n");
-            for (uint64_t i = 0; i < struct_->item_count; ++i) {
-              Struct_Item *item = &struct_->items[i];
+            for (uint64_t item_index = 0; item_index < struct_->item_count; ++item_index) {
+              Struct_Item *item = &struct_->items[item_index];
               fprintf(file, "  %s %s;\n", item->type, item->name);
             }
             fprintf(file, "} %s_%s;\n", type->union_.name, struct_->name);
