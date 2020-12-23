@@ -3679,12 +3679,12 @@ token_parse_statement(
   return result;
 }
 
-bool
+PRELUDE_NO_DISCARD Mass_Result
 token_parse(
   Compilation_Context *context,
   Token_View view
 ) {
-  if (!view.length) return true;
+  if (!view.length) return MASS_SUCCESS();
 
   Token_View_Split_Iterator it = { .view = view };
   while (!it.done) {
@@ -3699,13 +3699,10 @@ token_parse(
 
     // Report unmatched statements
     Source_Range source_range = source_range_from_token_view(statement);
-    program_error_builder(context, source_range) {
-      program_error_append_literal("Could not parse a top level statement");
-    }
-    return false;
+    return MASS_ERROR(slice_literal("Could not parse a top level statement"), source_range);
   }
 
-  return true;
+  return MASS_SUCCESS();
 }
 
 Mass_Result
@@ -3715,12 +3712,8 @@ program_parse(
 ) {
   Array_Const_Token_Ptr tokens;
   MASS_TRY(tokenize(context->allocator, file, &tokens));
-
-  bool ok = token_parse(context, token_view_from_token_array(tokens));
-  return (Mass_Result) {
-    .tag = ok ? Mass_Result_Tag_Success
-      : Mass_Result_Tag_Error
-  };
+  MASS_TRY(token_parse(context, token_view_from_token_array(tokens)));
+  return MASS_SUCCESS();
 }
 
 Fixed_Buffer *

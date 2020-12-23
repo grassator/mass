@@ -45,16 +45,27 @@ bool
 spec_check_and_print_program(
   Program *program
 ) {
-  bool has_errors = false;
+  bool success = true;
   for (u64 i = 0; i < dyn_array_length(program->errors); ++i) {
-    has_errors = true;
+    success = false;
     Parse_Error *error = dyn_array_get(program->errors, i);
 
     slice_print(error->message);
     printf("\n  at ");
     source_range_print_start_position(&error->source_range);
   }
-  return has_errors;
+  return success;
+}
+
+bool
+spec_check_mass_result(
+  Mass_Result *result
+) {
+  if (result->tag == Mass_Result_Tag_Success) return true;
+  slice_print(result->Error.details.message);
+  printf("\n  at ");
+  source_range_print_start_position(&result->Error.details.source_range);
+  return false;
 }
 
 #define test_program_inline_source_base(_source_, _fn_value_id_)\
@@ -62,8 +73,8 @@ spec_check_and_print_program(
   Mass_Result result = tokenize(\
     test_context.allocator, &(Source_File){test_file_name,  slice_literal(_source_)}, &tokens\
   );\
-  check(result.tag == Mass_Result_Tag_Success);\
-  token_parse(&test_context, token_view_from_token_array(tokens));\
+  check(spec_check_mass_result(&result));\
+  result = token_parse(&test_context, token_view_from_token_array(tokens));\
   Value *_fn_value_id_ = scope_lookup_force(\
     &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_)\
   );\
@@ -71,10 +82,10 @@ spec_check_and_print_program(
 
 #define test_program_inline_source(_source_, _fn_value_id_)\
   test_program_inline_source_base(_source_, _fn_value_id_);\
-  check(!spec_check_and_print_program(test_context.program));\
+  check(spec_check_and_print_program(test_context.program));\
   check(_fn_value_id_);\
   program_jit(&test_context);\
-  check(!spec_check_and_print_program(test_context.program))
+  check(spec_check_and_print_program(test_context.program))
 
 
 spec("source") {
@@ -825,7 +836,7 @@ spec("source") {
     test_context.program->entry_point =
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
-    check(!spec_check_and_print_program(test_context.program));
+    check(spec_check_and_print_program(test_context.program));
 
     write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
   }
@@ -836,7 +847,7 @@ spec("source") {
       scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
     check(test_context.program->entry_point);
     check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
-    check(!spec_check_and_print_program(test_context.program));
+    check(spec_check_and_print_program(test_context.program));
 
     write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
   }
@@ -869,7 +880,7 @@ spec("source") {
     check(fizz_buzz);
 
     program_jit(&test_context);
-    check(!spec_check_and_print_program(test_context.program));
+    check(spec_check_and_print_program(test_context.program));
 
     fn_type_void_to_void checker =
       (fn_type_void_to_void)value_as_function(test_context.program, fizz_buzz);
@@ -941,9 +952,11 @@ spec("source") {
       test_program_inline_source_base(
         "foo bar", main
       );
-      check(dyn_array_length(test_context.program->errors));
-      Parse_Error *error = dyn_array_get(test_context.program->errors, 0);
-      check(slice_equal(slice_literal("Could not parse a top level statement"), error->message));
+      check(result.tag == Mass_Result_Tag_Error);
+      check(slice_equal(
+        slice_literal("Could not parse a top level statement"),
+        result.Error.details.message
+      ));
     }
     it("should report an error for macro external functions") {
       test_program_inline_source_base(

@@ -44,6 +44,22 @@ register_bitset_get(
     _result.tag != Mass_Result_Tag_Success;\
   ) return _result;
 
+PRELUDE_NO_DISCARD static inline Mass_Result
+MASS_SUCCESS() {
+  return (const Mass_Result){ .tag = Mass_Result_Tag_Success };
+}
+
+PRELUDE_NO_DISCARD static inline Mass_Result
+MASS_ERROR(Slice message, Source_Range source_range) {
+  return (const Mass_Result){
+    .tag = Mass_Result_Tag_Error,
+    .Error.details = {
+      .message = message,
+      .source_range = source_range,
+    }
+  };
+}
+
 #define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
   {\
     .filename = __FILE__,\
