@@ -936,6 +936,18 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
     }
+    it("should be reported when field name is not an identifier") {
+      test_program_inline_source_base(
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "main :: () -> () { p : Point; p.(x) }",
+        main
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal(
+        "Right hand side of the . operator must be an identifier"), error->message
+      ));
+    }
     it("should be reported when encountering unknown top level statement") {
       test_program_inline_source_base(
         "foo bar", main

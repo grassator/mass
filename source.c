@@ -2934,13 +2934,17 @@ token_dispatch_operator(
   } else if (slice_equal(operator, slice_literal("."))) {
     const Token *rhs = *dyn_array_pop(*token_stack);
     const Token *lhs = *dyn_array_pop(*token_stack);
+
     Value *result_value = 0;
     if (rhs->tag == Token_Tag_Id) {
       Value *struct_value = value_any(context->allocator);
       MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
       result_value = struct_get_field(context->allocator, struct_value, rhs->source);
     } else {
-      panic("FIXME user error");
+      program_error_builder(context, rhs->source_range) {
+        program_error_append_literal("Right hand side of the . operator must be an identifier");
+      }
+      return;
     }
     result_token = token_value_make(context, result_value, lhs->source_range);
   } else if (
