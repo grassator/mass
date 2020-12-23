@@ -1227,6 +1227,30 @@ slice_parse_hex(
   return integer;
 }
 
+u64
+slice_parse_binary(
+  Slice slice,
+  bool *ok
+) {
+  if (!ok) ok = &(bool){0};
+  *ok = true;
+
+  u64 integer = 0;
+  for (u64 index = 0; index < slice.length; ++index) {
+    u64 byte_index = slice.length - index - 1;
+    s8 byte = slice.bytes[byte_index];
+    u64 digit = 0;
+    if (byte == '1') {
+      digit = 1;
+    } else if (byte != '0') {
+      *ok = false;
+      return 0;
+    }
+    integer += digit << index;
+  }
+  return integer;
+}
+
 Color_Rgba_8
 hex_parse_color_digits(
   Slice color,
