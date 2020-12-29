@@ -162,9 +162,10 @@ win32_program_jit(
   if (dyn_array_is_initialized(program->import_libraries)) {
     for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
       Import_Library *lib = dyn_array_get(program->import_libraries, i);
-      const char *library_name = slice_to_c_string(context->allocator, lib->name);
+      char *library_name = slice_to_c_string(context->allocator, lib->name);
       HINSTANCE dll_handle = LoadLibraryA(library_name);
       assert(dll_handle);
+      allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
 
       for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
         Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
