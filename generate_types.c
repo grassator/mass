@@ -344,6 +344,7 @@ main(void) {
     { "Slice", "name" },
     { "u32", "name_rva" },
     { "Label_Index", "label32" },
+    { "fn_type_opaque", "address" },
   }));
 
   push_type(type_struct("Import_Library", (Struct_Item[]){
@@ -537,8 +538,8 @@ main(void) {
       print_c_type_forward_declaration(file, &types[i]);
     }
     // Custom forward declarations
-    // TODO would be great to not have these
     {
+      fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
     }

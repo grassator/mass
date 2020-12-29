@@ -155,31 +155,41 @@ win32_program_test_exception_handler(
 }
 
 void
-win32_program_jit(
+win32_program_jit_resolve_dll_imports(
   Compilation_Context *context
 ) {
   Program *program = context->program;
-  if (dyn_array_is_initialized(program->import_libraries)) {
-    for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-      Import_Library *lib = dyn_array_get(program->import_libraries, i);
-      if (!lib->handle) {
-        char *library_name = slice_to_c_string(context->allocator, lib->name);
-        lib->handle = LoadLibraryA(library_name);
-        assert(lib->handle);
-        allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
-      }
+  if (!dyn_array_is_initialized(program->import_libraries)) return;
 
-      for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-        Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
+  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    if (!lib->handle) {
+      char *library_name = slice_to_c_string(context->allocator, lib->name);
+      lib->handle = LoadLibraryA(library_name);
+      assert(lib->handle);
+      allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
+    }
 
-        const char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
-        fn_type_opaque fn_address = GetProcAddress(lib->handle, symbol_name);
-        assert(fn_address);
-        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)fn_address);
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
+      if (!symbol->address) {
+        char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
+        symbol->address = GetProcAddress(lib->handle, symbol_name);
+        assert(symbol->address);
+        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)symbol->address);
         program_set_label_offset(program, symbol->label32, u64_to_u32(offset));
+        allocator_deallocate(context->allocator, symbol_name, symbol->name.length + 1);
       }
     }
   }
+}
+
+void
+win32_program_jit(
+  Compilation_Context *context
+) {
+  win32_program_jit_resolve_dll_imports(context);
+  Program *program = context->program;
   u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
   u64 function_count = dyn_array_length(program->functions);
   u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);

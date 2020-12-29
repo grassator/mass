@@ -88,6 +88,8 @@ typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
+typedef void(*fn_type_opaque)();
+
 typedef struct Scope Scope;
 
 typedef struct Function_Builder Function_Builder;
@@ -177,6 +179,7 @@ typedef struct Import_Symbol {
   Slice name;
   u32 name_rva;
   Label_Index label32;
+  fn_type_opaque address;
 } Import_Symbol;
 typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 

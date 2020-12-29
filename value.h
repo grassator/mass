@@ -5,8 +5,6 @@
 #include "types.h"
 #include "encoding.h"
 
-typedef void(*fn_type_opaque)();
-
 static inline bool
 register_is_xmm(
   Register reg
