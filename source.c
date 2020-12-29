@@ -1226,15 +1226,14 @@ token_maybe_split_on_operator(
   return true;
 }
 
-Token_Match_Arg *
+Token_Match_Arg
 token_match_argument(
   Compilation_Context *context,
   Token_View view,
   Descriptor_Function *function
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Token_Match_Arg *arg = 0;
+  Token_Match_Arg arg = {0};
+  if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Token_View lhs;
   Token_View rhs;
@@ -1257,25 +1256,62 @@ token_match_argument(
       goto err;
     }
 
-    arg = allocator_allocate(context->allocator, Token_Match_Arg);
-    *arg = (Token_Match_Arg){.name = lhs.tokens[0]->source};
+    arg.name = lhs.tokens[0]->source;
 
     if (type_descriptor == &descriptor_any) {
       // TODO figure out what should happen here or not use any type for macros
-      arg->value = value_any(context->allocator);
+      arg.value = value_any(context->allocator);
     } else {
-      arg->value = function_next_argument_value(
+      arg.value = function_next_argument_value(
         context->allocator, function, type_descriptor
       );
     }
   } else {
-    Value *literal_value_type = token_parse_constant_expression(context, view);
-    arg = allocator_allocate(context->allocator, Token_Match_Arg);
-    *arg = (Token_Match_Arg){
-      .name = {0},
-      .value = literal_value_type,
-    };
+    arg.value = token_parse_constant_expression(context, view);
   }
+
+  err:
+  return arg;
+}
+
+Token_Match_Arg
+token_match_return_type(
+  Compilation_Context *context,
+  Token_View view,
+  Descriptor_Function *function
+) {
+  Token_Match_Arg arg = {0};
+  if (context->result->tag != Mass_Result_Tag_Success) return arg;
+
+  Token_View lhs;
+  Token_View rhs;
+  const Token *operator;
+  Descriptor *type_descriptor;
+  if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
+    if (lhs.length == 0) {
+      program_error_builder(context, operator->source_range) {
+        program_error_append_literal("':' operator expects an identifier on the left hand side");
+      }
+      goto err;
+    }
+    if (lhs.length > 1 || !token_match(lhs.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })) {
+      program_error_builder(context, operator->source_range) {
+        program_error_append_literal("':' operator expects only a single identifier on the left hand side");
+      }
+      goto err;
+    }
+    type_descriptor = token_match_type(context, rhs);
+    arg.name = lhs.tokens[0]->source;
+  } else {
+    type_descriptor = token_match_type(context, view);
+  }
+
+  if (!type_descriptor) {
+    goto err;
+  }
+
+  function_return_descriptor(context, function, type_descriptor);
+  arg.value = function->returns;
 
   err:
   return arg;
@@ -1907,23 +1943,27 @@ token_process_function_literal(
     scope_define_value(function_scope, MASS_RETURN_LABEL_NAME, return_label_value);
   }
 
-  switch (dyn_array_length(return_types->Group.children)) {
-    case 0: {
-      descriptor->Function.returns = &void_value;
-      break;
-    }
-    case 1: {
-      const Token *return_type_token = *dyn_array_get(return_types->Group.children, 0);
-      Descriptor *return_descriptor = token_force_type(context, function_scope, return_type_token);
-      if (!return_descriptor) return 0;
-      function_return_descriptor(context, &descriptor->Function, return_descriptor);
-      break;
-    }
-    default: {
-      panic("Multiple return types are not supported at the moment");
-      break;
+  if (dyn_array_length(return_types->Group.children) == 0) {
+    descriptor->Function.returns = &void_value;
+  } else {
+    Token_View children = token_view_from_token_array(return_types->Group.children);
+    Token_View_Split_Iterator it = { .view = children };
+
+    while (!it.done) {
+      Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+
+      Compilation_Context arg_context = *context;
+      arg_context.scope = function_scope;
+      arg_context.builder = builder;
+      Token_Match_Arg arg = token_match_return_type(&arg_context, arg_view, &descriptor->Function);
+
+      // Return values can be named
+      if (arg.name.length) {
+        scope_define_value(function_scope, arg.name, descriptor->Function.returns);
+      }
     }
   }
+
   scope_define_value(function_scope, MASS_RETURN_VALUE_NAME, descriptor->Function.returns);
 
   if (dyn_array_length(args->Group.children) != 0) {
@@ -1935,20 +1975,20 @@ token_process_function_literal(
       Compilation_Context arg_context = *context;
       arg_context.scope = function_scope;
       arg_context.builder = builder;
-      Token_Match_Arg *arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
-      if (!arg) return 0;
+      Token_Match_Arg arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
+      MASS_ON_ERROR(*context->result) return 0;
 
       // Literal values do not have a name ATM
-      if (arg->name.length) {
-        scope_define_value(function_scope, arg->name, arg->value);
+      if (arg.name.length) {
+        scope_define_value(function_scope, arg.name, arg.value);
       }
-      dyn_array_push(descriptor->Function.argument_names, arg->name);
-      dyn_array_push(descriptor->Function.arguments, arg->value);
+      dyn_array_push(descriptor->Function.argument_names, arg.name);
+      dyn_array_push(descriptor->Function.arguments, arg.value);
 
-      if (!is_external && arg->value->operand.tag == Operand_Tag_Register) {
+      if (!is_external && arg.value->operand.tag == Operand_Tag_Register) {
         register_bitset_set(
           &builder->code_block.register_occupied_bitset,
-          arg->value->operand.Register.index
+          arg.value->operand.Register.index
         );
       }
     }
