@@ -81,6 +81,11 @@ MASS_ERROR(Slice message, Source_Range source_range) {
 typedef struct Scope Scope;
 typedef struct Function_Builder Function_Builder;
 
+Descriptor descriptor_type = {
+  .tag = Descriptor_Tag_Opaque,
+  .Opaque = { .bit_size = sizeof(Descriptor) * 8 },
+};
+
 #define MASS_ENUMERATE_BUILT_IN_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\
   MASS_PROCESS_BUILT_IN_TYPE(s16, 16)\
@@ -93,19 +98,30 @@ typedef struct Function_Builder Function_Builder;
   MASS_PROCESS_BUILT_IN_TYPE(f32, 32)\
   MASS_PROCESS_BUILT_IN_TYPE(f64, 64)
 
+#define MASS_TYPE_VALUE(_DESCRIPTOR_)\
+  (Value) {\
+    .descriptor = &descriptor_type,\
+    .operand = {\
+      .tag = Operand_Tag_Immediate,\
+      .byte_size = sizeof(Descriptor),\
+      .Immediate.memory = (_DESCRIPTOR_),\
+    },\
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
+  }
+
+static inline Value
+type_value_for_descriptor(
+  Descriptor *descriptor
+) {
+  return MASS_TYPE_VALUE(descriptor);
+}
+
 #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
   Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
     .Opaque = { .bit_size = (_BIT_SIZE_) },\
   };\
-  Value *type_##_NAME_##_value = &(Value) {\
-    .descriptor = &(Descriptor) {\
-      .tag = Descriptor_Tag_Type,\
-      .Type = {.descriptor = &descriptor_##_NAME_ },\
-    },\
-    .operand = { .tag = Operand_Tag_None },\
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
-  };
+  Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
 MASS_ENUMERATE_BUILT_IN_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
@@ -125,11 +141,11 @@ Descriptor descriptor_any = {
 };
 
 Value *type_any_value = &(Value) {
-  .descriptor = &(Descriptor) {
-    .tag = Descriptor_Tag_Type,
-    .Type = {.descriptor = &descriptor_any },
+  .descriptor = &descriptor_type,
+  .operand = {
+    .tag = Operand_Tag_Immediate,
+    .Immediate.memory = &descriptor_any,
   },
-  .operand = { .tag = Operand_Tag_None },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 

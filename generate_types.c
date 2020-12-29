@@ -462,9 +462,6 @@ main(void) {
     struct_fields("Pointer", (Struct_Item[]){
       { "Descriptor *", "to" },
     }),
-    struct_fields("Type", (Struct_Item[]){
-      { "Descriptor *", "descriptor" },
-    }),
   }));
 
   push_type(type_struct("Source_Position", (Struct_Item[]){

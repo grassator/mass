@@ -72,7 +72,6 @@ same_type(
       return true;
     }
     case Descriptor_Tag_Any:
-    case Descriptor_Tag_Type:
     default: {
       assert(!"Unsupported descriptor type");
       return false;
@@ -147,7 +146,6 @@ descriptor_byte_size(
       return 8;
     }
     case Descriptor_Tag_Any:
-    case Descriptor_Tag_Type:
     default: {
       assert(!"Unknown Descriptor Type");
     }
@@ -195,6 +193,15 @@ source_range_print_start_position(
     source_file_offset_to_position(source_range->file, source_range->offsets.from);
   slice_print(source_range->file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
+}
+
+static inline Descriptor *
+operand_immediate_memory_as_descriptor(
+  const Operand *operand
+) {
+  assert(operand->tag == Operand_Tag_Immediate);
+  assert(operand->byte_size == sizeof(Descriptor));
+  return operand->Immediate.memory;
 }
 
 #define OPERAND_IMMEDIATE_CAST(_TYPE_)\
@@ -1198,7 +1205,6 @@ c_function_return_value(
     case Descriptor_Tag_Tagged_Union:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Struct:
-    case Descriptor_Tag_Type:
     default: {
       assert(!"Unsupported return type");
     }

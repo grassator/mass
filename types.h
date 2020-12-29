@@ -290,7 +290,6 @@ typedef enum {
   Descriptor_Tag_Struct = 5,
   Descriptor_Tag_Tagged_Union = 6,
   Descriptor_Tag_Pointer = 7,
-  Descriptor_Tag_Type = 8,
 } Descriptor_Tag;
 
 typedef struct {
@@ -321,9 +320,6 @@ typedef struct {
 typedef struct {
   Descriptor * to;
 } Descriptor_Pointer;
-typedef struct {
-  Descriptor * descriptor;
-} Descriptor_Type;
 typedef struct Descriptor {
   Descriptor_Tag tag;
   union {
@@ -333,7 +329,6 @@ typedef struct Descriptor {
     Descriptor_Struct Struct;
     Descriptor_Tagged_Union Tagged_Union;
     Descriptor_Pointer Pointer;
-    Descriptor_Type Type;
   };
 } Descriptor;
 typedef dyn_array_type(Descriptor) Array_Descriptor;

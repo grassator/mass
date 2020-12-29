@@ -865,14 +865,14 @@ value_ensure_type(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
-  if (value->descriptor->tag != Descriptor_Tag_Type) {
+  if (value->descriptor != &descriptor_type) {
     program_error_builder(context, source_range) {
       program_error_append_slice(type_name);
       program_error_append_literal(" is not a type");
     }
     return 0;
   }
-  Descriptor *descriptor = value->descriptor->Type.descriptor;
+  Descriptor *descriptor = operand_immediate_memory_as_descriptor(&value->operand);
   return descriptor;
 }
 
@@ -1715,16 +1715,8 @@ token_process_bit_type_definition(
     .Opaque = { .bit_size = bit_size },
   };
 
-  Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
-  *value_descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Type,
-    .Type = { .descriptor = descriptor },
-  };
   Value *result = allocator_allocate(context->allocator, Value);
-  *result = (Value) {
-    .descriptor = value_descriptor,
-    .operand = {.tag = Operand_Tag_None },
-  };
+  *result = type_value_for_descriptor(descriptor);
   return token_value_make(context, result, args->source_range);
 
   err:
@@ -1781,15 +1773,7 @@ token_process_c_struct_definition(
     }
   }
 
-  Descriptor *value_descriptor = allocator_allocate(context->allocator, Descriptor);
-  *value_descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Type,
-    .Type = { .descriptor = descriptor },
-  };
-  *result = (Value) {
-    .descriptor = value_descriptor,
-    .operand = {.tag = Operand_Tag_None },
-  };
+  *result = type_value_for_descriptor(descriptor);
   return token_value_make(context, result, args->source_range);
 
   err:
@@ -2094,8 +2078,7 @@ compile_time_eval(
       };
       break;
     }
-    case Descriptor_Tag_Function:
-    case Descriptor_Tag_Type: {
+    case Descriptor_Tag_Function: {
       panic("TODO figure out how that works");
       break;
     }
@@ -2127,9 +2110,9 @@ token_handle_cast(
 
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
-  assert(type->descriptor->tag == Descriptor_Tag_Type);
+  Descriptor *cast_to_descriptor =
+    value_ensure_type(context, type, *source_range, slice_literal("TODO cast source"));
 
-  Descriptor *cast_to_descriptor = type->descriptor->Type.descriptor;
   assert(descriptor_is_integer(cast_to_descriptor));
   assert(value->descriptor->tag == cast_to_descriptor->tag);
 
