@@ -406,54 +406,42 @@ token_match(
   return result;
 }
 
-void
+u64
 tokenizer_handle_decimal_integer_end(
-  const Source_File *file,
-  Token *current_token,
-  u64 index
+  Slice digits
 ) {
-  u64 from = current_token->source_range.offsets.from;
-  u64 to = index;
-  Slice digits = slice_sub(file->text, from, to);
   bool ok = true;
-  current_token->Integer.bits = slice_parse_u64(digits, &ok);
+  u64 result = slice_parse_u64(digits, &ok);
   if (!ok) {
     panic("Internal Error: Mismatch between tokenizer and decimal integer parser");
   }
+  return result;
 }
 
-void
+u64
 tokenizer_handle_hex_integer_end(
-  const Source_File *file,
-  Token *current_token,
-  u64 index
+  Slice digits
 ) {
-  u64 from = current_token->source_range.offsets.from;
-  from += slice_literal("0x").length;
-  u64 to = index;
-  Slice digits = slice_sub(file->text, from, to);
+  digits = slice_sub(digits, 2, digits.length); // Skip over 0x
   bool ok = true;
-  current_token->Integer.bits = slice_parse_hex(digits, &ok);
+  u64 result = slice_parse_hex(digits, &ok);
   if (!ok) {
     panic("Internal Error: Mismatch between tokenizer and hex integer parser");
   }
+  return result;
 }
 
-void
+u64
 tokenizer_handle_binary_integer_end(
-  const Source_File *file,
-  Token *current_token,
-  u64 index
+  Slice digits
 ) {
-  u64 from = current_token->source_range.offsets.from;
-  from += slice_literal("0b").length;
-  u64 to = index;
-  Slice digits = slice_sub(file->text, from, to);
+  digits = slice_sub(digits, 2, digits.length); // Skip over 0b
   bool ok = true;
-  current_token->Integer.bits = slice_parse_binary(digits, &ok);
+  u64 result = slice_parse_binary(digits, &ok);
   if (!ok) {
     panic("Internal Error: Mismatch between tokenizer and binary integer parser");
   }
+  return result;
 }
 
 PRELUDE_NO_DISCARD Mass_Result
@@ -492,6 +480,9 @@ tokenize(
   );
 
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
+
+#define current_token_source()\
+   slice_sub(file->text, current_token->source_range.offsets.from, i)
 
 #define start_token(_type_)\
   do {\
@@ -656,7 +647,8 @@ tokenize(
       }
       case Tokenizer_State_Decimal_Integer: {
         if (!isdigit(ch)) {
-          tokenizer_handle_decimal_integer_end(file, current_token, i);
+          current_token->Integer.bits =
+            tokenizer_handle_decimal_integer_end(current_token_source());
           reject_and_push;
           goto retry;
         }
@@ -664,7 +656,8 @@ tokenize(
       }
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
-          tokenizer_handle_hex_integer_end(file, current_token, i);
+          current_token->Integer.bits =
+            tokenizer_handle_hex_integer_end(current_token_source());
           reject_and_push;
           goto retry;
         }
@@ -672,7 +665,8 @@ tokenize(
       }
       case Tokenizer_State_Binary_Integer: {
         if (ch != '0' && ch != '1') {
-          tokenizer_handle_binary_integer_end(file, current_token, i);
+          current_token->Integer.bits =
+            tokenizer_handle_binary_integer_end(current_token_source());
           reject_and_push;
           goto retry;
         }
@@ -739,15 +733,18 @@ tokenize(
     }
 
     case Tokenizer_State_Decimal_Integer: {
-      tokenizer_handle_decimal_integer_end(file, current_token, i);
+      current_token->Integer.bits =
+        tokenizer_handle_decimal_integer_end(current_token_source());
       break;
     }
     case Tokenizer_State_Hex_Integer: {
-      tokenizer_handle_hex_integer_end(file, current_token, i);
+      current_token->Integer.bits =
+        tokenizer_handle_hex_integer_end(current_token_source());
       break;
     }
     case Tokenizer_State_Binary_Integer: {
-      tokenizer_handle_binary_integer_end(file, current_token, i);
+      current_token->Integer.bits =
+        tokenizer_handle_binary_integer_end(current_token_source());
       break;
     }
     case Tokenizer_State_String:
