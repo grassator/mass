@@ -186,6 +186,7 @@ typedef struct Import_Library {
   u32 rva;
   Array_Import_Symbol symbols;
   u32 image_thunk_rva;
+  void * handle;
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 

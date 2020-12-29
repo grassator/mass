@@ -352,6 +352,7 @@ main(void) {
     { "u32", "rva" },
     { "Array_Import_Symbol", "symbols" },
     { "u32", "image_thunk_rva" },
+    { "void *", "handle" }
   }));
 
   push_type(type_enum("Compare_Type", (Enum_Item[]){

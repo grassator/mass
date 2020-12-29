@@ -162,16 +162,18 @@ win32_program_jit(
   if (dyn_array_is_initialized(program->import_libraries)) {
     for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
       Import_Library *lib = dyn_array_get(program->import_libraries, i);
-      char *library_name = slice_to_c_string(context->allocator, lib->name);
-      HINSTANCE dll_handle = LoadLibraryA(library_name);
-      assert(dll_handle);
-      allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
+      if (!lib->handle) {
+        char *library_name = slice_to_c_string(context->allocator, lib->name);
+        lib->handle = LoadLibraryA(library_name);
+        assert(lib->handle);
+        allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
+      }
 
       for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
         Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
 
         const char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
-        fn_type_opaque fn_address = GetProcAddress(dll_handle, symbol_name);
+        fn_type_opaque fn_address = GetProcAddress(lib->handle, symbol_name);
         assert(fn_address);
         u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)fn_address);
         program_set_label_offset(program, symbol->label32, u64_to_u32(offset));
