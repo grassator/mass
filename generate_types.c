@@ -455,10 +455,6 @@ main(void) {
       { "Slice", "name" },
       { "Array_Descriptor_Struct_Field", "fields" },
     }),
-    struct_fields("Tagged_Union", (Struct_Item[]){
-      { "Descriptor_Struct *", "struct_list" },
-      { "s32", "struct_count" },
-    }),
     struct_fields("Pointer", (Struct_Item[]){
       { "Descriptor *", "to" },
     }),

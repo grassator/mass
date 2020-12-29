@@ -50,7 +50,6 @@ same_type(
     }
     case Descriptor_Tag_Void:
     case Descriptor_Tag_Opaque:
-    case Descriptor_Tag_Tagged_Union:
     case Descriptor_Tag_Struct: {
       return a == b;
     }
@@ -118,17 +117,6 @@ descriptor_byte_size(
   switch(descriptor->tag) {
     case Descriptor_Tag_Void: {
       return 0;
-    }
-    case Descriptor_Tag_Tagged_Union: {
-      s64 count = descriptor->Tagged_Union.struct_count;
-      u32 tag_size = sizeof(s64);
-      u32 body_size = 0;
-      for (s32 i = 0; i < count; ++i) {
-        Descriptor_Struct *Struct = &descriptor->Tagged_Union.struct_list[i];
-        u32 struct_size = struct_byte_size(Struct);
-        body_size = u32_max(body_size, struct_size);
-      }
-      return tag_size + body_size;
     }
     case Descriptor_Tag_Struct: {
       return struct_byte_size(&descriptor->Struct);
@@ -1202,7 +1190,6 @@ c_function_return_value(
       break;
     }
     case Descriptor_Tag_Any:
-    case Descriptor_Tag_Tagged_Union:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Struct:
     default: {

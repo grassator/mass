@@ -288,8 +288,7 @@ typedef enum {
   Descriptor_Tag_Function = 3,
   Descriptor_Tag_Fixed_Size_Array = 4,
   Descriptor_Tag_Struct = 5,
-  Descriptor_Tag_Tagged_Union = 6,
-  Descriptor_Tag_Pointer = 7,
+  Descriptor_Tag_Pointer = 6,
 } Descriptor_Tag;
 
 typedef struct {
@@ -314,10 +313,6 @@ typedef struct {
   Array_Descriptor_Struct_Field fields;
 } Descriptor_Struct;
 typedef struct {
-  Descriptor_Struct * struct_list;
-  s32 struct_count;
-} Descriptor_Tagged_Union;
-typedef struct {
   Descriptor * to;
 } Descriptor_Pointer;
 typedef struct Descriptor {
@@ -327,7 +322,6 @@ typedef struct Descriptor {
     Descriptor_Function Function;
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
     Descriptor_Struct Struct;
-    Descriptor_Tagged_Union Tagged_Union;
     Descriptor_Pointer Pointer;
   };
 } Descriptor;

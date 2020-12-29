@@ -2061,7 +2061,6 @@ compile_time_eval(
       panic("Internal Error: We should never get Any type from comp time eval");
       break;
     }
-    case Descriptor_Tag_Tagged_Union:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Pointer:
     case Descriptor_Tag_Struct: {
