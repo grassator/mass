@@ -903,7 +903,15 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
     }
-    it("should be report wrong argument type to external()") {
+    it("should be report when encountering multiple return types") {
+      test_program_inline_source_base(
+        "exit :: (status: s32) -> (s32, s32) {}", exit
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal("Multiple return types are not supported at the moment"), error->message));
+    }
+    it("should be report when encountering wrong argument type to external()") {
       test_program_inline_source_base(
         "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", exit
       );
@@ -911,7 +919,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
     }
-    it("should be wrong type of label identifier") {
+    it("should be reported when encountering wrong type of label identifier") {
       test_program_inline_source_base(
         "main :: (status: s32) -> () { x : s32; goto x; }", main
       );

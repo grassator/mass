@@ -1949,7 +1949,13 @@ token_process_function_literal(
     Token_View children = token_view_from_token_array(return_types->Group.children);
     Token_View_Split_Iterator it = { .view = children };
 
-    while (!it.done) {
+    for (u64 i = 0; !it.done; ++i) {
+      if (i > 0) {
+        program_error_builder(context, return_types->source_range) {
+          program_error_append_literal("Multiple return types are not supported at the moment");
+        }
+        return 0;
+      }
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
 
       Compilation_Context arg_context = *context;
