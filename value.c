@@ -187,7 +187,7 @@ void
 source_range_print_start_position(
   const Source_Range *source_range
 ) {
-  if (!dyn_array_is_initialized(source_range->file->line_ranges)) {
+  if (!source_range->file || !dyn_array_is_initialized(source_range->file->line_ranges)) {
     printf(":(0:0)\n");
     return;
   }
@@ -722,7 +722,7 @@ value_global_internal(
 Value *
 value_any_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator
+  const Allocator *allocator
 ) {
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
@@ -738,7 +738,7 @@ value_any_internal(
 Value *
 value_from_s64_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   s64 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -754,7 +754,7 @@ value_from_s64_internal(
 Value *
 value_from_s32_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   s32 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -771,7 +771,7 @@ value_from_s32_internal(
 Value *
 value_from_s16_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   s16 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -788,7 +788,7 @@ value_from_s16_internal(
 Value *
 value_from_s8_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   s8 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -807,7 +807,7 @@ value_from_s8_internal(
 Value *
 value_from_u64_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   u64 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -823,7 +823,7 @@ value_from_u64_internal(
 Value *
 value_from_u32_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   u32 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -839,7 +839,7 @@ value_from_u32_internal(
 Value *
 value_from_u16_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   u16 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -855,7 +855,7 @@ value_from_u16_internal(
 Value *
 value_from_u8_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   u8 integer
 ) {
   Value *result = allocator_allocate(allocator, Value);
@@ -873,7 +873,7 @@ value_from_u8_internal(
 static inline Value *
 value_from_signed_immediate_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
@@ -893,7 +893,7 @@ value_from_signed_immediate_internal(
 static inline Value *
 value_from_unsigned_immediate_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  const Allocator *allocator,
   u64 value
 ) {
   if (u64_fits_into_u8(value)) {

@@ -152,9 +152,12 @@ spec("source") {
     check(result.tag == Mass_Result_Tag_Success);
     check(dyn_array_length(tokens) == 1);
     const Token *token = *dyn_array_get(tokens, 0);
-    check(token->tag == Token_Tag_Integer);
+    check(token->tag == Token_Tag_Value);
     check(slice_equal(token->source, slice_literal("0xCAFE")));
-    check(token->Integer.bits == 0xCAFE, "Expected 0xCAFE, got 0x%" PRIx64, token->Integer.bits);
+    check(token->Value.value->descriptor == &descriptor_u16);
+    check(operand_is_immediate(&token->Value.value->operand));
+    u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
+    check(bits == 0xCAFE, "Expected 0xCAFE, got 0x%" PRIx64, bits);
   }
 
   it("should be able to parse binary integers") {
@@ -165,9 +168,12 @@ spec("source") {
     check(result.tag == Mass_Result_Tag_Success);
     check(dyn_array_length(tokens) == 1);
     const Token *token = *dyn_array_get(tokens, 0);
-    check(token->tag == Token_Tag_Integer);
+    check(token->tag == Token_Tag_Value);
     check(slice_equal(token->source, slice_literal("0b100")));
-    check(token->Integer.bits == 0b100, "Expected 0x8, got 0x%" PRIx64, token->Integer.bits);
+    check(token->Value.value->descriptor == &descriptor_u8);
+    check(operand_is_immediate(&token->Value.value->operand));
+    u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
+    check(bits == 0b100, "Expected 0x8, got 0x%" PRIx64, bits);
   }
 
   it("should be able to tokenize a sum of integers") {
@@ -179,7 +185,7 @@ spec("source") {
     check(dyn_array_length(tokens) == 3);
 
     const Token *a_num = *dyn_array_get(tokens, 0);
-    check(a_num->tag == Token_Tag_Integer);
+    check(a_num->tag == Token_Tag_Value);
     check(slice_equal(a_num->source, slice_literal("12")));
 
     const Token *plus = *dyn_array_get(tokens, 1);

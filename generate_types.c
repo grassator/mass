@@ -498,9 +498,6 @@ main(void) {
     struct_empty("None"),
     struct_empty("Id"),
     struct_empty("Operator"),
-    struct_fields("Integer", (Struct_Item[]){
-      { "u64", "bits" },
-    }),
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),

@@ -17,7 +17,6 @@ token_clone_deep(
   *clone = *token;
   switch (token->tag) {
     case Token_Tag_None:
-    case Token_Tag_Integer:
     case Token_Tag_Operator:
     case Token_Tag_String:
     case Token_Tag_Id: {
@@ -30,7 +29,12 @@ token_clone_deep(
       break;
     }
     case Token_Tag_Value: {
-      panic("Macro definitions should not contain semi-resolved tokens");
+      if (!operand_is_immediate(&token->Value.value->operand)) {
+        panic("Only immediate operand values are safe to clone");
+      }
+      if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
+        panic("Unpexected Any value in the cloned tree");
+      }
       break;
     }
   }
@@ -446,7 +450,7 @@ tokenizer_handle_binary_integer_end(
 
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
-  Allocator *allocator,
+  const Allocator *allocator,
   Source_File *file,
   Array_Const_Token_Ptr *out_tokens
 ) {
@@ -564,15 +568,15 @@ tokenize(
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
-          start_token(Token_Tag_Integer);
+          start_token(Token_Tag_Value);
           i++;
           state = Tokenizer_State_Hex_Integer;
         } else if (ch == '0' && peek == 'b') {
-          start_token(Token_Tag_Integer);
+          start_token(Token_Tag_Value);
           i++;
           state = Tokenizer_State_Binary_Integer;
         } else if (isdigit(ch)) {
-          start_token(Token_Tag_Integer);
+          start_token(Token_Tag_Value);
           state = Tokenizer_State_Decimal_Integer;
         } else if (isalpha(ch) || ch == '_') {
           start_token(Token_Tag_Id);
@@ -647,8 +651,8 @@ tokenize(
       }
       case Tokenizer_State_Decimal_Integer: {
         if (!isdigit(ch)) {
-          current_token->Integer.bits =
-            tokenizer_handle_decimal_integer_end(current_token_source());
+          u64 bits = tokenizer_handle_decimal_integer_end(current_token_source());
+          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
           reject_and_push;
           goto retry;
         }
@@ -656,8 +660,8 @@ tokenize(
       }
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
-          current_token->Integer.bits =
-            tokenizer_handle_hex_integer_end(current_token_source());
+          u64 bits = tokenizer_handle_hex_integer_end(current_token_source());
+          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
           reject_and_push;
           goto retry;
         }
@@ -665,8 +669,8 @@ tokenize(
       }
       case Tokenizer_State_Binary_Integer: {
         if (ch != '0' && ch != '1') {
-          current_token->Integer.bits =
-            tokenizer_handle_binary_integer_end(current_token_source());
+          u64 bits = tokenizer_handle_binary_integer_end(current_token_source());
+          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
           reject_and_push;
           goto retry;
         }
@@ -733,18 +737,18 @@ tokenize(
     }
 
     case Tokenizer_State_Decimal_Integer: {
-      current_token->Integer.bits =
-        tokenizer_handle_decimal_integer_end(current_token_source());
+      u64 bits = tokenizer_handle_decimal_integer_end(current_token_source());
+      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
       break;
     }
     case Tokenizer_State_Hex_Integer: {
-      current_token->Integer.bits =
-        tokenizer_handle_hex_integer_end(current_token_source());
+      u64 bits = tokenizer_handle_hex_integer_end(current_token_source());
+      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
       break;
     }
     case Tokenizer_State_Binary_Integer: {
-      current_token->Integer.bits =
-        tokenizer_handle_binary_integer_end(current_token_source());
+      u64 bits = tokenizer_handle_binary_integer_end(current_token_source());
+      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
       break;
     }
     case Tokenizer_State_String:
@@ -853,15 +857,13 @@ token_split_next(
 }
 
 Descriptor *
-scope_lookup_type(
+value_ensure_type(
   Compilation_Context *context,
-  Scope *scope,
+  Value *value,
   Source_Range source_range,
   Slice type_name
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value *value = scope_lookup_force(context, scope, type_name);
   if (!value) return 0;
   if (value->descriptor->tag != Descriptor_Tag_Type) {
     program_error_builder(context, source_range) {
@@ -872,6 +874,18 @@ scope_lookup_type(
   }
   Descriptor *descriptor = value->descriptor->Type.descriptor;
   return descriptor;
+}
+
+Descriptor *
+scope_lookup_type(
+  Compilation_Context *context,
+  Scope *scope,
+  Source_Range source_range,
+  Slice type_name
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  Value *value = scope_lookup_force(context, scope, type_name);
+  return value_ensure_type(context, value, source_range, type_name);
 }
 
 #define Token_Maybe_Match(_id_, ...)\
@@ -897,6 +911,7 @@ token_force_type(
   const Token *token
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (!token) return 0;
 
   Descriptor *descriptor = 0;
   switch (token->tag) {
@@ -936,16 +951,11 @@ token_force_type(
       };
       break;
     }
-    case Token_Tag_Integer: {
-      program_error_builder(context, token->source_range) {
-        program_error_append_slice(token->source);
-        program_error_append_literal(" is not a type");
-      }
-      return 0;
+    case Token_Tag_Value: {
+      return value_ensure_type(context, token->Value.value, token->source_range, token->source);
     }
     case Token_Tag_Operator:
     case Token_Tag_String:
-    case Token_Tag_Value:
     default: {
       panic("TODO");
       break;
@@ -1053,7 +1063,6 @@ token_apply_macro_replacements(
         }
         continue;
       }
-      case Token_Tag_Integer:
       case Token_Tag_Operator:
       case Token_Tag_String: {
         Token *copy = allocator_allocate(context->allocator, Token);
@@ -1072,7 +1081,15 @@ token_apply_macro_replacements(
         break;
       }
       case Token_Tag_Value: {
-        panic("Macro definitions should not contain semi-resolved tokens");
+        if (!operand_is_immediate(&token->Value.value->operand)) {
+          panic("Only immediate operand values are safe to clone inside a macro");
+        }
+        if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
+          panic("Unpexected Any value in the cloned macro tree");
+        }
+        Token *copy = allocator_allocate(context->allocator, Token);
+        *copy = *token;
+        dyn_array_push(result, copy);
         break;
       }
     }
@@ -1265,16 +1282,6 @@ token_match_argument(
 }
 
 Value *
-value_from_integer_token(
-  Compilation_Context *context,
-  const Token *token
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  assert(token->tag == Token_Tag_Integer);
-  return value_from_unsigned_immediate(context->allocator, token->Integer.bits);
-}
-
-Value *
 token_force_constant_value(
   Compilation_Context *context,
   const Token *token
@@ -1285,9 +1292,6 @@ token_force_constant_value(
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
       break;
-    }
-    case Token_Tag_Integer: {
-      return value_from_integer_token(context, token);
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
@@ -1342,11 +1346,6 @@ token_force_value(
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
       break;
-    }
-    case Token_Tag_Integer: {
-      Value *immediate = value_from_integer_token(context, token);
-      move_value(context->allocator, context->builder, &token->source_range, result_value, immediate);
-      return *context->result;
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
@@ -1639,7 +1638,6 @@ token_parse_syntax_definition(
         break;
       }
       case Token_Tag_Id:
-      case Token_Tag_Integer:
       case Token_Tag_Value: {
         program_error_builder(context, token->source_range) {
           program_error_append_literal("Unsupported token tag in a syntax definition");
@@ -2440,7 +2438,6 @@ token_parse_constant_expression(
         panic("Internal Error: Encountered token with an uninitialized tag");
         break;
       }
-      case Token_Tag_Integer:
       case Token_Tag_String:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
@@ -3096,7 +3093,6 @@ token_parse_expression(
         panic("Internal Error: Encountered token with an uninitialized tag");
         break;
       }
-      case Token_Tag_Integer:
       case Token_Tag_String:
       case Token_Tag_Id:
       case Token_Tag_Value: {
