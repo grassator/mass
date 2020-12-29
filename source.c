@@ -24,7 +24,7 @@ token_clone_deep(
       break;
     }
     case Token_Tag_Group: {
-      clone->Group.type = token->Group.type;
+      clone->Group.tag = token->Group.tag;
       clone->Group.children = token_clone_token_array_deep(allocator, token->Group.children);
       break;
     }
@@ -387,9 +387,9 @@ token_match_internal(
   const Token *token,
   const Token_Pattern *pattern
 ) {
-  if (pattern->group_type) {
+  if (pattern->group_tag) {
     if (token->tag != Token_Tag_Group) return false;
-    return token->Group.type == pattern->group_type;
+    return token->Group.tag == pattern->group_tag;
   }
   if (pattern->tag && pattern->tag != token->tag) return false;
   if (pattern->source.length) {
@@ -540,7 +540,7 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (parent->tag == Token_Tag_None || parent->Group.type == Token_Group_Type_Curly) {\
+    if (parent->tag == Token_Tag_None || parent->Group.tag == Token_Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent->Group.children)) {\
         start_token(Token_Tag_Operator);\
@@ -592,10 +592,10 @@ tokenize(
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
           start_token(Token_Tag_Group);
-          current_token->Group.type =
-            ch == '(' ? Token_Group_Type_Paren :
-            ch == '{' ? Token_Group_Type_Curly :
-            Token_Group_Type_Square;
+          current_token->Group.tag =
+            ch == '(' ? Token_Group_Tag_Paren :
+            ch == '{' ? Token_Group_Tag_Curly :
+            Token_Group_Tag_Square;
           current_token->Group.children = dyn_array_make(Array_Const_Token_Ptr, 4);
           dyn_array_push(parent->Group.children, current_token);
           dyn_array_push(parent_stack, parent);
@@ -605,12 +605,12 @@ tokenize(
             panic("Tokenizer: unexpected closing char for group");
           }
           s8 expected_paren = 0;
-          switch (parent->Group.type) {
-            case Token_Group_Type_Paren: {
+          switch (parent->Group.tag) {
+            case Token_Group_Tag_Paren: {
               expected_paren = ')';
               break;
             }
-            case Token_Group_Type_Curly: {
+            case Token_Group_Tag_Curly: {
               // Newlines at the end of the block do not count as semicolons otherwise this:
               // { 42
               // }
@@ -629,7 +629,7 @@ tokenize(
               expected_paren = '}';
               break;
             }
-            case Token_Group_Type_Square: {
+            case Token_Group_Tag_Square: {
               expected_paren = ']';
               break;
             }
@@ -931,7 +931,7 @@ token_force_type(
       break;
     }
     case Token_Tag_Group: {
-      if (token->Group.type != Token_Group_Type_Square) {
+      if (token->Group.tag != Token_Group_Tag_Square) {
         panic("TODO");
       }
       if (dyn_array_length(token->Group.children) != 1) {
@@ -1073,7 +1073,7 @@ token_apply_macro_replacements(
       case Token_Tag_Group: {
         Token *copy = allocator_allocate(context->allocator, Token);
         *copy = *token;
-        copy->Group.type = token->Group.type;
+        copy->Group.tag = token->Group.tag;
         copy->Group.children = token_apply_macro_replacements(
           context, map, token_view_from_token_array(token->Group.children)
         );
@@ -1315,7 +1315,7 @@ token_force_constant_value(
       return token->Value.value;
     }
     case Token_Tag_Group: {
-      if (token->Group.type == Token_Group_Type_Paren) {
+      if (token->Group.tag == Token_Group_Tag_Paren) {
         Token_View children_view = token_view_from_token_array(token->Group.children);
         return token_parse_constant_expression(context, children_view);
       } else {
@@ -1382,17 +1382,17 @@ token_force_value(
       return *context->result;
     }
     case Token_Tag_Group: {
-      switch(token->Group.type) {
-        case Token_Group_Type_Paren: {
+      switch(token->Group.tag) {
+        case Token_Group_Tag_Paren: {
           Token_View expression_tokens = token_view_from_token_array(token->Group.children);
           token_parse_expression(context, expression_tokens, result_value);
           return *context->result;
         }
-        case Token_Group_Type_Curly: {
+        case Token_Group_Tag_Curly: {
           token_parse_block(context, token, result_value);
           return *context->result;
         }
-        case Token_Group_Type_Square: {
+        case Token_Group_Tag_Square: {
           panic("TODO");
           return *context->result;
         }
@@ -1511,7 +1511,7 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
 
-  Token_Maybe_Match(pattern_token, .group_type = Token_Group_Type_Paren);
+  Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
   if (!pattern_token) {
     panic("TODO user error");
@@ -1556,7 +1556,7 @@ token_parse_syntax_definition(
           .tag = Macro_Pattern_Tag_Single_Token,
           .Single_Token = {
             .token_pattern = {
-              .group_type = token->Group.type,
+              .group_tag = token->Group.tag,
             }
           },
         });
@@ -1739,7 +1739,7 @@ token_process_c_struct_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if (!token_match(args, &(Token_Pattern) { .group_type = Token_Group_Type_Paren })) {
+  if (!token_match(args, &(Token_Pattern) { .group_tag = Token_Group_Tag_Paren })) {
     program_error_builder(context, args->source_range) {
       program_error_append_literal("c_struct must be followed by ()");
     }
@@ -1753,7 +1753,7 @@ token_process_c_struct_definition(
     goto err;
   }
   const Token *layout_block = *dyn_array_get(args->Group.children, 0);
-  if (!token_match(layout_block, &(Token_Pattern) { .group_type = Token_Group_Type_Curly })) {
+  if (!token_match(layout_block, &(Token_Pattern) { .group_tag = Token_Group_Tag_Curly })) {
     program_error_builder(context, args->source_range) {
       program_error_append_literal("c_struct expects a {} block as the argument");
     }
@@ -2359,7 +2359,7 @@ token_dispatch_constant_operator(
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = *dyn_array_pop(*token_stack);
     Token *result = 0;
-    if (body->tag == Token_Tag_Group && body->Group.type == Token_Group_Type_Paren) {
+    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
       Token_View eval_view = token_view_from_token_array(body->Group.children);
       result = compile_time_eval(context, eval_view, context->scope);
     } else {
@@ -2446,8 +2446,8 @@ token_parse_constant_expression(
       }
       case Token_Tag_Group: {
         dyn_array_push(token_stack, token);
-        switch (token->Group.type) {
-          case Token_Group_Type_Paren: {
+        switch (token->Group.tag) {
+          case Token_Group_Tag_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_constant_operator,
@@ -2456,11 +2456,11 @@ token_parse_constant_expression(
             }
             break;
           }
-          case Token_Group_Type_Curly: {
+          case Token_Group_Tag_Curly: {
             // Nothing special to do for now?
             break;
           }
-          case Token_Group_Type_Square: {
+          case Token_Group_Tag_Square: {
             panic("TODO support parsing [] in constant expressions");
             break;
           }
@@ -2643,7 +2643,7 @@ token_handle_function_call(
 
   Value *target = value_any(context->allocator);
   MASS_ON_ERROR(token_force_value(context, target_token, target)) return 0;
-  assert(token_match(args_token, &(Token_Pattern){.group_type = Token_Group_Type_Paren}));
+  assert(token_match(args_token, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}));
 
   // TODO consider how this should be exposed in the syntax
   //Token_View args_view = token_view_from_token_array(args_token->Group.children);
@@ -3102,8 +3102,8 @@ token_parse_expression(
       }
       case Token_Tag_Group: {
         dyn_array_push(token_stack, token);
-        switch (token->Group.type) {
-          case Token_Group_Type_Paren: {
+        switch (token->Group.tag) {
+          case Token_Group_Tag_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
@@ -3112,11 +3112,11 @@ token_parse_expression(
             }
             break;
           }
-          case Token_Group_Type_Curly: {
+          case Token_Group_Tag_Curly: {
             // Nothing special to do for now?
             break;
           }
-          case Token_Group_Type_Square: {
+          case Token_Group_Tag_Square: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
@@ -3186,7 +3186,7 @@ token_parse_block(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   assert(block->tag == Token_Tag_Group);
-  assert(block->Group.type == Token_Group_Type_Curly);
+  assert(block->Group.tag == Token_Group_Tag_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) return false;
   Token_View children_view = token_view_from_token_array(children);
@@ -3458,7 +3458,7 @@ token_match_fixed_array_type(
 
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Tag_Id);
-  Token_Match(square_brace, .group_type = Token_Group_Type_Square);
+  Token_Match(square_brace, .group_tag = Token_Group_Tag_Square);
   Descriptor *descriptor =
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
@@ -3502,7 +3502,7 @@ token_parse_inline_machine_code_bytes(
   u64 peek_index = 0;
   Token_Match(id_token, .tag = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
-  Token_Match(args_token, .group_type = Token_Group_Type_Paren);
+  Token_Match(args_token, .group_tag = Token_Group_Tag_Paren);
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
 

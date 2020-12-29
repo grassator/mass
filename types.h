@@ -70,7 +70,7 @@ typedef struct Parse_Error Parse_Error;
 typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
 typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
 
-typedef enum Token_Group_Type Token_Group_Type;
+typedef enum Token_Group_Tag Token_Group_Tag;
 
 typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
@@ -362,11 +362,11 @@ typedef struct Parse_Error {
 } Parse_Error;
 typedef dyn_array_type(Parse_Error) Array_Parse_Error;
 
-typedef enum Token_Group_Type {
-  Token_Group_Type_Paren = 1,
-  Token_Group_Type_Square = 2,
-  Token_Group_Type_Curly = 3,
-} Token_Group_Type;
+typedef enum Token_Group_Tag {
+  Token_Group_Tag_Paren = 1,
+  Token_Group_Tag_Square = 2,
+  Token_Group_Tag_Curly = 3,
+} Token_Group_Tag;
 
 typedef enum {
   Token_Tag_None = 0,
@@ -384,7 +384,7 @@ typedef struct {
   Slice slice;
 } Token_String;
 typedef struct {
-  Token_Group_Type type;
+  Token_Group_Tag tag;
   Array_Const_Token_Ptr children;
 } Token_Group;
 typedef struct Token {
@@ -406,7 +406,7 @@ typedef dyn_array_type(Token_View) Array_Token_View;
 
 typedef struct Token_Pattern {
   Token_Tag tag;
-  Token_Group_Type group_type;
+  Token_Group_Tag group_tag;
   Slice source;
   const Token_Pattern * or;
 } Token_Pattern;

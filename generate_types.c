@@ -488,7 +488,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_enum("Token_Group_Type", (Enum_Item[]){
+  push_type(type_enum("Token_Group_Tag", (Enum_Item[]){
     { "Paren", 1 },
     { "Square", 2 },
     { "Curly", 3 },
@@ -505,7 +505,7 @@ main(void) {
       { "Slice", "slice" },
     }),
     struct_fields("Group", (Struct_Item[]){
-      { "Token_Group_Type", "type" },
+      { "Token_Group_Tag", "tag" },
       { "Array_Const_Token_Ptr", "children" },
     }),
   }), (Struct_Item[]){
@@ -520,7 +520,7 @@ main(void) {
 
   push_type(type_struct("Token_Pattern", (Struct_Item[]){
     { "Token_Tag", "tag" },
-    { "Token_Group_Type", "group_type" },
+    { "Token_Group_Tag", "group_tag" },
     { "Slice", "source" },
     { "const Token_Pattern *", "or" },
   }));

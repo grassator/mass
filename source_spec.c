@@ -207,7 +207,7 @@ spec("source") {
 
     const Token *paren = *dyn_array_get(tokens, 0);
     check(paren->tag == Token_Tag_Group);
-    check(paren->Group.type == Token_Group_Type_Paren);
+    check(paren->Group.tag == Token_Group_Tag_Paren);
     check(dyn_array_length(paren->Group.children) == 1);
     check(slice_equal(paren->source, slice_literal("(x)")));
 
@@ -236,13 +236,13 @@ spec("source") {
 
     const Token *curly = *dyn_array_get(tokens, 0);
     check(curly->tag == Token_Tag_Group);
-    check(curly->Group.type == Token_Group_Type_Curly);
+    check(curly->Group.tag == Token_Group_Tag_Curly);
     check(dyn_array_length(curly->Group.children) == 1);
     check(slice_equal(curly->source, slice_literal("{[]}")));
 
     const Token *square = *dyn_array_get(curly->Group.children, 0);
     check(square->tag == Token_Tag_Group);
-    check(square->Group.type == Token_Group_Type_Square);
+    check(square->Group.tag == Token_Group_Tag_Square);
     check(dyn_array_length(square->Group.children) == 0);
     check(slice_equal(square->source, slice_literal("[]")));
   }
