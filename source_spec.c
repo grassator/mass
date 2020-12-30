@@ -301,8 +301,6 @@ spec("source") {
   it("should be able to reference a declared label in raw machine code bytes") {
     // :WindowsOnly
     test_program_inline_source(
-      // FIXME return type here should be s64, but then it will expect a value to return
-      //       which does not exist as we are dealing with machine code bytes directly
       "foo :: () -> (s64) {"
         "goto start;"
         "label from_machine_code;"
