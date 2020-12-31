@@ -1536,6 +1536,154 @@ scope_add_macro(
   dyn_array_push(scope->macros, macro);
 }
 
+const Token *
+token_handle_user_defined_operator(
+  Compilation_Context *context,
+  Token_View args,
+  User_Defined_Operator *operator
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  // We make a nested scope based on the original scope
+  // instead of current scope for hygiene reasons.
+  Scope *body_scope = scope_make(context->allocator, operator->scope);
+
+  switch (operator->fixity) {
+    case Operator_Fixity_Infix: {
+      panic("TODO not implemented infix operator");
+      break;
+    }
+    case Operator_Fixity_Prefix: {
+      assert(args.length == 1);
+      Value *arg_value = value_any(context->allocator);
+      token_force_value(context, token_view_get(args, 0), arg_value);
+      scope_define_value(body_scope, operator->arg0, arg_value);
+      break;
+    }
+    case Operator_Fixity_Postfix: {
+      panic("TODO not implemented postfix operator");
+      break;
+    }
+  }
+  Value *result_value = value_any(context->allocator);
+
+  // Define a new return target label and value so that explicit return statements
+  // jump to correct location and put value in the right place
+  Operand fake_return_label =
+    label32(make_label(context->program, &context->program->data_section));
+  {
+    scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
+      .descriptor = &descriptor_void,
+      .operand = fake_return_label,
+    });
+    scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
+  }
+
+  Token *body = token_clone_deep(context->allocator, operator->body);
+  {
+    Compilation_Context body_context = *context;
+    body_context.scope = body_scope;
+    token_parse_block(&body_context, body, result_value);
+  }
+
+  // FIXME get the source range of the operator application
+  const Source_Range *call_range = &operator->body->source_range;
+
+  push_instruction(
+    &context->builder->code_block.instructions,
+    call_range,
+    (Instruction) {
+      .type = Instruction_Type_Label,
+      .label = fake_return_label.Label.index
+    }
+  );
+
+  return token_value_make(context, result_value, *call_range);
+}
+
+bool
+token_parse_operator_definition(
+  Compilation_Context *context,
+  Token_View view,
+  Scope *scope
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("operator"));
+
+  Token_Maybe_Match(precedence_token, 0);
+
+  if (!precedence_token) {
+    panic("TODO user error");
+  }
+
+  Value *precedence_value = token_force_constant_value(context, precedence_token);
+
+  if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
+    panic("TODO user error");
+  }
+
+  assert(operand_is_immediate(&precedence_value->operand));
+
+  u64 precendence = operand_immediate_value_up_to_u64(&precedence_value->operand);
+  (void)precendence;
+
+  Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
+
+  if (!pattern_token) {
+    panic("TODO user error");
+  }
+
+  Token_Maybe_Match(body_token, .group_tag = Token_Group_Tag_Curly);
+
+  if (!body_token) {
+    panic("TODO user error");
+  }
+
+  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
+
+  // prefix and postfix
+  if (definition.length == 2) {
+    const Token *first = token_view_get(definition, 0);
+    bool is_prefix = first->tag == Token_Tag_Operator;
+    if (is_prefix) {
+      const Token *argument = token_view_get(definition, 1);
+      if (argument->tag != Token_Tag_Id) {
+        panic("TODO user error");
+      }
+      // TODO check already defined operator in scope as we do not allow overloading
+
+      User_Defined_Operator *operator = allocator_allocate(context->allocator, User_Defined_Operator);
+      *operator = (User_Defined_Operator) {
+        .fixity = Operator_Fixity_Prefix,
+        .arg0 = argument->source,
+        .body = body_token,
+        .scope = context->scope,
+      };
+
+      scope_define(context->scope, first->source, (Scope_Entry) {
+        .type = Scope_Entry_Type_Operator,
+        .Operator = {
+          .precedence = precendence,
+          .argument_count = 1,
+          .fixity = Operator_Fixity_Prefix,
+          .handler = token_handle_user_defined_operator,
+          .handler_payload = operator,
+        }
+      });
+    } else {
+      panic("TODO not implemented postfix operator");
+    }
+  } else if (definition.length == 3) { // infix
+    panic("TODO not implemented infix operator");
+  } else {
+    panic("TODO user error");
+  }
+
+  return true;
+}
+
 bool
 token_parse_syntax_definition(
   Compilation_Context *context,
@@ -2261,12 +2409,12 @@ token_handle_cast(
 const Token *
 token_handle_negation(
   Compilation_Context *context,
-  Token_View view,
+  Token_View args,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  assert(view.length == 1);
-  const Token *token = token_view_get(view, 0);
+  assert(args.length == 1);
+  const Token *token = token_view_get(args, 0);
 
   Value *value = token_force_constant_value(context, token);
   if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
@@ -2839,7 +2987,9 @@ token_dispatch_operator(
     }
 
     Token_View args_view = token_view_from_token_array(args);
-    result_token = operator_entry->scope_entry.handler(context, args_view, 0);
+    result_token = operator_entry->scope_entry.handler(
+      context, args_view, operator_entry->scope_entry.handler_payload
+    );
     dyn_array_destroy(args);
   } else if (slice_equal(operator, slice_literal("[]"))) {
     const Token *brackets = *dyn_array_pop(*token_stack);
@@ -3747,6 +3897,9 @@ token_parse(
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
+      continue;
+    }
+    if (token_parse_operator_definition(context, statement, context->program->global_scope)) {
       continue;
     }
     if (token_parse_constant_definitions(context, statement, 0)) {

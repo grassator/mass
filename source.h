@@ -20,10 +20,26 @@ typedef struct {
 typedef const Token *(*Token_Handle_Operator_Proc)
 (Compilation_Context *context, Token_View, void *payload);
 
+typedef enum {
+  Operator_Fixity_Infix,
+  Operator_Fixity_Prefix,
+  Operator_Fixity_Postfix,
+} Operator_Fixity;
+
 typedef struct {
-  s64 precedence;
+  Operator_Fixity fixity;
+  Slice arg0;
+  Slice arg1;
+  const Token *body;
+  Scope *scope;
+} User_Defined_Operator;
+
+typedef struct {
+  Operator_Fixity fixity;
+  u64 precedence;
   u64 argument_count;
   Token_Handle_Operator_Proc handler;
+  void *handler_payload;
 } Scope_Entry_Operator;
 
 typedef struct Scope_Entry Scope_Entry;
