@@ -1547,21 +1547,15 @@ token_handle_user_defined_operator(
   // We make a nested scope based on the original scope
   // instead of current scope for hygiene reasons.
   Scope *body_scope = scope_make(context->allocator, operator->scope);
+  assert(operator->argument_count == args.length);
 
-  switch (operator->fixity) {
-    case Operator_Fixity_Prefix:
-    case Operator_Fixity_Postfix: {
-      assert(args.length == 1);
-      Value *arg_value = value_any(context->allocator);
-      token_force_value(context, token_view_get(args, 0), arg_value);
-      scope_define_value(body_scope, operator->arg0, arg_value);
-      break;
-    }
-    case Operator_Fixity_Infix: {
-      panic("TODO not implemented infix operator");
-      break;
-    }
+  for (u8 i = 0; i < operator->argument_count; ++i) {
+    Slice arg_name = operator->argument_names[i];
+    Value *arg_value = value_any(context->allocator);
+    token_force_value(context, token_view_get(args, i), arg_value);
+    scope_define_value(body_scope, arg_name, arg_value);
   }
+
   Value *result_value = value_any(context->allocator);
 
   // Define a new return target label and value so that explicit return statements
@@ -1647,43 +1641,38 @@ token_parse_operator_definition(
   };
 
   const Token *operator_token;
-  const Token *arg0_token;
-  const Token *arg1_token = 0;
+  const Token *arguments[2] = {0};
 
   // prefix and postfix
   if (definition.length == 2) {
     operator->fixity = token_view_get(definition, 0)->tag == Token_Tag_Operator
       ? Operator_Fixity_Prefix
       : Operator_Fixity_Postfix;
+    operator->argument_count = 1;
     if (operator->fixity == Operator_Fixity_Prefix) {
       operator_token = token_view_get(definition, 0);
-      arg0_token = token_view_get(definition, 1);
+      arguments[0] = token_view_get(definition, 1);
     } else {
       operator_token = token_view_get(definition, 1);
-      arg0_token = token_view_get(definition, 0);
+      arguments[0] = token_view_get(definition, 0);
     }
   } else if (definition.length == 3) { // infix
+    operator->argument_count = 2;
+    operator->fixity = Operator_Fixity_Infix;
     operator_token = token_view_get(definition, 1);
-    arg0_token = token_view_get(definition, 0);
-    arg1_token = token_view_get(definition, 2);
+    arguments[0] = token_view_get(definition, 0);
+    arguments[1] = token_view_get(definition, 2);
   } else {
     operator_token = 0;
-    arg0_token = 0;
     panic("TODO user error");
   }
 
-  if (arg0_token->tag != Token_Tag_Id) {
-    panic("TODO user error");
-    goto err;
-  }
-  operator->arg0 = arg0_token->source;
-
-  if (arg1_token) {
-    if (arg1_token->tag != Token_Tag_Id) {
+  for (u8 i = 0; i < operator->argument_count; ++i) {
+    if (arguments[i]->tag != Token_Tag_Id) {
       panic("TODO user error");
       goto err;
     }
-    operator->arg1 = arg1_token->source;
+    operator->argument_names[i] = arguments[i]->source;
   }
 
   if (operator_token->tag != Token_Tag_Operator) {
@@ -1695,7 +1684,7 @@ token_parse_operator_definition(
     .type = Scope_Entry_Type_Operator,
     .Operator = {
       .precedence = precendence,
-      .argument_count = 1,
+      .argument_count = operator->argument_count,
       .fixity = operator->fixity,
       .handler = token_handle_user_defined_operator,
       .handler_payload = operator,

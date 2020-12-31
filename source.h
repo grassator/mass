@@ -28,8 +28,8 @@ typedef enum {
 
 typedef struct {
   Operator_Fixity fixity;
-  Slice arg0;
-  Slice arg1;
+  u8 argument_count;
+  Slice argument_names[2];
   const Token *body;
   Scope *scope;
 } User_Defined_Operator;
