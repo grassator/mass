@@ -1544,6 +1544,8 @@ token_handle_user_defined_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  // FIXME This is almost identical with the macro function call
+
   // We make a nested scope based on the original scope
   // instead of current scope for hygiene reasons.
   Scope *body_scope = scope_make(context->allocator, operator->scope);
@@ -1577,8 +1579,7 @@ token_handle_user_defined_operator(
     token_parse_block(&body_context, body, result_value);
   }
 
-  // FIXME get the source range of the operator application
-  const Source_Range *call_range = &operator->body->source_range;
+  Source_Range call_range = source_range_from_token_view(args);
 
   push_instruction(
     &context->builder->code_block.instructions,
@@ -1589,7 +1590,7 @@ token_handle_user_defined_operator(
     }
   );
 
-  return token_value_make(context, result_value, *call_range);
+  return token_value_make(context, result_value, call_range);
 }
 
 bool
@@ -2813,7 +2814,7 @@ token_maybe_macro_call_with_lazy_arguments(
 
   push_instruction(
     &context->builder->code_block.instructions,
-    call_source_range,
+    *call_source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
       .label = fake_return_label.Label.index
@@ -2945,7 +2946,7 @@ token_handle_function_call(
 
       push_instruction(
         &context->builder->code_block.instructions,
-        &target_token->source_range,
+        target_token->source_range,
         (Instruction) {
           .type = Instruction_Type_Label,
           .label = fake_return_label.Label.index
@@ -3470,7 +3471,7 @@ token_parse_statement_label(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) { .type = Instruction_Type_Label, .label = value->operand.Label.index }
   );
 
@@ -3515,7 +3516,7 @@ token_parse_statement_if(
   );
   token_parse_block(context, body, value_any(context->allocator));
   push_instruction(
-    &context->builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
@@ -3585,7 +3586,7 @@ token_parse_goto(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, &keyword->source_range,
+    &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
   );
 
@@ -3634,7 +3635,7 @@ token_parse_explicit_return(
 
   push_instruction(
     &context->builder->code_block.instructions,
-    &keyword->source_range,
+    keyword->source_range,
     (Instruction) {.assembly = {jmp, {return_label->operand, 0, 0}}}
   );
 
@@ -3749,7 +3750,7 @@ token_parse_inline_machine_code_bytes(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, &id_token->source_range,
+    &context->builder->code_block.instructions, id_token->source_range,
     (Instruction) {
       .type = Instruction_Type_Bytes,
       .Bytes = bytes,
