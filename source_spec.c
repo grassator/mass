@@ -490,6 +490,16 @@ spec("source") {
     check(checker() == 42);
   }
 
+  it("should be possible to define postfix operators") {
+    test_program_inline_source(
+      "operator 10 (x++) { result := x; x = x + 1; result };"
+      "test :: () -> (s64) { y := 42; y++ }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
   it("should be able to define a local function") {
     test_program_inline_source(
       "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
