@@ -2,22 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-void
-program_push_error_from_bucket_buffer(
-  Compilation_Context *context,
-  Source_Range source_range,
-  Bucket_Buffer *buffer
-) {
-  assert(context->result->tag == Mass_Result_Tag_Success);
-  Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(context->allocator, buffer);
-  Slice message = fixed_buffer_as_slice(message_buffer);
-  *context->result = (Mass_Result) {
-    .tag = Mass_Result_Tag_Error,
-    .Error.details = { message, source_range }
-  };
-  bucket_buffer_destroy(buffer);
-}
-
 Array_Const_Token_Ptr
 token_clone_token_array_deep(
   Allocator *allocator,
@@ -917,10 +901,10 @@ token_force_type(
       descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
         MASS_ON_ERROR(*context->result) return 0;
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Could not find type ");
-          program_error_append_slice(token->source);
-        }
+        context_error_snprintf(
+          context, token->source_range, "Could not find type %"PRIslice,
+          SLICE_EXPAND_PRINTF(token->source)
+        );
       }
       break;
     }
@@ -929,9 +913,9 @@ token_force_type(
         panic("TODO");
       }
       if (dyn_array_length(token->Group.children) != 1) {
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Pointer type must have a single type inside");
-        }
+        context_error_snprintf(
+          context, token->source_range, "Pointer type must have a single type inside"
+        );
         return 0;
       }
       const Token *child = *dyn_array_get(token->Group.children, 0);
@@ -1181,9 +1165,9 @@ token_match_type(
   if (!view.length) panic("Caller must not call token_match_type with empty token list");
   const Token *token = token_view_get(view, 0);
   if (view.length > 1) {
-    program_error_builder(context, token->source_range) {
-      program_error_append_literal("Can not resolve type");
-    }
+    context_error_snprintf(
+      context, token->source_range, "Can not resolve type"
+    );
     return 0;
   }
   return token_force_type(context, context->scope, token);
@@ -1234,15 +1218,17 @@ token_match_argument(
   const Token *operator;
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
-      program_error_builder(context, operator->source_range) {
-        program_error_append_literal("':' operator expects an identifier on the left hand side");
-      }
+      context_error_snprintf(
+        context, operator->source_range,
+        "':' operator expects an identifier on the left hand side"
+      );
       goto err;
     }
     if (lhs.length > 1 || !token_match(lhs.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })) {
-      program_error_builder(context, operator->source_range) {
-        program_error_append_literal("':' operator expects only a single identifier on the left hand side");
-      }
+      context_error_snprintf(
+        context, operator->source_range,
+        "':' operator expects only a single identifier on the left hand side"
+      );
       goto err;
     }
     Descriptor *type_descriptor = token_match_type(context, rhs);
@@ -1283,15 +1269,17 @@ token_match_return_type(
   Descriptor *type_descriptor;
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
-      program_error_builder(context, operator->source_range) {
-        program_error_append_literal("':' operator expects an identifier on the left hand side");
-      }
+      context_error_snprintf(
+        context, operator->source_range,
+        "':' operator expects an identifier on the left hand side"
+      );
       goto err;
     }
     if (lhs.length > 1 || !token_match(lhs.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })) {
-      program_error_builder(context, operator->source_range) {
-        program_error_append_literal("':' operator expects only a single identifier on the left hand side");
-      }
+      context_error_snprintf(
+        context, operator->source_range,
+        "':' operator expects only a single identifier on the left hand side"
+      );
       goto err;
     }
     type_descriptor = token_match_type(context, rhs);
@@ -1334,10 +1322,11 @@ token_force_constant_value(
       Value *value = scope_lookup_force(context, context->scope, name);
       if (!value) {
         MASS_ON_ERROR(*context->result) return 0;
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Undefined variable ");
-          program_error_append_slice(name);
-        }
+        context_error_snprintf(
+          context, token->source_range,
+          "Undefined variable %"PRIslice,
+          SLICE_EXPAND_PRINTF(name)
+        );
       }
       return value;
     }
@@ -1391,10 +1380,11 @@ token_force_value(
       Value *value = scope_lookup_force(context, scope, name);
       if (!value) {
         MASS_TRY(*context->result);
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Undefined variable ");
-          program_error_append_slice(name);
-        }
+        context_error_snprintf(
+          context, token->source_range,
+          "Undefined variable %"PRIslice,
+          SLICE_EXPAND_PRINTF(name)
+        );
         return *context->result;
       } else {
         move_value(context->allocator, context->builder, &token->source_range, result_value, value);
@@ -1616,18 +1606,20 @@ token_parse_operator_definition(
   Token_Maybe_Match(precedence_token, 0);
 
   if (!precedence_token) {
-    program_error_builder(context, keyword_token->source_range) {
-      program_error_append_literal("'operator' keyword must be followed by a precedence number");
-    }
+    context_error_snprintf(
+      context, keyword_token->source_range,
+      "'operator' keyword must be followed by a precedence number"
+    );
     goto err;
   }
 
   Value *precedence_value = token_force_constant_value(context, precedence_token);
 
   if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
-    program_error_builder(context, precedence_token->source_range) {
-      program_error_append_literal("Operator precedence must be an unsigned number");
-    }
+    context_error_snprintf(
+      context, precedence_token->source_range,
+      "Operator precedence must be an unsigned number"
+    );
     goto err;
   }
 
@@ -1639,18 +1631,20 @@ token_parse_operator_definition(
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
   if (!pattern_token) {
-    program_error_builder(context, precedence_token->source_range) {
-      program_error_append_literal("Operator definition have a pattern in () following the precedence");
-    }
+    context_error_snprintf(
+      context, precedence_token->source_range,
+      "Operator definition have a pattern in () following the precedence"
+    );
     goto err;
   }
 
   Token_Maybe_Match(body_token, .group_tag = Token_Group_Tag_Curly);
 
   if (!body_token) {
-    program_error_builder(context, pattern_token->source_range) {
-      program_error_append_literal("Operator definition have a macro body in {} following the pattern");
-    }
+    context_error_snprintf(
+      context, pattern_token->source_range,
+      "Operator definition have a macro body in {} following the pattern"
+    );
     goto err;
   }
 
@@ -1686,26 +1680,29 @@ token_parse_operator_definition(
     arguments[1] = token_view_get(definition, 2);
   } else {
     operator_token = 0;
-    program_error_builder(context, pattern_token->source_range) {
-      program_error_append_literal("Expected the pattern to have two (for prefix / postfix) or three tokens");
-    }
+    context_error_snprintf(
+      context, pattern_token->source_range,
+      "Expected the pattern to have two (for prefix / postfix) or three tokens"
+    );
     goto err;
   }
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
     if (arguments[i]->tag != Token_Tag_Id) {
-      program_error_builder(context, arguments[i]->source_range) {
-        program_error_append_literal("Operator argument must be an identifier");
-      }
+      context_error_snprintf(
+        context, arguments[i]->source_range,
+        "Operator argument must be an identifier"
+      );
       goto err;
     }
     operator->argument_names[i] = arguments[i]->source;
   }
 
   if (operator_token->tag != Token_Tag_Operator) {
-    program_error_builder(context, operator_token->source_range) {
-      program_error_append_literal("Expected an operator token here");
-    }
+    context_error_snprintf(
+      context, operator_token->source_range,
+      "Expected an operator token here"
+    );
     goto err;
   }
 
@@ -1724,13 +1721,13 @@ token_parse_operator_definition(
       operator->fixity == Operator_Fixity_Postfix &&
       operator_entry->fixity == Operator_Fixity_Infix
     )) {
-      program_error_builder(context, keyword_token->source_range) {
-        program_error_append_literal("There is already ");
-        program_error_append_slice(operator_fixity_to_lowercase_slice(operator_entry->fixity));
-        program_error_append_literal(" operator ");
-        program_error_append_slice(operator_token->source);
-        program_error_append_literal(". You can only have one definition for prefix and one for infix or suffix.");
-      }
+      Slice existing = operator_fixity_to_lowercase_slice(operator_entry->fixity);
+      context_error_snprintf(
+        context, keyword_token->source_range,
+        "There is already %"PRIslice" operator %"PRIslice
+        ". You can only have one definition for prefix and one for infix or suffix.",
+        SLICE_EXPAND_PRINTF(existing), SLICE_EXPAND_PRINTF(operator_token->source)
+      );
       goto err;
     }
     existing_scope_entry = existing_scope_entry->next_overload;
@@ -1799,11 +1796,10 @@ token_parse_syntax_definition(
       }
       case Token_Tag_Group: {
         if (dyn_array_length(token->Group.children)) {
-          program_error_builder(context, token->source_range) {
-            program_error_append_literal(
-              "Nested group matches are not supported in syntax declarations (yet)"
-            );
-          }
+          context_error_snprintf(
+            context, token->source_range,
+            "Nested group matches are not supported in syntax declarations (yet)"
+          );
           goto err;
         }
         dyn_array_push(pattern, (Macro_Pattern) {
@@ -1824,11 +1820,10 @@ token_parse_syntax_definition(
         ) {
           const Token *pattern_name = token_view_peek(definition, ++i);
           if (!pattern_name || pattern_name->tag != Token_Tag_Id) {
-            program_error_builder(context, token->source_range) {
-              program_error_append_literal(
-                "@ operator in a syntax definition requires an id after it"
-              );
-            }
+            context_error_snprintf(
+              context, token->source_range,
+              "@ operator in a syntax definition requires an id after it"
+            );
             goto err;
           }
           Macro_Pattern *last_pattern = 0;
@@ -1846,9 +1841,10 @@ token_parse_syntax_definition(
             panic("Internal Error: Unexpected @-like operator");
           }
           if (!last_pattern) {
-            program_error_builder(context, token->source_range) {
-              program_error_append_literal("@ requires a valid pattern before it");
-            }
+            context_error_snprintf(
+              context, token->source_range,
+              "@ requires a valid pattern before it"
+            );
             goto err;
           }
           switch(last_pattern->tag) {
@@ -1863,39 +1859,38 @@ token_parse_syntax_definition(
           }
         } else if (slice_equal(token->source, slice_literal("^"))) {
           if (i != 0) {
-            program_error_builder(context, token->source_range) {
-              program_error_append_literal(
-                "^ operator (statement start match) can only appear at the start of the pattern."
-              );
-            }
+            context_error_snprintf(
+              context, token->source_range,
+              "^ operator (statement start match) can only appear at the start of the pattern."
+            );
             goto err;
           }
           statement_start = true;
         } else if (slice_equal(token->source, slice_literal("$"))) {
           if (i != definition.length - 1) {
-            program_error_builder(context, token->source_range) {
-              program_error_append_literal(
-                "$ operator (statement end match) can only appear at the end of the pattern."
-              );
-            }
+            context_error_snprintf(
+              context, token->source_range,
+              "$ operator (statement end match) can only appear at the end of the pattern."
+            );
             goto err;
           }
           statement_end = true;
         } else {
-          program_error_builder(context, token->source_range) {
-            program_error_append_literal("Unsupported operator ");
-            program_error_append_slice(token->source);
-            program_error_append_literal(" in a syntax definition");
-          }
+          context_error_snprintf(
+            context, token->source_range,
+            "Unsupported operator %"PRIslice" in a syntax definition",
+            SLICE_EXPAND_PRINTF(token->source)
+          );
           goto err;
         }
         break;
       }
       case Token_Tag_Id:
       case Token_Tag_Value: {
-        program_error_builder(context, token->source_range) {
-          program_error_append_literal("Unsupported token tag in a syntax definition");
-        }
+        context_error_snprintf(
+          context, token->source_range,
+          "Unsupported token tag in a syntax definition"
+        );
         goto err;
         break;
       }
@@ -1986,23 +1981,26 @@ token_process_c_struct_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if (!token_match(args, &(Token_Pattern) { .group_tag = Token_Group_Tag_Paren })) {
-    program_error_builder(context, args->source_range) {
-      program_error_append_literal("c_struct must be followed by ()");
-    }
+    context_error_snprintf(
+      context, args->source_range,
+      "c_struct must be followed by ()"
+    );
     goto err;
   }
   if (dyn_array_length(args->Group.children) != 1) {
-    program_error_builder(context, args->source_range) {
-      program_error_append_literal("c_struct expects 1 argument, got ");
-      program_error_append_number("%" PRIu64, dyn_array_length(args->Group.children));
-    }
+    context_error_snprintf(
+      context, args->source_range,
+      "c_struct expects 1 argument, got %"PRIu64,
+      dyn_array_length(args->Group.children)
+    );
     goto err;
   }
   const Token *layout_block = *dyn_array_get(args->Group.children, 0);
   if (!token_match(layout_block, &(Token_Pattern) { .group_tag = Token_Group_Tag_Curly })) {
-    program_error_builder(context, args->source_range) {
-      program_error_append_literal("c_struct expects a {} block as the argument");
-    }
+    context_error_snprintf(
+      context, args->source_range,
+      "c_struct expects a {} block as the argument"
+    );
     goto err;
   }
 
@@ -2047,9 +2045,10 @@ token_import_match_arguments(
     .tag = Token_Tag_String,
   });
   if (!library_name_token) {
-    program_error_builder(context, source_range) {
-      program_error_append_literal("First argument to external() must be a literal string");
-    }
+    context_error_snprintf(
+      context, source_range,
+      "First argument to external() must be a literal string"
+    );
     return 0;
   }
   const Token *comma = token_peek_match(view, peek_index++, &(Token_Pattern) {
@@ -2057,18 +2056,20 @@ token_import_match_arguments(
     .source = slice_literal(","),
   });
   if (!comma) {
-    program_error_builder(context, source_range) {
-      program_error_append_literal("external(\"library_name\", \"symbol_name\") requires two arguments");
-    }
+    context_error_snprintf(
+      context, source_range,
+      "external(\"library_name\", \"symbol_name\") requires two arguments"
+    );
     return 0;
   }
   const Token *symbol_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
     .tag = Token_Tag_String,
   });
   if (!symbol_name_token) {
-    program_error_builder(context, source_range) {
-      program_error_append_literal("Second argument to external() must be a literal string");
-    }
+    context_error_snprintf(
+      context, source_range,
+      "Second argument to external() must be a literal string"
+    );
     return 0;
   }
   Slice library_name = library_name_token->String.slice;
@@ -2169,9 +2170,10 @@ token_process_function_literal(
 
     for (u64 i = 0; !it.done; ++i) {
       if (i > 0) {
-        program_error_builder(context, return_types->source_range) {
-          program_error_append_literal("Multiple return types are not supported at the moment");
-        }
+        context_error_snprintf(
+          context, return_types->source_range,
+          "Multiple return types are not supported at the moment"
+        );
         return 0;
       }
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
@@ -2593,16 +2595,18 @@ token_dispatch_constant_operator(
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
         if (descriptor->flags & Descriptor_Function_Flags_External) {
-          program_error_builder(context, function->source_range) {
-            program_error_append_literal("External functions can not be macro");
-          }
+          context_error_snprintf(
+            context, function->source_range,
+            "External functions can not be macro"
+          );
         } else {
           descriptor->flags |= Descriptor_Function_Flags_Macro;
         }
       } else {
-        program_error_builder(context, function->source_range) {
-          program_error_append_literal("Trying to mark a non-function as macro");
-        }
+        context_error_snprintf(
+          context, function->source_range,
+          "Trying to mark a non-function as macro"
+        );
       }
     }
   } else if (slice_equal(operator, slice_literal("@"))) {
@@ -2612,9 +2616,10 @@ token_dispatch_constant_operator(
       Token_View eval_view = token_view_from_token_array(body->Group.children);
       result = compile_time_eval(context, eval_view, context->scope);
     } else {
-      program_error_builder(context, body->source_range) {
-        program_error_append_literal("@ operator must be followed by a parenthesized expression");
-      }
+      context_error_snprintf(
+        context, body->source_range,
+        "@ operator must be followed by a parenthesized expression"
+      );
       result = token_value_make(context, 0, body->source_range);
     }
     dyn_array_push(*token_stack, result);
@@ -2639,20 +2644,22 @@ token_handle_operator(
   Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
 
   if (!scope_entry) {
-    program_error_builder(context, source_range) {
-      program_error_append_literal("Unknown operator ");
-      program_error_append_slice(new_operator);
-    }
+    context_error_snprintf(
+      context, source_range,
+      "Unknown operator %"PRIslice,
+      SLICE_EXPAND_PRINTF(new_operator)
+    );
     return false;
   }
 
   Scope_Entry_Operator *operator_entry = 0;
   while (scope_entry) {
     if (scope_entry->type != Scope_Entry_Type_Operator) {
-      program_error_builder(context, source_range) {
-        program_error_append_slice(new_operator);
-        program_error_append_literal(" is not an operator");
-      }
+      context_error_snprintf(
+        context, source_range,
+        "%"PRIslice" is not an operator",
+        SLICE_EXPAND_PRINTF(new_operator)
+      );
       return false;
     }
     operator_entry = &scope_entry->Operator;
@@ -2954,10 +2961,11 @@ token_handle_function_call(
   }
 
   if (target->descriptor->tag != Descriptor_Tag_Function) {
-    program_error_builder(context, target_token->source_range) {
-      program_error_append_slice(target_token->source);
-      program_error_append_literal(" is not a function");
-    }
+    context_error_snprintf(
+      context, target_token->source_range,
+      "%"PRIslice" is not a function",
+      SLICE_EXPAND_PRINTF(target_token->source)
+    );
     return false;
   }
   Token *result = 0;
@@ -2969,11 +2977,12 @@ token_handle_function_call(
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == match.score) {
-      program_error_builder(context, target_token->source_range) {
-        // TODO improve error message
-        program_error_append_literal("Could not decide which overload to pick");
-        // TODO provide names of matched overloads
-      }
+      // TODO improve error message
+      // TODO provide names of matched overloads
+      context_error_snprintf(
+        context, target_token->source_range,
+        "Could not decide which overload to pick"
+      );
       return 0;
     } else if (score > match.score) {
       match.value = to_call;
@@ -3036,10 +3045,11 @@ token_handle_function_call(
 
     result = token_value_make(context, return_value, target_token->source_range);
   } else {
-    program_error_builder(context, target_token->source_range) {
-      // TODO add better error message
-      program_error_append_literal("Could not find matching overload");
-    }
+    // TODO add better error message
+    context_error_snprintf(
+      context, target_token->source_range,
+      "Could not find matching overload"
+    );
   }
   dyn_array_destroy(args);
   return result;
@@ -3061,14 +3071,11 @@ token_dispatch_operator(
     u64 argument_count = operator_entry->scope_entry.argument_count;
     if (dyn_array_length(*token_stack) < argument_count) {
       // FIXME provide source range
-      program_error_builder(context, operator_entry->source_range) {
-        program_error_append_literal("Operator ");
-        program_error_append_slice(operator);
-        program_error_append_literal(" required ");
-        program_error_append_number("%" PRIu64, argument_count);
-        program_error_append_literal(" get ");
-        program_error_append_number("%" PRIu64, dyn_array_length(*token_stack));
-      }
+      context_error_snprintf(
+        context, operator_entry->source_range,
+        "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
+        SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*token_stack)
+      );
       return;
     }
     // TODO maybe reverse the arguments in place on the stack @Speed
@@ -3190,9 +3197,10 @@ token_dispatch_operator(
       MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
       result_value = struct_get_field(context->allocator, struct_value, rhs->source);
     } else {
-      program_error_builder(context, rhs->source_range) {
-        program_error_append_literal("Right hand side of the . operator must be an identifier");
-      }
+      context_error_snprintf(
+        context, rhs->source_range,
+        "Right hand side of the . operator must be an identifier"
+      );
       return;
     }
     result_token = token_value_make(context, result_value, lhs->source_range);
@@ -3251,26 +3259,27 @@ token_dispatch_operator(
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     if (!descriptor_is_integer(lhs_value->descriptor)) {
-      program_error_builder(context, lhs->source_range) {
-        program_error_append_literal("Left hand side of the ");
-        program_error_append_slice(operator);
-        program_error_append_literal(" is not an integer");
-      }
+      context_error_snprintf(
+        context, lhs->source_range,
+        "Left hand side of the  %"PRIslice" is not an integer",
+        SLICE_EXPAND_PRINTF(operator)
+      );
       return;
     }
     if (!descriptor_is_integer(rhs_value->descriptor)) {
-      program_error_builder(context, lhs->source_range) {
-        program_error_append_literal("Right hand side of the ");
-        program_error_append_slice(operator);
-        program_error_append_literal(" is not an integer");
-      }
+      context_error_snprintf(
+        context, rhs->source_range,
+        "Right hand side of the  %"PRIslice" is not an integer",
+        SLICE_EXPAND_PRINTF(operator)
+      );
       return;
     }
 
     if (!(same_value_type_or_can_implicitly_move_cast(lhs_value, rhs_value))) {
-      program_error_builder(context, lhs->source_range) {
-        program_error_append_literal("Incompatible integer types in comparison");
-      }
+      context_error_snprintf(
+        context, lhs->source_range,
+        "Incompatible integer types in comparison"
+      );
       return;
     }
 
@@ -3428,9 +3437,10 @@ token_parse_expression(
       assert(token);
       MASS_ON_ERROR(token_force_value(context, token, result_value)) goto err;
     } else {
-      program_error_builder(context, source_range_from_token_view(view)) {
-        program_error_append_literal("Could not parse the expression");
-      }
+      context_error_snprintf(
+        context, source_range_from_token_view(view),
+        "Could not parse the expression"
+      );
     }
   }
 
@@ -3508,9 +3518,10 @@ token_parse_statement_label(
     rest.length != 1 ||
     !token_match(token_view_get(rest, 0), &(Token_Pattern){ .tag = Token_Tag_Id })
   ) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_literal("`label` must be followed by an identifier");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "`label` must be followed by an identifier"
+    );
     goto err;
   }
 
@@ -3542,11 +3553,11 @@ token_parse_statement_label(
     value->descriptor != &descriptor_void ||
     value->operand.tag != Operand_Tag_Label
   ) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_literal("Trying to redefine variable ");
-      program_error_append_slice(id->source);
-      program_error_append_literal(" as a label");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "Trying to redefine variable %"PRIslice" as a label",
+      SLICE_EXPAND_PRINTF(id->source)
+    );
     goto err;
   }
 
@@ -3573,9 +3584,10 @@ token_parse_statement_if(
   Token_View rest = token_view_rest(view, peek_index);
 
   if (!rest.length) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_literal("`if` keyword must be followed by an expression");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "`if` keyword must be followed by an expression"
+    );
     goto err;
   }
 
@@ -3616,23 +3628,26 @@ token_parse_goto(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
   Token_View rest = token_view_rest(view, peek_index);
   if (rest.length == 0) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_literal("`goto` keyword must be followed by an identifier");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "`goto` keyword must be followed by an identifier"
+    );
     goto err;
   }
 
   if (rest.length > 1) {
-    program_error_builder(context, token_view_get(rest, 1)->source_range) {
-      program_error_append_literal("Unexpected token");
-    }
+    context_error_snprintf(
+      context, token_view_get(rest, 1)->source_range,
+      "Unexpected token"
+    );
     goto err;
   }
   const Token *id = token_view_get(rest, 0);
   if (!token_match(id, &(Token_Pattern){.tag = Token_Tag_Id})) {
-    program_error_builder(context, id->source_range) {
-      program_error_append_literal("`goto` keyword must be followed by an identifier");
-    }
+    context_error_snprintf(
+      context, id->source_range,
+      "`goto` keyword must be followed by an identifier"
+    );
     goto err;
   }
 
@@ -3658,10 +3673,11 @@ token_parse_goto(
     value->descriptor != &descriptor_void ||
     value->operand.tag != Operand_Tag_Label
   ) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_slice(id->source);
-      program_error_append_literal(" is not a label");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "%"PRIslice" is not a label",
+      SLICE_EXPAND_PRINTF(id->source)
+    );
     goto err;
   }
 
@@ -3703,9 +3719,10 @@ token_parse_explicit_return(
 
   bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
-    program_error_builder(context, keyword->source_range) {
-      program_error_append_literal("Explicit return from a non-void function requires a value");
-    }
+    context_error_snprintf(
+      context, keyword->source_range,
+      "Explicit return from a non-void function requires a value"
+    );
   }
 
   Value *return_label = scope_lookup_force(context, context->scope, MASS_RETURN_LABEL_NAME);
@@ -3739,15 +3756,17 @@ token_match_fixed_array_type(
   Value *size_value = token_parse_constant_expression(context, size_view);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
-    program_error_builder(context, square_brace->source_range) {
-      program_error_append_literal("Fixed size array size is not an integer");
-    }
+    context_error_snprintf(
+      context, square_brace->source_range,
+      "Fixed size array size is not an integer"
+    );
     return 0;
   }
   if (!operand_is_immediate(&size_value->operand)) {
-    program_error_builder(context, square_brace->source_range) {
-      program_error_append_literal("Fixed size array size must be known at compile time");
-    }
+    context_error_snprintf(
+      context, square_brace->source_range,
+      "Fixed size array size must be known at compile time"
+    );
     return 0;
   }
   u32 length = s64_to_u32(operand_immediate_value_up_to_s64(&size_value->operand));
@@ -3785,17 +3804,19 @@ token_parse_inline_machine_code_bytes(
 
   for (u64 i = 0; i < dyn_array_length(args); ++i) {
     if (bytes.length >= 15) {
-      program_error_builder(context, args_token->source_range) {
-        program_error_append_literal("Expected a maximum of 15 bytes");
-      }
+      context_error_snprintf(
+        context, args_token->source_range,
+        "Expected a maximum of 15 bytes"
+      );
     }
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
     if (value->operand.tag == Operand_Tag_Label) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
-        program_error_builder(context, args_token->source_range) {
-          program_error_append_literal("inline_machine_code_bytes only supports one label");
-        }
+        context_error_snprintf(
+          context, args_token->source_range,
+          "inline_machine_code_bytes only supports one label"
+        );
         goto err;
       }
       bytes.label_index = value->operand.Label.index;
@@ -3806,23 +3827,26 @@ token_parse_inline_machine_code_bytes(
       bytes.memory[bytes.length++] = 0;
     } else {
       if (!descriptor_is_integer(value->descriptor)) {
-        program_error_builder(context, args_token->source_range) {
-          program_error_append_literal("inline_machine_code_bytes expects arguments to be integers");
-        }
+        context_error_snprintf(
+          context, args_token->source_range,
+          "inline_machine_code_bytes expects arguments to be integers"
+        );
         goto err;
       }
       if (!operand_is_immediate(&value->operand)) {
-        program_error_builder(context, args_token->source_range) {
-          program_error_append_literal("inline_machine_code_bytes expects arguments to be compile-time known");
-        }
+        context_error_snprintf(
+          context, args_token->source_range,
+          "inline_machine_code_bytes expects arguments to be compile-time known"
+        );
         goto err;
       }
       u64 byte = operand_immediate_value_up_to_u64(&value->operand);
       if (!u64_fits_into_u8(byte)) {
-        program_error_builder(context, args_token->source_range) {
-          program_error_append_literal("Expected integer between 0 and 255, got ");
-          program_error_append_number("%" PRIu64, byte);
-        }
+        context_error_snprintf(
+          context, args_token->source_range,
+          "Expected integer between 0 and 255, got %"PRIu64,
+          byte
+        );
         goto err;
       }
       bytes.memory[bytes.length++] = s64_to_u8(byte);
@@ -3856,9 +3880,10 @@ token_parse_definition(
   Token_View rest = token_view_rest(view, peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) {
-    program_error_builder(context, define->source_range) {
-      program_error_append_literal("Could not find type");
-    }
+    context_error_snprintf(
+      context, define->source_range,
+      "Could not find type"
+    );
     goto err;
   }
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
@@ -4003,9 +4028,10 @@ token_parse(
 
     // Report unmatched statements
     Source_Range source_range = source_range_from_token_view(statement);
-    program_error_builder(context, source_range) {
-      program_error_append_literal("Could not parse a top level statement");
-    }
+    context_error_snprintf(
+      context, source_range,
+      "Could not parse a top level statement"
+    );
     break;
   }
 
