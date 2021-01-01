@@ -1281,101 +1281,100 @@ program_init(
 
   scope_define(program->global_scope, slice_literal("[]"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 20 }
+    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix }
   });
   scope_define(program->global_scope, slice_literal("()"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 20 }
+    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix }
   });
   scope_define(program->global_scope, slice_literal("."), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19 }
+    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("->"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19 }
+    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("macro"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19 }
+    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix }
   });
   scope_define(program->global_scope, slice_literal("@"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 18 }
+    .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix }
   });
 
-
-  scope_define(program->global_scope, slice_literal("-x"), (Scope_Entry) {
+  scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
     .Operator = {
       .precedence = 17,
       .handler = token_handle_negation,
       .argument_count = 1,
+      .fixity = Operator_Fixity_Prefix
     }
   });
 
-
   scope_define(program->global_scope, slice_literal("&"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 16 }
+    .Operator = { .precedence = 16, .fixity = Operator_Fixity_Prefix }
   });
   scope_define(program->global_scope, slice_literal("*"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15 }
+    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("/"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15 }
+    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("%"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15 }
+    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
 
   scope_define(program->global_scope, slice_literal("+"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 10 }
+    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 10 }
+    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix }
   });
 
 
   scope_define(program->global_scope, slice_literal("<"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8 }
+    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal(">"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8 }
+    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("<="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8 }
+    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal(">="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8 }
+    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
 
   scope_define(program->global_scope, slice_literal("=="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 7}
+    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("!="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 7 }
+    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix }
   });
 
 
   scope_define(program->global_scope, slice_literal("&&"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 5 }
+    .Operator = { .precedence = 5, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("||"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 4 }
+    .Operator = { .precedence = 4, .fixity = Operator_Fixity_Infix }
   });
 
 

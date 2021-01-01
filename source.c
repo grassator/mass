@@ -319,28 +319,6 @@ scope_define_value(
   });
 }
 
-#define SCOPE_OPERATOR_NOT_FOUND (-1)
-
-bool
-scope_lookup_operator(
-  Scope *scope,
-  Slice name,
-  Scope_Entry_Operator *out_entry
-) {
-  Scope_Entry *entry = 0;
-  while (scope) {
-    entry = hash_map_get(scope->map, name);
-    if (entry) break;
-    scope = scope->parent;
-  }
-  if (!entry || entry->type != Scope_Entry_Type_Operator) {
-    return false;
-  }
-
-  *out_entry = entry->Operator;
-  return true;
-}
-
 bool
 code_point_is_operator(
   s32 code_point
@@ -2473,7 +2451,10 @@ token_dispatch_constant_operator(
 
   Slice operator = operator_entry->source;
 
-  if (slice_equal(operator, slice_literal("-x"))) {
+  if (
+    slice_equal(operator, slice_literal("-")) &&
+    operator_entry->scope_entry.fixity == Operator_Fixity_Prefix
+  ) {
     const Token *token = *dyn_array_pop(*token_stack);
     Token_View args_view = {
       .tokens = &token,
@@ -2573,23 +2554,39 @@ token_handle_operator(
   Array_Const_Token_Ptr *token_stack,
   Array_Operator_Stack_Entry *operator_stack,
   Slice new_operator,
-  Source_Range source_range
+  Source_Range source_range,
+  Operator_Fixity fixity_mask
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope_Entry_Operator operator_entry;
+  Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
 
-  if (!scope_lookup_operator(context->scope, new_operator, &operator_entry)) {
+  if (!scope_entry) {
     program_error_builder(context, source_range) {
       program_error_append_literal("Unknown operator ");
       program_error_append_slice(new_operator);
     }
     return false;
   }
+
+  Scope_Entry_Operator *operator_entry = 0;
+  while (scope_entry) {
+    if (scope_entry->type != Scope_Entry_Type_Operator) {
+      program_error_builder(context, source_range) {
+        program_error_append_slice(new_operator);
+        program_error_append_literal(" is not an operator");
+      }
+      return false;
+    }
+    operator_entry = &scope_entry->Operator;
+    if (operator_entry->fixity & fixity_mask) break;
+    scope_entry = scope_entry->next_overload;
+  }
+
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
-    if (last_operator->scope_entry.precedence <= operator_entry.precedence) {
+    if (last_operator->scope_entry.precedence <= operator_entry->precedence) {
       break;
     }
 
@@ -2601,7 +2598,7 @@ token_handle_operator(
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source = new_operator,
     .source_range = source_range,
-    .scope_entry = operator_entry,
+    .scope_entry = *operator_entry,
   });
   return true;
 }
@@ -2623,6 +2620,9 @@ token_parse_constant_expression(
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
+    Operator_Fixity fixity_mask = is_previous_an_operator
+      ? Operator_Fixity_Prefix
+      : Operator_Fixity_Infix | Operator_Fixity_Postfix;
 
     switch(token->tag) {
       case Token_Tag_None: {
@@ -2642,7 +2642,8 @@ token_parse_constant_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_constant_operator,
-                &token_stack, &operator_stack, slice_literal("()"), token->source_range
+                &token_stack, &operator_stack, slice_literal("()"), token->source_range,
+                Operator_Fixity_Postfix
               )) goto err;
             }
             break;
@@ -2660,10 +2661,13 @@ token_parse_constant_expression(
         break;
       }
       case Token_Tag_Id: {
-        if (scope_lookup_operator(context->scope, token->source, &(Scope_Entry_Operator){0})) {
+        Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
+        if (scope_entry && scope_entry->type == Scope_Entry_Type_Operator) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
-            &token_stack, &operator_stack, token->source, token->source_range
+            &token_stack, &operator_stack, token->source, token->source_range,
+            // FIXME figure out how to deal with fixity for non-symbol operators
+            Operator_Fixity_Prefix
           )) goto err;
           is_previous_an_operator = true;
         } else {
@@ -2675,13 +2679,10 @@ token_parse_constant_expression(
       }
       case Token_Tag_Operator: {
         Slice operator = token->source;
-        // unary minus, i.e x + -5
-        if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
-          operator = slice_literal("-x");
-        }
         if (!token_handle_operator(
           context, view, token_dispatch_constant_operator,
-          &token_stack, &operator_stack, operator, token->source_range
+          &token_stack, &operator_stack, operator, token->source_range,
+          fixity_mask
         )) goto err;
         is_previous_an_operator = true;
         break;
@@ -3280,6 +3281,9 @@ token_parse_expression(
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
+    Operator_Fixity fixity_mask = is_previous_an_operator
+      ? Operator_Fixity_Prefix
+      : Operator_Fixity_Infix | Operator_Fixity_Postfix;
 
     switch(token->tag) {
       case Token_Tag_None: {
@@ -3300,7 +3304,8 @@ token_parse_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("()"), token->source_range
+                &token_stack, &operator_stack, slice_literal("()"), token->source_range,
+                Operator_Fixity_Postfix
               )) goto err;
             }
             break;
@@ -3313,7 +3318,8 @@ token_parse_expression(
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("[]"), token->source_range
+                &token_stack, &operator_stack, slice_literal("[]"), token->source_range,
+                Operator_Fixity_Postfix
               )) goto err;
             }
             break;
@@ -3324,13 +3330,10 @@ token_parse_expression(
       }
       case Token_Tag_Operator: {
         Slice operator = token->source;
-        // unary minus, i.e x + -5
-        if (is_previous_an_operator && slice_equal(operator, slice_literal("-"))) {
-          operator = slice_literal("-x");
-        }
         if (!token_handle_operator(
           context, view, token_dispatch_operator,
-          &token_stack, &operator_stack, operator, token->source_range
+          &token_stack, &operator_stack, operator, token->source_range,
+          fixity_mask
         )) goto err;
         is_previous_an_operator = true;
         break;

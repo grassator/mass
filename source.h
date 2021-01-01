@@ -21,9 +21,9 @@ typedef const Token *(*Token_Handle_Operator_Proc)
 (Compilation_Context *context, Token_View, void *payload);
 
 typedef enum {
-  Operator_Fixity_Infix,
-  Operator_Fixity_Prefix,
-  Operator_Fixity_Postfix,
+  Operator_Fixity_Infix   = 1 << 0,
+  Operator_Fixity_Prefix  = 1 << 1,
+  Operator_Fixity_Postfix = 1 << 2,
 } Operator_Fixity;
 
 typedef struct {
@@ -43,7 +43,7 @@ typedef struct {
 } Scope_Entry_Operator;
 
 typedef struct Scope_Entry Scope_Entry;
-typedef struct Scope_Entry{
+typedef struct Scope_Entry {
   Scope_Entry_Type type;
   Scope_Entry *next_overload;
   union {

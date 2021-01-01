@@ -483,7 +483,7 @@ spec("source") {
   it("should be possible to define infix operators") {
     test_program_inline_source(
       "operator 18 (++ x) { x = x + 1; x };"
-      "test :: () -> (s64) { y := 41; ++y; y }",
+      "test :: () -> (s64) { y := 41; ++y }",
       test
     );
     fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
@@ -494,6 +494,17 @@ spec("source") {
     test_program_inline_source(
       "operator 18 (x ++) { result := x; x = x + 1; result };"
       "test :: () -> (s64) { y := 42; y++ }",
+      test
+    );
+    fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+    check(checker() == 42);
+  }
+
+  it("should be possible to define an overloaded postfix and infix operator") {
+    test_program_inline_source(
+      "operator 18 (++ x) { x = x + 1; x };"
+      "operator 18 (x ++) { result := x; x = x + 1; result };"
+      "test :: () -> (s64) { y := 41; ++y++ }",
       test
     );
     fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
