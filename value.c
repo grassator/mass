@@ -1418,6 +1418,9 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
+  if (program->jit_buffer) {
+    fixed_buffer_destroy(program->jit_buffer);
+  }
 }
 
 void
