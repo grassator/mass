@@ -1592,19 +1592,27 @@ token_parse_operator_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  User_Defined_Operator *operator = 0;
+
   u64 peek_index = 0;
   Token_Match(keyword_token, .tag = Token_Tag_Id, .source = slice_literal("operator"));
 
   Token_Maybe_Match(precedence_token, 0);
 
   if (!precedence_token) {
-    panic("TODO user error");
+    program_error_builder(context, keyword_token->source_range) {
+      program_error_append_literal("'operator' keyword must be followed by a precedence number");
+    }
+    goto err;
   }
 
   Value *precedence_value = token_force_constant_value(context, precedence_token);
 
   if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
-    panic("TODO user error");
+    program_error_builder(context, precedence_token->source_range) {
+      program_error_append_literal("Operator precedence must be an unsigned number");
+    }
+    goto err;
   }
 
   assert(operand_is_immediate(&precedence_value->operand));
@@ -1615,18 +1623,24 @@ token_parse_operator_definition(
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
   if (!pattern_token) {
-    panic("TODO user error");
+    program_error_builder(context, precedence_token->source_range) {
+      program_error_append_literal("Operator definition have a pattern in () following the precedence");
+    }
+    goto err;
   }
 
   Token_Maybe_Match(body_token, .group_tag = Token_Group_Tag_Curly);
 
   if (!body_token) {
-    panic("TODO user error");
+    program_error_builder(context, pattern_token->source_range) {
+      program_error_append_literal("Operator definition have a macro body in {} following the pattern");
+    }
+    goto err;
   }
 
   Token_View definition = token_view_from_token_array(pattern_token->Group.children);
 
-  User_Defined_Operator *operator = allocator_allocate(context->allocator, User_Defined_Operator);
+  operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *operator = (User_Defined_Operator) {
     .body = body_token,
     .scope = context->scope,
@@ -1656,19 +1670,26 @@ token_parse_operator_definition(
     arguments[1] = token_view_get(definition, 2);
   } else {
     operator_token = 0;
-    panic("TODO user error");
+    program_error_builder(context, pattern_token->source_range) {
+      program_error_append_literal("Expected the pattern to have two (for prefix / postfix) or three tokens");
+    }
+    goto err;
   }
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
     if (arguments[i]->tag != Token_Tag_Id) {
-      panic("TODO user error");
+      program_error_builder(context, arguments[i]->source_range) {
+        program_error_append_literal("Operator argument must be an identifier");
+      }
       goto err;
     }
     operator->argument_names[i] = arguments[i]->source;
   }
 
   if (operator_token->tag != Token_Tag_Operator) {
-    panic("TODO user error");
+    program_error_builder(context, operator_token->source_range) {
+      program_error_append_literal("Expected an operator token here");
+    }
     goto err;
   }
 
@@ -1699,7 +1720,6 @@ token_parse_operator_definition(
     existing_scope_entry = existing_scope_entry->next_overload;
   }
 
-  // TODO check already defined operator in scope as we do not allow overloading
   scope_define(context->scope, operator_token->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
     .Operator = {
@@ -1712,9 +1732,9 @@ token_parse_operator_definition(
   });
 
   return true;
-  err:
-  allocator_deallocate(context->allocator, operator, sizeof(*operator));
 
+  err:
+  if (operator) allocator_deallocate(context->allocator, operator, sizeof(*operator));
   return true;
 }
 
