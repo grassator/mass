@@ -634,6 +634,36 @@ spec("source") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
       check(checker() == 42);
     }
+
+    it("should report an error when defining an overloaded infix operator") {
+      test_program_inline_source_base(
+        "operator 15 (x ** y) { x * y };"
+        "operator 15 (x ** y) { x * y };"
+        "dummy :: () -> (s64) { 21 ** 2 }",
+        dummy
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(
+        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix."),
+        error->message
+      ));
+    }
+
+    it("should report an error when defining an overloaded infix and postfix operator") {
+      test_program_inline_source_base(
+        "operator 15 (x ** y) { x * y };"
+        "operator 15 (x **) { x * x };"
+        "dummy :: () -> (s64) { 21 ** 2 }",
+        dummy
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(
+        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix."),
+        error->message
+      ));
+    }
   }
 
   describe("Macro") {

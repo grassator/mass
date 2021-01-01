@@ -1571,6 +1571,19 @@ token_handle_user_defined_operator(
   return token_value_make(context, result_value, call_range);
 }
 
+static inline Slice
+operator_fixity_to_lowercase_slice(
+  Operator_Fixity fixity
+) {
+  switch(fixity) {
+    case Operator_Fixity_Infix: return slice_literal("an infix");
+    case Operator_Fixity_Prefix: return slice_literal("a prefix");
+    case Operator_Fixity_Postfix: return slice_literal("a postfix");
+  }
+  panic("Unexpected fixity");
+  return slice_literal("");
+}
+
 bool
 token_parse_operator_definition(
   Compilation_Context *context,
@@ -1580,7 +1593,7 @@ token_parse_operator_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("operator"));
+  Token_Match(keyword_token, .tag = Token_Tag_Id, .source = slice_literal("operator"));
 
   Token_Maybe_Match(precedence_token, 0);
 
@@ -1658,6 +1671,34 @@ token_parse_operator_definition(
     panic("TODO user error");
     goto err;
   }
+
+  Scope_Entry *existing_scope_entry = scope_lookup(context->scope, operator_token->source);
+  while (existing_scope_entry) {
+    if (existing_scope_entry->type != Scope_Entry_Type_Operator) {
+      panic("Internal Error: Found an operator-like scope entry that is not an operator");
+    }
+    Scope_Entry_Operator *operator_entry = &existing_scope_entry->Operator;
+    if ((
+      operator->fixity == operator_entry->fixity
+    ) || (
+      operator->fixity == Operator_Fixity_Infix &&
+      operator_entry->fixity == Operator_Fixity_Postfix
+    ) || (
+      operator->fixity == Operator_Fixity_Postfix &&
+      operator_entry->fixity == Operator_Fixity_Infix
+    )) {
+      program_error_builder(context, keyword_token->source_range) {
+        program_error_append_literal("There is already ");
+        program_error_append_slice(operator_fixity_to_lowercase_slice(operator_entry->fixity));
+        program_error_append_literal(" operator ");
+        program_error_append_slice(operator_token->source);
+        program_error_append_literal(". You can only have one definition for prefix and one for infix or suffix.");
+      }
+      goto err;
+    }
+    existing_scope_entry = existing_scope_entry->next_overload;
+  }
+
   // TODO check already defined operator in scope as we do not allow overloading
   scope_define(context->scope, operator_token->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
