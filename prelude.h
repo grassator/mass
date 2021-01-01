@@ -1134,11 +1134,16 @@ typedef struct {
 
 typedef dyn_array_type(Slice) Array_Slice;
 
+#define PRIslice ".*s"
+
+#define SLICE_EXPAND_PRINTF(_SLICE_)\
+  u64_to_s32((_SLICE_).length), (_SLICE_).bytes
+
 static inline void
 slice_print(
   Slice slice
 ) {
-  printf("%.*s", u64_to_s32(slice.length), slice.bytes);
+  printf("%"PRIslice, SLICE_EXPAND_PRINTF(slice));
 }
 
 /// Input slice is expected to just contain the number without any surrounding whitespace.

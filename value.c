@@ -1497,22 +1497,6 @@ program_jit(
   #endif
 }
 
-void
-program_push_error_from_bucket_buffer(
-  Compilation_Context *context,
-  Source_Range source_range,
-  Bucket_Buffer *buffer
-) {
-  assert(context->result->tag == Mass_Result_Tag_Success);
-  Fixed_Buffer *message_buffer = bucket_buffer_to_fixed_buffer(context->allocator, buffer);
-  Slice message = fixed_buffer_as_slice(message_buffer);
-  *context->result = (Mass_Result) {
-    .tag = Mass_Result_Tag_Error,
-    .Error.details = { message, source_range }
-  };
-  bucket_buffer_destroy(buffer);
-}
-
 Import_Library *
 program_find_import_library(
   const Program *program,

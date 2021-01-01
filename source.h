@@ -211,6 +211,26 @@ typedef struct {
   char number_print_buffer[32];
 } Program_Error_Builder;
 
+#define context_error_snprintf(_CONTEXT_, _SOURCE_RANGE_, ...)\
+  do {\
+    /* Calculating the size of the buffer not including null termination */ \
+    int context_error_snprintf_buffer_size = snprintf(0, 0, ##__VA_ARGS__);\
+    /* negative value is an error when encoding a string */ \
+    assert(context_error_snprintf_buffer_size >= 0); \
+    context_error_snprintf_buffer_size += 1; \
+    char *context_error_snprintf_buffer = allocator_allocate_array(\
+      (_CONTEXT_)->allocator, u8, context_error_snprintf_buffer_size\
+    );\
+    assert(0 <= snprintf(context_error_snprintf_buffer, context_error_snprintf_buffer_size, ##__VA_ARGS__));\
+    *(_CONTEXT_)->result = (Mass_Result) {\
+      .tag = Mass_Result_Tag_Error,\
+      .Error.details = {\
+        .message = slice_from_c_string(context_error_snprintf_buffer),\
+        .source_range = (_SOURCE_RANGE_)\
+      }\
+    };\
+  } while(0)
+
 #define program_error_builder(_program_, _location_)\
   for(\
     Program_Error_Builder _error_builder = {\
