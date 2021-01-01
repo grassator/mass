@@ -258,9 +258,14 @@ win32_program_jit(
   program_patch_labels(program);
 
   // Setup permissions for the code segment
-  DWORD win32_permissions =
-    win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
-  VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
+  {
+    DWORD win32_permissions =
+      win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
+    VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
+    if (!FlushInstructionCache(GetCurrentProcess(), code_memory, code_segment_size)) {
+      panic("Unable to flush instruction cache");
+    }
+  }
 
   if (!RtlAddFunctionTable(
     fn_exception_info, u64_to_u32(function_count), (s64) result_buffer->memory
