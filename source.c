@@ -2369,9 +2369,17 @@ compile_time_eval(
   *out_value = (Value) {
     .descriptor = expression_result_value->descriptor,
     .operand = (Operand){
-      .tag = Operand_Tag_Memory_Indirect,
+      .tag = Operand_Tag_Memory,
       .byte_size = expression_result_value->operand.byte_size,
-      .Memory_Indirect = { .reg = arg_value->operand.Register.index },
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = {
+          .base = {
+            .tag = Memory_Indirect_Operand_Tag_Register,
+            .Register.index = arg_value->operand.Register.index
+          }
+        },
+      },
     },
   };
 
@@ -2467,7 +2475,6 @@ token_handle_operand_variant_of(
     case Operand_Tag_Immediate:
     case Operand_Tag_Eflags:
     case Operand_Tag_Xmm:
-    case Operand_Tag_Memory_Indirect:
     case Operand_Tag_Sib:
     case Operand_Tag_Memory: {
       panic("TODO implement operand reflection for more types");
@@ -3240,26 +3247,21 @@ token_dispatch_operator(
     Token_View index_tokens = token_view_from_token_array(brackets->Group.children);
     token_parse_expression(context, index_tokens, index_value);
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-    assert(array->operand.tag == Operand_Tag_Memory_Indirect);
+    assert(array->operand.tag == Operand_Tag_Memory);
+    assert(array->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
 
     Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
     u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
     Value *result = allocator_allocate(context->allocator, Value);
+    *result = (Value) {
+      .descriptor = item_descriptor,
+      .operand = array->operand
+    };
+    result->operand.byte_size = item_byte_size;
     if (operand_is_immediate(&index_value->operand)) {
       s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
-      *result = (Value){
-        .descriptor = item_descriptor,
-        .operand = {
-          .tag = Operand_Tag_Memory_Indirect,
-          .byte_size = item_byte_size,
-          .Memory_Indirect = (Operand_Memory_Indirect) {
-            .reg = array->operand.Memory_Indirect.reg,
-            .displacement = array->operand.Memory_Indirect.displacement + index * item_byte_size,
-          }
-        }
-      };
-
+      result->operand.Memory.location.Indirect.offset = index * item_byte_size;
     } else if(
       item_byte_size == 1 ||
       item_byte_size == 2 ||
@@ -3283,19 +3285,33 @@ token_dispatch_operator(
         index_value_in_register,
         index_value
       );
-      *result = (Value){
-        .descriptor = item_descriptor,
-        .operand = {
-          .tag = Operand_Tag_Sib,
-          .byte_size = item_byte_size,
-          .Sib = (Operand_Sib) {
-            .scale = scale,
-            .index = index_value_in_register->operand.Register.index,
-            .base = array->operand.Memory_Indirect.reg,
-            .displacement = array->operand.Memory_Indirect.displacement,
-          }
+      result->operand = (Operand) {
+        .tag = Operand_Tag_Sib,
+        .byte_size = item_byte_size,
+        .Sib = (Operand_Sib) {
+          .scale = scale,
+          .index = index_value_in_register->operand.Register.index,
+          .base = array->operand.Memory.location.Indirect.base.Register.index,
+          .displacement = s64_to_s32(array->operand.Memory.location.Indirect.offset),
         }
       };
+      //switch(array->operand.Memory.location.Indirect.index.tag) {
+        //case Memory_Indirect_Operand_Tag_None: {
+          //result->operand.Memory.location.Indirect.index = (Memory_Indirect_Operand) {
+            //.tag = Memory_Indirect_Operand_Tag_Immediate,
+            //.Immediate.value = index * item_byte_size
+          //};
+          //break;
+        //}
+        //case Memory_Indirect_Operand_Tag_Immediate: {
+          //result->operand.Memory.location.Indirect.index.Immediate.value += index * item_byte_size;
+          //break;
+        //}
+        //case Memory_Indirect_Operand_Tag_Register: {
+          //panic("TODO support indexing on alread register indexed values");
+          //break;
+        //}
+      //}
     } else {
       panic("TODO");
     }

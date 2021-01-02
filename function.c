@@ -404,9 +404,14 @@ fn_normalize_instruction_operands(
     // [RSP + X] always needs to be encoded as SIB because RSP register index
     // in MOD R/M is occupied by RIP-relative encoding
     if (
-      operand->tag == Operand_Tag_Memory_Indirect &&
-      operand->Memory_Indirect.reg == rsp.Register.index
+      operand->tag == Operand_Tag_Memory &&
+      operand->Memory.location.tag == Memory_Location_Tag_Indirect &&
+      operand->Memory.location.Indirect.base.Register.index == Register_SP
     ) {
+      assert(
+        operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
+        operand->Memory.location.Indirect.index.Immediate.value == 0
+      );
       *operand = (Operand){
         .tag = Operand_Tag_Sib,
         .byte_size = operand->byte_size,
@@ -414,7 +419,7 @@ fn_normalize_instruction_operands(
           .scale = SIB_Scale_1,
           .base = Register_SP,
           .index = Register_SP,
-          .displacement = operand->Memory_Indirect.displacement,
+          .displacement = s64_to_s32(operand->Memory.location.Indirect.offset),
         },
       };
     }
@@ -542,12 +547,17 @@ function_return_descriptor(
           *function->returns = (Value){
             .descriptor = descriptor,
             .operand = {
-              .tag = Operand_Tag_Memory_Indirect,
+              .tag = Operand_Tag_Memory,
               .byte_size = byte_size,
-              .Memory_Indirect = {
-                .reg = Register_C,
-                .displacement = 0,
-              },
+              .Memory.location = {
+                .tag = Memory_Location_Tag_Indirect,
+                .Indirect = {
+                  .base = {
+                    .tag = Memory_Indirect_Operand_Tag_Register,
+                    .Register.index = Register_C,
+                  }
+                }
+              }
             },
           };
         } else {
@@ -1050,10 +1060,7 @@ value_pointer_to(
   Array_Instruction *instructions = &builder->code_block.instructions;
   // TODO support register
   // TODO support immediates
-  assert(
-    value->operand.tag == Operand_Tag_Memory_Indirect ||
-    operand_is_label(&value->operand)
-  );
+  assert(value->operand.tag == Operand_Tag_Memory);
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
   Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, result_descriptor);
@@ -1286,18 +1293,23 @@ ensure_memory(
   Value *value
 ) {
   Operand operand = value->operand;
-  if (operand.tag == Operand_Tag_Memory_Indirect) return value;
+  if (operand.tag == Operand_Tag_Memory) return value;
   Value *result = allocator_allocate(allocator, Value);
   if (value->descriptor->tag != Descriptor_Tag_Pointer) assert(!"Not implemented");
   if (value->operand.tag != Operand_Tag_Register) assert(!"Not implemented");
   *result = (const Value) {
     .descriptor = value->descriptor->Pointer.to,
     .operand = {
-      .tag = Operand_Tag_Memory_Indirect,
-      .Memory_Indirect = {
-        .reg = value->operand.Register.index,
-        .displacement = 0,
-      },
+      .tag = Operand_Tag_Memory,
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = {
+          .base = {
+            .tag = Memory_Indirect_Operand_Tag_Register,
+            .Register.index = value->operand.Register.index,
+          }
+        }
+      }
     },
   };
   return result;
@@ -1318,9 +1330,10 @@ struct_get_field(
       Value *result = allocator_allocate(allocator, Value);
       Operand operand = struct_value->operand;
       // FIXME support more operands
-      assert(operand.tag == Operand_Tag_Memory_Indirect);
+      assert(operand.tag == Operand_Tag_Memory);
+      assert(operand.Memory.location.tag == Memory_Location_Tag_Indirect);
       operand.byte_size = descriptor_byte_size(field->descriptor);
-      operand.Memory_Indirect.displacement += field->offset;
+      operand.Memory.location.Indirect.offset += field->offset;
       *result = (const Value) {
         .descriptor = field->descriptor,
         .operand = operand,

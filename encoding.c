@@ -95,10 +95,7 @@ encode_instruction_assembly(
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
       mod_r_m_operand_index = operand_index;
-      if (operand_is_label(operand)) {
-        r_m = 0b101;
-        mod = 0;
-      } else if (operand->tag == Operand_Tag_Register) {
+      if (operand->tag == Operand_Tag_Register) {
         r_m = operand->Register.index;
         if (operand->Register.index & 0b1000) {
           rex_byte |= REX_B;
@@ -108,11 +105,37 @@ encode_instruction_assembly(
         r_m = operand->Register.index;
         mod = MOD_Register;
       } else {
-        if (operand->tag == Operand_Tag_Memory_Indirect) {
-          // :OperandNormalization
-          assert(operand->Memory_Indirect.reg != Register_SP);
-          displacement = operand->Memory_Indirect.displacement;
-          r_m = operand->Memory_Indirect.reg;
+        if (operand->tag == Operand_Tag_Memory) {
+          const Memory_Location *location = &operand->Memory.location;
+          switch(location->tag) {
+            case Memory_Location_Tag_Instruction_Pointer_Relative: {
+              r_m = 0b101;
+              break;
+            }
+            case Memory_Location_Tag_Indirect: {
+              // Right now the compiler does not support SIB scale other than 1.
+              // From what I can tell there are two reasons that only matter in *extremely*
+              // performance-sensitive code which probably would be written by hand anyway:
+              // 1) `add rax, 8` is three bytes longer than `inc rax`. With current instruction
+              //    cache sizes it is very unlikely to be problematic.
+              // 2) Loop uses the same index for arrays of values of different sizes that could
+              //    be represented with SIB scale. In cases of extreme register pressure this
+              //    can cause spilling. To avoid that we could try to use temporary shifts
+              //    to adjust the offset between different indexes, but it is not implemented ATM.
+              //SIB_Scale scale = SIB_Scale_1;
+              // FIXME remove when SIB is migrated
+              assert(
+                operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
+                operand->Memory.location.Indirect.index.Immediate.value == 0
+              );
+              assert(operand->Memory.location.Indirect.base.tag == Memory_Indirect_Operand_Tag_Register);
+              r_m = operand->Memory.location.Indirect.base.Register.index;
+              // :OperandNormalization
+              assert(r_m != Register_SP);
+              displacement = s64_to_s32(operand->Memory.location.Indirect.offset);
+              break;
+            }
+          }
         } else if (operand->tag == Operand_Tag_Sib) {
           displacement = operand->Sib.displacement;
           needs_sib = true;
@@ -207,12 +230,17 @@ encode_instruction_assembly(
           break;
         }
         case Memory_Location_Tag_Indirect: {
-          panic("TODO implement indirect operand encoding");
+          if (mod == MOD_Displacement_s32) {
+            fixed_buffer_append_s32(buffer, displacement);
+          } else if (mod == MOD_Displacement_s8) {
+            fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
+          } else {
+            assert(mod == MOD_Displacement_0);
+          }
           break;
         }
       }
     } else if (
-      operand->tag == Operand_Tag_Memory_Indirect ||
       operand->tag == Operand_Tag_Sib
     ) {
       if (mod == MOD_Displacement_s32) {
@@ -361,18 +389,6 @@ encode_instruction(
         continue;
       }
       if (
-        operand->tag == Operand_Tag_Memory_Indirect &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
-      ) {
-        continue;
-      }
-      if (
-        operand->tag == Operand_Tag_Memory_Indirect &&
-        operand_encoding->type == Operand_Encoding_Type_Memory
-      ) {
-        continue;
-      }
-      if (
         operand->tag == Operand_Tag_Sib &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
@@ -392,12 +408,6 @@ encode_instruction(
       }
       if (
         operand->tag == Operand_Tag_Xmm &&
-        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
-      ) {
-        continue;
-      }
-      if (
-        operand->tag == Operand_Tag_Memory_Indirect &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;

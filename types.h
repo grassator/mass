@@ -215,13 +215,12 @@ typedef enum Compare_Type {
 } Compare_Type;
 
 typedef enum {
-  Memory_Indirect_Operand_Tag_None = 0,
-  Memory_Indirect_Operand_Tag_Immediate = 1,
-  Memory_Indirect_Operand_Tag_Register = 2,
+  Memory_Indirect_Operand_Tag_Immediate = 0,
+  Memory_Indirect_Operand_Tag_Register = 1,
 } Memory_Indirect_Operand_Tag;
 
 typedef struct {
-  s64 offset;
+  s64 value;
 } Memory_Indirect_Operand_Immediate;
 typedef struct {
   Register index;
@@ -245,7 +244,7 @@ typedef struct {
 typedef struct {
   Memory_Indirect_Operand base;
   Memory_Indirect_Operand index;
-  Memory_Indirect_Operand offset;
+  s64 offset;
 } Memory_Location_Indirect;
 typedef struct Memory_Location {
   Memory_Location_Tag tag;
@@ -262,9 +261,8 @@ typedef enum {
   Operand_Tag_Register = 3,
   Operand_Tag_Xmm = 4,
   Operand_Tag_Immediate = 5,
-  Operand_Tag_Memory_Indirect = 6,
-  Operand_Tag_Sib = 7,
-  Operand_Tag_Memory = 8,
+  Operand_Tag_Sib = 6,
+  Operand_Tag_Memory = 7,
 } Operand_Tag;
 
 typedef struct {
@@ -279,10 +277,6 @@ typedef struct {
 typedef struct {
   void * memory;
 } Operand_Immediate;
-typedef struct {
-  Register reg;
-  s32 displacement;
-} Operand_Memory_Indirect;
 typedef struct {
   SIB_Scale scale;
   Register index;
@@ -300,7 +294,6 @@ typedef struct Operand {
     Operand_Register Register;
     Operand_Xmm Xmm;
     Operand_Immediate Immediate;
-    Operand_Memory_Indirect Memory_Indirect;
     Operand_Sib Sib;
     Operand_Memory Memory;
   };

@@ -295,11 +295,6 @@ print_operand(
       break;
     }
     case Operand_Tag_Sib:
-    case Operand_Tag_Memory_Indirect: {
-      u32 bits = operand->byte_size * 8;
-      printf("m%d", bits);
-      break;
-    }
     case Operand_Tag_Memory: {
       // TODO print better info
       u32 bits = operand->byte_size * 8;
@@ -397,7 +392,10 @@ data_label32(
   return (const Operand) {
     .tag = Operand_Tag_Memory,
     .byte_size = byte_size,
-    .Memory.location.Instruction_Pointer_Relative.label_index = label_index
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
+      .Instruction_Pointer_Relative.label_index = label_index
+    }
   };
 }
 
@@ -410,7 +408,10 @@ code_label32(
     // FIXME this is set at 4 as otherwise current encoder is unhappy
     //       about the size mismatch. It should be zero instead.
     .byte_size = 4,
-    .Memory.location.Instruction_Pointer_Relative.label_index = label_index
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
+      .Instruction_Pointer_Relative.label_index = label_index,
+    }
   };
 }
 
@@ -509,11 +510,17 @@ stack(
 ) {
   assert(byte_size);
   return (const Operand) {
-    .tag = Operand_Tag_Memory_Indirect,
+    .tag = Operand_Tag_Memory,
     .byte_size = byte_size,
-    .Memory_Indirect = (Operand_Memory_Indirect) {
-      .reg = rsp.Register.index,
-      .displacement = offset,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base = {
+          .tag = Memory_Indirect_Operand_Tag_Register,
+          .Register.index = Register_SP,
+        },
+        .offset = offset,
+      }
     }
   };
 }
@@ -592,7 +599,6 @@ operand_is_memory(
   const Operand *operand
 ) {
   return (
-    operand->tag == Operand_Tag_Memory_Indirect ||
     operand->tag == Operand_Tag_Memory ||
     operand->tag == Operand_Tag_Sib
   );
@@ -611,6 +617,25 @@ operand_is_immediate(
 ) {
   return operand->tag == Operand_Tag_Immediate;
 }
+
+static inline bool
+memory_indirect_operand_equal(
+  const Memory_Indirect_Operand *a,
+  const Memory_Indirect_Operand *b
+) {
+  if (a->tag != b->tag) return false;
+  switch(a->tag) {
+    case Memory_Indirect_Operand_Tag_Immediate: {
+      return a->Immediate.value == b->Immediate.value;
+    }
+    case Memory_Indirect_Operand_Tag_Register: {
+      return a->Register.index == b->Register.index;
+    }
+  }
+  panic("Unexpected Memory_Indirect_Operand_Tag");
+  return false;
+}
+
 static inline bool
 operand_equal(
   const Operand *a,
@@ -635,7 +660,11 @@ operand_equal(
             == b_location->Instruction_Pointer_Relative.label_index.value;
         }
         case Memory_Location_Tag_Indirect: {
-          panic("TODO implement indirect operand comparison");
+          return (
+            memory_indirect_operand_equal(&a_location->Indirect.base, &b_location->Indirect.base) &&
+            memory_indirect_operand_equal(&a_location->Indirect.index, &b_location->Indirect.index) &&
+            a_location->Indirect.offset == b_location->Indirect.offset
+          );
           break;
         }
       }
@@ -657,12 +686,6 @@ operand_equal(
         a->Sib.scale == b->Sib.scale &&
         a->Sib.index == b->Sib.index &&
         a->Sib.base == b->Sib.base
-      );
-    }
-    case Operand_Tag_Memory_Indirect: {
-      return (
-        a->Memory_Indirect.reg == b->Memory_Indirect.reg &&
-        a->Memory_Indirect.displacement == b->Memory_Indirect.displacement
       );
     }
   }

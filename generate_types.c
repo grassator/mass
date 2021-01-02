@@ -374,9 +374,8 @@ main(void) {
   }));
 
   push_type(type_union("Memory_Indirect_Operand", (Struct[]){
-    struct_empty("None"),
     struct_fields("Immediate", (Struct_Item[]){
-      { "s64", "offset" },
+      { "s64", "value" },
     }),
     struct_fields("Register", (Struct_Item[]){
       { "Register", "index" },
@@ -390,7 +389,7 @@ main(void) {
     struct_fields("Indirect", (Struct_Item[]){
       { "Memory_Indirect_Operand", "base" },
       { "Memory_Indirect_Operand", "index" },
-      { "Memory_Indirect_Operand", "offset" },
+      { "s64", "offset" },
     }),
   }));
 
@@ -408,10 +407,6 @@ main(void) {
     }),
     struct_fields("Immediate", (Struct_Item[]){
       { "void *", "memory" },
-    }),
-    struct_fields("Memory_Indirect", (Struct_Item[]){
-      { "Register", "reg" },
-      { "s32", "displacement" },
     }),
     struct_fields("Sib", (Struct_Item[]){
       { "SIB_Scale", "scale" },

@@ -42,11 +42,13 @@ spec("function") {
   describe("stack") {
     it("should correctly align allocated values") {
       Value *a = reserve_stack(temp_allocator, builder, &descriptor_s8);
-      check(a->operand.tag == Operand_Tag_Memory_Indirect);
-      check(a->operand.Memory_Indirect.displacement == -1);
+      check(a->operand.tag == Operand_Tag_Memory);
+      check(a->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
+      check(a->operand.Memory.location.Indirect.offset == -1);
       Value *b = reserve_stack(temp_allocator, builder, &descriptor_s32);
-      check(b->operand.tag == Operand_Tag_Memory_Indirect);
-      check(b->operand.Memory_Indirect.displacement == -8);
+      check(b->operand.tag == Operand_Tag_Memory);
+      check(b->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
+      check(b->operand.Memory.location.Indirect.offset == -8);
     }
   }
 
