@@ -188,6 +188,73 @@ token_force_value(
   Value *result_value
 );
 
+typedef struct {
+  Scope *scope;
+  Slice name;
+  Scope_Entry *entry;
+  bool done;
+} Scope_Overload_Iterator;
+
+Scope_Entry *
+scope_lookup_overload(
+  Scope_Overload_Iterator *it
+) {
+  if (it->done) return 0;
+  for (; it->scope && !it->entry; it->scope = it->scope->parent) {
+    it->entry = hash_map_get(it->scope->map, it->name);
+  }
+  Scope_Entry *result = it->entry;
+  if (it->entry) {
+    it->entry = it->entry->next_overload;
+  }
+  it->done = !it->entry;
+  return result;
+}
+
+Value *
+scope_entry_force(
+  Compilation_Context *context,
+  Scope_Entry *entry
+) {
+  switch(entry->type) {
+    case Scope_Entry_Type_Operator: {
+      // TODO Should scope entries have a Source_Range?
+      context_error_snprintf(
+        context, (Source_Range){0},
+        "Operators are not allowed in this context"
+      );
+      return 0;
+    }
+    case Scope_Entry_Type_Lazy_Expression: {
+      Scope_Lazy_Expression *expr = &entry->lazy_expression;
+      Value *result = 0;
+      Compilation_Context lazy_context = *context;
+      lazy_context.scope = expr->scope;
+      lazy_context.builder = expr->maybe_builder;
+      if (expr->maybe_builder) {
+        result = value_any(context->allocator);
+        token_parse_expression(&lazy_context, expr->tokens, result);
+      } else {
+        result = token_parse_constant_expression(&lazy_context, expr->tokens);
+      }
+      // FIXME We mutate an original scope entry here. It might be problematic if a scope is resized
+      //       and memory is relocated. We should either ensure that scope entries are stable
+      //       by switching to a tree instead of hash map, or do something else here.
+      *entry = (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .value = result,
+        .next_overload = entry->next_overload,
+      };
+      return result;
+    }
+    case Scope_Entry_Type_Value: {
+      return entry->value;
+    }
+  }
+  panic("Internal Error: Unexpected scope entry type");
+  return 0;
+}
+
 Value *
 scope_lookup_force(
   Compilation_Context *context,
@@ -862,7 +929,15 @@ scope_lookup_type(
   Slice type_name
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  Value *value = scope_lookup_force(context, scope, type_name);
+  Scope_Entry *scope_entry = scope_lookup(scope, type_name);
+  if (!scope_entry) {
+    context_error_snprintf(
+      context, source_range, "Could not find type %"PRIslice,
+      SLICE_EXPAND_PRINTF(type_name)
+    );
+    return 0;
+  }
+  Value *value = scope_entry_force(context, scope_entry);
   return value_ensure_type(context, value, source_range, type_name);
 }
 
@@ -1319,15 +1394,16 @@ token_force_constant_value(
     }
     case Token_Tag_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(context, context->scope, name);
-      if (!value) {
-        MASS_ON_ERROR(*context->result) return 0;
+      Scope_Entry *scope_entry = scope_lookup(context->scope, name);
+      if (!scope_entry) {
         context_error_snprintf(
           context, token->source_range,
           "Undefined variable %"PRIslice,
           SLICE_EXPAND_PRINTF(name)
         );
+        return 0;
       }
+      Value *value = scope_entry_force(context, scope_entry);
       return value;
     }
     case Token_Tag_Value: {
@@ -3600,13 +3676,12 @@ token_parse_statement_label(
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   // FIXME make sure we don't double declare label
-  Value *value = scope_lookup_force(
-    context,
-    context->builder->value->descriptor->Function.scope,
-    id->source
-  );
-
-  if (!value) {
+  Scope *function_scope = context->builder->value->descriptor->Function.scope;
+  Scope_Entry *scope_entry = scope_lookup(function_scope, id->source);
+  Value *value;
+  if (scope_entry) {
+    value = scope_entry_force(context, scope_entry);
+  } else {
     Label_Index label = make_label(context->program, &context->program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
@@ -3615,7 +3690,7 @@ token_parse_statement_label(
     };
     // FIXME this should define a label in the function scope, but because
     // the macros are not hygienic we can not do that yet
-    //scope_define_value(builder->value->descriptor->Function.scope, id->source, value);
+    //scope_define_value(function_scope, id->source, value);
     scope_define_value(context->scope, id->source, value);
   }
 
@@ -3721,13 +3796,15 @@ token_parse_goto(
     goto err;
   }
 
-  Value *value = scope_lookup_force(context, context->scope, id->source);
-
-  // :ForwardLabelRef
-  // If we didn't find an identifier with this name, declare one and hope
-  // that some label will resolve it
-  // FIXME somehow report unresolved labels
-  if (!value) {
+  Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
+  Value *value;
+  if (scope_entry) {
+    value = scope_entry_force(context, scope_entry);
+  } else {
+    // :ForwardLabelRef
+    // If we didn't find an identifier with this name, declare one and hope
+    // that some label will resolve it
+    // FIXME somehow report unresolved labels
     Label_Index label = make_label(context->program, &context->program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
@@ -3773,7 +3850,9 @@ token_parse_explicit_return(
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
 
-  Value *fn_return = scope_lookup_force(context, context->scope, MASS_RETURN_VALUE_NAME);
+  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
+  assert(scope_value_entry);
+  Value *fn_return = scope_entry_force(context, scope_value_entry);
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
@@ -3795,7 +3874,9 @@ token_parse_explicit_return(
     );
   }
 
-  Value *return_label = scope_lookup_force(context, context->scope, MASS_RETURN_LABEL_NAME);
+  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
+  assert(scope_label_entry);
+  Value *return_label = scope_entry_force(context, scope_label_entry);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
   assert(return_label->operand.tag == Operand_Tag_Label);
