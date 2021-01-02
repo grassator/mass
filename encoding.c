@@ -95,7 +95,7 @@ encode_instruction_assembly(
         panic("Multiple MOD R/M operands are not supported in an instruction");
       }
       mod_r_m_operand_index = operand_index;
-      if (operand->tag == Operand_Tag_Label) {
+      if (operand_is_label(operand)) {
         r_m = 0b101;
         mod = 0;
       } else if (operand->tag == Operand_Tag_Register) {
@@ -188,17 +188,29 @@ encode_instruction_assembly(
 
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
-    Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
-    // :OperandNormalization
-    if (operand->tag == Operand_Tag_Label) {
-      s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
-      // :AfterInstructionPatch
-      mod_r_m_patch_info =
-        dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          .target_label_index = operand->Label.index,
-          .from = {.section = &program->code_section},
-          .patch_target = patch_target,
-        });
+    const Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
+    if (operand->tag == Operand_Tag_Memory) {
+      const Memory_Location *location = &operand->Memory.location;
+      switch(location->tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          Label_Index label_index =
+            operand->Memory.location.Instruction_Pointer_Relative.label_index;
+          // :OperandNormalization
+          s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
+          // :AfterInstructionPatch
+          mod_r_m_patch_info =
+            dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+              .target_label_index = label_index,
+              .from = {.section = &program->code_section},
+              .patch_target = patch_target,
+            });
+          break;
+        }
+        case Memory_Location_Tag_Indirect: {
+          panic("TODO implement indirect operand encoding");
+          break;
+        }
+      }
     } else if (
       operand->tag == Operand_Tag_Memory_Indirect ||
       operand->tag == Operand_Tag_Sib
@@ -220,12 +232,13 @@ encode_instruction_assembly(
       continue;
     }
     Operand *operand = &instruction->assembly.operands[operand_index];
-    if (operand->tag == Operand_Tag_Label) {
+    if (operand_is_label(operand)) {
+      Label_Index label_index = operand->Memory.location.Instruction_Pointer_Relative.label_index;
       s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
       immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          .target_label_index = operand->Label.index,
+          .target_label_index = label_index,
           .from = {.section = &program->code_section},
           .patch_target = patch_target,
         });
@@ -336,13 +349,13 @@ encode_instruction(
         continue;
       }
       if (
-        operand->tag == Operand_Tag_Label &&
+        operand->tag == Operand_Tag_Memory &&
         operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
       if (
-        operand->tag == Operand_Tag_Label &&
+        operand->tag == Operand_Tag_Memory &&
         operand_encoding->type == Operand_Encoding_Type_Memory
       ) {
         continue;
@@ -390,7 +403,7 @@ encode_instruction(
         continue;
       }
       if (
-        operand->tag == Operand_Tag_Label &&
+        operand->tag == Operand_Tag_Memory &&
         operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
@@ -399,7 +412,7 @@ encode_instruction(
         if (operand_is_immediate(operand)) {
           assert(encoding_size == operand->byte_size);
           continue;
-        } else if (operand->tag == Operand_Tag_Label) {
+        } else if (operand_is_label(operand)) {
           assert(encoding_size == Operand_Size_32);
           continue;
         }

@@ -299,7 +299,7 @@ fn_begin(
   Value *fn_value = allocator_allocate(context->allocator, Value);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = label32(make_label(context->program, &context->program->code_section)),
+    .operand = code_label32(make_label(context->program, &context->program->code_section)),
   };
   Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
     .layout = {0},
@@ -366,8 +366,9 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   if (last_instruction->type != Instruction_Type_Assembly) return;
   if (last_instruction->assembly.mnemonic != jmp) return;
   Operand op = last_instruction->assembly.operands[0];
-  if (op.tag != Operand_Tag_Label) return;
-  if (op.Label.index.value != builder->code_block.end_label.value) return;
+  if (!operand_is_label(&op)) return;
+  if (op.Memory.location.Instruction_Pointer_Relative.label_index.value
+    != builder->code_block.end_label.value) return;
   dyn_array_pop(builder->code_block.instructions);
 }
 
@@ -438,8 +439,9 @@ fn_encode(
   Program *program = context->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
-  assert(operand->tag == Operand_Tag_Label);
-  Label *label = program_get_label(program, operand->Label.index);
+  assert(operand_is_label(operand));
+  Label_Index label_index = operand->Memory.location.Instruction_Pointer_Relative.label_index;
+  Label *label = program_get_label(program, label_index);
 
   s64 code_base_rva = label->section->base_rva;
   builder->layout.begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
@@ -447,7 +449,7 @@ fn_encode(
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,
-      .label = operand->Label.index
+      .label = label_index
     }
   );
 
@@ -578,45 +580,45 @@ make_if(
     if (value->operand.tag == Operand_Tag_Eflags) {
       switch(value->operand.Eflags.compare_type) {
         case Compare_Type_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jne, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jne, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Not_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), value->operand, 0}}});
           break;
         }
 
         case Compare_Type_Unsigned_Below: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jae, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jae, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Below_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {ja, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {ja, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jbe, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jbe, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jb, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jb, {code_label32(label), value->operand, 0}}});
           break;
         }
 
         case Compare_Type_Signed_Less: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jge, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jge, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Signed_Less_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jg, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jg, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jle, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jle, {code_label32(label), value->operand, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jl, {label32(label), value->operand, 0}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jl, {code_label32(label), value->operand, 0}}});
           break;
         }
         default: {
@@ -639,7 +641,7 @@ make_if(
         assert(!"Unsupported value inside `if`");
       }
       Value *eflags = value_from_compare(context->allocator, Compare_Type_Equal);
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {label32(label), eflags->operand, 0}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), eflags->operand, 0}}});
     }
   }
   return label;
@@ -1050,7 +1052,7 @@ value_pointer_to(
   // TODO support immediates
   assert(
     value->operand.tag == Operand_Tag_Memory_Indirect ||
-    value->operand.tag == Operand_Tag_Label
+    operand_is_label(&value->operand)
   );
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
@@ -1139,7 +1141,7 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (to_call->operand.tag == Operand_Tag_Label) {
+  if (operand_is_label(&to_call->operand)) {
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
   } else {
     Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, to_call->descriptor);
@@ -1222,7 +1224,7 @@ make_and(
   Label_Index else_label = make_if(context, instructions, source_range, a);
   {
     compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {label32(label)}}});
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {code_label32(label)}}});
   }
   push_instruction(instructions, *source_range, (Instruction) {
     .type = Instruction_Type_Label,
@@ -1259,7 +1261,7 @@ make_or(
   Label_Index else_label = make_if(context, instructions, source_range, result);
   {
     compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {label32(label)}}});
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {code_label32(label)}}});
   }
   push_instruction(instructions, *source_range, (Instruction) {
     .type = Instruction_Type_Label,

@@ -32,6 +32,14 @@ typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
 typedef enum Compare_Type Compare_Type;
 
+typedef struct Memory_Indirect_Operand Memory_Indirect_Operand;
+typedef dyn_array_type(Memory_Indirect_Operand *) Array_Memory_Indirect_Operand_Ptr;
+typedef dyn_array_type(const Memory_Indirect_Operand *) Array_Const_Memory_Indirect_Operand_Ptr;
+
+typedef struct Memory_Location Memory_Location;
+typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
+typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
+
 typedef struct Operand Operand;
 typedef dyn_array_type(Operand *) Array_Operand_Ptr;
 typedef dyn_array_type(const Operand *) Array_Const_Operand_Ptr;
@@ -207,6 +215,47 @@ typedef enum Compare_Type {
 } Compare_Type;
 
 typedef enum {
+  Memory_Indirect_Operand_Tag_None = 0,
+  Memory_Indirect_Operand_Tag_Immediate = 1,
+  Memory_Indirect_Operand_Tag_Register = 2,
+} Memory_Indirect_Operand_Tag;
+
+typedef struct {
+  s64 offset;
+} Memory_Indirect_Operand_Immediate;
+typedef struct {
+  Register index;
+} Memory_Indirect_Operand_Register;
+typedef struct Memory_Indirect_Operand {
+  Memory_Indirect_Operand_Tag tag;
+  union {
+    Memory_Indirect_Operand_Immediate Immediate;
+    Memory_Indirect_Operand_Register Register;
+  };
+} Memory_Indirect_Operand;
+typedef dyn_array_type(Memory_Indirect_Operand) Array_Memory_Indirect_Operand;
+typedef enum {
+  Memory_Location_Tag_Instruction_Pointer_Relative = 0,
+  Memory_Location_Tag_Indirect = 1,
+} Memory_Location_Tag;
+
+typedef struct {
+  Label_Index label_index;
+} Memory_Location_Instruction_Pointer_Relative;
+typedef struct {
+  Memory_Indirect_Operand base;
+  Memory_Indirect_Operand index;
+  Memory_Indirect_Operand offset;
+} Memory_Location_Indirect;
+typedef struct Memory_Location {
+  Memory_Location_Tag tag;
+  union {
+    Memory_Location_Instruction_Pointer_Relative Instruction_Pointer_Relative;
+    Memory_Location_Indirect Indirect;
+  };
+} Memory_Location;
+typedef dyn_array_type(Memory_Location) Array_Memory_Location;
+typedef enum {
   Operand_Tag_None = 0,
   Operand_Tag_Any = 1,
   Operand_Tag_Eflags = 2,
@@ -215,7 +264,7 @@ typedef enum {
   Operand_Tag_Immediate = 5,
   Operand_Tag_Memory_Indirect = 6,
   Operand_Tag_Sib = 7,
-  Operand_Tag_Label = 8,
+  Operand_Tag_Memory = 8,
 } Operand_Tag;
 
 typedef struct {
@@ -241,8 +290,8 @@ typedef struct {
   s32 displacement;
 } Operand_Sib;
 typedef struct {
-  Label_Index index;
-} Operand_Label;
+  Memory_Location location;
+} Operand_Memory;
 typedef struct Operand {
   Operand_Tag tag;
   u32 byte_size;
@@ -253,7 +302,7 @@ typedef struct Operand {
     Operand_Immediate Immediate;
     Operand_Memory_Indirect Memory_Indirect;
     Operand_Sib Sib;
-    Operand_Label Label;
+    Operand_Memory Memory;
   };
 } Operand;
 typedef dyn_array_type(Operand) Array_Operand;

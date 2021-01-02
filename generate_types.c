@@ -373,6 +373,27 @@ main(void) {
     { "Signed_Greater_Equal", 10 },
   }));
 
+  push_type(type_union("Memory_Indirect_Operand", (Struct[]){
+    struct_empty("None"),
+    struct_fields("Immediate", (Struct_Item[]){
+      { "s64", "offset" },
+    }),
+    struct_fields("Register", (Struct_Item[]){
+      { "Register", "index" },
+    }),
+  }));
+
+  push_type(type_union("Memory_Location", (Struct[]){
+    struct_fields("Instruction_Pointer_Relative", (Struct_Item[]){
+      { "Label_Index", "label_index" },
+    }),
+    struct_fields("Indirect", (Struct_Item[]){
+      { "Memory_Indirect_Operand", "base" },
+      { "Memory_Indirect_Operand", "index" },
+      { "Memory_Indirect_Operand", "offset" },
+    }),
+  }));
+
   push_type(add_common_fields(type_union("Operand", (Struct[]){
     struct_empty("None"),
     struct_empty("Any"),
@@ -398,8 +419,8 @@ main(void) {
       { "Register", "base" },
       { "s32", "displacement" },
     }),
-    struct_fields("Label", (Struct_Item[]){
-      { "Label_Index", "index" },
+    struct_fields("Memory", (Struct_Item[]){
+      { "Memory_Location", "location" },
     }),
   }), (Struct_Item[]){
     // TODO change to bit_size

@@ -300,8 +300,10 @@ print_operand(
       printf("m%d", bits);
       break;
     }
-    case Operand_Tag_Label: {
-      printf("rel....UNIMPLEMENTED");
+    case Operand_Tag_Memory: {
+      // TODO print better info
+      u32 bits = operand->byte_size * 8;
+      printf("m%d", bits);
       break;
     }
     default: {
@@ -388,13 +390,27 @@ make_label(
 }
 
 static inline Operand
-label32(
-  Label_Index label
+data_label32(
+  Label_Index label_index,
+  u32 byte_size
 ) {
   return (const Operand) {
-    .tag = Operand_Tag_Label,
+    .tag = Operand_Tag_Memory,
+    .byte_size = byte_size,
+    .Memory.location.Instruction_Pointer_Relative.label_index = label_index
+  };
+}
+
+static inline Operand
+code_label32(
+  Label_Index label_index
+) {
+  return (const Operand) {
+    .tag = Operand_Tag_Memory,
+    // FIXME this is set at 4 as otherwise current encoder is unhappy
+    //       about the size mismatch. It should be zero instead.
     .byte_size = 4,
-    .Label = {.index = label}
+    .Memory.location.Instruction_Pointer_Relative.label_index = label_index
   };
 }
 
@@ -564,12 +580,20 @@ register_bitset_get(
 }
 
 static inline bool
+operand_is_label(
+  const Operand *operand
+) {
+  return operand->tag == Operand_Tag_Memory
+    && operand->Memory.location.tag == Memory_Location_Tag_Instruction_Pointer_Relative;
+}
+
+static inline bool
 operand_is_memory(
-  Operand *operand
+  const Operand *operand
 ) {
   return (
     operand->tag == Operand_Tag_Memory_Indirect ||
-    operand->tag == Operand_Tag_Label ||
+    operand->tag == Operand_Tag_Memory ||
     operand->tag == Operand_Tag_Sib
   );
 }
@@ -583,11 +607,10 @@ operand_is_register_or_memory(
 
 static inline bool
 operand_is_immediate(
-  Operand *operand
+  const Operand *operand
 ) {
   return operand->tag == Operand_Tag_Immediate;
 }
-
 static inline bool
 operand_equal(
   const Operand *a,
@@ -602,9 +625,22 @@ operand_equal(
     case Operand_Tag_Immediate: {
       return !memcmp(a->Immediate.memory, b->Immediate.memory, a->byte_size);
     }
-    case Operand_Tag_Label: {
-      // TODO figure out if need some other way to compare labels
-      return a->Label.index.value == b->Label.index.value;
+    case Operand_Tag_Memory: {
+      const Memory_Location *a_location = &a->Memory.location;
+      const Memory_Location *b_location = &b->Memory.location;
+      if (a_location->tag != b_location->tag) return false;
+      switch(a_location->tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          return a_location->Instruction_Pointer_Relative.label_index.value
+            == b_location->Instruction_Pointer_Relative.label_index.value;
+        }
+        case Memory_Location_Tag_Indirect: {
+          panic("TODO implement indirect operand comparison");
+          break;
+        }
+      }
+      panic("Internal Error: Unexpected Memory_Location_Tag");
+      return false;
     }
     case Operand_Tag_Xmm:
     case Operand_Tag_Register: {
@@ -704,11 +740,7 @@ value_global_internal(
 
   *result = (Value) {
     .descriptor = descriptor,
-    .operand = {
-      .tag = Operand_Tag_Label,
-      .byte_size = byte_size,
-      .Label = {.index = label_index},
-    },
+    .operand = data_label32(label_index, byte_size),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -956,8 +988,10 @@ rip_value_pointer(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.tag == Operand_Tag_Label);
-  Label *label = program_get_label(program, value->operand.Label.index);
+  assert(operand_is_label(&value->operand));
+  Label *label = program_get_label(
+    program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+  );
   return bucket_buffer_offset_to_pointer(label->section->buffer, label->offset_in_section);
 }
 
@@ -1021,9 +1055,11 @@ value_as_function(
   Program *program,
   Value *value
 ) {
-  assert(value->operand.tag == Operand_Tag_Label);
+  assert(operand_is_label(&value->operand));
   assert(program->jit_buffer);
-  Label *label = program_get_label(program, value->operand.Label.index);
+  Label *label = program_get_label(
+    program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+  );
   assert(label->section == &program->code_section);
   s8 *target = program->jit_buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
@@ -1572,11 +1608,8 @@ import_symbol(
     });
   }
 
-  return (Operand) {
-    .tag = Operand_Tag_Label,
-    .byte_size = 8,
-    .Label = {.index = symbol->label32},
-  };
+  u32 byte_size = 8;
+  return data_label32(symbol->label32, byte_size);
 }
 
 Value *

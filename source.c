@@ -1622,12 +1622,12 @@ token_handle_user_defined_operator(
 
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
-  Operand fake_return_label =
-    label32(make_label(context->program, &context->program->data_section));
+  Label_Index fake_return_label_index =
+    make_label(context->program, &context->program->data_section);
   {
     scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
       .descriptor = &descriptor_void,
-      .operand = fake_return_label,
+      .operand = code_label32(fake_return_label_index),
     });
     scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
   }
@@ -1646,7 +1646,7 @@ token_handle_user_defined_operator(
     call_range,
     (Instruction) {
       .type = Instruction_Type_Label,
-      .label = fake_return_label.Label.index
+      .label = fake_return_label_index
     }
   );
 
@@ -2233,7 +2233,7 @@ token_process_function_literal(
     Value *return_label_value = allocator_allocate(context->allocator, Value);
     *return_label_value = (Value) {
       .descriptor = &descriptor_void,
-      .operand = label32(builder->code_block.end_label),
+      .operand = code_label32(builder->code_block.end_label),
     };
     scope_define_value(function_scope, MASS_RETURN_LABEL_NAME, return_label_value);
   }
@@ -2469,7 +2469,7 @@ token_handle_operand_variant_of(
     case Operand_Tag_Xmm:
     case Operand_Tag_Memory_Indirect:
     case Operand_Tag_Sib:
-    case Operand_Tag_Label: {
+    case Operand_Tag_Memory: {
       panic("TODO implement operand reflection for more types");
       break;
     }
@@ -3018,12 +3018,12 @@ token_maybe_macro_call_with_lazy_arguments(
 
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
-  Operand fake_return_label =
-    label32(make_label(context->program, &context->program->data_section));
+  Label_Index fake_return_label_index =
+    make_label(context->program, &context->program->data_section);
   {
     scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
       .descriptor = &descriptor_void,
-      .operand = fake_return_label,
+      .operand = code_label32(fake_return_label_index),
     });
     assert(result_value);
     scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
@@ -3041,7 +3041,7 @@ token_maybe_macro_call_with_lazy_arguments(
     *call_source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
-      .label = fake_return_label.Label.index
+      .label = fake_return_label_index
     }
   );
   return true;
@@ -3152,12 +3152,12 @@ token_handle_function_call(
 
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
-      Operand fake_return_label =
-        label32(make_label(context->program, &context->program->data_section));
+      Label_Index fake_return_label_index =
+        make_label(context->program, &context->program->data_section);
       {
         scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
           .descriptor = &descriptor_void,
-          .operand = fake_return_label,
+          .operand = code_label32(fake_return_label_index),
         });
         assert(return_value);
         scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, return_value);
@@ -3175,7 +3175,7 @@ token_handle_function_call(
         target_token->source_range,
         (Instruction) {
           .type = Instruction_Type_Label,
-          .label = fake_return_label.Label.index
+          .label = fake_return_label_index
         }
       );
     } else {
@@ -3686,7 +3686,7 @@ token_parse_statement_label(
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
-      .operand = label32(label),
+      .operand = code_label32(label),
     };
     // FIXME this should define a label in the function scope, but because
     // the macros are not hygienic we can not do that yet
@@ -3696,7 +3696,8 @@ token_parse_statement_label(
 
   if (
     value->descriptor != &descriptor_void ||
-    value->operand.tag != Operand_Tag_Label
+    value->operand.tag != Operand_Tag_Memory ||
+    value->operand.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -3708,7 +3709,10 @@ token_parse_statement_label(
 
   push_instruction(
     &context->builder->code_block.instructions, keyword->source_range,
-    (Instruction) { .type = Instruction_Type_Label, .label = value->operand.Label.index }
+    (Instruction) {
+      .type = Instruction_Type_Label,
+      .label = value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+    }
   );
 
   err:
@@ -3809,7 +3813,7 @@ token_parse_goto(
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
-      .operand = label32(label),
+      .operand = code_label32(label),
     };
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
@@ -3818,7 +3822,8 @@ token_parse_goto(
 
   if (
     value->descriptor != &descriptor_void ||
-    value->operand.tag != Operand_Tag_Label
+    value->operand.tag != Operand_Tag_Memory ||
+    value->operand.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -3879,7 +3884,7 @@ token_parse_explicit_return(
   Value *return_label = scope_entry_force(context, scope_label_entry);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
-  assert(return_label->operand.tag == Operand_Tag_Label);
+  assert(operand_is_label(&return_label->operand));
 
   push_instruction(
     &context->builder->code_block.instructions,
@@ -3962,7 +3967,7 @@ token_parse_inline_machine_code_bytes(
     }
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
-    if (value->operand.tag == Operand_Tag_Label) {
+    if (operand_is_label(&value->operand)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error_snprintf(
           context, args_token->source_range,
@@ -3970,7 +3975,7 @@ token_parse_inline_machine_code_bytes(
         );
         goto err;
       }
-      bytes.label_index = value->operand.Label.index;
+      bytes.label_index = value->operand.Memory.location.Instruction_Pointer_Relative.label_index;
       bytes.label_offset_in_instruction = u64_to_u8(i);
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
