@@ -114,15 +114,25 @@ type_value_for_descriptor(
   return MASS_TYPE_VALUE(descriptor);
 }
 
-#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
+#define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\
   Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
     .Opaque = { .bit_size = (_BIT_SIZE_) },\
   };\
   Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
+
+#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
+  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)
 MASS_ENUMERATE_BUILT_IN_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
+// TODO Shrink to 4 bits when supported
+MASS_DEFINE_OPAQUE_TYPE(register_8, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_16, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_32, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_64, 8);
+MASS_DEFINE_OPAQUE_TYPE(immediate, sizeof(Slice));
+MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Operand_Eflags));
 
 Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Void,

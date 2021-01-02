@@ -316,6 +316,22 @@ spec("source") {
     }
     #endif
 
+    #ifdef _WIN32
+    // This test relies on Windows calling convention
+    it("should be able to include raw machine code bytes") {
+      test_program_inline_source(
+        "foo :: (x : s64) -> (Register_64) {"
+          "operand_variant_of(x)"
+        "}",
+        foo
+      );
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(test_context.program, foo);
+      Register actual = checker();
+      Register expected = Register_C;
+      check(actual == expected, "Expected %d, got %d", expected, actual);
+    }
+    #endif
+
     it("should be able to reference a declared label in raw machine code bytes") {
       // TODO only run on X64 hosts
       test_program_inline_source(
@@ -333,6 +349,7 @@ spec("source") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, foo);
       check(checker() == 42);
     }
+
   }
 
   #ifdef _WIN32

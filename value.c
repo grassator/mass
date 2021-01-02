@@ -1380,6 +1380,12 @@ program_init(
 
   scope_define_value(program->global_scope, slice_literal("any"), type_any_value);
 
+
+  scope_define_value(program->global_scope, slice_literal("Register_8"), type_register_8_value);
+  scope_define_value(program->global_scope, slice_literal("Register_16"), type_register_16_value);
+  scope_define_value(program->global_scope, slice_literal("Register_32"), type_register_32_value);
+  scope_define_value(program->global_scope, slice_literal("Register_64"), type_register_64_value);
+
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
     scope_define_value(program->global_scope, slice_literal(#_NAME_), type_##_NAME_##_value);
   MASS_ENUMERATE_BUILT_IN_TYPES

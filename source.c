@@ -2366,6 +2366,69 @@ typedef void (*Operator_Dispatch_Proc)(
 );
 
 const Token *
+token_handle_operand_variant_of(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Array_Value_Ptr args
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  if (dyn_array_length(args) != 1) {
+    context_error_snprintf(
+      context, *source_range,
+      "operand_variant_of expects a single argument"
+    );
+    return 0;
+  }
+
+  Value *value = *dyn_array_get(args, 0);
+
+  Value *result = allocator_allocate(context->allocator, Value);
+
+  switch(value->operand.tag) {
+    case Operand_Tag_None:
+    case Operand_Tag_Any:
+    case Operand_Tag_Immediate:
+    case Operand_Tag_Eflags:
+    case Operand_Tag_Xmm:
+    case Operand_Tag_Memory_Indirect:
+    case Operand_Tag_Sib:
+    case Operand_Tag_Label: {
+      panic("TODO implement operand reflection for more types");
+      break;
+    }
+    case Operand_Tag_Register: {
+      // TODO figure out a better encoding for small immediates
+      u8 *register_index = allocator_allocate(context->allocator, u8);
+      *register_index = value->operand.Register.index;
+      Descriptor *result_descriptor = 0;
+      switch(value->operand.byte_size) {
+        case 1: result_descriptor = &descriptor_register_8; break;
+        case 2: result_descriptor = &descriptor_register_16; break;
+        case 4: result_descriptor = &descriptor_register_32; break;
+        case 8: result_descriptor = &descriptor_register_64; break;
+        default: {
+          panic("Internal Error: Unsupported register size");
+          break;
+        }
+      }
+      *result = (Value) {
+        .descriptor = &descriptor_register_8,
+        .operand = {
+          .tag = Operand_Tag_Immediate,
+          .byte_size = 1,
+          .Immediate.memory = register_index,
+        }
+      };
+    }
+  }
+
+  const Token *result_token = token_value_make(context, result, *source_range);
+
+  return result_token;
+}
+
+const Token *
 token_handle_cast(
   Compilation_Context *context,
   const Source_Range *source_range,
@@ -3171,6 +3234,13 @@ token_dispatch_operator(
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
       result_token = token_handle_cast(context, &args_token->source_range, args);
+      dyn_array_destroy(args);
+    } else if (
+      target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("operand_variant_of"))
+    ) {
+      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+      result_token = token_handle_operand_variant_of(context, &args_token->source_range, args);
       dyn_array_destroy(args);
     } else {
       result_token = token_handle_function_call(
