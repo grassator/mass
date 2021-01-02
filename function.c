@@ -372,17 +372,17 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   dyn_array_pop(builder->code_block.instructions);
 }
 
-s32
+s64
 fn_adjust_stack_displacement(
   const Function_Builder *builder,
-  s32 displacement
+  s64 displacement
 ) {
   // Negative diplacement is used to encode local variables
   if (displacement < 0) {
     displacement += builder->layout.stack_reserve;
   } else
   // Positive values larger than max_call_parameters_stack_size
-  if (displacement >= u32_to_s32(builder->max_call_parameters_stack_size)) {
+  if (displacement >= u32_to_s64(builder->max_call_parameters_stack_size)) {
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
     s32 return_address_size = 8;
@@ -401,31 +401,13 @@ fn_normalize_instruction_operands(
   // Normalizing operands to simplify future handling in the encoder
   for (u8 operand_index = 0; operand_index < countof(instruction->assembly.operands); ++operand_index) {
     Operand *operand = &instruction->assembly.operands[operand_index];
-    // [RSP + X] always needs to be encoded as SIB because RSP register index
-    // in MOD R/M is occupied by RIP-relative encoding
     if (
       operand->tag == Operand_Tag_Memory &&
       operand->Memory.location.tag == Memory_Location_Tag_Indirect &&
       operand->Memory.location.Indirect.base.Register.index == Register_SP
     ) {
-      assert(
-        operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
-        operand->Memory.location.Indirect.index.Immediate.value == 0
-      );
-      *operand = (Operand){
-        .tag = Operand_Tag_Sib,
-        .byte_size = operand->byte_size,
-        .Sib = {
-          .scale = SIB_Scale_1,
-          .base = Register_SP,
-          .index = Register_SP,
-          .displacement = s64_to_s32(operand->Memory.location.Indirect.offset),
-        },
-      };
-    }
-    bool is_stack_operand = operand->tag == Operand_Tag_Sib && operand->Sib.base == Register_SP;
-    if (is_stack_operand) {
-      operand->Sib.displacement = fn_adjust_stack_displacement(builder, operand->Sib.displacement);
+      operand->Memory.location.Indirect.offset =
+        fn_adjust_stack_displacement(builder, operand->Memory.location.Indirect.offset);
     }
   }
 }
@@ -821,9 +803,6 @@ multiply(
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type(x, y));
   assert(descriptor_is_integer(x->descriptor));
-
-  assert_not_register_ax(x);
-  assert_not_register_ax(y);
 
   maybe_constant_fold(builder, source_range, result_value, x, y, *);
 

@@ -2475,7 +2475,6 @@ token_handle_operand_variant_of(
     case Operand_Tag_Immediate:
     case Operand_Tag_Eflags:
     case Operand_Tag_Xmm:
-    case Operand_Tag_Sib:
     case Operand_Tag_Memory: {
       panic("TODO implement operand reflection for more types");
       break;
@@ -3249,6 +3248,10 @@ token_dispatch_operator(
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory);
     assert(array->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
+    assert(
+      array->operand.Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
+      array->operand.Memory.location.Indirect.index.Immediate.value == 0
+    );
 
     Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
     u32 item_byte_size = descriptor_byte_size(item_descriptor);
@@ -3262,58 +3265,79 @@ token_dispatch_operator(
     if (operand_is_immediate(&index_value->operand)) {
       s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
       result->operand.Memory.location.Indirect.offset = index * item_byte_size;
-    } else if(
-      item_byte_size == 1 ||
-      item_byte_size == 2 ||
-      item_byte_size == 4 ||
-      item_byte_size == 8
-    ) {
-      SIB_Scale scale = SIB_Scale_1;
-      if (item_byte_size == 2) {
-        scale = SIB_Scale_2;
-      } else if (item_byte_size == 4) {
-        scale = SIB_Scale_4;
-      } else if (item_byte_size == 8) {
-        scale = SIB_Scale_8;
-      }
-      Value *index_value_in_register =
-        value_register_for_descriptor(context->allocator, Register_R10, index_value->descriptor);
+    } else {
+      // @InstructionQuality
+      // This code is very general in terms of the operands where the base
+      // or the index are stored, but it is
+
+      // FIXME it should acquire temp instead but `multiply` asserts on it
+      Register reg = Register_R10;
+      register_acquire(context->builder, reg);
+      Value *new_base_register =
+        value_register_for_descriptor(context->allocator, reg, &descriptor_s64);
+
+      // Move the index into the register
       move_value(
         context->allocator,
         context->builder,
         &target_token->source_range,
-        index_value_in_register,
+        new_base_register,
         index_value
       );
+
+      // Multiply index by the item byte size
+      multiply(
+        context->allocator,
+        context->builder,
+        &target_token->source_range,
+        new_base_register,
+        new_base_register,
+        value_from_s64(context->allocator, item_byte_size)
+      );
+
+      {
+        // Load previous address into a temp register
+        Register temp_register = register_acquire_temp(context->builder);
+        Value *temp_value =
+          value_register_for_descriptor(context->allocator, temp_register, &descriptor_s64);
+
+        Operand source_operand = array->operand;
+
+        // TODO rethink operand sizing
+        // We need to manually adjust the size here because even if we loading one byte
+        // the right side is treated as an opaque address and does not participate in
+        // instruction encoding.
+        source_operand.byte_size = descriptor_byte_size(&descriptor_s64);
+
+        push_instruction(
+          &context->builder->code_block.instructions, target_token->source_range,
+          (Instruction) {.assembly = {lea, {temp_value->operand, source_operand, 0}}}
+        );
+
+        plus(
+          context->allocator,
+          context->builder,
+          &target_token->source_range,
+          new_base_register,
+          new_base_register,
+          temp_value
+        );
+        register_release(context->builder, temp_register);
+      }
+
       result->operand = (Operand) {
-        .tag = Operand_Tag_Sib,
+        .tag = Operand_Tag_Memory,
         .byte_size = item_byte_size,
-        .Sib = (Operand_Sib) {
-          .scale = scale,
-          .index = index_value_in_register->operand.Register.index,
-          .base = array->operand.Memory.location.Indirect.base.Register.index,
-          .displacement = s64_to_s32(array->operand.Memory.location.Indirect.offset),
+        .Memory.location = {
+          .tag = Memory_Location_Tag_Indirect,
+          .Indirect = {
+            .base = {
+              .tag = Memory_Indirect_Operand_Tag_Register,
+              .Register.index = new_base_register->operand.Register.index,
+            },
+          }
         }
       };
-      //switch(array->operand.Memory.location.Indirect.index.tag) {
-        //case Memory_Indirect_Operand_Tag_None: {
-          //result->operand.Memory.location.Indirect.index = (Memory_Indirect_Operand) {
-            //.tag = Memory_Indirect_Operand_Tag_Immediate,
-            //.Immediate.value = index * item_byte_size
-          //};
-          //break;
-        //}
-        //case Memory_Indirect_Operand_Tag_Immediate: {
-          //result->operand.Memory.location.Indirect.index.Immediate.value += index * item_byte_size;
-          //break;
-        //}
-        //case Memory_Indirect_Operand_Tag_Register: {
-          //panic("TODO support indexing on alread register indexed values");
-          //break;
-        //}
-      //}
-    } else {
-      panic("TODO");
     }
     result_token = token_value_make(context, result, brackets->source_range);
   } else if (slice_equal(operator, slice_literal("()"))) {

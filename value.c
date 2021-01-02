@@ -294,7 +294,6 @@ print_operand(
       }
       break;
     }
-    case Operand_Tag_Sib:
     case Operand_Tag_Memory: {
       // TODO print better info
       u32 bits = operand->byte_size * 8;
@@ -598,10 +597,7 @@ static inline bool
 operand_is_memory(
   const Operand *operand
 ) {
-  return (
-    operand->tag == Operand_Tag_Memory ||
-    operand->tag == Operand_Tag_Sib
-  );
+  return (operand->tag == Operand_Tag_Memory);
 }
 
 static inline bool
@@ -680,13 +676,6 @@ operand_equal(
     }
     case Operand_Tag_None: {
       return true;
-    }
-    case Operand_Tag_Sib: {
-      return (
-        a->Sib.scale == b->Sib.scale &&
-        a->Sib.index == b->Sib.index &&
-        a->Sib.base == b->Sib.base
-      );
     }
   }
   panic("Unknown operand type");

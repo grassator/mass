@@ -8,8 +8,6 @@ typedef dyn_array_type(const Section *) Array_Const_Section_Ptr;
 
 typedef enum Register Register;
 
-typedef enum SIB_Scale SIB_Scale;
-
 typedef struct Label_Index Label_Index;
 typedef dyn_array_type(Label_Index *) Array_Label_Index_Ptr;
 typedef dyn_array_type(const Label_Index *) Array_Const_Label_Index_Ptr;
@@ -158,13 +156,6 @@ typedef enum Register {
   Register_Xmm15 = 31,
 } Register;
 
-typedef enum SIB_Scale {
-  SIB_Scale_1 = 0,
-  SIB_Scale_2 = 1,
-  SIB_Scale_4 = 2,
-  SIB_Scale_8 = 3,
-} SIB_Scale;
-
 typedef struct Label_Index {
   u64 value;
 } Label_Index;
@@ -261,8 +252,7 @@ typedef enum {
   Operand_Tag_Register = 3,
   Operand_Tag_Xmm = 4,
   Operand_Tag_Immediate = 5,
-  Operand_Tag_Sib = 6,
-  Operand_Tag_Memory = 7,
+  Operand_Tag_Memory = 6,
 } Operand_Tag;
 
 typedef struct {
@@ -278,12 +268,6 @@ typedef struct {
   void * memory;
 } Operand_Immediate;
 typedef struct {
-  SIB_Scale scale;
-  Register index;
-  Register base;
-  s32 displacement;
-} Operand_Sib;
-typedef struct {
   Memory_Location location;
 } Operand_Memory;
 typedef struct Operand {
@@ -294,7 +278,6 @@ typedef struct Operand {
     Operand_Register Register;
     Operand_Xmm Xmm;
     Operand_Immediate Immediate;
-    Operand_Sib Sib;
     Operand_Memory Memory;
   };
 } Operand;

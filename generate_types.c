@@ -318,13 +318,6 @@ main(void) {
     { "Xmm15", 0b11111 },
   }));
 
-  push_type(type_enum("SIB_Scale", (Enum_Item[]){
-    { "1", 0b00 },
-    { "2", 0b01 },
-    { "4", 0b10 },
-    { "8", 0b11 },
-  }));
-
   push_type(type_struct("Label_Index", (Struct_Item[]){
     { "u64", "value" },
   }));
@@ -407,12 +400,6 @@ main(void) {
     }),
     struct_fields("Immediate", (Struct_Item[]){
       { "void *", "memory" },
-    }),
-    struct_fields("Sib", (Struct_Item[]){
-      { "SIB_Scale", "scale" },
-      { "Register", "index" },
-      { "Register", "base" },
-      { "s32", "displacement" },
     }),
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },

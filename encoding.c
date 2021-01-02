@@ -97,60 +97,64 @@ encode_instruction_assembly(
       mod_r_m_operand_index = operand_index;
       if (operand->tag == Operand_Tag_Register) {
         r_m = operand->Register.index;
-        if (operand->Register.index & 0b1000) {
-          rex_byte |= REX_B;
-        }
         mod = MOD_Register;
       } else if (operand->tag == Operand_Tag_Xmm) {
         r_m = operand->Register.index;
         mod = MOD_Register;
-      } else {
-        if (operand->tag == Operand_Tag_Memory) {
-          const Memory_Location *location = &operand->Memory.location;
-          switch(location->tag) {
-            case Memory_Location_Tag_Instruction_Pointer_Relative: {
-              r_m = 0b101;
-              break;
+      } else if (operand->tag == Operand_Tag_Memory) {
+        const Memory_Location *location = &operand->Memory.location;
+        switch(location->tag) {
+          case Memory_Location_Tag_Instruction_Pointer_Relative: {
+            r_m = 0b101;
+            break;
+          }
+          case Memory_Location_Tag_Indirect: {
+            // Right now the compiler does not support SIB scale other than 1.
+            // From what I can tell there are two reasons that only matter in *extremely*
+            // performance-sensitive code which probably would be written by hand anyway:
+            // 1) `add rax, 8` is three bytes longer than `inc rax`. With current instruction
+            //    cache sizes it is very unlikely to be problematic.
+            // 2) Loop uses the same index for arrays of values of different sizes that could
+            //    be represented with SIB scale. In cases of extreme register pressure this
+            //    can cause spilling. To avoid that we could try to use temporary shifts
+            //    to adjust the offset between different indexes, but it is not implemented ATM.
+            enum { SIB_Scale_1 = 0b00, };
+            u8 sib_scale_bits = SIB_Scale_1;
+            if (operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate) {
+              assert(operand->Memory.location.Indirect.index.Immediate.value == 0);
             }
-            case Memory_Location_Tag_Indirect: {
-              // Right now the compiler does not support SIB scale other than 1.
-              // From what I can tell there are two reasons that only matter in *extremely*
-              // performance-sensitive code which probably would be written by hand anyway:
-              // 1) `add rax, 8` is three bytes longer than `inc rax`. With current instruction
-              //    cache sizes it is very unlikely to be problematic.
-              // 2) Loop uses the same index for arrays of values of different sizes that could
-              //    be represented with SIB scale. In cases of extreme register pressure this
-              //    can cause spilling. To avoid that we could try to use temporary shifts
-              //    to adjust the offset between different indexes, but it is not implemented ATM.
-              //SIB_Scale scale = SIB_Scale_1;
-              // FIXME remove when SIB is migrated
-              assert(
-                operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
-                operand->Memory.location.Indirect.index.Immediate.value == 0
+            assert(operand->Memory.location.Indirect.base.tag == Memory_Indirect_Operand_Tag_Register);
+            Register base = operand->Memory.location.Indirect.base.Register.index;
+            // [RSP + X] always needs to be encoded as SIB because RSP register index
+            // in MOD R/M is occupied by RIP-relative encoding
+            if (base == Register_SP) {
+              needs_sib = true;
+              r_m = 0b0100; // SIB
+              sib_byte = (
+                ((sib_scale_bits & 0b11) << 6) |
+                ((Register_SP & 0b111) << 3) |
+                ((Register_SP & 0b111) << 0)
               );
-              assert(operand->Memory.location.Indirect.base.tag == Memory_Indirect_Operand_Tag_Register);
+            } else if (
+              operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Register
+            ) {
+              needs_sib = true;
+              r_m = 0b0100; // SIB
+              Register sib_index = operand->Memory.location.Indirect.index.Register.index;
+              sib_byte = (
+                ((sib_scale_bits & 0b11) << 6) |
+                ((sib_index & 0b111) << 3) |
+                ((base & 0b111) << 0)
+              );
+              if (sib_index & 0b1000) {
+                rex_byte |= REX_X;
+              }
+            } else {
               r_m = operand->Memory.location.Indirect.base.Register.index;
-              // :OperandNormalization
-              assert(r_m != Register_SP);
-              displacement = s64_to_s32(operand->Memory.location.Indirect.offset);
-              break;
             }
+            displacement = s64_to_s32(operand->Memory.location.Indirect.offset);
+            break;
           }
-        } else if (operand->tag == Operand_Tag_Sib) {
-          displacement = operand->Sib.displacement;
-          needs_sib = true;
-          r_m = 0b0100; // SIB
-
-          if (operand->Sib.index & 0b1000) {
-            rex_byte |= REX_X;
-          }
-          sib_byte = (
-            ((operand->Sib.scale & 0b11) << 6) |
-            ((operand->Sib.index & 0b111) << 3) |
-            ((operand->Sib.base & 0b111) << 0)
-          );
-        } else {
-          assert(!"Unsupported operand type");
         }
         if (displacement == 0) {
           mod = MOD_Displacement_0;
@@ -159,12 +163,18 @@ encode_instruction_assembly(
         } else {
           mod = MOD_Displacement_s32;
         }
+      } else {
+        panic("Unsupported operand type");
       }
     }
   }
 
   if (encoding->extension_type == Instruction_Extension_Type_Op_Code) {
     reg_or_op_code = encoding->op_code_extension;
+  }
+
+  if (r_m & 0b1000) {
+    rex_byte |= REX_B;
   }
 
   if (rex_byte) {
@@ -212,43 +222,32 @@ encode_instruction_assembly(
   // Write out displacement
   if (mod_r_m_operand_index != -1 && mod != MOD_Register) {
     const Operand *operand = &instruction->assembly.operands[mod_r_m_operand_index];
-    if (operand->tag == Operand_Tag_Memory) {
-      const Memory_Location *location = &operand->Memory.location;
-      switch(location->tag) {
-        case Memory_Location_Tag_Instruction_Pointer_Relative: {
-          Label_Index label_index =
-            operand->Memory.location.Instruction_Pointer_Relative.label_index;
-          // :OperandNormalization
-          s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
-          // :AfterInstructionPatch
-          mod_r_m_patch_info =
-            dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-              .target_label_index = label_index,
-              .from = {.section = &program->code_section},
-              .patch_target = patch_target,
-            });
-          break;
-        }
-        case Memory_Location_Tag_Indirect: {
-          if (mod == MOD_Displacement_s32) {
-            fixed_buffer_append_s32(buffer, displacement);
-          } else if (mod == MOD_Displacement_s8) {
-            fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
-          } else {
-            assert(mod == MOD_Displacement_0);
-          }
-          break;
-        }
+    assert (operand->tag == Operand_Tag_Memory);
+    const Memory_Location *location = &operand->Memory.location;
+    switch(location->tag) {
+      case Memory_Location_Tag_Instruction_Pointer_Relative: {
+        Label_Index label_index =
+          operand->Memory.location.Instruction_Pointer_Relative.label_index;
+        // :OperandNormalization
+        s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
+        // :AfterInstructionPatch
+        mod_r_m_patch_info =
+          dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+            .target_label_index = label_index,
+            .from = {.section = &program->code_section},
+            .patch_target = patch_target,
+          });
+        break;
       }
-    } else if (
-      operand->tag == Operand_Tag_Sib
-    ) {
-      if (mod == MOD_Displacement_s32) {
-        fixed_buffer_append_s32(buffer, displacement);
-      } else if (mod == MOD_Displacement_s8) {
-        fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
-      } else {
-        assert(mod == MOD_Displacement_0);
+      case Memory_Location_Tag_Indirect: {
+        if (mod == MOD_Displacement_s32) {
+          fixed_buffer_append_s32(buffer, displacement);
+        } else if (mod == MOD_Displacement_s8) {
+          fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
+        } else {
+          assert(mod == MOD_Displacement_0);
+        }
+        break;
       }
     }
   }
@@ -385,18 +384,6 @@ encode_instruction(
       if (
         operand->tag == Operand_Tag_Memory &&
         operand_encoding->type == Operand_Encoding_Type_Memory
-      ) {
-        continue;
-      }
-      if (
-        operand->tag == Operand_Tag_Sib &&
-        operand_encoding->type == Operand_Encoding_Type_Memory
-      ) {
-        continue;
-      }
-      if (
-        operand->tag == Operand_Tag_Sib &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
       ) {
         continue;
       }
