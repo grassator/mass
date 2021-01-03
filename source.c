@@ -2325,6 +2325,7 @@ compile_time_eval(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   const Token *first_token = token_view_get(view, 0);
+  const Source_Range *source_range = &first_token->source_range;
 
   Program eval_program = {
     .import_libraries = dyn_array_copy(Array_Import_Library, context->program->import_libraries),
@@ -2349,22 +2350,36 @@ compile_time_eval(
     context, &eval_context.builder->value->descriptor->Function, &descriptor_void
   );
 
+  // FIXME We have to call token_parse_expression here before we figure out
+  //       what is the return value because we need to figure out the return type.
+  //       Ideally there would be a type-only eval available instead
   Value *expression_result_value = value_any(context->allocator);
   token_parse_expression(&eval_context, view, expression_result_value);
 
-  // We use a something like a C++ reference out parameter for the
-  // result to have a consitent function signature on this C side of things.
+  u32 result_byte_size = expression_result_value->operand.byte_size;
+  // Need to ensure 16-byte alignment here because result value might be __m128
+  // TODO When we support AVX-2 or AVX-512, this might need to increase further
+  u32 alignment = 16;
+  void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
 
-  // Make it out parameter a pointer to ensure it is passed inside a register according to ABI
-  Value *arg_value = function_next_argument_value(
-    context->allocator,
-    &eval_context.builder->value->descriptor->Function,
-    descriptor_pointer_to(context->allocator, expression_result_value->descriptor)
-  );
-  dyn_array_push(eval_context.builder->value->descriptor->Function.arguments, arg_value);
+  // Load the address of the result
+  Register out_register = register_acquire_temp(eval_context.builder);
+  Value out_value_register = {
+    .descriptor = &descriptor_s64,
+    .operand = {
+      .tag = Operand_Tag_Register,
+      .byte_size = 8,
+      .Register.index = out_register
+    }
+  };
+  Value result_address = {
+    .descriptor = &descriptor_s64,
+    .operand = imm64(context->allocator, (u64)result),
+  };
 
-  // Create a reference Value
-  assert(arg_value->operand.tag == Operand_Tag_Register);
+  move_value(context->allocator, eval_context.builder, source_range, &out_value_register, &result_address);
+
+  // Use memory-indirect addressing to copy
   Value *out_value = allocator_allocate(context->allocator, Value);
   *out_value = (Value) {
     .descriptor = expression_result_value->descriptor,
@@ -2376,28 +2391,22 @@ compile_time_eval(
         .Indirect = {
           .base = {
             .tag = Memory_Indirect_Operand_Tag_Register,
-            .Register.index = arg_value->operand.Register.index
+            .Register.index = out_register
           }
         },
       },
     },
   };
 
-  move_value(context->allocator, eval_context.builder, &first_token->source_range, out_value, expression_result_value);
+  move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
   fn_end(eval_context.builder);
 
   program_jit(&eval_context);
 
-  u32 result_byte_size = out_value->operand.byte_size;
-  // Need to ensure 16-byte alignment here because result value might be __m128
-  // TODO When we support AVX-2 or AVX-512, this might need to increase further
-  u32 alignment = 16;
-  void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
+  fn_type_opaque jitted_code =
+    (fn_type_opaque)value_as_function(&eval_program, eval_context.builder->value);
 
-  Compile_Time_Eval_Proc jitted_code =
-    (Compile_Time_Eval_Proc)value_as_function(&eval_program, eval_context.builder->value);
-
-  jitted_code(result);
+  jitted_code();
   Value *token_value = allocator_allocate(context->allocator, Value);
   *token_value = (Value) {
     .descriptor = out_value->descriptor,
