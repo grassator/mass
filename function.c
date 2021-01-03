@@ -304,9 +304,13 @@ move_to_result_from_temp(
     target->operand = temp_source->operand;
     return;
   }
-  move_value(allocator, builder, source_range, target, temp_source);
-  if (temp_source->operand.tag == Operand_Tag_Register) {
-    register_release(builder, temp_source->operand.Register.index);
+  // Sometimes it is convenient to use result as temp in which case there
+  // is no need for a move or a register release
+  if (!operand_equal(&target->operand, &temp_source->operand)) {
+    move_value(allocator, builder, source_range, target, temp_source);
+    if (temp_source->operand.tag == Operand_Tag_Register) {
+      register_release(builder, temp_source->operand.Register.index);
+    }
   }
 }
 
