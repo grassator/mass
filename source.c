@@ -1445,10 +1445,7 @@ token_force_value(
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *string_bytes = value_global_c_string_from_slice(context, string);
-      Value *c_string_pointer = value_pointer_to(
-        context, context->builder, &token->source_range, string_bytes
-      );
-      move_value(context->allocator, context->builder, &token->source_range, result_value, c_string_pointer);
+      load_address(context, context->builder, &token->source_range, result_value, string_bytes);
       return *context->result;
     }
     case Token_Tag_Id: {
@@ -3377,8 +3374,12 @@ token_dispatch_operator(
 
     Value *pointee = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
-    Value *result_value = value_pointer_to(
-      context, context->builder, &pointee_token->source_range, pointee
+
+    Descriptor *pointer_descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
+    // FIXME figure out how to avoid stack allocation
+    Value *result_value = reserve_stack(context->allocator, context->builder, pointer_descriptor);
+    load_address(
+      context, context->builder, &pointee_token->source_range, result_value, pointee
     );
 
     result_token = token_value_make(context, result_value, pointee_token->source_range);

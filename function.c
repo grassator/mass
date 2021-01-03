@@ -1061,40 +1061,36 @@ compare(
   move_value(allocator, builder, source_range, result_value, comparison_value);
 }
 
-Value *
-value_pointer_to(
+void
+load_address(
   Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
-  Value *value
+  Value *result_value,
+  Value *memory
 ) {
-  Array_Instruction *instructions = &builder->code_block.instructions;
-  // TODO support register
-  // TODO support immediates
-  assert(value->operand.tag == Operand_Tag_Memory);
-  Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
+  assert(memory->operand.tag == Operand_Tag_Memory);
+  Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, memory->descriptor);
 
-  Value *temp_register = value_register_for_descriptor(
-    context->allocator, register_acquire_temp(builder), result_descriptor
-  );
-  Operand source_operand = value->operand;
+  Value *temp_register = result_value->operand.tag == Operand_Tag_Register
+    ? result_value
+    : value_register_for_descriptor(
+        context->allocator, register_acquire_temp(builder), result_descriptor
+    );
 
   // TODO rethink operand sizing
   // We need to manually adjust the size here because even if we loading one byte
   // the right side is treated as an opaque address and does not participate in
   // instruction encoding.
+  Operand source_operand = memory->operand;
   source_operand.byte_size = descriptor_byte_size(result_descriptor);
 
   push_instruction(
-    instructions, *source_range,
+    &builder->code_block.instructions, *source_range,
     (Instruction) {.assembly = {lea, {temp_register->operand, source_operand, 0}}}
   );
 
-  Value *result = reserve_stack(context->allocator, builder, result_descriptor);
-  move_value(context->allocator, builder, source_range, result, temp_register);
-  register_release(builder, temp_register->operand.Register.index);
-
-  return result;
+  move_to_result_from_temp(context->allocator, builder, source_range, result_value, temp_register);
 }
 
 typedef struct {

@@ -133,12 +133,13 @@ compare(
   Value *b
 );
 
-Value *
-value_pointer_to(
+void
+load_address(
   Compilation_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
-  Value *value
+  Value *result_value,
+  Value *memory
 );
 
 Value *
