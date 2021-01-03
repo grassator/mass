@@ -436,7 +436,7 @@ fn_normalize_instruction_operands(
     if (
       operand->tag == Operand_Tag_Memory &&
       operand->Memory.location.tag == Memory_Location_Tag_Indirect &&
-      operand->Memory.location.Indirect.base.Register.index == Register_SP
+      operand->Memory.location.Indirect.base_register == Register_SP
     ) {
       operand->Memory.location.Indirect.offset =
         fn_adjust_stack_displacement(builder, operand->Memory.location.Indirect.offset);
@@ -550,7 +550,7 @@ function_return_descriptor(
 ) {
   if (!function->returns) {
     if (descriptor->tag != Descriptor_Tag_Void) {
-      // TODO handle 16 bit non-float return values are returned in XMM0
+      // TODO handle 16 byte non-float return values in XMM0
       if (descriptor_is_float(descriptor)) {
         function->returns = value_register_for_descriptor(context->allocator, Register_Xmm0, descriptor);
       } else {
@@ -566,10 +566,7 @@ function_return_descriptor(
               .Memory.location = {
                 .tag = Memory_Location_Tag_Indirect,
                 .Indirect = {
-                  .base = {
-                    .tag = Memory_Indirect_Operand_Tag_Register,
-                    .Register.index = Register_C,
-                  }
+                  .base_register = Register_C,
                 }
               }
             },
@@ -1317,10 +1314,7 @@ ensure_memory(
       .Memory.location = {
         .tag = Memory_Location_Tag_Indirect,
         .Indirect = {
-          .base = {
-            .tag = Memory_Indirect_Operand_Tag_Register,
-            .Register.index = value->operand.Register.index,
-          }
+          .base_register = value->operand.Register.index
         }
       }
     },

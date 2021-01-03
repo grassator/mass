@@ -2386,10 +2386,7 @@ compile_time_eval(
       .Memory.location = {
         .tag = Memory_Location_Tag_Indirect,
         .Indirect = {
-          .base = {
-            .tag = Memory_Indirect_Operand_Tag_Register,
-            .Register.index = out_register
-          }
+          .base_register = out_register
         },
       },
     },
@@ -3276,9 +3273,7 @@ token_dispatch_operator(
       // This code is very general in terms of the operands where the base
       // or the index are stored, but it is
 
-      // FIXME it should acquire temp instead but `multiply` asserts on it
-      Register reg = Register_R10;
-      register_acquire(context->builder, reg);
+      Register reg = register_acquire_temp(context->builder);
       Value *new_base_register =
         value_register_for_descriptor(context->allocator, reg, &descriptor_s64);
 
@@ -3302,23 +3297,18 @@ token_dispatch_operator(
       );
 
       {
+        // @InstructionQuality
+        // TODO If the source does not have index, on X64 it should be possible to avoid
+        //      using an extra register and put the index into SIB on x64
+
         // Load previous address into a temp register
         Register temp_register = register_acquire_temp(context->builder);
-        Value *temp_value =
-          value_register_for_descriptor(context->allocator, temp_register, &descriptor_s64);
+        Value temp_value = {
+          .descriptor = &descriptor_s64,
+          .operand = operand_register_for_descriptor(temp_register, &descriptor_s64)
+        };
 
-        Operand source_operand = array->operand;
-
-        // TODO rethink operand sizing
-        // We need to manually adjust the size here because even if we loading one byte
-        // the right side is treated as an opaque address and does not participate in
-        // instruction encoding.
-        source_operand.byte_size = descriptor_byte_size(&descriptor_s64);
-
-        push_instruction(
-          &context->builder->code_block.instructions, target_token->source_range,
-          (Instruction) {.assembly = {lea, {temp_value->operand, source_operand, 0}}}
-        );
+        load_address(context, context->builder, &target_token->source_range, &temp_value, array);
 
         plus(
           context->allocator,
@@ -3326,7 +3316,7 @@ token_dispatch_operator(
           &target_token->source_range,
           new_base_register,
           new_base_register,
-          temp_value
+          &temp_value
         );
         register_release(context->builder, temp_register);
       }
@@ -3337,10 +3327,7 @@ token_dispatch_operator(
         .Memory.location = {
           .tag = Memory_Location_Tag_Indirect,
           .Indirect = {
-            .base = {
-              .tag = Memory_Indirect_Operand_Tag_Register,
-              .Register.index = new_base_register->operand.Register.index,
-            },
+            .base_register = new_base_register->operand.Register.index,
           }
         }
       };

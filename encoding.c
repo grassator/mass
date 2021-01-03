@@ -123,8 +123,7 @@ encode_instruction_assembly(
             if (operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate) {
               assert(operand->Memory.location.Indirect.index.Immediate.value == 0);
             }
-            assert(operand->Memory.location.Indirect.base.tag == Memory_Indirect_Operand_Tag_Register);
-            Register base = operand->Memory.location.Indirect.base.Register.index;
+            Register base = operand->Memory.location.Indirect.base_register;
             // [RSP + X] always needs to be encoded as SIB because RSP register index
             // in MOD R/M is occupied by RIP-relative encoding
             if (base == Register_SP) {
@@ -150,7 +149,7 @@ encode_instruction_assembly(
                 rex_byte |= REX_X;
               }
             } else {
-              r_m = operand->Memory.location.Indirect.base.Register.index;
+              r_m = operand->Memory.location.Indirect.base_register;
             }
             displacement = s64_to_s32(operand->Memory.location.Indirect.offset);
             break;

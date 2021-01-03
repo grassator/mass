@@ -233,7 +233,7 @@ typedef struct {
   Label_Index label_index;
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct {
-  Memory_Indirect_Operand base;
+  Register base_register;
   Memory_Indirect_Operand index;
   s64 offset;
 } Memory_Location_Indirect;

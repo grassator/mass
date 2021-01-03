@@ -380,7 +380,7 @@ main(void) {
       { "Label_Index", "label_index" },
     }),
     struct_fields("Indirect", (Struct_Item[]){
-      { "Memory_Indirect_Operand", "base" },
+      { "Register", "base_register" },
       { "Memory_Indirect_Operand", "index" },
       { "s64", "offset" },
     }),

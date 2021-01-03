@@ -514,10 +514,7 @@ stack(
     .Memory.location = {
       .tag = Memory_Location_Tag_Indirect,
       .Indirect = {
-        .base = {
-          .tag = Memory_Indirect_Operand_Tag_Register,
-          .Register.index = Register_SP,
-        },
+        .base_register = Register_SP,
         .offset = offset,
       }
     }
@@ -657,7 +654,7 @@ operand_equal(
         }
         case Memory_Location_Tag_Indirect: {
           return (
-            memory_indirect_operand_equal(&a_location->Indirect.base, &b_location->Indirect.base) &&
+            a_location->Indirect.base_register == b_location->Indirect.base_register &&
             memory_indirect_operand_equal(&a_location->Indirect.index, &b_location->Indirect.index) &&
             a_location->Indirect.offset == b_location->Indirect.offset
           );
