@@ -65,6 +65,7 @@ move_value(
   if (target == source) return;
   if (operand_equal(&target->operand, &source->operand)) return;
 
+  // FIXME remove these after refactoring using move_to_result_from_temp
   if (target->descriptor->tag == Descriptor_Tag_Any) {
     target->descriptor = source->descriptor;
   }
@@ -280,6 +281,27 @@ move_value(
   }
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, source->operand}}});
+}
+
+void
+move_to_result_from_temp(
+  Allocator *allocator,
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Value *target,
+  Value *temp_source
+) {
+  if (target->descriptor->tag == Descriptor_Tag_Any) {
+    target->descriptor = temp_source->descriptor;
+  }
+  if (target->operand.tag == Operand_Tag_Any) {
+    target->operand = temp_source->operand;
+    return;
+  }
+  move_value(allocator, builder, source_range, target, temp_source);
+  if (temp_source->operand.tag == Operand_Tag_Register) {
+    register_release(builder, temp_source->operand.Register.index);
+  }
 }
 
 Function_Builder *
@@ -759,9 +781,8 @@ plus_or_minus(
     (Instruction) {.assembly = {mnemonic, {temp->operand, b->operand}}}
   );
   if (temp != result_value) {
-    move_value(allocator, builder, source_range, result_value, temp);
     assert(temp->operand.tag == Operand_Tag_Register);
-    register_release(builder, temp->operand.Register.index);
+    move_to_result_from_temp(allocator, builder, source_range, result_value, temp);
   }
 }
 
@@ -821,8 +842,7 @@ multiply(
     (Instruction) {.assembly = {imul, {temp_register->operand, y_temp->operand}}}
   );
 
-  move_value(allocator, builder, source_range, result_value, temp_register);
-  register_release(builder, temp_register_index);
+  move_to_result_from_temp(allocator, builder, source_range, result_value, temp_register);
 }
 
 typedef enum {
@@ -908,6 +928,8 @@ divide_or_remainder(
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {divisor->operand, 0, 0}}});
 
 
+  // FIXME division uses specific registers so if the result_value operand is `any`
+  //       we need to create a new temporary value and "return" that
   if (operation == Divide_Operation_Divide) {
     move_value(allocator, builder, source_range, result_value, reg_a);
   } else {
@@ -1024,6 +1046,7 @@ compare(
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {cmp, {reg_r11->operand, temp_b->operand, 0}}});
 
+  // FIXME if the result_value operand is any we should create a temp value
   Value *comparison_value = value_from_compare(allocator, operation);
   move_value(allocator, builder, source_range, result_value, comparison_value);
 }
@@ -1041,7 +1064,9 @@ value_pointer_to(
   assert(value->operand.tag == Operand_Tag_Memory);
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, value->descriptor);
 
-  Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, result_descriptor);
+  Value *temp_register = value_register_for_descriptor(
+    context->allocator, register_acquire_temp(builder), result_descriptor
+  );
   Operand source_operand = value->operand;
 
   // TODO rethink operand sizing
@@ -1050,10 +1075,14 @@ value_pointer_to(
   // instruction encoding.
   source_operand.byte_size = descriptor_byte_size(result_descriptor);
 
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_a->operand, source_operand, 0}}});
+  push_instruction(
+    instructions, *source_range,
+    (Instruction) {.assembly = {lea, {temp_register->operand, source_operand, 0}}}
+  );
 
   Value *result = reserve_stack(context->allocator, builder, result_descriptor);
-  move_value(context->allocator, builder, source_range, result, reg_a);
+  move_value(context->allocator, builder, source_range, result, temp_register);
+  register_release(builder, temp_register->operand.Register.index);
 
   return result;
 }
