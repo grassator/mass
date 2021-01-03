@@ -612,24 +612,6 @@ operand_is_immediate(
 }
 
 static inline bool
-memory_indirect_operand_equal(
-  const Memory_Indirect_Operand *a,
-  const Memory_Indirect_Operand *b
-) {
-  if (a->tag != b->tag) return false;
-  switch(a->tag) {
-    case Memory_Indirect_Operand_Tag_Immediate: {
-      return a->Immediate.value == b->Immediate.value;
-    }
-    case Memory_Indirect_Operand_Tag_Register: {
-      return a->Register.index == b->Register.index;
-    }
-  }
-  panic("Unexpected Memory_Indirect_Operand_Tag");
-  return false;
-}
-
-static inline bool
 operand_equal(
   const Operand *a,
   const Operand *b
@@ -655,7 +637,8 @@ operand_equal(
         case Memory_Location_Tag_Indirect: {
           return (
             a_location->Indirect.base_register == b_location->Indirect.base_register &&
-            memory_indirect_operand_equal(&a_location->Indirect.index, &b_location->Indirect.index) &&
+            a_location->Indirect.maybe_index_register.has_value == b_location->Indirect.maybe_index_register.has_value &&
+            a_location->Indirect.maybe_index_register.index == b_location->Indirect.maybe_index_register.index &&
             a_location->Indirect.offset == b_location->Indirect.offset
           );
           break;

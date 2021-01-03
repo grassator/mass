@@ -30,9 +30,9 @@ typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
 typedef enum Compare_Type Compare_Type;
 
-typedef struct Memory_Indirect_Operand Memory_Indirect_Operand;
-typedef dyn_array_type(Memory_Indirect_Operand *) Array_Memory_Indirect_Operand_Ptr;
-typedef dyn_array_type(const Memory_Indirect_Operand *) Array_Const_Memory_Indirect_Operand_Ptr;
+typedef struct Maybe_Register Maybe_Register;
+typedef dyn_array_type(Maybe_Register *) Array_Maybe_Register_Ptr;
+typedef dyn_array_type(const Maybe_Register *) Array_Const_Maybe_Register_Ptr;
 
 typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
@@ -205,25 +205,12 @@ typedef enum Compare_Type {
   Compare_Type_Signed_Greater_Equal = 10,
 } Compare_Type;
 
-typedef enum {
-  Memory_Indirect_Operand_Tag_Immediate = 0,
-  Memory_Indirect_Operand_Tag_Register = 1,
-} Memory_Indirect_Operand_Tag;
-
-typedef struct {
-  s64 value;
-} Memory_Indirect_Operand_Immediate;
-typedef struct {
+typedef struct Maybe_Register {
   Register index;
-} Memory_Indirect_Operand_Register;
-typedef struct Memory_Indirect_Operand {
-  Memory_Indirect_Operand_Tag tag;
-  union {
-    Memory_Indirect_Operand_Immediate Immediate;
-    Memory_Indirect_Operand_Register Register;
-  };
-} Memory_Indirect_Operand;
-typedef dyn_array_type(Memory_Indirect_Operand) Array_Memory_Indirect_Operand;
+  bool has_value;
+} Maybe_Register;
+typedef dyn_array_type(Maybe_Register) Array_Maybe_Register;
+
 typedef enum {
   Memory_Location_Tag_Instruction_Pointer_Relative = 0,
   Memory_Location_Tag_Indirect = 1,
@@ -234,7 +221,7 @@ typedef struct {
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct {
   Register base_register;
-  Memory_Indirect_Operand index;
+  Maybe_Register maybe_index_register;
   s64 offset;
 } Memory_Location_Indirect;
 typedef struct Memory_Location {

@@ -3251,10 +3251,7 @@ token_dispatch_operator(
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory);
     assert(array->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-    assert(
-      array->operand.Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate &&
-      array->operand.Memory.location.Indirect.index.Immediate.value == 0
-    );
+    assert(!array->operand.Memory.location.Indirect.maybe_index_register.has_value);
 
     Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
     u32 item_byte_size = descriptor_byte_size(item_descriptor);

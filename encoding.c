@@ -118,11 +118,8 @@ encode_instruction_assembly(
             //    be represented with SIB scale. In cases of extreme register pressure this
             //    can cause spilling. To avoid that we could try to use temporary shifts
             //    to adjust the offset between different indexes, but it is not implemented ATM.
-            enum { SIB_Scale_1 = 0b00, };
+            enum { SIB_Scale_1 = 0b00, SIB_Scale_2 = 0b01, SIB_Scale_4 = 0b10, SIB_Scale_8 = 0b11,};
             u8 sib_scale_bits = SIB_Scale_1;
-            if (operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Immediate) {
-              assert(operand->Memory.location.Indirect.index.Immediate.value == 0);
-            }
             Register base = operand->Memory.location.Indirect.base_register;
             // [RSP + X] always needs to be encoded as SIB because RSP register index
             // in MOD R/M is occupied by RIP-relative encoding
@@ -134,12 +131,10 @@ encode_instruction_assembly(
                 ((Register_SP & 0b111) << 3) |
                 ((Register_SP & 0b111) << 0)
               );
-            } else if (
-              operand->Memory.location.Indirect.index.tag == Memory_Indirect_Operand_Tag_Register
-            ) {
+            } else if (operand->Memory.location.Indirect.maybe_index_register.has_value) {
               needs_sib = true;
               r_m = 0b0100; // SIB
-              Register sib_index = operand->Memory.location.Indirect.index.Register.index;
+              Register sib_index = operand->Memory.location.Indirect.maybe_index_register.index;
               sib_byte = (
                 ((sib_scale_bits & 0b11) << 6) |
                 ((sib_index & 0b111) << 3) |

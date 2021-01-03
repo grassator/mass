@@ -366,13 +366,9 @@ main(void) {
     { "Signed_Greater_Equal", 10 },
   }));
 
-  push_type(type_union("Memory_Indirect_Operand", (Struct[]){
-    struct_fields("Immediate", (Struct_Item[]){
-      { "s64", "value" },
-    }),
-    struct_fields("Register", (Struct_Item[]){
-      { "Register", "index" },
-    }),
+  push_type(type_struct("Maybe_Register", (Struct_Item[]){
+    { "Register", "index" },
+    { "bool", "has_value" },
   }));
 
   push_type(type_union("Memory_Location", (Struct[]){
@@ -381,7 +377,7 @@ main(void) {
     }),
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },
-      { "Memory_Indirect_Operand", "index" },
+      { "Maybe_Register", "maybe_index_register" },
       { "s64", "offset" },
     }),
   }));
