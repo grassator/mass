@@ -32,7 +32,13 @@ Register
 register_acquire_temp(
   Function_Builder *builder
 ) {
-  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+  // FIXME We are skipping Register_A here as it is hardcoded in quite a few places still
+  static const Register temp_registers[] = {
+    Register_C, Register_B, Register_D, Register_R8, Register_R9, Register_R10,
+    Register_R11, Register_R12,  Register_R13, Register_R14,  Register_R15,
+  };
+  for (u32 i = 0; i < countof(temp_registers); ++i) {
+    Register reg_index = temp_registers[i];
     if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
       register_acquire(builder, reg_index);
       return reg_index;
