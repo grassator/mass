@@ -691,17 +691,15 @@ plus_or_minus(
   );
   assert(is_pointer_arithmetic || both_operands_are_integers);
 
-  if (operand_is_immediate(&a->operand) && operand_is_immediate(&b->operand)) {
-    s64 a_s64 = operand_immediate_value_up_to_s64(&a->operand);
-    s64 b_s64 = operand_immediate_value_up_to_s64(&b->operand);
-    s64 folded = 0;
-    switch(operation) {
-      case Arithmetic_Operation_Plus: folded = a_s64 + b_s64; break;
-      case Arithmetic_Operation_Minus: folded = a_s64 - b_s64; break;
+  switch(operation) {
+    case Arithmetic_Operation_Plus: {
+      maybe_constant_fold(builder, source_range, result_value, a, b, +);
+      break;
     }
-    Value *folded_value = value_from_signed_immediate(allocator, folded);
-    move_value(allocator, builder, source_range, result_value, folded_value);
-    return;
+    case Arithmetic_Operation_Minus: {
+      maybe_constant_fold(builder, source_range, result_value, a, b, -);
+      break;
+    }
   }
 
   u32 a_size = descriptor_byte_size(a->descriptor);
