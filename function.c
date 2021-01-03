@@ -99,8 +99,8 @@ move_value(
       }
       return;
     } else {
-      assert(operand_is_memory(&target->operand));
-      assert(operand_is_memory(&source->operand));
+      assert(target->operand.tag == Operand_Tag_Memory);
+      assert(source->operand.tag == Operand_Tag_Memory);
       // Using xmm4 as it is volatile and not used in function arguments
       Value *reg_xmm4 = value_register_for_descriptor(allocator, Register_Xmm4, target->descriptor);
       move_value(allocator, builder, source_range, reg_xmm4, source);
@@ -251,7 +251,7 @@ move_value(
     }
   }
 
-  if (operand_is_memory(&target->operand) && operand_is_memory(&source->operand)) {
+  if (target->operand.tag == Operand_Tag_Memory && source->operand.tag == Operand_Tag_Memory) {
     if (target_size >= 16) {
       // TODO probably can use larger chunks for copying but need to check alignment
       Value *temp_rsi = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s64);
