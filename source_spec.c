@@ -386,6 +386,15 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to parse and run a function with 5 arguments") {
+      test_program_inline_source(
+        "foo :: (x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }",
+        foo
+      );
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(test_context.program, foo);
+      check(checker(1, 2, 3, 4, 5) == 5);
+    }
+
     it("should correctly save volatile registers when calling other functions") {
       test_program_inline_source(
         "inner :: (x : s64) -> () { x = 21 };"

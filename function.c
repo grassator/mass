@@ -1,5 +1,17 @@
 #include "function.h"
 
+// :StackDisplacementEncoding
+// There are three types of values that can be present on the stack in the current setup
+// 1) Parameters to the current function. In Win32 ABI that is every parameter past 4th.
+//    these values are temporarily stored in the Operand as positive integers with values
+//    larger than max_call_parameters_stack_size. Offsets of these are adjusted in
+//    fn_adjust_stack_displacement.
+// 2) Temporary values that are used for stack arguments for function to other functions for
+//    the same cases as above.
+// 3) Locals. They need to physically located in memory after the 2), but untill we know
+//    all the function calls within the body we do not know the max_call_parameters_stack_size
+//    so during initial encoding they are stored as negative numbers and then adjusted in
+//    fn_adjust_stack_displacement.
 Value *
 reserve_stack(
   Allocator *allocator,
@@ -404,6 +416,7 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
   dyn_array_pop(builder->code_block.instructions);
 }
 
+// :StackDisplacementEncoding
 s64
 fn_adjust_stack_displacement(
   const Function_Builder *builder,
@@ -414,6 +427,7 @@ fn_adjust_stack_displacement(
     displacement += builder->layout.stack_reserve;
   } else
   // Positive values larger than max_call_parameters_stack_size
+  // are for arguments to this function on the stack
   if (displacement >= u32_to_s64(builder->max_call_parameters_stack_size)) {
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
