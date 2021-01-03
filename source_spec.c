@@ -156,7 +156,7 @@ spec("source") {
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0xCAFE")));
       check(token->Value.value->descriptor == &descriptor_u16);
-      check(operand_is_immediate(&token->Value.value->operand));
+      check(token->Value.value->operand.tag == Operand_Tag_Immediate);
       u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
       check(bits == 0xCAFE, "Expected 0xCAFE, got 0x%" PRIx64, bits);
     }
@@ -172,7 +172,7 @@ spec("source") {
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0b100")));
       check(token->Value.value->descriptor == &descriptor_u8);
-      check(operand_is_immediate(&token->Value.value->operand));
+      check(token->Value.value->operand.tag == Operand_Tag_Immediate);
       u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
       check(bits == 0b100, "Expected 0x8, got 0x%" PRIx64, bits);
     }

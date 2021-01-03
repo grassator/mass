@@ -173,7 +173,7 @@ move_value(
     return;
   }
 
-  if (operand_is_immediate(&source->operand)) {
+  if (source->operand.tag == Operand_Tag_Immediate) {
     s64 immediate = operand_immediate_value_up_to_s64(&source->operand);
     if (immediate == 0 && target->operand.tag == Operand_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
@@ -591,7 +591,7 @@ make_if(
   Program *program = context->program;
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->code_section);
-  if(operand_is_immediate(&value->operand)) {
+  if(value->operand.tag == Operand_Tag_Immediate) {
     s64 imm = operand_immediate_value_up_to_s64(&value->operand);
     if (imm == 0) return label;
     is_always_true = true;
@@ -688,7 +688,7 @@ typedef enum {
   do {\
     Operand *a_operand = &(_a_)->operand;\
     Operand *b_operand = &(_b_)->operand;\
-    if (operand_is_immediate(a_operand) && operand_is_immediate(b_operand)) {\
+    if (a_operand->tag == Operand_Tag_Immediate && b_operand->tag == Operand_Tag_Immediate) {\
       s64 a_s64 = operand_immediate_value_up_to_s64(a_operand);\
       s64 b_s64 = operand_immediate_value_up_to_s64(b_operand);\
       move_value(\
@@ -871,24 +871,15 @@ divide_or_remainder(
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
   assert(descriptor_is_integer(a->descriptor));
 
-  if (operand_is_immediate(&a->operand) && operand_is_immediate(&a->operand)) {
-    s64 divident = operand_immediate_value_up_to_s64(&a->operand);
-    s64 divisor = operand_immediate_value_up_to_s64(&b->operand);
-    assert(divisor != 0);
-    s64 folded = 0;
-    switch(operation) {
-      case Divide_Operation_Divide: {
-        folded = divident / divisor;
-        break;
-      }
-      case Divide_Operation_Remainder: {
-        folded = divident % divisor;
-        break;
-      }
+  switch(operation) {
+    case Divide_Operation_Divide: {
+      maybe_constant_fold(builder, source_range, result_value, a, b, /);
+      break;
     }
-    Value *folded_value = value_from_signed_immediate(allocator, folded);
-    move_value(allocator, builder, source_range, result_value, folded_value);
-    return;
+    case Divide_Operation_Remainder: {
+      maybe_constant_fold(builder, source_range, result_value, a, b, %);
+      break;
+    }
   }
 
   // Save RDX as it will be used for the remainder
@@ -1204,7 +1195,7 @@ calculate_arguments_match_score(
     Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
     if (same_value_type(target_arg, source_arg)) {
       if (
-        operand_is_immediate(&target_arg->operand) &&
+        target_arg->operand.tag == Operand_Tag_Immediate &&
         operand_equal(&target_arg->operand, &source_arg->operand)
       ) {
         score += Score_Exact_Literal;

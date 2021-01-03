@@ -400,7 +400,7 @@ encode_instruction(
         continue;
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
-        if (operand_is_immediate(operand)) {
+        if (operand->tag == Operand_Tag_Immediate) {
           assert(encoding_size == operand->byte_size);
           continue;
         } else if (operand_is_label(operand)) {

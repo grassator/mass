@@ -29,7 +29,7 @@ token_clone_deep(
       break;
     }
     case Token_Tag_Value: {
-      if (!operand_is_immediate(&token->Value.value->operand)) {
+      if (token->Value.value->operand.tag != Operand_Tag_Immediate) {
         panic("Only immediate operand values are safe to clone");
       }
       if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
@@ -1134,7 +1134,7 @@ token_apply_macro_replacements(
         break;
       }
       case Token_Tag_Value: {
-        if (!operand_is_immediate(&token->Value.value->operand)) {
+        if (token->Value.value->operand.tag != Operand_Tag_Immediate) {
           panic("Only immediate operand values are safe to clone inside a macro");
         }
         if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
@@ -1696,7 +1696,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  assert(operand_is_immediate(&precedence_value->operand));
+  assert(precedence_value->operand.tag == Operand_Tag_Immediate);
 
   u64 precendence = operand_immediate_value_up_to_u64(&precedence_value->operand);
   (void)precendence;
@@ -2026,7 +2026,7 @@ token_process_bit_type_definition(
     // TODO err
     goto err;
   }
-  if (!operand_is_immediate(&bit_size_value->operand)) {
+  if (bit_size_value->operand.tag != Operand_Tag_Immediate) {
     // TODO err
     goto err;
   }
@@ -2535,7 +2535,7 @@ token_handle_cast(
   if (cast_to_byte_size != original_byte_size) {
     result = allocator_allocate(context->allocator, Value);
 
-    if (operand_is_immediate(&value->operand)) {
+    if (value->operand.tag == Operand_Tag_Immediate) {
       if (descriptor_is_signed_integer(cast_to_descriptor)) {
         s64 integer = operand_immediate_value_up_to_s64(&value->operand);
         switch(cast_to_byte_size) {
@@ -2637,7 +2637,7 @@ token_handle_negation(
   const Token *token = token_view_get(args, 0);
 
   Value *value = token_force_constant_value(context, token);
-  if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
+  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
     switch(value->operand.byte_size) {
       case 1: {
         value->operand = imm8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
@@ -3262,7 +3262,7 @@ token_dispatch_operator(
       .operand = array->operand
     };
     result->operand.byte_size = item_byte_size;
-    if (operand_is_immediate(&index_value->operand)) {
+    if (index_value->operand.tag == Operand_Tag_Immediate) {
       s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
       result->operand.Memory.location.Indirect.offset = index * item_byte_size;
     } else {
@@ -3952,7 +3952,7 @@ token_match_fixed_array_type(
     );
     return 0;
   }
-  if (!operand_is_immediate(&size_value->operand)) {
+  if (size_value->operand.tag != Operand_Tag_Immediate) {
     context_error_snprintf(
       context, square_brace->source_range,
       "Fixed size array size must be known at compile time"
@@ -4023,7 +4023,7 @@ token_parse_inline_machine_code_bytes(
         );
         goto err;
       }
-      if (!operand_is_immediate(&value->operand)) {
+      if (value->operand.tag != Operand_Tag_Immediate) {
         context_error_snprintf(
           context, args_token->source_range,
           "inline_machine_code_bytes expects arguments to be compile-time known"
@@ -4120,11 +4120,11 @@ token_parse_definition_and_assignment_statements(
   token_parse_expression(context, rhs, value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (descriptor_is_integer(value->descriptor) && operand_is_immediate(&value->operand)) {
+  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
     value = value_from_s64(context->allocator, operand_immediate_value_up_to_s64(&value->operand));
   } else if (
     value->descriptor->tag == Descriptor_Tag_Opaque &&
-    operand_is_immediate(&value->operand)
+    value->operand.tag == Operand_Tag_Immediate
   ) {
     panic("TODO decide how to handle opaque types");
   }

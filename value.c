@@ -605,13 +605,6 @@ operand_is_register_or_memory(
 }
 
 static inline bool
-operand_is_immediate(
-  const Operand *operand
-) {
-  return operand->tag == Operand_Tag_Immediate;
-}
-
-static inline bool
 operand_equal(
   const Operand *a,
   const Operand *b
@@ -1669,7 +1662,7 @@ same_value_type_or_can_implicitly_move_cast(
   if (
     target->descriptor->tag == Descriptor_Tag_Pointer &&
     descriptor_is_integer(source->descriptor) &&
-    operand_is_immediate(&source->operand) &&
+    source->operand.tag == Operand_Tag_Immediate &&
     operand_immediate_value_up_to_s64(&source->operand) == 0
   ) {
     return true;
@@ -1680,7 +1673,7 @@ same_value_type_or_can_implicitly_move_cast(
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
       return true;
     }
-    if (operand_is_immediate(&source->operand)) {
+    if (source->operand.tag == Operand_Tag_Immediate) {
 
       #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_TYPE_, _TARGET_TYPE_)\
         if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
