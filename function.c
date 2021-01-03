@@ -806,22 +806,23 @@ multiply(
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
-  // TODO make the move only for imm value
   Value *y_temp = reserve_stack(allocator, builder, y->descriptor);
 
-  Value *reg_a = value_register_for_descriptor(allocator, Register_A, y->descriptor);
-  move_value(allocator, builder, source_range, reg_a, y);
-  move_value(allocator, builder, source_range, y_temp, reg_a);
+  Register temp_register_index = register_acquire_temp(builder);
+  Value *temp_register = value_register_for_descriptor(allocator, temp_register_index, y->descriptor);
+  move_value(allocator, builder, source_range, temp_register, y);
+  move_value(allocator, builder, source_range, y_temp, temp_register);
 
-  reg_a = value_register_for_descriptor(allocator, Register_A, x->descriptor);
-  move_value(allocator, builder, source_range, reg_a, x);
+  temp_register = value_register_for_descriptor(allocator, temp_register_index, x->descriptor);
+  move_value(allocator, builder, source_range, temp_register, x);
 
   push_instruction(
     instructions, *source_range,
-    (Instruction) {.assembly = {imul, {reg_a->operand, y_temp->operand}}}
+    (Instruction) {.assembly = {imul, {temp_register->operand, y_temp->operand}}}
   );
 
-  move_value(allocator, builder, source_range, result_value, reg_a);
+  move_value(allocator, builder, source_range, result_value, temp_register);
+  register_release(builder, temp_register_index);
 }
 
 typedef enum {
