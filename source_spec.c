@@ -60,7 +60,10 @@ spec_check_mass_result(
   check(spec_check_mass_result(&result));\
   result = token_parse(&test_context, token_view_from_token_array(tokens));\
   Value *_fn_value_id_ = scope_lookup_force(\
-    &test_context, test_context.program->global_scope, slice_literal(#_fn_value_id_)\
+    &test_context,\
+    test_context.program->global_scope,\
+    slice_literal(#_fn_value_id_),\
+    Scope_Entry_Flags_None\
   );\
   (void)_fn_value_id_
 
@@ -88,8 +91,12 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_from_s64(test_context.allocator, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define_value(root_scope, slice_literal("test"), test);
-      Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
+      scope_define(root_scope, slice_literal("test"), (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_None,
+        .value = test,
+      });
+      Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"), Scope_Entry_Flags_None);
       check(entry->type == Scope_Entry_Type_Value);
       check(entry->value == test);
     }
@@ -97,19 +104,54 @@ spec("source") {
     it("should be able to lookup things from parent scopes") {
       Value *global = value_from_s64(test_context.allocator, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define_value(root_scope, slice_literal("global"), global);
+      scope_define(root_scope, slice_literal("global"), (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_None,
+        .value = global,
+      });
 
       Value *level_1_test = value_from_s64(test_context.allocator, 1);
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
-      scope_define_value(scope_level_1, slice_literal("test"), level_1_test);
+      scope_define(scope_level_1, slice_literal("test"), (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_None,
+        .value = level_1_test,
+      });
 
       Value *level_2_test = value_from_s64(test_context.allocator, 1);
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
-      scope_define_value(scope_level_2, slice_literal("test"), level_2_test);
+      scope_define(scope_level_2, slice_literal("test"),  (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_None,
+        .value = level_2_test,
+      });
 
-      Scope_Entry *entry = scope_lookup(root_scope, slice_literal("global"));
+      Scope_Entry *entry =
+        scope_lookup(scope_level_2, slice_literal("global"), Scope_Entry_Flags_None);
       check(entry->type == Scope_Entry_Type_Value);
       check(entry->value == global);
+    }
+
+    it("should limit lookup to provided flag mask") {
+      Value *has_flags = value_from_s64(test_context.allocator, 42);
+      Scope *root_scope = scope_make(test_context.allocator, 0);
+      scope_define(root_scope, slice_literal("foo"), (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_Static,
+        .value = has_flags,
+      });
+
+      Value *no_flags = value_from_s64(test_context.allocator, 1);
+      Scope *nested = scope_make(test_context.allocator, root_scope);
+      scope_define(nested, slice_literal("foo"), (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .flags = Scope_Entry_Flags_None,
+        .value = no_flags,
+      });
+
+      Scope_Entry *entry = scope_lookup(nested, slice_literal("foo"), Scope_Entry_Flags_Static);
+      check(entry->type == Scope_Entry_Type_Value);
+      check(entry->value == has_flags);
     }
   }
 
@@ -359,7 +401,7 @@ spec("source") {
         program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
       check(result.tag == Mass_Result_Tag_Success);
       Value *main =
-        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
+        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), Scope_Entry_Flags_None);
       check(main);
 
       program_jit(&test_context);
@@ -467,9 +509,9 @@ spec("source") {
       }
 
       Value *checker_s64 =
-        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"));
+        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s64"), Scope_Entry_Flags_None);
       Value *checker_32 =
-        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"));
+        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"), Scope_Entry_Flags_None);
 
       program_jit(&test_context);
 
@@ -582,7 +624,7 @@ spec("source") {
       Mass_Result result =
         program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
       check(result.tag == Mass_Result_Tag_Success);
-      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
+      scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), Scope_Entry_Flags_None);
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("Could not find type s33"), error->message));
@@ -868,6 +910,18 @@ spec("source") {
         error->message
       ));
     }
+
+    it("should be able to parse and run macro id function") {
+      test_program_inline_source(
+        "FOO :: 42\n"
+        "id :: macro (x : s64) -> (s64) { x }\n"
+        "BAR :: id(FOO)\n"
+        "test :: () -> (s64) { BAR }",
+        test
+      );
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(test_context.program, test);
+      check(checker() == 42);
+    }
   }
 
   describe("if / else") {
@@ -1020,7 +1074,7 @@ spec("source") {
       );
 
       Value *status = scope_lookup_force(
-        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
+        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), Scope_Entry_Flags_None
       );
       check(status);
       check(descriptor_is_integer(status->descriptor));
@@ -1037,13 +1091,26 @@ spec("source") {
       );
 
       Value *status = scope_lookup_force(
-        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
+        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), Scope_Entry_Flags_None
       );
       check(status);
       check(descriptor_is_integer(status->descriptor));
       check(status->operand.tag == Operand_Tag_Immediate);
       check(status->operand.byte_size == 1);
       check(operand_immediate_memory_as_s8(&status->operand) == 42);
+    }
+
+    it("should not be able to use runtime values in a static context") {
+      test_program_inline_source_base(
+        "test :: () -> (s64) { foo := 42; @( foo ) }",
+        test
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(
+        slice_literal("Undefined variable foo"),
+        error->message
+      ));
     }
   }
 
@@ -1107,7 +1174,7 @@ spec("source") {
       }
 
       test_context.program->entry_point =
-        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
+        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), Scope_Entry_Flags_None);
       check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
 
@@ -1117,7 +1184,7 @@ spec("source") {
     it("should parse and write an executable that prints Hello, world!") {
       program_import_file(&test_context, slice_literal("fixtures\\hello_world"));
       test_context.program->entry_point =
-        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
+        scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"), Scope_Entry_Flags_None);
       check(test_context.program->entry_point);
       check(test_context.program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
@@ -1134,7 +1201,7 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
 
       Value *fizz_buzz = scope_lookup_force(
-        &test_context, test_context.program->global_scope, slice_literal("fizz_buzz")
+        &test_context, test_context.program->global_scope, slice_literal("fizz_buzz"), Scope_Entry_Flags_None
       );
       check(fizz_buzz);
 

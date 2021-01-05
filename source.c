@@ -162,14 +162,23 @@ scope_print_names(
   printf("\n");
 }
 
+static inline bool
+scope_entry_matches_flag_mask(
+  Scope_Entry *entry,
+  Scope_Entry_Flags flag_mask
+) {
+  return (entry->flags & flag_mask) == flag_mask;
+}
+
 Scope_Entry *
 scope_lookup(
   Scope *scope,
-  Slice name
+  Slice name,
+  Scope_Entry_Flags flag_mask
 ) {
   while (scope) {
     Scope_Entry *result = hash_map_get(scope->map, name);
-    if (result) return result;
+    if (result && scope_entry_matches_flag_mask(result, flag_mask)) return result;
     scope = scope->parent;
   }
   return 0;
@@ -242,6 +251,7 @@ scope_entry_force(
       //       by switching to a tree instead of hash map, or do something else here.
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
+        .flags = entry->flags,
         .value = result,
         .next_overload = entry->next_overload,
       };
@@ -259,12 +269,14 @@ Value *
 scope_lookup_force(
   Compilation_Context *context,
   Scope *scope,
-  Slice name
+  Slice name,
+  Scope_Entry_Flags flag_mask
 ) {
+  flag_mask |= context->scope_entry_lookup_flags;
   Scope_Entry *entry = 0;
   while (scope) {
     entry = hash_map_get(scope->map, name);
-    if (entry) break;
+    if (entry && scope_entry_matches_flag_mask(entry, flag_mask)) break;
     scope = scope->parent;
   }
   if (!entry) {
@@ -312,6 +324,7 @@ scope_lookup_force(
           : function->returns;
         {
           Compilation_Context body_context = *context;
+          body_context.scope_entry_lookup_flags = Scope_Entry_Flags_None;
           body_context.scope = function->scope;
           body_context.builder = function->builder;
           token_parse_block(&body_context, body, return_result_value);
@@ -340,7 +353,7 @@ scope_lookup_force(
       parent = parent->parent;
       if (!parent) break;
       if (!hash_map_has(parent->map, name)) continue;
-      Value *overload = scope_lookup_force(context, parent, name);
+      Value *overload = scope_lookup_force(context, parent, name, flag_mask);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
       if (overload->descriptor->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
@@ -372,18 +385,6 @@ scope_define(
     *allocated = entry;
     it->next_overload = allocated;
   }
-}
-
-void
-scope_define_value(
-  Scope *scope,
-  Slice name,
-  Value *value
-) {
-  scope_define(scope, name, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = value,
-  });
 }
 
 bool
@@ -929,12 +930,21 @@ scope_lookup_type(
   Slice type_name
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  Scope_Entry *scope_entry = scope_lookup(scope, type_name);
+  Scope_Entry *scope_entry = scope_lookup(scope, type_name, Scope_Entry_Flags_Static);
   if (!scope_entry) {
-    context_error_snprintf(
-      context, source_range, "Could not find type %"PRIslice,
-      SLICE_EXPAND_PRINTF(type_name)
-    );
+    Scope_Entry *runtime_entry = scope_lookup(scope, type_name, Scope_Entry_Flags_None);
+    if (runtime_entry) {
+      context_error_snprintf(
+        context, source_range, "Could not find type %"PRIslice"."
+        "There is a runtime value with the same name, but only static values can be used as types.",
+        SLICE_EXPAND_PRINTF(type_name)
+      );
+    } else {
+      context_error_snprintf(
+        context, source_range, "Could not find type %"PRIslice,
+        SLICE_EXPAND_PRINTF(type_name)
+      );
+    }
     return 0;
   }
   Value *value = scope_entry_force(context, scope_entry);
@@ -1374,6 +1384,7 @@ token_match_return_type(
   return arg;
 }
 
+// TODO rename to static_value
 Value *
 token_force_constant_value(
   Compilation_Context *context,
@@ -1394,7 +1405,7 @@ token_force_constant_value(
     }
     case Token_Tag_Id: {
       Slice name = token->source;
-      Scope_Entry *scope_entry = scope_lookup(context->scope, name);
+      Scope_Entry *scope_entry = scope_lookup(context->scope, name, Scope_Entry_Flags_Static);
       if (!scope_entry) {
         context_error_snprintf(
           context, token->source_range,
@@ -1450,7 +1461,7 @@ token_force_value(
     }
     case Token_Tag_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(context, scope, name);
+      Value *value = scope_lookup_force(context, scope, name, Scope_Entry_Flags_None);
       if (!value) {
         MASS_TRY(*context->result);
         context_error_snprintf(
@@ -1612,7 +1623,11 @@ token_handle_user_defined_operator(
     Slice arg_name = operator->argument_names[i];
     Value *arg_value = value_any(context->allocator);
     token_force_value(context, token_view_get(args, i), arg_value);
-    scope_define_value(body_scope, arg_name, arg_value);
+    scope_define(body_scope, arg_name, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = arg_value,
+    });
   }
 
   Value *result_value = value_any(context->allocator);
@@ -1622,11 +1637,19 @@ token_handle_user_defined_operator(
   Label_Index fake_return_label_index =
     make_label(context->program, &context->program->data_section);
   {
-    scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
-      .descriptor = &descriptor_void,
-      .operand = code_label32(fake_return_label_index),
+    scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = &(Value) {
+        .descriptor = &descriptor_void,
+        .operand = code_label32(fake_return_label_index),
+      },
     });
-    scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
+    scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = result_value,
+    });
   }
 
   Token *body = token_clone_deep(context->allocator, operator->body);
@@ -1779,7 +1802,8 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Scope_Entry *existing_scope_entry = scope_lookup(context->scope, operator_token->source);
+  Scope_Entry *existing_scope_entry =
+    scope_lookup(context->scope, operator_token->source, Scope_Entry_Flags_Static);
   while (existing_scope_entry) {
     if (existing_scope_entry->type != Scope_Entry_Type_Operator) {
       panic("Internal Error: Found an operator-like scope entry that is not an operator");
@@ -1808,6 +1832,7 @@ token_parse_operator_definition(
 
   scope_define(context->scope, operator_token->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = {
       .precedence = precendence,
       .argument_count = operator->argument_count,
@@ -2232,7 +2257,11 @@ token_process_function_literal(
       .descriptor = &descriptor_void,
       .operand = code_label32(builder->code_block.end_label),
     };
-    scope_define_value(function_scope, MASS_RETURN_LABEL_NAME, return_label_value);
+    scope_define(function_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = return_label_value,
+    });
   }
 
   if (dyn_array_length(return_types->Group.children) == 0) {
@@ -2252,18 +2281,27 @@ token_process_function_literal(
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
 
       Compilation_Context arg_context = *context;
+      arg_context.scope_entry_lookup_flags = Scope_Entry_Flags_None;
       arg_context.scope = function_scope;
       arg_context.builder = builder;
       Token_Match_Arg arg = token_match_return_type(&arg_context, arg_view, &descriptor->Function);
 
       // Return values can be named
       if (arg.name.length) {
-        scope_define_value(function_scope, arg.name, descriptor->Function.returns);
+        scope_define(function_scope, arg.name, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          .flags = Scope_Entry_Flags_None,
+          .value = descriptor->Function.returns,
+        });
       }
     }
   }
 
-  scope_define_value(function_scope, MASS_RETURN_VALUE_NAME, descriptor->Function.returns);
+  scope_define(function_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_None,
+    .value = descriptor->Function.returns,
+  });
 
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_token_array(args->Group.children);
@@ -2272,6 +2310,7 @@ token_process_function_literal(
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
+      arg_context.scope_entry_lookup_flags = Scope_Entry_Flags_None;
       arg_context.scope = function_scope;
       arg_context.builder = builder;
       Token_Match_Arg arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
@@ -2279,7 +2318,11 @@ token_process_function_literal(
 
       // Literal values do not have a name ATM
       if (arg.name.length) {
-        scope_define_value(function_scope, arg.name, arg.value);
+        scope_define(function_scope, arg.name, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          .flags = Scope_Entry_Flags_None,
+          .value = arg.value,
+        });
       }
       dyn_array_push(descriptor->Function.argument_names, arg.name);
       dyn_array_push(descriptor->Function.arguments, arg.value);
@@ -2340,7 +2383,8 @@ compile_time_eval(
   };
 
   Compilation_Context eval_context = *context;
-  eval_context.scope = eval_program.global_scope;
+  eval_context.scope_entry_lookup_flags = Scope_Entry_Flags_Static;
+  eval_context.scope = scope_make(context->allocator, context->scope);
   eval_context.program = &eval_program;
   eval_context.builder = fn_begin(&eval_context);
   function_return_descriptor(
@@ -2352,6 +2396,10 @@ compile_time_eval(
   //       Ideally there would be a type-only eval available instead
   Value *expression_result_value = value_any(context->allocator);
   token_parse_expression(&eval_context, view, expression_result_value);
+  MASS_ON_ERROR(*eval_context.result) {
+    context->result = eval_context.result;
+    return 0;
+  }
 
   u32 result_byte_size = expression_result_value->operand.byte_size;
   // Need to ensure 16-byte alignment here because result value might be __m128
@@ -2789,7 +2837,7 @@ token_handle_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
+  Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator, Scope_Entry_Flags_Static);
 
   if (!scope_entry) {
     context_error_snprintf(
@@ -2893,7 +2941,8 @@ token_parse_constant_expression(
         break;
       }
       case Token_Tag_Id: {
-        Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
+        Scope_Entry *scope_entry =
+          scope_lookup(context->scope, token->source, Scope_Entry_Flags_Static);
         if (scope_entry && scope_entry->type == Scope_Entry_Type_Operator) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
@@ -2962,6 +3011,7 @@ token_parse_constant_definitions(
   if (name->tag != Token_Tag_Id) return false;
   scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Lazy_Expression,
+    .flags = Scope_Entry_Flags_Static,
     .lazy_expression = {
       .tokens = rhs,
       .scope = context->scope,
@@ -3017,6 +3067,7 @@ token_maybe_macro_call_with_lazy_arguments(
     Token_View arg_expr = token_split_next(&it, &token_pattern_comma_operator);
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .type = Scope_Entry_Type_Lazy_Expression,
+      .flags = Scope_Entry_Flags_Static,
       .lazy_expression = {
         .tokens = arg_expr,
         .scope = context->scope,
@@ -3030,12 +3081,20 @@ token_maybe_macro_call_with_lazy_arguments(
   Label_Index fake_return_label_index =
     make_label(context->program, &context->program->data_section);
   {
-    scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
-      .descriptor = &descriptor_void,
-      .operand = code_label32(fake_return_label_index),
+    scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = &(Value) {
+        .descriptor = &descriptor_void,
+        .operand = code_label32(fake_return_label_index),
+      },
     });
     assert(result_value);
-    scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, result_value);
+    scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = result_value,
+    });
   }
 
   Token *body = token_clone_deep(context->allocator, function->body);
@@ -3155,7 +3214,12 @@ token_handle_function_call(
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Slice arg_name = *dyn_array_get(function->argument_names, i);
         Value *arg_value = *dyn_array_get(args, i);
-        scope_define_value(body_scope, arg_name, arg_value);
+        scope_define(body_scope, arg_name, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          // FIXME Think if this is correct
+          .flags = context->scope_entry_lookup_flags,
+          .value = arg_value,
+        });
       }
       return_value = result_value;
 
@@ -3164,12 +3228,20 @@ token_handle_function_call(
       Label_Index fake_return_label_index =
         make_label(context->program, &context->program->data_section);
       {
-        scope_define_value (body_scope, MASS_RETURN_LABEL_NAME, &(Value) {
-          .descriptor = &descriptor_void,
-          .operand = code_label32(fake_return_label_index),
+        scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          .flags = Scope_Entry_Flags_None,
+          .value = &(Value) {
+            .descriptor = &descriptor_void,
+            .operand = code_label32(fake_return_label_index),
+          },
         });
         assert(return_value);
-        scope_define_value(body_scope, MASS_RETURN_VALUE_NAME, return_value);
+        scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          .flags = Scope_Entry_Flags_None,
+          .value = return_value,
+        });
       }
 
       Token *body = token_clone_deep(context->allocator, function->body);
@@ -3367,6 +3439,18 @@ token_dispatch_operator(
     );
 
     result_token = token_value_make(context, result_value, pointee_token->source_range);
+  } else if (slice_equal(operator, slice_literal("@"))) {
+    const Token *body = *dyn_array_pop(*token_stack);
+    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
+      Token_View eval_view = token_view_from_token_array(body->Group.children);
+      result_token = compile_time_eval(context, eval_view, context->scope);
+    } else {
+      context_error_snprintf(
+        context, body->source_range,
+        "@ operator must be followed by a parenthesized expression"
+      );
+      result_token = token_value_make(context, 0, body->source_range);
+    }
   } else if (slice_equal(operator, slice_literal("."))) {
     const Token *rhs = *dyn_array_pop(*token_stack);
     const Token *lhs = *dyn_array_pop(*token_stack);
@@ -3711,7 +3795,7 @@ token_parse_statement_label(
   // First try to lookup a label that might have been declared by `goto`
   // FIXME make sure we don't double declare label
   Scope *function_scope = context->builder->value->descriptor->Function.scope;
-  Scope_Entry *scope_entry = scope_lookup(function_scope, id->source);
+  Scope_Entry *scope_entry = scope_lookup(function_scope, id->source, 0);
   Value *value;
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
@@ -3725,7 +3809,11 @@ token_parse_statement_label(
     // FIXME this should define a label in the function scope, but because
     // the macros are not hygienic we can not do that yet
     //scope_define_value(function_scope, id->source, value);
-    scope_define_value(context->scope, id->source, value);
+    scope_define(context->scope, id->source, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = value,
+    });
   }
 
   if (
@@ -3834,7 +3922,7 @@ token_parse_goto(
     goto err;
   }
 
-  Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
+  Scope_Entry *scope_entry = scope_lookup(context->scope, id->source, 0);
   Value *value;
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
@@ -3851,7 +3939,11 @@ token_parse_goto(
     };
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
-    scope_define_value(context->builder->value->descriptor->Function.scope, id->source, value);
+    scope_define(context->builder->value->descriptor->Function.scope, id->source, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_None,
+      .value = value,
+    });
   }
 
   if (
@@ -3889,7 +3981,8 @@ token_parse_explicit_return(
   Token_View rest = token_view_rest(view, peek_index);
   bool has_return_expression = rest.length > 0;
 
-  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
+  Scope_Entry *scope_value_entry =
+    scope_lookup(context->scope, MASS_RETURN_VALUE_NAME, Scope_Entry_Flags_None);
   assert(scope_value_entry);
   Value *fn_return = scope_entry_force(context, scope_value_entry);
   assert(fn_return);
@@ -3913,7 +4006,8 @@ token_parse_explicit_return(
     );
   }
 
-  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
+  Scope_Entry *scope_label_entry =
+    scope_lookup(context->scope, MASS_RETURN_LABEL_NAME, Scope_Entry_Flags_None);
   assert(scope_label_entry);
   Value *return_label = scope_entry_force(context, scope_label_entry);
   assert(return_label);
@@ -4077,7 +4171,11 @@ token_parse_definition(
     goto err;
   }
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
-  scope_define_value(context->scope, name->source, value);
+  scope_define(context->scope, name->source, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_None,
+    .value = value,
+  });
   return value;
 
   err:
@@ -4131,7 +4229,11 @@ token_parse_definition_and_assignment_statements(
   Value *on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
   move_value(context->allocator, context->builder, &name->source_range, on_stack, value);
 
-  scope_define_value(context->scope, name->source, on_stack);
+  scope_define(context->scope, name->source, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_None,
+    .value = on_stack,
+  });
   return true;
 }
 

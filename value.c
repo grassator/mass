@@ -1295,31 +1295,38 @@ program_init(
 
   scope_define(program->global_scope, slice_literal("[]"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix }
   });
   scope_define(program->global_scope, slice_literal("()"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix }
   });
   scope_define(program->global_scope, slice_literal("."), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("->"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("macro"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix }
   });
   scope_define(program->global_scope, slice_literal("@"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix }
   });
 
   scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = {
       .precedence = 17,
       .handler = token_handle_negation,
@@ -1330,78 +1337,115 @@ program_init(
 
   scope_define(program->global_scope, slice_literal("&"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 16, .fixity = Operator_Fixity_Prefix }
   });
   scope_define(program->global_scope, slice_literal("*"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("/"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("%"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix }
   });
 
   scope_define(program->global_scope, slice_literal("+"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix }
   });
 
 
   scope_define(program->global_scope, slice_literal("<"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal(">"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("<="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal(">="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix }
   });
 
   scope_define(program->global_scope, slice_literal("=="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("!="), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix }
   });
 
 
   scope_define(program->global_scope, slice_literal("&&"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 5, .fixity = Operator_Fixity_Infix }
   });
   scope_define(program->global_scope, slice_literal("||"), (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
+    .flags = Scope_Entry_Flags_Static,
     .Operator = { .precedence = 4, .fixity = Operator_Fixity_Infix }
   });
 
 
-  scope_define_value(program->global_scope, slice_literal("any"), type_any_value);
+  scope_define(program->global_scope, slice_literal("any"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_Static,
+    .value = type_any_value
+  });
 
-
-  scope_define_value(program->global_scope, slice_literal("Register_8"), type_register_8_value);
-  scope_define_value(program->global_scope, slice_literal("Register_16"), type_register_16_value);
-  scope_define_value(program->global_scope, slice_literal("Register_32"), type_register_32_value);
-  scope_define_value(program->global_scope, slice_literal("Register_64"), type_register_64_value);
+  scope_define(program->global_scope, slice_literal("Register_8"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_Static,
+    .value = type_register_8_value
+  });
+  scope_define(program->global_scope, slice_literal("Register_16"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_Static,
+    .value = type_register_16_value
+  });
+  scope_define(program->global_scope, slice_literal("Register_32"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_Static,
+    .value = type_register_32_value
+  });
+  scope_define(program->global_scope, slice_literal("Register_64"), (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .flags = Scope_Entry_Flags_Static,
+    .value = type_register_64_value
+  });
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
-    scope_define_value(program->global_scope, slice_literal(#_NAME_), type_##_NAME_##_value);
+    scope_define(program->global_scope, slice_literal(#_NAME_), (Scope_Entry) {\
+      .type = Scope_Entry_Type_Value,\
+      .flags = Scope_Entry_Flags_Static,\
+      .value = type_##_NAME_##_value\
+    });
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
