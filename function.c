@@ -71,6 +71,63 @@ register_release(
   register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
 }
 
+
+typedef struct {
+  const Source_Range *source_range;
+  Register index;
+  Register saved_index;
+  bool saved;
+} Maybe_Saved_Register;
+
+Maybe_Saved_Register
+register_acquire_maybe_save_if_already_acquired(
+  Allocator *allocator,
+  Function_Builder *builder,
+  const Source_Range *source_range,
+  Register reg_index
+) {
+  Maybe_Saved_Register result = {
+    .saved = false,
+    .source_range = source_range,
+    .index = reg_index,
+  };
+  if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+    register_acquire(builder, reg_index);
+    return result;
+  }
+
+  // Save RDX as it will be used for the remainder
+  result.saved_index = register_acquire_temp(builder);
+  result.saved = true;
+
+  push_instruction(
+    &builder->code_block.instructions, *source_range,
+    (Instruction) {.assembly = {mov, {
+      operand_register_for_descriptor(result.saved_index, &descriptor_s64),
+      operand_register_for_descriptor(reg_index, &descriptor_s64)
+    }}}
+  );
+
+  return result;
+}
+
+void
+register_release_maybe_restore(
+  Function_Builder *builder,
+  const Maybe_Saved_Register *maybe_saved_register
+) {
+  register_release(builder, maybe_saved_register->index);
+  if (maybe_saved_register->saved) {
+    push_instruction(
+      &builder->code_block.instructions, *maybe_saved_register->source_range,
+      (Instruction) {.assembly = {mov, {
+        operand_register_for_descriptor(maybe_saved_register->index, &descriptor_s64),
+        operand_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
+      }}}
+    );
+  }
+}
+
 void
 move_value(
   Allocator *allocator,
@@ -686,16 +743,6 @@ make_if(
   return label;
 }
 
-void
-assert_not_register_ax(
-  Value *overload
-) {
-  assert(overload);
-  if (overload->operand.tag == Operand_Tag_Register) {
-    assert(overload->operand.Register.index != Register_A);
-  }
-}
-
 typedef enum {
   Arithmetic_Operation_Plus,
   Arithmetic_Operation_Minus,
@@ -901,10 +948,9 @@ divide_or_remainder(
   }
 
   // Save RDX as it will be used for the remainder
-  Value *rdx_temp = reserve_stack(allocator, builder, &descriptor_s64);
-
-  Value *reg_rdx = value_register_for_descriptor(allocator, Register_D, &descriptor_s64);
-  move_value(allocator, builder, source_range, rdx_temp, reg_rdx);
+  Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+    allocator, builder, source_range, Register_D
+  );
 
   Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
@@ -958,8 +1004,7 @@ divide_or_remainder(
     }
   }
 
-  // Restore RDX
-  move_value(allocator, builder, source_range, reg_rdx, rdx_temp);
+  register_release_maybe_restore(builder, &maybe_saved_rdx);
 }
 
 void
