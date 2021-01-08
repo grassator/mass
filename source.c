@@ -199,6 +199,7 @@ token_force_value(
 
 typedef struct {
   Scope *scope;
+  Scope_Entry_Flags flag_mask;
   Slice name;
   Scope_Entry *entry;
   bool done;
@@ -210,11 +211,15 @@ scope_lookup_overload(
 ) {
   if (it->done) return 0;
   for (; it->scope && !it->entry; it->scope = it->scope->parent) {
-    it->entry = hash_map_get(it->scope->map, it->name);
+    Scope_Entry *entry = hash_map_get(it->scope->map, it->name);
+    if (scope_entry_matches_flag_mask(entry, it->flag_mask)) {
+      it->entry = entry;
+    }
   }
   Scope_Entry *result = it->entry;
-  if (it->entry) {
+  while (it->entry) {
     it->entry = it->entry->next_overload;
+    if (scope_entry_matches_flag_mask(it->entry, it->flag_mask)) break;
   }
   it->done = !it->entry;
   return result;
