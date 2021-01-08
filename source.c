@@ -2291,6 +2291,20 @@ token_process_function_literal(
           .value = descriptor->Function.returns,
         });
       }
+
+      // :ReturnTypeLargerThanRegister
+      // Make sure we don't stomp the address of a larger-than-register
+      // return value during the execution of the function
+      if (
+        !is_external &&
+        arg.value->operand.tag == Operand_Tag_Memory &&
+        arg.value->operand.Memory.location.tag == Memory_Location_Tag_Indirect
+      ) {
+        register_bitset_set(
+          &builder->code_block.register_occupied_bitset,
+          arg.value->operand.Memory.location.Indirect.base_register
+        );
+      }
     }
   }
 
@@ -3748,17 +3762,6 @@ token_parse_block(
     Value *result_value = is_last_statement
       ? block_result_value
       : value_any(body_context.allocator);
-
-    // If result is a register we need to make sure it is acquired to avoid it being used
-    // as temporary when evaluating last statement. This definitely can happen with
-    // the function returns but should be safe to do all the time.
-    if (is_last_statement && result_value->operand.tag == Operand_Tag_Register) {
-      if (!register_bitset_get(
-        context->builder->used_register_bitset, result_value->operand.Register.index
-      )) {
-        register_acquire(context->builder, result_value->operand.Register.index);
-      }
-    }
 
     token_parse_statement(&body_context, view, &block->source_range, result_value);
   }
