@@ -414,6 +414,7 @@ main(void) {
   push_type(type_struct("Value", (Struct_Item[]){
     { "Descriptor *", "descriptor" },
     { "Operand", "operand" },
+    { "Value *", "next_overload" },
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
@@ -445,8 +446,6 @@ main(void) {
       { "Function_Builder *", "builder" },
 
       { "Value *", "returns" },
-      // FIXME return multiple things from scope lookup instead
-      { "Value *", "next_overload" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "Descriptor *", "item" },

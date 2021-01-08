@@ -86,6 +86,8 @@ move_value(
   // FIXME remove these after refactoring using move_to_result_from_temp
   if (target->descriptor->tag == Descriptor_Tag_Any) {
     target->descriptor = source->descriptor;
+    assert(!target->next_overload);
+    target->next_overload = source->next_overload;
   }
   if (target->operand.tag == Operand_Tag_Any) {
     target->operand = source->operand;
@@ -311,6 +313,8 @@ move_to_result_from_temp(
 ) {
   if (target->descriptor->tag == Descriptor_Tag_Any) {
     target->descriptor = temp_source->descriptor;
+    assert(!target->next_overload);
+    target->next_overload = temp_source->next_overload;
   }
   if (target->operand.tag == Operand_Tag_Any) {
     target->operand = temp_source->operand;

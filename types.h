@@ -279,6 +279,7 @@ typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 typedef struct Value {
   Descriptor * descriptor;
   Operand operand;
+  Value * next_overload;
   Compiler_Source_Location compiler_source_location;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
@@ -318,7 +319,6 @@ typedef struct {
   Scope * scope;
   Function_Builder * builder;
   Value * returns;
-  Value * next_overload;
 } Descriptor_Function;
 typedef struct {
   Descriptor * item;

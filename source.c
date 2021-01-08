@@ -336,7 +336,7 @@ scope_lookup_force(
         panic("Only functions support overloading");
       }
       Value *overload = it->value;
-      overload->descriptor->Function.next_overload = result;
+      overload->next_overload = result;
       result = overload;
     }
   }
@@ -354,10 +354,10 @@ scope_lookup_force(
       if (overload->descriptor->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
-      while (last->descriptor->Function.next_overload) {
-        last = last->descriptor->Function.next_overload;
+      while (last->next_overload) {
+        last = last->next_overload;
       }
-      last->descriptor->Function.next_overload = overload;
+      last->next_overload = overload;
     };
   }
   return result;
@@ -3038,7 +3038,8 @@ token_maybe_macro_call_with_lazy_arguments(
 
   Value *maybe_macro_overload = 0;
 
-  for (Value *to_call = target; to_call; to_call = to_call->descriptor->Function.next_overload) {
+  for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
+    assert(to_call->descriptor->tag == Descriptor_Tag_Function);
     Descriptor_Function *descriptor = &to_call->descriptor->Function;
     if (!(descriptor->flags & Descriptor_Function_Flags_Macro)) continue;
     if (arg_count != dyn_array_length(descriptor->argument_names)) continue;
@@ -3176,7 +3177,8 @@ token_handle_function_call(
   const Source_Range *source_range = &target_token->source_range;
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
-  for (Value *to_call = target; to_call; to_call = to_call->descriptor->Function.next_overload) {
+  for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
+    assert(to_call->descriptor->tag == Descriptor_Tag_Function);
     Descriptor_Function *descriptor = &to_call->descriptor->Function;
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
