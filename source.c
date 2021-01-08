@@ -176,10 +176,13 @@ scope_lookup(
   Slice name,
   Scope_Entry_Flags flag_mask
 ) {
-  while (scope) {
-    Scope_Entry *result = hash_map_get(scope->map, name);
-    if (result && scope_entry_matches_flag_mask(result, flag_mask)) return result;
-    scope = scope->parent;
+  for (; scope; scope = scope->parent) {
+    Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
+    if (!entry_pointer) continue;
+    Scope_Entry *entry = *entry_pointer;
+    if (entry && scope_entry_matches_flag_mask(entry, flag_mask)) {
+      return entry;
+    }
   }
   return 0;
 }
@@ -211,15 +214,18 @@ scope_lookup_overload(
 ) {
   if (it->done) return 0;
   for (; it->scope && !it->entry; it->scope = it->scope->parent) {
-    Scope_Entry *entry = hash_map_get(it->scope->map, it->name);
-    if (scope_entry_matches_flag_mask(entry, it->flag_mask)) {
-      it->entry = entry;
+    Scope_Entry **entry_pointer = hash_map_get(it->scope->map, it->name);
+    if (!entry_pointer) continue;
+    if (scope_entry_matches_flag_mask(*entry_pointer, it->flag_mask)) {
+      it->entry = *entry_pointer;
     }
   }
   Scope_Entry *result = it->entry;
-  while (it->entry) {
+  if (it->entry) {
     it->entry = it->entry->next_overload;
-    if (scope_entry_matches_flag_mask(it->entry, it->flag_mask)) break;
+    while (it->entry && !scope_entry_matches_flag_mask(it->entry, it->flag_mask)) {
+      it->entry = it->entry->next_overload;
+    }
   }
   it->done = !it->entry;
   return result;
@@ -251,9 +257,6 @@ scope_entry_force(
       } else {
         result = token_parse_constant_expression(&lazy_context, expr->tokens);
       }
-      // FIXME We mutate an original scope entry here. It might be problematic if a scope is resized
-      //       and memory is relocated. We should either ensure that scope entries are stable
-      //       by switching to a tree instead of hash map, or do something else here.
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .flags = entry->flags,
@@ -279,10 +282,13 @@ scope_lookup_force(
 ) {
   flag_mask |= context->scope_entry_lookup_flags;
   Scope_Entry *entry = 0;
-  while (scope) {
-    entry = hash_map_get(scope->map, name);
-    if (entry && scope_entry_matches_flag_mask(entry, flag_mask)) break;
-    scope = scope->parent;
+  for (; scope; scope = scope->parent) {
+    Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
+    if (!entry_pointer) continue;
+    if (*entry_pointer && scope_entry_matches_flag_mask(*entry_pointer, flag_mask)) {
+      entry = *entry_pointer;
+      break;
+    }
   }
   if (!entry) {
     return 0;
@@ -378,17 +384,18 @@ scope_define(
   Slice name,
   Scope_Entry entry
 ) {
-  if (!hash_map_has(scope->map, name)) {
-    hash_map_set(scope->map, name, entry);
-  } else {
+  Scope_Entry *allocated = allocator_allocate(scope->map->allocator, Scope_Entry);
+  *allocated = entry;
+  if (hash_map_has(scope->map, name)) {
+    // We just checked that the map has the entry so it safe to deref right away
+    Scope_Entry *it = *hash_map_get(scope->map, name);
     // TODO Consider using a hash map that allows multiple values instead
-    Scope_Entry *it = hash_map_get(scope->map, name);
     while (it->next_overload) {
       it = it->next_overload;
     }
-    Scope_Entry *allocated = allocator_allocate(scope->map->allocator, Scope_Entry);
-    *allocated = entry;
     it->next_overload = allocated;
+  } else {
+    hash_map_set(scope->map, name, allocated);
   }
 }
 

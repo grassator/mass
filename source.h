@@ -54,7 +54,7 @@ typedef struct Scope_Entry {
   };
 } Scope_Entry;
 
-hash_map_slice_template(Scope_Map, Scope_Entry)
+hash_map_slice_template(Scope_Map, Scope_Entry *)
 hash_map_slice_template(Macro_Replacement_Map, Token_View)
 
 typedef enum {
