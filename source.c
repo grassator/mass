@@ -297,22 +297,7 @@ scope_lookup_force(
   // Force lazy entries
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
     if (it->type == Scope_Entry_Type_Lazy_Expression) {
-      Scope_Lazy_Expression *expr = &it->lazy_expression;
-      Value *result = 0;
-      Compilation_Context lazy_context = *context;
-      lazy_context.scope = expr->scope;
-      lazy_context.builder = expr->maybe_builder;
-      if (expr->maybe_builder) {
-        result = value_any(context->allocator);
-        token_parse_expression(&lazy_context, expr->tokens, result);
-      } else {
-        result = token_parse_constant_expression(&lazy_context, expr->tokens);
-      }
-      *it = (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = result,
-        .next_overload = it->next_overload,
-      };
+      scope_entry_force(context, it);
     }
   }
 
