@@ -531,6 +531,11 @@ fn_encode(
   Fixed_Buffer *buffer,
   Function_Builder *builder
 ) {
+  if (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) {
+    // We should not encode macro functions. And we might not even to be able to anyway
+    // as some of them have Any arguments or returns
+    return;
+  }
   Program *program = context->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
