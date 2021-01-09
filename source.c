@@ -1328,60 +1328,6 @@ token_match_return_type(
   return arg;
 }
 
-// TODO rename to static_value
-Value *
-token_force_constant_value(
-  Compilation_Context *context,
-  const Token *token
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  switch(token->tag) {
-    case Token_Tag_None: {
-      panic("Internal Error: Encountered token with an uninitialized tag");
-      break;
-    }
-    case Token_Tag_String: {
-      Slice string = token->String.slice;
-      Value *string_bytes = value_global_c_string_from_slice(context, string);
-      // TODO make a proper string type
-      return string_bytes;
-    }
-    case Token_Tag_Id: {
-      Slice name = token->source;
-      Scope_Entry *scope_entry = scope_lookup(context->scope, name, Scope_Entry_Flags_Static);
-      if (!scope_entry) {
-        context_error_snprintf(
-          context, token->source_range,
-          "Undefined variable %"PRIslice,
-          SLICE_EXPAND_PRINTF(name)
-        );
-        return 0;
-      }
-      Value *value = scope_entry_force(context, scope_entry);
-      return value;
-    }
-    case Token_Tag_Value: {
-      return token->Value.value;
-    }
-    case Token_Tag_Group: {
-      if (token->Group.tag == Token_Group_Tag_Paren) {
-        Token_View children_view = token_view_from_token_array(token->Group.children);
-        return token_parse_constant_expression(context, children_view);
-      } else {
-        panic("TODO support other group types in constant context");
-      }
-      return 0;
-    }
-    case Token_Tag_Operator: {
-      panic("TODO support operator lookup in constant context");
-      return 0;
-    }
-  }
-  panic("Internal Error: Unknown token type");
-  return 0;
-}
-
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
@@ -1389,7 +1335,6 @@ token_force_value(
   Value *result_value
 ) {
   MASS_TRY(*context->result);
-  assert(context->builder);
 
   Scope *scope = context->scope;
   switch(token->tag) {
@@ -1653,7 +1598,8 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Value *precedence_value = token_force_constant_value(context, precedence_token);
+  Value *precedence_value = value_any(context->allocator);
+  token_force_value(context, precedence_token, precedence_value);
 
   if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
     context_error_snprintf(
@@ -2642,7 +2588,8 @@ token_handle_negation(
   assert(args.length == 1);
   const Token *token = token_view_get(args, 0);
 
-  Value *value = token_force_constant_value(context, token);
+  Value *value = value_any(context->allocator);
+  token_force_value(context, token, value);
   if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
     switch(value->operand.byte_size) {
       case 1: {
@@ -2744,7 +2691,8 @@ token_dispatch_constant_operator(
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = *dyn_array_last(*token_stack);
-    Value *function_value = token_force_constant_value(context, function);
+    Value *function_value = value_any(context->allocator);
+    token_force_value(context, function, function_value);
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
@@ -2935,7 +2883,8 @@ token_parse_constant_expression(
   }
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
-    result = token_force_constant_value(context, token);
+    result = value_any(context->allocator);
+    token_force_value(context, token, result);
   } else {
     // FIXME user error
   }
