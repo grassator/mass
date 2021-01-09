@@ -2681,20 +2681,6 @@ token_dispatch_constant_operator(
         );
       }
     }
-  } else if (slice_equal(operator, slice_literal("@"))) {
-    const Token *body = *dyn_array_pop(*token_stack);
-    Token *result = 0;
-    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
-      Token_View eval_view = token_view_from_token_array(body->Group.children);
-      result = compile_time_eval(context, eval_view, context->scope);
-    } else {
-      context_error_snprintf(
-        context, body->source_range,
-        "@ operator must be followed by a parenthesized expression"
-      );
-      result = token_value_make(context, 0, body->source_range);
-    }
-    dyn_array_push(*token_stack, result);
   } else {
     panic("TODO: Unknown operator");
   }

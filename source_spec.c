@@ -1083,23 +1083,6 @@ spec("source") {
       check(operand_immediate_memory_as_s8(&status->operand) == 42);
     }
 
-    it("should be able to execute arbitrary expression at compile time") {
-      test_program_inline_source_base(
-        "STATUS_CODE :: @( the_answer() + 2 );"
-        "the_answer :: () -> (s8) { 40 }",
-        STATUS_CODE
-      );
-
-      Value *status = scope_lookup_force(
-        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE"), Scope_Entry_Flags_None
-      );
-      check(status);
-      check(descriptor_is_integer(status->descriptor));
-      check(status->operand.tag == Operand_Tag_Immediate);
-      check(status->operand.byte_size == 1);
-      check(operand_immediate_memory_as_s8(&status->operand) == 42);
-    }
-
     it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test :: () -> (s64) { foo := 42; @( foo ) }",
