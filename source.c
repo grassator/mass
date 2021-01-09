@@ -1434,36 +1434,6 @@ token_match_call_arguments(
   return result;
 }
 
-// FIXME pass in the function definition
-Array_Value_Ptr
-token_match_constant_call_arguments(
-  Compilation_Context *context,
-  const Token *token
-) {
-  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
-  if (context->result->tag != Mass_Result_Tag_Success) return result;
-
-  if (dyn_array_length(token->Group.children) != 0) {
-    Token_View children = token_view_from_token_array(token->Group.children);
-    Token_View_Split_Iterator it = { .view = children };
-
-    while (!it.done) {
-      if (context->result->tag != Mass_Result_Tag_Success) return result;
-      Token_View view = token_split_next(&it, &token_pattern_comma_operator);
-      // TODO :TargetValue
-      // There is an interesting conundrum here that we need to know the types of the
-      // arguments for overload resolution, but then we need the exact function definition
-      // to know the result_value definition to do the evaluation. Proper solution would
-      // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
-      // target value that can be anything that will behave like type inference and is
-      // needed regardless for something like x := (...)
-      Value *result_value = token_parse_constant_expression(context, view);
-      dyn_array_push(result, result_value);
-    }
-  }
-  return result;
-}
-
 static inline Token *
 token_value_make(
   Compilation_Context *context,
@@ -2669,7 +2639,7 @@ token_dispatch_constant_operator(
       slice_equal(function->source, slice_literal("cast"))
     ) {
       // TODO turn `cast` into a compile-time function call / macro
-      Array_Value_Ptr arg_values = token_match_constant_call_arguments(context, args);
+      Array_Value_Ptr arg_values = token_match_call_arguments(context, args);
       result = token_handle_cast(context, &args->source_range, arg_values);
       dyn_array_destroy(arg_values);
     }  else {
