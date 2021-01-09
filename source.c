@@ -895,6 +895,24 @@ scope_lookup_type(
   return value_ensure_type(context, value, source_range, type_name);
 }
 
+static inline Token *
+token_value_make(
+  Compilation_Context *context,
+  Value *result,
+  Source_Range source_range
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  Token *result_token = allocator_allocate(context->allocator, Token);
+  *result_token = (Token){
+    .tag = Token_Tag_Value,
+    .source_range = source_range,
+    .source = slice_sub_range(source_range.file->text, source_range.offsets),
+    .Value = { result },
+  };
+  return result_token;
+}
+
 #define Token_Maybe_Match(_id_, ...)\
   const Token *(_id_) = token_peek_match(view, peek_index, &(Token_Pattern) { __VA_ARGS__ });\
   if (_id_) (++peek_index)
@@ -1143,6 +1161,94 @@ token_parse_macro_match(
   return replacement;
 }
 
+Array_Const_Token_Ptr
+token_apply_macro_new_syntax(
+  Compilation_Context *context,
+  Array_Token_View match,
+  Macro *macro
+) {
+  // FIXME switch to an out parameter
+  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
+  assert(macro->scope);
+  Scope *expansion_scope = scope_make(context->allocator, macro->scope);
+
+  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
+    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
+    Slice capture_name = {0};
+
+    switch(item->tag) {
+      case Macro_Pattern_Tag_Single_Token: {
+        capture_name = item->Single_Token.capture_name;
+        break;
+      }
+      case Macro_Pattern_Tag_Any_Token_Sequence: {
+        capture_name = item->Any_Token_Sequence.capture_name;
+        break;
+      }
+    }
+
+    if (!capture_name.length) continue;
+
+    Token_View capture_view = *dyn_array_get(match, i);
+
+    Scope *function_scope = scope_make(context->allocator, context->scope);
+
+    Function_Builder *builder = fn_begin(context);
+    Descriptor *descriptor = builder->value->descriptor;
+
+    // FIXME maybe function calls should not expect a body in {}
+    Token *fake_body = allocator_allocate(context->allocator, Token);
+    *fake_body = (Token) {
+      .tag = Token_Tag_Group,
+      // FIXME get proper range
+      .source_range = {0},
+      // FIXME what should the source be here?
+      .source = slice_literal(""),
+      .Group = {
+        .tag = Token_Group_Tag_Curly,
+        .children = token_array_from_view(context->allocator, capture_view),
+      }
+    };
+
+    Value *result = builder->value;
+    descriptor->Function.returns = macro->replacement.length
+      ? value_any(context->allocator)
+      : &void_value;
+    descriptor->Function.scope = function_scope;
+    descriptor->Function.body = fake_body;
+    descriptor->Function.builder = builder;
+    descriptor->Function.flags
+      |= Descriptor_Function_Flags_Pending_Body_Compilation
+      |  Descriptor_Function_Flags_Macro;
+
+    scope_define(expansion_scope, capture_name, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .flags = Scope_Entry_Flags_Static,
+      .value = result,
+    });
+  }
+
+  Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
+
+  Compilation_Context body_context = *context;
+  body_context.scope = expansion_scope;
+  Value *result_value = value_any(context->allocator);
+
+  token_parse_expression(&body_context, macro->replacement, result_value);
+  // FIXME provide a proper source_range
+  Token *result_token = allocator_allocate(context->allocator, Token);
+  *result_token = (Token){
+    .tag = Token_Tag_Value,
+    .source_range = {0},
+    .source = slice_literal(""),
+    .Value = { result_value },
+  };
+  dyn_array_push(replacement, result_token);
+
+  return replacement;
+}
+
+
 void
 token_parse_macros(
   Compilation_Context *context,
@@ -1163,9 +1269,15 @@ token_parse_macros(
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
           if (match_length) {
-            Array_Const_Token_Ptr replacement = token_parse_macro_match(context, match, macro);
-            dyn_array_splice(*tokens, i, match_length, replacement);
-            dyn_array_destroy(replacement);
+            if (macro->new_syntax) {
+              Array_Const_Token_Ptr replacement = token_apply_macro_new_syntax(context, match, macro);
+              dyn_array_splice(*tokens, i, match_length, replacement);
+              dyn_array_destroy(replacement);
+            } else {
+              Array_Const_Token_Ptr replacement = token_parse_macro_match(context, match, macro);
+              dyn_array_splice(*tokens, i, match_length, replacement);
+              dyn_array_destroy(replacement);
+            }
             goto start;
           }
         }
@@ -1358,6 +1470,7 @@ token_force_value(
           "Undefined variable %"PRIslice,
           SLICE_EXPAND_PRINTF(name)
         );
+
         return *context->result;
       } else {
         move_value(context->allocator, context->builder, &token->source_range, result_value, value);
@@ -1432,24 +1545,6 @@ token_match_call_arguments(
     }
   }
   return result;
-}
-
-static inline Token *
-token_value_make(
-  Compilation_Context *context,
-  Value *result,
-  Source_Range source_range
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Token *result_token = allocator_allocate(context->allocator, Token);
-  *result_token = (Token){
-    .tag = Token_Tag_Value,
-    .source_range = source_range,
-    .source = slice_sub_range(source_range.file->text, source_range.offsets),
-    .Value = { result },
-  };
-  return result_token;
 }
 
 void
@@ -1706,6 +1801,171 @@ token_parse_operator_definition(
 
   err:
   if (operator) allocator_deallocate(context->allocator, operator, sizeof(*operator));
+  return true;
+}
+
+bool
+token_parse_new_syntax_definition(
+  Compilation_Context *context,
+  Token_View view,
+  Scope *scope
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("new_syntax"));
+
+  Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
+
+  if (!pattern_token) {
+    panic("TODO user error");
+  }
+
+  Token_View replacement = token_view_rest(view, peek_index);
+  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
+
+  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
+  bool statement_start = false;
+  bool statement_end = false;
+
+  for (u64 i = 0; i < definition.length; ++i) {
+    const Token *token = token_view_get(definition, i);
+
+    switch(token->tag) {
+      case Token_Tag_None: {
+        panic("Unexpected None Token");
+        break;
+      }
+      case Token_Tag_String: {
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .source = token->String.slice,
+            }
+          },
+        });
+        break;
+      }
+      case Token_Tag_Group: {
+        if (dyn_array_length(token->Group.children)) {
+          context_error_snprintf(
+            context, token->source_range,
+            "Nested group matches are not supported in syntax declarations (yet)"
+          );
+          goto err;
+        }
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .group_tag = token->Group.tag,
+            }
+          },
+        });
+        break;
+      }
+      case Token_Tag_Operator: {
+        if (
+          slice_equal(token->source, slice_literal("..@")) ||
+          slice_equal(token->source, slice_literal(".@")) ||
+          slice_equal(token->source, slice_literal("@"))
+        ) {
+          const Token *pattern_name = token_view_peek(definition, ++i);
+          if (!pattern_name || pattern_name->tag != Token_Tag_Id) {
+            context_error_snprintf(
+              context, token->source_range,
+              "@ operator in a syntax definition requires an id after it"
+            );
+            goto err;
+          }
+          Macro_Pattern *last_pattern = 0;
+          if (slice_equal(token->source, slice_literal("@"))) {
+            last_pattern = dyn_array_last(pattern);
+          } else if (slice_equal(token->source, slice_literal(".@"))) {
+            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
+              .tag = Macro_Pattern_Tag_Single_Token,
+            });
+          } else if (slice_equal(token->source, slice_literal("..@"))) {
+            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
+              .tag = Macro_Pattern_Tag_Any_Token_Sequence,
+            });
+          } else {
+            panic("Internal Error: Unexpected @-like operator");
+          }
+          if (!last_pattern) {
+            context_error_snprintf(
+              context, token->source_range,
+              "@ requires a valid pattern before it"
+            );
+            goto err;
+          }
+          switch(last_pattern->tag) {
+            case Macro_Pattern_Tag_Single_Token: {
+              last_pattern->Single_Token.capture_name = pattern_name->source;
+              break;
+            }
+            case Macro_Pattern_Tag_Any_Token_Sequence: {
+              last_pattern->Any_Token_Sequence.capture_name = pattern_name->source;
+              break;
+            }
+          }
+        } else if (slice_equal(token->source, slice_literal("^"))) {
+          if (i != 0) {
+            context_error_snprintf(
+              context, token->source_range,
+              "^ operator (statement start match) can only appear at the start of the pattern."
+            );
+            goto err;
+          }
+          statement_start = true;
+        } else if (slice_equal(token->source, slice_literal("$"))) {
+          if (i != definition.length - 1) {
+            context_error_snprintf(
+              context, token->source_range,
+              "$ operator (statement end match) can only appear at the end of the pattern."
+            );
+            goto err;
+          }
+          statement_end = true;
+        } else {
+          context_error_snprintf(
+            context, token->source_range,
+            "Unsupported operator %"PRIslice" in a syntax definition",
+            SLICE_EXPAND_PRINTF(token->source)
+          );
+          goto err;
+        }
+        break;
+      }
+      case Token_Tag_Id:
+      case Token_Tag_Value: {
+        context_error_snprintf(
+          context, token->source_range,
+          "Unsupported token tag in a syntax definition"
+        );
+        goto err;
+        break;
+      }
+    }
+  }
+
+  Macro *macro = allocator_allocate(context->allocator, Macro);
+  *macro = (Macro){
+    .pattern = pattern,
+    .replacement = replacement,
+    .statement_start = statement_start,
+    .statement_end = statement_end,
+    .new_syntax = true,
+    .scope = scope,
+  };
+
+  scope_add_macro(scope, macro);
+
+  return true;
+
+  err:
+  dyn_array_destroy(pattern);
   return true;
 }
 
@@ -4154,6 +4414,9 @@ token_parse(
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
+    if (token_parse_new_syntax_definition(context, statement, context->program->global_scope)) {
+      continue;
+    }
     if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }

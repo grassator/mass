@@ -788,7 +788,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro without a capture") {
       test_program_inline_source(
-        "syntax (\"the\" \"answer\") 42;"
+        "new_syntax (\"the\" \"answer\") 42;"
         "checker :: () -> (s32) { the answer }",
         checker
       );
@@ -799,7 +799,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching start and end of statement") {
       test_program_inline_source(
-        "syntax (^ \"foo\" $) 42;"
+        "new_syntax (^ \"foo\" $) 42;"
         "checker :: () -> (s64) { foo := 20; foo }",
         checker
       );
@@ -810,7 +810,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching a curly brace block") {
       test_program_inline_source(
-        "syntax (^ \"block\" {}@body $) body;"
+        "new_syntax (^ \"block\" {}@body $) body();"
         "checker :: () -> (s64) { block { 42 } }",
         checker
       );
@@ -821,19 +821,8 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching a sequence at the end") {
       test_program_inline_source(
-        "syntax (^ \"comment\" ..@ignore $);"
+        "new_syntax (^ \"comment\" ..@ignore $);"
         "checker :: () -> (s64) { x := 42; comment x = x + 1; x }",
-        checker
-      );
-      fn_type_void_to_s64 checker_fn =
-        (fn_type_void_to_s64)value_as_function(test_context.program, checker);
-      check(checker_fn() == 42);
-    }
-
-    it("should be able to define and use a syntax macro matching a sequence in the middle") {
-      test_program_inline_source(
-        "syntax (\"comment_start\" ..@ignore \"comment_end\");"
-        "checker :: () -> (s64) { x := 42; x = x comment_start + 1 comment_end; x }",
         checker
       );
       fn_type_void_to_s64 checker_fn =
@@ -843,7 +832,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro with a capture") {
       test_program_inline_source(
-        "syntax (\"negative\" .@x) (-x);"
+        "new_syntax (\"negative\" .@x) (-x());"
         "checker :: () -> (s32) { negative 42 }",
         checker
       );
