@@ -2,59 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-Array_Const_Token_Ptr
-token_clone_token_array_deep(
-  Allocator *allocator,
-  Array_Const_Token_Ptr source
-);
-
-Token *
-token_clone_deep(
-  Allocator *allocator,
-  const Token *token
-) {
-  Token *clone = allocator_allocate(allocator, Token);
-  *clone = *token;
-  switch (token->tag) {
-    case Token_Tag_None:
-    case Token_Tag_Operator:
-    case Token_Tag_String:
-    case Token_Tag_Id: {
-      // Nothing to do
-      break;
-    }
-    case Token_Tag_Group: {
-      clone->Group.tag = token->Group.tag;
-      clone->Group.children = token_clone_token_array_deep(allocator, token->Group.children);
-      break;
-    }
-    case Token_Tag_Value: {
-      if (token->Value.value->operand.tag != Operand_Tag_Immediate) {
-        panic("Only immediate operand values are safe to clone");
-      }
-      if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
-        panic("Unpexected Any value in the cloned tree");
-      }
-      break;
-    }
-  }
-  return clone;
-}
-
-Array_Const_Token_Ptr
-token_clone_token_array_deep(
-  Allocator *allocator,
-  Array_Const_Token_Ptr source
-) {
-  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = dyn_array_length(source));
-  for (u64 i = 0; i < dyn_array_length(source); ++i) {
-    const Token *token = *dyn_array_get(source, i);
-    Token *clone = token_clone_deep(allocator, token);
-    dyn_array_push(result, clone);
-  }
-  return result;
-}
-
 static inline const Token *
 token_view_get(
   Token_View view,
@@ -312,7 +259,7 @@ scope_lookup_force(
       Descriptor_Function *function = &it->value->descriptor->Function;
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
         function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-        Token *body = token_clone_deep(context->allocator, function->body);
+        const Token *body = function->body;
 
         Value *return_result_value =
           function->returns->descriptor->tag == Descriptor_Tag_Void
@@ -1649,7 +1596,7 @@ token_handle_user_defined_operator(
     });
   }
 
-  Token *body = token_clone_deep(context->allocator, operator->body);
+  const Token *body = operator->body;
   {
     Compilation_Context body_context = *context;
     body_context.scope = body_scope;
@@ -3109,7 +3056,7 @@ token_maybe_macro_call_with_lazy_arguments(
     });
   }
 
-  Token *body = token_clone_deep(context->allocator, function->body);
+  const Token *body = function->body;
   {
     Compilation_Context body_context = *context;
     body_context.scope = body_scope;
@@ -3257,7 +3204,7 @@ token_handle_function_call(
         });
       }
 
-      Token *body = token_clone_deep(context->allocator, function->body);
+      const Token *body = function->body;
       {
         Compilation_Context body_context = *context;
         body_context.scope = body_scope;
