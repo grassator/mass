@@ -2634,15 +2634,7 @@ token_dispatch_constant_operator(
       slice_equal(function->source, slice_literal("c_struct"))
     ) {
       result = token_process_c_struct_definition(context, view, args);
-    } else if (
-      function->tag == Token_Tag_Id &&
-      slice_equal(function->source, slice_literal("cast"))
-    ) {
-      // TODO turn `cast` into a compile-time function call / macro
-      Array_Value_Ptr arg_values = token_match_call_arguments(context, args);
-      result = token_handle_cast(context, &args->source_range, arg_values);
-      dyn_array_destroy(arg_values);
-    }  else {
+    } else {
       Token_View call_view = {
         .tokens = (const Token *[]){function, args},
         .length = 2,
