@@ -1,5 +1,3 @@
-syntax (^ "continue" $) goto _loop_end
-
 syntax (^ "while" ..@condition {}@body $) {
   label _loop_start;
   if condition {

@@ -133,7 +133,10 @@ descriptor_byte_size(
     case Descriptor_Tag_Function: {
       return 8;
     }
-    case Descriptor_Tag_Any:
+    case Descriptor_Tag_Any: {
+      panic("Trying to get byte size of an Any descriptor");
+      break;
+    }
     default: {
       assert(!"Unknown Descriptor Type");
     }

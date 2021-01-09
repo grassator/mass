@@ -139,6 +139,7 @@ move_value(
   Array_Instruction *instructions = &builder->code_block.instructions;
   if (target == source) return;
   if (operand_equal(&target->operand, &source->operand)) return;
+  if (target->descriptor == &descriptor_void) return;
 
   // FIXME remove these after refactoring using move_to_result_from_temp
   if (target->descriptor->tag == Descriptor_Tag_Any) {

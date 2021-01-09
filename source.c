@@ -258,19 +258,13 @@ scope_lookup_force(
     if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
       Descriptor_Function *function = &it->value->descriptor->Function;
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
-        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-        const Token *body = function->body;
-
-        Value *return_result_value =
-          function->returns->descriptor->tag == Descriptor_Tag_Void
-          ? value_any(context->allocator)
-          : function->returns;
+        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;\
         {
           Compilation_Context body_context = *context;
           body_context.scope_entry_lookup_flags = Scope_Entry_Flags_None;
           body_context.scope = function->scope;
           body_context.builder = function->builder;
-          token_parse_block(&body_context, body, return_result_value);
+          token_parse_block(&body_context, function->body, function->returns);
         }
         fn_end(function->builder);
       }
@@ -1232,9 +1226,10 @@ token_apply_macro_new_syntax(
 
   Compilation_Context body_context = *context;
   body_context.scope = expansion_scope;
-  Value *result_value = value_any(context->allocator);
 
+  Value *result_value = value_any(context->allocator);
   token_parse_expression(&body_context, macro->replacement, result_value);
+
   // FIXME provide a proper source_range
   Token *result_token = allocator_allocate(context->allocator, Token);
   *result_token = (Token){
@@ -3863,10 +3858,7 @@ token_parse_block(
     Token_View view = token_split_next(&it, &token_pattern_semicolon);
     if (!view.length) continue;
     bool is_last_statement = it.done;
-    Value *result_value = is_last_statement
-      ? block_result_value
-      : value_any(body_context.allocator);
-
+    Value *result_value = is_last_statement ? block_result_value : &void_value;
     token_parse_statement(&body_context, view, &block->source_range, result_value);
   }
   return true;
