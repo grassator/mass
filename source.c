@@ -1051,111 +1051,6 @@ token_match_pattern(
 }
 
 Array_Const_Token_Ptr
-token_apply_macro_replacements(
-  Compilation_Context *context,
-  Macro_Replacement_Map *map,
-  Token_View source
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
-
-  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = source.length);
-  for (u64 i = 0; i < source.length; ++i) {
-    const Token *token = source.tokens[i];
-    switch (token->tag) {
-      case Token_Tag_None: {
-        panic("Internal Error: Encountered token with an uninitialized tag");
-        break;
-      }
-      case Token_Tag_Id: {
-        Slice name = token->source;
-        Token_View *view = hash_map_get(map, name);
-        if (view) {
-          for (u64 view_index = 0; view_index < view->length; ++view_index) {
-            Token *copy = allocator_allocate(context->allocator, Token);
-            *copy = *token_view_get(*view, view_index);
-            dyn_array_push(result, copy);
-          }
-        } else {
-          Token *copy = allocator_allocate(context->allocator, Token);
-          *copy = *token;
-          dyn_array_push(result, copy);
-        }
-        continue;
-      }
-      case Token_Tag_Operator:
-      case Token_Tag_String: {
-        Token *copy = allocator_allocate(context->allocator, Token);
-        *copy = *token;
-        dyn_array_push(result, copy);
-        break;
-      }
-      case Token_Tag_Group: {
-        Token *copy = allocator_allocate(context->allocator, Token);
-        *copy = *token;
-        copy->Group.tag = token->Group.tag;
-        copy->Group.children = token_apply_macro_replacements(
-          context, map, token_view_from_token_array(token->Group.children)
-        );
-        dyn_array_push(result, copy);
-        break;
-      }
-      case Token_Tag_Value: {
-        if (token->Value.value->operand.tag != Operand_Tag_Immediate) {
-          panic("Only immediate operand values are safe to clone inside a macro");
-        }
-        if (token->Value.value->descriptor->tag == Descriptor_Tag_Any) {
-          panic("Unpexected Any value in the cloned macro tree");
-        }
-        Token *copy = allocator_allocate(context->allocator, Token);
-        *copy = *token;
-        dyn_array_push(result, copy);
-        break;
-      }
-    }
-  }
-  return result;
-}
-
-Array_Const_Token_Ptr
-token_parse_macro_match(
-  Compilation_Context *context,
-  Array_Token_View match,
-  Macro *macro
-) {
-  // FIXME switch to an out parameter
-  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
-
-  Macro_Replacement_Map *map = hash_map_make(Macro_Replacement_Map);
-  if (dyn_array_length(macro->pattern) != dyn_array_length(match)) {
-    panic("Internal Error: Should not have chosen the macro if pattern length do not match");
-  }
-  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
-    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
-    switch(item->tag) {
-      case Macro_Pattern_Tag_Single_Token: {
-        Token_View single_token_view = *dyn_array_get(match, i);
-        if (single_token_view.length != 1) {
-          panic("Internal Error: Single Token matches should have a single token");
-        }
-        if (item->Single_Token.capture_name.length) {
-          hash_map_set(map, item->Single_Token.capture_name, single_token_view);
-        }
-        break;
-      }
-      case Macro_Pattern_Tag_Any_Token_Sequence: {
-        if (item->Any_Token_Sequence.capture_name.length) {
-          hash_map_set(map, item->Any_Token_Sequence.capture_name, *dyn_array_get(match, i));
-        }
-        break;
-      }
-    }
-  }
-  Array_Const_Token_Ptr replacement = token_apply_macro_replacements(context, map, macro->replacement);
-  hash_map_destroy(map);
-  return replacement;
-}
-
-Array_Const_Token_Ptr
 token_apply_macro_new_syntax(
   Compilation_Context *context,
   Array_Token_View match,
@@ -1267,15 +1162,9 @@ token_parse_macros(
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
           if (match_length) {
-            if (macro->new_syntax) {
-              Array_Const_Token_Ptr replacement = token_apply_macro_new_syntax(context, match, macro);
-              dyn_array_splice(*tokens, i, match_length, replacement);
-              dyn_array_destroy(replacement);
-            } else {
-              Array_Const_Token_Ptr replacement = token_parse_macro_match(context, match, macro);
-              dyn_array_splice(*tokens, i, match_length, replacement);
-              dyn_array_destroy(replacement);
-            }
+            Array_Const_Token_Ptr replacement = token_apply_macro_new_syntax(context, match, macro);
+            dyn_array_splice(*tokens, i, match_length, replacement);
+            dyn_array_destroy(replacement);
             goto start;
           }
         }

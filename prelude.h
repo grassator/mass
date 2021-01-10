@@ -984,11 +984,10 @@ dyn_array_insert_internal(
     &(_array_).data->items[_index_]\
   )
 
-#define dyn_array_splice(_array_, _index_, _length_, _to_splice_)\
+#define dyn_array_splice_raw(_array_, _index_, _length_, _to_splice_, _insert_length_)\
   do { \
     u64 _splice_index = _index_; \
-    u64 _insert_length = dyn_array_length(_to_splice_); \
-    s64 _diff = (s64)_insert_length - (_length_); \
+    s64 _diff = (s64)_insert_length_ - (_length_); \
     if (_diff < 0) { \
       dyn_array_delete_range(\
         _array_, (Range_u64){_splice_index, _splice_index - _diff}\
@@ -999,10 +998,13 @@ dyn_array_insert_internal(
       ); \
     } \
     /* do not use memmove to ensure type safety */ \
-    for (u64 j = 0; j < _insert_length; ++j) { \
-      (_array_).data->items[_splice_index + j] = (_to_splice_).data->items[j]; \
+    for (u64 j = 0; j < _insert_length_; ++j) { \
+      (_array_).data->items[_splice_index + j] = (_to_splice_)[j]; \
     } \
-  } while(0);
+  } while(0)
+
+#define dyn_array_splice(_array_, _index_, _length_, _to_splice_)\
+  dyn_array_splice_raw(_array_, _index_, _length_, (_to_splice_).data->items, dyn_array_length(_to_splice_))
 
 #define dyn_array_push_uninitialized(_array_)\
   (\
