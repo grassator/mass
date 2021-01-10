@@ -954,6 +954,9 @@ spec("source") {
           "sum = sum + x;"
           "x = x - 1;"
           "goto loop;"
+          // FIXME This return is never reached and ideally should not be required
+          //       but currently there is no way to track dead branches
+          "sum"
         "}",
         sum_up_to
       );

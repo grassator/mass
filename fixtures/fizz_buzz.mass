@@ -14,7 +14,7 @@ print :: (integer : s32) -> () {
   minus_code :: 0x2d
   temp := integer
   count : s32 = 0
-  while (temp) {
+  while temp {
     temp = temp / 10
     count = count + 1
   }
@@ -29,7 +29,7 @@ print :: (integer : s32) -> () {
   }
   buffer_size := buffer_start_index + count
   integer_index : s32 = 0
-  while (integer_index < count) {
+  while integer_index < count {
     integer_index = integer_index + 1
     digit_s32 := integer % 10
     digit := cast(s8, digit_s32)

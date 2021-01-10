@@ -3731,9 +3731,16 @@ token_parse_expression(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if (!view.length) {
+  if(!view.length) {
     // FIXME provide a source range
-    move_value(context->allocator, context->builder, &(Source_Range){0}, result_value, &void_value);
+    if (
+      result_value->descriptor->tag == Descriptor_Tag_Any ||
+      result_value->descriptor->tag == Descriptor_Tag_Void
+    ) {
+      move_value(context->allocator, context->builder, &(Source_Range){0}, result_value, &void_value);
+    } else {
+      panic("TODO user error unexpected void result");
+    }
     return true;
   }
 
@@ -3856,7 +3863,6 @@ token_parse_block(
 
   while (!it.done) {
     Token_View view = token_split_next(&it, &token_pattern_semicolon);
-    if (!view.length) continue;
     bool is_last_statement = it.done;
     Value *result_value = is_last_statement ? block_result_value : &void_value;
     token_parse_statement(&body_context, view, &block->source_range, result_value);

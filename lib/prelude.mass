@@ -1,7 +1,7 @@
-syntax (^ "while" ..@condition {}@body $) {
+new_syntax (^ "while" ..@condition {}@body $) {
   label _loop_start;
-  if condition {
-    body;
+  if condition() {
+    body();
     goto _loop_start;
   }
   label _loop_end;
