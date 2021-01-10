@@ -7,12 +7,12 @@ new_syntax (^ "while" ..@condition {}@body $) {
   label _loop_end;
 }
 
-syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
-  pre;
+new_syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
+  pre();
   label loop;
-  if condition {
-    body;
-    post;
+  if condition() {
+    body();
+    post();
     goto loop;
   }
 }
