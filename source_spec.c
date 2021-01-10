@@ -874,7 +874,7 @@ spec("source") {
 
     it("should report an end of statement marker not at the start of a syntax definition") {
       test_program_inline_source_base(
-        "syntax (\"foo\" ^ .@_ );"
+        "new_syntax (\"foo\" ^ .@_ );"
         "dummy :: () -> () {}",
         dummy
       );
@@ -888,7 +888,7 @@ spec("source") {
 
     it("should report an end of statement marker not at the end of a syntax definition") {
       test_program_inline_source_base(
-        "syntax (\"foo\" $ .@_ );"
+        "new_syntax (\"foo\" $ .@_ );"
         "dummy :: () -> () {}",
         dummy
       );

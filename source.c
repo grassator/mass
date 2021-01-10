@@ -1050,14 +1050,14 @@ token_match_pattern(
   return view_index;
 }
 
-Array_Const_Token_Ptr
+const Token *
 token_apply_macro_new_syntax(
   Compilation_Context *context,
   Array_Token_View match,
   Macro *macro
 ) {
-  // FIXME switch to const Token * return type
-  if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
   assert(macro->scope);
   Scope *expansion_scope = scope_make(context->allocator, macro->scope);
 
@@ -1120,8 +1120,6 @@ token_apply_macro_new_syntax(
     });
   }
 
-  Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
-
   Compilation_Context body_context = *context;
   body_context.scope = expansion_scope;
 
@@ -1136,9 +1134,8 @@ token_apply_macro_new_syntax(
     .source = slice_literal(""),
     .Value = { result_value },
   };
-  dyn_array_push(replacement, result_token);
 
-  return replacement;
+  return result_token;
 }
 
 
@@ -1162,9 +1159,8 @@ token_parse_macros(
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
           if (match_length) {
-            Array_Const_Token_Ptr replacement = token_apply_macro_new_syntax(context, match, macro);
-            dyn_array_splice(*tokens, i, match_length, replacement);
-            dyn_array_destroy(replacement);
+            const Token *replacement = token_apply_macro_new_syntax(context, match, macro);
+            dyn_array_splice_raw(*tokens, i, match_length, &replacement, 1);
             goto start;
           }
         }
@@ -1848,170 +1844,6 @@ token_parse_new_syntax_definition(
   };
 
   scope_add_macro(scope, macro);
-
-  return true;
-
-  err:
-  dyn_array_destroy(pattern);
-  return true;
-}
-
-bool
-token_parse_syntax_definition(
-  Compilation_Context *context,
-  Token_View view,
-  Scope *scope
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
-
-  Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
-
-  if (!pattern_token) {
-    panic("TODO user error");
-  }
-
-  Token_View replacement = token_view_rest(view, peek_index);
-  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
-
-  Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
-  bool statement_start = false;
-  bool statement_end = false;
-
-  for (u64 i = 0; i < definition.length; ++i) {
-    const Token *token = token_view_get(definition, i);
-
-    switch(token->tag) {
-      case Token_Tag_None: {
-        panic("Unexpected None Token");
-        break;
-      }
-      case Token_Tag_String: {
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .source = token->String.slice,
-            }
-          },
-        });
-        break;
-      }
-      case Token_Tag_Group: {
-        if (dyn_array_length(token->Group.children)) {
-          context_error_snprintf(
-            context, token->source_range,
-            "Nested group matches are not supported in syntax declarations (yet)"
-          );
-          goto err;
-        }
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .group_tag = token->Group.tag,
-            }
-          },
-        });
-        break;
-      }
-      case Token_Tag_Operator: {
-        if (
-          slice_equal(token->source, slice_literal("..@")) ||
-          slice_equal(token->source, slice_literal(".@")) ||
-          slice_equal(token->source, slice_literal("@"))
-        ) {
-          const Token *pattern_name = token_view_peek(definition, ++i);
-          if (!pattern_name || pattern_name->tag != Token_Tag_Id) {
-            context_error_snprintf(
-              context, token->source_range,
-              "@ operator in a syntax definition requires an id after it"
-            );
-            goto err;
-          }
-          Macro_Pattern *last_pattern = 0;
-          if (slice_equal(token->source, slice_literal("@"))) {
-            last_pattern = dyn_array_last(pattern);
-          } else if (slice_equal(token->source, slice_literal(".@"))) {
-            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
-              .tag = Macro_Pattern_Tag_Single_Token,
-            });
-          } else if (slice_equal(token->source, slice_literal("..@"))) {
-            last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
-              .tag = Macro_Pattern_Tag_Any_Token_Sequence,
-            });
-          } else {
-            panic("Internal Error: Unexpected @-like operator");
-          }
-          if (!last_pattern) {
-            context_error_snprintf(
-              context, token->source_range,
-              "@ requires a valid pattern before it"
-            );
-            goto err;
-          }
-          switch(last_pattern->tag) {
-            case Macro_Pattern_Tag_Single_Token: {
-              last_pattern->Single_Token.capture_name = pattern_name->source;
-              break;
-            }
-            case Macro_Pattern_Tag_Any_Token_Sequence: {
-              last_pattern->Any_Token_Sequence.capture_name = pattern_name->source;
-              break;
-            }
-          }
-        } else if (slice_equal(token->source, slice_literal("^"))) {
-          if (i != 0) {
-            context_error_snprintf(
-              context, token->source_range,
-              "^ operator (statement start match) can only appear at the start of the pattern."
-            );
-            goto err;
-          }
-          statement_start = true;
-        } else if (slice_equal(token->source, slice_literal("$"))) {
-          if (i != definition.length - 1) {
-            context_error_snprintf(
-              context, token->source_range,
-              "$ operator (statement end match) can only appear at the end of the pattern."
-            );
-            goto err;
-          }
-          statement_end = true;
-        } else {
-          context_error_snprintf(
-            context, token->source_range,
-            "Unsupported operator %"PRIslice" in a syntax definition",
-            SLICE_EXPAND_PRINTF(token->source)
-          );
-          goto err;
-        }
-        break;
-      }
-      case Token_Tag_Id:
-      case Token_Tag_Value: {
-        context_error_snprintf(
-          context, token->source_range,
-          "Unsupported token tag in a syntax definition"
-        );
-        goto err;
-        break;
-      }
-    }
-  }
-
-  Macro *macro = allocator_allocate(context->allocator, Macro);
-  *macro = (Macro){
-    .pattern = pattern,
-    .replacement = replacement,
-    .statement_start = statement_start,
-    .statement_end = statement_end,
-  };
-
-  scope_add_macro(scope, macro);
-
 
   return true;
 
@@ -4315,9 +4147,6 @@ token_parse(
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
     if (token_parse_new_syntax_definition(context, statement, context->program->global_scope)) {
-      continue;
-    }
-    if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
     if (token_parse_operator_definition(context, statement, context->program->global_scope)) {
