@@ -1051,7 +1051,7 @@ token_match_pattern(
 }
 
 const Token *
-token_apply_macro_new_syntax(
+token_apply_macro_syntax(
   Compilation_Context *context,
   Array_Token_View match,
   Macro *macro
@@ -1159,7 +1159,7 @@ token_parse_macros(
           Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
           if (match_length) {
-            const Token *replacement = token_apply_macro_new_syntax(context, match, macro);
+            const Token *replacement = token_apply_macro_syntax(context, match, macro);
             dyn_array_splice_raw(*tokens, i, match_length, &replacement, 1);
             goto start;
           }
@@ -1688,7 +1688,7 @@ token_parse_operator_definition(
 }
 
 bool
-token_parse_new_syntax_definition(
+token_parse_syntax_definition(
   Compilation_Context *context,
   Token_View view,
   Scope *scope
@@ -1696,7 +1696,7 @@ token_parse_new_syntax_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("new_syntax"));
+  Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -1839,7 +1839,6 @@ token_parse_new_syntax_definition(
     .replacement = replacement,
     .statement_start = statement_start,
     .statement_end = statement_end,
-    .new_syntax = true,
     .scope = scope,
   };
 
@@ -4146,7 +4145,7 @@ token_parse(
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
-    if (token_parse_new_syntax_definition(context, statement, context->program->global_scope)) {
+    if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
       continue;
     }
     if (token_parse_operator_definition(context, statement, context->program->global_scope)) {

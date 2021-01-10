@@ -788,7 +788,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro without a capture") {
       test_program_inline_source(
-        "new_syntax (\"the\" \"answer\") 42;"
+        "syntax (\"the\" \"answer\") 42;"
         "checker :: () -> (s32) { the answer }",
         checker
       );
@@ -799,7 +799,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching start and end of statement") {
       test_program_inline_source(
-        "new_syntax (^ \"foo\" $) 42;"
+        "syntax (^ \"foo\" $) 42;"
         "checker :: () -> (s64) { foo := 20; foo }",
         checker
       );
@@ -810,7 +810,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching a curly brace block") {
       test_program_inline_source(
-        "new_syntax (^ \"block\" {}@body $) body();"
+        "syntax (^ \"block\" {}@body $) body();"
         "checker :: () -> (s64) { block { 42 } }",
         checker
       );
@@ -821,7 +821,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro matching a sequence at the end") {
       test_program_inline_source(
-        "new_syntax (^ \"comment\" ..@ignore $);"
+        "syntax (^ \"comment\" ..@ignore $);"
         "checker :: () -> (s64) { x := 42; comment x = x + 1; x }",
         checker
       );
@@ -832,7 +832,7 @@ spec("source") {
 
     it("should be able to define and use a syntax macro with a capture") {
       test_program_inline_source(
-        "new_syntax (\"negative\" .@x) (-x());"
+        "syntax (\"negative\" .@x) (-x());"
         "checker :: () -> (s32) { negative 42 }",
         checker
       );
@@ -874,7 +874,7 @@ spec("source") {
 
     it("should report an end of statement marker not at the start of a syntax definition") {
       test_program_inline_source_base(
-        "new_syntax (\"foo\" ^ .@_ );"
+        "syntax (\"foo\" ^ .@_ );"
         "dummy :: () -> () {}",
         dummy
       );
@@ -888,7 +888,7 @@ spec("source") {
 
     it("should report an end of statement marker not at the end of a syntax definition") {
       test_program_inline_source_base(
-        "new_syntax (\"foo\" $ .@_ );"
+        "syntax (\"foo\" $ .@_ );"
         "dummy :: () -> () {}",
         dummy
       );

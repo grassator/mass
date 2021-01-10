@@ -85,7 +85,6 @@ typedef struct {
   Token_View replacement;
   bool statement_start;
   bool statement_end;
-  bool new_syntax;
   Scope *scope;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;

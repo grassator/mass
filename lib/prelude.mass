@@ -1,4 +1,4 @@
-new_syntax (^ "while" ..@condition {}@body $) {
+syntax (^ "while" ..@condition {}@body $) {
   label _loop_start;
   if condition() {
     body();
@@ -7,7 +7,7 @@ new_syntax (^ "while" ..@condition {}@body $) {
   label _loop_end;
 }
 
-new_syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
+syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
   pre();
   label loop;
   if condition() {
