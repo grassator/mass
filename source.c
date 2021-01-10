@@ -258,13 +258,13 @@ scope_lookup_force(
     if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
       Descriptor_Function *function = &it->value->descriptor->Function;
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
-        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;\
+        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
         {
           Compilation_Context body_context = *context;
           body_context.scope_entry_lookup_flags = Scope_Entry_Flags_None;
           body_context.scope = function->scope;
           body_context.builder = function->builder;
-          token_parse_block(&body_context, function->body, function->returns);
+          token_parse_block_no_scope(&body_context, function->body, function->returns);
         }
         fn_end(function->builder);
       }
@@ -1161,10 +1161,16 @@ token_apply_macro_new_syntax(
   Array_Token_View match,
   Macro *macro
 ) {
-  // FIXME switch to an out parameter
+  // FIXME switch to const Token * return type
   if (context->result->tag != Mass_Result_Tag_Success) return dyn_array_make(Array_Const_Token_Ptr);
   assert(macro->scope);
   Scope *expansion_scope = scope_make(context->allocator, macro->scope);
+
+  // All captured token sequences need to have access to the same base scope
+  // to support implementing disjointed syntax, such as for (;;) loop
+  // or switch / pattern matching.
+  // Ideally there should be a way to control this explicitly somehow.
+  Scope *captured_scope = scope_make(context->allocator, context->scope);
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
@@ -1185,12 +1191,9 @@ token_apply_macro_new_syntax(
 
     Token_View capture_view = *dyn_array_get(match, i);
 
-    Scope *function_scope = scope_make(context->allocator, context->scope);
-
     Function_Builder *builder = fn_begin(context);
     Descriptor *descriptor = builder->value->descriptor;
 
-    // FIXME maybe function calls should not expect a body in {}
     Token *fake_body = allocator_allocate(context->allocator, Token);
     *fake_body = (Token) {
       .tag = Token_Tag_Group,
@@ -1208,12 +1211,12 @@ token_apply_macro_new_syntax(
     descriptor->Function.returns = macro->replacement.length
       ? value_any(context->allocator)
       : &void_value;
-    descriptor->Function.scope = function_scope;
+    descriptor->Function.scope = captured_scope;
     descriptor->Function.body = fake_body;
     descriptor->Function.builder = builder;
     descriptor->Function.flags
-      |= Descriptor_Function_Flags_Pending_Body_Compilation
-      |  Descriptor_Function_Flags_Macro;
+      |= Descriptor_Function_Flags_Macro
+      |  Descriptor_Function_Flags_No_Own_Scope;
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
@@ -3321,7 +3324,9 @@ token_handle_function_call(
       // We make a nested scope based on function's original parent scope
       // instead of current scope for hygiene reasons. I.e. function body
       // should not have access to locals inside the call scope.
-      Scope *body_scope = scope_make(context->allocator, function->scope->parent);
+      Scope *body_scope = (function->flags & Descriptor_Function_Flags_No_Own_Scope)
+        ? function->scope
+        : scope_make(context->allocator, function->scope);
 
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Slice arg_name = *dyn_array_get(function->argument_names, i);
@@ -3360,7 +3365,7 @@ token_handle_function_call(
       {
         Compilation_Context body_context = *context;
         body_context.scope = body_scope;
-        token_parse_block(&body_context, body, return_value);
+        token_parse_block_no_scope(&body_context, body, return_value);
       }
 
       push_instruction(
@@ -3844,7 +3849,7 @@ token_parse_statement(
 );
 
 bool
-token_parse_block(
+token_parse_block_no_scope(
   Compilation_Context *context,
   const Token *block,
   Value *block_result_value
@@ -3858,16 +3863,24 @@ token_parse_block(
   Token_View children_view = token_view_from_token_array(children);
   Token_View_Split_Iterator it = { .view = children_view };
 
-  Compilation_Context body_context = *context;
-  body_context.scope = scope_make(context->allocator, context->scope);
-
   while (!it.done) {
     Token_View view = token_split_next(&it, &token_pattern_semicolon);
     bool is_last_statement = it.done;
     Value *result_value = is_last_statement ? block_result_value : &void_value;
-    token_parse_statement(&body_context, view, &block->source_range, result_value);
+    token_parse_statement(context, view, &block->source_range, result_value);
   }
   return true;
+}
+
+bool
+token_parse_block(
+  Compilation_Context *context,
+  const Token *block,
+  Value *block_result_value
+) {
+  Compilation_Context body_context = *context;
+  body_context.scope = scope_make(context->allocator, context->scope);
+  return token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
 bool

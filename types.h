@@ -289,6 +289,7 @@ typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_Pending_Body_Compilation = 1,
   Descriptor_Function_Flags_Macro = 2,
   Descriptor_Function_Flags_External = 4,
+  Descriptor_Function_Flags_No_Own_Scope = 8,
 } Descriptor_Function_Flags;
 
 typedef struct Descriptor_Struct_Field {

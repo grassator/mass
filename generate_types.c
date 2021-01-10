@@ -423,6 +423,7 @@ main(void) {
     { "Pending_Body_Compilation", 1 << 0 },
     { "Macro", 1 << 1 },
     { "External", 1 << 2 },
+    { "No_Own_Scope", 1 << 3 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){

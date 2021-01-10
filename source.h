@@ -134,6 +134,13 @@ token_parse_expression(
 );
 
 bool
+token_parse_block_no_scope(
+  Compilation_Context *context,
+  const Token *block,
+  Value *block_result_value
+);
+
+bool
 token_parse_block(
   Compilation_Context *program,
   const Token *block,
