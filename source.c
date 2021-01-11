@@ -215,11 +215,7 @@ scope_entry_force(
 ) {
   switch(entry->type) {
     case Scope_Entry_Type_Operator: {
-      // TODO Should scope entries have a Source_Range?
-      context_error_snprintf(
-        context, (Source_Range){0},
-        "Operators are not allowed in this context"
-      );
+      panic("Internal Error: Operators are not allowed in this context");
       return 0;
     }
     case Scope_Entry_Type_Lazy_Expression: {
@@ -3462,12 +3458,11 @@ token_parse_expression(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if(!view.length) {
-    // FIXME provide a source range
     if (
       result_value->descriptor->tag == Descriptor_Tag_Any ||
       result_value->descriptor->tag == Descriptor_Tag_Void
     ) {
-      move_value(context->allocator, context->builder, &(Source_Range){0}, result_value, &void_value);
+      move_value(context->allocator, context->builder, &view.source_range, result_value, &void_value);
     } else {
       panic("TODO user error unexpected void result");
     }
