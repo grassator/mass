@@ -53,12 +53,8 @@ spec_check_mass_result(
 }
 
 #define test_program_inline_source_base(_source_, _fn_value_id_)\
-  Array_Const_Token_Ptr tokens;\
-  Mass_Result result = tokenize(\
-    test_context.allocator, &(Source_File){test_file_name,  slice_literal(_source_)}, &tokens\
-  );\
-  check(spec_check_mass_result(&result));\
-  result = token_parse(&test_context, token_view_from_token_array(tokens));\
+  Source_File source_file = {test_file_name,  slice_literal(_source_)};\
+  program_parse(&test_context, &source_file);\
   Value *_fn_value_id_ = scope_lookup_force(\
     &test_context,\
     test_context.program->global_scope,\
@@ -334,10 +330,10 @@ spec("source") {
       test_program_inline_source_base(
         "foo bar", main
       );
-      check(result.tag == Mass_Result_Tag_Error);
+      check(test_context.result->tag == Mass_Result_Tag_Error);
       check(slice_equal(
         slice_literal("Could not parse a top level statement"),
-        result.Error.details.message
+        test_context.result->Error.details.message
       ));
     }
   }
@@ -499,12 +495,8 @@ spec("source") {
         "checker_s64 :: (x : s64) -> (s64) { size_of(x) }\n"
         "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
       );
-      Array_Const_Token_Ptr tokens;
-      Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
-      check(result.tag == Mass_Result_Tag_Success);
 
-      MASS_ON_ERROR(token_parse(&test_context, token_view_from_token_array(tokens))) {
+      MASS_ON_ERROR(program_parse(&test_context, &(Source_File){test_file_name, source})) {
         check(false, "Failed parsing");
       }
 
@@ -1139,12 +1131,8 @@ spec("source") {
         "main :: () -> () { ExitProcess(42) }\n"
         "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
-      Array_Const_Token_Ptr tokens;
-      Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
-      check(result.tag == Mass_Result_Tag_Success);
 
-      MASS_ON_ERROR(token_parse(&test_context, token_view_from_token_array(tokens))) {
+      MASS_ON_ERROR(program_parse(&test_context, &(Source_File){test_file_name, source})) {
         check(false, "Failed parsing");
       }
 
