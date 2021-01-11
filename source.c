@@ -2019,41 +2019,6 @@ token_import_match_arguments(
   return token_value_make(context, result, source_range_from_token_view(view));
 }
 
-typedef const Token *(*token_rewrite_expression_callback)(
-  Compilation_Context *context,
-  Token_View,
-  Value *result_value,
-  u64 *replacement_count
-);
-
-void
-token_rewrite_expression(
-  Compilation_Context *context,
-  Array_Const_Token_Ptr *tokens,
-  Value *result_value,
-  token_rewrite_expression_callback callback
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  // FIXME speed
-  Array_Const_Token_Ptr replacement = dyn_array_make(Array_Const_Token_Ptr);
-  start: for (;;) {
-    for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
-      Token_View rewrite_view = token_view_rest(token_view_from_token_array(*tokens), i);
-      u64 replacement_count = 0;
-      const Token *token = callback(context, rewrite_view, result_value, &replacement_count);
-      if (replacement_count) {
-        if (token) dyn_array_push(replacement, token);
-        dyn_array_splice(*tokens, i, replacement_count, replacement);
-        if (token) dyn_array_pop(replacement);
-        goto start;
-      }
-    }
-    break;
-  }
-  dyn_array_destroy(replacement);
-}
-
 Value *
 token_process_function_literal(
   Compilation_Context *context,
