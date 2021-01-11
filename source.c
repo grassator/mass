@@ -27,23 +27,36 @@ token_view_last(
   return view.tokens[view.length - 1];
 }
 
+static Token_View
+token_view_slice(
+  const Token_View *view,
+  u64 start_index,
+  u64 end_index
+) {
+  assert(end_index <= view->length);
+  assert(start_index <= end_index);
+
+  Source_Range source_range = view->source_range;
+  source_range.offsets.to = end_index == view->length
+    ? view->source_range.offsets.to
+    : view->tokens[end_index]->source_range.offsets.from;
+  source_range.offsets.from = start_index == end_index
+    ? source_range.offsets.to
+    : view->tokens[start_index]->source_range.offsets.from;
+
+  return (Token_View) {
+    .tokens = view->tokens + start_index,
+    .length = end_index - start_index,
+    .source_range = source_range,
+  };
+}
+
 static inline Token_View
 token_view_rest(
   const Token_View *view,
   u64 index
 ) {
-  assert(index <= view->length);
-
-  Source_Range source_range = view->source_range;
-  source_range.offsets.from = index == view->length
-    ? view->source_range.offsets.to
-    : view->tokens[index]->source_range.offsets.from;
-
-  return (Token_View) {
-    .tokens = view->tokens + index,
-    .length = view->length - index,
-    .source_range = source_range,
-  };
+  return token_view_slice(view, index, view->length);
 }
 
 static inline Token_View
@@ -94,23 +107,6 @@ token_array_from_view(
     dyn_array_push(result, token_view_get(view, i));
   }
   return result;
-}
-
-Source_Range
-source_range_from_token_view(
-  Token_View view
-) {
-  assert(view.length);
-  const Token *first = token_view_get(view, 0);
-  const Token *last = token_view_last(view);
-  assert(first->source_range.file == last->source_range.file);
-  return (Source_Range) {
-    .file = first->source_range.file,
-    .offsets = {
-      .from = first->source_range.offsets.from,
-      .to = last->source_range.offsets.to,
-    },
-  };
 }
 
 Scope *
@@ -1532,18 +1528,16 @@ token_handle_user_defined_operator(
     token_parse_block(&body_context, body, result_value);
   }
 
-  Source_Range call_range = source_range_from_token_view(args);
-
   push_instruction(
     &context->builder->code_block.instructions,
-    call_range,
+    args.source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
       .label = fake_return_label_index
     }
   );
 
-  return token_value_make(context, result_value, call_range);
+  return token_value_make(context, result_value, args.source_range);
 }
 
 static inline Slice
@@ -2051,7 +2045,7 @@ token_import_match_arguments(
     .descriptor = 0,
     .operand = import_symbol(context, library_name, symbol_name),
   };
-  return token_value_make(context, result, source_range_from_token_view(view));
+  return token_value_make(context, result, view.source_range);
 }
 
 Value *
@@ -2335,7 +2329,7 @@ compile_time_eval(
       break;
     }
   }
-  return token_value_make(context, token_value, source_range_from_token_view(view));
+  return token_value_make(context, token_value, view.source_range);
 }
 
 typedef struct {
@@ -2613,9 +2607,18 @@ token_dispatch_constant_operator(
     ) {
       result = token_process_c_struct_definition(context, view, args);
     } else {
+      // TODO somehow generalize this for all operators
+      const Token *call_tokens[] = {function, args};
       Token_View call_view = {
-        .tokens = (const Token *[]){function, args},
+        .tokens = call_tokens,
         .length = 2,
+        .source_range = {
+          .file = function->source_range.file,
+          .offsets = {
+            .from = function->source_range.offsets.from,
+            .to = args->source_range.offsets.to,
+          },
+        },
       };
       result = compile_time_eval(context, call_view, context->scope);
     }
@@ -3548,7 +3551,7 @@ token_parse_expression(
       MASS_ON_ERROR(token_force_value(context, token, result_value)) goto err;
     } else {
       context_error_snprintf(
-        context, source_range_from_token_view(view),
+        context, view.source_range,
         "Could not parse the expression"
       );
     }
@@ -3705,10 +3708,7 @@ token_parse_statement_if(
   }
 
   const Token *body = token_view_last(rest);
-  Token_View condition_view = {
-    .tokens = rest.tokens,
-    .length = rest.length - 1,
-  };
+  Token_View condition_view = token_view_slice(&rest, 0, rest.length - 1);
 
   Value *condition_value = value_any(context->allocator);
   token_parse_expression(context, condition_view, condition_value);
@@ -4161,9 +4161,8 @@ token_parse(
     }
 
     // Report unmatched statements
-    Source_Range source_range = source_range_from_token_view(statement);
     context_error_snprintf(
-      context, source_range,
+      context, statement.source_range,
       "Could not parse a top level statement"
     );
     break;
