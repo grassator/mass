@@ -407,6 +407,7 @@ typedef dyn_array_type(Token) Array_Token;
 typedef struct Token_View {
   const Token ** tokens;
   u64 length;
+  Source_Range source_range;
 } Token_View;
 typedef dyn_array_type(Token_View) Array_Token_View;
 

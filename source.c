@@ -29,24 +29,58 @@ token_view_last(
 
 static inline Token_View
 token_view_rest(
-  Token_View view,
+  const Token_View *view,
   u64 index
 ) {
-  assert(index <= view.length);
+  assert(index <= view->length);
+
+  Source_Range source_range = view->source_range;
+  source_range.offsets.from = index == view->length
+    ? view->source_range.offsets.to
+    : view->tokens[index]->source_range.offsets.from;
+
   return (Token_View) {
-    .tokens = view.tokens + index,
-    .length = view.length - index,
+    .tokens = view->tokens + index,
+    .length = view->length - index,
+    .source_range = source_range,
   };
 }
 
 static inline Token_View
 token_view_from_token_array(
-  Array_Const_Token_Ptr token_array
+  Array_Const_Token_Ptr token_array,
+  const Source_Range *source_range
 ) {
   return (Token_View) {
     .tokens = dyn_array_raw(token_array),
     .length = dyn_array_length(token_array),
+    .source_range = *source_range
   };
+}
+
+static Token_View
+token_view_from_group_token(
+  const Token *token
+) {
+  assert(token->tag == Token_Tag_Group);
+  Source_Range children_source_range;
+  if (dyn_array_length(token->Group.children)) {
+    const Token *first = *dyn_array_get(token->Group.children, 0);
+    const Token *last = *dyn_array_last(token->Group.children);
+    children_source_range = (Source_Range) {
+      .file = token->source_range.file,
+      .offsets = {
+        .from = first->source_range.offsets.from,
+        .to = last->source_range.offsets.to,
+      },
+    };
+  } else {
+    // TODO maybe we should this during tokenization for groups
+    //      and correctly remove braces
+    children_source_range = token->source_range;
+  }
+
+  return token_view_from_token_array(token->Group.children, &token->source_range);
 }
 
 static inline Array_Const_Token_Ptr
@@ -837,7 +871,7 @@ token_split_next(
     }
   }
   it->done = true;
-  return token_view_rest(it->view, start_index);
+  return token_view_rest(&it->view, start_index);
 }
 
 Descriptor *
@@ -1143,6 +1177,7 @@ void
 token_parse_macros(
   Compilation_Context *context,
   Array_Const_Token_Ptr *tokens,
+  const Source_Range *source_range,
   Scope *scope
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
@@ -1154,9 +1189,10 @@ token_parse_macros(
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
       start: for (;;) {
+        Token_View token_view = token_view_from_token_array(*tokens, source_range);
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
           if (macro->statement_start && i != 0) break;
-          Token_View sub_view = token_view_rest(token_view_from_token_array(*tokens), i);
+          Token_View sub_view = token_view_rest(&token_view, i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
           if (match_length) {
             const Token *replacement = token_apply_macro_syntax(context, match, macro);
@@ -1223,7 +1259,7 @@ token_maybe_split_on_operator(
   }
 
   *lhs = (Token_View) { .tokens = view.tokens, .length = lhs_end };
-  *rhs = token_view_rest(view, rhs_start);
+  *rhs = token_view_rest(&view, rhs_start);
 
   return true;
 }
@@ -1373,7 +1409,7 @@ token_force_value(
     case Token_Tag_Group: {
       switch(token->Group.tag) {
         case Token_Group_Tag_Paren: {
-          Token_View expression_tokens = token_view_from_token_array(token->Group.children);
+          Token_View expression_tokens = token_view_from_group_token(token);
           token_parse_expression(context, expression_tokens, result_value);
           return *context->result;
         }
@@ -1409,7 +1445,7 @@ token_match_call_arguments(
   if (context->result->tag != Mass_Result_Tag_Success) return result;
 
   if (dyn_array_length(token->Group.children) != 0) {
-    Token_View children = token_view_from_token_array(token->Group.children);
+    Token_View children = token_view_from_group_token(token);
     Token_View_Split_Iterator it = { .view = children };
 
     while (!it.done) {
@@ -1582,7 +1618,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
+  Token_View definition = token_view_from_group_token(pattern_token);
 
   operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *operator = (User_Defined_Operator) {
@@ -1704,8 +1740,8 @@ token_parse_syntax_definition(
     panic("TODO user error");
   }
 
-  Token_View replacement = token_view_rest(view, peek_index);
-  Token_View definition = token_view_from_token_array(pattern_token->Group.children);
+  Token_View replacement = token_view_rest(&view, peek_index);
+  Token_View definition = token_view_from_group_token(pattern_token);
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
   bool statement_start = false;
@@ -1863,7 +1899,7 @@ token_match_struct_field(
   Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, name->source);
@@ -1951,8 +1987,7 @@ token_process_c_struct_definition(
   };
 
   if (dyn_array_length(layout_block->Group.children) != 0) {
-    Token_View layout_block_children =
-      token_view_from_token_array(layout_block->Group.children);
+    Token_View layout_block_children = token_view_from_group_token(layout_block);
 
     Token_View_Split_Iterator it = { .view = layout_block_children };
     while (!it.done) {
@@ -2070,7 +2105,7 @@ token_process_function_literal(
   if (dyn_array_length(return_types->Group.children) == 0) {
     descriptor->Function.returns = &void_value;
   } else {
-    Token_View children = token_view_from_token_array(return_types->Group.children);
+    Token_View children = token_view_from_group_token(return_types);
     Token_View_Split_Iterator it = { .view = children };
 
     for (u64 i = 0; !it.done; ++i) {
@@ -2121,7 +2156,7 @@ token_process_function_literal(
   });
 
   if (dyn_array_length(args->Group.children) != 0) {
-    Token_View children = token_view_from_token_array(args->Group.children);
+    Token_View children = token_view_from_group_token(args);
     Token_View_Split_Iterator it = { .view = children };
 
     while (!it.done) {
@@ -2565,7 +2600,7 @@ token_dispatch_constant_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("external"))
     ) {
-      Token_View args_children = token_view_from_token_array(args->Group.children);
+      Token_View args_children = token_view_from_group_token(args);
       result = token_import_match_arguments(args->source_range, args_children, context);
     } else if (
       function->tag == Token_Tag_Id &&
@@ -3080,6 +3115,7 @@ token_handle_function_call(
 void
 token_dispatch_operator(
   Compilation_Context *context,
+  // FIXME this view does not seem to be required
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator_entry
@@ -3108,7 +3144,8 @@ token_dispatch_operator(
       dyn_array_push(args, *dyn_array_pop(*token_stack));
     }
 
-    Token_View args_view = token_view_from_token_array(args);
+      // FIXME provide source range
+    Token_View args_view = token_view_from_token_array(args, &operator_entry->source_range);
     result_token = operator_entry->scope_entry.handler(
       context, args_view, operator_entry->scope_entry.handler_payload
     );
@@ -3120,7 +3157,7 @@ token_dispatch_operator(
     Value *array = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
     Value *index_value = value_any(context->allocator);
-    Token_View index_tokens = token_view_from_token_array(brackets->Group.children);
+    Token_View index_tokens = token_view_from_group_token(brackets);
     token_parse_expression(context, index_tokens, index_value);
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory);
@@ -3244,7 +3281,7 @@ token_dispatch_operator(
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = *dyn_array_pop(*token_stack);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
-      Token_View eval_view = token_view_from_token_array(body->Group.children);
+      Token_View eval_view = token_view_from_group_token(body);
       result_token = compile_time_eval(context, eval_view, context->scope);
     } else {
       context_error_snprintf(
@@ -3544,8 +3581,11 @@ token_parse_block_no_scope(
   assert(block->tag == Token_Tag_Group);
   assert(block->Group.tag == Token_Group_Tag_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
-  if (!dyn_array_length(children)) return false;
-  Token_View children_view = token_view_from_token_array(children);
+  if (!dyn_array_length(children)) {
+    // FIXME this should move void into the result value
+    return false;
+  }
+  Token_View children_view = token_view_from_group_token(block);
   Token_View_Split_Iterator it = { .view = children_view };
 
   while (!it.done) {
@@ -3578,7 +3618,7 @@ token_parse_statement_label(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
 
   if (
     rest.length != 1 ||
@@ -3654,7 +3694,7 @@ token_parse_statement_if(
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
 
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
 
   if (!rest.length) {
     context_error_snprintf(
@@ -3699,7 +3739,7 @@ token_parse_goto(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
   if (rest.length == 0) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -3780,7 +3820,7 @@ token_parse_explicit_return(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
   bool has_return_expression = rest.length > 0;
 
   Scope_Entry *scope_value_entry =
@@ -3838,7 +3878,7 @@ token_match_fixed_array_type(
   Descriptor *descriptor =
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
-  Token_View size_view = token_view_from_token_array(square_brace->Group.children);
+  Token_View size_view = token_view_from_group_token(square_brace);
   Value *size_value = token_parse_constant_expression(context, size_view);
   if (!size_value) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
@@ -3963,7 +4003,7 @@ token_parse_definition(
   Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
-  Token_View rest = token_view_rest(view, peek_index);
+  Token_View rest = token_view_rest(&view, peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) {
     context_error_snprintf(
@@ -4074,8 +4114,8 @@ token_parse_statement(
 
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
-  token_parse_macros(context, &statement_tokens, context->scope);
-  view = token_view_from_token_array(statement_tokens);
+  token_parse_macros(context, &statement_tokens, source_range, context->scope);
+  view = token_view_from_token_array(statement_tokens, source_range);
   for (
     Scope *statement_matcher_scope = context->scope;
     statement_matcher_scope;
@@ -4139,7 +4179,13 @@ program_parse(
 ) {
   Array_Const_Token_Ptr tokens;
   MASS_TRY(tokenize(context->allocator, file, &tokens));
-  MASS_TRY(token_parse(context, token_view_from_token_array(tokens)));
+  Source_Range *file_source_range = allocator_allocate(context->allocator, Source_Range);
+  *file_source_range = (Source_Range) {
+    .file = file,
+    .offsets = { .from = 0, .to = file->text.length },
+  };
+  Token_View program_token_view = token_view_from_token_array(tokens, file_source_range);
+  MASS_TRY(token_parse(context, program_token_view));
   return *context->result;
 }
 

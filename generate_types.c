@@ -510,6 +510,7 @@ main(void) {
   push_type(type_struct("Token_View", (Struct_Item[]){
     { "const Token **", "tokens" },
     { "u64", "length" },
+    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Token_Pattern", (Struct_Item[]){
