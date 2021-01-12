@@ -1475,7 +1475,6 @@ void
 jit_deinit(
   Jit *jit
 ) {
-  program_deinit(jit->program);
   hash_map_destroy(jit->import_library_handles);
   if (jit->buffer) {
     fixed_buffer_destroy(jit->buffer);
@@ -1512,6 +1511,7 @@ compilation_context_deinit(
   Compilation_Context *context
 ) {
   program_deinit(context->program);
+  program_deinit(context->jit->program);
   jit_deinit(context->jit);
   bucket_buffer_destroy(context->allocation_buffer);
 }

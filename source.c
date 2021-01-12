@@ -2291,8 +2291,10 @@ compile_time_eval(
       break;
     }
   }
-  // FIXME this causes memory corruption for some reason
-  //jit_deinit(&jit);
+  // FIXME we can not deinit program here because the data section is not copied
+  //program_deinit(&eval_program);
+
+  jit_deinit(&jit);
   return token_value_make(context, token_value, view.source_range);
 }
 
