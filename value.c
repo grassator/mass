@@ -1037,12 +1037,12 @@ value_as_function(
   Value *value
 ) {
   assert(operand_is_label(&value->operand));
-  assert(program->jit_buffer);
+  assert(program->jit.buffer);
   Label *label = program_get_label(
     program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
   assert(label->section == &program->code_section);
-  s8 *target = program->jit_buffer->memory + label->section->base_rva + label->offset_in_section;
+  s8 *target = program->jit.buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1457,8 +1457,8 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
-  if (program->jit_buffer) {
-    fixed_buffer_destroy(program->jit_buffer);
+  if (program->jit.buffer) {
+    fixed_buffer_destroy(program->jit.buffer);
   }
 }
 

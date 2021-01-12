@@ -25,7 +25,7 @@ win32_section_permissions_to_virtual_protect_flags(
 
 typedef struct {
   const Function_Builder *builder;
-  Program *program;
+  Jit *jit;
 } Win32_Exception_Data;
 
 static_assert(
@@ -47,8 +47,8 @@ win32_program_test_exception_handler(
 
   Win32_Exception_Data *exception_data = DispatcherContext->HandlerData;
 
-  if (!exception_data->program->is_stack_unwinding_in_progress) {
-    exception_data->program->is_stack_unwinding_in_progress = true;
+  if (!exception_data->jit->is_stack_unwinding_in_progress) {
+    exception_data->jit->is_stack_unwinding_in_progress = true;
     printf("Unhandled Exception: ");
     switch(ExceptionRecord->ExceptionCode) {
       case EXCEPTION_ACCESS_VIOLATION: {
@@ -248,7 +248,7 @@ win32_program_jit(
       Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
-        .program = program,
+        .jit = &program->jit,
       };
     }
   }
@@ -272,7 +272,7 @@ win32_program_jit(
   )) {
     panic("Could not add function table definition");
   }
-  program->jit_buffer = result_buffer;
+  program->jit.buffer = result_buffer;
 }
 
 

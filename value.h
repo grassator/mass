@@ -278,8 +278,13 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
+typedef struct {
+  Fixed_Buffer *buffer;
+  bool is_stack_unwinding_in_progress;
+} Jit;
+
 typedef struct Program {
-  Fixed_Buffer *jit_buffer;
+  Jit jit;
   Array_Import_Library import_libraries;
   Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
@@ -288,7 +293,6 @@ typedef struct Program {
   Section data_section;
   Section code_section;
   Scope *global_scope;
-  bool is_stack_unwinding_in_progress;
 } Program;
 
 typedef struct {
