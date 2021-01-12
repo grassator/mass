@@ -323,6 +323,7 @@ main(void) {
   }));
 
   push_type(type_struct("Label", (Struct_Item[]){
+    { "bool", "resolved" },
     { "Section *", "section" },
     { "u32", "offset_in_section" },
   }));
@@ -336,7 +337,6 @@ main(void) {
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
     { "Label_Index", "label32" },
-    { "fn_type_opaque", "address" },
   }));
 
   push_type(type_struct("Import_Library", (Struct_Item[]){

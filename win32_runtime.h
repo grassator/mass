@@ -161,27 +161,31 @@ win32_program_jit_resolve_dll_imports(
   Program *program = context->program;
   if (!dyn_array_is_initialized(program->import_libraries)) return;
 
+  Bucket_Buffer *temp_buffer = bucket_buffer_make();
+  Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);
+
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     if (!lib->jit_handle) {
-      char *library_name = slice_to_c_string(context->allocator, lib->name);
+      char *library_name = slice_to_c_string(temp_allocator, lib->name);
       lib->jit_handle = LoadLibraryA(library_name);
       assert(lib->jit_handle);
-      allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
     }
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      if (!symbol->address) {
-        char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
-        symbol->address = GetProcAddress(lib->jit_handle, symbol_name);
-        assert(symbol->address);
-        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)symbol->address);
-        program_set_label_offset(program, symbol->label32, u64_to_u32(offset));
-        allocator_deallocate(context->allocator, symbol_name, symbol->name.length + 1);
+      Label *label = program_get_label(program, symbol->label32);
+      if (!label->resolved) {
+        char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        fn_type_opaque address = GetProcAddress(lib->jit_handle, symbol_name);
+        assert(address);
+        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)address);
+        label->offset_in_section = u64_to_u32(offset);
+        label->resolved = true;
       }
     }
   }
+  bucket_buffer_destroy(temp_buffer);
 }
 
 void

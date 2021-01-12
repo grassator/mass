@@ -321,6 +321,12 @@ program_jit(
   Compilation_Context *context
 );
 
+static inline Label *
+program_get_label(
+  Program *program,
+  Label_Index label
+);
+
 void
 program_patch_labels(
   Program *program

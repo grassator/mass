@@ -162,6 +162,7 @@ typedef struct Label_Index {
 typedef dyn_array_type(Label_Index) Array_Label_Index;
 
 typedef struct Label {
+  bool resolved;
   Section * section;
   u32 offset_in_section;
 } Label;
@@ -177,7 +178,6 @@ typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff
 typedef struct Import_Symbol {
   Slice name;
   Label_Index label32;
-  fn_type_opaque address;
 } Import_Symbol;
 typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
