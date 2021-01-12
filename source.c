@@ -1899,7 +1899,6 @@ token_match_struct_field(
 Token *
 token_process_bit_type_definition(
   Compilation_Context *context,
-  Token_View view,
   const Token *args
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -1937,7 +1936,6 @@ token_process_bit_type_definition(
 Token *
 token_process_c_struct_definition(
   Compilation_Context *context,
-  Token_View view,
   const Token *args
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2047,7 +2045,6 @@ token_import_match_arguments(
 Value *
 token_process_function_literal(
   Compilation_Context *context,
-  Token_View view,
   Scope *scope,
   const Token *args,
   const Token *return_types,
@@ -2337,7 +2334,6 @@ typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
 typedef void (*Operator_Dispatch_Proc)(
   Compilation_Context *,
-  Token_View,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator
 );
@@ -2561,7 +2557,6 @@ token_handle_negation(
 void
 token_dispatch_constant_operator(
   Compilation_Context *context,
-  Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator_entry
 ) {
@@ -2596,12 +2591,12 @@ token_dispatch_constant_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("bit_type"))
     ) {
-      result = token_process_bit_type_definition(context, view, args);
+      result = token_process_bit_type_definition(context, args);
     } else if (
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("c_struct"))
     ) {
-      result = token_process_c_struct_definition(context, view, args);
+      result = token_process_c_struct_definition(context, args);
     } else {
       // TODO somehow generalize this for all operators
       const Token *call_tokens[] = {function, args};
@@ -2624,7 +2619,7 @@ token_dispatch_constant_operator(
     const Token *return_types = *dyn_array_pop(*token_stack);
     const Token *arguments = *dyn_array_pop(*token_stack);
     Value *function_value = token_process_function_literal(
-      context, view, context->scope, arguments, return_types, body
+      context, context->scope, arguments, return_types, body
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
     dyn_array_push(*token_stack, result);
@@ -2704,7 +2699,7 @@ token_handle_operator(
     dyn_array_pop(*operator_stack);
 
     // apply the operator on the stack
-    dispatch_proc(context, view, token_stack, last_operator);
+    dispatch_proc(context, token_stack, last_operator);
   }
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source = new_operator,
@@ -2804,7 +2799,7 @@ token_parse_constant_expression(
 
   while (dyn_array_length(operator_stack)) {
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
-    token_dispatch_constant_operator(context, view, &token_stack, entry);
+    token_dispatch_constant_operator(context, &token_stack, entry);
   }
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
@@ -3114,8 +3109,6 @@ token_handle_function_call(
 void
 token_dispatch_operator(
   Compilation_Context *context,
-  // FIXME this view does not seem to be required
-  Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator_entry
 ) {
@@ -3537,7 +3530,7 @@ token_parse_expression(
 
   while (dyn_array_length(operator_stack)) {
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
-    token_dispatch_operator(context, view, &token_stack, entry);
+    token_dispatch_operator(context, &token_stack, entry);
   }
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(token_stack) == 1) {
