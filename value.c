@@ -1470,6 +1470,7 @@ compilation_context_init(
   Program *program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, program);
   Jit *jit = allocator_allocate(compilation_allocator, Jit);
+  jit->import_library_handles = hash_map_make(Jit_Import_Library_Handle_Map);
   program_init(compilation_allocator, &jit->program);
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
@@ -1487,6 +1488,7 @@ compilation_context_deinit(
 ) {
   program_deinit(context->program);
   program_deinit(&context->jit->program);
+  hash_map_destroy(context->jit->import_library_handles);
   if (context->jit->buffer) {
     fixed_buffer_destroy(context->jit->buffer);
   }
@@ -1500,6 +1502,7 @@ program_set_label_offset(
   u32 offset_in_section
 ) {
   Label *label = program_get_label(program, label_index);
+  label->resolved = true;
   label->offset_in_section = offset_in_section;
 }
 

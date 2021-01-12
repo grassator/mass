@@ -289,10 +289,13 @@ typedef struct Program {
   Scope *global_scope;
 } Program;
 
+hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
+
 typedef struct Jit {
   Fixed_Buffer *buffer;
   bool is_stack_unwinding_in_progress;
   Program program;
+  Jit_Import_Library_Handle_Map *import_library_handles;
 } Jit;
 
 typedef struct {

@@ -184,7 +184,6 @@ typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 typedef struct Import_Library {
   Slice name;
   Array_Import_Symbol symbols;
-  void * jit_handle;
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 

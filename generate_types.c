@@ -342,7 +342,6 @@ main(void) {
   push_type(type_struct("Import_Library", (Struct_Item[]){
     { "Slice", "name" },
     { "Array_Import_Symbol", "symbols" },
-    { "void *", "jit_handle" }
   }));
 
   push_type(type_enum("Compare_Type", (Enum_Item[]){
