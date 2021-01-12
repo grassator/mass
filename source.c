@@ -111,13 +111,14 @@ token_array_from_view(
 
 Scope *
 scope_make(
-  Allocator *allocator,
+  const Allocator *allocator,
   Scope *parent
 ) {
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
+    .allocator = allocator,
     .parent = parent,
-    .map = hash_map_make(Scope_Map),
+    .map = 0,
   };
   return scope;
 }
@@ -126,7 +127,8 @@ void
 scope_print_names(
   Scope *scope
 ) {
-  while (scope) {
+  for (; scope; scope = scope->parent) {
+    if (!scope->map) continue;
     for (u64 i = 0; i < scope->map->capacity; ++i) {
       Scope_Map__Entry *entry = &scope->map->entries[i];
       if (entry->occupied) {
@@ -134,7 +136,6 @@ scope_print_names(
         printf(" ; ");
       }
     }
-    scope = scope->parent;
   }
   printf("\n");
 }
@@ -154,6 +155,7 @@ scope_lookup(
   Scope_Entry_Flags flag_mask
 ) {
   for (; scope; scope = scope->parent) {
+    if (!scope->map) continue;
     Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
     if (!entry_pointer) continue;
     Scope_Entry *entry = *entry_pointer;
@@ -191,6 +193,7 @@ scope_lookup_overload(
 ) {
   if (it->done) return 0;
   for (; it->scope && !it->entry; it->scope = it->scope->parent) {
+    if (!it->scope->map) continue;
     Scope_Entry **entry_pointer = hash_map_get(it->scope->map, it->name);
     if (!entry_pointer) continue;
     if (scope_entry_matches_flag_mask(*entry_pointer, it->flag_mask)) {
@@ -256,6 +259,7 @@ scope_lookup_force(
   flag_mask |= context->scope_entry_lookup_flags;
   Scope_Entry *entry = 0;
   for (; scope; scope = scope->parent) {
+    if (!scope->map) continue;
     Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
     if (!entry_pointer) continue;
     if (*entry_pointer && scope_entry_matches_flag_mask(*entry_pointer, flag_mask)) {
@@ -315,6 +319,7 @@ scope_lookup_force(
     for (;;) {
       parent = parent->parent;
       if (!parent) break;
+      if (!parent->map) continue;
       if (!hash_map_has(parent->map, name)) continue;
       Value *overload = scope_lookup_force(context, parent, name, flag_mask);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
@@ -336,7 +341,10 @@ scope_define(
   Slice name,
   Scope_Entry entry
 ) {
-  Scope_Entry *allocated = allocator_allocate(scope->map->allocator, Scope_Entry);
+  if (!scope->map) {
+    scope->map = Scope_Map__make(scope->allocator);
+  }
+  Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
   *allocated = entry;
   if (hash_map_has(scope->map, name)) {
     // We just checked that the map has the entry so it safe to deref right away

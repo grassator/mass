@@ -99,6 +99,7 @@ typedef struct {
 typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
 typedef struct Scope {
+  const Allocator *allocator;
   struct Scope *parent;
   Scope_Map *map;
   Array_Macro_Ptr macros;
@@ -107,7 +108,7 @@ typedef struct Scope {
 
 Scope *
 scope_make(
-  Allocator *allocator,
+  const Allocator *allocator,
   Scope *parent
 );
 
