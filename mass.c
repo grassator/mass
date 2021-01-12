@@ -117,7 +117,7 @@ int main(s32 argc, char **argv) {
     }
     case Mass_Cli_Mode_Run: {
       program_jit(&context);
-      fn_type_opaque main = value_as_function(context.program, context.program->entry_point);
+      fn_type_opaque main = value_as_function(&context, context.program->entry_point);
       main();
       return 0;
     }

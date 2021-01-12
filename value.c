@@ -1033,16 +1033,17 @@ descriptor_array_of(
 
 fn_type_opaque
 value_as_function(
-  Program *program,
+  Compilation_Context *context,
   Value *value
 ) {
   assert(operand_is_label(&value->operand));
-  assert(program->jit.buffer);
+  assert(context->jit->buffer);
+  // FIXME :HostVsTarget
   Label *label = program_get_label(
-    program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+    context->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  assert(label->section == &program->code_section);
-  s8 *target = program->jit.buffer->memory + label->section->base_rva + label->offset_in_section;
+  assert(label->section == &context->program->code_section);
+  s8 *target = context->jit->buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1457,9 +1458,6 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
-  if (program->jit.buffer) {
-    fixed_buffer_destroy(program->jit.buffer);
-  }
 }
 
 void
@@ -1471,10 +1469,13 @@ compilation_context_init(
   Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
   Program *program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, program);
+  Jit *jit = allocator_allocate(compilation_allocator, Jit);
+  program_init(compilation_allocator, &jit->program);
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .program = program,
+    .jit = jit,
     .scope = program->global_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
@@ -1485,6 +1486,10 @@ compilation_context_deinit(
   Compilation_Context *context
 ) {
   program_deinit(context->program);
+  program_deinit(&context->jit->program);
+  if (context->jit->buffer) {
+    fixed_buffer_destroy(context->jit->buffer);
+  }
   bucket_buffer_destroy(context->allocation_buffer);
 }
 

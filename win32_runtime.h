@@ -248,7 +248,7 @@ win32_program_jit(
       Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
-        .jit = &program->jit,
+        .jit = context->jit,
       };
     }
   }
@@ -272,7 +272,7 @@ win32_program_jit(
   )) {
     panic("Could not add function table definition");
   }
-  program->jit.buffer = result_buffer;
+  context->jit->buffer = result_buffer;
 }
 
 

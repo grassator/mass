@@ -2253,7 +2253,7 @@ compile_time_eval(
   program_jit(&eval_context);
 
   fn_type_opaque jitted_code =
-    (fn_type_opaque)value_as_function(&eval_program, eval_context.builder->value);
+    (fn_type_opaque)value_as_function(&eval_context, eval_context.builder->value);
 
   jitted_code();
   Value *token_value = allocator_allocate(context->allocator, Value);
