@@ -335,18 +335,14 @@ main(void) {
 
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
-    { "u32", "name_rva" },
     { "Label_Index", "label32" },
     { "fn_type_opaque", "address" },
   }));
 
   push_type(type_struct("Import_Library", (Struct_Item[]){
     { "Slice", "name" },
-    { "u32", "name_rva" },
-    { "u32", "rva" },
     { "Array_Import_Symbol", "symbols" },
-    { "u32", "image_thunk_rva" },
-    { "void *", "handle" }
+    { "void *", "jit_handle" }
   }));
 
   push_type(type_enum("Compare_Type", (Enum_Item[]){

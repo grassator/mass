@@ -1592,9 +1592,6 @@ import_symbol(
   if (!library) {
     library = dyn_array_push(program->import_libraries, (Import_Library) {
       .name = library_name,
-      .name_rva = 0xCCCCCCCC,
-      .rva = 0xCCCCCCCC,
-      .image_thunk_rva = 0xCCCCCCCC,
       .symbols = dyn_array_make(Array_Import_Symbol, .allocator = context->allocator),
     });
   }
@@ -1606,7 +1603,6 @@ import_symbol(
     Label_Index label = make_label(program, &program->data_section);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
-      .name_rva = 0xCCCCCCCC,
       .label32 = label,
     });
   }

@@ -176,7 +176,6 @@ typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff
 
 typedef struct Import_Symbol {
   Slice name;
-  u32 name_rva;
   Label_Index label32;
   fn_type_opaque address;
 } Import_Symbol;
@@ -184,11 +183,8 @@ typedef dyn_array_type(Import_Symbol) Array_Import_Symbol;
 
 typedef struct Import_Library {
   Slice name;
-  u32 name_rva;
-  u32 rva;
   Array_Import_Symbol symbols;
-  u32 image_thunk_rva;
-  void * handle;
+  void * jit_handle;
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
 

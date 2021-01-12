@@ -163,10 +163,10 @@ win32_program_jit_resolve_dll_imports(
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    if (!lib->handle) {
+    if (!lib->jit_handle) {
       char *library_name = slice_to_c_string(context->allocator, lib->name);
-      lib->handle = LoadLibraryA(library_name);
-      assert(lib->handle);
+      lib->jit_handle = LoadLibraryA(library_name);
+      assert(lib->jit_handle);
       allocator_deallocate(context->allocator, library_name, lib->name.length + 1);
     }
 
@@ -174,7 +174,7 @@ win32_program_jit_resolve_dll_imports(
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       if (!symbol->address) {
         char *symbol_name = slice_to_c_string(context->allocator, symbol->name);
-        symbol->address = GetProcAddress(lib->handle, symbol_name);
+        symbol->address = GetProcAddress(lib->jit_handle, symbol_name);
         assert(symbol->address);
         u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)symbol->address);
         program_set_label_offset(program, symbol->label32, u64_to_u32(offset));

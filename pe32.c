@@ -28,6 +28,14 @@ enum {
 };
 
 typedef struct {
+  u32 name_rva;
+  u32 rva;
+  u32 image_thunk_rva;
+  Array_u32 symbol_rvas;
+} Import_Library_Pe32;
+typedef dyn_array_type(Import_Library_Pe32) Array_Import_Library_Pe32;
+
+typedef struct {
   Fixed_Buffer *buffer;
   s32 iat_rva;
   s32 iat_size;
@@ -102,11 +110,27 @@ encode_rdata_section(
   void *global_data = fixed_buffer_allocate_bytes(buffer, global_data_size, sizeof(s8));
   bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
 
+  Bucket_Buffer *temp_buffer = bucket_buffer_make();
+  Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);
+  Array_Import_Library_Pe32 pe32_libraries =
+    dyn_array_make(Array_Import_Library_Pe32, .allocator = temp_allocator);
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    dyn_array_push(pe32_libraries, (Import_Library_Pe32){
+      .symbol_rvas = dyn_array_make(
+        Array_u32,
+        .allocator = temp_allocator,
+        .capacity = dyn_array_length(lib->symbols),
+      ),
+    });
+  }
+
+  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      symbol->name_rva = get_rva();
+      dyn_array_push(pe32_lib->symbol_rvas, get_rva());
       fixed_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
       u64 name_size = symbol->name.length;
       u64 aligned_name_size = u64_align(name_size + 1, 2);
@@ -122,12 +146,14 @@ encode_rdata_section(
   // IAT list
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    lib->rva = get_rva();
+    Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
+    pe32_lib->rva = get_rva();
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *fn = dyn_array_get(lib->symbols, symbol_index);
       u32 offset = get_rva() - header->VirtualAddress;
       program_set_label_offset(program, fn->label32, offset);
-      fixed_buffer_append_u64(buffer, fn->name_rva);
+      u32 symbol_rva = *dyn_array_get(pe32_lib->symbol_rvas, symbol_index);
+      fixed_buffer_append_u64(buffer, symbol_rva);
     }
 
     fixed_buffer_append_u64(buffer, 0);
@@ -137,11 +163,12 @@ encode_rdata_section(
   // Image thunks
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    lib->image_thunk_rva = get_rva();
+    Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
+    pe32_lib->image_thunk_rva = get_rva();
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-      Import_Symbol *fn = dyn_array_get(lib->symbols, symbol_index);
-      fixed_buffer_append_u64(buffer, fn->name_rva);
+      u32 symbol_rva = *dyn_array_get(pe32_lib->symbol_rvas, symbol_index);
+      fixed_buffer_append_u64(buffer, symbol_rva);
     }
     // End of Image thunks list
     fixed_buffer_append_u64(buffer, 0);
@@ -150,7 +177,8 @@ encode_rdata_section(
   // Library Names
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    lib->name_rva = get_rva();
+    Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
+    pe32_lib->name_rva = get_rva();
     u64 name_size = lib->name.length;
     u64 aligned_name_size = u64_align(name_size + 1, 2);
     memcpy(
@@ -164,14 +192,14 @@ encode_rdata_section(
   result.import_directory_rva = get_rva();
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
 
     IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
       fixed_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR);
     *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
-      .OriginalFirstThunk = lib->image_thunk_rva,
-      .Name = lib->name_rva,
-      .FirstThunk = lib->rva,
+      .OriginalFirstThunk = pe32_lib->image_thunk_rva,
+      .Name = pe32_lib->name_rva,
+      .FirstThunk = pe32_lib->rva,
     };
   }
   result.import_directory_size = get_rva() - result.import_directory_rva;
@@ -199,6 +227,8 @@ encode_rdata_section(
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
+
+  bucket_buffer_destroy(temp_buffer);
 
   return result;
 }
