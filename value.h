@@ -278,12 +278,6 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
-typedef struct Scope Scope;
-typedef enum {
-  Scope_Entry_Flags_None   = 0,
-  Scope_Entry_Flags_Static = 1 << 0,
-} Scope_Entry_Flags;
-
 typedef struct Program {
   Fixed_Buffer *jit_buffer;
   Array_Import_Library import_libraries;
@@ -301,7 +295,6 @@ typedef struct {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Program *program;
-  Scope_Entry_Flags scope_entry_lookup_flags;
   Scope *scope;
   Function_Builder *builder;
   Mass_Result *result;

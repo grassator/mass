@@ -45,7 +45,6 @@ typedef struct {
 typedef struct Scope_Entry Scope_Entry;
 typedef struct Scope_Entry {
   Scope_Entry_Type type;
-  Scope_Entry_Flags flags;
   Scope_Entry *next_overload;
   union {
     Value *value;
