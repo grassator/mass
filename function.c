@@ -446,17 +446,18 @@ fn_end(
 
 u32
 make_trampoline(
-  Compilation_Context *context,
+  Program *program,
   Fixed_Buffer *buffer,
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
   encode_instruction_with_compiler_location(
-    context->program, buffer,
-    &(Instruction) {.assembly = {mov, {rax, imm64(context->allocator, address)}}}
+    program, buffer,
+    // @Leak
+    &(Instruction) {.assembly = {mov, {rax, imm64(allocator_default, address)}}}
   );
   encode_instruction_with_compiler_location(
-    context->program, buffer,
+    program, buffer,
     &(Instruction) {.assembly = {jmp, {rax}}}
   );
   return result;
@@ -527,7 +528,7 @@ typedef struct {
 
 void
 fn_encode(
-  Compilation_Context *context,
+  Program *program,
   Fixed_Buffer *buffer,
   Function_Builder *builder
 ) {
@@ -536,7 +537,6 @@ fn_encode(
     // as some of them have Any arguments or returns
     return;
   }
-  Program *program = context->program;
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand_is_label(operand));
@@ -545,7 +545,8 @@ fn_encode(
 
   s64 code_base_rva = label->section->base_rva;
   builder->layout.begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
-  Operand stack_size_operand = imm_auto_8_or_32(context->allocator, builder->layout.stack_reserve);
+  // @Leak
+  Operand stack_size_operand = imm_auto_8_or_32(allocator_default, builder->layout.stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,

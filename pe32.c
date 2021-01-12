@@ -263,7 +263,7 @@ encode_text_section(
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
-    fn_encode(context, result.buffer, builder);
+    fn_encode(context->program, result.buffer, builder);
   }
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {

@@ -1033,17 +1033,16 @@ descriptor_array_of(
 
 fn_type_opaque
 value_as_function(
-  Compilation_Context *context,
+  const Jit *jit,
   Value *value
 ) {
   assert(operand_is_label(&value->operand));
-  assert(context->jit->buffer);
-  // FIXME :HostVsTarget
+  assert(jit->buffer);
   Label *label = program_get_label(
-    context->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+    jit->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  assert(label->section == &context->program->code_section);
-  s8 *target = context->jit->buffer->memory + label->section->base_rva + label->offset_in_section;
+  assert(label->section == &jit->program->code_section);
+  s8 *target = jit->buffer->memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1461,6 +1460,29 @@ program_deinit(
 }
 
 void
+jit_init(
+  Jit *jit,
+  Program *program
+) {
+  *jit = (Jit) {
+    .buffer = 0,
+    .import_library_handles = hash_map_make(Jit_Import_Library_Handle_Map),
+    .program = program,
+  };
+}
+
+void
+jit_deinit(
+  Jit *jit
+) {
+  program_deinit(jit->program);
+  hash_map_destroy(jit->import_library_handles);
+  if (jit->buffer) {
+    fixed_buffer_destroy(jit->buffer);
+  }
+}
+
+void
 compilation_context_init(
   const Allocator *allocator,
   Compilation_Context *context
@@ -1469,9 +1491,12 @@ compilation_context_init(
   Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
   Program *program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, program);
+
+  Program *jit_program = allocator_allocate(compilation_allocator, Program);
+  program_init(compilation_allocator, jit_program);
   Jit *jit = allocator_allocate(compilation_allocator, Jit);
-  jit->import_library_handles = hash_map_make(Jit_Import_Library_Handle_Map);
-  program_init(compilation_allocator, &jit->program);
+  jit_init(jit, jit_program);
+
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
@@ -1487,11 +1512,7 @@ compilation_context_deinit(
   Compilation_Context *context
 ) {
   program_deinit(context->program);
-  program_deinit(&context->jit->program);
-  hash_map_destroy(context->jit->import_library_handles);
-  if (context->jit->buffer) {
-    fixed_buffer_destroy(context->jit->buffer);
-  }
+  jit_deinit(context->jit);
   bucket_buffer_destroy(context->allocation_buffer);
 }
 
@@ -1536,10 +1557,10 @@ program_patch_labels(
 
 void
 program_jit(
-  Compilation_Context *context
+  Jit *jit
 ) {
   #ifdef _WIN32
-  win32_program_jit(context);
+  win32_program_jit(jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif

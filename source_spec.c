@@ -66,7 +66,9 @@ spec_check_mass_result(
   test_program_inline_source_base(_source_, _fn_value_id_);\
   check(spec_check_mass_result(test_context.result));\
   check(_fn_value_id_);\
-  program_jit(&test_context);\
+  Jit jit;\
+  jit_init(&jit, test_context.program);\
+  program_jit(&jit);\
   check(spec_check_mass_result(test_context.result));
 
 
@@ -322,7 +324,7 @@ spec("source") {
         "}",
         foo
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, foo);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, foo);
       check(checker() == 42);
     }
     #endif
@@ -336,7 +338,7 @@ spec("source") {
         "}",
         foo
       );
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&test_context, foo);
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&jit, foo);
       Register actual = checker();
       Register expected = Register_C;
       check(actual == expected, "Expected %d, got %d", expected, actual);
@@ -357,7 +359,7 @@ spec("source") {
         "}",
         foo
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, foo);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, foo);
       check(checker() == 42);
     }
 
@@ -373,10 +375,12 @@ spec("source") {
         scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("main"));
       check(main);
 
-      program_jit(&test_context);
+      Jit jit;
+      jit_init(&jit, test_context.program);
+      program_jit(&jit);
       check(spec_check_mass_result(test_context.result));
 
-      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(&test_context, main);
+      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(&jit, main);
 
       volatile bool caught_exception = false;
       __try {
@@ -393,7 +397,7 @@ spec("source") {
   describe("Functions") {
     it("should be able to parse and run a void -> s64 function") {
       test_program_inline_source("foo :: () -> (s64) { 42 }", foo);
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, foo);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, foo);
       check(checker() == 42);
     }
 
@@ -402,7 +406,7 @@ spec("source") {
         "foo :: (x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }",
         foo
       );
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&test_context, foo);
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&jit, foo);
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
@@ -412,14 +416,14 @@ spec("source") {
         "outer :: (x : s64) -> (s64) { inner(1); x }",
         outer
       );
-      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(&test_context, outer);
+      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(&jit, outer);
       s64 actual = checker(42);
       check(actual == 42);
     }
 
     it("should be able to parse and run a s64 -> s64 function") {
       test_program_inline_source("foo :: (x : s64) -> (s64) { x }", foo);
-      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(&test_context, foo);
+      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)value_as_function(&jit, foo);
       check(checker(42) == 42);
     }
 
@@ -428,7 +432,7 @@ spec("source") {
         "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
         foo
       );
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&test_context, foo);
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&jit, foo);
       check(checker() == 42);
     }
 
@@ -438,7 +442,7 @@ spec("source") {
         "plus :: (x : s32, y : s32) -> (s32) { x + y }",
         proxy
       );
-      s32 answer = ((fn_type_void_to_s32)value_as_function(&test_context, proxy))();
+      s32 answer = ((fn_type_void_to_s32)value_as_function(&jit, proxy))();
       check(answer == 42);
     }
 
@@ -447,7 +451,7 @@ spec("source") {
         "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
         checker
       );
-      s64 answer = ((fn_type_void_to_s64)value_as_function(&test_context, checker))();
+      s64 answer = ((fn_type_void_to_s64)value_as_function(&jit, checker))();
       check(answer == 42);
     }
 
@@ -457,7 +461,7 @@ spec("source") {
         "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
         checker
       );
-      s64 size = ((fn_type_s32_to_s64)value_as_function(&test_context, checker))(0);
+      s64 size = ((fn_type_s32_to_s64)value_as_function(&jit, checker))(0);
       check(size == 4);
     }
 
@@ -478,15 +482,17 @@ spec("source") {
       Value *checker_32 =
         scope_lookup_force(&test_context, test_context.program->global_scope, slice_literal("checker_s32"));
 
-      program_jit(&test_context);
+      Jit jit;
+      jit_init(&jit, test_context.program);
+      program_jit(&jit);
 
       {
-        s64 size = ((fn_type_s64_to_s64)value_as_function(&test_context, checker_s64))(0);
+        s64 size = ((fn_type_s64_to_s64)value_as_function(&jit, checker_s64))(0);
         check(size == 8);
       }
 
       {
-        s64 size = ((fn_type_s32_to_s64)value_as_function(&test_context, checker_32))(0);
+        s64 size = ((fn_type_s32_to_s64)value_as_function(&jit, checker_32))(0);
         check(size == 4);
       }
     }
@@ -508,7 +514,7 @@ spec("source") {
         "checker :: (x : s32) -> (s32) { return x }",
         checker
       );
-      s32 actual = ((fn_type_s32_to_s32)value_as_function(&test_context, checker))(42);
+      s32 actual = ((fn_type_s32_to_s32)value_as_function(&jit, checker))(42);
       check(actual == 42);
     }
 
@@ -521,7 +527,7 @@ spec("source") {
         test_fn
       );
       fn_type_void_to_s32 checker =
-        (fn_type_void_to_s32)value_as_function(&test_context, test_fn);
+        (fn_type_void_to_s32)value_as_function(&jit, test_fn);
       check(checker() == 42);
     }
 
@@ -535,7 +541,7 @@ spec("source") {
       );
 
       fn_type_s64_to_s64 checker =
-        (fn_type_s64_to_s64)value_as_function(&test_context, fibonnacci);
+        (fn_type_s64_to_s64)value_as_function(&jit, fibonnacci);
       check(checker(0) == 0);
       check(checker(1) == 1);
       check(checker(10) == 55);
@@ -603,7 +609,7 @@ spec("source") {
         plus
       );
       fn_type_s64_s64_s64_to_s64 checker =
-        (fn_type_s64_s64_s64_to_s64)value_as_function(&test_context, plus);
+        (fn_type_s64_s64_s64_to_s64)value_as_function(&jit, plus);
       check(checker(30, 10, 2) == 42);
     }
 
@@ -613,7 +619,7 @@ spec("source") {
         plus_one
       );
       fn_type_s64_to_s64 checker =
-        (fn_type_s64_to_s64)value_as_function(&test_context, plus_one);
+        (fn_type_s64_to_s64)value_as_function(&jit, plus_one);
       check(checker(41) == 42);
     }
 
@@ -623,7 +629,7 @@ spec("source") {
         "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }",
         plus
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, plus);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, plus);
       check(checker() == 42);
     }
 
@@ -633,7 +639,7 @@ spec("source") {
         "test :: () -> (s64) { y := 41; ++y }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -643,7 +649,7 @@ spec("source") {
         "test :: () -> (s64) { y := 42; y++ }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -654,7 +660,7 @@ spec("source") {
         "test :: () -> (s64) { y := 41; ++y++ }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -664,7 +670,7 @@ spec("source") {
         "test :: () -> (s64) { 21 ** 2 }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -706,7 +712,7 @@ spec("source") {
         "test :: () -> (s64) { id(42) }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -716,38 +722,38 @@ spec("source") {
         "test :: () -> (s64) { id(42) + 1 }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 21);
     }
 
     it("should be able to parse and run macro with a literal s64 type") {
       test_program_inline_source(
-        "broken_plus :: macro (x : s64, cast(s64, 0)) -> (s64) { x + 1 }\n"
-        "broken_plus :: macro (x : s64, y : s64) -> (s64) { x + y }\n"
-        "test :: () -> (s64) { broken_plus(cast(s64, 41), cast(s64, 0)) }",
+        "broken_plus :: macro (x : u8, 0) -> (u8) { x + 1 }\n"
+        "broken_plus :: macro (x : u8, y : u8) -> (u8) { x + y }\n"
+        "test :: () -> (u8) { broken_plus(41, 0) }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
-    xit("should allow changes to the passed arguments to macro function") {
+    it("should allow changes to the passed arguments to macro function") {
       test_program_inline_source(
-        "process :: macro (y : any) -> () { y = 42; }\n"
+        "process :: macro (y : s64) -> () { y = 42; }\n"
         "test :: () -> (s64) { x := 20; process(x); x }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
-    xit("should allow changes to the passed arguments to inline function") {
+    xit("should not allow changes to the passed arguments to inline function") {
       test_program_inline_source(
         "process :: inline (y : s64) -> () { y = 20; }\n"
         "test :: () -> (s64) { x := 42; process(x); x }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -758,7 +764,7 @@ spec("source") {
         checker
       );
       fn_type_void_to_s32 checker_fn =
-        (fn_type_void_to_s32)value_as_function(&test_context, checker);
+        (fn_type_void_to_s32)value_as_function(&jit, checker);
       check(checker_fn() == 42);
     }
 
@@ -769,7 +775,7 @@ spec("source") {
         checker
       );
       fn_type_void_to_s64 checker_fn =
-        (fn_type_void_to_s64)value_as_function(&test_context, checker);
+        (fn_type_void_to_s64)value_as_function(&jit, checker);
       check(checker_fn() == 42);
     }
 
@@ -780,7 +786,7 @@ spec("source") {
         checker
       );
       fn_type_void_to_s64 checker_fn =
-        (fn_type_void_to_s64)value_as_function(&test_context, checker);
+        (fn_type_void_to_s64)value_as_function(&jit, checker);
       check(checker_fn() == 42);
     }
 
@@ -791,7 +797,7 @@ spec("source") {
         checker
       );
       fn_type_void_to_s64 checker_fn =
-        (fn_type_void_to_s64)value_as_function(&test_context, checker);
+        (fn_type_void_to_s64)value_as_function(&jit, checker);
       check(checker_fn() == 42);
     }
 
@@ -802,7 +808,7 @@ spec("source") {
         checker
       );
       fn_type_void_to_s32 checker_fn =
-        (fn_type_void_to_s32)value_as_function(&test_context, checker);
+        (fn_type_void_to_s32)value_as_function(&jit, checker);
       check(checker_fn() == -42);
     }
 
@@ -821,7 +827,7 @@ spec("source") {
         sum_up_to
       );
       fn_type_s32_to_s32 sum_up_to_fn =
-        (fn_type_s32_to_s32)value_as_function(&test_context, sum_up_to);
+        (fn_type_s32_to_s32)value_as_function(&jit, sum_up_to);
       check(sum_up_to_fn(0) == 0);
       check(sum_up_to_fn(1) == 1);
       check(sum_up_to_fn(2) == 3);
@@ -873,7 +879,7 @@ spec("source") {
         "test :: () -> (s64) { BAR }",
         test
       );
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&test_context, test);
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)value_as_function(&jit, test);
       check(checker() == 42);
     }
   }
@@ -888,7 +894,7 @@ spec("source") {
         is_positive
       );
       fn_type_s32_to_s8 is_positive_fn =
-        (fn_type_s32_to_s8)value_as_function(&test_context, is_positive);
+        (fn_type_s32_to_s8)value_as_function(&jit, is_positive);
       check(is_positive_fn(42) == 1);
       check(is_positive_fn(-2) == 0);
     }
@@ -926,7 +932,7 @@ spec("source") {
         sum_up_to
       );
       fn_type_s32_to_s32 sum_up_to_fn =
-        (fn_type_s32_to_s32)value_as_function(&test_context, sum_up_to);
+        (fn_type_s32_to_s32)value_as_function(&jit, sum_up_to);
       check(sum_up_to_fn(0) == 0);
       check(sum_up_to_fn(1) == 1);
       check(sum_up_to_fn(2) == 3);
@@ -945,7 +951,7 @@ spec("source") {
         test
       );
       fn_type_void_to_s32 checker =
-        (fn_type_void_to_s32)value_as_function(&test_context, test);
+        (fn_type_void_to_s32)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -970,7 +976,7 @@ spec("source") {
       );
 
       fn_type_void_to_void checker =
-        (fn_type_void_to_void)value_as_function(&test_context, test);
+        (fn_type_void_to_void)value_as_function(&jit, test);
       checker();
     }
 
@@ -985,7 +991,7 @@ spec("source") {
       );
 
       fn_type_void_to_s32 checker =
-        (fn_type_void_to_s32)value_as_function(&test_context, test);
+        (fn_type_void_to_s32)value_as_function(&jit, test);
       check(checker() == 42);
     }
 
@@ -1015,7 +1021,7 @@ spec("source") {
       );
 
       fn_type_s64_to_test_128bit_struct checker =
-        (fn_type_s64_to_test_128bit_struct) value_as_function(&test_context, return_struct);
+        (fn_type_s64_to_test_128bit_struct) value_as_function(&jit, return_struct);
       Test_128bit test_128bit = checker(42);
       check(test_128bit.x == 42);
       check(test_128bit.y == 21);
@@ -1061,7 +1067,7 @@ spec("source") {
         checker
       );
       const char *string =
-        ((fn_type_void_to_const_charp)value_as_function(&test_context, checker))();
+        ((fn_type_void_to_const_charp)value_as_function(&jit, checker))();
       check(strcmp(string, "test") == 0);
     }
   }
@@ -1073,7 +1079,7 @@ spec("source") {
         return_200
       );
       fn_type_void_to_u8 checker =
-        (fn_type_void_to_u8)value_as_function(&test_context, return_200);
+        (fn_type_void_to_u8)value_as_function(&jit, return_200);
       check(checker() == 200);
     }
 
@@ -1082,7 +1088,7 @@ spec("source") {
         "test :: () -> (u8) { x : u8 = 200; x < 0 }",
         test
       );
-      fn_type_void_to_u8 checker = (fn_type_void_to_u8)value_as_function(&test_context, test);
+      fn_type_void_to_u8 checker = (fn_type_void_to_u8)value_as_function(&jit, test);
       check(checker() == false);
     }
   }
@@ -1093,7 +1099,7 @@ spec("source") {
         "add_one :: (x : s16) -> (s16) { x + 1 }",
         add_one
       );
-      fn_type_s16_to_s16 checker = (fn_type_s16_to_s16)value_as_function(&test_context, add_one);
+      fn_type_s16_to_s16 checker = (fn_type_s16_to_s16)value_as_function(&jit, add_one);
       check(checker(8) == 9);
     }
   }
@@ -1141,11 +1147,13 @@ spec("source") {
       );
       check(fizz_buzz);
 
-      program_jit(&test_context);
+      Jit jit;
+      jit_init(&jit, test_context.program);
+      program_jit(&jit);
       check(spec_check_mass_result(test_context.result));
 
       fn_type_void_to_void checker =
-        (fn_type_void_to_void)value_as_function(&test_context, fizz_buzz);
+        (fn_type_void_to_void)value_as_function(&jit, fizz_buzz);
       checker();
     }
   }

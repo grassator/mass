@@ -156,9 +156,9 @@ win32_program_test_exception_handler(
 
 void
 win32_program_jit_resolve_dll_imports(
-  Compilation_Context *context
+  Jit *jit
 ) {
-  Program *program = context->program;
+  Program *program = jit->program;
   if (!dyn_array_is_initialized(program->import_libraries)) return;
 
   Bucket_Buffer *temp_buffer = bucket_buffer_make();
@@ -166,7 +166,7 @@ win32_program_jit_resolve_dll_imports(
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    void **maybe_handle_pointer = hash_map_get(context->jit->import_library_handles, lib->name);
+    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
     void *handle;
     if (maybe_handle_pointer) {
       handle = *maybe_handle_pointer;
@@ -174,7 +174,7 @@ win32_program_jit_resolve_dll_imports(
       char *library_name = slice_to_c_string(temp_allocator, lib->name);
       handle = LoadLibraryA(library_name);
       assert(handle);
-      hash_map_set(context->jit->import_library_handles, lib->name, handle);
+      hash_map_set(jit->import_library_handles, lib->name, handle);
     }
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
@@ -195,10 +195,10 @@ win32_program_jit_resolve_dll_imports(
 
 void
 win32_program_jit(
-  Compilation_Context *context
+  Jit *jit
 ) {
-  win32_program_jit_resolve_dll_imports(context);
-  Program *program = context->program;
+  win32_program_jit_resolve_dll_imports(jit);
+  Program *program = jit->program;
   u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
   u64 function_count = dyn_array_length(program->functions);
   u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
@@ -237,11 +237,11 @@ win32_program_jit(
 
   s8 *code_memory = result_buffer->memory + result_buffer->occupied;
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
-  u32 trampoline_virtual_address = make_trampoline(context, result_buffer, trampoline_target);
+  u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(context, result_buffer, builder);
+    fn_encode(program, result_buffer, builder);
   }
 
   for (u64 i = 0; i < function_count; ++i) {
@@ -257,7 +257,7 @@ win32_program_jit(
       Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
-        .jit = context->jit,
+        .jit = jit,
       };
     }
   }
@@ -281,7 +281,7 @@ win32_program_jit(
   )) {
     panic("Could not add function table definition");
   }
-  context->jit->buffer = result_buffer;
+  jit->buffer = result_buffer;
 }
 
 

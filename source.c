@@ -2250,10 +2250,11 @@ compile_time_eval(
   move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
   fn_end(eval_context.builder);
 
-  program_jit(&eval_context);
+  Jit jit;
+  jit_init(&jit, &eval_program);
+  program_jit(&jit);
 
-  fn_type_opaque jitted_code =
-    (fn_type_opaque)value_as_function(&eval_context, eval_context.builder->value);
+  fn_type_opaque jitted_code = value_as_function(&jit, eval_context.builder->value);
 
   jitted_code();
   Value *token_value = allocator_allocate(context->allocator, Value);
@@ -2290,6 +2291,8 @@ compile_time_eval(
       break;
     }
   }
+  // FIXME this causes memory corruption for some reason
+  //jit_deinit(&jit);
   return token_value_make(context, token_value, view.source_range);
 }
 
