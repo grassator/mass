@@ -277,7 +277,7 @@ scope_lookup_force(
           body_context.builder = function->builder;
           token_parse_block_no_scope(&body_context, function->body, function->returns);
         }
-        fn_end(function->builder);
+        fn_end(context->program, function->builder);
       }
     }
 
@@ -2234,7 +2234,7 @@ compile_time_eval(
   };
 
   move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
-  fn_end(eval_context.builder);
+  fn_end(eval_context.program, eval_context.builder);
 
   program_jit(jit);
 

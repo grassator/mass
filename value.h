@@ -269,6 +269,7 @@ typedef struct {
 } Function_Layout;
 
 typedef struct Function_Builder {
+  bool frozen;
   Function_Layout layout;
   u32 max_call_parameters_stack_size;
   Code_Block code_block;

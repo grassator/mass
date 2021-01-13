@@ -434,51 +434,6 @@ fn_begin(
   return builder;
 }
 
-void
-fn_end(
-  Function_Builder *builder
-) {
-  u8 alignment = 0x8;
-  builder->layout.stack_reserve += builder->max_call_parameters_stack_size;
-  builder->layout.stack_reserve = s32_align(builder->layout.stack_reserve, 16) + alignment;
-  assert(builder->value->descriptor->Function.returns);
-}
-
-u32
-make_trampoline(
-  Program *program,
-  Fixed_Buffer *buffer,
-  s64 address
-) {
-  u32 result = u64_to_u32(buffer->occupied);
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    // @Leak
-    &(Instruction) {.assembly = {mov, {rax, imm64(allocator_default, address)}}}
-  );
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    &(Instruction) {.assembly = {jmp, {rax}}}
-  );
-  return result;
-}
-
-
-void
-fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
-  Function_Builder *builder
-) {
-  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
-  if (!last_instruction) return;
-  if (last_instruction->type != Instruction_Type_Assembly) return;
-  if (last_instruction->assembly.mnemonic != jmp) return;
-  Operand op = last_instruction->assembly.operands[0];
-  if (!operand_is_label(&op)) return;
-  if (op.Memory.location.Instruction_Pointer_Relative.label_index.value
-    != builder->code_block.end_label.value) return;
-  dyn_array_pop(builder->code_block.instructions);
-}
-
 // :StackDisplacementEncoding
 s64
 fn_adjust_stack_displacement(
@@ -521,6 +476,60 @@ fn_normalize_instruction_operands(
   }
 }
 
+void
+fn_end(
+  Program *program,
+  Function_Builder *builder
+) {
+  assert(!builder->frozen);
+
+  u8 alignment = 0x8;
+  builder->layout.stack_reserve += builder->max_call_parameters_stack_size;
+  builder->layout.stack_reserve = s32_align(builder->layout.stack_reserve, 16) + alignment;
+  assert(builder->value->descriptor->Function.returns);
+
+  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
+    fn_normalize_instruction_operands(program, builder, instruction);
+  }
+  builder->frozen = true;
+}
+
+u32
+make_trampoline(
+  Program *program,
+  Fixed_Buffer *buffer,
+  s64 address
+) {
+  u32 result = u64_to_u32(buffer->occupied);
+  encode_instruction_with_compiler_location(
+    program, buffer,
+    // @Leak
+    &(Instruction) {.assembly = {mov, {rax, imm64(allocator_default, address)}}}
+  );
+  encode_instruction_with_compiler_location(
+    program, buffer,
+    &(Instruction) {.assembly = {jmp, {rax}}}
+  );
+  return result;
+}
+
+
+void
+fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
+  Function_Builder *builder
+) {
+  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
+  if (!last_instruction) return;
+  if (last_instruction->type != Instruction_Type_Assembly) return;
+  if (last_instruction->assembly.mnemonic != jmp) return;
+  Operand op = last_instruction->assembly.operands[0];
+  if (!operand_is_label(&op)) return;
+  if (op.Memory.location.Instruction_Pointer_Relative.label_index.value
+    != builder->code_block.end_label.value) return;
+  dyn_array_pop(builder->code_block.instructions);
+}
+
 typedef struct {
   u8 register_index;
   u8 offset_in_prolog;
@@ -537,6 +546,8 @@ fn_encode(
     // as some of them have Any arguments or returns
     return;
   }
+  // Macro functions do not have own stack and do not need freezing
+  assert(builder->frozen);
   fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand_is_label(operand));
@@ -579,10 +590,8 @@ fn_encode(
   builder->layout.size_of_prolog =
     u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
 
-
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    fn_normalize_instruction_operands(program, builder, instruction);
     encode_instruction(program, buffer, instruction);
   }
 
