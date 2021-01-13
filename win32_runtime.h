@@ -243,16 +243,22 @@ win32_program_jit(
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
   u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
 
-  for (u64 i = 0; i < function_count; ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    fn_encode(program, result_buffer, builder);
-  }
+  Array_Function_Layout layouts =
+    dyn_array_make(Array_Function_Layout, .capacity = function_count);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
+    Function_Layout *layout = dyn_array_push(layouts, (Function_Layout){0});
+    fn_encode(program, result_buffer, builder, layout);
+  }
+
+  // It is a separate loop from above to make sure unwinding data is not in executable memory
+  for (u64 i = 0; i < function_count; ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    Function_Layout *layout = dyn_array_get(layouts, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
     u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
-    win32_fn_init_unwind_info(builder, unwind_info, &fn_exception_info[i], unwind_data_rva);
+    win32_fn_init_unwind_info(builder, layout, unwind_info, &fn_exception_info[i], unwind_data_rva);
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
@@ -286,6 +292,8 @@ win32_program_jit(
     panic("Could not add function table definition");
   }
   jit->buffer = result_buffer;
+
+  dyn_array_destroy(layouts);
 }
 
 

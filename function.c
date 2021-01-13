@@ -19,9 +19,9 @@ reserve_stack(
   Descriptor *descriptor
 ) {
   u32 byte_size = descriptor_byte_size(descriptor);
-  fn->layout.stack_reserve = s32_align(fn->layout.stack_reserve, byte_size);
-  fn->layout.stack_reserve += byte_size;
-  Operand operand = stack(-fn->layout.stack_reserve, byte_size);
+  fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
+  fn->stack_reserve += byte_size;
+  Operand operand = stack(-fn->stack_reserve, byte_size);
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
@@ -408,7 +408,6 @@ fn_begin(
     .operand = code_label32(make_label(context->program, &context->program->code_section)),
   };
   Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
-    .layout = {0},
     .value = fn_value,
     .code_block = {
       .end_label = make_label(context->program, &context->program->code_section),
@@ -442,7 +441,7 @@ fn_adjust_stack_displacement(
 ) {
   // Negative diplacement is used to encode local variables
   if (displacement < 0) {
-    displacement += builder->layout.stack_reserve;
+    displacement += builder->stack_reserve;
   } else
   // Positive values larger than max_call_parameters_stack_size
   // are for arguments to this function on the stack
@@ -450,7 +449,7 @@ fn_adjust_stack_displacement(
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
     s32 return_address_size = 8;
-    displacement += builder->layout.stack_reserve + return_address_size;
+    displacement += builder->stack_reserve + return_address_size;
   }
   return displacement;
 }
@@ -476,6 +475,22 @@ fn_normalize_instruction_operands(
   }
 }
 
+// TODO generalize for all jumps to jumps
+void
+fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
+  Function_Builder *builder
+) {
+  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
+  if (!last_instruction) return;
+  if (last_instruction->type != Instruction_Type_Assembly) return;
+  if (last_instruction->assembly.mnemonic != jmp) return;
+  Operand op = last_instruction->assembly.operands[0];
+  if (!operand_is_label(&op)) return;
+  if (op.Memory.location.Instruction_Pointer_Relative.label_index.value
+    != builder->code_block.end_label.value) return;
+  dyn_array_pop(builder->code_block.instructions);
+}
+
 void
 fn_end(
   Program *program,
@@ -484,14 +499,16 @@ fn_end(
   assert(!builder->frozen);
 
   u8 alignment = 0x8;
-  builder->layout.stack_reserve += builder->max_call_parameters_stack_size;
-  builder->layout.stack_reserve = s32_align(builder->layout.stack_reserve, 16) + alignment;
+  builder->stack_reserve += builder->max_call_parameters_stack_size;
+  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
   assert(builder->value->descriptor->Function.returns);
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     fn_normalize_instruction_operands(program, builder, instruction);
   }
+  fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
+
   builder->frozen = true;
 }
 
@@ -514,22 +531,6 @@ make_trampoline(
   return result;
 }
 
-
-void
-fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
-  Function_Builder *builder
-) {
-  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
-  if (!last_instruction) return;
-  if (last_instruction->type != Instruction_Type_Assembly) return;
-  if (last_instruction->assembly.mnemonic != jmp) return;
-  Operand op = last_instruction->assembly.operands[0];
-  if (!operand_is_label(&op)) return;
-  if (op.Memory.location.Instruction_Pointer_Relative.label_index.value
-    != builder->code_block.end_label.value) return;
-  dyn_array_pop(builder->code_block.instructions);
-}
-
 typedef struct {
   u8 register_index;
   u8 offset_in_prolog;
@@ -539,8 +540,10 @@ void
 fn_encode(
   Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder
+  Function_Builder *builder,
+  Function_Layout *out_layout
 ) {
+  // FIXME move to the callers and turn into an assert
   if (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) {
     // We should not encode macro functions. And we might not even to be able to anyway
     // as some of them have Any arguments or returns
@@ -548,16 +551,22 @@ fn_encode(
   }
   // Macro functions do not have own stack and do not need freezing
   assert(builder->frozen);
-  fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
   Operand *operand = &builder->value->operand;
   assert(operand_is_label(operand));
+
+  *out_layout = (Function_Layout) {
+    .stack_reserve = builder->stack_reserve,
+  };
+
   Label_Index label_index = operand->Memory.location.Instruction_Pointer_Relative.label_index;
+
+  // TODO Maybe we can check if label is already resolved and stop here
   Label *label = program_get_label(program, label_index);
 
   s64 code_base_rva = label->section->base_rva;
-  builder->layout.begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
+  out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
   // @Leak
-  Operand stack_size_operand = imm_auto_8_or_32(allocator_default, builder->layout.stack_reserve);
+  Operand stack_size_operand = imm_auto_8_or_32(allocator_default, out_layout->stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,
@@ -572,8 +581,8 @@ fn_encode(
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
-        builder->layout.volatile_register_push_offsets[push_index++] =
-          u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
+        out_layout->volatile_register_push_offsets[push_index++] =
+          u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Operand to_save = operand_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(
           program, buffer, &(Instruction) {.assembly = {push, {to_save}}}
@@ -585,10 +594,10 @@ fn_encode(
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {.assembly = {sub, {rsp, stack_size_operand}}}
   );
-  builder->layout.stack_allocation_offset_in_prolog =
-    u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
-  builder->layout.size_of_prolog =
-    u64_to_u8(code_base_rva + buffer->occupied - builder->layout.begin_rva);
+  out_layout->stack_allocation_offset_in_prolog =
+    u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
+  out_layout->size_of_prolog =
+    u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
@@ -628,7 +637,7 @@ fn_encode(
   }
 
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {ret, {0}}});
-  builder->layout.end_rva = u64_to_u32(code_base_rva + buffer->occupied);
+  out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
 }

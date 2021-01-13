@@ -196,11 +196,11 @@ typedef struct {
 void
 win32_fn_init_unwind_info(
   const Function_Builder *builder,
+  const Function_Layout *layout,
   UNWIND_INFO *unwind_info,
   RUNTIME_FUNCTION *function_exception_info,
   u32 unwind_data_rva
 ) {
-  const Function_Layout *layout = &builder->layout;
   assert(unwind_info);
   assert(function_exception_info);
   *unwind_info = (UNWIND_INFO) {
@@ -218,7 +218,7 @@ win32_fn_init_unwind_info(
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
         unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE) {
-          .CodeOffset = builder->layout.volatile_register_push_offsets[unwind_code_index],
+          .CodeOffset = layout->volatile_register_push_offsets[unwind_code_index],
           .UnwindOp = UWOP_PUSH_NONVOL,
           .OpInfo = s32_to_u8(reg_index),
         };

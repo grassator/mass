@@ -69,7 +69,8 @@ void
 fn_encode(
   Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder
+  Function_Builder *builder,
+  Function_Layout *out_layout
 );
 
 void

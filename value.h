@@ -257,8 +257,6 @@ typedef struct {
   u64 register_occupied_bitset;
 } Code_Block;
 
-
-
 typedef struct {
   s32 stack_reserve;
   u8 size_of_prolog;
@@ -267,10 +265,11 @@ typedef struct {
   u8 stack_allocation_offset_in_prolog;
   u8 volatile_register_push_offsets[16];
 } Function_Layout;
+typedef dyn_array_type(Function_Layout) Array_Function_Layout;
 
 typedef struct Function_Builder {
   bool frozen;
-  Function_Layout layout;
+  s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   u64 used_register_bitset;
