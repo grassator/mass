@@ -723,7 +723,7 @@ spec("source") {
       check(operand_immediate_memory_as_s8(&status->operand) == 42);
     }
 
-    xit("should not be able to use runtime values in a static context") {
+    it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test :: () -> (s64) { foo := 42; @( foo ) }",
         test
