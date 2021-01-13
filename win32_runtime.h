@@ -193,6 +193,10 @@ win32_program_jit_resolve_dll_imports(
   bucket_buffer_destroy(temp_buffer);
 }
 
+typedef struct {
+  RUNTIME_FUNCTION *function_table;
+} Win32_Jit_Info;
+
 void
 win32_program_jit(
   Jit *jit
@@ -206,9 +210,23 @@ win32_program_jit(
   u64 data_segment_size = global_data_size + unwind_info_size;
   u64 program_size = data_segment_size + code_segment_size;
 
+  Win32_Jit_Info *info;
   if (jit->buffer) {
-    panic("TODO support reintrant or better yet incremental jitting");
+    assert(jit->platform_specific_payload);
+    info = jit->platform_specific_payload;
+    // TODO @Speed use RtlInstallFunctionTableCallback
+    RtlDeleteFunctionTable(info->function_table);
+    fixed_buffer_destroy(jit->buffer);
+    jit->buffer = 0;
+  } else {
+    info = allocator_allocate(allocator_default, Win32_Jit_Info);
+    *info = (Win32_Jit_Info) {0};
+    jit->platform_specific_payload = info;
   }
+
+  info->function_table = allocator_allocate_array(
+    allocator_system, RUNTIME_FUNCTION, function_count
+  );
 
   // Making a contiguous buffer holding both data and memory to ensure
   Fixed_Buffer *result_buffer = fixed_buffer_make(
@@ -235,10 +253,6 @@ win32_program_jit(
     result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
   );
 
-  RUNTIME_FUNCTION *fn_exception_info = allocator_allocate_array(
-    allocator_system, RUNTIME_FUNCTION, function_count
-  );
-
   s8 *code_memory = result_buffer->memory + result_buffer->occupied;
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
   u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
@@ -258,7 +272,9 @@ win32_program_jit(
     Function_Layout *layout = dyn_array_get(layouts, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
     u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
-    win32_fn_init_unwind_info(builder, layout, unwind_info, &fn_exception_info[i], unwind_data_rva);
+    win32_fn_init_unwind_info(
+      builder, layout, unwind_info, &info->function_table[i], unwind_data_rva
+    );
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
@@ -286,10 +302,13 @@ win32_program_jit(
     }
   }
 
-  if (!RtlAddFunctionTable(
-    fn_exception_info, u64_to_u32(function_count), (s64) result_buffer->memory
-  )) {
-    panic("Could not add function table definition");
+  // TODO consider if we want to not do JIT at all in this case?
+  if (function_count) {
+    if (!RtlAddFunctionTable(
+      info->function_table, u64_to_u32(function_count), (s64) result_buffer->memory
+    )) {
+      panic("Could not add function table definition");
+    }
   }
   jit->buffer = result_buffer;
 

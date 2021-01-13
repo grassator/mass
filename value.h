@@ -273,6 +273,7 @@ typedef struct Function_Builder {
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   u64 used_register_bitset;
+  Slice source;
 
   Value *value;
 } Function_Builder;
@@ -296,6 +297,7 @@ typedef struct Jit {
   bool is_stack_unwinding_in_progress;
   Program *program;
   Jit_Import_Library_Handle_Map *import_library_handles;
+  void *platform_specific_payload;
 } Jit;
 
 typedef struct {

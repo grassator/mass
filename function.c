@@ -540,11 +540,15 @@ void
 fn_encode(
   Program *program,
   Fixed_Buffer *buffer,
-  Function_Builder *builder,
+  const Function_Builder *builder,
   Function_Layout *out_layout
 ) {
   // FIXME move to the callers and turn into an assert
-  if (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) {
+  if (
+    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) ||
+    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Pending_Body_Compilation) ||
+    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_In_Body_Compilation)
+  ) {
     // We should not encode macro functions. And we might not even to be able to anyway
     // as some of them have Any arguments or returns
     return;

@@ -269,8 +269,12 @@ scope_lookup_force(
     // the second one, here, actually processes function body
     if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
       Descriptor_Function *function = &it->value->descriptor->Function;
+
+      // FIXME we should probabably have a separate flag or a stack to track
+      //       functions with compilation in progress to avoid loops
       if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
         function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
+        function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
         {
           Compilation_Context body_context = *context;
           body_context.scope = function->scope;
@@ -278,6 +282,7 @@ scope_lookup_force(
           token_parse_block_no_scope(&body_context, function->body, function->returns);
         }
         fn_end(context->program, function->builder);
+        function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
       }
     }
 
@@ -2061,6 +2066,9 @@ token_process_function_literal(
       .type = Scope_Entry_Type_Value,
       .value = return_label_value,
     });
+
+    // TODO Encompass the whole function maybe?
+    builder->source = body->source;
   }
 
   if (dyn_array_length(return_types->Group.children) == 0) {
@@ -2172,17 +2180,18 @@ compile_time_eval(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  const Token *first_token = token_view_get(view, 0);
-  const Source_Range *source_range = &first_token->source_range;
+  const Source_Range *source_range = &view.source_range;
 
   Jit *jit = context->compile_time_jit;
   Compilation_Context eval_context = *context;
   eval_context.scope = scope_make(context->allocator, context->compile_time_scope);
   eval_context.program = jit->program;
   eval_context.builder = fn_begin(&eval_context);
-  function_return_descriptor(
-    context, &eval_context.builder->value->descriptor->Function, &descriptor_void
-  );
+  eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
+
+  Descriptor_Function *fake_function = &eval_context.builder->value->descriptor->Function;
+  fake_function->flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
+  function_return_descriptor(context, fake_function, &descriptor_void);
 
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.
@@ -2234,6 +2243,7 @@ compile_time_eval(
   };
 
   move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
+  fake_function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
   fn_end(eval_context.program, eval_context.builder);
 
   program_jit(jit);

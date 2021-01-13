@@ -416,9 +416,10 @@ main(void) {
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None",   0 },
     { "Pending_Body_Compilation", 1 << 0 },
-    { "Macro", 1 << 1 },
-    { "External", 1 << 2 },
-    { "No_Own_Scope", 1 << 3 },
+    { "In_Body_Compilation", 1 << 1 },
+    { "Macro", 1 << 2 },
+    { "External", 1 << 3 },
+    { "No_Own_Scope", 1 << 4 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){

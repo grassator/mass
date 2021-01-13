@@ -723,6 +723,25 @@ spec("source") {
       check(operand_immediate_memory_as_s8(&status->operand) == 42);
     }
 
+    it("should be able to to do nested compile time calls") {
+      test_program_inline_source(
+        "RESULT :: get_a();"
+        "B :: get_b();"
+        "get_a :: () -> (s8) { B };"
+        "get_b :: () -> (s8) { 42 }",
+        RESULT
+      );
+
+      Value *result = scope_lookup_force(
+        &test_context, test_context.program->global_scope, slice_literal("RESULT")
+      );
+      check(result);
+      check(descriptor_is_integer(result->descriptor));
+      check(result->operand.tag == Operand_Tag_Immediate);
+      check(result->operand.byte_size == 1);
+      check(operand_immediate_memory_as_s8(&result->operand) == 42);
+    }
+
     it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test :: () -> (s64) { foo := 42; @( foo ) }",
