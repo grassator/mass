@@ -302,8 +302,9 @@ typedef struct {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Program *program;
-  Jit *jit;
+  Jit *compile_time_jit;
   Scope *scope;
+  Scope *compile_time_scope;
   Function_Builder *builder;
   Mass_Result *result;
 } Compilation_Context;

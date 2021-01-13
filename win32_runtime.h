@@ -206,6 +206,10 @@ win32_program_jit(
   u64 data_segment_size = global_data_size + unwind_info_size;
   u64 program_size = data_segment_size + code_segment_size;
 
+  if (jit->buffer) {
+    panic("TODO support reintrant or better yet incremental jitting");
+  }
+
   // Making a contiguous buffer holding both data and memory to ensure
   Fixed_Buffer *result_buffer = fixed_buffer_make(
     .allocator = allocator_system,

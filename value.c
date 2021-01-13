@@ -1500,8 +1500,9 @@ compilation_context_init(
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .program = program,
-    .jit = jit,
+    .compile_time_jit = jit,
     .scope = program->global_scope,
+    .compile_time_scope = jit->program->global_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 }
@@ -1511,8 +1512,8 @@ compilation_context_deinit(
   Compilation_Context *context
 ) {
   program_deinit(context->program);
-  program_deinit(context->jit->program);
-  jit_deinit(context->jit);
+  program_deinit(context->compile_time_jit->program);
+  jit_deinit(context->compile_time_jit);
   bucket_buffer_destroy(context->allocation_buffer);
 }
 

@@ -2175,24 +2175,10 @@ compile_time_eval(
   const Token *first_token = token_view_get(view, 0);
   const Source_Range *source_range = &first_token->source_range;
 
-  Program eval_program = {
-    .import_libraries = dyn_array_copy(Array_Import_Library, context->program->import_libraries),
-    // FIXME this is probably broken now because code ones should point to a different section
-    .labels = dyn_array_copy(Array_Label, context->program->labels),
-    .patch_info_array =
-      dyn_array_copy(Array_Label_Location_Diff_Patch_Info, context->program->patch_info_array),
-    .functions = dyn_array_copy(Array_Function_Builder, context->program->functions),
-    .global_scope = scope_make(context->allocator, context->program->global_scope),
-    .data_section = context->program->data_section,
-    .code_section = {
-      .buffer = bucket_buffer_make(.allocator = allocator_system),
-      .permissions = Section_Permissions_Execute,
-    }
-  };
-
+  Jit *jit = context->compile_time_jit;
   Compilation_Context eval_context = *context;
-  eval_context.scope = scope_make(context->allocator, context->scope);
-  eval_context.program = &eval_program;
+  eval_context.scope = scope_make(context->allocator, context->compile_time_scope);
+  eval_context.program = jit->program;
   eval_context.builder = fn_begin(&eval_context);
   function_return_descriptor(
     context, &eval_context.builder->value->descriptor->Function, &descriptor_void
@@ -2250,13 +2236,11 @@ compile_time_eval(
   move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
   fn_end(eval_context.builder);
 
-  Jit jit;
-  jit_init(&jit, &eval_program);
-  program_jit(&jit);
+  program_jit(jit);
 
-  fn_type_opaque jitted_code = value_as_function(&jit, eval_context.builder->value);
-
+  fn_type_opaque jitted_code = value_as_function(jit, eval_context.builder->value);
   jitted_code();
+
   Value *token_value = allocator_allocate(context->allocator, Value);
   *token_value = (Value) {
     .descriptor = out_value->descriptor,
@@ -2291,10 +2275,7 @@ compile_time_eval(
       break;
     }
   }
-  // FIXME we can not deinit program here because the data section is not copied
-  //program_deinit(&eval_program);
 
-  jit_deinit(&jit);
   return token_value_make(context, token_value, view.source_range);
 }
 
@@ -2808,6 +2789,16 @@ token_parse_constant_definitions(
   if (lhs.length > 1) return false;
   const Token *name = token_view_get(lhs, 0);
   if (name->tag != Token_Tag_Id) return false;
+
+  // TODO :CompileTimeScope maybe have a helper function to define something in both scopes
+  scope_define(context->compile_time_scope, name->source, (Scope_Entry) {
+    .type = Scope_Entry_Type_Lazy_Expression,
+    .lazy_expression = {
+      .tokens = rhs,
+      .scope = context->scope,
+    },
+  });
+
   scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Lazy_Expression,
     .lazy_expression = {
@@ -2815,6 +2806,7 @@ token_parse_constant_definitions(
       .scope = context->scope,
     },
   });
+
   return true;
 }
 
