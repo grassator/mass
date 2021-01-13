@@ -705,6 +705,38 @@ spec("source") {
     }
   }
 
+  describe("Compile Time Execution") {
+    it("should be able to call a function at compile time") {
+      test_program_inline_source_base(
+        "STATUS_CODE :: the_answer();"
+        "the_answer :: () -> (s8) { 42 }",
+        STATUS_CODE
+      );
+
+      Value *status = scope_lookup_force(
+        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
+      );
+      check(status);
+      check(descriptor_is_integer(status->descriptor));
+      check(status->operand.tag == Operand_Tag_Immediate);
+      check(status->operand.byte_size == 1);
+      check(operand_immediate_memory_as_s8(&status->operand) == 42);
+    }
+
+    xit("should not be able to use runtime values in a static context") {
+      test_program_inline_source_base(
+        "test :: () -> (s64) { foo := 42; @( foo ) }",
+        test
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(
+        slice_literal("Undefined variable foo"),
+        error->message
+      ));
+    }
+  }
+
   describe("Macro") {
     it("should be able to parse and run macro id function") {
       test_program_inline_source(
@@ -1025,38 +1057,6 @@ spec("source") {
       Test_128bit test_128bit = checker(42);
       check(test_128bit.x == 42);
       check(test_128bit.y == 21);
-    }
-  }
-
-  describe("Compile Time Execution") {
-    it("should be able to call a function at compile time") {
-      test_program_inline_source_base(
-        "STATUS_CODE :: the_answer();"
-        "the_answer :: () -> (s8) { 42 }",
-        STATUS_CODE
-      );
-
-      Value *status = scope_lookup_force(
-        &test_context, test_context.program->global_scope, slice_literal("STATUS_CODE")
-      );
-      check(status);
-      check(descriptor_is_integer(status->descriptor));
-      check(status->operand.tag == Operand_Tag_Immediate);
-      check(status->operand.byte_size == 1);
-      check(operand_immediate_memory_as_s8(&status->operand) == 42);
-    }
-
-    xit("should not be able to use runtime values in a static context") {
-      test_program_inline_source_base(
-        "test :: () -> (s64) { foo := 42; @( foo ) }",
-        test
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("Undefined variable foo"),
-        error->message
-      ));
     }
   }
 
