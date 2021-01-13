@@ -1353,8 +1353,8 @@ token_force_value(
     case Token_Tag_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, scope, name);
+      MASS_TRY(*context->result);
       if (!value) {
-        MASS_TRY(*context->result);
         context_error_snprintf(
           context, token->source_range,
           "Undefined variable %"PRIslice,
