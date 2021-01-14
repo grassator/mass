@@ -214,6 +214,7 @@ typedef struct {
 
 #define context_error_snprintf(_CONTEXT_, _SOURCE_RANGE_, ...)\
   do {\
+    assert((_CONTEXT_)->result->tag != Mass_Result_Tag_Error);\
     /* Calculating the size of the buffer not including null termination */ \
     int context_error_snprintf_buffer_size = snprintf(0, 0, ##__VA_ARGS__);\
     /* negative value is an error when encoding a string */ \

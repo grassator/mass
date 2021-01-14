@@ -210,7 +210,6 @@ scope_entry_force(
       Scope_Lazy_Expression *expr = &entry->lazy_expression;
       Compilation_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
-      lazy_context.builder = 0;
       Value *result = token_parse_constant_expression(&lazy_context, expr->tokens);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
@@ -1191,6 +1190,7 @@ token_match_type(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Descriptor *descriptor = token_match_fixed_array_type(context, view);
+  MASS_ON_ERROR(*context->result) return 0;
   if (descriptor) return descriptor;
   if (!view.length) panic("Caller must not call token_match_type with empty token list");
   const Token *token = token_view_get(view, 0);
@@ -1345,8 +1345,8 @@ token_force_value(
     }
     case Token_Tag_String: {
       Slice string = token->String.slice;
-      Value *string_bytes = value_global_c_string_from_slice(context, string);
-      load_address(context, context->builder, &token->source_range, result_value, string_bytes);
+      Value *value = value_global_c_string_from_slice(context, string);
+      move_value(context->allocator, context->builder, &token->source_range, result_value, value);
       return *context->result;
     }
     case Token_Tag_Id: {
@@ -2257,12 +2257,12 @@ compile_time_eval(
       panic("Internal Error: We should never get Any type from comp time eval");
       break;
     }
-    case Descriptor_Tag_Fixed_Size_Array:
-    case Descriptor_Tag_Pointer:
-    case Descriptor_Tag_Struct: {
+    case Descriptor_Tag_Pointer: {
       panic("TODO move to data section or maybe we should allocate from there right away above?");
       break;
     };
+    case Descriptor_Tag_Struct:
+    case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
       token_value->operand = (Operand){
         .tag = Operand_Tag_Immediate,
@@ -3849,22 +3849,13 @@ token_parse_definition(
 
   Token_View rest = token_view_rest(&view, peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
-  if (!descriptor) {
-    context_error_snprintf(
-      context, define->source_range,
-      "Could not find type"
-    );
-    goto err;
-  }
+  MASS_ON_ERROR(*context->result) return 0;
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
   scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
     .value = value,
   });
   return value;
-
-  err:
-  return 0;
 }
 
 bool

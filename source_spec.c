@@ -1016,7 +1016,34 @@ spec("source") {
     }
   }
 
+  describe("Strings") {
+    it("should parse and return C-compatible strings") {
+      test_program_inline_source(
+        "checker :: () -> ([s8]) { &\"test\" }",
+        checker
+      );
+      const char *string =
+        ((fn_type_void_to_const_charp)value_as_function(&jit, checker))();
+      check(strcmp(string, "test") == 0);
+    }
+  }
+
   describe("Fixed Size Arrays") {
+    it("should report an error when fixed size array size does not resolve to an integer") {
+      test_program_inline_source_base(
+        "BAR :: \"foo\"; "
+        "test :: () -> (s8) {"
+          "foo : s8[BAR];"
+          "foo[0] = 42;"
+          "foo[0]"
+        "}",
+        test
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal("Fixed size array size is not an integer"), error->message));
+    }
+
     it("should be able to define a variable with a fixed size array type") {
       test_program_inline_source(
         "test :: () -> (s8) {"
@@ -1094,18 +1121,6 @@ spec("source") {
       Test_128bit test_128bit = checker(42);
       check(test_128bit.x == 42);
       check(test_128bit.y == 21);
-    }
-  }
-
-  describe("Strings") {
-    it("should parse and return C-compatible strings") {
-      test_program_inline_source(
-        "checker :: () -> ([s8]) { \"test\" }",
-        checker
-      );
-      const char *string =
-        ((fn_type_void_to_const_charp)value_as_function(&jit, checker))();
-      check(strcmp(string, "test") == 0);
     }
   }
 

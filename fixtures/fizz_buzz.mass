@@ -46,16 +46,16 @@ fizz_buzz :: () -> () {
     print_number := true
     if (i % 3 == 0) {
       print_number = false
-      WriteFile(stdout_handle, "fizz", 4, 0, 0)
+      WriteFile(stdout_handle, &"fizz", 4, 0, 0)
     }
     if (i % 5 == 0) {
       print_number = false
-      WriteFile(stdout_handle, "buzz", 4, 0, 0)
+      WriteFile(stdout_handle, &"buzz", 4, 0, 0)
     }
     if (print_number) {
       print(i)
     }
-    WriteFile(stdout_handle, " ", 1, 0, 0)
+    WriteFile(stdout_handle, &" ", 1, 0, 0)
   }
 }
 
