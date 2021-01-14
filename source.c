@@ -2799,7 +2799,7 @@ token_parse_constant_definitions(
     .type = Scope_Entry_Type_Lazy_Expression,
     .lazy_expression = {
       .tokens = rhs,
-      .scope = context->scope,
+      .scope = context->compile_time_scope,
     },
   });
 
