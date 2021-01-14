@@ -1016,6 +1016,24 @@ spec("source") {
     }
   }
 
+  describe("Fixed Size Arrays") {
+    it("should be able to define a variable with a fixed size array type") {
+      test_program_inline_source(
+        "test :: () -> (s8) {"
+          "foo : s8[64];"
+          "foo[0] = 42;"
+          "foo[0]"
+        "}",
+        test
+      );
+
+      fn_type_void_to_s8 checker =
+        (fn_type_void_to_s8)value_as_function(&jit, test);
+      u8 actual = checker();
+      check(actual == 42);
+    }
+  }
+
   describe("User-defined Types") {
     it("should be able to parse fixed-bit sized type definitions") {
       test_program_inline_source(
