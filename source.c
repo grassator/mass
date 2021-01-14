@@ -208,16 +208,10 @@ scope_entry_force(
     }
     case Scope_Entry_Type_Lazy_Expression: {
       Scope_Lazy_Expression *expr = &entry->lazy_expression;
-      Value *result = 0;
       Compilation_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
-      lazy_context.builder = expr->maybe_builder;
-      if (expr->maybe_builder) {
-        result = value_any(context->allocator);
-        token_parse_expression(&lazy_context, expr->tokens, result);
-      } else {
-        result = token_parse_constant_expression(&lazy_context, expr->tokens);
-      }
+      lazy_context.builder = 0;
+      Value *result = token_parse_constant_expression(&lazy_context, expr->tokens);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
         .value = result,

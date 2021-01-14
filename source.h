@@ -14,7 +14,6 @@ typedef enum {
 typedef struct {
   Token_View tokens;
   Scope *scope;
-  Function_Builder *maybe_builder;
 } Scope_Lazy_Expression;
 
 typedef const Token *(*Token_Handle_Operator_Proc)
