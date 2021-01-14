@@ -2169,8 +2169,7 @@ typedef void (*Compile_Time_Eval_Proc)(void *);
 Token *
 compile_time_eval(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2569,7 +2568,7 @@ token_dispatch_constant_operator(
           },
         },
       };
-      result = compile_time_eval(context, call_view, context->scope);
+      result = compile_time_eval(context, call_view);
     }
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("->"))) {
@@ -3132,7 +3131,7 @@ token_dispatch_operator(
     const Token *body = *dyn_array_pop(*token_stack);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
       Token_View eval_view = token_view_from_group_token(body);
-      result_token = compile_time_eval(context, eval_view, context->scope);
+      result_token = compile_time_eval(context, eval_view);
     } else {
       context_error_snprintf(
         context, body->source_range,
@@ -3721,8 +3720,11 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_group_token(square_brace);
-  Value *size_value = token_parse_constant_expression(context, size_view);
-  if (!size_value) return 0;
+  Token *size_token = compile_time_eval(context, size_view);
+  MASS_ON_ERROR(*context->result) return 0;
+  Value *size_value = value_any(context->allocator);
+  token_force_value(context, size_token, size_value);
+  MASS_ON_ERROR(*context->result) return 0;
   if (!descriptor_is_integer(size_value->descriptor)) {
     context_error_snprintf(
       context, square_brace->source_range,
