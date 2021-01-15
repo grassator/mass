@@ -157,7 +157,7 @@ scope_lookup(
   return 0;
 }
 
-void
+PRELUDE_NO_DISCARD Mass_Result
 assign(
   Compilation_Context *context,
   const Source_Range *source_range,
@@ -165,19 +165,20 @@ assign(
   Value *source
 ) {
   if (target->descriptor->tag == Descriptor_Tag_Void) {
-    return;
+    return *context->result;
   }
   if (
     target->descriptor->tag == Descriptor_Tag_Any ||
     same_value_type_or_can_implicitly_move_cast(target, source)
   ) {
     move_value(context->allocator, context->builder, source_range, target, source);
-    return;
+    return *context->result;
   }
   // TODO elaborate the error
   context_error_snprintf(
     context, *source_range, "Incompatible type"
   );
+  return *context->result;
 }
 
 Value *
@@ -1369,8 +1370,7 @@ token_force_value(
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *value = value_global_c_string_from_slice(context, string);
-      assign(context, &token->source_range, result_value, value);
-      return *context->result;
+      return assign(context, &token->source_range, result_value, value);
     }
     case Token_Tag_Id: {
       Slice name = token->source;
@@ -1385,13 +1385,12 @@ token_force_value(
 
         return *context->result;
       } else {
-        assign(context, &token->source_range, result_value, value);
+        return assign(context, &token->source_range, result_value, value);
       }
-      return *context->result;
     }
     case Token_Tag_Value: {
       if (token->Value.value) {
-        assign(context, &token->source_range, result_value, token->Value.value);
+        return assign(context, &token->source_range, result_value, token->Value.value);
       } else {
         // TODO consider what should happen here
       }
@@ -2238,7 +2237,10 @@ compile_time_eval(
     .operand = imm64(context->allocator, (u64)result),
   };
 
-  move_value(context->allocator, eval_context.builder, source_range, &out_value_register, &result_address);
+  MASS_ON_ERROR(assign(&eval_context, source_range, &out_value_register, &result_address)) {
+    context->result = eval_context.result;
+    return 0;
+  }
 
   // Use memory-indirect addressing to copy
   Value *out_value = allocator_allocate(context->allocator, Value);
@@ -2256,7 +2258,10 @@ compile_time_eval(
     },
   };
 
-  move_value(context->allocator, eval_context.builder, source_range, out_value, expression_result_value);
+  MASS_ON_ERROR(assign(&eval_context, source_range, out_value, expression_result_value)) {
+    context->result = eval_context.result;
+    return 0;
+  }
   fake_function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
   fn_end(eval_context.program, eval_context.builder);
 
@@ -2481,8 +2486,6 @@ token_handle_cast(
       result->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       panic("Not implemented cast to a larger type");
-      //result = reserve_stack(context->allocator, builder, cast_to_descriptor);
-      //move_value(context->allocator, builder, source_range, result, value);
     }
   }
   const Token *result_token = token_value_make(context, result, *source_range);
@@ -3471,7 +3474,7 @@ token_dispatch_operator(
 
     // FIXME figure out how to avoid this
     Value *result_value = reserve_stack(context->allocator, context->builder, raw->descriptor);
-    move_value(context->allocator, context->builder, &lhs->source_range, result_value, raw);
+    MASS_ON_ERROR(assign(context, &lhs->source_range, result_value, raw)) return;
     result_token = token_value_make(context, result_value, lhs->source_range);
   } else {
     panic("TODO: Unknown operator");
@@ -3490,14 +3493,7 @@ token_parse_expression(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if(!view.length) {
-    if (
-      result_value->descriptor->tag == Descriptor_Tag_Any ||
-      result_value->descriptor->tag == Descriptor_Tag_Void
-    ) {
-      move_value(context->allocator, context->builder, &view.source_range, result_value, &void_value);
-    } else {
-      panic("TODO user error unexpected void result");
-    }
+    MASS_ON_ERROR(assign(context, &view.source_range, result_value, &void_value)) return true;
     return true;
   }
 
@@ -3860,7 +3856,7 @@ token_parse_explicit_return(
   //       values that are trying to be moved in the same return value
   if (is_any_return) {
     Value *stack_return = reserve_stack(context->allocator, context->builder, fn_return->descriptor);
-    move_value(context->allocator, context->builder, &keyword->source_range, stack_return, fn_return);
+    MASS_ON_ERROR(assign(context, &keyword->source_range, stack_return, fn_return)) return true;
     *fn_return = *stack_return;
   }
 
@@ -4078,7 +4074,7 @@ token_parse_definition_and_assignment_statements(
     panic("TODO decide how to handle opaque types");
   }
   Value *on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
-  move_value(context->allocator, context->builder, &name->source_range, on_stack, value);
+  MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) return true;
 
   scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
