@@ -3414,14 +3414,8 @@ token_dispatch_operator(
       );
       return;
     }
-
-    if (!(same_value_type_or_can_implicitly_move_cast(lhs_value, rhs_value))) {
-      context_error_snprintf(
-        context, lhs->source_range,
-        "Incompatible integer types in comparison"
-      );
-      return;
-    }
+    maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs_value, &rhs_value);
+    MASS_ON_ERROR(*context->result) return;
 
     Compare_Type compare_type = 0;
 
