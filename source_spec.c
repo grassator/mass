@@ -518,6 +518,16 @@ spec("source") {
       check(actual == 42);
     }
 
+    it("should be able to assign a fn to a variable and call through pointer") {
+      test_program_inline_source(
+        "checker :: () -> (s32) { local := () -> (s32) { 42 }; local() }",
+        checker
+      );
+      fn_type_void_to_s32 fn = (fn_type_void_to_s32)value_as_function(&jit, checker);
+      s32 actual = fn();
+      check(actual == 42);
+    }
+
     it("should be able to parse typed definition and assignment in the same statement") {
       test_program_inline_source(
         "test_fn :: () -> (s32) {"

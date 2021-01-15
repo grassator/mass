@@ -167,10 +167,13 @@ assign(
   if (target->descriptor->tag == Descriptor_Tag_Void) {
     return *context->result;
   }
-  if (
-    target->descriptor->tag == Descriptor_Tag_Any ||
-    same_value_type_or_can_implicitly_move_cast(target, source)
-  ) {
+  if (target->descriptor->tag == Descriptor_Tag_Any) {
+    move_value(context->allocator, context->builder, source_range, target, source);
+    return *context->result;
+  }
+
+  assert(source->descriptor->tag != Descriptor_Tag_Function);
+  if (same_value_type_or_can_implicitly_move_cast(target, source)) {
     move_value(context->allocator, context->builder, source_range, target, source);
     return *context->result;
   }
@@ -2873,7 +2876,8 @@ token_handle_function_call(
     }
   }
 
-  if (target->descriptor->tag != Descriptor_Tag_Function) {
+  Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
+  if (target_descriptor->tag != Descriptor_Tag_Function) {
     context_error_snprintf(
       context, target_token->source_range,
       "%"PRIslice" is not a function",
@@ -2886,8 +2890,9 @@ token_handle_function_call(
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
-    assert(to_call->descriptor->tag == Descriptor_Tag_Function);
-    Descriptor_Function *descriptor = &to_call->descriptor->Function;
+    Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+    assert(to_call_descriptor->tag == Descriptor_Tag_Function);
+    Descriptor_Function *descriptor = &to_call_descriptor->Function;
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == match.score) {
@@ -3466,6 +3471,37 @@ token_dispatch_operator(
     Value *result_value = reserve_stack(context->allocator, context->builder, raw->descriptor);
     MASS_ON_ERROR(assign(context, &lhs->source_range, result_value, raw)) return;
     result_token = token_value_make(context, result_value, lhs->source_range);
+  } else if (slice_equal(operator, slice_literal("->"))) {
+    const Token *body = *dyn_array_pop(*token_stack);
+    const Token *return_types = *dyn_array_pop(*token_stack);
+    const Token *arguments = *dyn_array_pop(*token_stack);
+    Value *function_value = token_process_function_literal(
+      context, context->scope, arguments, return_types, body
+    );
+    result_token = token_value_make(context, function_value, arguments->source_range);
+  } else if (slice_equal(operator, slice_literal("macro"))) {
+    const Token *function = *dyn_array_pop(*token_stack);
+    Value *function_value = value_any(context->allocator);
+    token_force_value(context, function, function_value);
+    if (function_value) {
+      if (function_value->descriptor->tag == Descriptor_Tag_Function) {
+        Descriptor_Function *descriptor = &function_value->descriptor->Function;
+        if (descriptor->flags & Descriptor_Function_Flags_External) {
+          context_error_snprintf(
+            context, function->source_range,
+            "External functions can not be macro"
+          );
+        } else {
+          descriptor->flags |= Descriptor_Function_Flags_Macro;
+        }
+      } else {
+        context_error_snprintf(
+          context, function->source_range,
+          "Trying to mark a non-function as macro"
+        );
+      }
+    }
+    result_token = function;
   } else {
     panic("TODO: Unknown operator");
     result_token = 0;
@@ -4067,8 +4103,15 @@ token_parse_definition_and_assignment_statements(
   ) {
     panic("TODO decide how to handle opaque types");
   }
-  Value *on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
-  MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) return true;
+  Value *on_stack;
+  if (value->descriptor->tag == Descriptor_Tag_Function) {
+    Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+    on_stack = reserve_stack(context->allocator, context->builder, fn_pointer);
+    load_address(context, &view.source_range, on_stack, value);
+  } else {
+    on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
+    MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) return true;
+  }
 
   scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,

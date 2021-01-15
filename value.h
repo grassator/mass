@@ -195,6 +195,16 @@ descriptor_is_float(
   return descriptor == &descriptor_f32 || descriptor == &descriptor_f64;
 }
 
+static inline Descriptor *
+maybe_unwrap_pointer_descriptor(
+  Descriptor *descriptor
+) {
+  if (descriptor->tag == Descriptor_Tag_Pointer) {
+    return descriptor->Pointer.to;
+  }
+  return descriptor;
+}
+
 u32
 descriptor_byte_size(
   const Descriptor *descriptor
