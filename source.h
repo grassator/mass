@@ -16,8 +16,8 @@ typedef struct {
   Scope *scope;
 } Scope_Lazy_Expression;
 
-typedef const Token *(*Token_Handle_Operator_Proc)
-(Compilation_Context *context, Token_View, void *payload);
+typedef void(*Token_Handle_Operator_Proc)
+(Compilation_Context *context, Token_View, Value *result_value, void *payload);
 
 typedef enum {
   Operator_Fixity_Infix   = 1 << 0,
@@ -117,10 +117,11 @@ scope_define(
   Scope_Entry entry
 );
 
-const Token *
+void
 token_handle_negation(
   Compilation_Context *context,
-  Token_View view,
+  Token_View args,
+  Value *result_value,
   void *unused_payload
 );
 

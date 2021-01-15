@@ -1226,6 +1226,7 @@ call_function_overload(
   const Source_Range *source_range,
   Value *to_call,
   Array_Value_Ptr arguments
+  // FIXME accept result_value
 ) {
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
@@ -1440,38 +1441,6 @@ ensure_memory(
   };
   return result;
 }
-
-Value *
-struct_get_field(
-  Allocator *allocator,
-  Value *raw_value,
-  Slice name
-) {
-  Value *struct_value = ensure_memory(allocator, raw_value);
-  Descriptor *descriptor = struct_value->descriptor;
-  assert(descriptor->tag == Descriptor_Tag_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
-    if (slice_equal(name, field->name)) {
-      Value *result = allocator_allocate(allocator, Value);
-      Operand operand = struct_value->operand;
-      // FIXME support more operands
-      assert(operand.tag == Operand_Tag_Memory);
-      assert(operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-      operand.byte_size = descriptor_byte_size(field->descriptor);
-      operand.Memory.location.Indirect.offset += field->offset;
-      *result = (const Value) {
-        .descriptor = field->descriptor,
-        .operand = operand,
-      };
-      return result;
-    }
-  }
-
-  assert(!"Could not find a field with specified name");
-  return 0;
-}
-
 
 
 

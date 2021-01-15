@@ -1458,13 +1458,14 @@ scope_add_macro(
   dyn_array_push(scope->macros, macro);
 }
 
-const Token *
+void
 token_handle_user_defined_operator(
   Compilation_Context *context,
   Token_View args,
+  Value *result_value,
   User_Defined_Operator *operator
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   // FIXME This is almost identical with the macro function call
 
@@ -1482,8 +1483,6 @@ token_handle_user_defined_operator(
       .value = arg_value,
     });
   }
-
-  Value *result_value = value_any(context->allocator);
 
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
@@ -1518,8 +1517,6 @@ token_handle_user_defined_operator(
       .label = fake_return_label_index
     }
   );
-
-  return token_value_make(context, result_value, args.source_range);
 }
 
 static inline Slice
@@ -2177,12 +2174,13 @@ token_process_function_literal(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-Value *
+void
 compile_time_eval(
   Compilation_Context *context,
-  Token_View view
+  Token_View view,
+  Value *result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   // TODO @Speed if `view` is empty or a single token we can do something much faster
 
@@ -2206,7 +2204,7 @@ compile_time_eval(
   token_parse_expression(&eval_context, view, expression_result_value);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
-    return 0;
+    return;
   }
 
   u32 result_byte_size = expression_result_value->operand.byte_size;
@@ -2232,7 +2230,7 @@ compile_time_eval(
 
   MASS_ON_ERROR(assign(&eval_context, source_range, &out_value_register, &result_address)) {
     context->result = eval_context.result;
-    return 0;
+    return;
   }
 
   // Use memory-indirect addressing to copy
@@ -2253,7 +2251,7 @@ compile_time_eval(
 
   MASS_ON_ERROR(assign(&eval_context, source_range, out_value, expression_result_value)) {
     context->result = eval_context.result;
-    return 0;
+    return;
   }
   fake_function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
   fn_end(eval_context.program, eval_context.builder);
@@ -2263,8 +2261,8 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_context.builder->value);
   jitted_code();
 
-  Value *result_value = allocator_allocate(context->allocator, Value);
-  *result_value = (Value) {
+  Value *temp_result = allocator_allocate(context->allocator, Value);
+  *temp_result = (Value) {
     .descriptor = out_value->descriptor,
   };
   switch(out_value->descriptor->tag) {
@@ -2283,7 +2281,7 @@ compile_time_eval(
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
-      result_value->operand = (Operand){
+      temp_result->operand = (Operand){
         .tag = Operand_Tag_Immediate,
         .byte_size = result_byte_size,
         .Immediate = {
@@ -2297,8 +2295,7 @@ compile_time_eval(
       break;
     }
   }
-
-  return result_value;
+  MASS_ON_ERROR(assign(context, source_range, result_value, temp_result));
 }
 
 typedef struct {
@@ -2314,26 +2311,26 @@ typedef void (*Operator_Dispatch_Proc)(
   Operator_Stack_Entry *operator
 );
 
-const Token *
+void
 token_handle_operand_variant_of(
   Compilation_Context *context,
   const Source_Range *source_range,
-  Array_Value_Ptr args
+  Array_Value_Ptr args,
+  Value *result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   if (dyn_array_length(args) != 1) {
     context_error_snprintf(
       context, *source_range,
       "operand_variant_of expects a single argument"
     );
-    return 0;
+    return;
   }
 
   Value *value = *dyn_array_get(args, 0);
 
-  Value *result = allocator_allocate(context->allocator, Value);
-
+  Value *operand_value = allocator_allocate(context->allocator, Value);
   switch(value->operand.tag) {
     case Operand_Tag_None:
     case Operand_Tag_Any:
@@ -2359,7 +2356,7 @@ token_handle_operand_variant_of(
           break;
         }
       }
-      *result = (Value) {
+      *operand_value = (Value) {
         .descriptor = result_descriptor,
         .operand = {
           .tag = Operand_Tag_Immediate,
@@ -2369,19 +2366,17 @@ token_handle_operand_variant_of(
       };
     }
   }
-
-  const Token *result_token = token_value_make(context, result, *source_range);
-
-  return result_token;
+  MASS_ON_ERROR(assign(context, source_range, result_value, operand_value));
 }
 
-const Token *
+void
 token_handle_cast(
   Compilation_Context *context,
   const Source_Range *source_range,
-  Array_Value_Ptr args
+  Array_Value_Ptr args,
+  Value *result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
@@ -2393,37 +2388,37 @@ token_handle_cast(
 
   u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
   u32 original_byte_size = descriptor_byte_size(value->descriptor);
-  Value *result = value;
+  Value *after_cast_value = value;
   if (cast_to_byte_size != original_byte_size) {
-    result = allocator_allocate(context->allocator, Value);
+    after_cast_value = allocator_allocate(context->allocator, Value);
 
     if (value->operand.tag == Operand_Tag_Immediate) {
       if (descriptor_is_signed_integer(cast_to_descriptor)) {
         s64 integer = operand_immediate_value_up_to_s64(&value->operand);
         switch(cast_to_byte_size) {
           case 1: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm8(context->allocator, (s8)integer),
             };
             break;
           }
           case 2: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm16(context->allocator, (s16)integer),
             };
             break;
           }
           case 4: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm32(context->allocator, (s32)integer),
             };
             break;
           }
           case 8: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm64(context->allocator, (s64)integer),
             };
@@ -2438,28 +2433,28 @@ token_handle_cast(
         u64 integer = operand_immediate_value_up_to_u64(&value->operand);
         switch(cast_to_byte_size) {
           case 1: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm8(context->allocator, (u8)integer),
             };
             break;
           }
           case 2: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm16(context->allocator, (u16)integer),
             };
             break;
           }
           case 4: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm32(context->allocator, (u32)integer),
             };
             break;
           }
           case 8: {
-            *result = (Value) {
+            *after_cast_value = (Value) {
               .descriptor = cast_to_descriptor,
               .operand = imm64(context->allocator, (u64)integer),
             };
@@ -2472,50 +2467,50 @@ token_handle_cast(
         }
       }
     } else if (cast_to_byte_size < original_byte_size) {
-      *result = (Value) {
+      *after_cast_value = (Value) {
         .descriptor = cast_to_descriptor,
         .operand = value->operand,
       };
-      result->operand.byte_size = cast_to_byte_size;
+      after_cast_value->operand.byte_size = cast_to_byte_size;
     } else if (cast_to_byte_size > original_byte_size) {
       panic("Not implemented cast to a larger type");
     }
   }
-  const Token *result_token = token_value_make(context, result, *source_range);
-
-  return result_token;
+  MASS_ON_ERROR(assign(context, source_range, result_value, after_cast_value));
 }
 
-const Token *
+void
 token_handle_negation(
   Compilation_Context *context,
   Token_View args,
+  Value *result_value,
   void *unused_payload
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
   assert(args.length == 1);
   const Token *token = token_view_get(args, 0);
 
+  // FIXME use result_value here
   Value *value = value_any(context->allocator);
   token_force_value(context, token, value);
-  Value *result = 0;
+  Value *negated_value = 0;
   if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {\
     // FIXME this is broken for originally unsigned values larger than their signed counterpart
     switch(value->operand.byte_size) {
       case 1: {
-        result = value_from_s8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
+        negated_value = value_from_s8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
         break;
       }
       case 2: {
-        result = value_from_s16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
+        negated_value = value_from_s16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
         break;
       }
       case 4: {
-        result = value_from_s32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
+        negated_value = value_from_s32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
         break;
       }
       case 8: {
-        result = value_from_s64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
+        negated_value = value_from_s64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
         break;
       }
       default: {
@@ -2526,8 +2521,7 @@ token_handle_negation(
   } else {
     panic("TODO");
   }
-  Token *new_token = token_value_make(context, result, token->source_range);
-  return new_token;
+  MASS_ON_ERROR(assign(context, &token->source_range, result_value, negated_value));
 }
 
 void
@@ -2548,8 +2542,11 @@ token_dispatch_constant_operator(
     Token_View args_view = {
       .tokens = &token,
       .length = 1,
+      .source_range = token->source_range,
     };
-    const Token *new_token = token_handle_negation(context, args_view, 0);
+    Value *negation_result = value_any(context->allocator);
+    token_handle_negation(context, args_view, negation_result, 0);
+    const Token *new_token = token_value_make(context, negation_result, token->source_range);
     dyn_array_push(*token_stack, new_token);
   } else if (slice_equal(operator, slice_literal("()"))) {
     const Token *args = *dyn_array_pop(*token_stack);
@@ -2587,7 +2584,8 @@ token_dispatch_constant_operator(
           },
         },
       };
-      Value *comp_time_result = compile_time_eval(context, call_view);
+      Value *comp_time_result = value_any(context->allocator);
+      compile_time_eval(context, call_view, comp_time_result);
       result = token_value_make(context, comp_time_result, call_view.source_range);
     }
     dyn_array_push(*token_stack, result);
@@ -2833,17 +2831,17 @@ token_parse_constant_definitions(
   return true;
 }
 
-const Token *
+void
 token_handle_function_call(
   Compilation_Context *context,
   const Token *target_token,
   const Token *args_token,
   Value *result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   Value *target = value_any(context->allocator);
-  MASS_ON_ERROR(token_force_value(context, target_token, target)) return 0;
+  MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
   assert(token_match(args_token, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}));
 
   Array_Value_Ptr args;
@@ -2883,9 +2881,8 @@ token_handle_function_call(
       "%"PRIslice" is not a function",
       SLICE_EXPAND_PRINTF(target_token->source)
     );
-    return false;
+    return;
   }
-  Token *result = 0;
   const Source_Range *source_range = &target_token->source_range;
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
@@ -2902,7 +2899,7 @@ token_handle_function_call(
         context, target_token->source_range,
         "Could not decide which overload to pick"
       );
-      return 0;
+      return;
     } else if (score > match.score) {
       match.value = to_call;
       match.score = score;
@@ -2913,7 +2910,6 @@ token_handle_function_call(
 
   Value *overload = match.value;
   if (overload) {
-    Value *return_value;
     Descriptor_Function *function = &overload->descriptor->Function;
 
     if (function->flags & Descriptor_Function_Flags_Macro) {
@@ -2933,7 +2929,6 @@ token_handle_function_call(
           .value = arg_value,
         });
       }
-      return_value = result_value;
 
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
@@ -2947,10 +2942,9 @@ token_handle_function_call(
             .operand = code_label32(fake_return_label_index),
           },
         });
-        assert(return_value);
         scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
           .type = Scope_Entry_Type_Value,
-          .value = return_value,
+          .value = result_value,
         });
       }
 
@@ -2958,7 +2952,7 @@ token_handle_function_call(
       {
         Compilation_Context body_context = *context;
         body_context.scope = body_scope;
-        token_parse_block_no_scope(&body_context, body, return_value);
+        token_parse_block_no_scope(&body_context, body, result_value);
       }
 
       push_instruction(
@@ -2970,10 +2964,11 @@ token_handle_function_call(
         }
       );
     } else {
-      return_value = call_function_overload(context, source_range, overload, args);
+      Value *return_value = call_function_overload(context, source_range, overload, args);
+      MASS_ON_ERROR(assign(context, source_range, result_value, return_value));
     }
 
-    result = token_value_make(context, return_value, target_token->source_range);
+
   } else {
     // TODO add better error message
     context_error_snprintf(
@@ -2982,7 +2977,6 @@ token_handle_function_call(
     );
   }
   dyn_array_destroy(args);
-  return result;
 }
 
 static inline Value *
@@ -3135,44 +3129,59 @@ maybe_resize_values_for_integer_math_operation(
 }
 
 void
-token_dispatch_operator(
+struct_get_field(
   Compilation_Context *context,
-  Array_Const_Token_Ptr *token_stack,
-  Operator_Stack_Entry *operator_entry
+  const Source_Range *source_range,
+  Value *raw_value,
+  Slice name,
+  Value *result_value
+) {
+  Value *struct_value = ensure_memory(context->allocator, raw_value);
+  Descriptor *descriptor = struct_value->descriptor;
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+    if (slice_equal(name, field->name)) {
+      Value *field_value = allocator_allocate(context->allocator, Value);
+      Operand operand = struct_value->operand;
+      // FIXME support more operands
+      assert(operand.tag == Operand_Tag_Memory);
+      assert(operand.Memory.location.tag == Memory_Location_Tag_Indirect);
+      operand.byte_size = descriptor_byte_size(field->descriptor);
+      operand.Memory.location.Indirect.offset += field->offset;
+      *field_value = (const Value) {
+        .descriptor = field->descriptor,
+        .operand = operand,
+      };
+
+      MASS_ON_ERROR(assign(context, source_range, result_value, field_value));
+      return;
+    }
+  }
+
+  assert(!"Could not find a field with specified name");
+  return;
+}
+
+
+void
+token_eval_operator(
+  Compilation_Context *context,
+  Token_View args_view,
+  Operator_Stack_Entry *operator_entry,
+  Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   Slice operator = operator_entry->source;
-  const Token *result_token;
 
   if (operator_entry->scope_entry.handler) {
-    u64 argument_count = operator_entry->scope_entry.argument_count;
-    if (dyn_array_length(*token_stack) < argument_count) {
-      // FIXME provide source range
-      context_error_snprintf(
-        context, operator_entry->source_range,
-        "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
-        SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*token_stack)
-      );
-      return;
-    }
-    // TODO maybe reverse the arguments in place on the stack @Speed
-    Array_Const_Token_Ptr args = dyn_array_make(
-      Array_Const_Token_Ptr, .capacity = argument_count
+    operator_entry->scope_entry.handler(
+      context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
-    for (u64 i = 0; i < argument_count; ++i) {
-      dyn_array_push(args, *dyn_array_pop(*token_stack));
-    }
-
-      // FIXME provide source range
-    Token_View args_view = token_view_from_token_array(args, &operator_entry->source_range);
-    result_token = operator_entry->scope_entry.handler(
-      context, args_view, operator_entry->scope_entry.handler_payload
-    );
-    dyn_array_destroy(args);
   } else if (slice_equal(operator, slice_literal("[]"))) {
-    const Token *brackets = *dyn_array_pop(*token_stack);
-    const Token *target_token = *dyn_array_pop(*token_stack);
+    const Token *target_token = token_view_get(args_view, 0);
+    const Token *brackets = token_view_get(args_view, 1);
 
     Value *array = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
@@ -3187,15 +3196,15 @@ token_dispatch_operator(
     Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
     u32 item_byte_size = descriptor_byte_size(item_descriptor);
 
-    Value *result = allocator_allocate(context->allocator, Value);
-    *result = (Value) {
+    Value *array_element_value = allocator_allocate(context->allocator, Value);
+    *array_element_value = (Value) {
       .descriptor = item_descriptor,
       .operand = array->operand
     };
-    result->operand.byte_size = item_byte_size;
+    array_element_value->operand.byte_size = item_byte_size;
     if (index_value->operand.tag == Operand_Tag_Immediate) {
       s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
-      result->operand.Memory.location.Indirect.offset = index * item_byte_size;
+      array_element_value->operand.Memory.location.Indirect.offset = index * item_byte_size;
     } else {
       // @InstructionQuality
       // This code is very general in terms of the operands where the base
@@ -3227,7 +3236,7 @@ token_dispatch_operator(
       {
         // @InstructionQuality
         // TODO If the source does not have index, on X64 it should be possible to avoid
-        //      using an extra register and put the index into SIB on x64
+        //      using an extra register and put the index into SIB
 
         // Load previous address into a temp register
         Register temp_register = register_acquire_temp(context->builder);
@@ -3249,7 +3258,7 @@ token_dispatch_operator(
         register_release(context->builder, temp_register);
       }
 
-      result->operand = (Operand) {
+      array_element_value->operand = (Operand) {
         .tag = Operand_Tag_Memory,
         .byte_size = item_byte_size,
         .Memory.location = {
@@ -3260,64 +3269,56 @@ token_dispatch_operator(
         }
       };
     }
-    result_token = token_value_make(context, result, brackets->source_range);
+    // FIXME this might actually cause problems in assigning to an array element
+    MASS_ON_ERROR(assign(context, &brackets->source_range, result_value, array_element_value)) return;
   } else if (slice_equal(operator, slice_literal("()"))) {
-    const Token *args_token = *dyn_array_pop(*token_stack);
-    const Token *target = *dyn_array_pop(*token_stack);
+    const Token *target = token_view_get(args_view, 0);
+    const Token *args_token = token_view_get(args_view, 1);
     // TODO turn `cast` into a compile-time function call / macro
     if (
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("cast"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      result_token = token_handle_cast(context, &args_token->source_range, args);
+      token_handle_cast(context, &args_token->source_range, args, result_value);
       dyn_array_destroy(args);
     } else if (
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("operand_variant_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      result_token = token_handle_operand_variant_of(context, &args_token->source_range, args);
+      token_handle_operand_variant_of(context, &args_token->source_range, args, result_value);
       dyn_array_destroy(args);
     } else {
-      result_token = token_handle_function_call(
-        context, target, args_token, value_any(context->allocator)
-      );
+      token_handle_function_call(context, target, args_token, result_value);
     }
   } else if (slice_equal(operator, slice_literal("&"))) {
-    const Token *pointee_token = *dyn_array_pop(*token_stack);
+    const Token *pointee_token = token_view_get(args_view, 0);
 
     Value *pointee = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
 
-    Descriptor *pointer_descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
-    // FIXME figure out how to avoid stack allocation
-    Value *result_value = reserve_stack(context->allocator, context->builder, pointer_descriptor);
     load_address(context, &pointee_token->source_range, result_value, pointee);
-
-    result_token = token_value_make(context, result_value, pointee_token->source_range);
   } else if (slice_equal(operator, slice_literal("@"))) {
-    const Token *body = *dyn_array_pop(*token_stack);
+    const Token *body = token_view_get(args_view, 0);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
       Token_View eval_view = token_view_from_group_token(body);
-      Value *comp_time_result = compile_time_eval(context, eval_view);
-      result_token = token_value_make(context, comp_time_result, body->source_range);
+      compile_time_eval(context, eval_view, result_value);
     } else {
       context_error_snprintf(
         context, body->source_range,
         "@ operator must be followed by a parenthesized expression"
       );
-      result_token = token_value_make(context, 0, body->source_range);
+      return;
     }
   } else if (slice_equal(operator, slice_literal("."))) {
-    const Token *rhs = *dyn_array_pop(*token_stack);
-    const Token *lhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = token_view_get(args_view, 0);
+    const Token *rhs = token_view_get(args_view, 1);
 
-    Value *result_value = 0;
     if (rhs->tag == Token_Tag_Id) {
       Value *struct_value = value_any(context->allocator);
       MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
-      result_value = struct_get_field(context->allocator, struct_value, rhs->source);
+      struct_get_field(context, &rhs->source_range, struct_value, rhs->source, result_value);
     } else {
       context_error_snprintf(
         context, rhs->source_range,
@@ -3325,7 +3326,6 @@ token_dispatch_operator(
       );
       return;
     }
-    result_token = token_value_make(context, result_value, lhs->source_range);
   } else if (
     slice_equal(operator, slice_literal("+")) ||
     slice_equal(operator, slice_literal("-")) ||
@@ -3333,8 +3333,8 @@ token_dispatch_operator(
     slice_equal(operator, slice_literal("/")) ||
     slice_equal(operator, slice_literal("%"))
   ) {
-    const Token *rhs = *dyn_array_pop(*token_stack);
-    const Token *lhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = token_view_get(args_view, 0);
+    const Token *rhs = token_view_get(args_view, 1);
 
     Value *lhs_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
@@ -3364,22 +3364,21 @@ token_dispatch_operator(
 
     Function_Builder *builder = context->builder;
 
-    // FIXME figure out how to avoid this
-    Value *result_value = reserve_stack(context->allocator, builder, lhs_value->descriptor);
+    Value *stack_result = reserve_stack(context->allocator, builder, lhs_value->descriptor);
     if (slice_equal(operator, slice_literal("+"))) {
-      plus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+      plus(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
-      minus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+      minus(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("*"))) {
-      multiply(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+      multiply(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("/"))) {
-      divide(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+      divide(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("%"))) {
-      value_remainder(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
+      value_remainder(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else {
       panic("Internal error: Unexpected operator");
     }
-    result_token = token_value_make(context, result_value, lhs->source_range);
+    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, stack_result)) return;
   } else if (
     slice_equal(operator, slice_literal(">")) ||
     slice_equal(operator, slice_literal("<")) ||
@@ -3388,8 +3387,8 @@ token_dispatch_operator(
     slice_equal(operator, slice_literal("==")) ||
     slice_equal(operator, slice_literal("!="))
   ) {
-    const Token *rhs = *dyn_array_pop(*token_stack);
-    const Token *lhs = *dyn_array_pop(*token_stack);
+    const Token *lhs = token_view_get(args_view, 0);
+    const Token *rhs = token_view_get(args_view, 1);
 
     Value *lhs_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
@@ -3461,26 +3460,20 @@ token_dispatch_operator(
       }
     }
 
-    Value *raw = value_any(context->allocator);
     compare(
       context->allocator, compare_type, context->builder,
-      &lhs->source_range, raw, lhs_value, rhs_value
+      &lhs->source_range, result_value, lhs_value, rhs_value
     );
-
-    // FIXME figure out how to avoid this
-    Value *result_value = reserve_stack(context->allocator, context->builder, raw->descriptor);
-    MASS_ON_ERROR(assign(context, &lhs->source_range, result_value, raw)) return;
-    result_token = token_value_make(context, result_value, lhs->source_range);
   } else if (slice_equal(operator, slice_literal("->"))) {
-    const Token *body = *dyn_array_pop(*token_stack);
-    const Token *return_types = *dyn_array_pop(*token_stack);
-    const Token *arguments = *dyn_array_pop(*token_stack);
+    const Token *arguments = token_view_get(args_view, 0);
+    const Token *return_types = token_view_get(args_view, 1);
+    const Token *body = token_view_get(args_view, 2);
     Value *function_value = token_process_function_literal(
       context, context->scope, arguments, return_types, body
     );
-    result_token = token_value_make(context, function_value, arguments->source_range);
+    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
-    const Token *function = *dyn_array_pop(*token_stack);
+    const Token *function = token_view_get(args_view, 0);
     Value *function_value = value_any(context->allocator);
     token_force_value(context, function, function_value);
     if (function_value) {
@@ -3501,13 +3494,58 @@ token_dispatch_operator(
         );
       }
     }
-    result_token = function;
+    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else {
     panic("TODO: Unknown operator");
-    result_token = 0;
   }
+}
 
-  dyn_array_push(*token_stack, result_token);
+
+
+void
+token_dispatch_operator(
+  Compilation_Context *context,
+  Array_Const_Token_Ptr *token_stack,
+  Operator_Stack_Entry *operator_entry
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
+  Slice operator = operator_entry->source;
+
+  u64 argument_count = operator_entry->scope_entry.argument_count;
+
+  if (dyn_array_length(*token_stack) < argument_count) {
+    // FIXME provide source range
+    context_error_snprintf(
+      context, operator_entry->source_range,
+      "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
+      SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*token_stack)
+    );
+    return;
+  }
+  assert(argument_count);
+  u64 start_index = dyn_array_length(*token_stack) - argument_count;
+  const Token *first_arg = *dyn_array_get(*token_stack, start_index);
+  const Token *last_arg = *dyn_array_last(*token_stack);
+  Token_View args_view = {
+    .tokens = dyn_array_get(*token_stack, start_index),
+    .length = argument_count,
+    .source_range = {
+      .file = last_arg->source_range.file,
+      .offsets = {
+        .from = first_arg->source_range.offsets.from,
+        .to = last_arg->source_range.offsets.to,
+      },
+    },
+  };
+  Value *result_value = value_any(context->allocator);
+  token_eval_operator(context, args_view, operator_entry, result_value);
+  MASS_ON_ERROR(*context->result) return;
+
+  Token *result_token = token_value_make(context, result_value, args_view.source_range);
+
+  // Pop off current arguments and push a new one
+  dyn_array_splice_raw(*token_stack, start_index, argument_count, &result_token, 1);
 }
 
 bool
@@ -3924,7 +3962,8 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_group_token(square_brace);
-  Value *size_value = compile_time_eval(context, size_view);
+  Value *size_value = value_any(context->allocator);
+  compile_time_eval(context, size_view, size_value);
   if (!descriptor_is_unsigned_integer(size_value->descriptor)) {
     context_error_snprintf(
       context, size_view.source_range,
