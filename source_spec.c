@@ -1041,7 +1041,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Incompatible type"), error->message));
+      check(slice_equal(slice_literal("Fixed size array size must be an unsigned integer"), error->message));
     }
 
     it("should be able to define a variable with a fixed size array type") {

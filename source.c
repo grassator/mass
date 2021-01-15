@@ -2186,12 +2186,14 @@ token_process_function_literal(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-Token *
+Value *
 compile_time_eval(
   Compilation_Context *context,
   Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  // TODO @Speed if `view` is empty or a single token we can do something much faster
 
   const Source_Range *source_range = &view.source_range;
 
@@ -2270,13 +2272,13 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_context.builder->value);
   jitted_code();
 
-  Value *token_value = allocator_allocate(context->allocator, Value);
-  *token_value = (Value) {
+  Value *result_value = allocator_allocate(context->allocator, Value);
+  *result_value = (Value) {
     .descriptor = out_value->descriptor,
   };
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
-      token_value->operand = (Operand){0};
+      result_value->operand = (Operand){0};
       break;
     }
     case Descriptor_Tag_Any: {
@@ -2290,7 +2292,7 @@ compile_time_eval(
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
-      token_value->operand = (Operand){
+      result_value->operand = (Operand){
         .tag = Operand_Tag_Immediate,
         .byte_size = result_byte_size,
         .Immediate = {
@@ -2305,7 +2307,7 @@ compile_time_eval(
     }
   }
 
-  return token_value_make(context, token_value, view.source_range);
+  return result_value;
 }
 
 typedef struct {
@@ -2594,7 +2596,8 @@ token_dispatch_constant_operator(
           },
         },
       };
-      result = compile_time_eval(context, call_view);
+      Value *comp_time_result = compile_time_eval(context, call_view);
+      result = token_value_make(context, comp_time_result, call_view.source_range);
     }
     dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("->"))) {
@@ -3306,7 +3309,8 @@ token_dispatch_operator(
     const Token *body = *dyn_array_pop(*token_stack);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
       Token_View eval_view = token_view_from_group_token(body);
-      result_token = compile_time_eval(context, eval_view);
+      Value *comp_time_result = compile_time_eval(context, eval_view);
+      result_token = token_value_make(context, comp_time_result, body->source_range);
     } else {
       context_error_snprintf(
         context, body->source_range,
@@ -3898,19 +3902,23 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_group_token(square_brace);
-  Token *size_token = compile_time_eval(context, size_view);
-  MASS_ON_ERROR(*context->result) return 0;
-  Value *size_value = value_any_descriptor(&descriptor_u64, context->allocator);
-  token_force_value(context, size_token, size_value);
+  Value *size_value = compile_time_eval(context, size_view);
+  if (!descriptor_is_unsigned_integer(size_value->descriptor)) {
+    context_error_snprintf(
+      context, size_view.source_range,
+      "Fixed size array size must be an unsigned integer"
+    );
+    return 0;
+  }
   MASS_ON_ERROR(*context->result) return 0;
   if (size_value->operand.tag != Operand_Tag_Immediate) {
     context_error_snprintf(
-      context, square_brace->source_range,
+      context, size_view.source_range,
       "Fixed size array size must be known at compile time"
     );
     return 0;
   }
-  u32 length = s64_to_u32(operand_immediate_value_up_to_s64(&size_value->operand));
+  u32 length = u64_to_u32(operand_immediate_value_up_to_u64(&size_value->operand));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
