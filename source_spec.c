@@ -331,7 +331,7 @@ spec("source") {
 
     #ifdef _WIN32
     // This test relies on Windows calling convention
-    it("should be able to include raw machine code bytes") {
+    it("should be able to retrieve the register used for a particular value") {
       test_program_inline_source(
         "foo :: (x : s64) -> (Register_64) {"
           "operand_variant_of(x)"
@@ -1041,7 +1041,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Fixed size array size is not an integer"), error->message));
+      check(slice_equal(slice_literal("Incompatible type"), error->message));
     }
 
     it("should be able to define a variable with a fixed size array type") {
@@ -1137,7 +1137,7 @@ spec("source") {
 
     it("should use correct EFLAGS values when dealing with unsigned integers") {
       test_program_inline_source(
-        "test :: () -> (u8) { x : u8 = 200; x < 0 }",
+        "test :: () -> (s8) { x : u8 = 200; x < 0 }",
         test
       );
       fn_type_void_to_u8 checker = (fn_type_void_to_u8)value_as_function(&jit, test);

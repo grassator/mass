@@ -728,20 +728,25 @@ value_global_internal(
 }
 
 Value *
-value_any_internal(
+value_any_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
+  Descriptor *descriptor,
   const Allocator *allocator
 ) {
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
-    .descriptor = &descriptor_any,
+    .descriptor = descriptor,
     .operand = {.tag = Operand_Tag_Any},
     .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
-#define value_any(...) value_any_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
+#define value_any_descriptor(...)\
+  value_any_descriptor_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
+
+#define value_any(...)\
+  value_any_descriptor_internal(COMPILER_SOURCE_LOCATION, &descriptor_any, ##__VA_ARGS__)
 
 Value *
 value_from_s64_internal(

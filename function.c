@@ -825,6 +825,22 @@ plus_or_minus(
     }
   }
 
+  // TODO this is not optimal as the immediate might actually fit into a smaller size
+  //      that we do support but it is currently very messy to handle
+  // Ther is no `add r/m64 imm64 so use a temp register 
+  Value *temp_immediate = 0;
+  if (a->operand.tag == Operand_Tag_Immediate && a->operand.byte_size == 8) {
+    temp_immediate =
+        value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
+    move_value(allocator, builder, source_range, temp_immediate, a);
+    a = temp_immediate;
+  } else if (b->operand.tag == Operand_Tag_Immediate && b->operand.byte_size == 8) {
+    temp_immediate =
+        value_register_for_descriptor(allocator, register_acquire_temp(builder), b->descriptor);
+    move_value(allocator, builder, source_range, temp_immediate, b);
+    b = temp_immediate;
+  }
+
   u32 a_size = descriptor_byte_size(a->descriptor);
   u32 b_size = descriptor_byte_size(b->descriptor);
   Value *maybe_a_or_b_temp = 0;
@@ -884,6 +900,9 @@ plus_or_minus(
   if (temp != result_value) {
     assert(temp->operand.tag == Operand_Tag_Register);
     move_to_result_from_temp(allocator, builder, source_range, result_value, temp);
+  }
+  if (temp_immediate) {
+    register_release(builder, temp_immediate->operand.Register.index);
   }
 }
 

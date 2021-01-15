@@ -157,6 +157,29 @@ scope_lookup(
   return 0;
 }
 
+void
+assign(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *target,
+  Value *source
+) {
+  if (target->descriptor->tag == Descriptor_Tag_Void) {
+    return;
+  }
+  if (
+    target->descriptor->tag == Descriptor_Tag_Any ||
+    same_value_type_or_can_implicitly_move_cast(target, source)
+  ) {
+    move_value(context->allocator, context->builder, source_range, target, source);
+    return;
+  }
+  // TODO elaborate the error
+  context_error_snprintf(
+    context, *source_range, "Incompatible type"
+  );
+}
+
 Value *
 token_parse_constant_expression(
   Compilation_Context *context,
@@ -1346,7 +1369,7 @@ token_force_value(
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *value = value_global_c_string_from_slice(context, string);
-      move_value(context->allocator, context->builder, &token->source_range, result_value, value);
+      assign(context, &token->source_range, result_value, value);
       return *context->result;
     }
     case Token_Tag_Id: {
@@ -1362,15 +1385,13 @@ token_force_value(
 
         return *context->result;
       } else {
-        move_value(context->allocator, context->builder, &token->source_range, result_value, value);
+        assign(context, &token->source_range, result_value, value);
       }
       return *context->result;
     }
     case Token_Tag_Value: {
       if (token->Value.value) {
-        move_value(
-          context->allocator, context->builder, &token->source_range, result_value, token->Value.value
-        );
+        assign(context, &token->source_range, result_value, token->Value.value);
       } else {
         // TODO consider what should happen here
       }
@@ -2341,7 +2362,7 @@ token_handle_operand_variant_of(
         }
       }
       *result = (Value) {
-        .descriptor = &descriptor_register_8,
+        .descriptor = result_descriptor,
         .operand = {
           .tag = Operand_Tag_Immediate,
           .byte_size = 1,
@@ -2481,22 +2502,24 @@ token_handle_negation(
 
   Value *value = value_any(context->allocator);
   token_force_value(context, token, value);
-  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
+  Value *result = 0;
+  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {\
+    // FIXME this is broken for originally unsigned values larger than their signed counterpart
     switch(value->operand.byte_size) {
       case 1: {
-        value->operand = imm8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
+        result = value_from_s8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
         break;
       }
       case 2: {
-        value->operand = imm16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
+        result = value_from_s16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
         break;
       }
       case 4: {
-        value->operand = imm32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
+        result = value_from_s32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
         break;
       }
       case 8: {
-        value->operand = imm64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
+        result = value_from_s64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
         break;
       }
       default: {
@@ -2507,7 +2530,7 @@ token_handle_negation(
   } else {
     panic("TODO");
   }
-  Token *new_token = token_value_make(context, value, token->source_range);
+  Token *new_token = token_value_make(context, result, token->source_range);
   return new_token;
 }
 
@@ -2963,6 +2986,155 @@ token_handle_function_call(
   return result;
 }
 
+static inline Value *
+extend_integer_value(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *value,
+  Descriptor *target_descriptor
+) {
+  assert(descriptor_is_integer(value->descriptor));
+  assert(descriptor_is_integer(target_descriptor));
+  assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
+  Value *result = reserve_stack(context->allocator, context->builder, target_descriptor);
+  move_value(context->allocator, context->builder, source_range, result, value);
+  return result;
+}
+
+static inline Value *
+extend_signed_integer_value_to_next_size(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *value
+) {
+  assert(descriptor_is_signed_integer(value->descriptor));
+  assert(value->descriptor->tag == Descriptor_Tag_Opaque);
+  Descriptor *one_size_larger;
+  switch(value->descriptor->Opaque.bit_size) {
+    case 8: {
+      one_size_larger = &descriptor_s16;
+      break;
+    }
+    case 16: {
+      one_size_larger = &descriptor_s32;
+      break;
+    }
+    case 32: {
+      one_size_larger = &descriptor_s64;
+      break;
+    }
+    default: {
+      context_error_snprintf(
+        context, *source_range,
+        "Could not find large enough signed integer type to fit both operands"
+      );
+      return 0;
+    }
+  }
+  return extend_integer_value(context, source_range, value, one_size_larger);
+}
+
+Value *
+maybe_coerce_immediate_value_to_signed(
+  Compilation_Context *context,
+  Value *value,
+  Descriptor *target_descriptor
+) {
+  if (!descriptor_is_signed_integer(target_descriptor)) return value;
+  if (!descriptor_is_unsigned_integer(value->descriptor)) return value;
+  if (value->operand.tag != Operand_Tag_Immediate) return value;
+  u64 integer = operand_immediate_value_up_to_u64(&value->operand);
+  if (target_descriptor == &descriptor_s8) {
+    if (u64_fits_into_s8(integer)) {
+      return value_from_s8(context->allocator, u64_to_s8(integer));
+    }
+    return value;
+  } else if (target_descriptor == &descriptor_s16) {
+    if (u64_fits_into_s16(integer)) {
+      return value_from_s16(context->allocator, u64_to_s16(integer));
+    }
+    return value;
+  } else if (target_descriptor == &descriptor_s32) {
+    if (u64_fits_into_s32(integer)) {
+      return value_from_s32(context->allocator, u64_to_s32(integer));
+    }
+    return value;
+  } else if (target_descriptor == &descriptor_s64) {
+    if (u64_fits_into_s64(integer)) {
+      return value_from_s64(context->allocator, u64_to_s64(integer));
+    }
+    return value;
+  }
+  return value;
+}
+
+void
+maybe_resize_values_for_integer_math_operation(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value **lhs_pointer,
+  Value **rhs_pointer
+) {
+  *lhs_pointer = maybe_coerce_immediate_value_to_signed(
+    context, *lhs_pointer, (*rhs_pointer)->descriptor
+  );
+  *rhs_pointer = maybe_coerce_immediate_value_to_signed(
+    context, *rhs_pointer, (*lhs_pointer)->descriptor
+  );
+
+  Descriptor *ld = (*lhs_pointer)->descriptor;
+  Descriptor *rd = (*rhs_pointer)->descriptor;
+
+  bool ld_signed = descriptor_is_signed_integer(ld);
+  bool rd_signed = descriptor_is_signed_integer(rd);
+
+  u32 ld_size = descriptor_byte_size(ld);
+  u32 rd_size = descriptor_byte_size(rd);
+
+  if (ld_signed == rd_signed) {
+    if (ld_size == rd_size) return;
+    Descriptor *larger_descriptor = ld_size > rd_size ? ld : rd;
+    if (ld == larger_descriptor) {
+      *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, larger_descriptor);
+    } else {
+      *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, larger_descriptor);
+    }
+    return;
+  } else {
+    // If the signed and unsigned have the same size need to
+    // increase the size of the signed one so it fits the unsigned
+    if (ld_size == rd_size) {
+      if (ld_size == 8) {
+        context_error_snprintf(
+          context, *source_range,
+          "Could not find large enough signed integer type to fit both operands"
+        );
+        return;
+      }
+      if (ld_signed) {
+        *lhs_pointer =
+          extend_signed_integer_value_to_next_size(context, source_range, *lhs_pointer);
+        MASS_ON_ERROR(*context->result) return;
+      } else {
+        assert(rd_signed);
+        *rhs_pointer =
+          extend_signed_integer_value_to_next_size(context, source_range, *rhs_pointer);
+        MASS_ON_ERROR(*context->result) return;
+      }
+    }
+
+    // Now we know that the signed operand is larger so we move
+    if (ld_signed) {
+      *rhs_pointer =
+        extend_integer_value(context, source_range, *rhs_pointer, (*lhs_pointer)->descriptor);
+    } else {
+      assert(rd_signed);
+      *lhs_pointer =
+        extend_integer_value(context, source_range, *lhs_pointer, (*rhs_pointer)->descriptor);
+    }
+  }
+}
+
 void
 token_dispatch_operator(
   Compilation_Context *context,
@@ -3171,15 +3343,31 @@ token_dispatch_operator(
     Value *rhs_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
-    Descriptor *larger_descriptor =
-      descriptor_byte_size(lhs_value->descriptor) > descriptor_byte_size(rhs_value->descriptor)
-      ? lhs_value->descriptor
-      : rhs_value->descriptor;
+
+    if (!descriptor_is_integer(lhs_value->descriptor)) {
+      context_error_snprintf(
+        context, lhs->source_range,
+        "Left hand side of the  %"PRIslice" is not an integer",
+        SLICE_EXPAND_PRINTF(operator)
+      );
+      return;
+    }
+    if (!descriptor_is_integer(rhs_value->descriptor)) {
+      context_error_snprintf(
+        context, rhs->source_range,
+        "Right hand side of the  %"PRIslice" is not an integer",
+        SLICE_EXPAND_PRINTF(operator)
+      );
+      return;
+    }
+
+    maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs_value, &rhs_value);
+    MASS_ON_ERROR(*context->result) return;
 
     Function_Builder *builder = context->builder;
 
     // FIXME figure out how to avoid this
-    Value *result_value = reserve_stack(context->allocator, builder, larger_descriptor);
+    Value *result_value = reserve_stack(context->allocator, builder, lhs_value->descriptor);
     if (slice_equal(operator, slice_literal("+"))) {
       plus(context->allocator, builder, &lhs->source_range, result_value, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
@@ -3722,16 +3910,9 @@ token_match_fixed_array_type(
   Token_View size_view = token_view_from_group_token(square_brace);
   Token *size_token = compile_time_eval(context, size_view);
   MASS_ON_ERROR(*context->result) return 0;
-  Value *size_value = value_any(context->allocator);
+  Value *size_value = value_any_descriptor(&descriptor_u64, context->allocator);
   token_force_value(context, size_token, size_value);
   MASS_ON_ERROR(*context->result) return 0;
-  if (!descriptor_is_integer(size_value->descriptor)) {
-    context_error_snprintf(
-      context, square_brace->source_range,
-      "Fixed size array size is not an integer"
-    );
-    return 0;
-  }
   if (size_value->operand.tag != Operand_Tag_Immediate) {
     context_error_snprintf(
       context, square_brace->source_range,
