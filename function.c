@@ -1199,6 +1199,27 @@ typedef struct {
 } Saved_Register;
 typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
+void
+ensure_compiled_function_body(
+  Compilation_Context *context,
+  Descriptor_Function *function
+) {
+  // FIXME we should probabably have a separate flag or a stack to track
+  //       functions with compilation in progress to avoid loops
+  if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
+    function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
+    function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
+    {
+      Compilation_Context body_context = *context;
+      body_context.scope = function->scope;
+      body_context.builder = function->builder;
+      token_parse_block_no_scope(&body_context, function->body, function->returns);
+    }
+    fn_end(context->program, function->builder);
+    function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
+  }
+}
+
 Value *
 call_function_overload(
   Compilation_Context *context,
@@ -1208,9 +1229,12 @@ call_function_overload(
 ) {
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  assert(to_call->descriptor->tag == Descriptor_Tag_Function);
-  Descriptor_Function *descriptor = &to_call->descriptor->Function;
+  Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+  assert(to_call_descriptor->tag == Descriptor_Tag_Function);
+  Descriptor_Function *descriptor = &to_call_descriptor->Function;
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
+
+  ensure_compiled_function_body(context, descriptor);
 
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
 

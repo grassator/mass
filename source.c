@@ -286,21 +286,9 @@ scope_lookup_force(
     // the second one, here, actually processes function body
     if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
       Descriptor_Function *function = &it->value->descriptor->Function;
-
-      // FIXME we should probabably have a separate flag or a stack to track
-      //       functions with compilation in progress to avoid loops
-      if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
-        function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-        function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
-        {
-          Compilation_Context body_context = *context;
-          body_context.scope = function->scope;
-          body_context.builder = function->builder;
-          token_parse_block_no_scope(&body_context, function->body, function->returns);
-        }
-        fn_end(context->program, function->builder);
-        function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
-      }
+      // FIXME this should only happen on calls and for the entry / exported functions
+      //       but this breaks tests as we are calling from the "outside".
+      ensure_compiled_function_body(context, function);
     }
 
     if (!result) {
