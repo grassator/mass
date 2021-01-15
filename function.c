@@ -1163,7 +1163,6 @@ compare(
 void
 load_address(
   Compilation_Context *context,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *memory
@@ -1174,7 +1173,7 @@ load_address(
   Value *temp_register = result_value->operand.tag == Operand_Tag_Register
     ? result_value
     : value_register_for_descriptor(
-        context->allocator, register_acquire_temp(builder), result_descriptor
+        context->allocator, register_acquire_temp(context->builder), result_descriptor
     );
 
   // TODO rethink operand sizing
@@ -1185,11 +1184,13 @@ load_address(
   source_operand.byte_size = descriptor_byte_size(result_descriptor);
 
   push_instruction(
-    &builder->code_block.instructions, *source_range,
+    &context->builder->code_block.instructions, *source_range,
     (Instruction) {.assembly = {lea, {temp_register->operand, source_operand, 0}}}
   );
 
-  move_to_result_from_temp(context->allocator, builder, source_range, result_value, temp_register);
+  move_to_result_from_temp(
+    context->allocator, context->builder, source_range, result_value, temp_register
+  );
 }
 
 typedef struct {

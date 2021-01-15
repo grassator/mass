@@ -3243,7 +3243,7 @@ token_dispatch_operator(
           .operand = operand_register_for_descriptor(temp_register, &descriptor_s64)
         };
 
-        load_address(context, context->builder, &target_token->source_range, &temp_value, array);
+        load_address(context, &target_token->source_range, &temp_value, array);
 
         plus(
           context->allocator,
@@ -3300,9 +3300,7 @@ token_dispatch_operator(
     Descriptor *pointer_descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
     // FIXME figure out how to avoid stack allocation
     Value *result_value = reserve_stack(context->allocator, context->builder, pointer_descriptor);
-    load_address(
-      context, context->builder, &pointee_token->source_range, result_value, pointee
-    );
+    load_address(context, &pointee_token->source_range, result_value, pointee);
 
     result_token = token_value_make(context, result_value, pointee_token->source_range);
   } else if (slice_equal(operator, slice_literal("@"))) {

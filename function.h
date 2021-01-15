@@ -137,18 +137,9 @@ compare(
 void
 load_address(
   Compilation_Context *context,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *memory
-);
-
-Value *
-call_function_value_array(
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *to_call,
-  Array_Value_Ptr arguments
 );
 
 Value *
