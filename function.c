@@ -827,7 +827,7 @@ plus_or_minus(
 
   // TODO this is not optimal as the immediate might actually fit into a smaller size
   //      that we do support but it is currently very messy to handle
-  // Ther is no `add r/m64 imm64 so use a temp register 
+  // There is no `add r/m64 imm64` so use a temp register
   Value *temp_immediate = 0;
   if (a->operand.tag == Operand_Tag_Immediate && a->operand.byte_size == 8) {
     temp_immediate =
