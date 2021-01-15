@@ -1285,15 +1285,7 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (operand_is_label(&to_call->operand)) {
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
-  } else {
-    Value *reg_a = value_register_for_descriptor(context->allocator, Register_A, to_call->descriptor);
-    move_value(context->allocator, builder, source_range, reg_a, to_call);
-    push_instruction(
-      instructions, *source_range, (Instruction) {.assembly = {call, {reg_a->operand, 0, 0}}}
-    );
-  }
+  push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
 
   Value *result = descriptor->returns;
   if (return_size <= 8) {
