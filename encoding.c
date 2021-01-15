@@ -103,6 +103,7 @@ encode_instruction_assembly(
         mod = MOD_Register;
       } else if (operand->tag == Operand_Tag_Memory) {
         const Memory_Location *location = &operand->Memory.location;
+        bool can_have_zero_displacement = true;
         switch(location->tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
             r_m = 0b101;
@@ -118,20 +119,11 @@ encode_instruction_assembly(
             //    be represented with SIB scale. In cases of extreme register pressure this
             //    can cause spilling. To avoid that we could try to use temporary shifts
             //    to adjust the offset between different indexes, but it is not implemented ATM.
-            enum { SIB_Scale_1 = 0b00, SIB_Scale_2 = 0b01, SIB_Scale_4 = 0b10, SIB_Scale_8 = 0b11,};
-            u8 sib_scale_bits = SIB_Scale_1;
+            enum { Sib_Scale_1 = 0b00, Sib_Scale_2 = 0b01, Sib_Scale_4 = 0b10, Sib_Scale_8 = 0b11,};
+            enum { Sib_Index_None = 0b100,};
+            u8 sib_scale_bits = Sib_Scale_1;
             Register base = operand->Memory.location.Indirect.base_register;
-            // [RSP + X] always needs to be encoded as SIB because RSP register index
-            // in MOD R/M is occupied by RIP-relative encoding
-            if (base == Register_SP) {
-              needs_sib = true;
-              r_m = 0b0100; // SIB
-              sib_byte = (
-                ((sib_scale_bits & 0b11) << 6) |
-                ((Register_SP & 0b111) << 3) |
-                ((Register_SP & 0b111) << 0)
-              );
-            } else if (operand->Memory.location.Indirect.maybe_index_register.has_value) {
+            if (operand->Memory.location.Indirect.maybe_index_register.has_value) {
               needs_sib = true;
               r_m = 0b0100; // SIB
               Register sib_index = operand->Memory.location.Indirect.maybe_index_register.index;
@@ -143,14 +135,31 @@ encode_instruction_assembly(
               if (sib_index & 0b1000) {
                 rex_byte |= REX_X;
               }
+            } else if (base == Register_SP || base == Register_R12) {
+              // [RSP + X] and [R12 + X] always needs to be encoded as SIB because
+              // 0b100 register index in MOD R/M is occupied by SIB byte indicator
+              needs_sib = true;
+              r_m = 0b0100; // SIB
+              sib_byte = (
+                ((sib_scale_bits & 0b11) << 6) |
+                ((Sib_Index_None & 0b111) << 3) |
+                ((base & 0b111) << 0)
+              );
             } else {
-              r_m = operand->Memory.location.Indirect.base_register;
+              r_m = base;
+            }
+            // :RipRelativeEncoding
+            // 0b101 value is occupied RIP-relative encoding indicator
+            // when mod is 00, so for the (RBP / R13) always use disp8 (mod 01)
+            if (base == Register_BP || base == Register_R13) {
+              can_have_zero_displacement = false;
             }
             displacement = s64_to_s32(operand->Memory.location.Indirect.offset);
             break;
           }
         }
-        if (displacement == 0) {
+        // :RipRelativeEncoding
+        if (can_have_zero_displacement && displacement == 0) {
           mod = MOD_Displacement_0;
         } else if (s32_fits_into_s8(displacement)) {
           mod = MOD_Displacement_s8;
