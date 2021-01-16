@@ -2283,7 +2283,7 @@ compile_time_eval(
   };
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
-      result_value->operand = (Operand){0};
+      temp_result->operand = (Operand){0};
       break;
     }
     case Descriptor_Tag_Any: {
