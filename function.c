@@ -1211,7 +1211,8 @@ ensure_compiled_function_body(
     function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
     {
       Compilation_Context body_context = *context;
-      body_context.scope = function->scope;
+      // TODO Should this set compilation_mode?
+      context_set_active_scope(&body_context, function->scope);
       body_context.builder = function->builder;
       token_parse_block_no_scope(&body_context, function->body, function->returns);
     }

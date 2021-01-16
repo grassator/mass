@@ -1505,8 +1505,9 @@ compilation_context_init(
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .program = program,
+    .compilation_mode = Compilation_Mode_Runtime,
     .compile_time_jit = jit,
-    .scope = program->global_scope,
+    .runtime_scope = program->global_scope,
     .compile_time_scope = jit->program->global_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
   };

@@ -12,6 +12,7 @@ typedef enum {
 } Scope_Entry_Type;
 
 typedef struct {
+  Compilation_Mode compilation_mode;
   Token_View tokens;
   Scope *scope;
 } Scope_Lazy_Expression;
