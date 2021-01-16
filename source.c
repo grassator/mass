@@ -1125,8 +1125,8 @@ token_apply_macro_syntax(
 
     Value *result = builder->value;
     descriptor->Function.returns = macro->replacement.length
-      ? value_any(context->allocator)
-      : &void_value;
+      ? (Value){.descriptor = &descriptor_any, .operand = {.tag = Operand_Tag_Any}}
+      : void_value;
     descriptor->Function.scope = captured_scope;
     descriptor->Function.body = fake_body;
     descriptor->Function.builder = builder;
@@ -1339,8 +1339,8 @@ token_match_return_type(
     goto err;
   }
 
-  function_return_descriptor(context, function, type_descriptor);
-  arg.value = function->returns;
+  function->returns = function_return_value_for_descriptor(context, type_descriptor);
+  arg.value = &function->returns;
 
   err:
   return arg;
@@ -2078,7 +2078,7 @@ token_process_function_literal(
   }
 
   if (dyn_array_length(return_types->Group.children) == 0) {
-    descriptor->Function.returns = &void_value;
+    descriptor->Function.returns = void_value;
   } else {
     Token_View children = token_view_from_group_token(return_types);
     Token_View_Split_Iterator it = { .view = children };
@@ -2102,7 +2102,7 @@ token_process_function_literal(
       if (arg.name.length) {
         scope_define(function_scope, arg.name, (Scope_Entry) {
           .type = Scope_Entry_Type_Value,
-          .value = descriptor->Function.returns,
+          .value = &descriptor->Function.returns,
         });
       }
 
@@ -2124,7 +2124,7 @@ token_process_function_literal(
 
   scope_define(function_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
-    .value = descriptor->Function.returns,
+    .value = &descriptor->Function.returns,
   });
 
   if (dyn_array_length(args->Group.children) != 0) {
@@ -2201,7 +2201,7 @@ compile_time_eval(
   eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
 
   Descriptor_Function *fake_function = &eval_builder.value->descriptor->Function;
-  function_return_descriptor(context, fake_function, &descriptor_void);
+  fake_function->returns = void_value;
 
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.

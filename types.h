@@ -315,7 +315,7 @@ typedef struct {
   const Token * body;
   Scope * scope;
   Function_Builder * builder;
-  Value * returns;
+  Value returns;
 } Descriptor_Function;
 typedef struct {
   Descriptor * item;

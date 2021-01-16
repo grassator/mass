@@ -442,7 +442,7 @@ main(void) {
       { "Scope *", "scope" },
       { "Function_Builder *", "builder" },
 
-      { "Value *", "returns" },
+      { "Value", "returns" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "Descriptor *", "item" },

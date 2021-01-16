@@ -54,7 +54,7 @@ same_type(
       return a == b;
     }
     case Descriptor_Tag_Function: {
-      if (!same_type(a->Function.returns->descriptor, b->Function.returns->descriptor)) {
+      if (!same_type(a->Function.returns.descriptor, b->Function.returns.descriptor)) {
         return false;
       }
       if (dyn_array_length(a->Function.arguments) != dyn_array_length(b->Function.arguments)) {
@@ -1079,7 +1079,7 @@ function_next_argument_value_internal(
   // If return type is larger than register, the pointer to stack location
   // where it needs to be written to is passed as the first argument
   // shifting registers for actual arguments by one
-  if (descriptor_byte_size(function->returns->descriptor) > 8) {
+  if (descriptor_byte_size(function->returns.descriptor) > 8) {
     argument_index++;
   }
   switch (argument_index) {
@@ -1235,7 +1235,7 @@ c_function_descriptor(
     },
   };
 
-  descriptor->Function.returns = c_function_return_value(allocator, forward_declaration);
+  descriptor->Function.returns = *c_function_return_value(allocator, forward_declaration);
   char *ch = strchr(forward_declaration, '(');
   assert(ch);
   ch++;

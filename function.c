@@ -501,7 +501,7 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
-  assert(builder->value->descriptor->Function.returns);
+  assert(builder->value->descriptor->Function.returns.descriptor->tag != Descriptor_Tag_Any);
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
@@ -615,7 +615,7 @@ fn_encode(
   );
 
   // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->value->descriptor->Function.returns->descriptor) > 8) {
+  if(descriptor_byte_size(builder->value->descriptor->Function.returns.descriptor) > 8) {
     // FIXME :RegisterAllocation
     //       make sure that return value is always available in RCX at this point
     encode_instruction_with_compiler_location(
@@ -646,43 +646,42 @@ fn_encode(
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
 }
 
-void
-function_return_descriptor(
+Value
+function_return_value_for_descriptor(
   Compilation_Context *context,
-  Descriptor_Function *function,
   Descriptor *descriptor
 ) {
-  if (!function->returns) {
-    if (descriptor->tag != Descriptor_Tag_Void) {
-      // TODO handle 16 byte non-float return values in XMM0
-      if (descriptor_is_float(descriptor)) {
-        function->returns = value_register_for_descriptor(context->allocator, Register_Xmm0, descriptor);
-      } else {
-        // :ReturnTypeLargerThanRegister
-        u32 byte_size = descriptor_byte_size(descriptor);
-        if (byte_size > 8) {
-          function->returns = allocator_allocate(context->allocator, Value);
-          *function->returns = (Value){
-            .descriptor = descriptor,
-            .operand = {
-              .tag = Operand_Tag_Memory,
-              .byte_size = byte_size,
-              .Memory.location = {
-                .tag = Memory_Location_Tag_Indirect,
-                .Indirect = {
-                  .base_register = Register_C,
-                }
-              }
-            },
-          };
-        } else {
-          function->returns = value_register_for_descriptor(context->allocator, Register_A, descriptor);
+  if (descriptor->tag == Descriptor_Tag_Void) {
+    return void_value;
+  }
+  // TODO handle 16 byte non-float return values in XMM0
+  if (descriptor_is_float(descriptor)) {
+    return (Value) {
+      .descriptor = descriptor,
+      .operand = operand_register_for_descriptor(Register_Xmm0, descriptor),
+    };
+  }
+  // :ReturnTypeLargerThanRegister
+  u32 byte_size = descriptor_byte_size(descriptor);
+  if (byte_size <= 8) {
+    return (Value) {
+      .descriptor = descriptor,
+      .operand = operand_register_for_descriptor(Register_A, descriptor),
+    };
+  }
+  return (Value){
+    .descriptor = descriptor,
+    .operand = {
+      .tag = Operand_Tag_Memory,
+      .byte_size = byte_size,
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = {
+          .base_register = Register_C,
         }
       }
-    } else {
-      function->returns = &void_value;
-    }
-  }
+    },
+  };
 }
 
 Label_Index
@@ -1214,7 +1213,7 @@ ensure_compiled_function_body(
       // TODO Should this set compilation_mode?
       context_set_active_scope(&body_context, function->scope);
       body_context.builder = function->builder;
-      token_parse_block_no_scope(&body_context, function->body, function->returns);
+      token_parse_block_no_scope(&body_context, function->body, &function->returns);
     }
     fn_end(context_get_active_program(context), function->builder);
     function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
@@ -1270,15 +1269,15 @@ call_function_overload(
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
   // :ReturnTypeLargerThanRegister
-  u32 return_size = descriptor_byte_size(descriptor->returns->descriptor);
+  u32 return_size = descriptor_byte_size(descriptor->returns.descriptor);
   if (return_size > 8) {
     parameters_stack_size += return_size;
     Descriptor *return_pointer_descriptor =
-      descriptor_pointer_to(context->allocator, descriptor->returns->descriptor);
+      descriptor_pointer_to(context->allocator, descriptor->returns.descriptor);
     Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, return_pointer_descriptor);
     push_instruction(
       instructions, *source_range,
-      (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns->operand}}}
+      (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns.operand}}}
     );
   }
 
@@ -1289,12 +1288,12 @@ call_function_overload(
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
 
-  Value *saved_result = descriptor->returns;
+  Value *saved_result = &descriptor->returns;
   if (return_size <= 8) {
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
-      saved_result = reserve_stack(context->allocator, builder, descriptor->returns->descriptor);
-      move_value(context->allocator, builder, source_range, saved_result, descriptor->returns);
+      saved_result = reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
+      move_value(context->allocator, builder, source_range, saved_result, &descriptor->returns);
     }
   }
 
