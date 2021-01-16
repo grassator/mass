@@ -1491,12 +1491,14 @@ token_handle_user_defined_operator(
   Program *program = context_get_active_program(context);
   Label_Index fake_return_label_index = make_label(program, &program->data_section);
   {
+    Value *return_label_value = allocator_allocate(context->allocator, Value);
+    *return_label_value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = code_label32(fake_return_label_index),
+    };
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
-      .value = &(Value) {
-        .descriptor = &descriptor_void,
-        .operand = code_label32(fake_return_label_index),
-      },
+      .value = return_label_value,
     });
     scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
