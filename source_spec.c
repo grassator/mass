@@ -53,6 +53,7 @@ spec_check_mass_result(
 }
 
 static Slice test_file_name = slice_literal_fields("_test_.mass");
+static Source_File test_source_file = {0};
 
 static Value *
 test_program_inline_source_base(
@@ -60,8 +61,8 @@ test_program_inline_source_base(
   Compilation_Context *context,
   const char *source
 ) {
-  Source_File source_file = {test_file_name, slice_from_c_string(source)};
-  program_parse(context, &source_file);
+  test_source_file = (Source_File){test_file_name, slice_from_c_string(source)};
+  program_parse(context, &test_source_file);
   return scope_lookup_force(
     context, context_get_active_program(context)->global_scope, slice_from_c_string(id)
   );
