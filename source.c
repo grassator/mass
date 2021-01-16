@@ -1892,16 +1892,16 @@ token_process_bit_type_definition(
   Token_View args_view = { .tokens = &args, .length = 1 };
   Value *bit_size_value = token_parse_constant_expression(context, args_view);
   if (!bit_size_value) {
-    // TODO print error
+    context_error_snprintf(context, args->source_range, "Could not parse bit type size");
     goto err;
   }
 
   if (!descriptor_is_integer(bit_size_value->descriptor)) {
-    // TODO err
+    context_error_snprintf(context, args->source_range, "Bit type size must be an integer");
     goto err;
   }
   if (bit_size_value->operand.tag != Operand_Tag_Immediate) {
-    // TODO err
+    context_error_snprintf(context, args->source_range, "Bit type size must be a constant");
     goto err;
   }
   u64 bit_size = s64_to_u64(operand_immediate_value_up_to_s64(&bit_size_value->operand));
