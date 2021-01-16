@@ -388,9 +388,10 @@ move_to_result_from_temp(
   }
 }
 
-Function_Builder *
+void
 fn_begin(
-  Compilation_Context *context
+  Compilation_Context *context,
+  Function_Builder *out_builder
 ) {
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (const Descriptor) {
@@ -408,30 +409,28 @@ fn_begin(
     .descriptor = descriptor,
     .operand = code_label32(make_label(program, &program->code_section)),
   };
-  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
+  *out_builder = (Function_Builder){
     .value = fn_value,
     .code_block = {
       .end_label = make_label(program, &program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
-  });
+  };
 
   {
     // Arguments
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_C);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_D);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R8);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R9);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_C);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_D);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R8);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R9);
 
     // Return
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_A);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_A);
 
     // Other
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R10);
-    register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R11);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R10);
+    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R11);
   }
-
-  return builder;
 }
 
 // :StackDisplacementEncoding

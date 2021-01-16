@@ -1105,7 +1105,9 @@ token_apply_macro_syntax(
 
     Token_View capture_view = *dyn_array_get(match, i);
 
-    Function_Builder *builder = fn_begin(context);
+    Function_Builder *builder =
+      dyn_array_push_uninitialized(context_get_active_program(context)->functions);
+    fn_begin(context, builder);
     Descriptor *descriptor = builder->value->descriptor;
 
     Token *fake_body = allocator_allocate(context->allocator, Token);
@@ -2058,7 +2060,8 @@ token_process_function_literal(
     };
     descriptor->Function.flags |= Descriptor_Function_Flags_External;
   } else {
-    builder = fn_begin(context);
+    builder = dyn_array_push_uninitialized(context_get_active_program(context)->functions);
+    fn_begin(context, builder);
     descriptor = builder->value->descriptor;
     Value *return_label_value = allocator_allocate(context->allocator, Value);
     *return_label_value = (Value) {
@@ -2192,11 +2195,12 @@ compile_time_eval(
   // Is it actually always compile time scope or it depend on the current mode?
   context_set_active_scope(&eval_context, context->compile_time_scope);
   eval_context.compilation_mode = Compilation_Mode_Compile_Time;
-  eval_context.builder = fn_begin(&eval_context);
+  Function_Builder eval_builder;
+  fn_begin(&eval_context, &eval_builder);
+  eval_context.builder = &eval_builder;
   eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
 
-  Descriptor_Function *fake_function = &eval_context.builder->value->descriptor->Function;
-  fake_function->flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
+  Descriptor_Function *fake_function = &eval_builder.value->descriptor->Function;
   function_return_descriptor(context, fake_function, &descriptor_void);
 
   // FIXME We have to call token_parse_expression here before we figure out
@@ -2255,8 +2259,8 @@ compile_time_eval(
     context->result = eval_context.result;
     return;
   }
-  fake_function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-  fn_end(context_get_active_program(&eval_context), eval_context.builder);
+  fn_end(context_get_active_program(&eval_context), &eval_builder);
+  dyn_array_push(jit->program->functions, eval_builder);
 
   program_jit(jit);
 
