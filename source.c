@@ -2213,6 +2213,16 @@ compile_time_eval(
     return;
   }
 
+  // If we didn't generate any instructions there is no point
+  // actually running the code, we can just take the resulting value
+  if (!dyn_array_length(eval_builder.code_block.instructions)) {
+    if (expression_result_value->descriptor->tag == Descriptor_Tag_Function) {
+      panic("TODO figure out how to deal with function values");
+    }
+    MASS_ON_ERROR(assign(context, source_range, result_value, expression_result_value));
+    return;
+  }
+
   u32 result_byte_size = expression_result_value->operand.byte_size;
   // Need to ensure 16-byte alignment here because result value might be __m128
   // TODO When we support AVX-2 or AVX-512, this might need to increase further
@@ -2220,7 +2230,7 @@ compile_time_eval(
   void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
 
   // Load the address of the result
-  Register out_register = register_acquire_temp(eval_context.builder);
+  Register out_register = register_acquire_temp(&eval_builder);
   Value out_value_register = {
     .descriptor = &descriptor_s64,
     .operand = {
