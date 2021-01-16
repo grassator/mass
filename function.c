@@ -403,14 +403,15 @@ fn_begin(
     },
   };
   Value *fn_value = allocator_allocate(context->allocator, Value);
+  Program *program = context_get_active_program(context);
   *fn_value = (const Value) {
     .descriptor = descriptor,
-    .operand = code_label32(make_label(context->program, &context->program->code_section)),
+    .operand = code_label32(make_label(program, &program->code_section)),
   };
-  Function_Builder *builder = dyn_array_push(context->program->functions, (Function_Builder){
+  Function_Builder *builder = dyn_array_push(program->functions, (Function_Builder){
     .value = fn_value,
     .code_block = {
-      .end_label = make_label(context->program, &context->program->code_section),
+      .end_label = make_label(program, &program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   });
@@ -692,7 +693,7 @@ make_if(
   const Source_Range *source_range,
   Value *value
 ) {
-  Program *program = context->program;
+  Program *program = context_get_active_program(context);
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->code_section);
   if(value->operand.tag == Operand_Tag_Immediate) {
@@ -1216,7 +1217,7 @@ ensure_compiled_function_body(
       body_context.builder = function->builder;
       token_parse_block_no_scope(&body_context, function->body, function->returns);
     }
-    fn_end(context->program, function->builder);
+    fn_end(context_get_active_program(context), function->builder);
     function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
   }
 }
@@ -1350,7 +1351,7 @@ make_and(
   Value *a,
   Value *b
 ) {
-  Program *program = context->program;
+  Program *program = context_get_active_program(context);
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);
@@ -1386,7 +1387,7 @@ make_or(
   Value *a,
   Value *b
 ) {
-  Program *program = context->program;
+  Program *program = context_get_active_program(context);
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);

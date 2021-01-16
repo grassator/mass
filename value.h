@@ -318,7 +318,7 @@ typedef enum {
 typedef struct {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
-  Program *program;
+  Program *runtime_program;
   Jit *compile_time_jit;
   Compilation_Mode compilation_mode;
   Scope *runtime_scope;
@@ -326,6 +326,18 @@ typedef struct {
   Function_Builder *builder;
   Mass_Result *result;
 } Compilation_Context;
+
+static inline Program *
+context_get_active_program(
+  Compilation_Context *context
+) {
+  switch(context->compilation_mode) {
+    case Compilation_Mode_Runtime: return context->runtime_program;
+    case Compilation_Mode_Compile_Time: return context->compile_time_jit->program;
+  }
+  panic("Unknown compilation mode");
+  return 0;
+}
 
 static inline Scope *
 context_get_active_scope(

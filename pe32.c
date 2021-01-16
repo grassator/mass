@@ -244,7 +244,7 @@ encode_text_section(
   IMAGE_SECTION_HEADER *header,
   Encoded_Rdata_Section *encoded_rdata_section
 ) {
-  Program *program = context->program;
+  Program *program = context_get_active_program(context);
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
 
@@ -267,7 +267,7 @@ encode_text_section(
       found_entry_point = true;
     }
     Function_Layout *layout = dyn_array_push_uninitialized(layouts);
-    fn_encode(context->program, result.buffer, builder, layout);
+    fn_encode(program, result.buffer, builder, layout);
   }
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
@@ -327,7 +327,7 @@ write_executable(
   Compilation_Context *context,
   Executable_Type executable_type
 ) {
-  Program *program = context->program;
+  Program *program = context_get_active_program(context);
   assert(program->entry_point);
   // Sections
   IMAGE_SECTION_HEADER sections[] = {

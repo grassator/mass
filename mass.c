@@ -85,10 +85,10 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_error(&result.Error.details);
   }
 
-  context.program->entry_point = scope_lookup_force(
-    &context, context.program->global_scope, slice_literal("main")
+  context.runtime_program->entry_point = scope_lookup_force(
+    &context, context.runtime_program->global_scope, slice_literal("main")
   );
-  if (!context.program->entry_point) {
+  if (!context.runtime_program->entry_point) {
     printf("Could not find entry point function `main`");
     return -1;
   }
@@ -117,7 +117,7 @@ int main(s32 argc, char **argv) {
     }
     case Mass_Cli_Mode_Run: {
       Jit jit;
-      jit_init(&jit, context.program);
+      jit_init(&jit, context.runtime_program);
       program_jit(&jit);
       fn_type_opaque main = value_as_function(&jit, jit.program->entry_point);
       main();

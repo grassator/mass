@@ -1486,8 +1486,8 @@ token_handle_user_defined_operator(
 
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
-  Label_Index fake_return_label_index =
-    make_label(context->program, &context->program->data_section);
+  Program *program = context_get_active_program(context);
+  Label_Index fake_return_label_index = make_label(program, &program->data_section);
   {
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
@@ -2034,7 +2034,8 @@ token_process_function_literal(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope *function_scope = scope_make(context->allocator, context->program->global_scope);
+  Scope *parent_scope = context_get_active_program(context)->global_scope;
+  Scope *function_scope = scope_make(context->allocator, parent_scope);
 
   Function_Builder *builder = 0;
   Descriptor *descriptor = 0;
@@ -2190,7 +2191,7 @@ compile_time_eval(
   Compilation_Context eval_context = *context;
   // Is it actually always compile time scope or it depend on the current mode?
   context_set_active_scope(&eval_context, context->compile_time_scope);
-  eval_context.program = jit->program;
+  eval_context.compilation_mode = Compilation_Mode_Compile_Time;
   eval_context.builder = fn_begin(&eval_context);
   eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
 
@@ -2255,7 +2256,7 @@ compile_time_eval(
     return;
   }
   fake_function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-  fn_end(eval_context.program, eval_context.builder);
+  fn_end(context_get_active_program(&eval_context), eval_context.builder);
 
   program_jit(jit);
 
@@ -2935,8 +2936,8 @@ token_handle_function_call(
 
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
-      Label_Index fake_return_label_index =
-        make_label(context->program, &context->program->data_section);
+      Program *program = context_get_active_program(context);
+      Label_Index fake_return_label_index = make_label(program, &program->data_section);
       {
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
           .type = Scope_Entry_Type_Value,
@@ -3735,7 +3736,8 @@ token_parse_statement_label(
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
   } else {
-    Label_Index label = make_label(context->program, &context->program->code_section);
+    Program *program = context_get_active_program(context);
+    Label_Index label = make_label(program, &program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -3862,7 +3864,8 @@ token_parse_goto(
     // If we didn't find an identifier with this name, declare one and hope
     // that some label will resolve it
     // FIXME somehow report unresolved labels
-    Label_Index label = make_label(context->program, &context->program->code_section);
+    Program *program = context_get_active_program(context);
+    Label_Index label = make_label(program, &program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -4229,14 +4232,15 @@ token_parse(
   if (!view.length) return *context->result;
 
   Token_View_Split_Iterator it = { .view = view };
+  Program *program = context_get_active_program(context);
   while (!it.done) {
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
-    if (token_parse_syntax_definition(context, statement, context->program->global_scope)) {
+    if (token_parse_syntax_definition(context, statement, program->global_scope)) {
       continue;
     }
-    if (token_parse_operator_definition(context, statement, context->program->global_scope)) {
+    if (token_parse_operator_definition(context, statement, program->global_scope)) {
       continue;
     }
     if (token_parse_constant_definitions(context, statement, 0)) {
