@@ -923,18 +923,6 @@ value_from_unsigned_immediate_internal(
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-Value *
-value_byte_size_internal(
-  Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
-  Value *value
-) {
-  s32 byte_size = descriptor_byte_size(value->descriptor);
-  return value_from_s32_internal(compiler_source_location, allocator, byte_size);
-}
-#define value_byte_size(...)\
-  value_byte_size_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
 static inline Operand
 operand_register_for_descriptor(
   Register reg,
