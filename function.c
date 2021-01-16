@@ -1220,13 +1220,13 @@ ensure_compiled_function_body(
   }
 }
 
-Value *
+void
 call_function_overload(
   Compilation_Context *context,
   const Source_Range *source_range,
-  Value *to_call,
-  Array_Value_Ptr arguments
-  // FIXME accept result_value
+  const Value *to_call,
+  Array_Value_Ptr arguments,
+  Value *result_value
 ) {
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
@@ -1288,21 +1288,22 @@ call_function_overload(
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
 
-  Value *result = descriptor->returns;
+  Value *saved_result = descriptor->returns;
   if (return_size <= 8) {
     if (return_size != 0) {
-      result = reserve_stack(context->allocator, builder, descriptor->returns->descriptor);
-      move_value(context->allocator, builder, source_range, result, descriptor->returns);
+      // FIXME Should not be necessary with correct register allocation
+      saved_result = reserve_stack(context->allocator, builder, descriptor->returns->descriptor);
+      move_value(context->allocator, builder, source_range, saved_result, descriptor->returns);
     }
   }
+
+  move_value(context->allocator, builder, source_range, result_value, saved_result);
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
     move_value(context->allocator, builder, source_range, &reg->saved, reg->stack_value);
     // TODO :FreeStackAllocation
   }
-
-  return result;
 }
 
 

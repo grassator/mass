@@ -2964,8 +2964,7 @@ token_handle_function_call(
         }
       );
     } else {
-      Value *return_value = call_function_overload(context, source_range, overload, args);
-      MASS_ON_ERROR(assign(context, source_range, result_value, return_value));
+      call_function_overload(context, source_range, overload, args, result_value);
     }
 
 
