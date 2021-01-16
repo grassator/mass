@@ -2188,8 +2188,6 @@ compile_time_eval(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  // TODO @Speed if `view` is empty or a single token we can do something much faster
-
   const Source_Range *source_range = &view.source_range;
 
   Jit *jit = context->compile_time_jit;
