@@ -119,6 +119,13 @@ scope_define(
 );
 
 void
+compile_time_eval(
+  Compilation_Context *context,
+  Token_View view,
+  Value *result_value
+);
+
+void
 token_handle_negation(
   Compilation_Context *context,
   Token_View args,
