@@ -119,6 +119,12 @@ scope_define(
 );
 
 void
+scope_define_builtins(
+  const Allocator *allocator,
+  Scope *scope
+);
+
+void
 compile_time_eval(
   Compilation_Context *context,
   Token_View view,

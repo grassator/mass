@@ -297,7 +297,6 @@ typedef struct Program {
   Array_Function_Builder functions;
   Section data_section;
   Section code_section;
-  Scope *global_scope;
 } Program;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)

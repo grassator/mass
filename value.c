@@ -1268,6 +1268,8 @@ c_function_value(
   return result;
 }
 
+
+
 Program *
 program_init(
   Allocator *allocator,
@@ -1278,7 +1280,6 @@ program_init(
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
-    .global_scope = scope_make(allocator, 0),
     .data_section = {
       .buffer = bucket_buffer_make(.allocator = allocator_system),
       .permissions = Section_Permissions_Read | Section_Permissions_Write,
@@ -1288,150 +1289,6 @@ program_init(
       .permissions = Section_Permissions_Execute,
     },
   };
-
-  scope_define(program->global_scope, slice_literal("[]"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("()"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("."), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("->"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 3 }
-  });
-  scope_define(program->global_scope, slice_literal("macro"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
-  scope_define(program->global_scope, slice_literal("@"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
-
-  scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = {
-      .precedence = 17,
-      .handler = token_handle_negation,
-      .argument_count = 1,
-      .fixity = Operator_Fixity_Prefix
-    }
-  });
-
-  scope_define(program->global_scope, slice_literal("&"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 16, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
-  scope_define(program->global_scope, slice_literal("*"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("/"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("%"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-  scope_define(program->global_scope, slice_literal("+"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("-"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-
-  scope_define(program->global_scope, slice_literal("<"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal(">"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("<="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal(">="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-  scope_define(program->global_scope, slice_literal("=="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("!="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-
-  scope_define(program->global_scope, slice_literal("&&"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 5, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(program->global_scope, slice_literal("||"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
-    .Operator = { .precedence = 4, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-
-  scope_define(program->global_scope, slice_literal("any"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_any_value
-  });
-
-  scope_define(program->global_scope, slice_literal("Register_8"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_8_value
-  });
-  scope_define(program->global_scope, slice_literal("Register_16"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_16_value
-  });
-  scope_define(program->global_scope, slice_literal("Register_32"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_32_value
-  });
-  scope_define(program->global_scope, slice_literal("Register_64"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_64_value
-  });
-
-  #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
-    scope_define(program->global_scope, slice_literal(#_NAME_), (Scope_Entry) {\
-      .type = Scope_Entry_Type_Value,\
-      .value = type_##_NAME_##_value\
-    });
-  MASS_ENUMERATE_BUILT_IN_TYPES
-  #undef MASS_PROCESS_BUILT_IN_TYPE
-
-  {
-    Array_Token_Statement_Matcher matchers =
-      dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definitions});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_goto});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
-    program->global_scope->statement_matchers = matchers;
-  }
 
   return program;
 };
@@ -1489,14 +1346,20 @@ compilation_context_init(
   Jit *jit = allocator_allocate(compilation_allocator, Jit);
   jit_init(jit, jit_program);
 
+  Scope *runtime_scope = scope_make(compilation_allocator, 0);
+  scope_define_builtins(compilation_allocator, runtime_scope);
+
+  Scope *compile_time_scope = scope_make(compilation_allocator, 0);
+  scope_define_builtins(compilation_allocator, compile_time_scope);
+
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .runtime_program = program,
     .compilation_mode = Compilation_Mode_Runtime,
     .compile_time_jit = jit,
-    .runtime_scope = program->global_scope,
-    .compile_time_scope = jit->program->global_scope,
+    .runtime_scope = runtime_scope,
+    .compile_time_scope = compile_time_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 }
