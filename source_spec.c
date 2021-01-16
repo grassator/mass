@@ -67,9 +67,9 @@ test_program_inline_source_base(
 
 fn_type_opaque
 test_program_inline_source_function(
+  const char *function_id,
   Compilation_Context *context,
-  const char *source,
-  const char *function_id
+  const char *source
 ) {
   Value *value = test_program_inline_source_base(function_id, context, source);
   if (!spec_check_mass_result(context->result)) return 0;
@@ -324,12 +324,12 @@ spec("source") {
     #ifdef _WIN32
     // This test relies on Windows calling convention
     it("should be able to include raw machine code bytes") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "foo", &test_context,
         "foo :: () -> (result : s64) {"
           "inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00)"
           "result"
-        "}",
-        "foo"
+        "}"
       );
       check(checker);
       check(checker() == 42);
@@ -339,11 +339,11 @@ spec("source") {
     #ifdef _WIN32
     // This test relies on Windows calling convention
     it("should be able to retrieve the register used for a particular value") {
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
+        "foo", &test_context,
         "foo :: (x : s64) -> (Register_64) {"
           "operand_variant_of(x)"
-        "}",
-        "foo"
+        "}"
       );
       check(checker);
       Register actual = checker();
@@ -354,7 +354,8 @@ spec("source") {
 
     it("should be able to reference a declared label in raw machine code bytes") {
       // TODO only run on X64 hosts
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "foo", &test_context,
         "foo :: () -> (s64) {"
           "goto start;"
           "label from_machine_code;"
@@ -363,8 +364,7 @@ spec("source") {
           // "goto from_machine_code;"
           "inline_machine_code_bytes(0xE9, from_machine_code);"
           "10"
-        "}",
-        "foo"
+        "}"
       );
       check(checker);
       check(checker() == 42);
@@ -404,26 +404,27 @@ spec("source") {
   describe("Functions") {
     it("should be able to parse and run a void -> s64 function") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
-        &test_context, "foo :: () -> (s64) { 42 }", "foo"
+        "foo", &test_context,
+        "foo :: () -> (s64) { 42 }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to parse and run a function with 5 arguments") {
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(&test_context,
-        "foo :: (x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }",
-        "foo"
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: (x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }"
       );
       check(checker);
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
     it("should correctly save volatile registers when calling other functions") {
-      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(
+        "outer", &test_context,
         "inner :: (x : s64) -> () { x = 21 };"
-        "outer :: (x : s64) -> (s64) { inner(1); x }",
-        "outer"
+        "outer :: (x : s64) -> (s64) { inner(1); x }"
       );
       check(checker);
       s64 actual = checker(42);
@@ -431,27 +432,28 @@ spec("source") {
     }
 
     it("should be able to parse and run a s64 -> s64 function") {
-      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(&test_context,
-        "foo :: (x : s64) -> (s64) { x }", "foo"
+      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: (x : s64) -> (s64) { x }"
       );
       check(checker);
       check(checker(42) == 42);
     }
 
     it("should be able to define, assign and lookup an s64 variable on the stack") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
-        "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }",
-        "foo"
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: () -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to parse and run multiple function definitions") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "proxy", &test_context,
         "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }\n"
-        "plus :: (x : s32, y : s32) -> (s32) { x + y }",
-        "proxy"
+        "plus :: (x : s32, y : s32) -> (s32) { x + y }"
       );
       check(checker);
       s32 answer = checker();
@@ -459,9 +461,9 @@ spec("source") {
     }
 
     it("should be able to define a local function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
-        "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }",
-        "checker"
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: () -> (s64) { local :: () -> (s64) { 42 }; local() }"
       );
       check(checker);
       s64 answer = checker();
@@ -469,10 +471,10 @@ spec("source") {
     }
 
     it("should be able to parse and run functions with local overloads") {
-      fn_type_s32_to_s64 checker = (fn_type_s32_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_s32_to_s64 checker = (fn_type_s32_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
         "size_of :: (x : s32) -> (s64) { 4 }\n"
-        "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }",
-        "checker"
+        "checker :: (x : s32) -> (s64) { size_of :: (x : s64) -> (s64) { 8 }; size_of(x) }"
       );
       check(checker);
       s64 size = checker(0);
@@ -524,9 +526,9 @@ spec("source") {
     }
 
     it("should be able to have an explicit return") {
-      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(&test_context,
-        "checker :: (x : s32) -> (s32) { return x }",
-        "checker"
+      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: (x : s32) -> (s32) { return x }"
       );
       check(checker);
       s32 actual = checker(42);
@@ -534,9 +536,9 @@ spec("source") {
     }
 
     it("should be able to assign a fn to a variable and call through pointer") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
-        "checker :: () -> (s32) { local := () -> (s32) { 42 }; local() }",
-        "checker"
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: () -> (s32) { local := () -> (s32) { 42 }; local() }"
       );
       check(checker);
       s32 actual = checker();
@@ -544,24 +546,24 @@ spec("source") {
     }
 
     it("should be able to parse typed definition and assignment in the same statement") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "test_fn", &test_context,
         "test_fn :: () -> (s32) {"
           "result : s32 = 42;"
           "result"
-        "}",
-        "test_fn"
+        "}"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to run fibonnacii") {
-      fn_type_s64_to_s64 fibonnacci = (fn_type_s64_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_s64_to_s64 fibonnacci = (fn_type_s64_to_s64)test_program_inline_source_function(
+        "fibonnacci", &test_context,
         "fibonnacci :: (n : s64) -> (s64) {"
           "if (n < 2) { return n };"
           "fibonnacci(n - 1) + fibonnacci(n - 2)"
-        "}",
-        "fibonnacci"
+        "}"
       );
       check(fibonnacci);
 
@@ -634,69 +636,69 @@ spec("source") {
 
   describe("Operators") {
     it("should be able to parse and run a triple plus function") {
-      fn_type_s64_s64_s64_to_s64 checker = (fn_type_s64_s64_s64_to_s64)test_program_inline_source_function(&test_context,
-        "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }",
-        "plus"
+      fn_type_s64_s64_s64_to_s64 checker = (fn_type_s64_s64_s64_to_s64)test_program_inline_source_function(
+        "plus", &test_context,
+        "plus :: (x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
       );
       check(checker);
       check(checker(30, 10, 2) == 42);
     }
 
     it("should be able to parse and run a subtraction of a negative number") {
-      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(&test_context,
-        "plus_one :: (x : s64) -> (s64) { x - -1 }",
-        "plus_one"
+      fn_type_s64_to_s64 checker = (fn_type_s64_to_s64)test_program_inline_source_function(
+        "plus_one", &test_context,
+        "plus_one :: (x : s64) -> (s64) { x - -1 }"
       );
       check(checker);
       check(checker(41) == 42);
     }
 
     it("should be able to parse and run a sum passed to another function as an argument") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "plus", &test_context,
         "id :: (ignored : s64, x : s64) -> (s64) { x }\n"
-        "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }",
-        "plus"
+        "plus :: () -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be possible to define infix operators") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
-        "test :: () -> (s64) { y := 41; ++y }",
-        "test"
+        "test :: () -> (s64) { y := 41; ++y }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be possible to define postfix operators") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "operator 18 (x ++) { result := x; x = x + 1; result };"
-        "test :: () -> (s64) { y := 42; y++ }",
-        "test"
+        "test :: () -> (s64) { y := 42; y++ }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be possible to define an overloaded postfix and infix operator") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
         "operator 18 (x ++) { result := x; x = x + 1; result };"
-        "test :: () -> (s64) { y := 41; ++y++ }",
-        "test"
+        "test :: () -> (s64) { y := 41; ++y++ }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be possible to define infix operators") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "operator 15 (x ** y) { x * y };"
-        "test :: () -> (s64) { 21 ** 2 }",
-        "test"
+        "test :: () -> (s64) { 21 ** 2 }"
       );
       check(checker);
       check(checker() == 42);
@@ -780,101 +782,101 @@ spec("source") {
 
   describe("Macro") {
     it("should be able to parse and run macro id function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "id :: macro (x : s64) -> (s64) { x }\n"
-        "test :: () -> (s64) { id(42) }",
-        "test"
+        "test :: () -> (s64) { id(42) }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "id :: macro (x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
-        "test :: () -> (s64) { id(42) + 1 }",
-        "test"
+        "test :: () -> (s64) { id(42) + 1 }"
       );
       check(checker);
       check(checker() == 21);
     }
 
     it("should be able to parse and run macro with a literal s64 type") {
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
+        "test", &test_context,
         "broken_plus :: macro (x : u8, 0) -> (u8) { x + 1 }\n"
         "broken_plus :: macro (x : u8, y : u8) -> (u8) { x + y }\n"
-        "test :: () -> (u8) { broken_plus(41, 0) }",
-        "test"
+        "test :: () -> (u8) { broken_plus(41, 0) }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should allow changes to the passed arguments to macro function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "process :: macro (y : s64) -> () { y = 42; }\n"
-        "test :: () -> (s64) { x := 20; process(x); x }",
-        "test"
+        "test :: () -> (s64) { x := 20; process(x); x }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     xit("should not allow changes to the passed arguments to inline function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "process :: inline (y : s64) -> () { y = 20; }\n"
-        "test :: () -> (s64) { x := 42; process(x); x }",
-        "test"
+        "test :: () -> (s64) { x := 42; process(x); x }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to define and use a syntax macro without a capture") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
         "syntax (\"the\" \"answer\") 42;"
-        "checker :: () -> (s32) { the answer }",
-        "checker"
+        "checker :: () -> (s32) { the answer }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to define and use a syntax macro matching start and end of statement") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
         "syntax (^ \"foo\" $) 42;"
-        "checker :: () -> (s64) { foo := 20; foo }",
-        "checker"
+        "checker :: () -> (s64) { foo := 20; foo }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to define and use a syntax macro matching a curly brace block") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
         "syntax (^ \"block\" {}@body $) body();"
-        "checker :: () -> (s64) { block { 42 } }",
-        "checker"
+        "checker :: () -> (s64) { block { 42 } }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to define and use a syntax macro matching a sequence at the end") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
         "syntax (^ \"comment\" ..@ignore $);"
-        "checker :: () -> (s64) { x := 42; comment x = x + 1; x }",
-        "checker"
+        "checker :: () -> (s64) { x := 42; comment x = x + 1; x }"
       );
       check(checker);
       check(checker() == 42);
     }
 
     it("should be able to define and use a syntax macro with a capture") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
         "syntax (\"negative\" .@x) (-x());"
-        "checker :: () -> (s32) { negative 42 }",
-        "checker"
+        "checker :: () -> (s32) { negative 42 }"
       );
       check(checker);
       check(checker() == -42);
@@ -882,7 +884,8 @@ spec("source") {
 
     it("should be able to define and use a macro for while loop") {
       program_import_file(&test_context, slice_literal("lib\\prelude"));
-      fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(
+        "sum_up_to", &test_context,
         "sum_up_to :: (x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
@@ -891,8 +894,7 @@ spec("source") {
             "x = x + (-1);"
           "};"
           "return sum"
-        "}",
-        "sum_up_to"
+        "}"
       );
       check(sum_up_to);
       check(sum_up_to(0) == 0);
@@ -939,12 +941,12 @@ spec("source") {
     }
 
     it("should be able to parse and run macro id function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
         "FOO :: 42\n"
         "id :: macro (x : s64) -> (s64) { x }\n"
         "BAR :: id(FOO)\n"
-        "test :: () -> (s64) { BAR }",
-        "test"
+        "test :: () -> (s64) { BAR }"
       );
       check(checker);
       check(checker() == 42);
@@ -953,12 +955,12 @@ spec("source") {
 
   describe("if / else") {
     it("should be able to parse and run if statement") {
-      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(&test_context,
+      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
+        "is_positive", &test_context,
         "is_positive :: (x : s32) -> (s8) {"
           "if (x < 0) { return 0 };"
           "1"
-        "}",
-        "is_positive"
+        "}"
       );
       check(checker);
       check(checker(42) == 1);
@@ -988,7 +990,8 @@ spec("source") {
 
   describe("labels / goto") {
     it("should be able to parse and run a program with labels and goto") {
-      fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(
+        "sum_up_to", &test_context,
         "sum_up_to :: (x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
@@ -1000,8 +1003,7 @@ spec("source") {
           // FIXME This return is never reached and ideally should not be required
           //       but currently there is no way to track dead branches
           "sum"
-        "}",
-        "sum_up_to"
+        "}"
       );
       check(sum_up_to);
       check(sum_up_to(0) == 0);
@@ -1011,15 +1013,15 @@ spec("source") {
     }
 
     it("should be able to goto a label defined after the goto") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "test", &test_context,
         "test :: () -> (s32) {"
           "x : s32 = 42;"
           "goto skip;"
           "x = 0;"
           "label skip;"
           "x"
-        "}",
-        "test"
+        "}"
       );
       check(checker);
       check(checker() == 42);
@@ -1038,9 +1040,9 @@ spec("source") {
 
   describe("Strings") {
     it("should parse and return C-compatible strings") {
-      fn_type_void_to_const_charp checker = (fn_type_void_to_const_charp)test_program_inline_source_function(&test_context,
-        "checker :: () -> ([s8]) { &\"test\" }",
-        "checker"
+      fn_type_void_to_const_charp checker = (fn_type_void_to_const_charp)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: () -> ([s8]) { &\"test\" }"
       );
       check(checker);
       const char *string = checker();
@@ -1065,13 +1067,13 @@ spec("source") {
     }
 
     it("should be able to define a variable with a fixed size array type") {
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
+        "test", &test_context,
         "test :: () -> (s8) {"
           "foo : s8[64];"
           "foo[0] = 42;"
           "foo[0]"
-        "}",
-        "test"
+        "}"
       );
       check(checker);
       u8 actual = checker();
@@ -1081,25 +1083,25 @@ spec("source") {
 
   describe("User-defined Types") {
     it("should be able to parse fixed-bit sized type definitions") {
-      fn_type_void_to_void checker = (fn_type_void_to_void)test_program_inline_source_function(&test_context,
+      fn_type_void_to_void checker = (fn_type_void_to_void)test_program_inline_source_function(
+        "test", &test_context,
         "int8 :: bit_type(8);"
         "test :: () -> () {"
           "x : int8;"
-        "}",
-        "test"
+        "}"
       );
       check(checker);
       checker();
     }
 
     it("should be able to parse struct definitions") {
-      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(&test_context,
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "test", &test_context,
         "Point :: c_struct({ x : s32; y : s32; });"
         "test :: () -> (s32) {"
           "p : Point; p.x = 20; p.y = 22;"
           "p.x + p.y"
-        "}",
-        "test"
+        "}"
       );
       check(checker);
       check(checker() == 42);
@@ -1119,15 +1121,15 @@ spec("source") {
     }
 
     it("should be able to return structs while accepting other arguments") {
-      fn_type_s64_to_test_128bit_struct checker = (fn_type_s64_to_test_128bit_struct)test_program_inline_source_function(&test_context,
+      fn_type_s64_to_test_128bit_struct checker = (fn_type_s64_to_test_128bit_struct)test_program_inline_source_function(
+        "return_struct", &test_context,
         "Test_128bit :: c_struct({ x : s64; y : s64 });"
         "return_struct :: (x : s64) -> (Test_128bit) {"
           "result : Test_128bit;"
           "result.x = x;"
           "result.y = x / 2;"
           "result"
-        "}",
-        "return_struct"
+        "}"
       );
       check(checker);
 
@@ -1139,18 +1141,18 @@ spec("source") {
 
   describe("Unsigned Integers") {
     it("should be able to return unsigned integer literals") {
-      fn_type_void_to_u8 checker = (fn_type_void_to_u8)test_program_inline_source_function(&test_context,
-        "return_200 :: () -> (u8) { 200 }",
-        "return_200"
+      fn_type_void_to_u8 checker = (fn_type_void_to_u8)test_program_inline_source_function(
+        "return_200", &test_context,
+        "return_200 :: () -> (u8) { 200 }"
       );
       check(checker);
       check(checker() == 200);
     }
 
     it("should use correct EFLAGS values when dealing with unsigned integers") {
-      fn_type_void_to_u8 checker = (fn_type_void_to_u8)test_program_inline_source_function(&test_context,
-        "test :: () -> (s8) { x : u8 = 200; x < 0 }",
-        "test"
+      fn_type_void_to_u8 checker = (fn_type_void_to_u8)test_program_inline_source_function(
+        "test", &test_context,
+        "test :: () -> (s8) { x : u8 = 200; x < 0 }"
       );
       check(checker);
       check(checker() == false);
@@ -1159,9 +1161,9 @@ spec("source") {
 
   describe("Signed Integers") {
     it("should parse and correctly deal with 16 bit values") {
-      fn_type_s16_to_s16 checker = (fn_type_s16_to_s16)test_program_inline_source_function(&test_context,
-        "add_one :: (x : s16) -> (s16) { x + 1 }",
-        "add_one"
+      fn_type_s16_to_s16 checker = (fn_type_s16_to_s16)test_program_inline_source_function(
+        "add_one", &test_context,
+        "add_one :: (x : s16) -> (s16) { x + 1 }"
       );
       check(checker);
       check(checker(8) == 9);
