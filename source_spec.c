@@ -56,9 +56,9 @@ static Slice test_file_name = slice_literal_fields("_test_.mass");
 
 static Value *
 test_program_inline_source_base(
+  const char *id,
   Compilation_Context *context,
-  const char *source,
-  const char *id
+  const char *source
 ) {
   Source_File source_file = {test_file_name, slice_from_c_string(source)};
   program_parse(context, &source_file);
@@ -71,7 +71,7 @@ test_program_inline_source_function(
   const char *source,
   const char *function_id
 ) {
-  Value *value = test_program_inline_source_base(context, source, function_id);
+  Value *value = test_program_inline_source_base(function_id, context, source);
   if (!spec_check_mass_result(context->result)) return 0;
   if (!value) return 0;
   Jit jit;
@@ -311,7 +311,7 @@ spec("source") {
 
   describe("Top Level Statements") {
     it("should be reported when encountering unknown top level statement") {
-      test_program_inline_source_base(&test_context, "foo bar", "main");
+      test_program_inline_source_base("main", &test_context, "foo bar");
       check(test_context.result->tag == Mass_Result_Tag_Error);
       check(slice_equal(
         slice_literal("Could not parse a top level statement"),
@@ -512,11 +512,11 @@ spec("source") {
     }
 
     it("should report an overload overlap") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "test", &test_context,
         "overload :: (x : s64, y : s32) -> () { }\n"
         "overload :: (x : s32, y : s64) -> () { }\n"
-        "test :: () -> () { overload(1, 2) }",
-        "test"
+        "test :: () -> () { overload(1, 2) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -571,8 +571,9 @@ spec("source") {
     }
 
     it("should report an error when encountering invalid pointer type") {
-      test_program_inline_source_base(&test_context,
-        "main :: (arg : [s32 s32]) -> () {}", "main"
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: (arg : [s32 s32]) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -580,8 +581,9 @@ spec("source") {
     }
 
     it("should report an error when encountering multiple return types") {
-      test_program_inline_source_base(&test_context,
-        "exit :: (status: s32) -> (s32, s32) {}", "exit"
+      test_program_inline_source_base(
+        "exit", &test_context,
+        "exit :: (status: s32) -> (s32, s32) {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -589,8 +591,9 @@ spec("source") {
     }
 
     it("should report an error when encountering wrong argument type to external()") {
-      test_program_inline_source_base(&test_context,
-        "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)", "exit"
+      test_program_inline_source_base(
+        "exit", &test_context,
+        "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -598,9 +601,10 @@ spec("source") {
     }
 
     it("should report an error when non-type id is being used as a type") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "main", &test_context,
         "foo :: () -> () {};"
-        "main :: (arg : foo) -> () {}", "main"
+        "main :: (arg : foo) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -608,8 +612,9 @@ spec("source") {
     }
 
     it("should report an error when non-type token is being used as a type") {
-      test_program_inline_source_base(&test_context,
-        "main :: (arg : 42) -> () {}", "main"
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: (arg : 42) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -698,11 +703,11 @@ spec("source") {
     }
 
     it("should report an error when defining an overloaded infix operator") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "dummy", &test_context,
         "operator 15 (x ** y) { x * y };"
         "operator 15 (x ** y) { x * y };"
-        "dummy :: () -> (s64) { 21 ** 2 }",
-        "dummy"
+        "dummy :: () -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -713,11 +718,11 @@ spec("source") {
     }
 
     it("should report an error when defining an overloaded infix and postfix operator") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "dummy", &test_context,
         "operator 15 (x ** y) { x * y };"
         "operator 15 (x **) { x * x };"
-        "dummy :: () -> (s64) { 21 ** 2 }",
-        "dummy"
+        "dummy :: () -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -730,10 +735,10 @@ spec("source") {
 
   describe("Compile Time Execution") {
     it("should be able to call a function at compile time") {
-      Value *status = test_program_inline_source_base(&test_context,
+      Value *status = test_program_inline_source_base(
+        "STATUS_CODE", &test_context,
         "STATUS_CODE :: the_answer();"
-        "the_answer :: () -> (s8) { 42 }",
-        "STATUS_CODE"
+        "the_answer :: () -> (s8) { 42 }"
       );
 
       check(status);
@@ -744,12 +749,12 @@ spec("source") {
     }
 
     it("should be able to to do nested compile time calls") {
-      Value *result = test_program_inline_source_base(&test_context,
+      Value *result = test_program_inline_source_base(
+        "RESULT", &test_context,
         "RESULT :: get_a();"
         "B :: get_b();"
         "get_a :: () -> (s8) { B };"
-        "get_b :: () -> (s8) { 42 }",
-        "RESULT"
+        "get_b :: () -> (s8) { 42 }"
       );
 
       check(result);
@@ -760,9 +765,9 @@ spec("source") {
     }
 
     it("should not be able to use runtime values in a static context") {
-      test_program_inline_source_base(&test_context,
-        "test :: () -> (s64) { foo := 42; @( foo ) }",
-        "test"
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: () -> (s64) { foo := 42; @( foo ) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -897,19 +902,19 @@ spec("source") {
     }
 
     it("should report an error for macro external functions") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "test", &test_context,
         "ExitProcess :: macro (x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
-        "test :: () -> (s64) { ExitProcess(42) }",
-        "test"
+        "test :: () -> (s64) { ExitProcess(42) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
 
     it("should report an end of statement marker not at the start of a syntax definition") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "dummy", &test_context,
         "syntax (\"foo\" ^ .@_ );"
-        "dummy :: () -> () {}",
-        "dummy"
+        "dummy :: () -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -920,10 +925,10 @@ spec("source") {
     }
 
     it("should report an end of statement marker not at the end of a syntax definition") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "dummy", &test_context,
         "syntax (\"foo\" $ .@_ );"
-        "dummy :: () -> () {}",
-        "dummy"
+        "dummy :: () -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -961,16 +966,19 @@ spec("source") {
     }
 
     it("should report an error for an `if` statement without a body or a condition") {
-      test_program_inline_source_base(&test_context, "main :: () -> () { if; }", "main");
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if; }"
+      );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
     }
 
     it("should report an error for an `if` statement with an incorrect condition") {
-      test_program_inline_source_base(&test_context,
-        "main :: () -> () { if (1 < 0) { 0 } 42; }",
-        "main"
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if (1 < 0) { 0 } 42; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -1018,8 +1026,9 @@ spec("source") {
     }
 
     it("should report an error when encountering wrong type of label identifier") {
-      test_program_inline_source_base(&test_context,
-        "main :: (status: s32) -> () { x : s32; goto x; }", "main"
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: (status: s32) -> () { x : s32; goto x; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -1041,14 +1050,14 @@ spec("source") {
 
   describe("Fixed Size Arrays") {
     it("should report an error when fixed size array size does not resolve to an integer") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "test", &test_context,
         "BAR :: \"foo\"; "
         "test :: () -> (s8) {"
           "foo : s8[BAR];"
           "foo[0] = 42;"
           "foo[0]"
-        "}",
-        "test"
+        "}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
@@ -1097,10 +1106,10 @@ spec("source") {
     }
 
     it("should report an error when field name is not an identifier") {
-      test_program_inline_source_base(&test_context,
+      test_program_inline_source_base(
+        "main", &test_context,
         "Point :: c_struct({ x : s32; y : s32; });"
-        "main :: () -> () { p : Point; p.(x) }",
-        "main"
+        "main :: () -> () { p : Point; p.(x) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
