@@ -428,6 +428,22 @@ main(void) {
     { "s32", "offset" },
   }));
 
+  push_type(type_union("Function_Argument", (Struct[]){
+    struct_fields("Any_Of_Type", (Struct_Item[]){
+      { "Slice", "name" },
+      { "Descriptor *", "descriptor" },
+    }),
+    struct_fields("Exact", (Struct_Item[]){
+      { "Descriptor *", "descriptor" },
+      { "Operand", "operand" },
+    }),
+  }));
+
+  push_type(type_struct("Function_Return", (Struct_Item[]){
+    { "Slice", "name" },
+    { "Descriptor *", "descriptor" },
+  }));
+
   push_type(type_union("Descriptor", (Struct[]){
     struct_empty("Void"),
     struct_empty("Any"),
@@ -436,13 +452,11 @@ main(void) {
     }),
     struct_fields("Function", (Struct_Item[]){
       { "Descriptor_Function_Flags", "flags" },
-      { "Array_Value_Ptr", "arguments" },
-      { "Array_Slice", "argument_names" },
+      { "Array_Function_Argument", "arguments" },
       { "const Token *", "body" },
       { "Scope *", "scope" },
       { "Function_Builder *", "builder" },
-
-      { "Value", "returns" },
+      { "Function_Return", "returns" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "Descriptor *", "item" },

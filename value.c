@@ -61,12 +61,22 @@ same_type(
         return false;
       }
       for (u64 i = 0; i < dyn_array_length(a->Function.arguments); ++i) {
-        if (!same_value_type(
-          *dyn_array_get(a->Function.arguments, i),
-          *dyn_array_get(b->Function.arguments, i)
-        )) {
-          return false;
+        Function_Argument *a_arg = dyn_array_get(a->Function.arguments, i);
+        Function_Argument *b_arg = dyn_array_get(b->Function.arguments, i);
+        // Not sure that is correct with regards to exact arguments
+        if (a_arg->tag != b_arg->tag) return false;
+        switch(a_arg->tag) {
+          case Function_Argument_Tag_Any_Of_Type: {
+            return same_type(a_arg->Any_Of_Type.descriptor, b_arg->Any_Of_Type.descriptor);
+          }
+          case Function_Argument_Tag_Exact: {
+            return (
+              same_type(a_arg->Exact.descriptor, b_arg->Exact.descriptor) &&
+              operand_equal(&a_arg->Exact.operand, &b_arg->Exact.operand)
+            );
+          }
         }
+        panic("Unknown argument tag");
       }
       return true;
     }
@@ -1053,16 +1063,27 @@ memory_range_equal_to_c_string(
 }
 
 Value *
-function_next_argument_value_internal(
+function_argument_value_at_index_internal(
   Compiler_Source_Location compiler_source_location,
   Allocator *allocator,
   Descriptor_Function *function,
-  Descriptor *arg_descriptor
+  u64 argument_index
 ) {
+  Descriptor *arg_descriptor = 0;
+  Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
+  switch(argument->tag) {
+    case Function_Argument_Tag_Any_Of_Type: {
+      arg_descriptor = argument->Any_Of_Type.descriptor;
+      break;
+    }
+    case Function_Argument_Tag_Exact: {
+      arg_descriptor = argument->Exact.descriptor;
+      break;
+    }
+  }
   u32 byte_size = descriptor_byte_size(arg_descriptor);
   assert(byte_size <= 8);
 
-  u64 argument_index = dyn_array_length(function->arguments);
   // :ReturnTypeLargerThanRegister
   // If return type is larger than register, the pointer to stack location
   // where it needs to be written to is passed as the first argument
@@ -1096,7 +1117,7 @@ function_next_argument_value_internal(
       return value;
     }
     default: {
-      s32 offset = u64_to_s32(dyn_array_length(function->arguments) * 8);
+      s32 offset = u64_to_s32(argument_index * 8);
       Operand operand = stack(offset, byte_size);
       Value *value = allocator_allocate(allocator, Value);
       *value = (Value) {
@@ -1107,10 +1128,10 @@ function_next_argument_value_internal(
     }
   }
 }
-#define function_next_argument_value(...)\
-  function_next_argument_value_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define function_argument_value_at_index(...)\
+  function_argument_value_at_index_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-Program *
+void
 program_init(
   Allocator *allocator,
   Program *program
@@ -1129,8 +1150,6 @@ program_init(
       .permissions = Section_Permissions_Execute,
     },
   };
-
-  return program;
 };
 
 void
@@ -1178,14 +1197,14 @@ compilation_context_init(
 ) {
   Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
   Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
-  Program *program = allocator_allocate(compilation_allocator, Program);
-  program_init(compilation_allocator, program);
 
   Program *jit_program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, jit_program);
   Jit *jit = allocator_allocate(compilation_allocator, Jit);
   jit_init(jit, jit_program);
 
+  Program *runtime_program = allocator_allocate(compilation_allocator, Program);
+  program_init(compilation_allocator, runtime_program);
   Scope *runtime_scope = scope_make(compilation_allocator, 0);
   scope_define_builtins(compilation_allocator, runtime_scope);
 
@@ -1195,7 +1214,7 @@ compilation_context_init(
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
-    .runtime_program = program,
+    .runtime_program = runtime_program,
     .compilation_mode = Compilation_Mode_Runtime,
     .compile_time_jit = jit,
     .runtime_scope = runtime_scope,

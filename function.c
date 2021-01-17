@@ -398,8 +398,7 @@ fn_begin(
     .tag = Descriptor_Tag_Function,
     .Function = {
       .flags = 0,
-      .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
-      .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
+      .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
       .returns = 0,
     },
   };
@@ -648,7 +647,6 @@ fn_encode(
 
 Value
 function_return_value_for_descriptor(
-  Compilation_Context *context,
   Descriptor *descriptor
 ) {
   if (descriptor->tag == Descriptor_Tag_Void) {
@@ -1210,10 +1208,73 @@ ensure_compiled_function_body(
     function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
     {
       Compilation_Context body_context = *context;
+      for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
+        Function_Argument *argument = dyn_array_get(function->arguments, index);
+        switch(argument->tag) {
+          case Function_Argument_Tag_Any_Of_Type: {
+            Value *arg_value = function_argument_value_at_index(context->allocator, function, index);
+            scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
+              .type = Scope_Entry_Type_Value,
+              .value = arg_value,
+            });
+            if (arg_value->operand.tag == Operand_Tag_Register) {
+              register_bitset_set(
+                &function->builder->code_block.register_occupied_bitset,
+                arg_value->operand.Register.index
+              );
+            }
+            break;
+          }
+          case Function_Argument_Tag_Exact: {
+            // Nothing to do since there is no way to refer to this in the body
+            break;
+          }
+        }
+      }
+
+      Value *return_value = allocator_allocate(context->allocator, Value);
+      *return_value = function_return_value_for_descriptor(function->returns.descriptor);
+
+      scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .value = return_value,
+      });
+
+      Value *return_label_value = allocator_allocate(context->allocator, Value);
+      *return_label_value = (Value) {
+        .descriptor = &descriptor_void,
+        .operand = code_label32(function->builder->code_block.end_label),
+      };
+      scope_define(function->scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+        .type = Scope_Entry_Type_Value,
+        .value = return_label_value,
+      });
+
+      // :ReturnTypeLargerThanRegister
+      // Make sure we don't stomp the address of a larger-than-register
+      // return value during the execution of the function
+      if (
+        return_value->operand.tag == Operand_Tag_Memory &&
+        return_value->operand.Memory.location.tag == Memory_Location_Tag_Indirect
+      ) {
+        register_bitset_set(
+          &function->builder->code_block.register_occupied_bitset,
+          return_value->operand.Memory.location.Indirect.base_register
+        );
+      }
+
+      // Return value can be named in which case it should be accessible in the fn body
+      if (function->returns.name.length) {
+        scope_define(function->scope, function->returns.name, (Scope_Entry) {
+          .type = Scope_Entry_Type_Value,
+          .value = return_value,
+        });
+      }
+
       // TODO Should this set compilation_mode?
       context_set_active_scope(&body_context, function->scope);
       body_context.builder = function->builder;
-      token_parse_block_no_scope(&body_context, function->body, &function->returns);
+      token_parse_block_no_scope(&body_context, function->body, return_value);
     }
     fn_end(context_get_active_program(context), function->builder);
     function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
@@ -1260,13 +1321,15 @@ call_function_overload(
 
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
-    Value *target_arg = *dyn_array_get(descriptor->arguments, i);
+    Value *target_arg = function_argument_value_at_index(context->allocator, descriptor, i);
     move_value(context->allocator, builder, source_range, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
+
+  Value fn_return_value = function_return_value_for_descriptor(descriptor->returns.descriptor);
 
   // :ReturnTypeLargerThanRegister
   u32 return_size = descriptor_byte_size(descriptor->returns.descriptor);
@@ -1277,7 +1340,7 @@ call_function_overload(
     Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, return_pointer_descriptor);
     push_instruction(
       instructions, *source_range,
-      (Instruction) {.assembly = {lea, {reg_c->operand, descriptor->returns.operand}}}
+      (Instruction) {.assembly = {lea, {reg_c->operand, fn_return_value.operand}}}
     );
   }
 
@@ -1288,12 +1351,12 @@ call_function_overload(
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
 
-  Value *saved_result = &descriptor->returns;
+  Value *saved_result = &fn_return_value;
   if (return_size <= 8) {
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
       saved_result = reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
-      move_value(context->allocator, builder, source_range, saved_result, &descriptor->returns);
+      move_value(context->allocator, builder, source_range, saved_result, &fn_return_value);
     }
   }
 
@@ -1322,21 +1385,34 @@ calculate_arguments_match_score(
   s64 score = 0;
   for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
     Value *source_arg = *dyn_array_get(arguments, arg_index);
-    Value *target_arg = *dyn_array_get(descriptor->arguments, arg_index);
-    if (same_value_type(target_arg, source_arg)) {
-      if (
-        target_arg->operand.tag == Operand_Tag_Immediate &&
-        operand_equal(&target_arg->operand, &source_arg->operand)
-      ) {
-        score += Score_Exact_Literal;
-      } else {
-        score += Score_Exact_Type;
+    Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
+    switch(target_arg->tag) {
+      case Function_Argument_Tag_Any_Of_Type: {
+        Value fake_target_value = {
+          .descriptor = target_arg->Any_Of_Type.descriptor,
+          .operand = {.tag = Operand_Tag_Any },
+        };
+        if (same_value_type(&fake_target_value, source_arg)) {
+          score += Score_Exact_Type;
+        } else if(same_value_type_or_can_implicitly_move_cast(&fake_target_value, source_arg)) {
+          score += Score_Cast;
+        } else {
+          return -1;
+        }
+        break;
       }
-    } else if(same_value_type_or_can_implicitly_move_cast(target_arg, source_arg)) {
-      score += Score_Cast;
-    } else {
-      return -1;
+      case Function_Argument_Tag_Exact: {
+        if (
+          same_type(target_arg->Exact.descriptor, source_arg->descriptor) &&
+          source_arg->operand.tag == Operand_Tag_Immediate &&
+          operand_equal(&target_arg->Exact.operand, &source_arg->operand)
+        ) {
+          return Score_Exact_Literal;
+        }
+        return -1;
+      }
     }
+
   }
   return score;
 }

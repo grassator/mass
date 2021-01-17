@@ -56,6 +56,14 @@ typedef struct Descriptor_Struct_Field Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field *) Array_Descriptor_Struct_Field_Ptr;
 typedef dyn_array_type(const Descriptor_Struct_Field *) Array_Const_Descriptor_Struct_Field_Ptr;
 
+typedef struct Function_Argument Function_Argument;
+typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
+typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
+
+typedef struct Function_Return Function_Return;
+typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
+typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -296,6 +304,33 @@ typedef struct Descriptor_Struct_Field {
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
 typedef enum {
+  Function_Argument_Tag_Any_Of_Type = 0,
+  Function_Argument_Tag_Exact = 1,
+} Function_Argument_Tag;
+
+typedef struct {
+  Slice name;
+  Descriptor * descriptor;
+} Function_Argument_Any_Of_Type;
+typedef struct {
+  Descriptor * descriptor;
+  Operand operand;
+} Function_Argument_Exact;
+typedef struct Function_Argument {
+  Function_Argument_Tag tag;
+  union {
+    Function_Argument_Any_Of_Type Any_Of_Type;
+    Function_Argument_Exact Exact;
+  };
+} Function_Argument;
+typedef dyn_array_type(Function_Argument) Array_Function_Argument;
+typedef struct Function_Return {
+  Slice name;
+  Descriptor * descriptor;
+} Function_Return;
+typedef dyn_array_type(Function_Return) Array_Function_Return;
+
+typedef enum {
   Descriptor_Tag_Void = 0,
   Descriptor_Tag_Any = 1,
   Descriptor_Tag_Opaque = 2,
@@ -310,12 +345,11 @@ typedef struct {
 } Descriptor_Opaque;
 typedef struct {
   Descriptor_Function_Flags flags;
-  Array_Value_Ptr arguments;
-  Array_Slice argument_names;
+  Array_Function_Argument arguments;
   const Token * body;
   Scope * scope;
   Function_Builder * builder;
-  Value returns;
+  Function_Return returns;
 } Descriptor_Function;
 typedef struct {
   Descriptor * item;

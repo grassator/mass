@@ -1124,9 +1124,10 @@ token_apply_macro_syntax(
     };
 
     Value *result = builder->value;
-    descriptor->Function.returns = macro->replacement.length
-      ? (Value){.descriptor = &descriptor_any, .operand = {.tag = Operand_Tag_Any}}
-      : void_value;
+    descriptor->Function.returns = (Function_Return){
+      .name = {0},
+      .descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void,
+    };
     descriptor->Function.scope = captured_scope;
     descriptor->Function.body = fake_body;
     descriptor->Function.builder = builder;
@@ -1251,13 +1252,13 @@ token_maybe_split_on_operator(
   return true;
 }
 
-Token_Match_Arg
+Function_Argument
 token_match_argument(
   Compilation_Context *context,
   Token_View view,
   Descriptor_Function *function
 ) {
-  Token_Match_Arg arg = {0};
+  Function_Argument arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Token_View lhs;
@@ -1278,42 +1279,40 @@ token_match_argument(
       );
       goto err;
     }
-    Descriptor *type_descriptor = token_match_type(context, rhs);
-    if (!type_descriptor) {
-      goto err;
-    }
 
-    arg.name = lhs.tokens[0]->source;
-
-    if (type_descriptor == &descriptor_any) {
-      // TODO figure out what should happen here or not use any type for macros
-      arg.value = value_any(context->allocator);
-    } else {
-      arg.value = function_next_argument_value(
-        context->allocator, function, type_descriptor
-      );
-    }
+    arg = (Function_Argument) {
+      .tag = Function_Argument_Tag_Any_Of_Type,
+      .Any_Of_Type = {
+        .descriptor = token_match_type(context, rhs),
+        .name = lhs.tokens[0]->source,
+      },
+    };
   } else {
-    arg.value = token_parse_constant_expression(context, view);
+    Value *value = token_parse_constant_expression(context, view);
+    arg = (Function_Argument) {
+      .tag = Function_Argument_Tag_Exact,
+      .Exact = {
+        .descriptor = value->descriptor,
+        .operand = value->operand,
+      },
+    };
   }
 
   err:
   return arg;
 }
 
-Token_Match_Arg
+Function_Return
 token_match_return_type(
   Compilation_Context *context,
-  Token_View view,
-  Descriptor_Function *function
+  Token_View view
 ) {
-  Token_Match_Arg arg = {0};
-  if (context->result->tag != Mass_Result_Tag_Success) return arg;
+  Function_Return returns = {0};
+  if (context->result->tag != Mass_Result_Tag_Success) return returns;
 
   Token_View lhs;
   Token_View rhs;
   const Token *operator;
-  Descriptor *type_descriptor;
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
       context_error_snprintf(
@@ -1329,21 +1328,14 @@ token_match_return_type(
       );
       goto err;
     }
-    type_descriptor = token_match_type(context, rhs);
-    arg.name = lhs.tokens[0]->source;
+    returns.descriptor = token_match_type(context, rhs);
+    returns.name = lhs.tokens[0]->source;
   } else {
-    type_descriptor = token_match_type(context, view);
+    returns.descriptor = token_match_type(context, view);
   }
-
-  if (!type_descriptor) {
-    goto err;
-  }
-
-  function->returns = function_return_value_for_descriptor(context, type_descriptor);
-  arg.value = &function->returns;
 
   err:
-  return arg;
+  return returns;
 }
 
 PRELUDE_NO_DISCARD Mass_Result
@@ -2055,8 +2047,7 @@ token_process_function_literal(
     *descriptor = (Descriptor) {
       .tag = Descriptor_Tag_Function,
       .Function = {
-        .arguments = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator),
-        .argument_names = dyn_array_make(Array_Slice, .allocator = context->allocator),
+        .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
         .returns = 0,
       },
     };
@@ -2065,22 +2056,13 @@ token_process_function_literal(
     builder = dyn_array_push_uninitialized(context_get_active_program(context)->functions);
     fn_begin(context, builder);
     descriptor = builder->value->descriptor;
-    Value *return_label_value = allocator_allocate(context->allocator, Value);
-    *return_label_value = (Value) {
-      .descriptor = &descriptor_void,
-      .operand = code_label32(builder->code_block.end_label),
-    };
-    scope_define(function_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = return_label_value,
-    });
 
     // TODO Encompass the whole function maybe?
     builder->source = body->source;
   }
 
   if (dyn_array_length(return_types->Group.children) == 0) {
-    descriptor->Function.returns = void_value;
+    descriptor->Function.returns = (Function_Return) { .descriptor = &descriptor_void, };
   } else {
     Token_View children = token_view_from_group_token(return_types);
     Token_View_Split_Iterator it = { .view = children };
@@ -2098,36 +2080,9 @@ token_process_function_literal(
       Compilation_Context arg_context = *context;
       context_set_active_scope(&arg_context, function_scope);
       arg_context.builder = builder;
-      Token_Match_Arg arg = token_match_return_type(&arg_context, arg_view, &descriptor->Function);
-
-      // Return values can be named
-      if (arg.name.length) {
-        scope_define(function_scope, arg.name, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = &descriptor->Function.returns,
-        });
-      }
-
-      // :ReturnTypeLargerThanRegister
-      // Make sure we don't stomp the address of a larger-than-register
-      // return value during the execution of the function
-      if (
-        !is_external &&
-        arg.value->operand.tag == Operand_Tag_Memory &&
-        arg.value->operand.Memory.location.tag == Memory_Location_Tag_Indirect
-      ) {
-        register_bitset_set(
-          &builder->code_block.register_occupied_bitset,
-          arg.value->operand.Memory.location.Indirect.base_register
-        );
-      }
+      descriptor->Function.returns = token_match_return_type(&arg_context, arg_view);
     }
   }
-
-  scope_define(function_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = &descriptor->Function.returns,
-  });
 
   if (dyn_array_length(args->Group.children) != 0) {
     Token_View children = token_view_from_group_token(args);
@@ -2138,30 +2093,10 @@ token_process_function_literal(
       Compilation_Context arg_context = *context;
       context_set_active_scope(&arg_context, function_scope);
       arg_context.builder = builder;
-      Token_Match_Arg arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
+      Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
+      dyn_array_push(descriptor->Function.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
-
-      // Literal values do not have a name ATM
-      if (arg.name.length) {
-        scope_define(function_scope, arg.name, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = arg.value,
-        });
-      }
-      dyn_array_push(descriptor->Function.argument_names, arg.name);
-      dyn_array_push(descriptor->Function.arguments, arg.value);
-
-      if (!is_external && arg.value->operand.tag == Operand_Tag_Register) {
-        register_bitset_set(
-          &builder->code_block.register_occupied_bitset,
-          arg.value->operand.Register.index
-        );
-      }
     }
-    assert(
-      dyn_array_length(descriptor->Function.argument_names) ==
-      dyn_array_length(descriptor->Function.arguments)
-    );
   }
 
   Value *result = 0;
@@ -2201,7 +2136,10 @@ compile_time_eval(
   eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
 
   Descriptor_Function *fake_function = &eval_builder.value->descriptor->Function;
-  fake_function->returns = void_value;
+  fake_function->returns = (Function_Return){
+    .name = {0},
+    .descriptor = &descriptor_void,
+  };
 
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.
@@ -2940,12 +2878,21 @@ token_handle_function_call(
         : scope_make(context->allocator, function->scope);
 
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
-        Slice arg_name = *dyn_array_get(function->argument_names, i);
-        Value *arg_value = *dyn_array_get(args, i);
-        scope_define(body_scope, arg_name, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = arg_value,
-        });
+        Function_Argument *arg = dyn_array_get(function->arguments, i);
+        switch(arg->tag) {
+          case Function_Argument_Tag_Exact: {
+            // There is no name so nothing to do
+            break;
+          }
+          case Function_Argument_Tag_Any_Of_Type: {
+            Value *arg_value = *dyn_array_get(args, i);
+            scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
+              .type = Scope_Entry_Type_Value,
+              .value = arg_value,
+            });
+            break;
+          }
+        }
       }
 
       // Define a new return target label and value so that explicit return statements
