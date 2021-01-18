@@ -414,12 +414,9 @@ main(void) {
   }));
 
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
-    { "None",   0 },
-    { "Pending_Body_Compilation", 1 << 0 },
-    { "In_Body_Compilation", 1 << 1 },
-    { "Macro", 1 << 2 },
-    { "External", 1 << 3 },
-    { "No_Own_Scope", 1 << 4 },
+    { "None", 0 },
+    { "Macro", 1 << 0 },
+    { "No_Own_Scope", 1 << 1 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
@@ -455,7 +452,6 @@ main(void) {
       { "Array_Function_Argument", "arguments" },
       { "const Token *", "body" },
       { "Scope *", "scope" },
-      { "Function_Builder *", "builder" },
       { "Function_Return", "returns" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){

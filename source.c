@@ -288,10 +288,9 @@ scope_lookup_force(
     // force the lazy value in two steps. First creates a valid Value
     // the second one, here, actually processes function body
     if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
-      Descriptor_Function *function = &it->value->descriptor->Function;
       // FIXME this should only happen on calls and for the entry / exported functions
       //       but this breaks tests as we are calling from the "outside".
-      ensure_compiled_function_body(context, function);
+      ensure_compiled_function_body(context, it->value);
     }
 
     if (!result) {
@@ -1105,11 +1104,6 @@ token_apply_macro_syntax(
 
     Token_View capture_view = *dyn_array_get(match, i);
 
-    Function_Builder *builder =
-      dyn_array_push_uninitialized(context_get_active_program(context)->functions);
-    fn_begin(context, builder);
-    Descriptor *descriptor = builder->value->descriptor;
-
     Token *fake_body = allocator_allocate(context->allocator, Token);
     *fake_body = (Token) {
       .tag = Token_Tag_Group,
@@ -1123,17 +1117,29 @@ token_apply_macro_syntax(
       }
     };
 
-    Value *result = builder->value;
-    descriptor->Function.returns = (Function_Return){
-      .name = {0},
-      .descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void,
+    Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+    *descriptor = (Descriptor) {
+      .tag = Descriptor_Tag_Function,
+      .Function = {
+        .arguments = dyn_array_make(
+          Array_Function_Argument, .capacity = 1, .allocator = context->allocator
+        ),
+        .scope = captured_scope,
+        .body = fake_body,
+        .flags = Descriptor_Function_Flags_Macro | Descriptor_Function_Flags_No_Own_Scope,
+        .returns = {
+          .name = {0},
+          .descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void,
+        }
+      },
     };
-    descriptor->Function.scope = captured_scope;
-    descriptor->Function.body = fake_body;
-    descriptor->Function.builder = builder;
-    descriptor->Function.flags
-      |= Descriptor_Function_Flags_Macro
-      |  Descriptor_Function_Flags_No_Own_Scope;
+
+    Value *result = allocator_allocate(context->allocator, Value);
+    *result = (Value) {
+      .descriptor = descriptor,
+      .operand = {.tag = Operand_Tag_None },
+      .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+    };
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
@@ -2033,33 +2039,14 @@ token_process_function_literal(
   Scope *parent_scope = context_get_active_scope(context);
   Scope *function_scope = scope_make(context->allocator, parent_scope);
 
-  Function_Builder *builder = 0;
-  Descriptor *descriptor = 0;
-
-  if(!body) return 0;
-
-  // TODO think about a better way to distinguish imports
-  bool is_external = body->tag == Token_Tag_Value;
-
-  if (is_external) {
-    if(!body->Value.value) return 0;
-    descriptor = allocator_allocate(context->allocator, Descriptor);
-    *descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Function,
-      .Function = {
-        .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
-        .returns = 0,
-      },
-    };
-    descriptor->Function.flags |= Descriptor_Function_Flags_External;
-  } else {
-    builder = dyn_array_push_uninitialized(context_get_active_program(context)->functions);
-    fn_begin(context, builder);
-    descriptor = builder->value->descriptor;
-
-    // TODO Encompass the whole function maybe?
-    builder->source = body->source;
-  }
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
+      .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
+      .returns = 0,
+    },
+  };
 
   if (dyn_array_length(return_types->Group.children) == 0) {
     descriptor->Function.returns = (Function_Return) { .descriptor = &descriptor_void, };
@@ -2079,7 +2066,7 @@ token_process_function_literal(
 
       Compilation_Context arg_context = *context;
       context_set_active_scope(&arg_context, function_scope);
-      arg_context.builder = builder;
+      arg_context.builder = 0;
       descriptor->Function.returns = token_match_return_type(&arg_context, arg_view);
     }
   }
@@ -2092,24 +2079,29 @@ token_process_function_literal(
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
       context_set_active_scope(&arg_context, function_scope);
-      arg_context.builder = builder;
+      arg_context.builder = 0;
       Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
       dyn_array_push(descriptor->Function.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
     }
   }
 
-  Value *result = 0;
+  // TODO think about a better way to distinguish imports
+  bool is_external = body->tag == Token_Tag_Value;
+
+  Value *result = allocator_allocate(context->allocator, Value);
+  *result = (Value) {
+    .descriptor = descriptor,
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+  };
   if (is_external) {
-    body->Value.value->descriptor = descriptor;
-    result = body->Value.value;
+    result->descriptor = descriptor_pointer_to(context->allocator, descriptor);
+    result->operand = body->Value.value->operand;
   } else {
     descriptor->Function.scope = function_scope;
     descriptor->Function.body = body;
-    descriptor->Function.builder = builder;
-    descriptor->Function.flags |= Descriptor_Function_Flags_Pending_Body_Compilation;
-    result = builder->value;
   }
+
   return result;
 }
 
@@ -2130,16 +2122,27 @@ compile_time_eval(
   // Is it actually always compile time scope or it depend on the current mode?
   context_set_active_scope(&eval_context, context->compile_time_scope);
   eval_context.compilation_mode = Compilation_Mode_Compile_Time;
-  Function_Builder eval_builder;
-  fn_begin(&eval_context, &eval_builder);
+  Descriptor descriptor = {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
+      .returns = {
+        .descriptor = &descriptor_void,
+      },
+    },
+  };
+  Value eval_value = {
+    .descriptor = &descriptor,
+    .operand = code_label32(make_label(jit->program, &jit->program->code_section)),
+  };
+  Function_Builder eval_builder = {
+    .value = &eval_value,
+    .code_block = {
+      .end_label = make_label(jit->program, &jit->program->code_section),
+      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
+    },
+  };
   eval_context.builder = &eval_builder;
   eval_context.builder->source = slice_sub_range(source_range->file->text, source_range->offsets);
-
-  Descriptor_Function *fake_function = &eval_builder.value->descriptor->Function;
-  fake_function->returns = (Function_Return){
-    .name = {0},
-    .descriptor = &descriptor_void,
-  };
 
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.
@@ -2207,12 +2210,12 @@ compile_time_eval(
     context->result = eval_context.result;
     return;
   }
-  fn_end(context_get_active_program(&eval_context), &eval_builder);
+  fn_end(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
   program_jit(jit);
 
-  fn_type_opaque jitted_code = value_as_function(jit, eval_context.builder->value);
+  fn_type_opaque jitted_code = value_as_function(jit, &eval_value);
   jitted_code();
 
   Value *temp_result = allocator_allocate(context->allocator, Value);
@@ -2559,18 +2562,11 @@ token_dispatch_constant_operator(
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
-        if (descriptor->flags & Descriptor_Function_Flags_External) {
-          context_error_snprintf(
-            context, function->source_range,
-            "External functions can not be macro"
-          );
-        } else {
-          descriptor->flags |= Descriptor_Function_Flags_Macro;
-        }
+        descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
         context_error_snprintf(
           context, function->source_range,
-          "Trying to mark a non-function as macro"
+          "Only literal functions (with a body) can be marked as macro"
         );
       }
     }
@@ -3443,18 +3439,11 @@ token_eval_operator(
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
-        if (descriptor->flags & Descriptor_Function_Flags_External) {
-          context_error_snprintf(
-            context, function->source_range,
-            "External functions can not be macro"
-          );
-        } else {
-          descriptor->flags |= Descriptor_Function_Flags_Macro;
-        }
+        descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
         context_error_snprintf(
           context, function->source_range,
-          "Trying to mark a non-function as macro"
+          "Only literal functions (with a body) can be marked as macro"
         );
       }
     }
@@ -4112,6 +4101,7 @@ token_parse_definition_and_assignment_statements(
   Value *on_stack;
   if (value->descriptor->tag == Descriptor_Tag_Function) {
     Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+    ensure_compiled_function_body(context, value);
     on_stack = reserve_stack(context->allocator, context->builder, fn_pointer);
     load_address(context, &view.source_range, on_stack, value);
   } else {

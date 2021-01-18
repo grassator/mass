@@ -388,48 +388,23 @@ move_to_result_from_temp(
   }
 }
 
+// TODO move to platform code somehow
 void
-fn_begin(
-  Compilation_Context *context,
-  Function_Builder *out_builder
+win32_set_volatile_registers_for_function(
+  Function_Builder *builder
 ) {
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (const Descriptor) {
-    .tag = Descriptor_Tag_Function,
-    .Function = {
-      .flags = 0,
-      .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
-      .returns = 0,
-    },
-  };
-  Value *fn_value = allocator_allocate(context->allocator, Value);
-  Program *program = context_get_active_program(context);
-  *fn_value = (const Value) {
-    .descriptor = descriptor,
-    .operand = code_label32(make_label(program, &program->code_section)),
-  };
-  *out_builder = (Function_Builder){
-    .value = fn_value,
-    .code_block = {
-      .end_label = make_label(program, &program->code_section),
-      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
-    },
-  };
+  // Arguments
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_C);
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_D);
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R8);
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R9);
 
-  {
-    // Arguments
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_C);
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_D);
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R8);
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R9);
+  // Return
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_A);
 
-    // Return
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_A);
-
-    // Other
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R10);
-    register_bitset_set(&out_builder->code_block.register_volatile_bitset, Register_R11);
-  }
+  // Other
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R10);
+  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R11);
 }
 
 // :StackDisplacementEncoding
@@ -543,11 +518,7 @@ fn_encode(
   Function_Layout *out_layout
 ) {
   // FIXME move to the callers and turn into an assert
-  if (
-    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) ||
-    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Pending_Body_Compilation) ||
-    (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_In_Body_Compilation)
-  ) {
+  if (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) {
     // We should not encode macro functions. And we might not even to be able to anyway
     // as some of them have Any arguments or returns
     return;
@@ -1199,93 +1170,110 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 void
 ensure_compiled_function_body(
   Compilation_Context *context,
-  Descriptor_Function *function
+  Value *fn_value
 ) {
-  // FIXME we should probabably have a separate flag or a stack to track
-  //       functions with compilation in progress to avoid loops
-  if (function->flags & Descriptor_Function_Flags_Pending_Body_Compilation) {
-    function->flags &= ~Descriptor_Function_Flags_Pending_Body_Compilation;
-    function->flags |= Descriptor_Function_Flags_In_Body_Compilation;
-    {
-      Compilation_Context body_context = *context;
-      for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
-        Function_Argument *argument = dyn_array_get(function->arguments, index);
-        switch(argument->tag) {
-          case Function_Argument_Tag_Any_Of_Type: {
-            Value *arg_value = function_argument_value_at_index(context->allocator, function, index);
-            scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
-              .type = Scope_Entry_Type_Value,
-              .value = arg_value,
-            });
-            if (arg_value->operand.tag == Operand_Tag_Register) {
-              register_bitset_set(
-                &function->builder->code_block.register_occupied_bitset,
-                arg_value->operand.Register.index
-              );
-            }
-            break;
-          }
-          case Function_Argument_Tag_Exact: {
-            // Nothing to do since there is no way to refer to this in the body
-            break;
-          }
-        }
-      }
+  // If we already have an operand we assume that the body was compiled
+  if (fn_value->operand.tag != Operand_Tag_None) return;
+  assert(fn_value->descriptor->tag == Descriptor_Tag_Function);
+  Descriptor_Function *function = &fn_value->descriptor->Function;
 
-      Value *return_value = allocator_allocate(context->allocator, Value);
-      *return_value = function_return_value_for_descriptor(function->returns.descriptor);
+  // No need to compile macro body as it will be compiled inline
+  if (function->flags & Descriptor_Function_Flags_Macro) return;
+  assert(function->body);
 
-      scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = return_value,
-      });
+  Program *program = context_get_active_program(context);
+  fn_value->operand = code_label32(make_label(program, &program->code_section));
 
-      Value *return_label_value = allocator_allocate(context->allocator, Value);
-      *return_label_value = (Value) {
-        .descriptor = &descriptor_void,
-        .operand = code_label32(function->builder->code_block.end_label),
-      };
-      scope_define(function->scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = return_label_value,
-      });
+  Function_Builder builder = (Function_Builder){
+    .value = fn_value,
+    .code_block = {
+      .end_label = make_label(program, &program->code_section),
+      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
+    },
+  };
 
-      // :ReturnTypeLargerThanRegister
-      // Make sure we don't stomp the address of a larger-than-register
-      // return value during the execution of the function
-      if (
-        return_value->operand.tag == Operand_Tag_Memory &&
-        return_value->operand.Memory.location.tag == Memory_Location_Tag_Indirect
-      ) {
-        register_bitset_set(
-          &function->builder->code_block.register_occupied_bitset,
-          return_value->operand.Memory.location.Indirect.base_register
-        );
-      }
+  win32_set_volatile_registers_for_function(&builder);
 
-      // Return value can be named in which case it should be accessible in the fn body
-      if (function->returns.name.length) {
-        scope_define(function->scope, function->returns.name, (Scope_Entry) {
+  Compilation_Context body_context = *context;
+  for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
+    Function_Argument *argument = dyn_array_get(function->arguments, index);
+    switch(argument->tag) {
+      case Function_Argument_Tag_Any_Of_Type: {
+        Value *arg_value = function_argument_value_at_index(context->allocator, function, index);
+        scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
           .type = Scope_Entry_Type_Value,
-          .value = return_value,
+          .value = arg_value,
         });
+        if (arg_value->operand.tag == Operand_Tag_Register) {
+          register_bitset_set(
+            &builder.code_block.register_occupied_bitset,
+            arg_value->operand.Register.index
+          );
+        }
+        break;
       }
-
-      // TODO Should this set compilation_mode?
-      context_set_active_scope(&body_context, function->scope);
-      body_context.builder = function->builder;
-      token_parse_block_no_scope(&body_context, function->body, return_value);
+      case Function_Argument_Tag_Exact: {
+        // Nothing to do since there is no way to refer to this in the body
+        break;
+      }
     }
-    fn_end(context_get_active_program(context), function->builder);
-    function->flags &= ~Descriptor_Function_Flags_In_Body_Compilation;
   }
+
+  Value *return_value = allocator_allocate(context->allocator, Value);
+  *return_value = function_return_value_for_descriptor(function->returns.descriptor);
+
+  scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .value = return_value,
+  });
+
+  Value *return_label_value = allocator_allocate(context->allocator, Value);
+  *return_label_value = (Value) {
+    .descriptor = &descriptor_void,
+    .operand = code_label32(builder.code_block.end_label),
+  };
+  scope_define(function->scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .value = return_label_value,
+  });
+
+  // :ReturnTypeLargerThanRegister
+  // Make sure we don't stomp the address of a larger-than-register
+  // return value during the execution of the function
+  if (
+    return_value->operand.tag == Operand_Tag_Memory &&
+    return_value->operand.Memory.location.tag == Memory_Location_Tag_Indirect
+  ) {
+    register_bitset_set(
+      &builder.code_block.register_occupied_bitset,
+      return_value->operand.Memory.location.Indirect.base_register
+    );
+  }
+
+  // Return value can be named in which case it should be accessible in the fn body
+  if (function->returns.name.length) {
+    scope_define(function->scope, function->returns.name, (Scope_Entry) {
+      .type = Scope_Entry_Type_Value,
+      .value = return_value,
+    });
+  }
+
+  // TODO Should this set compilation_mode?
+  context_set_active_scope(&body_context, function->scope);
+  body_context.builder = &builder;
+  token_parse_block_no_scope(&body_context, function->body, return_value);
+
+  fn_end(program, &builder);
+
+  // Only push the builder at the end to avoid problems in nested JIT compiles
+  dyn_array_push(program->functions, builder);
 }
 
 void
 call_function_overload(
   Compilation_Context *context,
   const Source_Range *source_range,
-  const Value *to_call,
+  Value *to_call,
   Array_Value_Ptr arguments,
   Value *result_value
 ) {
@@ -1296,7 +1284,7 @@ call_function_overload(
   Descriptor_Function *descriptor = &to_call_descriptor->Function;
   assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
 
-  ensure_compiled_function_body(context, descriptor);
+  ensure_compiled_function_body(context, to_call);
 
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
 

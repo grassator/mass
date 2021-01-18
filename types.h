@@ -289,11 +289,8 @@ typedef dyn_array_type(Value) Array_Value;
 
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Pending_Body_Compilation = 1,
-  Descriptor_Function_Flags_In_Body_Compilation = 2,
-  Descriptor_Function_Flags_Macro = 4,
-  Descriptor_Function_Flags_External = 8,
-  Descriptor_Function_Flags_No_Own_Scope = 16,
+  Descriptor_Function_Flags_Macro = 1,
+  Descriptor_Function_Flags_No_Own_Scope = 2,
 } Descriptor_Function_Flags;
 
 typedef struct Descriptor_Struct_Field {
@@ -348,7 +345,6 @@ typedef struct {
   Array_Function_Argument arguments;
   const Token * body;
   Scope * scope;
-  Function_Builder * builder;
   Function_Return returns;
 } Descriptor_Function;
 typedef struct {

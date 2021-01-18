@@ -1049,19 +1049,6 @@ value_as_function(
   return (fn_type_opaque)target;
 }
 
-
-bool
-memory_range_equal_to_c_string(
-  const void *memory_range_start,
-  const void *memory_range_end,
-  const char *string
-) {
-  s64 length = ((char *)memory_range_end) - ((char *)memory_range_start);
-  s64 string_length = strlen(string);
-  if (string_length != length) return false;
-  return memcmp(memory_range_start, string, string_length) == 0;
-}
-
 Value *
 function_argument_value_at_index_internal(
   Compiler_Source_Location compiler_source_location,
