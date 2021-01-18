@@ -1121,9 +1121,7 @@ token_apply_macro_syntax(
     *descriptor = (Descriptor) {
       .tag = Descriptor_Tag_Function,
       .Function = {
-        .arguments = dyn_array_make(
-          Array_Function_Argument, .capacity = 1, .allocator = context->allocator
-        ),
+        .arguments = (Array_Function_Argument){&dyn_array_zero_items},
         .scope = captured_scope,
         .body = fake_body,
         .flags = Descriptor_Function_Flags_Macro | Descriptor_Function_Flags_No_Own_Scope,

@@ -833,6 +833,8 @@ dyn_array_alloc_internal(
   return result;
 }
 
+static Dyn_Array_Internal dyn_array_zero_items = {0};
+
 #define dyn_array_is_initialized(_array_)\
   (!!(_array_).data)
 
