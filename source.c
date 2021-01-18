@@ -2041,7 +2041,7 @@ token_process_function_literal(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .Function = {
-      .arguments = dyn_array_make(Array_Function_Argument, .allocator = context->allocator),
+      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
       .returns = 0,
     },
   };
@@ -2070,9 +2070,14 @@ token_process_function_literal(
   }
 
   if (dyn_array_length(args->Group.children) != 0) {
+    descriptor->Function.arguments = dyn_array_make(
+      Array_Function_Argument,
+      .allocator = context->allocator,
+      .capacity = 4,
+    );
+
     Token_View children = token_view_from_group_token(args);
     Token_View_Split_Iterator it = { .view = children };
-
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
