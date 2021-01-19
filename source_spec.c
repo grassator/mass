@@ -52,8 +52,20 @@ spec_check_mass_result(
   return false;
 }
 
+static Compilation_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
-static Source_File test_source_file = {0};
+static Module test_module = {0};
+
+void
+test_init_module(
+  Slice source
+) {
+  test_module = (Module) {
+    .source_file = {test_file_name, source},
+    .export_scope = test_context.scope,
+  };
+  test_context.module = &test_module;
+}
 
 static Value *
 test_program_inline_source_base(
@@ -61,8 +73,8 @@ test_program_inline_source_base(
   Compilation_Context *context,
   const char *source
 ) {
-  test_source_file = (Source_File){test_file_name, slice_from_c_string(source)};
-  program_parse(context, &test_source_file);
+  test_init_module(slice_from_c_string(source));
+  program_parse(context);
   return scope_lookup_force(context, context->scope, slice_from_c_string(id));
 }
 
@@ -84,7 +96,6 @@ test_program_inline_source_function(
 
 
 spec("source") {
-  static Compilation_Context test_context = {0};
 
   before_each() {
     compilation_context_init(allocator_system, &test_context);
@@ -493,7 +504,8 @@ spec("source") {
         "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
       );
 
-      MASS_ON_ERROR(program_parse(&test_context, &(Source_File){test_file_name, source})) {
+      test_init_module(source);
+      MASS_ON_ERROR(program_parse(&test_context)) {
         check(false, "Failed parsing");
       }
 
@@ -1182,7 +1194,8 @@ spec("source") {
         "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
 
-      MASS_ON_ERROR(program_parse(&test_context, &(Source_File){test_file_name, source})) {
+      test_init_module(source);
+      MASS_ON_ERROR(program_parse(&test_context)) {
         check(false, "Failed parsing");
       }
 

@@ -76,6 +76,10 @@ typedef struct Source_File Source_File;
 typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
 typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
 
+typedef struct Module Module;
+typedef dyn_array_type(Module *) Array_Module_Ptr;
+typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
+
 typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
@@ -381,6 +385,12 @@ typedef struct Source_File {
   Array_Range_u64 line_ranges;
 } Source_File;
 typedef dyn_array_type(Source_File) Array_Source_File;
+
+typedef struct Module {
+  Source_File source_file;
+  Scope * export_scope;
+} Module;
+typedef dyn_array_type(Module) Array_Module;
 
 typedef struct Source_Range {
   const Source_File * file;

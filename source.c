@@ -4347,15 +4347,16 @@ scope_define_builtins(
 
 Mass_Result
 program_parse(
-  Compilation_Context *context,
-  Source_File *file
+  Compilation_Context *context
 ) {
+  assert(context->module);
   Array_Const_Token_Ptr tokens;
-  MASS_TRY(tokenize(context->allocator, file, &tokens));
+
+  MASS_TRY(tokenize(context->allocator, &context->module->source_file, &tokens));
   Source_Range *file_source_range = allocator_allocate(context->allocator, Source_Range);
   *file_source_range = (Source_Range) {
-    .file = file,
-    .offsets = { .from = 0, .to = file->text.length },
+    .file = &context->module->source_file,
+    .offsets = { .from = 0, .to = context->module->source_file.text.length },
   };
   Token_View program_token_view = token_view_from_token_array(tokens, file_source_range);
   MASS_TRY(token_parse(context, program_token_view));
@@ -4426,11 +4427,15 @@ program_import_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
-  Source_File *file = allocator_allocate(context->allocator, Source_File);
-  *file = (Source_File) {
-    .path = file_path,
-    .text = {0},
+  Module *module = allocator_allocate(context->allocator, Module);
+  *module = (Module) {
+    .source_file = {
+      .path = file_path,
+      .text = {0},
+    },
+    .export_scope = context->scope,
   };
+  context->module = module;
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
     return (Mass_Result) {
@@ -4438,12 +4443,12 @@ program_import_file(
       .Error.details = {
         .message = slice_literal("Unable to open the file"),
         .source_range = {
-          .file = file,
+          .file = &module->source_file,
         },
       },
     };
   }
-  file->text = fixed_buffer_as_slice(buffer);
-  return program_parse(context, file);
+  module->source_file.text = fixed_buffer_as_slice(buffer);
+  return program_parse(context);
 }
 

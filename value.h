@@ -316,6 +316,7 @@ typedef struct {
   Jit *compile_time_jit;
   Scope *scope;
   Function_Builder *builder;
+  Module *module;
   Mass_Result *result;
 } Compilation_Context;
 
