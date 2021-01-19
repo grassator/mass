@@ -1051,7 +1051,7 @@ value_as_function(
 
 Value *
 function_argument_value_at_index_internal(
-  Compiler_Source_Location compiler_source_location,
+  Compiler_Source_Location source_location,
   Allocator *allocator,
   Descriptor_Function *function,
   u64 argument_index
@@ -1078,41 +1078,23 @@ function_argument_value_at_index_internal(
   if (descriptor_byte_size(function->returns.descriptor) > 8) {
     argument_index++;
   }
-  switch (argument_index) {
-    case 0: {
-      Value *value = descriptor_is_float(arg_descriptor)
-        ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm0, arg_descriptor)
-        : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_C, arg_descriptor);
-      return value;
-    }
-    case 1: {
-      Value *value = descriptor_is_float(arg_descriptor)
-        ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm1, arg_descriptor)
-        : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_D, arg_descriptor);
-      return value;
-    }
-    case 2: {
-      Value *value = descriptor_is_float(arg_descriptor)
-        ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm2, arg_descriptor)
-        : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R8, arg_descriptor);
-      return value;
-    }
-    case 3: {
-      Value *value = descriptor_is_float(arg_descriptor)
-        ? value_register_for_descriptor_internal(compiler_source_location, allocator, Register_Xmm3, arg_descriptor)
-        : value_register_for_descriptor_internal(compiler_source_location, allocator, Register_R9, arg_descriptor);
-      return value;
-    }
-    default: {
-      s32 offset = u64_to_s32(argument_index * 8);
-      Operand operand = stack(offset, byte_size);
-      Value *value = allocator_allocate(allocator, Value);
-      *value = (Value) {
-        .descriptor = arg_descriptor,
-        .operand = operand,
-      };
-      return value;
-    }
+
+  Register general_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
+  Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
+
+  assert(countof(general_registers) == countof(float_registers));
+
+  if (argument_index < countof(general_registers)) {
+    Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
+    return value_register_for_descriptor_internal(
+      source_location, allocator, registers[argument_index], arg_descriptor
+    );
+  } else {
+    s32 offset = u64_to_s32(argument_index * 8);
+    Operand operand = stack(offset, byte_size);
+    Value *value = allocator_allocate(allocator, Value);
+    *value = (Value) { .descriptor = arg_descriptor, .operand = operand };
+    return value;
   }
 }
 #define function_argument_value_at_index(...)\
