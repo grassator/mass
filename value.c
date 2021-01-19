@@ -731,6 +731,8 @@ value_make_internal(
   return result;
 }
 
+#define value_make(...) value_make_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
+
 static inline Operand
 operand_eflags(
   Compare_Type compare_type
@@ -748,180 +750,77 @@ operand_eflags(
 )
 
 #define value_any(_allocator_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_any, (Operand){.tag = Operand_Tag_Any}\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_any, (Operand){.tag = Operand_Tag_Any}\
 )
 
-Value *
-value_from_s64_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  s64 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_s64,
-    .operand = imm64(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-#define value_from_s64(...) value_from_s64_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define value_from_s64(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s64, imm64((_allocator_), (_integer_))\
+)
 
-Value *
-value_from_s32_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  s32 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (const Value) {
-    .descriptor = &descriptor_s32,
-    .operand = imm32(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
+#define value_from_s32(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s32, imm32((_allocator_), (_integer_))\
+)
 
-#define value_from_s32(...) value_from_s32_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define value_from_s16(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s16, imm16((_allocator_), (_integer_))\
+)
 
-Value *
-value_from_s16_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  s16 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (const Value) {
-    .descriptor = &descriptor_s16,
-    .operand = imm16(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
+#define value_from_s8(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s8, imm8((_allocator_), (_integer_))\
+)
 
-#define value_from_s16(...) value_from_s16_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define value_from_u64(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u64, imm64((_allocator_), (_integer_))\
+)
 
-Value *
-value_from_s8_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  s8 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (const Value) {
-    .descriptor = &descriptor_s8,
-    .operand = imm8(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
+#define value_from_u32(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u32, imm32((_allocator_), (_integer_))\
+)
 
-#define value_from_s8(...) value_from_s8_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define value_from_u16(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u16, imm16((_allocator_), (_integer_))\
+)
 
-// FIXME turn these into macros
-
-Value *
-value_from_u64_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  u64 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_u64,
-    .operand = imm64(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-#define value_from_u64(...) value_from_u64_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
-Value *
-value_from_u32_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  u32 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_u32,
-    .operand = imm32(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-#define value_from_u32(...) value_from_u32_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
-Value *
-value_from_u16_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  u16 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_u16,
-    .operand = imm16(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-#define value_from_u16(...) value_from_u16_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
-Value *
-value_from_u8_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  u8 integer
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_u8,
-    .operand = imm8(allocator, integer),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-#define value_from_u8(...) value_from_u8_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
-
+#define value_from_u8(_allocator_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u8, imm8((_allocator_), (_integer_))\
+)
 
 static inline Value *
 value_from_signed_immediate_internal(
-  Compiler_Source_Location compiler_source_location,
+  Compiler_Source_Location location,
   const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return value_from_s8_internal(compiler_source_location, allocator, (s8) value);
+    return value_make_internal(location, allocator, &descriptor_s8, imm8(allocator, (s8)value));
   }
   if (s64_fits_into_s16(value)) {
-    return value_from_s16_internal(compiler_source_location, allocator, (s16) value);
+    return value_make_internal(location, allocator, &descriptor_s16, imm16(allocator, (s16)value));
   }
   if (s64_fits_into_s32(value)) {
-    return value_from_s32_internal(compiler_source_location, allocator, (s32) value);
+    return value_make_internal(location, allocator, &descriptor_s32, imm32(allocator, (s32)value));
   }
-  return value_from_s64_internal(compiler_source_location, allocator, value);
+  return value_make_internal(location, allocator, &descriptor_s64, imm64(allocator, value));
 }
 #define value_from_signed_immediate(...)\
   value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
 value_from_unsigned_immediate_internal(
-  Compiler_Source_Location compiler_source_location,
+  Compiler_Source_Location location,
   const Allocator *allocator,
   u64 value
 ) {
   if (u64_fits_into_u8(value)) {
-    return value_from_u8_internal(compiler_source_location, allocator, (u8) value);
+    return value_make_internal(location, allocator, &descriptor_u8, imm8(allocator, (u8)value));
   }
   if (u64_fits_into_u16(value)) {
-    return value_from_u16_internal(compiler_source_location, allocator, (u16) value);
+    return value_make_internal(location, allocator, &descriptor_u16, imm16(allocator, (u16)value));
   }
   if (u64_fits_into_u32(value)) {
-    return value_from_u32_internal(compiler_source_location, allocator, (u32) value);
+    return value_make_internal(location, allocator, &descriptor_u32, imm32(allocator, (u32)value));
   }
-  return value_from_u64_internal(compiler_source_location, allocator, value);
+  return value_make_internal(location, allocator, &descriptor_u64, imm64(allocator, value));
 }
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)

@@ -2292,8 +2292,9 @@ token_handle_operand_variant_of(
 
   Value *value = *dyn_array_get(args, 0);
 
-  Value *operand_value = allocator_allocate(context->allocator, Value);
+  Value *operand_value;
   switch(value->operand.tag) {
+    default:
     case Operand_Tag_None:
     case Operand_Tag_Any:
     case Operand_Tag_Immediate:
@@ -2301,12 +2302,10 @@ token_handle_operand_variant_of(
     case Operand_Tag_Xmm:
     case Operand_Tag_Memory: {
       panic("TODO implement operand reflection for more types");
+      operand_value = 0;
       break;
     }
     case Operand_Tag_Register: {
-      // TODO figure out a better encoding for small immediates
-      u8 *register_index = allocator_allocate(context->allocator, u8);
-      *register_index = value->operand.Register.index;
       Descriptor *result_descriptor = 0;
       switch(value->operand.byte_size) {
         case 1: result_descriptor = &descriptor_register_8; break;
@@ -2318,14 +2317,11 @@ token_handle_operand_variant_of(
           break;
         }
       }
-      *operand_value = (Value) {
-        .descriptor = result_descriptor,
-        .operand = {
-          .tag = Operand_Tag_Immediate,
-          .byte_size = 1,
-          .Immediate.memory = register_index,
-        }
-      };
+      operand_value = value_make(
+        context->allocator,
+        result_descriptor,
+        imm8(context->allocator, value->operand.Register.index)
+      );
     }
   }
   MASS_ON_ERROR(assign(context, source_range, result_value, operand_value));
