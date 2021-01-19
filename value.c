@@ -688,27 +688,37 @@ instruction_equal(
   return true;
 }
 
-Value *
-value_from_compare_internal(
+static inline Value *
+value_make_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
-  Compare_Type compare_type
+  const Allocator *allocator,
+  Descriptor *descriptor,
+  Operand operand
 ) {
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
-    // TODO consider adding explicit boolean descriptor type
-    .descriptor = &descriptor_s8,
-    .operand = {
-      .tag = Operand_Tag_Eflags,
-      .byte_size = 1,
-      .Eflags = {.compare_type = compare_type },
-    },
+    .descriptor = descriptor,
+    .operand = operand,
     .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
-#define value_from_compare(...) value_from_compare_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+static inline Operand
+operand_eflags(
+  Compare_Type compare_type
+) {
+  return (Operand){
+    .tag = Operand_Tag_Eflags,
+    .byte_size = 1,
+    .Eflags = { .compare_type = compare_type }
+  };
+}
+
+// TODO consider adding explicit boolean descriptor type
+#define value_from_compare(_allocator_, _compare_type_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, operand_eflags(_compare_type_)\
+)
 
 Value *
 value_global_internal(
