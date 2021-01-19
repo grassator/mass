@@ -385,7 +385,9 @@ spec("source") {
   describe("Win32: Structured Exceptions") {
     it("should be unwind stack on hardware exception on Windows") {
       Module *module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"), test_context.scope
+        &test_context,
+        slice_literal("fixtures\\error_runtime_divide_by_zero"),
+        scope_make(test_context.allocator, test_context.scope)
       );
       Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
@@ -1231,7 +1233,7 @@ spec("source") {
 
   describe("Complex Examples") {
     it("should be able to run fizz buzz") {
-      Scope *module_scope = test_context.scope;
+      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
       Module *prelude_module = program_module_from_file(
         &test_context, slice_literal("lib\\prelude"), module_scope
       );
@@ -1245,7 +1247,7 @@ spec("source") {
       Program *test_program = test_context.program;
 
       Value *fizz_buzz = scope_lookup_force(
-        &test_context, test_context.scope, slice_literal("fizz_buzz")
+        &test_context, module_scope, slice_literal("fizz_buzz")
       );
       check(fizz_buzz);
 
