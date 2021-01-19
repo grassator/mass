@@ -2125,7 +2125,8 @@ compile_time_eval(
   // Is it actually always compile time scope or it depend on the current mode?
   context_set_active_scope(&eval_context, context->compile_time_scope);
   eval_context.compilation_mode = Compilation_Mode_Compile_Time;
-  Descriptor descriptor = {
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
     .Function = {
       .returns = {
@@ -2133,12 +2134,13 @@ compile_time_eval(
       },
     },
   };
-  Value eval_value = {
-    .descriptor = &descriptor,
-    .operand = code_label32(make_label(jit->program, &jit->program->code_section)),
-  };
+  Value *eval_value = value_make(
+    context->allocator,
+    descriptor,
+    code_label32(make_label(jit->program, &jit->program->code_section))
+  );
   Function_Builder eval_builder = {
-    .value = &eval_value,
+    .value = eval_value,
     .code_block = {
       .end_label = make_label(jit->program, &jit->program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
@@ -2218,7 +2220,7 @@ compile_time_eval(
 
   program_jit(jit);
 
-  fn_type_opaque jitted_code = value_as_function(jit, &eval_value);
+  fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
   Value *temp_result = allocator_allocate(context->allocator, Value);
