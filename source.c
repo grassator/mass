@@ -4353,12 +4353,7 @@ program_parse(
   Array_Const_Token_Ptr tokens;
 
   MASS_TRY(tokenize(context->allocator, &context->module->source_file, &tokens));
-  Source_Range *file_source_range = allocator_allocate(context->allocator, Source_Range);
-  *file_source_range = (Source_Range) {
-    .file = &context->module->source_file,
-    .offsets = { .from = 0, .to = context->module->source_file.text.length },
-  };
-  Token_View program_token_view = token_view_from_token_array(tokens, file_source_range);
+  Token_View program_token_view = token_view_from_token_array(tokens, &context->module->source_range);
   MASS_TRY(token_parse(context, program_token_view));
   return *context->result;
 }
@@ -4415,10 +4410,31 @@ program_absolute_path(
   return result_buffer;
 }
 
-Mass_Result
-program_import_file(
+void
+program_module_init(
+  Module *module,
+  Slice file_path,
+  Slice text,
+  Scope *scope
+) {
+  *module = (Module) {
+    .source_file = {
+      .path = file_path,
+      .text = text,
+    },
+    .scope = scope,
+  };
+  module->source_range = (Source_Range) {
+    .file = &module->source_file,
+    .offsets = { .from = 0, .to = module->source_file.text.length },
+  };
+}
+
+Module *
+program_module_from_file(
   Compilation_Context *context,
-  Slice file_path
+  Slice file_path,
+  Scope *scope
 ) {
   Slice extension = slice_literal(".mass");
   Fixed_Buffer *absolute_path = program_absolute_path(file_path);
@@ -4427,28 +4443,26 @@ program_import_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
-  Module *module = allocator_allocate(context->allocator, Module);
-  *module = (Module) {
-    .source_file = {
-      .path = file_path,
-      .text = {0},
-    },
-    .export_scope = context->scope,
-  };
-  context->module = module;
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
-    return (Mass_Result) {
-      .tag = Mass_Result_Tag_Error,
-      .Error.details = {
-        .message = slice_literal("Unable to open the file"),
-        .source_range = {
-          .file = &module->source_file,
-        },
-      },
-    };
+    context_error_snprintf(
+      context, (Source_Range){0}, "Unable to open the file %"PRIslice, SLICE_EXPAND_PRINTF(file_path)
+    );
   }
-  module->source_file.text = fixed_buffer_as_slice(buffer);
-  return program_parse(context);
+
+  Module *module = allocator_allocate(context->allocator, Module);
+  program_module_init(module, file_path, fixed_buffer_as_slice(buffer), scope);
+  return module;
+}
+
+Mass_Result
+program_import_module(
+  Compilation_Context *context,
+  Module *module
+) {
+  Compilation_Context import_context = *context;
+  import_context.module = module;
+  import_context.scope = module->scope;
+  return program_parse(&import_context);
 }
 

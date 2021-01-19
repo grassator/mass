@@ -478,14 +478,15 @@ main(void) {
     { "Array_Range_u64", "line_ranges" },
   }));
 
-  push_type(type_struct("Module", (Struct_Item[]){
-    { "Source_File", "source_file" },
-    { "Scope *", "export_scope" },
-  }));
-
   push_type(type_struct("Source_Range", (Struct_Item[]){
     { "const Source_File *", "file" },
     { "Range_u64", "offsets" },
+  }));
+
+  push_type(type_struct("Module", (Struct_Item[]){
+    { "Source_File", "source_file" },
+    { "Source_Range", "source_range" },
+    { "Scope *", "scope" },
   }));
 
   push_type(type_struct("Parse_Error", (Struct_Item[]){

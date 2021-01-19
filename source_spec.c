@@ -56,14 +56,11 @@ static Compilation_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
 static Module test_module = {0};
 
-void
+static inline void
 test_init_module(
   Slice source
 ) {
-  test_module = (Module) {
-    .source_file = {test_file_name, source},
-    .export_scope = test_context.scope,
-  };
+  program_module_init(&test_module, test_file_name, source, test_context.scope);
   test_context.module = &test_module;
 }
 
@@ -75,7 +72,7 @@ test_program_inline_source_base(
 ) {
   test_init_module(slice_from_c_string(source));
   program_parse(context);
-  return scope_lookup_force(context, test_context.module->export_scope, slice_from_c_string(id));
+  return scope_lookup_force(context, test_context.module->scope, slice_from_c_string(id));
 }
 
 fn_type_opaque
@@ -387,12 +384,14 @@ spec("source") {
   #ifdef _WIN32
   describe("Win32: Structured Exceptions") {
     it("should be unwind stack on hardware exception on Windows") {
-      Mass_Result result =
-        program_import_file(&test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"));
+      Module *module = program_module_from_file(
+        &test_context, slice_literal("fixtures\\error_runtime_divide_by_zero"), test_context.scope
+      );
+      Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
       Value *main = scope_lookup_force(
         &test_context,
-        test_context.scope,
+        module->scope,
         slice_literal("main")
       );
       check(main);
@@ -640,8 +639,10 @@ spec("source") {
     }
 
     it("should report an error when encountering an unknown type") {
-      Mass_Result result =
-        program_import_file(&test_context, slice_literal("fixtures\\error_unknown_type"));
+      Module *module = program_module_from_file(
+        &test_context, slice_literal("fixtures\\error_unknown_type"), test_context.scope
+      );
+      Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
       scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -900,7 +901,11 @@ spec("source") {
     }
 
     it("should be able to define and use a macro for while loop") {
-      program_import_file(&test_context, slice_literal("lib\\prelude"));
+      Module *prelude_module = program_module_from_file(
+        &test_context, slice_literal("lib\\prelude"), test_context.scope
+      );
+      Mass_Result result = program_import_module(&test_context, prelude_module);
+      check(result.tag == Mass_Result_Tag_Success);
       fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(
         "sum_up_to", &test_context,
         "sum_up_to :: (x : s32) -> (s32) {"
@@ -1209,7 +1214,10 @@ spec("source") {
     }
 
     it("should parse and write an executable that prints Hello, world!") {
-      program_import_file(&test_context, slice_literal("fixtures\\hello_world"));
+      Module *module = program_module_from_file(
+        &test_context, slice_literal("fixtures\\hello_world"), test_context.scope
+      );
+      program_import_module(&test_context, module);
       Program *test_program = test_context.program;
       test_program->entry_point =
         scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
@@ -1223,9 +1231,16 @@ spec("source") {
 
   describe("Complex Examples") {
     it("should be able to run fizz buzz") {
-      Mass_Result result = program_import_file(&test_context, slice_literal("lib\\prelude"));
+      Scope *module_scope = test_context.scope;
+      Module *prelude_module = program_module_from_file(
+        &test_context, slice_literal("lib\\prelude"), module_scope
+      );
+      Mass_Result result = program_import_module(&test_context, prelude_module);
       check(result.tag == Mass_Result_Tag_Success);
-      result = program_import_file(&test_context, slice_literal("fixtures\\fizz_buzz"));
+      Module *fizz_buzz_module = program_module_from_file(
+        &test_context, slice_literal("fixtures\\fizz_buzz"), module_scope
+      );
+      result = program_import_module(&test_context, fizz_buzz_module);
       check(result.tag == Mass_Result_Tag_Success);
       Program *test_program = test_context.program;
 

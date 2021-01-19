@@ -76,13 +76,13 @@ typedef struct Source_File Source_File;
 typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
 typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
 
-typedef struct Module Module;
-typedef dyn_array_type(Module *) Array_Module_Ptr;
-typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
-
 typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
+
+typedef struct Module Module;
+typedef dyn_array_type(Module *) Array_Module_Ptr;
+typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
 
 typedef struct Parse_Error Parse_Error;
 typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
@@ -386,17 +386,18 @@ typedef struct Source_File {
 } Source_File;
 typedef dyn_array_type(Source_File) Array_Source_File;
 
-typedef struct Module {
-  Source_File source_file;
-  Scope * export_scope;
-} Module;
-typedef dyn_array_type(Module) Array_Module;
-
 typedef struct Source_Range {
   const Source_File * file;
   Range_u64 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
+
+typedef struct Module {
+  Source_File source_file;
+  Source_Range source_range;
+  Scope * scope;
+} Module;
+typedef dyn_array_type(Module) Array_Module;
 
 typedef struct Parse_Error {
   Slice message;

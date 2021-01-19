@@ -76,17 +76,25 @@ int main(s32 argc, char **argv) {
   Compilation_Context context;
   compilation_context_init(allocator_system, &context);
 
-  Mass_Result result = program_import_file(&context, slice_literal("lib/prelude"));
+  Scope *module_scope = context.scope;
+  Module *prelude_module = program_module_from_file(
+    &context, slice_literal("lib\\prelude"), module_scope
+  );
+
+  Mass_Result result = program_import_module(&context, prelude_module);
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&result.Error.details);
   }
-  result = program_import_file(&context, file_path);
+  Module *root_module = program_module_from_file(
+    &context, file_path, module_scope
+  );
+  result = program_import_module(&context, root_module);
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&result.Error.details);
   }
 
   context.program->entry_point = scope_lookup_force(
-    &context, context.module->export_scope, slice_literal("main")
+    &context, root_module->scope, slice_literal("main")
   );
   if (!context.program->entry_point) {
     printf("Could not find entry point function `main`");
