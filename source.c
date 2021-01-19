@@ -854,10 +854,7 @@ token_split_next(
   ) {
     const Token *token = token_view_get(it->view, it->index);
     if (token_match(token, separator)) {
-      Token_View result = {
-        .tokens = it->view.tokens + start_index,
-        .length = it->index - start_index,
-      };
+      Token_View result = token_view_slice(&it->view, start_index, it->index);
       // Skip over the separator
       it->index++;
       return result;
@@ -1235,22 +1232,20 @@ token_maybe_split_on_operator(
 ) {
   u64 lhs_end = 0;
   u64 rhs_start = 0;
+  bool found = false;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
     if (token->tag == Token_Tag_Operator && slice_equal(token->source, operator)) {
       *operator_token = token;
       lhs_end = i;
       rhs_start = i + 1;
+      found = true;
       break;
     }
   }
+  if (!found) return false;
 
-  if (lhs_end == 0) {
-    *lhs = *rhs = (Token_View){0};
-    return false;
-  }
-
-  *lhs = (Token_View) { .tokens = view.tokens, .length = lhs_end };
+  *lhs = token_view_slice(&view, 0, lhs_end);
   *rhs = token_view_rest(&view, rhs_start);
 
   return true;
