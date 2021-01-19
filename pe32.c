@@ -244,7 +244,7 @@ encode_text_section(
   IMAGE_SECTION_HEADER *header,
   Encoded_Rdata_Section *encoded_rdata_section
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
 
@@ -327,7 +327,7 @@ write_executable(
   Compilation_Context *context,
   Executable_Type executable_type
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   assert(program->entry_point);
   // Sections
   IMAGE_SECTION_HEADER sections[] = {

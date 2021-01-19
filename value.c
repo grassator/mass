@@ -694,7 +694,7 @@ value_global_internal(
   Compilation_Context *context,
   Descriptor *descriptor
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   u32 byte_size = descriptor_byte_size(descriptor);
   u32 alignment = descriptor_alignment(descriptor);
   void *allocation =
@@ -888,7 +888,7 @@ value_global_c_string_from_slice_internal(
   };
 
   Value *string_value = value_global_internal(compiler_source_location, context, descriptor);
-  s8 *memory = rip_value_pointer(context_get_active_program(context), string_value);
+  s8 *memory = rip_value_pointer(context->program, string_value);
   memcpy(memory, slice.bytes, slice.length);
   memory[length - 1] = 0;
   return string_value;
@@ -1066,20 +1066,16 @@ compilation_context_init(
 
   Program *runtime_program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, runtime_program);
-  Scope *runtime_scope = scope_make(compilation_allocator, 0);
-  scope_define_builtins(compilation_allocator, runtime_scope);
 
-  Scope *compile_time_scope = scope_make(compilation_allocator, 0);
-  scope_define_builtins(compilation_allocator, compile_time_scope);
+  Scope *root_scope = scope_make(compilation_allocator, 0);
+  scope_define_builtins(compilation_allocator, root_scope);
 
   *context = (Compilation_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
-    .runtime_program = runtime_program,
-    .compilation_mode = Compilation_Mode_Runtime,
+    .program = runtime_program,
     .compile_time_jit = jit,
-    .runtime_scope = runtime_scope,
-    .compile_time_scope = compile_time_scope,
+    .scope = root_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 }
@@ -1088,7 +1084,7 @@ void
 compilation_context_deinit(
   Compilation_Context *context
 ) {
-  program_deinit(context->runtime_program);
+  program_deinit(context->program);
   program_deinit(context->compile_time_jit->program);
   jit_deinit(context->compile_time_jit);
   bucket_buffer_destroy(context->allocation_buffer);
@@ -1189,7 +1185,7 @@ import_symbol(
   const Slice library_name,
   const Slice symbol_name
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   Import_Library *library = program_find_import_library(program, library_name);
   if (!library) {
     library = dyn_array_push(program->import_libraries, (Import_Library) {

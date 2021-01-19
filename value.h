@@ -309,64 +309,15 @@ typedef struct Jit {
   void *platform_specific_payload;
 } Jit;
 
-typedef enum {
-  Compilation_Mode_Runtime,
-  Compilation_Mode_Compile_Time,
-} Compilation_Mode;
-
 typedef struct {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
-  Program *runtime_program;
+  Program *program;
   Jit *compile_time_jit;
-  Compilation_Mode compilation_mode;
-  Scope *runtime_scope;
-  Scope *compile_time_scope;
+  Scope *scope;
   Function_Builder *builder;
   Mass_Result *result;
 } Compilation_Context;
-
-static inline Program *
-context_get_active_program(
-  Compilation_Context *context
-) {
-  switch(context->compilation_mode) {
-    case Compilation_Mode_Runtime: return context->runtime_program;
-    case Compilation_Mode_Compile_Time: return context->compile_time_jit->program;
-  }
-  panic("Unknown compilation mode");
-  return 0;
-}
-
-static inline Scope *
-context_get_active_scope(
-  Compilation_Context *context
-) {
-  switch(context->compilation_mode) {
-    case Compilation_Mode_Runtime: return context->runtime_scope;
-    case Compilation_Mode_Compile_Time: return context->compile_time_scope;
-  }
-  panic("Unknown compilation mode");
-  return 0;
-}
-
-static inline void
-context_set_active_scope(
-  Compilation_Context *context,
-  Scope *scope
-) {
-  switch(context->compilation_mode) {
-    case Compilation_Mode_Runtime: {
-      context->runtime_scope = scope;
-      return;
-    }
-    case Compilation_Mode_Compile_Time: {
-      context->compile_time_scope = scope;
-      return;
-    }
-  }
-  panic("Unknown compilation mode");
-}
 
 void *
 rip_value_pointer(

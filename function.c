@@ -660,7 +660,7 @@ make_if(
   const Source_Range *source_range,
   Value *value
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->code_section);
   if(value->operand.tag == Operand_Tag_Immediate) {
@@ -1181,7 +1181,7 @@ ensure_compiled_function_body(
   if (function->flags & Descriptor_Function_Flags_Macro) return;
   assert(function->body);
 
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   fn_value->operand = code_label32(make_label(program, &program->code_section));
 
   Function_Builder builder = (Function_Builder){
@@ -1259,7 +1259,7 @@ ensure_compiled_function_body(
   }
 
   // TODO Should this set compilation_mode?
-  context_set_active_scope(&body_context, function->scope);
+  body_context.scope = function->scope;
   body_context.builder = &builder;
   token_parse_block_no_scope(&body_context, function->body, return_value);
 
@@ -1413,7 +1413,7 @@ make_and(
   Value *a,
   Value *b
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);
@@ -1449,7 +1449,7 @@ make_or(
   Value *a,
   Value *b
 ) {
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
   Label_Index label = make_label(program, &program->code_section);

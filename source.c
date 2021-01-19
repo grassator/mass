@@ -236,7 +236,7 @@ scope_entry_force(
     case Scope_Entry_Type_Lazy_Expression: {
       Scope_Lazy_Expression *expr = &entry->lazy_expression;
       Compilation_Context lazy_context = *context;
-      context_set_active_scope(&lazy_context, expr->scope);
+      lazy_context.scope = expr->scope;
       Value *result = token_parse_constant_expression(&lazy_context, expr->tokens);
       *entry = (Scope_Entry) {
         .type = Scope_Entry_Type_Value,
@@ -1080,7 +1080,7 @@ token_apply_macro_syntax(
   // to support implementing disjointed syntax, such as for (;;) loop
   // or switch / pattern matching.
   // Ideally there should be a way to control this explicitly somehow.
-  Scope *captured_scope = scope_make(context->allocator, context_get_active_scope(context));
+  Scope *captured_scope = scope_make(context->allocator, context->scope);
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
@@ -1143,7 +1143,7 @@ token_apply_macro_syntax(
   }
 
   Compilation_Context body_context = *context;
-  context_set_active_scope(&body_context, expansion_scope);
+  body_context.scope = expansion_scope;
 
   Value *result_value = value_any(context->allocator);
   token_parse_expression(&body_context, macro->replacement, result_value);
@@ -1219,7 +1219,7 @@ token_match_type(
     );
     return 0;
   }
-  return token_force_type(context, context_get_active_scope(context), token);
+  return token_force_type(context, context->scope, token);
 }
 
 bool
@@ -1346,7 +1346,7 @@ token_force_value(
 ) {
   MASS_TRY(*context->result);
 
-  Scope *scope = context_get_active_scope(context);
+  Scope *scope = context->scope;
   switch(token->tag) {
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
@@ -1480,7 +1480,7 @@ token_handle_user_defined_operator(
 
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
-  Program *program = context_get_active_program(context);
+  Program *program = context->program;
   Label_Index fake_return_label_index = make_label(program, &program->data_section);
   {
     Value *return_label_value = allocator_allocate(context->allocator, Value);
@@ -1501,7 +1501,7 @@ token_handle_user_defined_operator(
   const Token *body = operator->body;
   {
     Compilation_Context body_context = *context;
-    context_set_active_scope(&body_context, body_scope);
+    body_context.scope = body_scope;
     token_parse_block(&body_context, body, result_value);
   }
 
@@ -1592,7 +1592,7 @@ token_parse_operator_definition(
   operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *operator = (User_Defined_Operator) {
     .body = body_token,
-    .scope = context_get_active_scope(context),
+    .scope = context->scope,
   };
 
   const Token *operator_token;
@@ -1646,7 +1646,7 @@ token_parse_operator_definition(
   }
 
   Scope_Entry *existing_scope_entry =
-    scope_lookup(context_get_active_scope(context), operator_token->source);
+    scope_lookup(context->scope, operator_token->source);
   while (existing_scope_entry) {
     if (existing_scope_entry->type != Scope_Entry_Type_Operator) {
       panic("Internal Error: Found an operator-like scope entry that is not an operator");
@@ -1673,7 +1673,7 @@ token_parse_operator_definition(
     existing_scope_entry = existing_scope_entry->next_overload;
   }
 
-  scope_define(context_get_active_scope(context), operator_token->source, (Scope_Entry) {
+  scope_define(context->scope, operator_token->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Operator,
     .Operator = {
       .precedence = precendence,
@@ -2031,7 +2031,7 @@ token_process_function_literal(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope *parent_scope = context_get_active_scope(context);
+  Scope *parent_scope = context->scope;
   Scope *function_scope = scope_make(context->allocator, parent_scope);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -2060,7 +2060,7 @@ token_process_function_literal(
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
 
       Compilation_Context arg_context = *context;
-      context_set_active_scope(&arg_context, function_scope);
+      arg_context.scope = function_scope;
       arg_context.builder = 0;
       descriptor->Function.returns = token_match_return_type(&arg_context, arg_view);
     }
@@ -2078,7 +2078,7 @@ token_process_function_literal(
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
-      context_set_active_scope(&arg_context, function_scope);
+      arg_context.scope = function_scope;
       arg_context.builder = 0;
       Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
       dyn_array_push(descriptor->Function.arguments, arg);
@@ -2119,9 +2119,8 @@ compile_time_eval(
 
   Jit *jit = context->compile_time_jit;
   Compilation_Context eval_context = *context;
-  // Is it actually always compile time scope or it depend on the current mode?
-  context_set_active_scope(&eval_context, context->compile_time_scope);
-  eval_context.compilation_mode = Compilation_Mode_Compile_Time;
+  eval_context.program = jit->program;
+  eval_context.scope = scope_make(context->allocator, context->scope);
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
@@ -2160,7 +2159,8 @@ compile_time_eval(
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
     if (expression_result_value->descriptor->tag == Descriptor_Tag_Function) {
-      panic("TODO figure out how to deal with function values");
+      // It is only allowed to to pass through funciton definitions not compiled ones
+      assert(expression_result_value->operand.tag == Operand_Tag_None);
     }
     MASS_ON_ERROR(assign(context, source_range, result_value, expression_result_value));
     return;
@@ -2549,7 +2549,7 @@ token_dispatch_constant_operator(
     const Token *return_types = *dyn_array_pop(*token_stack);
     const Token *arguments = *dyn_array_pop(*token_stack);
     Value *function_value = token_process_function_literal(
-      context, context_get_active_scope(context), arguments, return_types, body
+      context, context->scope, arguments, return_types, body
     );
     Token *result = token_value_make(context, function_value, arguments->source_range);
     dyn_array_push(*token_stack, result);
@@ -2586,7 +2586,7 @@ token_handle_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope_Entry *scope_entry = scope_lookup(context_get_active_scope(context), new_operator);
+  Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
 
   if (!scope_entry) {
     context_error_snprintf(
@@ -2690,7 +2690,7 @@ token_parse_constant_expression(
         break;
       }
       case Token_Tag_Id: {
-        Scope_Entry *scope_entry = scope_lookup(context_get_active_scope(context), token->source);
+        Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
         if (scope_entry && scope_entry->type == Scope_Entry_Type_Operator) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
@@ -2759,22 +2759,11 @@ token_parse_constant_definitions(
   const Token *name = token_view_get(lhs, 0);
   if (name->tag != Token_Tag_Id) return false;
 
-  // TODO :CompileTimeScope maybe have a helper function to define something in both scopes
-  scope_define(context->compile_time_scope, name->source, (Scope_Entry) {
+  scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Lazy_Expression,
     .lazy_expression = {
-      .compilation_mode = Compilation_Mode_Compile_Time,
       .tokens = rhs,
-      .scope = context->compile_time_scope,
-    },
-  });
-
-  scope_define(context->runtime_scope, name->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Lazy_Expression,
-    .lazy_expression = {
-      .compilation_mode = Compilation_Mode_Runtime,
-      .tokens = rhs,
-      .scope = context->runtime_scope,
+      .scope = context->scope,
     },
   });
 
@@ -2891,7 +2880,7 @@ token_handle_function_call(
 
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
-      Program *program = context_get_active_program(context);
+      Program *program = context->program;
       Label_Index fake_return_label_index = make_label(program, &program->data_section);
       {
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
@@ -2910,7 +2899,7 @@ token_handle_function_call(
       const Token *body = function->body;
       {
         Compilation_Context body_context = *context;
-        context_set_active_scope(&body_context, body_scope);
+        body_context.scope = body_scope;
         token_parse_block_no_scope(&body_context, body, result_value);
       }
 
@@ -3427,8 +3416,9 @@ token_eval_operator(
     const Token *return_types = token_view_get(args_view, 1);
     const Token *body = token_view_get(args_view, 2);
     Value *function_value = token_process_function_literal(
-      context, context_get_active_scope(context), arguments, return_types, body
+      context, context->scope, arguments, return_types, body
     );
+    MASS_ON_ERROR(*context->result) return;
     MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = token_view_get(args_view, 0);
@@ -3645,8 +3635,8 @@ token_parse_block(
   Value *block_result_value
 ) {
   Compilation_Context body_context = *context;
-  Scope *block_scope = scope_make(context->allocator, context_get_active_scope(context));
-  context_set_active_scope(&body_context, block_scope);
+  Scope *block_scope = scope_make(context->allocator, context->scope);
+  body_context.scope = block_scope;
   return token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
@@ -3684,7 +3674,7 @@ token_parse_statement_label(
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
   } else {
-    Program *program = context_get_active_program(context);
+    Program *program = context->program;
     Label_Index label = make_label(program, &program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
@@ -3694,7 +3684,7 @@ token_parse_statement_label(
     // FIXME this should define a label in the function scope, but because
     // the macros are not hygienic we can not do that yet
     //scope_define_value(function_scope, id->source, value);
-    scope_define(context_get_active_scope(context), id->source, (Scope_Entry) {
+    scope_define(context->scope, id->source, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
       .value = value,
     });
@@ -3803,7 +3793,7 @@ token_parse_goto(
     goto err;
   }
 
-  Scope_Entry *scope_entry = scope_lookup(context_get_active_scope(context), id->source);
+  Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
   Value *value;
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
@@ -3812,7 +3802,7 @@ token_parse_goto(
     // If we didn't find an identifier with this name, declare one and hope
     // that some label will resolve it
     // FIXME somehow report unresolved labels
-    Program *program = context_get_active_program(context);
+    Program *program = context->program;
     Label_Index label = make_label(program, &program->code_section);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
@@ -3862,7 +3852,7 @@ token_parse_explicit_return(
   Token_View rest = token_view_rest(&view, peek_index);
   bool has_return_expression = rest.length > 0;
 
-  Scope_Entry *scope_value_entry = scope_lookup(context_get_active_scope(context), MASS_RETURN_VALUE_NAME);
+  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
   assert(scope_value_entry);
   Value *fn_return = scope_entry_force(context, scope_value_entry);
   assert(fn_return);
@@ -3886,7 +3876,7 @@ token_parse_explicit_return(
     );
   }
 
-  Scope_Entry *scope_label_entry = scope_lookup(context_get_active_scope(context), MASS_RETURN_LABEL_NAME);
+  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
   assert(scope_label_entry);
   Value *return_label = scope_entry_force(context, scope_label_entry);
   assert(return_label);
@@ -3913,7 +3903,7 @@ token_match_fixed_array_type(
   Token_Match(type, .tag = Token_Tag_Id);
   Token_Match(square_brace, .group_tag = Token_Group_Tag_Square);
   Descriptor *descriptor =
-    scope_lookup_type(context, context_get_active_scope(context), type->source_range, type->source);
+    scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = token_view_from_group_token(square_brace);
   Value *size_value = value_any(context->allocator);
@@ -4045,7 +4035,7 @@ token_parse_definition(
   Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) return 0;
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
-  scope_define(context_get_active_scope(context), name->source, (Scope_Entry) {
+  scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
     .value = value,
   });
@@ -4107,7 +4097,7 @@ token_parse_definition_and_assignment_statements(
     MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) return true;
   }
 
-  scope_define(context_get_active_scope(context), name->source, (Scope_Entry) {
+  scope_define(context->scope, name->source, (Scope_Entry) {
     .type = Scope_Entry_Type_Value,
     .value = on_stack,
   });
@@ -4149,10 +4139,10 @@ token_parse_statement(
 
   Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
   // TODO consider how this should work
-  token_parse_macros(context, &statement_tokens, source_range, context_get_active_scope(context));
+  token_parse_macros(context, &statement_tokens, source_range, context->scope);
   view = token_view_from_token_array(statement_tokens, source_range);
   for (
-    Scope *statement_matcher_scope = context_get_active_scope(context);
+    Scope *statement_matcher_scope = context->scope;
     statement_matcher_scope;
     statement_matcher_scope = statement_matcher_scope->parent
   ) {
@@ -4181,7 +4171,7 @@ token_parse(
   if (!view.length) return *context->result;
 
   Token_View_Split_Iterator it = { .view = view };
-  Scope *scope = context_get_active_scope(context);
+  Scope *scope = context->scope;
   while (!it.done) {
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);

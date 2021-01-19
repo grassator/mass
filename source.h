@@ -5,6 +5,7 @@
 
 #define MASS_RETURN_LABEL_NAME slice_literal("@return_label")
 #define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
+
 typedef enum {
   Scope_Entry_Type_Value = 1,
   Scope_Entry_Type_Lazy_Expression,
@@ -12,7 +13,6 @@ typedef enum {
 } Scope_Entry_Type;
 
 typedef struct {
-  Compilation_Mode compilation_mode;
   Token_View tokens;
   Scope *scope;
 } Scope_Lazy_Expression;
