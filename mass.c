@@ -86,7 +86,7 @@ int main(s32 argc, char **argv) {
   }
 
   context.program->entry_point = scope_lookup_force(
-    &context, context.scope, slice_literal("main")
+    &context, context.module->export_scope, slice_literal("main")
   );
   if (!context.program->entry_point) {
     printf("Could not find entry point function `main`");

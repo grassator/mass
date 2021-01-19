@@ -75,7 +75,7 @@ test_program_inline_source_base(
 ) {
   test_init_module(slice_from_c_string(source));
   program_parse(context);
-  return scope_lookup_force(context, context->scope, slice_from_c_string(id));
+  return scope_lookup_force(context, test_context.module->export_scope, slice_from_c_string(id));
 }
 
 fn_type_opaque
