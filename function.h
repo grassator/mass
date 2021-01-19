@@ -58,11 +58,11 @@ make_trampoline(
 
 void
 move_value(
-  Allocator* allocator,
+  Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
-  Value *a,
-  Value *b
+  const Operand *target,
+  const Operand *source
 );
 
 void
@@ -75,8 +75,7 @@ fn_encode(
 
 void
 plus(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -85,8 +84,7 @@ plus(
 
 void
 minus(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -95,8 +93,7 @@ minus(
 
 void
 multiply(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *x,
@@ -105,8 +102,7 @@ multiply(
 
 void
 divide(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -115,8 +111,7 @@ divide(
 
 void
 value_remainder(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -125,9 +120,8 @@ value_remainder(
 
 void
 compare(
-  Allocator *allocator,
+  Compilation_Context *context,
   Compare_Type operation,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,

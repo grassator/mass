@@ -105,6 +105,14 @@ typedef struct Scope {
   Array_Token_Statement_Matcher statement_matchers;
 } Scope;
 
+PRELUDE_NO_DISCARD Mass_Result
+assign(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *target,
+  Value *source
+);
+
 Scope *
 scope_make(
   const Allocator *allocator,

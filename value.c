@@ -605,7 +605,7 @@ operand_is_label(
 
 static inline bool
 operand_is_register_or_memory(
-  Operand *operand
+  const Operand *operand
 ) {
   return operand->tag == Operand_Tag_Register || operand->tag == Operand_Tag_Memory;
 }

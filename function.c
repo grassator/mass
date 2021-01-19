@@ -133,158 +133,146 @@ move_value(
   Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
-  Value *target,
-  Value *source
+  const Operand *target,
+  const Operand *source
 ) {
   Array_Instruction *instructions = &builder->code_block.instructions;
   if (target == source) return;
-  if (operand_equal(&target->operand, &source->operand)) return;
-  if (target->descriptor == &descriptor_void) return;
+  if (operand_equal(target, source)) return;
 
-  // FIXME remove these after refactoring using move_to_result_from_temp
-  if (target->descriptor->tag == Descriptor_Tag_Any) {
-    target->descriptor = source->descriptor;
-    assert(!target->next_overload);
-    target->next_overload = source->next_overload;
-  }
-  if (target->operand.tag == Operand_Tag_Any) {
-    target->operand = source->operand;
+  u32 target_size = target->byte_size;
+  u32 source_size = source->byte_size;
+
+  if (target->tag == Operand_Tag_Xmm || source->tag == Operand_Tag_Xmm) {
+    assert(target_size == source_size);
+    if (target_size == 4) {
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movss, {*target, *source, 0}}});
+    } else if (target_size == 8) {
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsd, {*target, *source, 0}}});
+    } else {
+      panic("Internal Error: XMM operand of unexpected size");
+    }
     return;
   }
 
-  u32 target_size = descriptor_byte_size(target->descriptor);
-  u32 source_size = descriptor_byte_size(source->descriptor);
-
-  if (descriptor_is_float(target->descriptor) || descriptor_is_float(source->descriptor)) {
-    assert(target_size == source_size);
-    assert(target->descriptor->tag == source->descriptor->tag);
-    if (
-      target->operand.tag == Operand_Tag_Xmm ||
-      source->operand.tag == Operand_Tag_Xmm
-    ) {
-      if (target_size == 4) {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {movss, {target->operand, source->operand, 0}}});
-      } else if (target_size == 8) {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsd, {target->operand, source->operand, 0}}});
-      } else {
-        panic("Internal Error: XMM operand of unexpected size");
-      }
-      return;
-    } else {
-      assert(target->operand.tag == Operand_Tag_Memory);
-      assert(source->operand.tag == Operand_Tag_Memory);
-      // Using xmm4 as it is volatile and not used in function arguments
-      Value *reg_xmm4 = value_register_for_descriptor(allocator, Register_Xmm4, target->descriptor);
-      move_value(allocator, builder, source_range, reg_xmm4, source);
-      move_value(allocator, builder, source_range, target, reg_xmm4);
-      return;
+  if (source->tag == Operand_Tag_Eflags) {
+    assert(operand_is_register_or_memory(target));
+    Operand temp = *target;
+    if (target->byte_size != 1) {
+      temp = (Operand) {
+        .tag = Operand_Tag_Register,
+        .byte_size = 1,
+        .Register.index = register_acquire_temp(builder),
+      };
     }
-  }
-
-  if (source->operand.tag == Operand_Tag_Eflags) {
-    assert(operand_is_register_or_memory(&target->operand));
-    Value *temp = target;
-    if (descriptor_byte_size(temp->descriptor) != 1) {
-      temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s8);
-    }
-    switch(source->operand.Eflags.compare_type) {
+    switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {sete, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {sete, {temp, *source}}});
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setne, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setne, {temp, *source}}});
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setb, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setb, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setbe, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setbe, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Above: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {seta, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {seta, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setae, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setae, {temp, *source}}});
         break;
       }
 
       case Compare_Type_Signed_Less: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setl, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setl, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setle, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setle, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Greater: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setg, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setg, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setge, {temp->operand, source->operand}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setge, {temp, *source}}});
         break;
       }
       default: {
         assert(!"Unsupported comparison");
       }
     }
-    if (temp != target) {
-      assert(temp->operand.tag == Operand_Tag_Register);
-      Operand resized_temp =
-        operand_register_for_descriptor(temp->operand.Register.index, target->descriptor);
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {resized_temp, temp->operand}}});
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, resized_temp}}});
-      register_release(builder, temp->operand.Register.index);
+    if (!operand_equal(&temp, target)) {
+      assert(temp.tag == Operand_Tag_Register);
+      Operand resized_temp = temp;
+      resized_temp.byte_size = target->byte_size;
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {resized_temp, temp}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, resized_temp}}});
+      register_release(builder, temp.Register.index);
     }
     return;
   }
 
-  if (source->operand.tag == Operand_Tag_Immediate) {
-    s64 immediate = operand_immediate_value_up_to_s64(&source->operand);
-    if (immediate == 0 && target->operand.tag == Operand_Tag_Register) {
+  if (source->tag == Operand_Tag_Immediate) {
+    s64 immediate = operand_immediate_value_up_to_s64(source);
+    if (immediate == 0 && target->tag == Operand_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {xor, {target->operand, target->operand}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {xor, {*target, *target}}});
       return;
     }
-    Value *adjusted_source = 0;
+    Operand adjusted_source;
     switch(target_size) {
       case 1: {
-        adjusted_source = value_from_s8(allocator, s64_to_s8(immediate));
+        adjusted_source = imm8(allocator, s64_to_s8(immediate));
         break;
       }
       case 2: {
-        adjusted_source = value_from_s16(allocator, s64_to_s16(immediate));
+        adjusted_source = imm16(allocator, s64_to_s16(immediate));
         break;
       }
       case 4: {
-        adjusted_source = value_from_s32(allocator, s64_to_s32(immediate));
+        adjusted_source = imm32(allocator, s64_to_s32(immediate));
         break;
       }
       case 8: {
+        // FIXME This does sign extension so will be broken for unsigned
         if (s64_fits_into_s32(immediate)) {
-          adjusted_source = value_from_s32(allocator, s64_to_s32(immediate));
+          adjusted_source = imm32(allocator, s64_to_s32(immediate));
         } else {
-          adjusted_source = value_from_s64(allocator, immediate);
+          adjusted_source = imm64(allocator, immediate);
         }
+        break;
+      }
+      default: {
+        panic("Unexpected integer size");
+        adjusted_source = (Operand){0};
         break;
       }
     }
     // Because of 15 byte instruction limit on x86 there is no way to move 64bit immediate
     // to a memory location. In which case we do a move through a temp register
-    bool is_64bit_immediate = descriptor_byte_size(adjusted_source->descriptor) == 8;
-    if (is_64bit_immediate && target->operand.tag != Operand_Tag_Register) {
-      Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp, adjusted_source->operand}}});
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, temp}}});
+    bool is_64bit_immediate = adjusted_source.byte_size == 8;
+    if (is_64bit_immediate && target->tag != Operand_Tag_Register) {
+      Operand temp = {
+        .tag = Operand_Tag_Register,
+        .byte_size = adjusted_source.byte_size,
+        .Register.index = register_acquire_temp(builder),
+      };
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp, adjusted_source}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, temp}}});
       register_release(builder, temp.Register.index);
     } else {
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, adjusted_source->operand}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, adjusted_source}}});
     }
     return;
   }
@@ -294,36 +282,40 @@ move_value(
   if (target_size != source_size) {
     if (source_size < target_size) {
       // TODO deal with unsigned numbers
-      if (target->operand.tag == Operand_Tag_Register) {
+      if (target->tag == Operand_Tag_Register) {
         if (source_size == 4) {
           // TODO check whether this correctly sign extends
           Operand adjusted_target = {
             .tag = Operand_Tag_Register,
-            .Register = target->operand.Register,
+            .Register = target->Register,
             .byte_size = 4,
           };
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {adjusted_target, source->operand}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {adjusted_target, *source}}});
         } else {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {target->operand, source->operand}}});
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {*target, *source}}});
         }
       } else {
-        Operand temp = operand_register_for_descriptor(register_acquire_temp(builder), target->descriptor);
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {temp, source->operand}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, temp}}});
+        Operand temp = {
+          .tag = Operand_Tag_Register,
+          .byte_size = target->byte_size,
+          .Register.index = register_acquire_temp(builder),
+        };
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {temp, *source}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, temp}}});
         register_release(builder, temp.Register.index);
       }
       return;
     } else {
-      print_operand(&target->operand);
+      print_operand(target);
       printf(" ");
-      print_operand(&source->operand);
+      print_operand(source);
       printf("\nat ");
       source_range_print_start_position(source_range);
       assert(!"Mismatched operand size when moving");
     }
   }
 
-  if (target->operand.tag == Operand_Tag_Memory && source->operand.tag == Operand_Tag_Memory) {
+  if (target->tag == Operand_Tag_Memory && source->tag == Operand_Tag_Memory) {
     if (target_size >= 16) {
       // TODO probably can use larger chunks for copying but need to check alignment
       Value *temp_rsi = value_register_for_descriptor(allocator, register_acquire_temp(builder), &descriptor_s64);
@@ -333,32 +325,37 @@ move_value(
         Value *reg_rsi = value_register_for_descriptor(allocator, Register_SI, &descriptor_s64);
         Value *reg_rdi = value_register_for_descriptor(allocator, Register_DI, &descriptor_s64);
         Value *reg_rcx = value_register_for_descriptor(allocator, Register_C, &descriptor_s64);
-        move_value(allocator, builder, source_range, temp_rsi, reg_rsi);
-        move_value(allocator, builder, source_range, temp_rdi, reg_rdi);
-        move_value(allocator, builder, source_range, temp_rcx, reg_rcx);
+        move_value(allocator, builder, source_range, &temp_rsi->operand, &reg_rsi->operand);
+        move_value(allocator, builder, source_range, &temp_rdi->operand, &reg_rdi->operand);
+        move_value(allocator, builder, source_range, &temp_rcx->operand, &reg_rcx->operand);
 
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rsi->operand, source->operand}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rdi->operand, target->operand}}});
-        move_value(allocator, builder, source_range, reg_rcx, value_from_s64(allocator, target_size));
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rsi->operand, *source}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rdi->operand, *target}}});
+        Operand size_operand = imm64(allocator, target_size);
+        move_value(allocator, builder, source_range, &reg_rcx->operand, &size_operand);
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {rep_movsb}});
 
-        move_value(allocator, builder, source_range, reg_rsi, temp_rsi);
-        move_value(allocator, builder, source_range, reg_rdi, temp_rdi);
-        move_value(allocator, builder, source_range, reg_rcx, temp_rcx);
+        move_value(allocator, builder, source_range, &reg_rsi->operand, &temp_rsi->operand);
+        move_value(allocator, builder, source_range, &reg_rdi->operand, &temp_rdi->operand);
+        move_value(allocator, builder, source_range, &reg_rcx->operand, &temp_rcx->operand);
       }
       register_release(builder, temp_rsi->operand.Register.index);
       register_release(builder, temp_rdi->operand.Register.index);
       register_release(builder, temp_rcx->operand.Register.index);
     } else {
-      Value *temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), target->descriptor);
-      move_value(allocator, builder, source_range, temp, source);
-      move_value(allocator, builder, source_range, target, temp);
-      register_release(builder, temp->operand.Register.index);
+      Operand temp = {
+        .tag = Operand_Tag_Register,
+        .byte_size = target->byte_size,
+        .Register.index = register_acquire_temp(builder),
+      };
+      move_value(allocator, builder, source_range, &temp, source);
+      move_value(allocator, builder, source_range, target, &temp);
+      register_release(builder, temp.Register.index);
     }
     return;
   }
 
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {target->operand, source->operand}}});
+  push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, *source}}});
 }
 
 void
@@ -381,7 +378,7 @@ move_to_result_from_temp(
   // Sometimes it is convenient to use result as temp in which case there
   // is no need for a move or a register release
   if (!operand_equal(&target->operand, &temp_source->operand)) {
-    move_value(allocator, builder, source_range, target, temp_source);
+    move_value(allocator, builder, source_range, &target->operand, &temp_source->operand);
     if (temp_source->operand.tag == Operand_Tag_Register) {
       register_release(builder, temp_source->operand.Register.index);
     }
@@ -746,26 +743,23 @@ typedef enum {
 } Arithmetic_Operation;
 
 
-#define maybe_constant_fold(_builder_, _loc_, _result_, _a_, _b_, _operator_)\
+#define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     Operand *a_operand = &(_a_)->operand;\
     Operand *b_operand = &(_b_)->operand;\
     if (a_operand->tag == Operand_Tag_Immediate && b_operand->tag == Operand_Tag_Immediate) {\
       s64 a_s64 = operand_immediate_value_up_to_s64(a_operand);\
       s64 b_s64 = operand_immediate_value_up_to_s64(b_operand);\
-      move_value(\
-        allocator, (_builder_), (_loc_), (_result_),\
-        value_from_signed_immediate(allocator, a_s64 _operator_ b_s64)\
-      );\
+      Value *imm_value = value_from_signed_immediate((_context_)->allocator, a_s64 _operator_ b_s64);\
+      assign((_context_), (_loc_), (_result_), imm_value);\
       return;\
     }\
   } while(0)
 
 void
 plus_or_minus(
-  Allocator *allocator,
+  Compilation_Context *context,
   Arithmetic_Operation operation,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -784,11 +778,11 @@ plus_or_minus(
 
   switch(operation) {
     case Arithmetic_Operation_Plus: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, +);
+      maybe_constant_fold(context, source_range, result_value, a, b, +);
       break;
     }
     case Arithmetic_Operation_Minus: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, -);
+      maybe_constant_fold(context, source_range, result_value, a, b, -);
       break;
     }
   }
@@ -798,14 +792,16 @@ plus_or_minus(
   // There is no `add r/m64 imm64` so use a temp register
   Value *temp_immediate = 0;
   if (a->operand.tag == Operand_Tag_Immediate && a->operand.byte_size == 8) {
-    temp_immediate =
-        value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
-    move_value(allocator, builder, source_range, temp_immediate, a);
+    temp_immediate = value_register_for_descriptor(
+      context->allocator, register_acquire_temp(context->builder), a->descriptor
+    );
+    move_value(context->allocator, context->builder, source_range, &temp_immediate->operand, &a->operand);
     a = temp_immediate;
   } else if (b->operand.tag == Operand_Tag_Immediate && b->operand.byte_size == 8) {
-    temp_immediate =
-        value_register_for_descriptor(allocator, register_acquire_temp(builder), b->descriptor);
-    move_value(allocator, builder, source_range, temp_immediate, b);
+    temp_immediate = value_register_for_descriptor(
+      context->allocator, register_acquire_temp(context->builder), b->descriptor
+    );
+    move_value(context->allocator, context->builder, source_range, &temp_immediate->operand, &b->operand);
     b = temp_immediate;
   }
 
@@ -815,15 +811,17 @@ plus_or_minus(
 
   if (a_size != b_size) {
     if (a_size > b_size) {
-      Value *b_sized_to_a =
-        value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
-      move_value(allocator, builder, source_range, b_sized_to_a, b);
+      Value *b_sized_to_a = value_register_for_descriptor(
+        context->allocator, register_acquire_temp(context->builder), a->descriptor
+      );
+      move_value(context->allocator, context->builder, source_range, &b_sized_to_a->operand, &b->operand);
       b = b_sized_to_a;
       maybe_a_or_b_temp = b;
     } else {
-      Value *a_sized_to_b =
-        value_register_for_descriptor(allocator, register_acquire_temp(builder), b->descriptor);
-      move_value(allocator, builder, source_range, a_sized_to_b, b);
+      Value *a_sized_to_b = value_register_for_descriptor(
+        context->allocator, register_acquire_temp(context->builder), b->descriptor
+      );
+      move_value(context->allocator, context->builder, source_range, &a_sized_to_b->operand, &b->operand);
       a = a_sized_to_b;
       maybe_a_or_b_temp = a;
     }
@@ -856,62 +854,63 @@ plus_or_minus(
   } else if (maybe_a_or_b_temp == a) {
     temp = a;
   } else {
-    temp = value_register_for_descriptor(allocator, register_acquire_temp(builder), a->descriptor);
+    temp = value_register_for_descriptor(
+      context->allocator, register_acquire_temp(context->builder), a->descriptor
+    );
   }
 
-  move_value(allocator, builder, source_range, temp, a);
+  move_value(context->allocator, context->builder, source_range, &temp->operand, &a->operand);
   push_instruction(
-    &builder->code_block.instructions,
+    &context->builder->code_block.instructions,
     *source_range,
     (Instruction) {.assembly = {mnemonic, {temp->operand, b->operand}}}
   );
   if (temp != result_value) {
     assert(temp->operand.tag == Operand_Tag_Register);
-    move_to_result_from_temp(allocator, builder, source_range, result_value, temp);
+    move_to_result_from_temp(context->allocator, context->builder, source_range, result_value, temp);
   }
   if (temp_immediate) {
-    register_release(builder, temp_immediate->operand.Register.index);
+    register_release(context->builder, temp_immediate->operand.Register.index);
   }
 }
 
 void
 plus(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(allocator, Arithmetic_Operation_Plus, builder, source_range, result_value, a, b);
+  plus_or_minus(context, Arithmetic_Operation_Plus, source_range, result_value, a, b);
 }
 
 void
 minus(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  plus_or_minus(allocator, Arithmetic_Operation_Minus, builder, source_range, result_value, a, b);
+  plus_or_minus(context, Arithmetic_Operation_Minus, source_range, result_value, a, b);
 }
 
 void
 multiply(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *x,
   Value *y
 ) {
+  Allocator *allocator = context->allocator;
+  Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type(x, y));
   assert(descriptor_is_integer(x->descriptor));
 
-  maybe_constant_fold(builder, source_range, result_value, x, y, *);
+  maybe_constant_fold(context, source_range, result_value, x, y, *);
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
@@ -919,11 +918,11 @@ multiply(
 
   Register temp_register_index = register_acquire_temp(builder);
   Value *temp_register = value_register_for_descriptor(allocator, temp_register_index, y->descriptor);
-  move_value(allocator, builder, source_range, temp_register, y);
-  move_value(allocator, builder, source_range, y_temp, temp_register);
+  move_value(allocator, builder, source_range, &temp_register->operand, &y->operand);
+  move_value(allocator, builder, source_range, &y_temp->operand, &temp_register->operand);
 
   temp_register = value_register_for_descriptor(allocator, temp_register_index, x->descriptor);
-  move_value(allocator, builder, source_range, temp_register, x);
+  move_value(allocator, builder, source_range, &temp_register->operand, &x->operand);
 
   push_instruction(
     instructions, *source_range,
@@ -940,25 +939,26 @@ typedef enum {
 
 void
 divide_or_remainder(
-  Allocator *allocator,
+  Compilation_Context *context,
   Divide_Operation operation,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
+  Allocator *allocator = context->allocator;
+  Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
   assert(descriptor_is_integer(a->descriptor));
 
   switch(operation) {
     case Divide_Operation_Divide: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, /);
+      maybe_constant_fold(context, source_range, result_value, a, b, /);
       break;
     }
     case Divide_Operation_Remainder: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, %);
+      maybe_constant_fold(context, source_range, result_value, a, b, %);
       break;
     }
   }
@@ -975,11 +975,11 @@ divide_or_remainder(
 
   // TODO deal with signed / unsigned
   Value *divisor = reserve_stack(allocator, builder, larger_descriptor);
-  move_value(allocator, builder, source_range, divisor, b);
+  move_value(allocator, builder, source_range, &divisor->operand, &b->operand);
 
   Value *reg_a = value_register_for_descriptor(allocator, Register_A, larger_descriptor);
   {
-    move_value(allocator, builder, source_range, reg_a, a);
+    move_value(allocator, builder, source_range, &reg_a->operand, &a->operand);
 
     switch (descriptor_byte_size(larger_descriptor)) {
       case 8: {
@@ -1009,14 +1009,14 @@ divide_or_remainder(
   // FIXME division uses specific registers so if the result_value operand is `any`
   //       we need to create a new temporary value and "return" that
   if (operation == Divide_Operation_Divide) {
-    move_value(allocator, builder, source_range, result_value, reg_a);
+    move_value(allocator, builder, source_range, &result_value->operand, &reg_a->operand);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
       Value *temp_result = value_register_for_descriptor(allocator, Register_AH, larger_descriptor);
-      move_value(allocator, builder, source_range, result_value, temp_result);
+      move_value(allocator, builder, source_range, &result_value->operand, &temp_result->operand);
     } else {
       Value *temp_result = value_register_for_descriptor(allocator, Register_D, larger_descriptor);
-      move_value(allocator, builder, source_range, result_value, temp_result);
+      move_value(allocator, builder, source_range, &result_value->operand, &temp_result->operand);
     }
   }
 
@@ -1025,84 +1025,83 @@ divide_or_remainder(
 
 void
 divide(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  divide_or_remainder(allocator, Divide_Operation_Divide, builder, source_range, result_value, a, b);
+  divide_or_remainder(context, Divide_Operation_Divide, source_range, result_value, a, b);
 }
 
 void
 value_remainder(
-  Allocator *allocator,
-  Function_Builder *builder,
+  Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
-  divide_or_remainder(allocator, Divide_Operation_Remainder, builder, source_range, result_value, a, b);
+  divide_or_remainder(context, Divide_Operation_Remainder, source_range, result_value, a, b);
 }
 
 
 void
 compare(
-  Allocator *allocator,
+  Compilation_Context *context,
   Compare_Type operation,
-  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
   Value *b
 ) {
+  Allocator *allocator = context->allocator;
+  Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(descriptor_is_integer(a->descriptor));
   assert(same_value_type_or_can_implicitly_move_cast(a, b));
 
   switch(operation) {
     case Compare_Type_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, ==);
+      maybe_constant_fold(context, source_range, result_value, a, b, ==);
       break;
     }
     case Compare_Type_Not_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, !=);
+      maybe_constant_fold(context, source_range, result_value, a, b, !=);
       break;
     }
 
     case Compare_Type_Unsigned_Below: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, <);
+      maybe_constant_fold(context, source_range, result_value, a, b, <);
       break;
     }
     case Compare_Type_Unsigned_Below_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, <=);
+      maybe_constant_fold(context, source_range, result_value, a, b, <=);
       break;
     }
     case Compare_Type_Unsigned_Above: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, >);
+      maybe_constant_fold(context, source_range, result_value, a, b, >);
       break;
     }
     case Compare_Type_Unsigned_Above_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, >=);
+      maybe_constant_fold(context, source_range, result_value, a, b, >=);
       break;
     }
 
     case Compare_Type_Signed_Less: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, <);
+      maybe_constant_fold(context, source_range, result_value, a, b, <);
       break;
     }
     case Compare_Type_Signed_Less_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, <=);
+      maybe_constant_fold(context, source_range, result_value, a, b, <=);
       break;
     }
     case Compare_Type_Signed_Greater: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, >);
+      maybe_constant_fold(context, source_range, result_value, a, b, >);
       break;
     }
     case Compare_Type_Signed_Greater_Equal: {
-      maybe_constant_fold(builder, source_range, result_value, a, b, >=);
+      maybe_constant_fold(context, source_range, result_value, a, b, >=);
       break;
     }
     default: {
@@ -1116,16 +1115,16 @@ compare(
     : b->descriptor;
 
   Value *temp_b = reserve_stack(allocator, builder, larger_descriptor);
-  move_value(allocator, builder, source_range, temp_b, b);
+  move_value(allocator, builder, source_range, &temp_b->operand, &b->operand);
 
   Value *reg_r11 = value_register_for_descriptor(allocator, Register_R11, larger_descriptor);
-  move_value(allocator, builder, source_range, reg_r11, a);
+  move_value(allocator, builder, source_range, &reg_r11->operand, &a->operand);
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {cmp, {reg_r11->operand, temp_b->operand, 0}}});
 
   // FIXME if the result_value operand is any we should create a temp value
   Value *comparison_value = value_from_compare(allocator, operation);
-  move_value(allocator, builder, source_range, result_value, comparison_value);
+  assign(context, source_range, result_value, comparison_value);
 }
 
 void
@@ -1310,7 +1309,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
     Value *target_arg = function_argument_value_at_index(context->allocator, descriptor, i);
-    move_value(context->allocator, builder, source_range, target_arg, source_arg);
+    move_value(context->allocator, builder, source_range, &target_arg->operand, &source_arg->operand);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -1344,15 +1343,15 @@ call_function_overload(
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
       saved_result = reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
-      move_value(context->allocator, builder, source_range, saved_result, &fn_return_value);
+      move_value(context->allocator, builder, source_range, &saved_result->operand, &fn_return_value.operand);
     }
   }
 
-  move_value(context->allocator, builder, source_range, result_value, saved_result);
+  assign(context, source_range, result_value, saved_result);
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
-    move_value(context->allocator, builder, source_range, &reg->saved, reg->stack_value);
+    move_value(context->allocator, builder, source_range, &reg->saved.operand, &reg->stack_value->operand);
     // TODO :FreeStackAllocation
   }
 }
@@ -1425,7 +1424,7 @@ make_and(
 
   Label_Index else_label = make_if(context, instructions, source_range, a);
   {
-    compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
+    compare(context, Compare_Type_Not_Equal, source_range, result, b, &zero);
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {code_label32(label)}}});
   }
   push_instruction(instructions, *source_range, (Instruction) {
@@ -1433,7 +1432,7 @@ make_and(
     .label = else_label,
   });
 
-  move_value(context->allocator, builder, source_range, result, &zero);
+  move_value(context->allocator, builder, source_range, &result->operand, &zero.operand);
   push_instruction(instructions, *source_range, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label,
@@ -1459,10 +1458,10 @@ make_or(
     .operand = imm8(context->allocator, 0),
   };
 
-  compare(context->allocator, Compare_Type_Equal, builder, source_range, result, a, &zero);
+  compare(context, Compare_Type_Equal, source_range, result, a, &zero);
   Label_Index else_label = make_if(context, instructions, source_range, result);
   {
-    compare(context->allocator, Compare_Type_Not_Equal, builder, source_range, result, b, &zero);
+    compare(context, Compare_Type_Not_Equal, source_range, result, b, &zero);
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {jmp, {code_label32(label)}}});
   }
   push_instruction(instructions, *source_range, (Instruction) {
@@ -1470,11 +1469,8 @@ make_or(
     .label = else_label,
   });
 
-  Value one = {
-    .descriptor = &descriptor_s8,
-    .operand = imm8(context->allocator, 1),
-  };
-  move_value(context->allocator, builder, source_range, result, &one);
+  Operand one = imm8(context->allocator, 1);
+  move_value(context->allocator, builder, source_range, &result->operand, &one);
   push_instruction(instructions, *source_range, (Instruction) {
     .type = Instruction_Type_Label,
     .label = label,
@@ -1506,10 +1502,5 @@ ensure_memory(
   };
   return result;
 }
-
-
-
-
-
 
 

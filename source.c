@@ -168,13 +168,16 @@ assign(
     return *context->result;
   }
   if (target->descriptor->tag == Descriptor_Tag_Any) {
-    move_value(context->allocator, context->builder, source_range, target, source);
+    assert(target->operand.tag == Operand_Tag_Any);
+    target->descriptor = source->descriptor;
+    target->operand = source->operand;
+    target->next_overload = source->next_overload;
     return *context->result;
   }
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
   if (same_value_type_or_can_implicitly_move_cast(target, source)) {
-    move_value(context->allocator, context->builder, source_range, target, source);
+    move_value(context->allocator, context->builder, source_range, &target->operand, &source->operand);
     return *context->result;
   }
   // TODO elaborate the error
@@ -2937,7 +2940,7 @@ extend_integer_value(
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
   Value *result = reserve_stack(context->allocator, context->builder, target_descriptor);
-  move_value(context->allocator, context->builder, source_range, result, value);
+  move_value(context->allocator, context->builder, source_range, &result->operand, &value->operand);
   return result;
 }
 
@@ -3166,14 +3169,13 @@ token_eval_operator(
         context->allocator,
         context->builder,
         &target_token->source_range,
-        new_base_register,
-        index_value
+        &new_base_register->operand,
+        &index_value->operand
       );
 
       // Multiply index by the item byte size
       multiply(
-        context->allocator,
-        context->builder,
+        context,
         &target_token->source_range,
         new_base_register,
         new_base_register,
@@ -3195,8 +3197,7 @@ token_eval_operator(
         load_address(context, &target_token->source_range, &temp_value, array);
 
         plus(
-          context->allocator,
-          context->builder,
+          context,
           &target_token->source_range,
           new_base_register,
           new_base_register,
@@ -3313,15 +3314,15 @@ token_eval_operator(
 
     Value *stack_result = reserve_stack(context->allocator, builder, lhs_value->descriptor);
     if (slice_equal(operator, slice_literal("+"))) {
-      plus(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      plus(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
-      minus(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      minus(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("*"))) {
-      multiply(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      multiply(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("/"))) {
-      divide(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      divide(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("%"))) {
-      value_remainder(context->allocator, builder, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      value_remainder(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
     } else {
       panic("Internal error: Unexpected operator");
     }
@@ -3407,10 +3408,7 @@ token_eval_operator(
       }
     }
 
-    compare(
-      context->allocator, compare_type, context->builder,
-      &lhs->source_range, result_value, lhs_value, rhs_value
-    );
+    compare(context, compare_type, &lhs->source_range, result_value, lhs_value, rhs_value);
   } else if (slice_equal(operator, slice_literal("->"))) {
     const Token *arguments = token_view_get(args_view, 0);
     const Token *return_types = token_view_get(args_view, 1);

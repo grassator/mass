@@ -805,7 +805,7 @@ spec("source") {
       check(checker() == 21);
     }
 
-    it("should be able to parse and run macro with a literal s64 type") {
+    it("should be able to parse and run macro with a literal argument") {
       fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
         "test", &test_context,
         "broken_plus :: macro (x : u8, 0) -> (u8) { x + 1 }\n"
@@ -879,7 +879,8 @@ spec("source") {
     it("should be able to define and use a syntax macro with a capture") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
-        "syntax (\"negative\" .@x) (0 - x());"
+        // TODO figure out what should be the rule for subtracting unsigned integers
+        "syntax (\"negative\" .@x) (cast(s32, 0) - x());"
         "checker :: () -> (s32) { negative 42 }"
       );
       check(checker);
