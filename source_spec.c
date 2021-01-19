@@ -879,7 +879,7 @@ spec("source") {
     it("should be able to define and use a syntax macro with a capture") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
-        "syntax (\"negative\" .@x) (-x());"
+        "syntax (\"negative\" .@x) (0 - x());"
         "checker :: () -> (s32) { negative 42 }"
       );
       check(checker);
