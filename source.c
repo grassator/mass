@@ -1292,7 +1292,8 @@ token_match_argument(
       },
     };
   } else {
-    Value *value = token_parse_constant_expression(context, view);
+    Value *value = value_any(context->allocator);
+    compile_time_eval(context, view, value);
     arg = (Function_Argument) {
       .tag = Function_Argument_Tag_Exact,
       .Exact = {
@@ -1885,8 +1886,9 @@ token_process_bit_type_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Token_View args_view = { .tokens = &args, .length = 1 };
-  Value *bit_size_value = token_parse_constant_expression(context, args_view);
+  Token_View args_view = { .tokens = &args, .length = 1, .source_range = args->source_range };
+  Value *bit_size_value = value_any(context->allocator);
+  compile_time_eval(context, args_view, bit_size_value);
   if (!bit_size_value) {
     context_error_snprintf(context, args->source_range, "Could not parse bit type size");
     goto err;
