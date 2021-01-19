@@ -688,6 +688,33 @@ instruction_equal(
   return true;
 }
 
+Value *
+value_global_internal(
+  Compiler_Source_Location compiler_source_location,
+  Compilation_Context *context,
+  Descriptor *descriptor
+) {
+  Program *program = context_get_active_program(context);
+  u32 byte_size = descriptor_byte_size(descriptor);
+  u32 alignment = descriptor_alignment(descriptor);
+  void *allocation =
+    bucket_buffer_allocate_bytes(program->data_section.buffer, byte_size, alignment);
+  s64 offset_in_data_section =
+    bucket_buffer_pointer_to_offset(program->data_section.buffer, allocation);
+
+  Value *result = allocator_allocate(context->allocator, Value);
+  Label_Index label_index = make_label(program, &program->data_section);
+  Label *label = program_get_label(program, label_index);
+  label->offset_in_section = s64_to_u32(offset_in_data_section);
+
+  *result = (Value) {
+    .descriptor = descriptor,
+    .operand = data_label32(label_index, byte_size),
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+
 static inline Value *
 value_make_internal(
   Compiler_Source_Location compiler_source_location,
@@ -720,53 +747,9 @@ operand_eflags(
   COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, operand_eflags(_compare_type_)\
 )
 
-Value *
-value_global_internal(
-  Compiler_Source_Location compiler_source_location,
-  Compilation_Context *context,
-  Descriptor *descriptor
-) {
-  Program *program = context_get_active_program(context);
-  u32 byte_size = descriptor_byte_size(descriptor);
-  u32 alignment = descriptor_alignment(descriptor);
-  void *allocation =
-    bucket_buffer_allocate_bytes(program->data_section.buffer, byte_size, alignment);
-  s64 offset_in_data_section =
-    bucket_buffer_pointer_to_offset(program->data_section.buffer, allocation);
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  Label_Index label_index = make_label(program, &program->data_section);
-  Label *label = program_get_label(program, label_index);
-  label->offset_in_section = s64_to_u32(offset_in_data_section);
-
-  *result = (Value) {
-    .descriptor = descriptor,
-    .operand = data_label32(label_index, byte_size),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-
-Value *
-value_any_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
-  Descriptor *descriptor,
-  const Allocator *allocator
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .operand = {.tag = Operand_Tag_Any},
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-
-#define value_any_descriptor(...)\
-  value_any_descriptor_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
-
-#define value_any(...)\
-  value_any_descriptor_internal(COMPILER_SOURCE_LOCATION, &descriptor_any, ##__VA_ARGS__)
+#define value_any(_allocator_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_any, (Operand){.tag = Operand_Tag_Any}\
+)
 
 Value *
 value_from_s64_internal(
