@@ -1721,7 +1721,11 @@ token_parse_syntax_definition(
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
   if (!pattern_token) {
-    panic("TODO user error");
+    context_error_snprintf(
+      context, name->source_range,
+      "Syntax definition requires a parenthesized pattern definitions"
+    );
+    goto err;
   }
 
   Token_View replacement = token_view_rest(&view, peek_index);
