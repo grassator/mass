@@ -1029,13 +1029,14 @@ token_match_pattern(
   return view_index;
 }
 
-const Token *
+void
 token_apply_macro_syntax(
   Compilation_Context *context,
   Array_Token_View match,
-  Macro *macro
+  Macro *macro,
+  Value *result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   assert(macro->scope);
   Scope *expansion_scope = scope_make(context->allocator, macro->scope);
@@ -1109,19 +1110,26 @@ token_apply_macro_syntax(
   Compilation_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  Value *result_value = value_any(context->allocator);
   token_parse_expression(&body_context, macro->replacement, result_value);
+}
 
-  // FIXME provide a proper source_range
-  Token *result_token = allocator_allocate(context->allocator, Token);
-  *result_token = (Token){
-    .tag = Token_Tag_Value,
-    .source_range = {0},
-    .source = slice_literal(""),
-    .Value = { result_value },
-  };
-
-  return result_token;
+bool
+token_parse_macro_statement(
+  Compilation_Context *context,
+  Token_View token_view,
+  Value *result_value,
+  void *payload
+) {
+  assert(payload);
+  if (!token_view.length) return false;
+  Macro *macro = payload;
+  // TODO @Speed would be nice to not need this copy
+  Array_Token_View match = dyn_array_make(Array_Token_View);
+  u64 match_length = token_match_pattern(token_view, macro, &match);
+  if (match_length != token_view.length) return false;
+  token_apply_macro_syntax(context, match, macro, result_value);
+  dyn_array_destroy(match);
+  return true;
 }
 
 
@@ -1143,13 +1151,20 @@ token_parse_macros(
       start: for (;;) {
         Token_View token_view = token_view_from_token_array(*tokens, source_range);
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
-          if (macro->is_statement && i != 0) break;
           Token_View sub_view = token_view_rest(&token_view, i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
-          // There are tokens remaining in the statement after the match
-          if (macro->is_statement && match_length != token_view.length) break;
           if (match_length) {
-            const Token *replacement = token_apply_macro_syntax(context, match, macro);
+            Value *macro_result = value_any(context->allocator);
+            token_apply_macro_syntax(context, match, macro, macro_result);
+            Token_View matched_view = token_view_rest(&sub_view, match_length);
+            // FIXME provide a proper source_range
+            Token *replacement = allocator_allocate(context->allocator, Token);
+            *replacement = (Token){
+              .tag = Token_Tag_Value,
+              .source_range = matched_view.source_range,
+              .source = slice_literal(""),
+              .Value = { macro_result },
+            };
             dyn_array_splice_raw(*tokens, i, match_length, &replacement, 1);
             goto start;
           }
@@ -1832,16 +1847,26 @@ token_parse_syntax_definition(
       }
     }
   }
-
   Macro *macro = allocator_allocate(context->allocator, Macro);
   *macro = (Macro){
     .pattern = pattern,
     .replacement = replacement,
-    .is_statement = !!statement,
     .scope = context->scope,
   };
+  if (statement) {
+    if (!dyn_array_is_initialized(context->scope->statement_matchers)) {
+      context->scope->statement_matchers =
+        dyn_array_make(Array_Token_Statement_Matcher, .allocator = context->allocator);
+    }
+    dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
+      .proc = token_parse_macro_statement,
+      .payload = macro,
+    });
+  } else {
 
-  scope_add_macro(context->scope, macro);
+    scope_add_macro(context->scope, macro);
+  }
+
 
   return true;
 
@@ -2736,6 +2761,7 @@ bool
 token_parse_constant_definitions(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3647,6 +3673,7 @@ bool
 token_parse_statement_label(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3722,6 +3749,7 @@ bool
 token_parse_statement_if(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3765,6 +3793,7 @@ bool
 token_parse_goto(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3846,6 +3875,7 @@ bool
 token_parse_explicit_return(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -3944,6 +3974,7 @@ bool
 token_parse_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4049,6 +4080,7 @@ bool
 token_parse_definitions(
   Compilation_Context *context,
   Token_View state,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4060,6 +4092,7 @@ bool
 token_parse_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4111,6 +4144,7 @@ bool
 token_parse_assignment(
   Compilation_Context *context,
   Token_View view,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4152,10 +4186,12 @@ token_parse_statement(
     if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
       continue;
     }
-    for (u64 i = 0 ; i < dyn_array_length(statement_matcher_scope->statement_matchers); ++i) {
-      Token_Statement_Matcher matcher =
-        *dyn_array_get(statement_matcher_scope->statement_matchers, i);
-      if (matcher.proc(context, view, matcher.payload)) {
+    Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
+    // Do reverse iteration because we want statements that are defined later
+    // to have higher precedence when parsing
+    for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
+      Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
+      if (matcher->proc(context, view, result_value, matcher->payload)) {
         return true;
       }
     }
@@ -4187,7 +4223,7 @@ token_parse(
     if (token_parse_operator_definition(context, statement)) {
       continue;
     }
-    if (token_parse_constant_definitions(context, statement, 0)) {
+    if (token_parse_constant_definitions(context, statement, &void_value, 0)) {
       continue;
     }
 
@@ -4339,15 +4375,16 @@ scope_define_builtins(
   {
     Array_Token_Statement_Matcher matchers =
       dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definitions});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_goto});
+
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_goto});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definitions});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
     scope->statement_matchers = matchers;
   }
 }
