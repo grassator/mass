@@ -1,4 +1,4 @@
-syntax (^ "while" ..@condition {}@body $) {
+syntax statement("while" ..@condition {}@body) {
   label _loop_start;
   if condition() {
     body();
@@ -7,7 +7,7 @@ syntax (^ "while" ..@condition {}@body $) {
   label _loop_end;
 }
 
-syntax (^ "for" ..@pre "," ..@condition "," ..@post {}@body $) {
+syntax statement("for" ..@pre "," ..@condition "," ..@post {}@body) {
   pre();
   label loop;
   if condition() {

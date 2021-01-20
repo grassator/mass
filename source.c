@@ -1026,10 +1026,6 @@ token_match_pattern(
     return 0;
   }
 
-  // There are tokens remaining in the statement after the match
-  if (macro->statement_end && view_index != view.length) {
-    return 0;
-  }
   return view_index;
 }
 
@@ -1147,9 +1143,11 @@ token_parse_macros(
       start: for (;;) {
         Token_View token_view = token_view_from_token_array(*tokens, source_range);
         for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
-          if (macro->statement_start && i != 0) break;
+          if (macro->is_statement && i != 0) break;
           Token_View sub_view = token_view_rest(&token_view, i);
           u64 match_length = token_match_pattern(sub_view, macro, &match);
+          // There are tokens remaining in the statement after the match
+          if (macro->is_statement && match_length != token_view.length) break;
           if (match_length) {
             const Token *replacement = token_apply_macro_syntax(context, match, macro);
             dyn_array_splice_raw(*tokens, i, match_length, &replacement, 1);
@@ -1718,6 +1716,7 @@ token_parse_syntax_definition(
 
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
+  Token_Maybe_Match(statement, .tag = Token_Tag_Id, .source = slice_literal("statement"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -1729,8 +1728,6 @@ token_parse_syntax_definition(
   Token_View definition = token_view_from_group_token(pattern_token);
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
-  bool statement_start = false;
-  bool statement_end = false;
 
   for (u64 i = 0; i < definition.length; ++i) {
     const Token *token = token_view_get(definition, i);
@@ -1814,24 +1811,6 @@ token_parse_syntax_definition(
               break;
             }
           }
-        } else if (slice_equal(token->source, slice_literal("^"))) {
-          if (i != 0) {
-            context_error_snprintf(
-              context, token->source_range,
-              "^ operator (statement start match) can only appear at the start of the pattern."
-            );
-            goto err;
-          }
-          statement_start = true;
-        } else if (slice_equal(token->source, slice_literal("$"))) {
-          if (i != definition.length - 1) {
-            context_error_snprintf(
-              context, token->source_range,
-              "$ operator (statement end match) can only appear at the end of the pattern."
-            );
-            goto err;
-          }
-          statement_end = true;
         } else {
           context_error_snprintf(
             context, token->source_range,
@@ -1858,8 +1837,7 @@ token_parse_syntax_definition(
   *macro = (Macro){
     .pattern = pattern,
     .replacement = replacement,
-    .statement_start = statement_start,
-    .statement_end = statement_end,
+    .is_statement = !!statement,
     .scope = scope,
   };
 

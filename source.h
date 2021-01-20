@@ -43,8 +43,7 @@ typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
 typedef struct {
   Array_Macro_Pattern pattern;
   Token_View replacement;
-  bool statement_start;
-  bool statement_end;
+  bool is_statement;
   Scope *scope;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;

@@ -867,7 +867,7 @@ spec("source") {
     it("should be able to define and use a syntax macro matching start and end of statement") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "checker", &test_context,
-        "syntax (^ \"foo\" $) 42;"
+        "syntax statement(\"foo\") 42;"
         "checker :: () -> (s64) { foo := 20; foo }"
       );
       check(checker);
@@ -877,7 +877,7 @@ spec("source") {
     it("should be able to define and use a syntax macro matching a curly brace block") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "checker", &test_context,
-        "syntax (^ \"block\" {}@body $) body();"
+        "syntax statement (\"block\" {}@body) body();"
         "checker :: () -> (s64) { block { 42 } }"
       );
       check(checker);
@@ -887,7 +887,7 @@ spec("source") {
     it("should be able to define and use a syntax macro matching a sequence at the end") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "checker", &test_context,
-        "syntax (^ \"comment\" ..@ignore $);"
+        "syntax statement (\"comment\" ..@ignore);"
         "checker :: () -> (s64) { x := 42; comment x = x + 1; x }"
       );
       check(checker);
@@ -937,34 +937,6 @@ spec("source") {
         "test :: () -> (s64) { ExitProcess(42) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-    }
-
-    it("should report an end of statement marker not at the start of a syntax definition") {
-      test_program_inline_source_base(
-        "dummy", &test_context,
-        "syntax (\"foo\" ^ .@_ );"
-        "dummy :: () -> () {}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("^ operator (statement start match) can only appear at the start of the pattern."),
-        error->message
-      ));
-    }
-
-    it("should report an end of statement marker not at the end of a syntax definition") {
-      test_program_inline_source_base(
-        "dummy", &test_context,
-        "syntax (\"foo\" $ .@_ );"
-        "dummy :: () -> () {}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("$ operator (statement end match) can only appear at the end of the pattern."),
-        error->message
-      ));
     }
 
     it("should be able to parse and run macro id function") {
