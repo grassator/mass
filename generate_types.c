@@ -42,15 +42,15 @@ typedef struct {
 typedef struct Type Type;
 
 typedef struct {
+  const char *type;
   const char *name;
-  Type *type;
 } Argument;
 
 typedef struct {
   const char *name;
+  const char *returns;
   Argument *arguments;
   uint64_t argument_count;
-  Type *returns;
 } Function;
 
 typedef enum {
@@ -97,7 +97,13 @@ print_c_type_forward_declaration(
       break;
     }
     case Type_Tag_Function: {
-      // Nothing to do
+      fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
+      for (uint64_t i = 0; i < type->function.argument_count; ++i) {
+        Argument *arg = &type->function.arguments[i];
+        if (i != 0) fprintf(file, ", ");
+        fprintf(file, "%s %s", arg->type, arg->name);
+      }
+      fprintf(file, ");\n");
       break;
     }
   }
@@ -180,7 +186,7 @@ print_c_type(
       break;
     }
     case Type_Tag_Function: {
-      assert(!"Not implemented");
+      // We only need a forward declaration so nothing to do here
       break;
     }
   }
@@ -242,6 +248,17 @@ add_common_fields_internal(
     .struct_ = struct_fields(_NAME_STRING_, __VA_ARGS__)\
   }
 
+#define type_function(_NAME_STRING_, _RETURNS_, ...)\
+  (Type){\
+    .tag = Type_Tag_Function,\
+    .function = {\
+      .name = (_NAME_STRING_),\
+      .returns = (_RETURNS_),\
+      .arguments = (__VA_ARGS__),\
+      .argument_count = countof(__VA_ARGS__),\
+    }\
+  }
+
 
 Type types[4096] = {0};
 uint32_t type_count = 0;
@@ -259,6 +276,72 @@ push_type(
 
 int
 main(void) {
+
+  push_type(type_struct("Source_Position", (Struct_Item[]){
+    { "u64", "line" },
+    { "u64", "column" },
+  }));
+
+  push_type(type_struct("Source_File", (Struct_Item[]){
+    { "Slice", "path" },
+    { "Slice", "text" },
+    { "Array_Range_u64", "line_ranges" },
+  }));
+
+  push_type(type_struct("Source_Range", (Struct_Item[]){
+    { "const Source_File *", "file" },
+    { "Range_u64", "offsets" },
+  }));
+
+  push_type(type_struct("Module", (Struct_Item[]){
+    { "Source_File", "source_file" },
+    { "Source_Range", "source_range" },
+    { "Scope *", "scope" },
+  }));
+
+  push_type(type_struct("Parse_Error", (Struct_Item[]){
+    { "Slice", "message" },
+    { "Source_Range", "source_range" },
+  }));
+
+  push_type(type_enum("Token_Group_Tag", (Enum_Item[]){
+    { "Paren", 1 },
+    { "Square", 2 },
+    { "Curly", 3 },
+  }));
+
+  push_type(add_common_fields(type_union("Token", (Struct[]){
+    struct_empty("None"),
+    struct_empty("Id"),
+    struct_empty("Operator"),
+    struct_fields("Value", (Struct_Item[]){
+      { "Value *", "value" },
+    }),
+    struct_fields("String", (Struct_Item[]){
+      { "Slice", "slice" },
+    }),
+    struct_fields("Group", (Struct_Item[]){
+      { "Token_Group_Tag", "tag" },
+      { "Array_Const_Token_Ptr", "children" },
+    }),
+  }), (Struct_Item[]){
+    { "Source_Range", "source_range" },
+    { "Slice", "source" },
+  }));
+
+  push_type(type_struct("Token_View", (Struct_Item[]){
+    { "const Token **", "tokens" },
+    { "u64", "length" },
+    { "Source_Range", "source_range" },
+  }));
+
+  push_type(type_struct("Token_Pattern", (Struct_Item[]){
+    { "Token_Tag", "tag" },
+    { "Token_Group_Tag", "group_tag" },
+    { "Slice", "source" },
+    { "const Token_Pattern *", "or" },
+  }));
+
   push_type(type_enum("Section_Permissions", (Enum_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },
@@ -406,6 +489,31 @@ main(void) {
     { "u32", "line_number" },
   }));
 
+  push_type(type_enum("Operator_Fixity", (Enum_Item[]){
+    { "Infix", 0 },
+    { "Prefix", 1 << 0 },
+    { "Postfix", 1 << 1 },
+  }));
+
+  push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){
+    struct_fields("Value", (Struct_Item[]){
+      { "Value *", "value" },
+    }),
+    struct_fields("Lazy_Expression", (Struct_Item[]){
+      { "Scope *", "scope" },
+      { "Token_View", "tokens" },
+    }),
+    struct_fields("Operator", (Struct_Item[]){
+      { "Operator_Fixity", "fixity" },
+      { "u64", "precedence" },
+      { "u64", "argument_count" },
+      { "Token_Handle_Operator_Proc", "handler" },
+      { "void *", "handler_payload" },
+    }),
+  }), (Struct_Item[]){
+    { "Scope_Entry *", "next_overload" },
+  }));
+
   push_type(type_struct("Value", (Struct_Item[]){
     { "Descriptor *", "descriptor" },
     { "Operand", "operand" },
@@ -467,76 +575,18 @@ main(void) {
     }),
   }));
 
-  push_type(type_struct("Source_Position", (Struct_Item[]){
-    { "u64", "line" },
-    { "u64", "column" },
-  }));
-
-  push_type(type_struct("Source_File", (Struct_Item[]){
-    { "Slice", "path" },
-    { "Slice", "text" },
-    { "Array_Range_u64", "line_ranges" },
-  }));
-
-  push_type(type_struct("Source_Range", (Struct_Item[]){
-    { "const Source_File *", "file" },
-    { "Range_u64", "offsets" },
-  }));
-
-  push_type(type_struct("Module", (Struct_Item[]){
-    { "Source_File", "source_file" },
-    { "Source_Range", "source_range" },
-    { "Scope *", "scope" },
-  }));
-
-  push_type(type_struct("Parse_Error", (Struct_Item[]){
-    { "Slice", "message" },
-    { "Source_Range", "source_range" },
-  }));
-
-  push_type(type_enum("Token_Group_Tag", (Enum_Item[]){
-    { "Paren", 1 },
-    { "Square", 2 },
-    { "Curly", 3 },
-  }));
-
-  push_type(add_common_fields(type_union("Token", (Struct[]){
-    struct_empty("None"),
-    struct_empty("Id"),
-    struct_empty("Operator"),
-    struct_fields("Value", (Struct_Item[]){
-      { "Value *", "value" },
-    }),
-    struct_fields("String", (Struct_Item[]){
-      { "Slice", "slice" },
-    }),
-    struct_fields("Group", (Struct_Item[]){
-      { "Token_Group_Tag", "tag" },
-      { "Array_Const_Token_Ptr", "children" },
-    }),
-  }), (Struct_Item[]){
-    { "Source_Range", "source_range" },
-    { "Slice", "source" },
-  }));
-
-  push_type(type_struct("Token_View", (Struct_Item[]){
-    { "const Token **", "tokens" },
-    { "u64", "length" },
-    { "Source_Range", "source_range" },
-  }));
-
-  push_type(type_struct("Token_Pattern", (Struct_Item[]){
-    { "Token_Tag", "tag" },
-    { "Token_Group_Tag", "group_tag" },
-    { "Slice", "source" },
-    { "const Token_Pattern *", "or" },
-  }));
-
   push_type(type_union("Mass_Result", (Struct[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
       { "Parse_Error", "details" },
     })
+  }));
+
+  push_type(type_function("Token_Handle_Operator_Proc", "void", (Argument[]){
+    { "Compilation_Context *", "context" },
+    { "Token_View", "view" },
+    { "Value *", "result_value" },
+    { "void *", "payload" },
   }));
 
   {
@@ -545,15 +595,17 @@ main(void) {
     FILE *file = fopen(filename, "w");
     if (!file) exit(1);
 
-    fprintf(file, "// Forward declarations\n\n");
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_c_type_forward_declaration(file, &types[i]);
-    }
     // Custom forward declarations
     {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
+      fprintf(file, "typedef struct Compilation_Context Compilation_Context;\n\n");
+    }
+
+    fprintf(file, "// Forward declarations\n\n");
+    for (uint32_t i = 0; i < type_count; ++i) {
+      print_c_type_forward_declaration(file, &types[i]);
     }
 
     fprintf(file, "\n// Type Definitions\n\n");

@@ -315,7 +315,7 @@ typedef struct Jit {
   void *platform_specific_payload;
 } Jit;
 
-typedef struct {
+typedef struct Compilation_Context {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Program *program;

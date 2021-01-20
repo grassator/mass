@@ -6,26 +6,6 @@
 #define MASS_RETURN_LABEL_NAME slice_literal("@return_label")
 #define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
 
-typedef enum {
-  Scope_Entry_Type_Value = 1,
-  Scope_Entry_Type_Lazy_Expression,
-  Scope_Entry_Type_Operator,
-} Scope_Entry_Type;
-
-typedef struct {
-  Token_View tokens;
-  Scope *scope;
-} Scope_Lazy_Expression;
-
-typedef void(*Token_Handle_Operator_Proc)
-(Compilation_Context *context, Token_View, Value *result_value, void *payload);
-
-typedef enum {
-  Operator_Fixity_Infix   = 1 << 0,
-  Operator_Fixity_Prefix  = 1 << 1,
-  Operator_Fixity_Postfix = 1 << 2,
-} Operator_Fixity;
-
 typedef struct {
   Operator_Fixity fixity;
   u8 argument_count;
@@ -33,25 +13,6 @@ typedef struct {
   const Token *body;
   Scope *scope;
 } User_Defined_Operator;
-
-typedef struct {
-  Operator_Fixity fixity;
-  u64 precedence;
-  u64 argument_count;
-  Token_Handle_Operator_Proc handler;
-  void *handler_payload;
-} Scope_Entry_Operator;
-
-typedef struct Scope_Entry Scope_Entry;
-typedef struct Scope_Entry {
-  Scope_Entry_Type type;
-  Scope_Entry *next_overload;
-  union {
-    Value *value;
-    Scope_Lazy_Expression lazy_expression;
-    Scope_Entry_Operator Operator;
-  };
-} Scope_Entry;
 
 hash_map_slice_template(Scope_Map, Scope_Entry *)
 hash_map_slice_template(Macro_Replacement_Map, Token_View)

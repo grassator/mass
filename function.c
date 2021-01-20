@@ -1211,8 +1211,8 @@ ensure_compiled_function_body(
       case Function_Argument_Tag_Any_Of_Type: {
         Value *arg_value = function_argument_value_at_index(context->allocator, function, index);
         scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = arg_value,
+          .tag = Scope_Entry_Tag_Value,
+          .Value.value = arg_value,
         });
         if (arg_value->operand.tag == Operand_Tag_Register) {
           register_bitset_set(
@@ -1233,8 +1233,8 @@ ensure_compiled_function_body(
   *return_value = function_return_value_for_descriptor(function->returns.descriptor);
 
   scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = return_value,
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = return_value,
   });
 
   Value *return_label_value = allocator_allocate(context->allocator, Value);
@@ -1243,8 +1243,8 @@ ensure_compiled_function_body(
     .operand = code_label32(builder.code_block.end_label),
   };
   scope_define(function->scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = return_label_value,
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = return_label_value,
   });
 
   // :ReturnTypeLargerThanRegister
@@ -1263,8 +1263,8 @@ ensure_compiled_function_body(
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
     scope_define(function->scope, function->returns.name, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = return_value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = return_value,
     });
   }
 

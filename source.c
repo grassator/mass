@@ -200,56 +200,30 @@ token_force_value(
   Value *result_value
 );
 
-typedef struct {
-  Scope *scope;
-  Slice name;
-  Scope_Entry *entry;
-  bool done;
-} Scope_Overload_Iterator;
-
-Scope_Entry *
-scope_lookup_overload(
-  Scope_Overload_Iterator *it
-) {
-  if (it->done) return 0;
-  for (; it->scope && !it->entry; it->scope = it->scope->parent) {
-    if (!it->scope->map) continue;
-    Scope_Entry **entry_pointer = hash_map_get(it->scope->map, it->name);
-    if (!entry_pointer) continue;
-    it->entry = *entry_pointer;
-  }
-  Scope_Entry *result = it->entry;
-  if (it->entry) {
-    it->entry = it->entry->next_overload;
-  }
-  it->done = !it->entry;
-  return result;
-}
-
 Value *
 scope_entry_force(
   Compilation_Context *context,
   Scope_Entry *entry
 ) {
-  switch(entry->type) {
-    case Scope_Entry_Type_Operator: {
+  switch(entry->tag) {
+    case Scope_Entry_Tag_Operator: {
       panic("Internal Error: Operators are not allowed in this context");
       return 0;
     }
-    case Scope_Entry_Type_Lazy_Expression: {
-      Scope_Lazy_Expression *expr = &entry->lazy_expression;
+    case Scope_Entry_Tag_Lazy_Expression: {
+      Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
       Compilation_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
       Value *result = token_parse_constant_expression(&lazy_context, expr->tokens);
       *entry = (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = result,
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = result,
         .next_overload = entry->next_overload,
       };
       return result;
     }
-    case Scope_Entry_Type_Value: {
-      return entry->value;
+    case Scope_Entry_Tag_Value: {
+      return entry->Value.value;
     }
   }
   panic("Internal Error: Unexpected scope entry type");
@@ -278,22 +252,22 @@ scope_lookup_force(
 
   // Force lazy entries
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
-    if (it->type == Scope_Entry_Type_Lazy_Expression) {
+    if (it->tag == Scope_Entry_Tag_Lazy_Expression) {
       scope_entry_force(context, it);
     }
   }
 
   Value *result = 0;
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
-    assert(it->type == Scope_Entry_Type_Value);
+    assert(it->tag == Scope_Entry_Tag_Value);
 
     if (!result) {
-      result = it->value;
+      result = it->Value.value;
     } else {
-      if (it->value->descriptor->tag != Descriptor_Tag_Function) {
+      if (it->Value.value->descriptor->tag != Descriptor_Tag_Function) {
         panic("Only functions support overloading");
       }
-      Value *overload = it->value;
+      Value *overload = it->Value.value;
       overload->next_overload = result;
       result = overload;
     }
@@ -1131,8 +1105,8 @@ token_apply_macro_syntax(
     };
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = result,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = result,
     });
   }
 
@@ -1467,8 +1441,8 @@ token_handle_user_defined_operator(
     Value *arg_value = value_any(context->allocator);
     token_force_value(context, token_view_get(args, i), arg_value);
     scope_define(body_scope, arg_name, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = arg_value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = arg_value,
     });
   }
 
@@ -1483,12 +1457,12 @@ token_handle_user_defined_operator(
       .operand = code_label32(fake_return_label_index),
     };
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = return_label_value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = return_label_value,
     });
     scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = result_value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = result_value,
     });
   }
 
@@ -1642,7 +1616,7 @@ token_parse_operator_definition(
   Scope_Entry *existing_scope_entry =
     scope_lookup(context->scope, operator_token->source);
   while (existing_scope_entry) {
-    if (existing_scope_entry->type != Scope_Entry_Type_Operator) {
+    if (existing_scope_entry->tag != Scope_Entry_Tag_Operator) {
       panic("Internal Error: Found an operator-like scope entry that is not an operator");
     }
     Scope_Entry_Operator *operator_entry = &existing_scope_entry->Operator;
@@ -1668,7 +1642,7 @@ token_parse_operator_definition(
   }
 
   scope_define(context->scope, operator_token->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = {
       .precedence = precendence,
       .argument_count = operator->argument_count,
@@ -1727,8 +1701,8 @@ token_parse_import_statement(
 
   // TODO consider making imports lazy
   scope_define(context->scope, name->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = module_value,
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = module_value,
   });
 
   return true;
@@ -2640,7 +2614,7 @@ token_handle_operator(
 
   Scope_Entry_Operator *operator_entry = 0;
   while (scope_entry) {
-    if (scope_entry->type != Scope_Entry_Type_Operator) {
+    if (scope_entry->tag != Scope_Entry_Tag_Operator) {
       context_error_snprintf(
         context, source_range,
         "%"PRIslice" is not an operator",
@@ -2732,7 +2706,7 @@ token_parse_constant_expression(
       }
       case Token_Tag_Id: {
         Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
-        if (scope_entry && scope_entry->type == Scope_Entry_Type_Operator) {
+        if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
           if (!token_handle_operator(
             context, view, token_dispatch_constant_operator,
             &token_stack, &operator_stack, token->source, token->source_range,
@@ -2801,8 +2775,8 @@ token_parse_constant_definitions(
   if (name->tag != Token_Tag_Id) return false;
 
   scope_define(context->scope, name->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Lazy_Expression,
-    .lazy_expression = {
+    .tag = Scope_Entry_Tag_Lazy_Expression,
+    .Lazy_Expression = {
       .tokens = rhs,
       .scope = context->scope,
     },
@@ -2911,8 +2885,8 @@ token_handle_function_call(
           case Function_Argument_Tag_Any_Of_Type: {
             Value *arg_value = *dyn_array_get(args, i);
             scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
-              .type = Scope_Entry_Type_Value,
-              .value = arg_value,
+              .tag = Scope_Entry_Tag_Value,
+              .Value.value = arg_value,
             });
             break;
           }
@@ -2925,15 +2899,15 @@ token_handle_function_call(
       Label_Index fake_return_label_index = make_label(program, &program->data_section);
       {
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = &(Value) {
+          .tag = Scope_Entry_Tag_Value,
+          .Value.value = &(Value) {
             .descriptor = &descriptor_void,
             .operand = code_label32(fake_return_label_index),
           },
         });
         scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-          .type = Scope_Entry_Type_Value,
-          .value = result_value,
+          .tag = Scope_Entry_Tag_Value,
+          .Value.value = result_value,
         });
       }
 
@@ -3736,8 +3710,8 @@ token_parse_statement_label(
     // the macros are not hygienic we can not do that yet
     //scope_define_value(function_scope, id->source, value);
     scope_define(context->scope, id->source, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = value,
     });
   }
 
@@ -3863,8 +3837,8 @@ token_parse_goto(
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
     scope_define(context->builder->function->scope, id->source, (Scope_Entry) {
-      .type = Scope_Entry_Type_Value,
-      .value = value,
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = value,
     });
   }
 
@@ -4087,8 +4061,8 @@ token_parse_definition(
   MASS_ON_ERROR(*context->result) return 0;
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
   scope_define(context->scope, name->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = value,
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = value,
   });
   return value;
 }
@@ -4149,8 +4123,8 @@ token_parse_definition_and_assignment_statements(
   }
 
   scope_define(context->scope, name->source, (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = on_stack,
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = on_stack,
   });
   return true;
 }
@@ -4257,32 +4231,32 @@ scope_define_builtins(
   Scope *scope
 ) {
   scope_define(scope, slice_literal("[]"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("()"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("->"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 3 }
   });
   scope_define(scope, slice_literal("macro"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
 
   scope_define(scope, slice_literal("-"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = {
       .precedence = 17,
       .handler = token_handle_negation,
@@ -4292,95 +4266,95 @@ scope_define_builtins(
   });
 
   scope_define(scope, slice_literal("&"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 16, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
   scope_define(scope, slice_literal("*"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("/"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("%"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
 
   scope_define(scope, slice_literal("+"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("-"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
 
 
   scope_define(scope, slice_literal("<"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal(">"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("<="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal(">="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
 
   scope_define(scope, slice_literal("=="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("!="), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
 
 
   scope_define(scope, slice_literal("&&"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 5, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
   scope_define(scope, slice_literal("||"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Operator,
+    .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 4, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
   });
 
 
   scope_define(scope, slice_literal("any"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_any_value
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_any_value
   });
 
   scope_define(scope, slice_literal("Register_8"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_8_value
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_register_8_value
   });
   scope_define(scope, slice_literal("Register_16"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_16_value
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_register_16_value
   });
   scope_define(scope, slice_literal("Register_32"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_32_value
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_register_32_value
   });
   scope_define(scope, slice_literal("Register_64"), (Scope_Entry) {
-    .type = Scope_Entry_Type_Value,
-    .value = type_register_64_value
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_register_64_value
   });
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
     scope_define(scope, slice_literal(#_NAME_), (Scope_Entry) {\
-      .type = Scope_Entry_Type_Value,\
-      .value = type_##_NAME_##_value\
+      .tag = Scope_Entry_Tag_Value,\
+      .Value.value = type_##_NAME_##_value\
     });
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE

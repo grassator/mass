@@ -111,40 +111,40 @@ spec("source") {
       Value *test = value_from_s64(test_context.allocator, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("test"), (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = test,
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = test,
       });
       Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
-      check(entry->type == Scope_Entry_Type_Value);
-      check(entry->value == test);
+      check(entry->tag == Scope_Entry_Tag_Value);
+      check(entry->Value.value == test);
     }
 
     it("should be able to lookup things from parent scopes") {
       Value *global = value_from_s64(test_context.allocator, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("global"), (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = global,
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = global,
       });
 
       Value *level_1_test = value_from_s64(test_context.allocator, 1);
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define(scope_level_1, slice_literal("test"), (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = level_1_test,
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = level_1_test,
       });
 
       Value *level_2_test = value_from_s64(test_context.allocator, 1);
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define(scope_level_2, slice_literal("test"),  (Scope_Entry) {
-        .type = Scope_Entry_Type_Value,
-        .value = level_2_test,
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = level_2_test,
       });
 
       Scope_Entry *entry =
         scope_lookup(scope_level_2, slice_literal("global"));
-      check(entry->type == Scope_Entry_Type_Value);
-      check(entry->value == global);
+      check(entry->tag == Scope_Entry_Tag_Value);
+      check(entry->Value.value == global);
     }
   }
 

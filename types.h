@@ -1,4 +1,46 @@
+typedef void(*fn_type_opaque)();
+
+typedef struct Scope Scope;
+
+typedef struct Function_Builder Function_Builder;
+
+typedef struct Compilation_Context Compilation_Context;
+
 // Forward declarations
+
+typedef struct Source_Position Source_Position;
+typedef dyn_array_type(Source_Position *) Array_Source_Position_Ptr;
+typedef dyn_array_type(const Source_Position *) Array_Const_Source_Position_Ptr;
+
+typedef struct Source_File Source_File;
+typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
+typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
+
+typedef struct Source_Range Source_Range;
+typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
+typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
+
+typedef struct Module Module;
+typedef dyn_array_type(Module *) Array_Module_Ptr;
+typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
+
+typedef struct Parse_Error Parse_Error;
+typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
+typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
+
+typedef enum Token_Group_Tag Token_Group_Tag;
+
+typedef struct Token Token;
+typedef dyn_array_type(Token *) Array_Token_Ptr;
+typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
+
+typedef struct Token_View Token_View;
+typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
+typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
+
+typedef struct Token_Pattern Token_Pattern;
+typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
+typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
 
 typedef enum Section_Permissions Section_Permissions;
 
@@ -46,6 +88,12 @@ typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
 
+typedef enum Operator_Fixity Operator_Fixity;
+
+typedef struct Scope_Entry Scope_Entry;
+typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
+typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
+
 typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
@@ -68,52 +116,98 @@ typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
-typedef struct Source_Position Source_Position;
-typedef dyn_array_type(Source_Position *) Array_Source_Position_Ptr;
-typedef dyn_array_type(const Source_Position *) Array_Const_Source_Position_Ptr;
-
-typedef struct Source_File Source_File;
-typedef dyn_array_type(Source_File *) Array_Source_File_Ptr;
-typedef dyn_array_type(const Source_File *) Array_Const_Source_File_Ptr;
-
-typedef struct Source_Range Source_Range;
-typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
-typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
-
-typedef struct Module Module;
-typedef dyn_array_type(Module *) Array_Module_Ptr;
-typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
-
-typedef struct Parse_Error Parse_Error;
-typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
-typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
-
-typedef enum Token_Group_Tag Token_Group_Tag;
-
-typedef struct Token Token;
-typedef dyn_array_type(Token *) Array_Token_Ptr;
-typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
-
-typedef struct Token_View Token_View;
-typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
-typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
-
-typedef struct Token_Pattern Token_Pattern;
-typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
-typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
-
 typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
-typedef void(*fn_type_opaque)();
-
-typedef struct Scope Scope;
-
-typedef struct Function_Builder Function_Builder;
+typedef void (*Token_Handle_Operator_Proc)
+  (Compilation_Context * context, Token_View view, Value * result_value, void * payload);
 
 
 // Type Definitions
+
+typedef struct Source_Position {
+  u64 line;
+  u64 column;
+} Source_Position;
+typedef dyn_array_type(Source_Position) Array_Source_Position;
+
+typedef struct Source_File {
+  Slice path;
+  Slice text;
+  Array_Range_u64 line_ranges;
+} Source_File;
+typedef dyn_array_type(Source_File) Array_Source_File;
+
+typedef struct Source_Range {
+  const Source_File * file;
+  Range_u64 offsets;
+} Source_Range;
+typedef dyn_array_type(Source_Range) Array_Source_Range;
+
+typedef struct Module {
+  Source_File source_file;
+  Source_Range source_range;
+  Scope * scope;
+} Module;
+typedef dyn_array_type(Module) Array_Module;
+
+typedef struct Parse_Error {
+  Slice message;
+  Source_Range source_range;
+} Parse_Error;
+typedef dyn_array_type(Parse_Error) Array_Parse_Error;
+
+typedef enum Token_Group_Tag {
+  Token_Group_Tag_Paren = 1,
+  Token_Group_Tag_Square = 2,
+  Token_Group_Tag_Curly = 3,
+} Token_Group_Tag;
+
+typedef enum {
+  Token_Tag_None = 0,
+  Token_Tag_Id = 1,
+  Token_Tag_Operator = 2,
+  Token_Tag_Value = 3,
+  Token_Tag_String = 4,
+  Token_Tag_Group = 5,
+} Token_Tag;
+
+typedef struct {
+  Value * value;
+} Token_Value;
+typedef struct {
+  Slice slice;
+} Token_String;
+typedef struct {
+  Token_Group_Tag tag;
+  Array_Const_Token_Ptr children;
+} Token_Group;
+typedef struct Token {
+  Token_Tag tag;
+  Source_Range source_range;
+  Slice source;
+  union {
+    Token_Value Value;
+    Token_String String;
+    Token_Group Group;
+  };
+} Token;
+typedef dyn_array_type(Token) Array_Token;
+typedef struct Token_View {
+  const Token ** tokens;
+  u64 length;
+  Source_Range source_range;
+} Token_View;
+typedef dyn_array_type(Token_View) Array_Token_View;
+
+typedef struct Token_Pattern {
+  Token_Tag tag;
+  Token_Group_Tag group_tag;
+  Slice source;
+  const Token_Pattern * or;
+} Token_Pattern;
+typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
@@ -283,6 +377,42 @@ typedef struct Compiler_Source_Location {
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
+typedef enum Operator_Fixity {
+  Operator_Fixity_Infix = 0,
+  Operator_Fixity_Prefix = 1,
+  Operator_Fixity_Postfix = 2,
+} Operator_Fixity;
+
+typedef enum {
+  Scope_Entry_Tag_Value = 0,
+  Scope_Entry_Tag_Lazy_Expression = 1,
+  Scope_Entry_Tag_Operator = 2,
+} Scope_Entry_Tag;
+
+typedef struct {
+  Value * value;
+} Scope_Entry_Value;
+typedef struct {
+  Scope * scope;
+  Token_View tokens;
+} Scope_Entry_Lazy_Expression;
+typedef struct {
+  Operator_Fixity fixity;
+  u64 precedence;
+  u64 argument_count;
+  Token_Handle_Operator_Proc handler;
+  void * handler_payload;
+} Scope_Entry_Operator;
+typedef struct Scope_Entry {
+  Scope_Entry_Tag tag;
+  Scope_Entry * next_overload;
+  union {
+    Scope_Entry_Value Value;
+    Scope_Entry_Lazy_Expression Lazy_Expression;
+    Scope_Entry_Operator Operator;
+  };
+} Scope_Entry;
+typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 typedef struct Value {
   Descriptor * descriptor;
   Operand operand;
@@ -373,89 +503,6 @@ typedef struct Descriptor {
   };
 } Descriptor;
 typedef dyn_array_type(Descriptor) Array_Descriptor;
-typedef struct Source_Position {
-  u64 line;
-  u64 column;
-} Source_Position;
-typedef dyn_array_type(Source_Position) Array_Source_Position;
-
-typedef struct Source_File {
-  Slice path;
-  Slice text;
-  Array_Range_u64 line_ranges;
-} Source_File;
-typedef dyn_array_type(Source_File) Array_Source_File;
-
-typedef struct Source_Range {
-  const Source_File * file;
-  Range_u64 offsets;
-} Source_Range;
-typedef dyn_array_type(Source_Range) Array_Source_Range;
-
-typedef struct Module {
-  Source_File source_file;
-  Source_Range source_range;
-  Scope * scope;
-} Module;
-typedef dyn_array_type(Module) Array_Module;
-
-typedef struct Parse_Error {
-  Slice message;
-  Source_Range source_range;
-} Parse_Error;
-typedef dyn_array_type(Parse_Error) Array_Parse_Error;
-
-typedef enum Token_Group_Tag {
-  Token_Group_Tag_Paren = 1,
-  Token_Group_Tag_Square = 2,
-  Token_Group_Tag_Curly = 3,
-} Token_Group_Tag;
-
-typedef enum {
-  Token_Tag_None = 0,
-  Token_Tag_Id = 1,
-  Token_Tag_Operator = 2,
-  Token_Tag_Value = 3,
-  Token_Tag_String = 4,
-  Token_Tag_Group = 5,
-} Token_Tag;
-
-typedef struct {
-  Value * value;
-} Token_Value;
-typedef struct {
-  Slice slice;
-} Token_String;
-typedef struct {
-  Token_Group_Tag tag;
-  Array_Const_Token_Ptr children;
-} Token_Group;
-typedef struct Token {
-  Token_Tag tag;
-  Source_Range source_range;
-  Slice source;
-  union {
-    Token_Value Value;
-    Token_String String;
-    Token_Group Group;
-  };
-} Token;
-typedef dyn_array_type(Token) Array_Token;
-typedef struct Token_View {
-  const Token ** tokens;
-  u64 length;
-  Source_Range source_range;
-} Token_View;
-typedef dyn_array_type(Token_View) Array_Token_View;
-
-typedef struct Token_Pattern {
-  Token_Tag tag;
-  Token_Group_Tag group_tag;
-  Slice source;
-  const Token_Pattern * or;
-} Token_Pattern;
-typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
-
 typedef enum {
   Mass_Result_Tag_Success = 0,
   Mass_Result_Tag_Error = 1,
