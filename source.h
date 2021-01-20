@@ -223,6 +223,19 @@ token_parse_constant_definitions(
   void *unused_payload
 );
 
+Module *
+program_module_from_file(
+  Compilation_Context *context,
+  Slice file_path,
+  Scope *scope
+);
+
+Mass_Result
+program_import_module(
+  Compilation_Context *context,
+  Module *module
+);
+
 void
 program_push_error_from_bucket_buffer(
   Compilation_Context *context,

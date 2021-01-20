@@ -79,6 +79,11 @@ MASS_ERROR(Slice message, Source_Range source_range) {
 typedef struct Scope Scope;
 typedef struct Function_Builder Function_Builder;
 
+Descriptor descriptor_scope = {
+  .tag = Descriptor_Tag_Opaque,
+  .Opaque = { .bit_size = sizeof(Scope *) * 8 },
+};
+
 Descriptor descriptor_type = {
   .tag = Descriptor_Tag_Opaque,
   .Opaque = { .bit_size = sizeof(Descriptor) * 8 },

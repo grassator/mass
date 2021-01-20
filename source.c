@@ -1695,6 +1695,55 @@ token_parse_operator_definition(
 }
 
 bool
+token_parse_import_statement(
+  Compilation_Context *context,
+  Token_View view,
+  // TODO do I need a scope argument here?
+  Scope *scope
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  // import "foo" as foo
+  u64 peek_index = 0;
+  Token_Match(import_keywors, .tag = Token_Tag_Id, .source = slice_literal("import"));
+  Token_Maybe_Match(file_path, .tag = Token_Tag_String);
+  Token_Maybe_Match(as_keyword, .tag = Token_Tag_Id, .source = slice_literal("as"));
+  Token_Maybe_Match(name, .tag = Token_Tag_Id);
+
+  if (!file_path || !as_keyword || !name) {
+    panic("TODO user error");
+  }
+
+  // TODO Probably want to cache the root scope somewhere
+  Scope *root_scope = context->scope;
+  while (root_scope->parent) root_scope = root_scope->parent;
+
+  Scope *module_scope = scope_make(context->allocator, root_scope);
+  Module *module = program_module_from_file(
+    context, file_path->String.slice, module_scope
+  );
+  program_import_module(context, module);
+
+  Value *module_value = value_make(
+    context->allocator,
+    &descriptor_scope,
+    (Operand){
+      .tag = Operand_Tag_Immediate,
+      .byte_size = sizeof(Scope *),
+      .Immediate.memory = module_scope,
+    }
+  );
+
+  // TODO consider making imports lazy
+  scope_define(context->scope, name->source, (Scope_Entry) {
+    .type = Scope_Entry_Type_Value,
+    .value = module_value,
+  });
+
+  return true;
+}
+
+bool
 token_parse_syntax_definition(
   Compilation_Context *context,
   Token_View view,
@@ -3266,7 +3315,22 @@ token_eval_operator(
     if (rhs->tag == Token_Tag_Id) {
       Value *struct_value = value_any(context->allocator);
       MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
-      struct_get_field(context, &rhs->source_range, struct_value, rhs->source, result_value);
+      if (struct_value->descriptor->tag == Descriptor_Tag_Struct) {
+        struct_get_field(context, &rhs->source_range, struct_value, rhs->source, result_value);
+      } else if (struct_value->descriptor == &descriptor_scope) {
+        assert(struct_value->operand.tag == Operand_Tag_Immediate);
+        Scope *module_scope = struct_value->operand.Immediate.memory;
+        Compilation_Context module_context = *context;
+        module_context.scope = module_scope;
+        module_context.builder = 0;
+        token_force_value(&module_context, rhs, result_value);
+      } else {
+        context_error_snprintf(
+          context, rhs->source_range,
+          "Left hand side of the . operator must be a struct"
+        );
+        return;
+      }
     } else {
       context_error_snprintf(
         context, rhs->source_range,
@@ -4175,6 +4239,9 @@ token_parse(
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
     if (token_parse_syntax_definition(context, statement, scope)) {
+      continue;
+    }
+    if (token_parse_import_statement(context, statement, 0)) {
       continue;
     }
     if (token_parse_operator_definition(context, statement, scope)) {

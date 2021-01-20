@@ -1194,6 +1194,20 @@ spec("source") {
     }
   }
 
+
+  describe("Modules") {
+    it("should support importing modules") {
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
+        // FIXME normalize slashes when importing
+        "import \"fixtures\\\\sample_module\" as sample_module\n"
+        "checker :: () -> (s32) { sample_module.the_answer }"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
+  }
+
   describe("PE32 Executables") {
     it("should parse and write out an executable that exits with status code 42") {
       Slice source = slice_literal(

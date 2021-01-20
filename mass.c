@@ -76,7 +76,7 @@ int main(s32 argc, char **argv) {
   Compilation_Context context;
   compilation_context_init(allocator_system, &context);
 
-  Scope *module_scope = context.scope;
+  Scope *module_scope = scope_make(context.allocator, context.scope);
   Module *prelude_module = program_module_from_file(
     &context, slice_literal("lib\\prelude"), module_scope
   );
