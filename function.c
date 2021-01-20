@@ -472,7 +472,7 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
-  assert(builder->value->descriptor->Function.returns.descriptor->tag != Descriptor_Tag_Any);
+  assert(builder->function->returns.descriptor->tag != Descriptor_Tag_Any);
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
@@ -515,21 +515,19 @@ fn_encode(
   Function_Layout *out_layout
 ) {
   // FIXME move to the callers and turn into an assert
-  if (builder->value->descriptor->Function.flags & Descriptor_Function_Flags_Macro) {
+  if (builder->function->flags & Descriptor_Function_Flags_Macro) {
     // We should not encode macro functions. And we might not even to be able to anyway
     // as some of them have Any arguments or returns
     return;
   }
   // Macro functions do not have own stack and do not need freezing
   assert(builder->frozen);
-  Operand *operand = &builder->value->operand;
-  assert(operand_is_label(operand));
 
   *out_layout = (Function_Layout) {
     .stack_reserve = builder->stack_reserve,
   };
 
-  Label_Index label_index = operand->Memory.location.Instruction_Pointer_Relative.label_index;
+  Label_Index label_index = builder->label_index;
 
   // TODO Maybe we can check if label is already resolved and stop here
   Label *label = program_get_label(program, label_index);
@@ -582,7 +580,7 @@ fn_encode(
   );
 
   // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->value->descriptor->Function.returns.descriptor) > 8) {
+  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
     // FIXME :RegisterAllocation
     //       make sure that return value is always available in RCX at this point
     encode_instruction_with_compiler_location(
@@ -1171,8 +1169,9 @@ ensure_compiled_function_body(
   Compilation_Context *context,
   Value *fn_value
 ) {
-  // If we already have an operand we assume that the body was compiled
+  // If the value already has the operand we assume it is compiled
   if (fn_value->operand.tag != Operand_Tag_None) return;
+
   assert(fn_value->descriptor->tag == Descriptor_Tag_Function);
   Descriptor_Function *function = &fn_value->descriptor->Function;
 
@@ -1181,10 +1180,22 @@ ensure_compiled_function_body(
   assert(function->body);
 
   Program *program = context->program;
-  fn_value->operand = code_label32(make_label(program, &program->code_section));
+  // FIXME @Speed switch this to a hash map lookup
+  // If we already built the function for the target program just set the operand
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    if (builder->function == function) {
+      fn_value->operand = code_label32(builder->label_index);
+      return;
+    }
+  }
+
+  Label_Index fn_label = make_label(program, &program->code_section);
+  fn_value->operand = code_label32(fn_label);
 
   Function_Builder builder = (Function_Builder){
-    .value = fn_value,
+    .function = function,
+    .label_index = fn_label,
     .code_block = {
       .end_label = make_label(program, &program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),

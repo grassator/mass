@@ -290,7 +290,8 @@ typedef struct Function_Builder {
   u64 used_register_bitset;
   Slice source;
 
-  Value *value;
+  Descriptor_Function *function;
+  Label_Index label_index;
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 

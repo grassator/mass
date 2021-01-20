@@ -72,7 +72,11 @@ test_program_inline_source_base(
 ) {
   test_init_module(slice_from_c_string(source));
   program_parse(context);
-  return scope_lookup_force(context, test_context.module->scope, slice_from_c_string(id));
+  Value *value = scope_lookup_force(context, test_context.module->scope, slice_from_c_string(id));
+  if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
+    ensure_compiled_function_body(context, value);
+  }
+  return value;
 }
 
 fn_type_opaque
@@ -391,12 +395,9 @@ spec("source") {
       );
       Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
-      Value *main = scope_lookup_force(
-        &test_context,
-        module->scope,
-        slice_literal("main")
-      );
+      Value *main = scope_lookup_force(&test_context, module->scope, slice_literal("main"));
       check(main);
+      ensure_compiled_function_body(&test_context, main);
 
       Jit jit;
       jit_init(&jit, test_context.program);
@@ -512,8 +513,10 @@ spec("source") {
 
       Value *checker_s64 =
         scope_lookup_force(&test_context, test_context.scope, slice_literal("checker_s64"));
-      Value *checker_32 =
+      ensure_compiled_function_body(&test_context, checker_s64);
+      Value *checker_s32 =
         scope_lookup_force(&test_context, test_context.scope, slice_literal("checker_s32"));
+      ensure_compiled_function_body(&test_context, checker_s32);
 
       Jit jit;
       jit_init(&jit, test_context.program);
@@ -525,7 +528,7 @@ spec("source") {
       }
 
       {
-        s64 size = ((fn_type_s32_to_s64)value_as_function(&jit, checker_32))(0);
+        s64 size = ((fn_type_s32_to_s64)value_as_function(&jit, checker_s32))(0);
         check(size == 4);
       }
     }
@@ -1223,6 +1226,7 @@ spec("source") {
       Program *test_program = test_context.program;
       test_program->entry_point =
         scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
+      ensure_compiled_function_body(&test_context, test_program->entry_point);
       check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
 
@@ -1237,6 +1241,7 @@ spec("source") {
       Program *test_program = test_context.program;
       test_program->entry_point =
         scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
+      ensure_compiled_function_body(&test_context, test_program->entry_point);
       check(test_program->entry_point);
       check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
@@ -1263,6 +1268,7 @@ spec("source") {
       Value *fizz_buzz = scope_lookup_force(
         &test_context, module_scope, slice_literal("fizz_buzz")
       );
+      ensure_compiled_function_body(&test_context, fizz_buzz);
       check(fizz_buzz);
 
       Jit jit;

@@ -93,13 +93,13 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_error(&result.Error.details);
   }
 
-  context.program->entry_point = scope_lookup_force(
-    &context, root_module->scope, slice_literal("main")
-  );
-  if (!context.program->entry_point) {
+  Value *main = scope_lookup_force(&context, root_module->scope, slice_literal("main"));
+  if (!main) {
     printf("Could not find entry point function `main`");
     return -1;
   }
+  context.program->entry_point = main;
+  ensure_compiled_function_body(&context, main);
   if(context.result->tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&context.result->Error.details);
   }

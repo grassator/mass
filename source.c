@@ -287,15 +287,6 @@ scope_lookup_force(
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
     assert(it->type == Scope_Entry_Type_Value);
 
-    // To support recursive functions without a hack like `self` we
-    // force the lazy value in two steps. First creates a valid Value
-    // the second one, here, actually processes function body
-    if (it->value && it->value->descriptor->tag == Descriptor_Tag_Function) {
-      // FIXME this should only happen on calls and for the entry / exported functions
-      //       but this breaks tests as we are calling from the "outside".
-      ensure_compiled_function_body(context, it->value);
-    }
-
     if (!result) {
       result = it->value;
     } else {
@@ -2182,13 +2173,11 @@ compile_time_eval(
       },
     },
   };
-  Value *eval_value = value_make(
-    context->allocator,
-    descriptor,
-    code_label32(make_label(jit->program, &jit->program->code_section))
-  );
+  Label_Index eval_label_index = make_label(jit->program, &jit->program->code_section);
+  Value *eval_value = value_make(context->allocator, descriptor, code_label32(eval_label_index));
   Function_Builder eval_builder = {
-    .value = eval_value,
+    .function = &descriptor->Function,
+    .label_index = eval_label_index,
     .code_block = {
       .end_label = make_label(jit->program, &jit->program->code_section),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
@@ -3730,7 +3719,7 @@ token_parse_statement_label(
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   // FIXME make sure we don't double declare label
-  Scope *function_scope = context->builder->value->descriptor->Function.scope;
+  Scope *function_scope = context->builder->function->scope;
   Scope_Entry *scope_entry = scope_lookup(function_scope, id->source);
   Value *value;
   if (scope_entry) {
@@ -3873,7 +3862,7 @@ token_parse_goto(
     };
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
-    scope_define(context->builder->value->descriptor->Function.scope, id->source, (Scope_Entry) {
+    scope_define(context->builder->function->scope, id->source, (Scope_Entry) {
       .type = Scope_Entry_Type_Value,
       .value = value,
     });
