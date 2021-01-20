@@ -1497,8 +1497,7 @@ operator_fixity_to_lowercase_slice(
 bool
 token_parse_operator_definition(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -1660,9 +1659,7 @@ token_parse_operator_definition(
 bool
 token_parse_import_statement(
   Compilation_Context *context,
-  Token_View view,
-  // TODO do I need a scope argument here?
-  Scope *scope
+  Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -1709,8 +1706,7 @@ token_parse_import_statement(
 bool
 token_parse_syntax_definition(
   Compilation_Context *context,
-  Token_View view,
-  Scope *scope
+  Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -1842,10 +1838,10 @@ token_parse_syntax_definition(
     .pattern = pattern,
     .replacement = replacement,
     .is_statement = !!statement,
-    .scope = scope,
+    .scope = context->scope,
   };
 
-  scope_add_macro(scope, macro);
+  scope_add_macro(context->scope, macro);
 
   return true;
 
@@ -4178,18 +4174,17 @@ token_parse(
   if (!view.length) return *context->result;
 
   Token_View_Split_Iterator it = { .view = view };
-  Scope *scope = context->scope;
   while (!it.done) {
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
-    if (token_parse_syntax_definition(context, statement, scope)) {
+    if (token_parse_syntax_definition(context, statement)) {
       continue;
     }
-    if (token_parse_import_statement(context, statement, 0)) {
+    if (token_parse_import_statement(context, statement)) {
       continue;
     }
-    if (token_parse_operator_definition(context, statement, scope)) {
+    if (token_parse_operator_definition(context, statement)) {
       continue;
     }
     if (token_parse_constant_definitions(context, statement, 0)) {
