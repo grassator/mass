@@ -340,7 +340,7 @@ spec("source") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "foo", &test_context,
         "foo :: () -> (result : s64) {"
-          "inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00)"
+          "inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00);"
           "result"
         "}"
       );
