@@ -164,6 +164,7 @@ assign(
   Value *target,
   Value *source
 ) {
+  MASS_TRY(*context->result);
   if (target->descriptor->tag == Descriptor_Tag_Void) {
     return *context->result;
   }
@@ -898,7 +899,8 @@ token_view_match_till_end_of_statement(
   for (; *peek_index < view.length; *peek_index += 1) {
     const Token *token = token_view_get(view, *peek_index);
     if (token->tag == Token_Tag_Operator && slice_equal(token->source, slice_literal(";"))) {
-      break;
+      *peek_index += 1;
+      return token_view_slice(&view, start_index, *peek_index - 1);
     }
   }
   return token_view_slice(&view, start_index, *peek_index);
@@ -980,11 +982,17 @@ token_force_type(
   return descriptor;
 }
 
+typedef enum {
+  Macro_Match_Mode_Expression,
+  Macro_Match_Mode_Statement
+} Macro_Match_Mode;
+
 u64
 token_match_pattern(
   Token_View view,
   Macro *macro,
-  Array_Token_View *out_match
+  Array_Token_View *out_match,
+  Macro_Match_Mode mode
 ) {
   u64 pattern_length = dyn_array_length(macro->pattern);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
@@ -1013,6 +1021,12 @@ token_match_pattern(
         assert(!peek || peek->tag == Macro_Pattern_Tag_Single_Token);
         for (; view_index < view.length; ++view_index) {
           const Token *token = token_view_get(view, view_index);
+          if (
+            !peek &&
+            mode == Macro_Match_Mode_Statement &&
+            token_match(token, &token_pattern_semicolon)) {
+            break;
+          }
           if (peek && token_match(token, &peek->Single_Token.token_pattern)) {
             break;
           }
@@ -1131,8 +1145,16 @@ token_parse_macro_statement(
   Macro *macro = payload;
   // TODO @Speed would be nice to not need this copy
   Array_Token_View match = dyn_array_make(Array_Token_View);
-  u64 match_length = token_match_pattern(token_view, macro, &match);
-  if (match_length != token_view.length) return 0;
+  u64 match_length = token_match_pattern(token_view, macro, &match, Macro_Match_Mode_Statement);
+  if (!match_length) return 0;
+  Token_View rest = token_view_rest(&token_view, match_length);
+  if (rest.length) {
+    if (token_match(token_view_get(rest, 0), &token_pattern_semicolon)) {
+      match_length += 1;
+    } else {
+      return 0;
+    }
+  }
   token_apply_macro_syntax(context, match, macro, result_value);
   dyn_array_destroy(match);
   return match_length;
@@ -1155,7 +1177,7 @@ token_parse_macros(
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
-      *match_length = token_match_pattern(token_view, macro, &match);
+      *match_length = token_match_pattern(token_view, macro, &match, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
 
       Value *macro_result = value_any(context->allocator);
@@ -3668,13 +3690,6 @@ token_parse_expression(
   return matched_length;
 }
 
-u64
-token_parse_statement(
-  Compilation_Context *context,
-  Token_View view,
-  Value *result_value
-);
-
 void
 token_parse_block_no_scope(
   Compilation_Context *context,
@@ -3691,15 +3706,55 @@ token_parse_block_no_scope(
     return;
   }
   Token_View children_view = token_view_from_group_token(block);
-  Token_View_Split_Iterator it = { .view = children_view };
 
-  while (!it.done) {
-    Token_View view = token_split_next(&it, &token_pattern_semicolon);
-    bool is_last_statement = it.done;
-    Value *result_value = is_last_statement ? block_result_value : &void_value;
-    token_parse_statement(context, view, result_value);
+  u64 match_length = 0;
+  Value last_result;
+  // FIXME deal with terminated vs unterminated statements
+  for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
+    MASS_ON_ERROR(*context->result) return;
+    last_result = (Value) {
+      .descriptor = &descriptor_any,
+      .operand = {.tag = Operand_Tag_Any},
+    };
+    Token_View rest = token_view_rest(&children_view, start_index);
+    // Skipping over empty statements
+    if (token_match(token_view_get(rest, 0), &token_pattern_semicolon)) {
+      match_length = 1;
+      continue;
+    }
+    for (
+      Scope *statement_matcher_scope = context->scope;
+      statement_matcher_scope;
+      statement_matcher_scope = statement_matcher_scope->parent
+    ) {
+      if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
+        continue;
+      }
+      Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
+      // Do a reverse iteration because we want statements that are defined later
+      // to have higher precedence when parsing
+      for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
+        Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
+        match_length = matcher->proc(context, rest, &last_result, matcher->payload);
+        if (match_length) goto check_match;
+      }
+    }
+    match_length = token_parse_expression(context, rest, &last_result, Expression_Parse_Mode_Statement);
+
+    check_match:
+    if (!match_length) {
+      const Token *token = token_view_get(rest, 0);
+      context_error_snprintf(
+        context, token->source_range,
+        "Can not parse statement. Unexpected token %"PRIslice".",
+        SLICE_EXPAND_PRINTF(token->source)
+      );
+      return;
+    }
   }
-  return;
+
+  // TODO This is not optimal as we might generate extra temp values
+  MASS_ON_ERROR(assign(context, &children_view.source_range, block_result_value, &last_result));
 }
 
 void
@@ -4123,13 +4178,15 @@ token_parse_definition(
 
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*context->result) goto err;
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = value,
   });
   MASS_ON_ERROR(assign(context, &define->source_range, result_value, value));
+
+  err:
   return peek_index;
 }
 
@@ -4232,38 +4289,6 @@ token_parse_assignment(
   token_parse_expression(context, rhs, target, Expression_Parse_Mode_Default);
 
   return statement_length;
-}
-
-u64
-token_parse_statement(
-  Compilation_Context *context,
-  Token_View view,
-  Value *result_value
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  for (
-    Scope *statement_matcher_scope = context->scope;
-    statement_matcher_scope;
-    statement_matcher_scope = statement_matcher_scope->parent
-  ) {
-    if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
-      continue;
-    }
-    Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
-    // Do reverse iteration because we want statements that are defined later
-    // to have higher precedence when parsing
-    for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
-      Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
-      if (matcher->proc(context, view, result_value, matcher->payload)) {
-        return true;
-      }
-    }
-  }
-
-  u64 match_length =
-    token_parse_expression(context, view, result_value, Expression_Parse_Mode_Statement);
-  return match_length;
 }
 
 PRELUDE_NO_DISCARD Mass_Result

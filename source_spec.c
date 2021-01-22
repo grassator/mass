@@ -548,7 +548,7 @@ spec("source") {
     it("should be able to have an explicit return") {
       fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: (x : s32) -> (s32) { return x }"
+        "checker :: (x : s32) -> (s32) { if x > 0 { return x }; 0 }"
       );
       check(checker);
       s32 actual = checker(42);
@@ -920,7 +920,7 @@ spec("source") {
             "sum = sum + x;"
             "x = x + (-1);"
           "};"
-          "return sum"
+          "sum"
         "}"
       );
       check(sum_up_to);

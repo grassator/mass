@@ -37,12 +37,11 @@ register_bitset_get(
 );
 
 #define MASS_ON_ERROR(...)\
-  for (\
-    Mass_Result _result = (__VA_ARGS__);\
-    _result.tag != Mass_Result_Tag_Success;\
-  )
+  if ((__VA_ARGS__).tag != Mass_Result_Tag_Success)
 
-#define MASS_TRY(...) MASS_ON_ERROR(__VA_ARGS__) return _result;
+
+#define MASS_TRY(...)\
+  for (Mass_Result _result = (__VA_ARGS__); _result.tag != Mass_Result_Tag_Success;) return _result;
 
 PRELUDE_NO_DISCARD static inline Mass_Result
 MASS_SUCCESS() {
