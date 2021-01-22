@@ -3633,7 +3633,6 @@ bool
 token_parse_statement(
   Compilation_Context *context,
   Token_View view,
-  const Source_Range *source_range,
   Value *result_value
 );
 
@@ -3659,7 +3658,7 @@ token_parse_block_no_scope(
     Token_View view = token_split_next(&it, &token_pattern_semicolon);
     bool is_last_statement = it.done;
     Value *result_value = is_last_statement ? block_result_value : &void_value;
-    token_parse_statement(context, view, &block->source_range, result_value);
+    token_parse_statement(context, view, result_value);
   }
   return;
 }
@@ -4176,7 +4175,6 @@ bool
 token_parse_statement(
   Compilation_Context *context,
   Token_View view,
-  const Source_Range *source_range,
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
