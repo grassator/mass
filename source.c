@@ -481,8 +481,7 @@ tokenize(
 
 #define do_push\
   do {\
-    current_token->source = \
-      slice_sub_range(file->text, current_token->source_range.offsets);\
+    current_token->source = source_from_source_range(&current_token->source_range);\
     dyn_array_push(parent->Group.children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
@@ -1133,47 +1132,41 @@ token_parse_macro_statement(
 }
 
 
-void
+const Token *
 token_parse_macros(
   Compilation_Context *context,
-  Array_Const_Token_Ptr *tokens,
-  const Source_Range *source_range,
-  Scope *scope
+  Token_View token_view,
+  u64 *match_length
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Array_Token_View match = dyn_array_make(Array_Token_View);
+  Token *replacement = 0;
+  Scope *scope = context->scope;
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
-      start: for (;;) {
-        Token_View token_view = token_view_from_token_array(*tokens, source_range);
-        for (u64 i = 0; i < dyn_array_length(*tokens); ++i) {
-          Token_View sub_view = token_view_rest(&token_view, i);
-          u64 match_length = token_match_pattern(sub_view, macro, &match);
-          if (match_length) {
-            Value *macro_result = value_any(context->allocator);
-            token_apply_macro_syntax(context, match, macro, macro_result);
-            Token_View matched_view = token_view_rest(&sub_view, match_length);
-            // FIXME provide a proper source_range
-            Token *replacement = allocator_allocate(context->allocator, Token);
-            *replacement = (Token){
-              .tag = Token_Tag_Value,
-              .source_range = matched_view.source_range,
-              .source = slice_literal(""),
-              .Value = { macro_result },
-            };
-            dyn_array_splice_raw(*tokens, i, match_length, &replacement, 1);
-            goto start;
-          }
-        }
-        break;
-      }
+      *match_length = token_match_pattern(token_view, macro, &match);
+      if (!*match_length) continue;
+
+      Value *macro_result = value_any(context->allocator);
+      token_apply_macro_syntax(context, match, macro, macro_result);
+      Token_View matched_view = token_view_rest(&token_view, *match_length);
+      replacement = allocator_allocate(context->allocator, Token);
+      *replacement = (Token){
+        .tag = Token_Tag_Value,
+        .source_range = matched_view.source_range,
+        .source = source_from_source_range(&matched_view.source_range),
+        .Value = { macro_result },
+      };
+      goto defer;
     }
   }
+  defer:
   dyn_array_destroy(match);
+  return replacement;
 }
 
 Descriptor *
@@ -3545,7 +3538,20 @@ token_parse_expression(
 
   bool is_previous_an_operator = true;
   for (u64 i = 0; i < view.length; ++i) {
+    // Try to match macros at the current position
+    u64 macro_match_length = 0;
+    Token_View rest = token_view_rest(&view, i);
+    const Token *macro_result = token_parse_macros(context, rest, &macro_match_length);
+    if (macro_match_length) {
+      assert(macro_result);
+      dyn_array_push(token_stack, macro_result);
+      // Skip over the matched slice
+      i += macro_match_length - 1;
+      continue;
+    }
+
     const Token *token = token_view_get(view, i);
+
     Operator_Fixity fixity_mask = is_previous_an_operator
       ? Operator_Fixity_Prefix
       : Operator_Fixity_Infix | Operator_Fixity_Postfix;
@@ -4183,10 +4189,6 @@ token_parse_statement(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Array_Const_Token_Ptr statement_tokens = token_array_from_view(allocator_system, view);
-  // TODO consider how this should work
-  token_parse_macros(context, &statement_tokens, source_range, context->scope);
-  view = token_view_from_token_array(statement_tokens, source_range);
   for (
     Scope *statement_matcher_scope = context->scope;
     statement_matcher_scope;
@@ -4207,7 +4209,6 @@ token_parse_statement(
   }
 
   bool result = token_parse_expression(context, view, result_value);
-  dyn_array_destroy(statement_tokens);
   return result;
 }
 
