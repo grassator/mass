@@ -466,6 +466,15 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to assign to a void value") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: () -> (s64) { () = 10; 42 }"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
+
     it("should be able to parse and run multiple function definitions") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "proxy", &test_context,
