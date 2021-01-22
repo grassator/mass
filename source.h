@@ -225,7 +225,7 @@ typedef struct {
     assert(context_error_snprintf_buffer_size >= 0); \
     context_error_snprintf_buffer_size += 1; \
     char *context_error_snprintf_buffer = allocator_allocate_array(\
-      (_CONTEXT_)->allocator, u8, context_error_snprintf_buffer_size\
+      (_CONTEXT_)->allocator, char, context_error_snprintf_buffer_size\
     );\
     assert(0 <= snprintf(context_error_snprintf_buffer, context_error_snprintf_buffer_size, ##__VA_ARGS__));\
     *(_CONTEXT_)->result = (Mass_Result) {\

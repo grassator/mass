@@ -749,7 +749,7 @@ typedef enum {
       s64 a_s64 = operand_immediate_value_up_to_s64(a_operand);\
       s64 b_s64 = operand_immediate_value_up_to_s64(b_operand);\
       Value *imm_value = value_from_signed_immediate((_context_)->allocator, a_s64 _operator_ b_s64);\
-      assign((_context_), (_loc_), (_result_), imm_value);\
+      MASS_ON_ERROR(assign((_context_), (_loc_), (_result_), imm_value));\
       return;\
     }\
   } while(0)
@@ -1122,7 +1122,7 @@ compare(
 
   // FIXME if the result_value operand is any we should create a temp value
   Value *comparison_value = value_from_compare(allocator, operation);
-  assign(context, source_range, result_value, comparison_value);
+  MASS_ON_ERROR(assign(context, source_range, result_value, comparison_value));
 }
 
 void
@@ -1358,7 +1358,7 @@ call_function_overload(
     }
   }
 
-  assign(context, source_range, result_value, saved_result);
+  MASS_ON_ERROR(assign(context, source_range, result_value, saved_result));
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);

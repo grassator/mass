@@ -1452,7 +1452,7 @@ token_handle_user_defined_operator(
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
     Value *arg_value = value_any(context->allocator);
-    token_force_value(context, token_view_get(args, i), arg_value);
+    MASS_ON_ERROR(token_force_value(context, token_view_get(args, i), arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
@@ -1496,6 +1496,16 @@ token_handle_user_defined_operator(
   );
 }
 
+void
+token_handle_user_defined_operator_proc(
+  Compilation_Context *context,
+  Token_View args,
+  Value *result_value,
+  void *payload
+) {
+  token_handle_user_defined_operator(context, args, result_value, payload);
+}
+
 static inline Slice
 operator_fixity_to_lowercase_slice(
   Operator_Fixity fixity
@@ -1532,7 +1542,7 @@ token_parse_operator_definition(
   }
 
   Value *precedence_value = value_any(context->allocator);
-  token_force_value(context, precedence_token, precedence_value);
+  MASS_ON_ERROR(token_force_value(context, precedence_token, precedence_value)) goto err;
 
   if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
     context_error_snprintf(
@@ -1659,7 +1669,7 @@ token_parse_operator_definition(
       .precedence = precendence,
       .argument_count = operator->argument_count,
       .fixity = operator->fixity,
-      .handler = token_handle_user_defined_operator,
+      .handler = token_handle_user_defined_operator_proc,
       .handler_payload = operator,
     }
   });
@@ -2465,7 +2475,7 @@ token_handle_negation(
 
   // FIXME use result_value here
   Value *value = value_any(context->allocator);
-  token_force_value(context, token, value);
+  MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value = 0;
   if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {\
     // FIXME this is broken for originally unsigned values larger than their signed counterpart
@@ -2574,7 +2584,7 @@ token_dispatch_constant_operator(
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = *dyn_array_last(*token_stack);
     Value *function_value = value_any(context->allocator);
-    token_force_value(context, function, function_value);
+    MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
@@ -2744,7 +2754,7 @@ token_parse_constant_expression(
   if (dyn_array_length(token_stack) == 1) {
     const Token *token = *dyn_array_last(token_stack);
     result = value_any(context->allocator);
-    token_force_value(context, token, result);
+    MASS_ON_ERROR(token_force_value(context, token, result)) goto err;
   } else {
     // FIXME user error
   }
@@ -3290,7 +3300,7 @@ token_eval_operator(
         Compilation_Context module_context = *context;
         module_context.scope = module_scope;
         module_context.builder = 0;
-        token_force_value(&module_context, rhs, result_value);
+        MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
       } else {
         context_error_snprintf(
           context, rhs->source_range,
@@ -3447,12 +3457,11 @@ token_eval_operator(
     Value *function_value = token_process_function_literal(
       context, context->scope, arguments, return_types, body
     );
-    MASS_ON_ERROR(*context->result) return;
     MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = token_view_get(args_view, 0);
     Value *function_value = value_any(context->allocator);
-    token_force_value(context, function, function_value);
+    MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
       if (function_value->descriptor->tag == Descriptor_Tag_Function) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
