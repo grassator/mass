@@ -47,7 +47,7 @@ typedef struct {
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
-typedef bool (*Token_Statement_Matcher_Proc)
+typedef u64 (*Token_Statement_Matcher_Proc)
 (Compilation_Context *context, Token_View, Value *result_value, void *payload);
 typedef struct {
   Token_Statement_Matcher_Proc proc;
@@ -127,63 +127,63 @@ token_parse_block(
   Value *result_value
 );
 
-bool
+u64
 token_parse_statement_label(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_statement_if(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_inline_machine_code_bytes(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_assignment(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_definition_and_assignment_statements(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_definitions(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_explicit_return(
   Compilation_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
-bool
+u64
 token_parse_goto(
   Compilation_Context *program,
   Token_View state,
   Value *unused_result,
   void *unused_payload
 );
-bool
+u64
 token_parse_constant_definitions(
   Compilation_Context *program,
   Token_View state,

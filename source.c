@@ -1119,7 +1119,7 @@ token_apply_macro_syntax(
   token_parse_expression(&body_context, macro->replacement, result_value);
 }
 
-bool
+u64
 token_parse_macro_statement(
   Compilation_Context *context,
   Token_View token_view,
@@ -1127,15 +1127,15 @@ token_parse_macro_statement(
   void *payload
 ) {
   assert(payload);
-  if (!token_view.length) return false;
+  if (!token_view.length) return 0;
   Macro *macro = payload;
   // TODO @Speed would be nice to not need this copy
   Array_Token_View match = dyn_array_make(Array_Token_View);
   u64 match_length = token_match_pattern(token_view, macro, &match);
-  if (match_length != token_view.length) return false;
+  if (match_length != token_view.length) return 0;
   token_apply_macro_syntax(context, match, macro, result_value);
   dyn_array_destroy(match);
-  return true;
+  return match_length;
 }
 
 
@@ -2767,7 +2767,7 @@ token_parse_constant_expression(
   return result;
 }
 
-bool
+u64
 token_parse_constant_definitions(
   Compilation_Context *context,
   Token_View view,
@@ -2783,12 +2783,18 @@ token_parse_constant_definitions(
   u64 statement_length = 0;
   view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
-    return false;
+    return 0;
   }
   // For now we support only single ID on the left
-  if (lhs.length > 1) return false;
+  if (lhs.length > 1) {
+    panic("TODO user error");
+    goto err;
+  }
   const Token *name = token_view_get(lhs, 0);
-  if (name->tag != Token_Tag_Id) return false;
+  if (name->tag != Token_Tag_Id) {
+    panic("TODO user error");
+    goto err;
+  }
 
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Lazy_Expression,
@@ -2798,7 +2804,8 @@ token_parse_constant_definitions(
     },
   });
 
-  return true;
+  err:
+  return statement_length;
 }
 
 void
@@ -3692,7 +3699,7 @@ token_parse_block(
   token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
-bool
+u64
 token_parse_statement_label(
   Compilation_Context *context,
   Token_View view,
@@ -3765,10 +3772,10 @@ token_parse_statement_label(
   );
 
   err:
-  return true;
+  return peek_index;
 }
 
-bool
+u64
 token_parse_statement_if(
   Compilation_Context *context,
   Token_View view,
@@ -3809,10 +3816,10 @@ token_parse_statement_if(
   );
 
   err:
-  return true;
+  return peek_index;
 }
 
-bool
+u64
 token_parse_goto(
   Compilation_Context *context,
   Token_View view,
@@ -3892,10 +3899,10 @@ token_parse_goto(
   );
 
   err:
-  return true;
+  return peek_index;
 }
 
-bool
+u64
 token_parse_explicit_return(
   Compilation_Context *context,
   Token_View view,
@@ -3946,7 +3953,7 @@ token_parse_explicit_return(
     (Instruction) {.assembly = {jmp, {return_label->operand, 0, 0}}}
   );
 
-  return true;
+  return peek_index;
 }
 
 Descriptor *
@@ -3994,7 +4001,7 @@ token_match_fixed_array_type(
   return array_descriptor;
 }
 
-bool
+u64
 token_parse_inline_machine_code_bytes(
   Compilation_Context *context,
   Token_View view,
@@ -4083,13 +4090,14 @@ token_parse_inline_machine_code_bytes(
   );
 
   err:
-  return true;
+  return peek_index;
 }
 
-Value *
+u64
 token_parse_definition(
   Compilation_Context *context,
-  Token_View view
+  Token_View view,
+  Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -4106,22 +4114,23 @@ token_parse_definition(
     .tag = Scope_Entry_Tag_Value,
     .Value.value = value,
   });
-  return value;
+  MASS_ON_ERROR(assign(context, &define->source_range, result_value, value));
+  return peek_index;
 }
 
-bool
+u64
 token_parse_definitions(
   Compilation_Context *context,
   Token_View state,
-  Value *unused_result,
+  Value *value_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  return !!token_parse_definition(context, state);
+  return token_parse_definition(context, state, value_result);
 }
 
-bool
+u64
 token_parse_definition_and_assignment_statements(
   Compilation_Context *context,
   Token_View view,
@@ -4137,13 +4146,19 @@ token_parse_definition_and_assignment_statements(
   u64 statement_length = 0;
   view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
-    return false;
+    return 0;
   }
   // For now we support only single ID on the left
-  if (lhs.length > 1) return false;
+  if (lhs.length > 1) {
+    panic("TODO user error");
+    return false;
+  }
   const Token *name = token_view_get(view, 0);
 
-  if (name->tag != Token_Tag_Id) return false;
+  if (name->tag != Token_Tag_Id) {
+    panic("TODO user error");
+    goto err;
+  }
 
   Value *value = value_any(context->allocator);
   token_parse_expression(context, rhs, value);
@@ -4165,17 +4180,19 @@ token_parse_definition_and_assignment_statements(
     load_address(context, &view.source_range, on_stack, value);
   } else {
     on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
-    MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) return true;
+    MASS_ON_ERROR(assign(context, &name->source_range, on_stack, value)) goto err;
   }
 
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = on_stack,
   });
-  return true;
+
+  err:
+  return statement_length;
 }
 
-bool
+u64
 token_parse_assignment(
   Compilation_Context *context,
   Token_View view,
@@ -4190,16 +4207,16 @@ token_parse_assignment(
   u64 statement_length = 0;
   view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("="), &lhs, &rhs, &operator)) {
-    return false;
+    return 0;
   }
 
-  Value *target = token_parse_definition(context, lhs);
-  if (!target) {
-    target = value_any(context->allocator);
+  Value *target = value_any(context->allocator);
+  if (!token_parse_definition(context, lhs, target)) {
     token_parse_expression(context, lhs, target);
   }
   token_parse_expression(context, rhs, target);
-  return true;
+
+  return statement_length;
 }
 
 bool
