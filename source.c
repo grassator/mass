@@ -889,6 +889,21 @@ token_value_make(
   return result_token;
 }
 
+static inline Token_View
+token_view_match_till_end_of_statement(
+  Token_View view,
+  u64 *peek_index
+) {
+  u64 start_index = *peek_index;
+  for (; *peek_index < view.length; *peek_index += 1) {
+    const Token *token = token_view_get(view, *peek_index);
+    if (token->tag == Token_Tag_Operator && slice_equal(token->source, slice_literal(";"))) {
+      break;
+    }
+  }
+  return token_view_slice(&view, start_index, *peek_index);
+}
+
 #define Token_Maybe_Match(_id_, ...)\
   const Token *(_id_) = token_peek_match(view, peek_index, &(Token_Pattern) { __VA_ARGS__ });\
   if (_id_) (++peek_index)
@@ -2765,6 +2780,8 @@ token_parse_constant_definitions(
   Token_View rhs;
   const Token *operator;
 
+  u64 statement_length = 0;
+  view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return false;
   }
@@ -3686,7 +3703,7 @@ token_parse_statement_label(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
-  Token_View rest = token_view_rest(&view, peek_index);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
 
   if (
     rest.length != 1 ||
@@ -3763,7 +3780,7 @@ token_parse_statement_if(
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
 
-  Token_View rest = token_view_rest(&view, peek_index);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
 
   if (!rest.length) {
     context_error_snprintf(
@@ -3806,7 +3823,8 @@ token_parse_goto(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("goto"));
-  Token_View rest = token_view_rest(&view, peek_index);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
+
   if (rest.length == 0) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -3888,7 +3906,7 @@ token_parse_explicit_return(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("return"));
-  Token_View rest = token_view_rest(&view, peek_index);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
   bool has_return_expression = rest.length > 0;
 
   Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
@@ -3989,6 +4007,14 @@ token_parse_inline_machine_code_bytes(
   Token_Match(id_token, .tag = Token_Tag_Id, .source = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
   Token_Match(args_token, .group_tag = Token_Group_Tag_Paren);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
+  if (rest.length) {
+    context_error_snprintf(
+      context, rest.source_range,
+      "Expected the end of the statement"
+    );
+    goto err;
+  }
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
 
@@ -4002,6 +4028,7 @@ token_parse_inline_machine_code_bytes(
         context, args_token->source_range,
         "Expected a maximum of 15 bytes"
       );
+      goto err;
     }
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
@@ -4071,7 +4098,7 @@ token_parse_definition(
   Token_Match(name, .tag = Token_Tag_Id);
   Token_Match_Operator(define, ":");
 
-  Token_View rest = token_view_rest(&view, peek_index);
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) return 0;
   Value *value = reserve_stack(context->allocator, context->builder, descriptor);
@@ -4107,6 +4134,8 @@ token_parse_definition_and_assignment_statements(
   Token_View rhs;
   const Token *operator;
 
+  u64 statement_length = 0;
+  view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return false;
   }
@@ -4158,6 +4187,8 @@ token_parse_assignment(
   Token_View lhs;
   Token_View rhs;
   const Token *operator;
+  u64 statement_length = 0;
+  view = token_view_match_till_end_of_statement(view, &statement_length);
   if (!token_maybe_split_on_operator(view, slice_literal("="), &lhs, &rhs, &operator)) {
     return false;
   }
