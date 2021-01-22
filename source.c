@@ -3637,20 +3637,20 @@ token_parse_statement(
   Value *result_value
 );
 
-bool
+void
 token_parse_block_no_scope(
   Compilation_Context *context,
   const Token *block,
   Value *block_result_value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   assert(block->tag == Token_Tag_Group);
   assert(block->Group.tag == Token_Group_Tag_Curly);
   Array_Const_Token_Ptr children = block->Group.children;
   if (!dyn_array_length(children)) {
-    // FIXME this should move void into the result value
-    return false;
+    MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
+    return;
   }
   Token_View children_view = token_view_from_group_token(block);
   Token_View_Split_Iterator it = { .view = children_view };
@@ -3661,10 +3661,10 @@ token_parse_block_no_scope(
     Value *result_value = is_last_statement ? block_result_value : &void_value;
     token_parse_statement(context, view, &block->source_range, result_value);
   }
-  return true;
+  return;
 }
 
-bool
+void
 token_parse_block(
   Compilation_Context *context,
   const Token *block,
@@ -3673,7 +3673,7 @@ token_parse_block(
   Compilation_Context body_context = *context;
   Scope *block_scope = scope_make(context->allocator, context->scope);
   body_context.scope = block_scope;
-  return token_parse_block_no_scope(&body_context, block, block_result_value);
+  token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
 bool
