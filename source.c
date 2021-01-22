@@ -1068,10 +1068,8 @@ token_apply_macro_syntax(
     Token *fake_body = allocator_allocate(context->allocator, Token);
     *fake_body = (Token) {
       .tag = Token_Tag_Group,
-      // FIXME get proper range
-      .source_range = {0},
-      // FIXME what should the source be here?
-      .source = slice_literal(""),
+      .source_range = capture_view.source_range,
+      .source = source_from_source_range(&capture_view.source_range),
       .Group = {
         .tag = Token_Group_Tag_Curly,
         .children = token_array_from_view(context->allocator, capture_view),
