@@ -232,6 +232,11 @@ source_range_print_start_position(
   const Source_Range *source_range
 );
 
+Slice
+source_from_source_range(
+  const Source_Range *source_range
+);
+
 typedef enum {
   Instruction_Type_Assembly,
   Instruction_Type_Label,

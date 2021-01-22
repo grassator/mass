@@ -182,6 +182,13 @@ source_file_offset_to_position(
   };
 }
 
+Slice
+source_from_source_range(
+  const Source_Range *source_range
+) {
+  return slice_sub_range(source_range->file->text, source_range->offsets);
+}
+
 void
 source_range_print_start_position(
   const Source_Range *source_range
