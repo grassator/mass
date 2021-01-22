@@ -986,10 +986,7 @@ token_match_pattern(
         if (!token) {
           return 0;
         }
-        dyn_array_push(*out_match, (Token_View){
-          .tokens = view.tokens + view_index,
-          .length = 1
-        });
+        dyn_array_push(*out_match, token_view_slice(&view, view_index, view_index + 1));
         view_index++;
         break;
       }
@@ -1005,10 +1002,7 @@ token_match_pattern(
             break;
           }
         }
-        dyn_array_push(*out_match, (Token_View){
-          .tokens = view.tokens + any_token_start_view_index,
-          .length = view_index - any_token_start_view_index,
-        });
+        dyn_array_push(*out_match, token_view_slice(&view, any_token_start_view_index, view_index));
         break;
       }
     }
