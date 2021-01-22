@@ -45,9 +45,9 @@ int main(s32 argc, char **argv) {
   Executable_Type win32_executable_type = Executable_Type_Cli;
 
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
-  const char *raw_file_path = 0;
+  char *raw_file_path = 0;
   for (s32 i = 1; i < argc; ++i) {
-    const char *arg = argv[i];
+    char *arg = argv[i];
     if (strcmp(arg, "--run") == 0) {
       mode = Mass_Cli_Mode_Run;
     } else if (strcmp(arg, "--binary-format") == 0) {
@@ -71,6 +71,10 @@ int main(s32 argc, char **argv) {
     }
   }
 
+  // Normalize slashes
+  for (char *ch = raw_file_path; *ch; ++ch) {
+    if (*ch == '\\') *ch = '/';
+  }
   Slice file_path = slice_from_c_string(raw_file_path);
 
   Compilation_Context context;
@@ -78,7 +82,7 @@ int main(s32 argc, char **argv) {
 
   Scope *module_scope = scope_make(context.allocator, context.scope);
   Module *prelude_module = program_module_from_file(
-    &context, slice_literal("lib\\prelude"), module_scope
+    &context, slice_literal("lib/prelude"), module_scope
   );
 
   Mass_Result result = program_import_module(&context, prelude_module);

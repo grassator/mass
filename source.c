@@ -4501,6 +4501,7 @@ program_module_from_file(
     context_error_snprintf(
       context, (Source_Range){0}, "Unable to open the file %"PRIslice, SLICE_EXPAND_PRINTF(file_path)
     );
+    return 0;
   }
 
   Module *module = allocator_allocate(context->allocator, Module);
@@ -4513,6 +4514,7 @@ program_import_module(
   Compilation_Context *context,
   Module *module
 ) {
+  MASS_TRY(*context->result);
   Compilation_Context import_context = *context;
   import_context.module = module;
   import_context.scope = module->scope;
