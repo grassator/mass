@@ -42,7 +42,7 @@ print :: (integer : s32) -> () {
 
 fizz_buzz :: () -> () {
   stdout_handle := GetStdHandle(-11)
-  for i : s8 = 1, i <= 100, i = i + 1 {
+  for i : s8 = 1; i <= 100; i = i + 1 {
     print_number := true
     if (i % 3 == 0) {
       print_number = false

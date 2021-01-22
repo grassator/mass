@@ -7,7 +7,7 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end;
 }
 
-syntax statement("for" ..@pre "," ..@condition "," ..@post {}@body) {
+syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre();
   label loop;
   if condition() {
