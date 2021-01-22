@@ -1116,7 +1116,7 @@ token_apply_macro_syntax(
   Compilation_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  token_parse_expression(&body_context, macro->replacement, result_value);
+  token_parse_expression(&body_context, macro->replacement, result_value, Expression_Parse_Mode_Default);
 }
 
 u64
@@ -1366,7 +1366,7 @@ token_force_value(
       switch(token->Group.tag) {
         case Token_Group_Tag_Paren: {
           Token_View expression_tokens = token_view_from_group_token(token);
-          token_parse_expression(context, expression_tokens, result_value);
+          token_parse_expression(context, expression_tokens, result_value, Expression_Parse_Mode_Default);
           return *context->result;
         }
         case Token_Group_Tag_Curly: {
@@ -1415,7 +1415,7 @@ token_match_call_arguments(
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
       Value *result_value = value_any(context->allocator);
-      token_parse_expression(context, view, result_value);
+      token_parse_expression(context, view, result_value, Expression_Parse_Mode_Default);
       dyn_array_push(result, result_value);
     }
   }
@@ -2177,7 +2177,7 @@ compile_time_eval(
   //       what is the return value because we need to figure out the return type.
   //       Ideally there would be a type-only eval available instead
   Value *expression_result_value = value_any(context->allocator);
-  token_parse_expression(&eval_context, view, expression_result_value);
+  token_parse_expression(&eval_context, view, expression_result_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
     return;
@@ -3172,7 +3172,7 @@ token_eval_operator(
     MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
     Value *index_value = value_any(context->allocator);
     Token_View index_tokens = token_view_from_group_token(brackets);
-    token_parse_expression(context, index_tokens, index_value);
+    token_parse_expression(context, index_tokens, index_value, Expression_Parse_Mode_Default);
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory);
     assert(array->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
@@ -3536,11 +3536,12 @@ token_dispatch_operator(
   dyn_array_splice_raw(*token_stack, start_index, argument_count, &result_token, 1);
 }
 
-bool
+PRELUDE_NO_DISCARD u64
 token_parse_expression(
   Compilation_Context *context,
   Token_View view,
-  Value *result_value
+  Value *result_value,
+  Expression_Parse_Mode mode
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -3553,6 +3554,7 @@ token_parse_expression(
   Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
 
   bool is_previous_an_operator = true;
+  u64 matched_length = view.length;
   for (u64 i = 0; i < view.length; ++i) {
     // Try to match macros at the current position
     u64 macro_match_length = 0;
@@ -3617,6 +3619,18 @@ token_parse_expression(
       }
       case Token_Tag_Operator: {
         Slice operator = token->source;
+        if (slice_equal(operator, slice_literal(";"))) {
+          matched_length = i + 1;
+          if (mode == Expression_Parse_Mode_Statement) {
+            goto drain;
+          } else {
+            context_error_snprintf(
+              context, token->source_range,
+              "Unexpected semicolon in an expression"
+            );
+            goto err;
+          }
+        }
         if (!token_handle_operator(
           context, view, token_dispatch_operator,
           &token_stack, &operator_stack, operator, token->source_range,
@@ -3628,6 +3642,7 @@ token_parse_expression(
     }
   }
 
+  drain:
   while (dyn_array_length(operator_stack)) {
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
     token_dispatch_operator(context, &token_stack, entry);
@@ -3650,10 +3665,10 @@ token_parse_expression(
   dyn_array_destroy(token_stack);
   dyn_array_destroy(operator_stack);
 
-  return true;
+  return matched_length;
 }
 
-bool
+u64
 token_parse_statement(
   Compilation_Context *context,
   Token_View view,
@@ -3801,7 +3816,7 @@ token_parse_statement_if(
   Token_View condition_view = token_view_slice(&rest, 0, rest.length - 1);
 
   Value *condition_value = value_any(context->allocator);
-  token_parse_expression(context, condition_view, condition_value);
+  token_parse_expression(context, condition_view, condition_value, Expression_Parse_Mode_Default);
   if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
     goto err;
   }
@@ -3922,7 +3937,7 @@ token_parse_explicit_return(
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
-  token_parse_expression(context, rest, fn_return);
+  token_parse_expression(context, rest, fn_return, Expression_Parse_Mode_Default);
 
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
@@ -4161,7 +4176,7 @@ token_parse_definition_and_assignment_statements(
   }
 
   Value *value = value_any(context->allocator);
-  token_parse_expression(context, rhs, value);
+  token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
@@ -4212,14 +4227,14 @@ token_parse_assignment(
 
   Value *target = value_any(context->allocator);
   if (!token_parse_definition(context, lhs, target)) {
-    token_parse_expression(context, lhs, target);
+    token_parse_expression(context, lhs, target, Expression_Parse_Mode_Default);
   }
-  token_parse_expression(context, rhs, target);
+  token_parse_expression(context, rhs, target, Expression_Parse_Mode_Default);
 
   return statement_length;
 }
 
-bool
+u64
 token_parse_statement(
   Compilation_Context *context,
   Token_View view,
@@ -4246,8 +4261,9 @@ token_parse_statement(
     }
   }
 
-  bool result = token_parse_expression(context, view, result_value);
-  return result;
+  u64 match_length =
+    token_parse_expression(context, view, result_value, Expression_Parse_Mode_Statement);
+  return match_length;
 }
 
 PRELUDE_NO_DISCARD Mass_Result
