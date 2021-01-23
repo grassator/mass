@@ -1724,8 +1724,26 @@ token_parse_import_statement(
   Token_Maybe_Match(as_keyword, .tag = Token_Tag_Id, .source = slice_literal("as"));
   Token_Maybe_Match(name, .tag = Token_Tag_Id);
 
-  if (!file_path || !as_keyword || !name) {
-    panic("TODO user error");
+  if (!file_path) {
+    context_error_snprintf(
+      context, name->source_range,
+      "import keyword must be followed by a path to the imported file"
+    );
+    goto err;
+  }
+  if (!as_keyword) {
+    context_error_snprintf(
+      context, name->source_range,
+      "import path must be followed by `as` keyword"
+    );
+    goto err;
+  }
+  if (!name) {
+    context_error_snprintf(
+      context, name->source_range,
+      "`as` keyword must be followed by a name you can use to access imported scope"
+    );
+    goto err;
   }
 
   // TODO Probably want to cache the root scope somewhere
@@ -1753,6 +1771,8 @@ token_parse_import_statement(
     .tag = Scope_Entry_Tag_Value,
     .Value.value = module_value,
   });
+  
+  err:
 
   return true;
 }
