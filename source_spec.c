@@ -447,6 +447,19 @@ spec("source") {
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
+    it("should be able to parse and run if / else statement ") {
+      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: (x : s32) -> (s8) {\n"
+          // FIXME figure out how to deal with a newline before `else`
+          "if (x < 10) { return 0 } else { return 1 }\n"
+          "0"
+        "}"
+      );
+      check(checker);
+      check(checker(42) == 1);
+      check(checker(-2) == 0);
+    }
 
     it("should report an error for an `if` statement without a body or a condition") {
       test_program_inline_source_base(

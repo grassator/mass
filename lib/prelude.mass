@@ -1,5 +1,9 @@
-syntax statement("if" ..@condition {}@body) {
-  () = if condition() then { body(); () } else {}
+syntax statement("if" ..@condition {}@then_branch) {
+  () = if condition() then { then_branch(); () } else {}
+}
+
+syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
+  () = if condition() then { then_branch(); () } else { else_branch(); () }
 }
 
 syntax statement("while" ..@condition {}@body) {
