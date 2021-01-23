@@ -1,5 +1,5 @@
 syntax statement("if" ..@condition {}@body) {
-  () = if condition() then body() else {}
+  () = if condition() then { body(); () } else {}
 }
 
 syntax statement("while" ..@condition {}@body) {

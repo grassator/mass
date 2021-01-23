@@ -3616,15 +3616,15 @@ token_parse_if_expression(
     context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
   );
 
-  Value *then_value = value_any(context->allocator);
-  token_parse_expression(context, then_branch, then_value, Expression_Parse_Mode_Default);
+  Value *if_value = value_any(context->allocator);
+  token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
 
-  if (then_value->operand.tag == Operand_Tag_Immediate) {
-    Value *on_stack = reserve_stack(context->allocator, context->builder, then_value->descriptor);
-    MASS_ON_ERROR(assign(context, &view.source_range, on_stack, then_value)) {
+  if (if_value->operand.tag == Operand_Tag_Immediate) {
+    Value *on_stack = reserve_stack(context->allocator, context->builder, if_value->descriptor);
+    MASS_ON_ERROR(assign(context, &view.source_range, on_stack, if_value)) {
       goto err;
     }
-    then_value = on_stack;
+    if_value = on_stack;
   }
 
   Label_Index after_label = make_label(context->program, &context->program->code_section);
@@ -3638,27 +3638,15 @@ token_parse_if_expression(
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  Value *else_value = value_any(context->allocator);
   u64 else_length =
-    token_parse_expression(context, else_branch, else_value, Expression_Parse_Mode_Default);
+    token_parse_expression(context, else_branch, if_value, Expression_Parse_Mode_Default);
   *matched_length = peek_index + else_length;
-
-  Value *result_value = then_value;
-  if (else_value->descriptor->tag == Descriptor_Tag_Void) {
-    result_value = else_value;
-  } else if (false) {
-    // FIXME do type checking
-  } else {
-    MASS_ON_ERROR(assign(context, &view.source_range, result_value, else_value)) {
-      goto err;
-    }
-  }
 
   push_instruction(
     &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) {.type = Instruction_Type_Label, .label = after_label}
   );
-  return token_value_make(context, result_value, view.source_range);
+  return token_value_make(context, if_value, view.source_range);
 
   err:
   return 0;
