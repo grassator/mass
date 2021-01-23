@@ -2621,6 +2621,22 @@ token_dispatch_constant_operator(
       result = token_value_make(context, comp_time_result, call_view.source_range);
     }
     dyn_array_push(*token_stack, result);
+  } else if (slice_equal(operator, slice_literal("@"))) {
+    const Token *keyword = *dyn_array_pop(*token_stack);
+    if (!token_match(keyword, &(Token_Pattern){ .source = slice_literal("scope") })) {
+      panic("TODO");
+    }
+    Value *scope_value = value_make(
+      context->allocator,
+      &descriptor_scope,
+      (Operand){
+        .tag = Operand_Tag_Immediate,
+        .byte_size = sizeof(Scope *),
+        .Immediate.memory = context->scope,
+      }
+    );
+    const Token *result = token_value_make(context, scope_value, keyword->source_range);
+    dyn_array_push(*token_stack, result);
   } else if (slice_equal(operator, slice_literal("->"))) {
     const Token *body = *dyn_array_pop(*token_stack);
     const Token *return_types = *dyn_array_pop(*token_stack);

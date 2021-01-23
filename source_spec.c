@@ -669,6 +669,19 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to refer to the current scope") {
+      fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
+        "test_fn", &test_context,
+        "test_fn :: () -> (s32) {"
+          "result : s32 = 42;"
+          "this_scope :: @scope;"
+          "this_scope.result"
+        "}"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
+
     it("should be able to run fibonnacii") {
       fn_type_s64_to_s64 fibonnacci = (fn_type_s64_to_s64)test_program_inline_source_function(
         "fibonnacci", &test_context,
