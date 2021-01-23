@@ -44,6 +44,7 @@ typedef struct {
   Array_Macro_Pattern pattern;
   Token_View replacement;
   Scope *scope;
+  bool transparent;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
@@ -56,8 +57,14 @@ typedef struct {
 
 typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
+typedef enum {
+  Scope_Flags_None = 0,
+  Scope_Flags_Labels = 1 << 0,
+} Scope_Flags;
+
 typedef struct Scope {
   const Allocator *allocator;
+  Scope_Flags flags;
   struct Scope *parent;
   Scope_Map *map;
   Array_Macro_Ptr macros;

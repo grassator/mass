@@ -1030,6 +1030,45 @@ spec("source") {
       check(sum_up_to(3) == 6);
     }
 
+    it("should be able to use `break` statement inside of the while loop") {
+      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: (x : s32) -> (s32) {"
+          "sum : s32;"
+          "sum = 0;"
+          "while (x >= 0) {"
+            "break;"
+            "sum = sum + x;"
+            "x = x + (-1);"
+          "};"
+          "sum"
+        "}"
+      );
+      check(checker);
+      check(checker(0) == 0);
+      check(checker(1) == 0);
+    }
+
+    it("should be able to use `continue` statement inside of the while loop") {
+      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: (x : s32) -> (s32) {"
+          "sum : s32;"
+          "sum = 0;"
+          "while (x >= 0) {"
+            "sum = sum + x;"
+            "x = x + (-1);"
+            "continue;"
+          "};"
+          "sum"
+        "}"
+      );
+      check(checker);
+      check(checker(0) == 0);
+      check(checker(1) == 1);
+      check(checker(2) == 3);
+    }
+
     it("should report an error for macro external functions") {
       test_program_inline_source_base(
         "test", &test_context,

@@ -1065,13 +1065,19 @@ token_apply_macro_syntax(
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   assert(macro->scope);
-  Scope *expansion_scope = scope_make(context->allocator, macro->scope);
 
   // All captured token sequences need to have access to the same base scope
   // to support implementing disjointed syntax, such as for (;;) loop
   // or switch / pattern matching.
   // Ideally there should be a way to control this explicitly somehow.
   Scope *captured_scope = scope_make(context->allocator, context->scope);
+
+  Scope *expansion_scope;
+  if (macro->transparent) {
+    expansion_scope = captured_scope;
+  } else {
+    expansion_scope = scope_make(context->allocator, macro->scope);
+  }
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
@@ -1787,6 +1793,7 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
   Token_Maybe_Match(statement, .tag = Token_Tag_Id, .source = slice_literal("statement"));
+  Token_Maybe_Match(transparent, .tag = Token_Tag_Id, .source = slice_literal("transparent"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -1911,6 +1918,7 @@ token_parse_syntax_definition(
     .pattern = pattern,
     .replacement = replacement,
     .scope = context->scope,
+    .transparent = !!transparent
   };
   if (statement) {
     if (!dyn_array_is_initialized(context->scope->statement_matchers)) {
@@ -1925,7 +1933,6 @@ token_parse_syntax_definition(
 
     scope_add_macro(context->scope, macro);
   }
-
 
   return true;
 
@@ -2112,6 +2119,7 @@ token_process_function_literal(
 
   Scope *parent_scope = context->scope;
   Scope *function_scope = scope_make(context->allocator, parent_scope);
+  function_scope->flags |= Scope_Flags_Labels;
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
@@ -3351,6 +3359,17 @@ token_eval_operator(
     MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
 
     load_address(context, &pointee_token->source_range, result_value, pointee);
+  } else if (slice_equal(operator, slice_literal("^"))) {
+    const Token *body = token_view_get(args_view, 0);
+    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Curly) {
+      token_parse_block_no_scope(context, body, result_value);
+    } else {
+      context_error_snprintf(
+        context, body->source_range,
+        "^ operator must be followed by {}"
+      );
+      return;
+    }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
@@ -3981,15 +4000,35 @@ token_parse_statement_label(
 
   const Token *id = token_view_get(rest, 0);
 
+  if (slice_equal(id->source, slice_literal("scope"))) {
+    context->scope->flags |= Scope_Flags_Labels;
+    return peek_index;
+  }
+
+  if (slice_equal(id->source, slice_literal("_loop_continue"))) {
+    int i = 0;
+    (void)i;
+  }
+
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
-  // FIXME make sure we don't double declare label
-  Scope *function_scope = context->builder->function->scope;
-  Scope_Entry *scope_entry = scope_lookup(function_scope, id->source);
+  Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
   Value *value;
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
   } else {
+    Scope *label_scope = context->scope;
+    while (label_scope) {
+      if (label_scope->flags & Scope_Flags_Labels) break;
+      label_scope = label_scope->parent;
+    }
+    if (!label_scope) {
+      context_error_snprintf(
+        context, id->source_range,
+        "Trying to add `label` outside of a label scope"
+      );
+      goto err;
+    }
     Program *program = context->program;
     Label_Index label = make_label(program, &program->code_section);
     value = allocator_allocate(context->allocator, Value);
@@ -3997,10 +4036,7 @@ token_parse_statement_label(
       .descriptor = &descriptor_void,
       .operand = code_label32(label),
     };
-    // FIXME this should define a label in the function scope, but because
-    // the macros are not hygienic we can not do that yet
-    //scope_define_value(function_scope, id->source, value);
-    scope_define(context->scope, id->source, (Scope_Entry) {
+    scope_define(label_scope, id->source, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
     });
@@ -4067,12 +4103,32 @@ token_parse_goto(
     );
     goto err;
   }
+  if (slice_equal(id->source, slice_literal("_loop_end"))) {
+    int i = 0;
+    (void)i;
+  }
+  if (slice_equal(id->source, slice_literal("_loop_continue"))) {
+    int i = 0;
+    (void)i;
+  }
 
   Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
   Value *value;
   if (scope_entry) {
     value = scope_entry_force(context, scope_entry);
   } else {
+    Scope *label_scope = context->scope;
+    while (label_scope) {
+      if (label_scope->flags & Scope_Flags_Labels) break;
+      label_scope = label_scope->parent;
+    }
+    if (!label_scope) {\
+      context_error_snprintf(
+        context, id->source_range,
+        "Trying to execute `goto` outside of a label scope"
+      );
+      goto err;
+    }
     // :ForwardLabelRef
     // If we didn't find an identifier with this name, declare one and hope
     // that some label will resolve it
@@ -4086,7 +4142,7 @@ token_parse_goto(
     };
     // Label declarations are always done in the function scope as they
     // might need to jump out of a nested block.
-    scope_define(context->builder->function->scope, id->source, (Scope_Entry) {
+    scope_define(label_scope, id->source, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
     });
@@ -4495,6 +4551,10 @@ scope_define_builtins(
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Operator,
+    .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
+  });
+  scope_define(scope, slice_literal("^"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
