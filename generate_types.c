@@ -525,6 +525,7 @@ main(void) {
     { "None", 0 },
     { "Macro", 1 << 0 },
     { "No_Own_Scope", 1 << 1 },
+    { "No_Own_Return", 1 << 2 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){

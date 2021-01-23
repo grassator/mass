@@ -165,6 +165,10 @@ assign(
   Value *source
 ) {
   MASS_TRY(*context->result);
+
+  if (target->operand.tag == Operand_Tag_Eflags) {
+    panic("Internal Error: Trying to move into Eflags");
+  }
   if (target->descriptor->tag == Descriptor_Tag_Void) {
     return *context->result;
   }
@@ -1106,7 +1110,10 @@ token_apply_macro_syntax(
         .arguments = (Array_Function_Argument){&dyn_array_zero_items},
         .scope = captured_scope,
         .body = fake_body,
-        .flags = Descriptor_Function_Flags_Macro | Descriptor_Function_Flags_No_Own_Scope,
+        .flags
+          = Descriptor_Function_Flags_Macro
+          | Descriptor_Function_Flags_No_Own_Scope
+          | Descriptor_Function_Flags_No_Own_Return,
         .returns = {
           .name = {0},
           .descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void,
@@ -2942,13 +2949,17 @@ token_handle_function_call(
       // jump to correct location and put value in the right place
       Program *program = context->program;
       Label_Index fake_return_label_index = make_label(program, &program->data_section);
-      {
+
+
+      Value return_label = {
+        .descriptor = &descriptor_void,
+        .operand = code_label32(fake_return_label_index),
+        .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+      };
+      if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
-          .Value.value = &(Value) {
-            .descriptor = &descriptor_void,
-            .operand = code_label32(fake_return_label_index),
-          },
+          .Value.value = &return_label,
         });
         scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
@@ -3558,6 +3569,101 @@ token_dispatch_operator(
   dyn_array_splice_raw(*token_stack, start_index, argument_count, &result_token, 1);
 }
 
+const Token *
+token_parse_if_expression(
+  Compilation_Context *context,
+  Token_View view,
+  u64 *matched_length
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
+
+  Token_View condition = {0};
+  Token_View then_branch = {0};
+  Token_View else_branch = {0};
+
+  for (u64 i = peek_index; i < view.length; ++i) {
+    const Token *token = token_view_get(view, i);
+    if (token_match(token, &(Token_Pattern){ .source = slice_literal("then") })) {
+      condition = token_view_slice(&view, peek_index, i);
+      peek_index = i + 1;
+    } else if (token_match(token, &(Token_Pattern){ .source = slice_literal("else") })) {
+      then_branch = token_view_slice(&view, peek_index, i);
+      peek_index = i + 1;
+      else_branch = token_view_rest(&view, peek_index);
+      break;
+      // TODO check that this comes after "then"
+    } else if (token_match(token, &token_pattern_semicolon)) {
+      break;
+    }
+  }
+  if (!condition.length) {
+    context_error_snprintf(
+      context, view.source_range,
+      "`if` keyword must be followed by an expression"
+    );
+    goto err;
+  }
+  if (!then_branch.length) panic("TODO");
+  if (!else_branch.length) panic("TODO");
+
+  Value *condition_value = value_any(context->allocator);
+  token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
+
+  Label_Index else_label = make_if(
+    context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
+  );
+
+  Value *then_value = value_any(context->allocator);
+  token_parse_expression(context, then_branch, then_value, Expression_Parse_Mode_Default);
+
+  if (then_value->operand.tag == Operand_Tag_Immediate) {
+    Value *on_stack = reserve_stack(context->allocator, context->builder, then_value->descriptor);
+    MASS_ON_ERROR(assign(context, &view.source_range, on_stack, then_value)) {
+      goto err;
+    }
+    then_value = on_stack;
+  }
+
+  Label_Index after_label = make_label(context->program, &context->program->code_section);
+  push_instruction(
+    &context->builder->code_block.instructions, keyword->source_range,
+    (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
+  );
+
+  push_instruction(
+    &context->builder->code_block.instructions, keyword->source_range,
+    (Instruction) {.type = Instruction_Type_Label, .label = else_label}
+  );
+
+  Value *else_value = value_any(context->allocator);
+  u64 else_length =
+    token_parse_expression(context, else_branch, else_value, Expression_Parse_Mode_Default);
+  *matched_length = peek_index + else_length;
+
+  Value *result_value = then_value;
+  if (else_value->descriptor->tag == Descriptor_Tag_Void) {
+    result_value = else_value;
+  } else if (false) {
+    // FIXME do type checking
+  } else {
+    MASS_ON_ERROR(assign(context, &view.source_range, result_value, else_value)) {
+      goto err;
+    }
+  }
+
+  push_instruction(
+    &context->builder->code_block.instructions, keyword->source_range,
+    (Instruction) {.type = Instruction_Type_Label, .label = after_label}
+  );
+  return token_value_make(context, result_value, view.source_range);
+
+  err:
+  return 0;
+}
+
 PRELUDE_NO_DISCARD u64
 token_parse_expression(
   Compilation_Context *context,
@@ -3578,16 +3684,32 @@ token_parse_expression(
   bool is_previous_an_operator = true;
   u64 matched_length = view.length;
   for (u64 i = 0; i < view.length; ++i) {
-    // Try to match macros at the current position
-    u64 macro_match_length = 0;
     Token_View rest = token_view_rest(&view, i);
-    const Token *macro_result = token_parse_macros(context, rest, &macro_match_length);
-    if (macro_match_length) {
-      assert(macro_result);
-      dyn_array_push(token_stack, macro_result);
-      // Skip over the matched slice
-      i += macro_match_length - 1;
-      continue;
+    {
+      // Try to match macros at the current position
+      u64 macro_match_length = 0;
+      const Token *macro_result = token_parse_macros(context, rest, &macro_match_length);
+      MASS_ON_ERROR(*context->result) goto err;
+      if (macro_match_length) {
+        assert(macro_result);
+        dyn_array_push(token_stack, macro_result);
+        // Skip over the matched slice
+        i += macro_match_length - 1;
+        continue;
+      }
+    }
+
+    {
+      u64 if_match_length = 0;
+      const Token *if_expression = token_parse_if_expression(context, rest, &if_match_length);
+      MASS_ON_ERROR(*context->result) goto err;
+      if (if_match_length) {
+        assert(if_expression);
+        dyn_array_push(token_stack, if_expression);
+        // Skip over the matched slice
+        i += if_match_length - 1;
+        continue;
+      }
     }
 
     const Token *token = token_view_get(view, i);
@@ -3736,7 +3858,12 @@ token_parse_block_no_scope(
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
         match_length = matcher->proc(context, rest, &last_result, matcher->payload);
-        if (match_length) goto check_match;
+        if (match_length) {
+          if (last_result.descriptor->tag == Descriptor_Tag_Any) {
+            MASS_ON_ERROR(assign(context, &block->source_range, &last_result, &void_value));
+          }
+          goto check_match;
+        }
       }
     }
     match_length = token_parse_expression(context, rest, &last_result, Expression_Parse_Mode_Statement);
@@ -4472,7 +4599,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
+    //dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
     scope->statement_matchers = matchers;
   }

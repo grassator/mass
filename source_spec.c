@@ -70,6 +70,11 @@ test_program_inline_source_base(
   Compilation_Context *context,
   const char *source
 ) {
+  Module *prelude_module = program_module_from_file(
+    &test_context, slice_literal("lib\\prelude"), test_context.scope
+  );
+  Mass_Result result = program_import_module(&test_context, prelude_module);
+  if (result.tag != Mass_Result_Tag_Success) return 0;
   test_init_module(slice_from_c_string(source));
   program_parse(context);
   Value *value = scope_lookup_force(context, test_context.module->scope, slice_from_c_string(id));
@@ -417,6 +422,53 @@ spec("source") {
     }
   }
   #endif
+
+  describe("if / else") {
+    it("should be able to parse and run if expression") {
+      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: (x : s32) -> (u8) {"
+          "if x < 0 then 0 else 1"
+        "}"
+      );
+      check(checker);
+      check(checker(42) == 1);
+      check(checker(-2) == 0);
+    }
+    it("should be able to parse and run if statement") {
+      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
+        "is_positive", &test_context,
+        "is_positive :: (x : s32) -> (s8) {\n"
+          "if (x < 10) { return 0 }\n"
+          "1\n"
+        "}"
+      );
+      check(checker);
+      check(checker(42) == 1);
+      check(checker(-2) == 0);
+    }
+
+    it("should report an error for an `if` statement without a body or a condition") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if; }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
+    }
+
+    it("should report an error for an `if` statement with an incorrect condition") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if (1 < 0) { 0 } 42; }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      // TODO improve error message
+      //Parse_Error *error = &test_context.result->Error.details;
+      //check(slice_equal(slice_literal("Could not parse the expression"), error->message));
+    }
+  }
 
   describe("Functions") {
     it("should be able to parse and run a void -> s64 function") {
@@ -915,11 +967,6 @@ spec("source") {
     }
 
     it("should be able to define and use a macro for while loop") {
-      Module *prelude_module = program_module_from_file(
-        &test_context, slice_literal("lib\\prelude"), test_context.scope
-      );
-      Mass_Result result = program_import_module(&test_context, prelude_module);
-      check(result.tag == Mass_Result_Tag_Success);
       fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(
         "sum_up_to", &test_context,
         "sum_up_to :: (x : s32) -> (s32) {"
@@ -958,41 +1005,6 @@ spec("source") {
       );
       check(checker);
       check(checker() == 42);
-    }
-  }
-
-  describe("if / else") {
-    it("should be able to parse and run if statement") {
-      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
-        "is_positive", &test_context,
-        "is_positive :: (x : s32) -> (s8) {"
-          "if (x < 0) { return 0 };"
-          "1"
-        "}"
-      );
-      check(checker);
-      check(checker(42) == 1);
-      check(checker(-2) == 0);
-    }
-
-    it("should report an error for an `if` statement without a body or a condition") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: () -> () { if; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
-    }
-
-    it("should report an error for an `if` statement with an incorrect condition") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: () -> () { if (1 < 0) { 0 } 42; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Could not parse the expression"), error->message));
     }
   }
 

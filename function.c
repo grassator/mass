@@ -140,6 +140,10 @@ move_value(
   if (target == source) return;
   if (operand_equal(target, source)) return;
 
+  if (target->tag == Operand_Tag_Eflags) {
+    panic("Internal Error: Trying to move into Eflags");
+  }
+
   u32 target_size = target->byte_size;
   u32 source_size = source->byte_size;
 
