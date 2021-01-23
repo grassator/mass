@@ -435,6 +435,24 @@ spec("source") {
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
+    it("should report an error on missing `then` inside of an if expression") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if true else 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal("Expected `then`, encountered `else` inside an `if` expression"), error->message));
+    }
+    it("should report an error on double `then` inside of an if expression") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { if true then 0 then 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(slice_literal("Expected `else`, encountered `then` inside an `if` expression"), error->message));
+    }
     it("should be able to parse and run if statement") {
       fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
         "is_positive", &test_context,

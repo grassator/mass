@@ -1771,7 +1771,7 @@ token_parse_import_statement(
     .tag = Scope_Entry_Tag_Value,
     .Value.value = module_value,
   });
-  
+
   err:
 
   return true;
@@ -3604,17 +3604,40 @@ token_parse_if_expression(
   Token_View then_branch = {0};
   Token_View else_branch = {0};
 
+  enum {
+    Parse_State_Condition,
+    Parse_State_Then,
+    Parse_State_Else
+  } parse_state = Parse_State_Condition;
+
   for (u64 i = peek_index; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
     if (token_match(token, &(Token_Pattern){ .source = slice_literal("then") })) {
-      condition = token_view_slice(&view, peek_index, i);
+      Token_View till_here = token_view_slice(&view, peek_index, i);
+      if (parse_state != Parse_State_Condition) {
+        context_error_snprintf(
+          context, till_here.source_range,
+          "Expected `else`, encountered `then` inside an `if` expression"
+        );
+        goto err;
+      }
+      parse_state = Parse_State_Then;
+      condition = till_here;
       peek_index = i + 1;
     } else if (token_match(token, &(Token_Pattern){ .source = slice_literal("else") })) {
-      then_branch = token_view_slice(&view, peek_index, i);
+      Token_View till_here = token_view_slice(&view, peek_index, i);
+      if (parse_state != Parse_State_Then) {
+        context_error_snprintf(
+          context, till_here.source_range,
+          "Expected `then`, encountered `else` inside an `if` expression"
+        );
+        goto err;
+      }
+      then_branch = till_here;
       peek_index = i + 1;
       else_branch = token_view_rest(&view, peek_index);
+      parse_state = Parse_State_Else;
       break;
-      // TODO check that this comes after "then"
     } else if (token_match(token, &token_pattern_semicolon)) {
       break;
     }
@@ -3626,8 +3649,20 @@ token_parse_if_expression(
     );
     goto err;
   }
-  if (!then_branch.length) panic("TODO");
-  if (!else_branch.length) panic("TODO");
+  if (!then_branch.length) {
+    context_error_snprintf(
+      context, view.source_range,
+      "`then` branch of an if expression must not be empty"
+    );
+    goto err;
+  }
+  if (!else_branch.length) {
+    context_error_snprintf(
+      context, view.source_range,
+      "`else` branch of an if expression must not be empty"
+    );
+    goto err;
+  }
 
   Value *condition_value = value_any(context->allocator);
   token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
