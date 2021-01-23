@@ -3961,50 +3961,6 @@ token_parse_statement_label(
 }
 
 u64
-token_parse_statement_if(
-  Compilation_Context *context,
-  Token_View view,
-  Value *unused_result,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("if"));
-
-  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
-
-  if (!rest.length) {
-    context_error_snprintf(
-      context, keyword->source_range,
-      "`if` keyword must be followed by an expression"
-    );
-    goto err;
-  }
-
-  const Token *body = token_view_last(rest);
-  Token_View condition_view = token_view_slice(&rest, 0, rest.length - 1);
-
-  Value *condition_value = value_any(context->allocator);
-  token_parse_expression(context, condition_view, condition_value, Expression_Parse_Mode_Default);
-  if (condition_value->descriptor->tag == Descriptor_Tag_Any) {
-    goto err;
-  }
-
-  Label_Index else_label = make_if(
-    context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
-  );
-  token_parse_block(context, body, value_any(context->allocator));
-  push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = else_label}
-  );
-
-  err:
-  return peek_index;
-}
-
-u64
 token_parse_goto(
   Compilation_Context *context,
   Token_View view,
@@ -4587,7 +4543,6 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    //dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_if});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
     scope->statement_matchers = matchers;
   }

@@ -141,13 +141,6 @@ token_parse_statement_label(
   void *unused_payload
 );
 u64
-token_parse_statement_if(
-  Compilation_Context *program,
-  Token_View state,
-  Value *result_value,
-  void *unused_payload
-);
-u64
 token_parse_inline_machine_code_bytes(
   Compilation_Context *program,
   Token_View state,
