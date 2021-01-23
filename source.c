@@ -4005,11 +4005,6 @@ token_parse_statement_label(
     return peek_index;
   }
 
-  if (slice_equal(id->source, slice_literal("_loop_continue"))) {
-    int i = 0;
-    (void)i;
-  }
-
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
@@ -4102,14 +4097,6 @@ token_parse_goto(
       "`goto` keyword must be followed by an identifier"
     );
     goto err;
-  }
-  if (slice_equal(id->source, slice_literal("_loop_end"))) {
-    int i = 0;
-    (void)i;
-  }
-  if (slice_equal(id->source, slice_literal("_loop_continue"))) {
-    int i = 0;
-    (void)i;
   }
 
   Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
