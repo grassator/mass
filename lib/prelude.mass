@@ -6,12 +6,12 @@ syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
   () = if condition() then { then_branch(); () } else { else_branch(); () }
 }
 
-syntax statement transparent("break") { goto _loop_end; }
-syntax statement transparent("continue") { goto _loop_start; }
-
 syntax statement transparent("while" ..@condition {}@body) ^{
   label scope;
   label _loop_start;
+
+  syntax statement("break") { goto _loop_end; }
+  syntax statement("continue") { goto _loop_start; }
   if condition() {
     body();
     goto _loop_start;
@@ -19,10 +19,12 @@ syntax statement transparent("while" ..@condition {}@body) ^{
   label _loop_end;
 }
 
-syntax statement transparent("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
+syntax statement transparent("for" ..@pre ";" ..@condition ";" ..@post {}@body) ^{
   label scope;
   pre();
   label _loop_start;
+  syntax statement("break") { goto _loop_end; }
+  syntax statement("continue") { goto _loop_start; }
   if condition() {
     body();
     post();
