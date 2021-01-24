@@ -407,6 +407,7 @@ main(void) {
 
   push_type(type_struct("Label", (Struct_Item[]){
     { "bool", "resolved" },
+    { "Slice", "name" },
     { "Section *", "section" },
     { "u32", "offset_in_section" },
   }));

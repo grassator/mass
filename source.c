@@ -1497,7 +1497,7 @@ token_handle_user_defined_operator(
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
   Program *program = context->program;
-  Label_Index fake_return_label_index = make_label(program, &program->data_section);
+  Label_Index fake_return_label_index = make_label(program, &program->data_section, MASS_RETURN_LABEL_NAME);
   {
     Value *return_label_value = allocator_allocate(context->allocator, Value);
     *return_label_value = (Value) {
@@ -2218,13 +2218,13 @@ compile_time_eval(
       },
     },
   };
-  Label_Index eval_label_index = make_label(jit->program, &jit->program->code_section);
+  Label_Index eval_label_index = make_label(jit->program, &jit->program->code_section, slice_literal("compile_time_eval"));
   Value *eval_value = value_make(context->allocator, descriptor, code_label32(eval_label_index));
   Function_Builder eval_builder = {
     .function = &descriptor->Function,
     .label_index = eval_label_index,
     .code_block = {
-      .end_label = make_label(jit->program, &jit->program->code_section),
+      .end_label = make_label(jit->program, &jit->program->code_section, slice_literal("compile_time_eval_end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
@@ -2993,8 +2993,7 @@ token_handle_function_call(
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
       Program *program = context->program;
-      Label_Index fake_return_label_index = make_label(program, &program->data_section);
-
+      Label_Index fake_return_label_index = make_label(program, &program->data_section, MASS_RETURN_LABEL_NAME);
 
       Value return_label = {
         .descriptor = &descriptor_void,
@@ -3718,7 +3717,8 @@ token_parse_if_expression(
     if_value = on_stack;
   }
 
-  Label_Index after_label = make_label(context->program, &context->program->code_section);
+  Label_Index after_label =
+    make_label(context->program, &context->program->code_section, slice_literal("if end"));
   push_instruction(
     &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
@@ -4026,7 +4026,8 @@ token_parse_statement_label(
       goto err;
     }
     Program *program = context->program;
-    Label_Index label = make_label(program, &program->code_section);
+    Label_Index label = make_label(program, &program->code_section, id->source);
+
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -4120,9 +4121,8 @@ token_parse_goto(
     // :ForwardLabelRef
     // If we didn't find an identifier with this name, declare one and hope
     // that some label will resolve it
-    // FIXME somehow report unresolved labels
     Program *program = context->program;
-    Label_Index label = make_label(program, &program->code_section);
+    Label_Index label = make_label(program, &program->code_section, id->source);
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
@@ -4489,7 +4489,7 @@ token_parse(
     MASS_TRY(*context->result);
     Token_View statement = token_split_next(&it, &token_pattern_semicolon);
     if (!statement.length) continue;
-    if (token_parse_syntax_definition(context, statement)) {
+    if (token_parse_syntax_definition(context, statement, &void_value, 0)) {
       continue;
     }
     if (token_parse_import_statement(context, statement)) {

@@ -306,6 +306,7 @@ encode_instruction(
     Label *label = program_get_label(program, instruction->label);
     label->section = &program->code_section;
     label->offset_in_section = u64_to_u32(buffer->occupied);
+    label->resolved = true;
     instruction->encoded_byte_size = 0;
     return;
   } else if (instruction->type == Instruction_Type_Bytes) {

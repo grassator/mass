@@ -396,10 +396,11 @@ define_xmm_register(xmm7, 0b111);
 static inline Label_Index
 make_label(
   Program *program,
-  Section *section
+  Section *section,
+  Slice name
 ) {
   Label_Index index = {dyn_array_length(program->labels)};
-  dyn_array_push(program->labels, (Label) {.section = section});
+  dyn_array_push(program->labels, (Label) {.section = section, .name = name});
   return index;
 }
 
@@ -710,9 +711,10 @@ value_global_internal(
     bucket_buffer_pointer_to_offset(program->data_section.buffer, allocation);
 
   Value *result = allocator_allocate(context->allocator, Value);
-  Label_Index label_index = make_label(program, &program->data_section);
+  Label_Index label_index = make_label(program, &program->data_section, slice_literal("global"));
   Label *label = program_get_label(program, label_index);
   label->offset_in_section = s64_to_u32(offset_in_data_section);
+  label->resolved = true;
 
   *result = (Value) {
     .descriptor = descriptor,
@@ -1127,6 +1129,7 @@ program_patch_labels(
   ) {
     Label_Location_Diff_Patch_Info *info = dyn_array_get(program->patch_info_array, patch_index);
     Label *target_label = program_get_label(program, info->target_label_index);
+    assert(target_label->resolved);
 
     s64 from_rva = program_resolve_label_to_rva(program, &info->from);
     s64 target_rva = program_resolve_label_to_rva(program, target_label);
@@ -1205,7 +1208,7 @@ import_symbol(
 
   if (!symbol) {
     // FIXME move to a readonly section
-    Label_Index label = make_label(program, &program->data_section);
+    Label_Index label = make_label(program, &program->data_section, slice_literal("import"));
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,

@@ -269,6 +269,7 @@ typedef dyn_array_type(Label_Index) Array_Label_Index;
 
 typedef struct Label {
   bool resolved;
+  Slice name;
   Section * section;
   u32 offset_in_section;
 } Label;
