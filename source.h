@@ -141,6 +141,13 @@ token_parse_block(
 );
 
 u64
+token_parse_syntax_definition(
+  Compilation_Context *context,
+  Token_View view,
+  Value *result_value,
+  void *payload
+);
+u64
 token_parse_statement_label(
   Compilation_Context *program,
   Token_View state,

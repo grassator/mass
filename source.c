@@ -1783,10 +1783,12 @@ token_parse_import_statement(
   return true;
 }
 
-bool
+u64
 token_parse_syntax_definition(
   Compilation_Context *context,
-  Token_View view
+  Token_View view,
+  Value *result_value,
+  void *payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -1805,7 +1807,7 @@ token_parse_syntax_definition(
     goto err;
   }
 
-  Token_View replacement = token_view_rest(&view, peek_index);
+  Token_View replacement = token_view_match_till_end_of_statement(view, &peek_index);
   Token_View definition = token_view_from_group_token(pattern_token);
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
@@ -1930,15 +1932,14 @@ token_parse_syntax_definition(
       .payload = macro,
     });
   } else {
-
     scope_add_macro(context->scope, macro);
   }
-
-  return true;
+  MASS_ON_ERROR(assign(context, &view.source_range, result_value, &void_value));
+  return peek_index;
 
   err:
   dyn_array_destroy(pattern);
-  return true;
+  return peek_index;
 }
 
 bool
@@ -4662,6 +4663,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition});
     scope->statement_matchers = matchers;
   }
 }
