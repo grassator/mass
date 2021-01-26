@@ -439,7 +439,7 @@ tokenize(
   Array_Const_Token_Ptr *out_tokens
 ) {
 
-  Array_Const_Token_Ptr parent_stack = dyn_array_make(Array_Const_Token_Ptr);
+  Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
   Token *root = &(Token){0};
   root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
 
@@ -621,11 +621,11 @@ tokenize(
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
           parent->source_range.offsets.to = i + 1;
-          parent->source = slice_sub_range(file->text, parent->source_range.offsets);
+          parent->source = source_from_source_range(&parent->source_range);
           if (!dyn_array_length(parent_stack)) {
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
           }
-          parent = (Token *)*dyn_array_pop(parent_stack);
+          parent = *dyn_array_pop(parent_stack);
           current_token = 0;
         } else {
           TOKENIZER_HANDLE_ERROR("Unpexpected input");
