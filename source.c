@@ -2093,7 +2093,7 @@ token_import_match_arguments(
   Slice symbol_name = symbol_name_token->String.slice;
 
   Value *result = allocator_allocate(context->allocator, Value);
-  *result = (const Value) {
+  *result = (Value) {
     .descriptor = 0,
     .operand = import_symbol(context, library_name, symbol_name),
   };
@@ -2289,10 +2289,7 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = allocator_allocate(context->allocator, Value);
-  *temp_result = (Value) {
-    .descriptor = out_value->descriptor,
-  };
+  Value *temp_result = value_make(context->allocator, out_value->descriptor, (Operand){0});
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
       temp_result->operand = (Operand){0};
@@ -2319,7 +2316,7 @@ compile_time_eval(
       break;
     }
     case Descriptor_Tag_Function: {
-      panic("TODO figure out how that works");
+      assert(out_value->operand.tag == Operand_Tag_None);
       break;
     }
   }
@@ -3326,6 +3323,14 @@ token_eval_operator(
       dyn_array_destroy(args);
     } else if (
       target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("external"))
+    ) {
+      Token *import_token = token_import_match_arguments(
+        args_token->source_range, args_token->Group.children, context
+      );
+      MASS_ON_ERROR(token_force_value(context, import_token, result_value)) return;
+    } else if (
+      target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("operand_variant_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -3354,7 +3359,18 @@ token_eval_operator(
     }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
-    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
+    if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
+      Value *scope_value = value_make(
+        context->allocator,
+        &descriptor_scope,
+        (Operand){
+          .tag = Operand_Tag_Immediate,
+          .byte_size = sizeof(Scope *),
+          .Immediate.memory = context->scope,
+        }
+      );
+      MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
+    } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
     } else {
       context_error_snprintf(
@@ -3784,10 +3800,25 @@ token_parse_expression(
         break;
       }
       case Token_Tag_String:
-      case Token_Tag_Id:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
         is_previous_an_operator = false;
+        break;
+      }
+      case Token_Tag_Id: {
+        Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
+        if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
+          if (!token_handle_operator(
+            context, view, token_dispatch_constant_operator,
+            &token_stack, &operator_stack, token->source, token->source_range,
+            // FIXME figure out how to deal with fixity for non-symbol operators
+            Operator_Fixity_Prefix
+          )) goto err;
+          is_previous_an_operator = true;
+        } else {
+          is_previous_an_operator = false;
+          dyn_array_push(token_stack, token);
+        }
         break;
       }
       case Token_Tag_Group: {
