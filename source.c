@@ -2164,15 +2164,8 @@ token_process_function_literal(
     }
   }
 
-  // TODO think about a better way to distinguish imports
-  bool is_external = body->tag == Token_Tag_Value;
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-  };
-  if (is_external) {
+  Value *result = value_make(context->allocator, descriptor, (Operand){0});
+  if (body->tag == Token_Tag_Value) {
     result->descriptor = descriptor_pointer_to(context->allocator, descriptor);
     result->operand = body->Value.value->operand;
   } else {
