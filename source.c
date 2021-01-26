@@ -71,44 +71,6 @@ token_view_from_token_array(
   };
 }
 
-static Token_View
-token_view_from_group_token(
-  const Token *token
-) {
-  assert(token->tag == Token_Tag_Group);
-  Source_Range children_source_range;
-  if (dyn_array_length(token->Group.children)) {
-    const Token *first = *dyn_array_get(token->Group.children, 0);
-    const Token *last = *dyn_array_last(token->Group.children);
-    children_source_range = (Source_Range) {
-      .file = token->source_range.file,
-      .offsets = {
-        .from = first->source_range.offsets.from,
-        .to = last->source_range.offsets.to,
-      },
-    };
-  } else {
-    // TODO maybe we should this during tokenization for groups
-    //      and correctly remove braces
-    children_source_range = token->source_range;
-  }
-
-  return token_view_from_token_array(token->Group.children, &token->source_range);
-}
-
-static inline Array_Const_Token_Ptr
-token_array_from_view(
-  const Allocator *allocator,
-  Token_View view
-) {
-  // TODO optimize
-  Array_Const_Token_Ptr result = dyn_array_make(Array_Const_Token_Ptr, .capacity = view.length);
-  for (u64 i = 0; i < view.length; ++i) {
-    dyn_array_push(result, token_view_get(view, i));
-  }
-  return result;
-}
-
 Scope *
 scope_make(
   const Allocator *allocator,
@@ -438,16 +400,33 @@ typedef struct {
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
+static inline Token_View
+temp_token_array_into_token_view(
+  const Allocator *allocator,
+  Array_Const_Token_Ptr *array,
+  Source_Range children_range
+) {
+  Token_View result = { .tokens = 0, .length = 0, .source_range = children_range };
+  if (!dyn_array_is_initialized(*array)) return result;
+  result.length = dyn_array_length(*array);
+  if (!result.length) goto end;
+  Token **tokens = allocator_allocate_array(allocator, Token *, result.length);
+  memcpy(tokens, dyn_array_raw(*array), sizeof(*tokens) * result.length);
+  result.tokens = tokens;
+
+  end:
+  dyn_array_destroy(*array);
+  *array = (Array_Const_Token_Ptr){0};
+  return result;
+}
+
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   const Allocator *allocator,
   Source_File *file,
-  Array_Const_Token_Ptr *out_tokens
+  Token_View *out_tokens
 ) {
-
   Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
-  // FIXME get rid of this
-  Token *root = &(Token){0};
 
   assert(!dyn_array_is_initialized(file->line_ranges));
   file->line_ranges = dyn_array_make(Array_Range_u64);
@@ -467,7 +446,11 @@ tokenize(
   Range_u64 current_line = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
-  Tokenizer_Parent parent = {root, dyn_array_make(Array_Const_Token_Ptr)};
+  Tokenizer_Parent parent = {
+    .token = 0,
+    // FIXME only initialize on first push
+    .children = dyn_array_make(Array_Const_Token_Ptr)
+  };
   Fixed_Buffer *string_buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = 4096,
@@ -529,7 +512,7 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (parent.token->tag == Token_Tag_None || parent.token->Group.tag == Token_Group_Tag_Curly) {\
+    if (!parent.token || parent.token->Group.tag == Token_Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Operator);\
@@ -625,9 +608,13 @@ tokenize(
           if (ch != expected_paren) {
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
-          parent.token->Group.children = parent.children;
           parent.token->source_range.offsets.to = i + 1;
           parent.token->source = source_from_source_range(&parent.token->source_range);
+          Source_Range children_range = parent.token->source_range;
+          children_range.offsets.to -= 1;
+          children_range.offsets.from -= 1;
+          parent.token->Group.children =
+            temp_token_array_into_token_view(allocator, &parent.children, children_range);
           if (!dyn_array_length(parent_stack)) {
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
           }
@@ -750,7 +737,7 @@ tokenize(
   current_line.to = file->text.length;
   dyn_array_push(file->line_ranges, current_line);
 
-  if (parent.token != root) {
+  if (parent.token) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
   // current_token can be null in case of an empty input
@@ -770,7 +757,8 @@ tokenize(
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
   if (result.tag == Mass_Result_Tag_Success) {
-    *out_tokens = parent.children;
+    Source_Range children_range = { .file = file, .offsets = {.from = 0, .to = file->text.length} };
+    *out_tokens = temp_token_array_into_token_view(allocator, &parent.children, children_range);
   } else {
     // TODO @Leak cleanup token memory
   }
@@ -962,13 +950,13 @@ token_force_type(
       if (token->Group.tag != Token_Group_Tag_Square) {
         panic("TODO");
       }
-      if (dyn_array_length(token->Group.children) != 1) {
+      if (token->Group.children.length != 1) {
         context_error_snprintf(
           context, token->source_range, "Pointer type must have a single type inside"
         );
         return 0;
       }
-      const Token *child = *dyn_array_get(token->Group.children, 0);
+      const Token *child = token_view_get(token->Group.children, 0);
       if (child->tag != Token_Tag_Id) {
         panic("TODO: should be recursive");
       }
@@ -1111,7 +1099,7 @@ token_apply_macro_syntax(
       .source = source_from_source_range(&capture_view.source_range),
       .Group = {
         .tag = Token_Group_Tag_Curly,
-        .children = token_array_from_view(context->allocator, capture_view),
+        .children = capture_view,
       }
     };
 
@@ -1406,8 +1394,9 @@ token_force_value(
     case Token_Tag_Group: {
       switch(token->Group.tag) {
         case Token_Group_Tag_Paren: {
-          Token_View expression_tokens = token_view_from_group_token(token);
-          token_parse_expression(context, expression_tokens, result_value, Expression_Parse_Mode_Default);
+          token_parse_expression(
+            context, token->Group.children, result_value, Expression_Parse_Mode_Default
+          );
           return *context->result;
         }
         case Token_Group_Tag_Curly: {
@@ -1441,9 +1430,8 @@ token_match_call_arguments(
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (context->result->tag != Mass_Result_Tag_Success) return result;
 
-  if (dyn_array_length(token->Group.children) != 0) {
-    Token_View children = token_view_from_group_token(token);
-    Token_View_Split_Iterator it = { .view = children };
+  if (token->Group.children.length != 0) {
+    Token_View_Split_Iterator it = { .view = token->Group.children };
 
     while (!it.done) {
       if (context->result->tag != Mass_Result_Tag_Success) return result;
@@ -1618,7 +1606,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Token_View definition = token_view_from_group_token(pattern_token);
+  Token_View definition = pattern_token->Group.children;
 
   operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *operator = (User_Defined_Operator) {
@@ -1814,7 +1802,7 @@ token_parse_syntax_definition(
   }
 
   Token_View replacement = token_view_match_till_end_of_statement(view, &peek_index);
-  Token_View definition = token_view_from_group_token(pattern_token);
+  Token_View definition = pattern_token->Group.children;
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
 
@@ -1838,7 +1826,7 @@ token_parse_syntax_definition(
         break;
       }
       case Token_Tag_Group: {
-        if (dyn_array_length(token->Group.children)) {
+        if (token->Group.children.length) {
           context_error_snprintf(
             context, token->source_range,
             "Nested group matches are not supported in syntax declarations (yet)"
@@ -2019,15 +2007,15 @@ token_process_c_struct_definition(
     );
     goto err;
   }
-  if (dyn_array_length(args->Group.children) != 1) {
+  if (args->Group.children.length != 1) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct expects 1 argument, got %"PRIu64,
-      dyn_array_length(args->Group.children)
+      args->Group.children.length
     );
     goto err;
   }
-  const Token *layout_block = *dyn_array_get(args->Group.children, 0);
+  const Token *layout_block = token_view_get(args->Group.children, 0);
   if (!token_match(layout_block, &(Token_Pattern) { .group_tag = Token_Group_Tag_Curly })) {
     context_error_snprintf(
       context, args->source_range,
@@ -2046,10 +2034,8 @@ token_process_c_struct_definition(
     },
   };
 
-  if (dyn_array_length(layout_block->Group.children) != 0) {
-    Token_View layout_block_children = token_view_from_group_token(layout_block);
-
-    Token_View_Split_Iterator it = { .view = layout_block_children };
+  if (layout_block->Group.children.length != 0) {
+    Token_View_Split_Iterator it = { .view = layout_block->Group.children };
     while (!it.done) {
       Token_View field_view = token_split_next(&it, &token_pattern_semicolon);
       token_match_struct_field(context, descriptor, field_view);
@@ -2137,11 +2123,10 @@ token_process_function_literal(
     },
   };
 
-  if (dyn_array_length(return_types->Group.children) == 0) {
+  if (return_types->Group.children.length == 0) {
     descriptor->Function.returns = (Function_Return) { .descriptor = &descriptor_void, };
   } else {
-    Token_View children = token_view_from_group_token(return_types);
-    Token_View_Split_Iterator it = { .view = children };
+    Token_View_Split_Iterator it = { .view = return_types->Group.children };
 
     for (u64 i = 0; !it.done; ++i) {
       if (i > 0) {
@@ -2160,15 +2145,14 @@ token_process_function_literal(
     }
   }
 
-  if (dyn_array_length(args->Group.children) != 0) {
+  if (args->Group.children.length != 0) {
     descriptor->Function.arguments = dyn_array_make(
       Array_Function_Argument,
       .allocator = context->allocator,
       .capacity = 4,
     );
 
-    Token_View children = token_view_from_group_token(args);
-    Token_View_Split_Iterator it = { .view = children };
+    Token_View_Split_Iterator it = { .view = args->Group.children };
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Compilation_Context arg_context = *context;
@@ -2605,8 +2589,7 @@ token_dispatch_constant_operator(
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("external"))
     ) {
-      Token_View args_children = token_view_from_group_token(args);
-      result = token_import_match_arguments(args->source_range, args_children, context);
+      result = token_import_match_arguments(args->source_range, args->Group.children, context);
     } else if (
       function->tag == Token_Tag_Id &&
       slice_equal(function->source, slice_literal("bit_type"))
@@ -3254,7 +3237,7 @@ token_eval_operator(
     Value *array = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
     Value *index_value = value_any(context->allocator);
-    Token_View index_tokens = token_view_from_group_token(brackets);
+    Token_View index_tokens = brackets->Group.children;
     token_parse_expression(context, index_tokens, index_value, Expression_Parse_Mode_Default);
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->operand.tag == Operand_Tag_Memory);
@@ -3379,8 +3362,7 @@ token_eval_operator(
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
     if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Paren) {
-      Token_View eval_view = token_view_from_group_token(body);
-      compile_time_eval(context, eval_view, result_value);
+      compile_time_eval(context, body->Group.children, result_value);
     } else {
       context_error_snprintf(
         context, body->source_range,
@@ -3907,12 +3889,11 @@ token_parse_block_no_scope(
 
   assert(block->tag == Token_Tag_Group);
   assert(block->Group.tag == Token_Group_Tag_Curly);
-  Array_Const_Token_Ptr children = block->Group.children;
-  if (!dyn_array_length(children)) {
+  Token_View children_view = block->Group.children;
+  if (!children_view.length) {
     MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
     return;
   }
-  Token_View children_view = token_view_from_group_token(block);
 
   u64 match_length = 0;
   Value last_result;
@@ -4231,7 +4212,7 @@ token_match_fixed_array_type(
   Descriptor *descriptor =
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
-  Token_View size_view = token_view_from_group_token(square_brace);
+  Token_View size_view = square_brace->Group.children;
   Value *size_value = value_any(context->allocator);
   compile_time_eval(context, size_view, size_value);
   if (!descriptor_is_unsigned_integer(size_value->descriptor)) {
@@ -4679,10 +4660,10 @@ program_parse(
   Compilation_Context *context
 ) {
   assert(context->module);
-  Array_Const_Token_Ptr tokens;
+  Token_View tokens;
 
   MASS_TRY(tokenize(context->allocator, &context->module->source_file, &tokens));
-  Token_View program_token_view = token_view_from_token_array(tokens, &context->module->source_range);
+  Token_View program_token_view = tokens;
   MASS_TRY(token_parse(context, program_token_view));
   return *context->result;
 }
@@ -4752,10 +4733,6 @@ program_module_init(
       .text = text,
     },
     .scope = scope,
-  };
-  module->source_range = (Source_Range) {
-    .file = &module->source_file,
-    .offsets = { .from = 0, .to = module->source_file.text.length },
   };
 }
 

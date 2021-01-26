@@ -295,7 +295,6 @@ main(void) {
 
   push_type(type_struct("Module", (Struct_Item[]){
     { "Source_File", "source_file" },
-    { "Source_Range", "source_range" },
     { "Scope *", "scope" },
   }));
 
@@ -310,6 +309,12 @@ main(void) {
     { "Curly", 3 },
   }));
 
+  push_type(type_struct("Token_View", (Struct_Item[]){
+    { "const Token **", "tokens" },
+    { "u64", "length" },
+    { "Source_Range", "source_range" },
+  }));
+
   push_type(add_common_fields(type_union("Token", (Struct[]){
     struct_empty("None"),
     struct_empty("Id"),
@@ -322,17 +327,11 @@ main(void) {
     }),
     struct_fields("Group", (Struct_Item[]){
       { "Token_Group_Tag", "tag" },
-      { "Array_Const_Token_Ptr", "children" },
+      { "Token_View", "children" },
     }),
   }), (Struct_Item[]){
     { "Source_Range", "source_range" },
     { "Slice", "source" },
-  }));
-
-  push_type(type_struct("Token_View", (Struct_Item[]){
-    { "const Token **", "tokens" },
-    { "u64", "length" },
-    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Token_Pattern", (Struct_Item[]){
