@@ -594,7 +594,7 @@ main(void) {
   {
     const char *filename = "../types.h";
     #pragma warning(disable : 4996)
-    FILE *file = fopen(filename, "w");
+    FILE *file = fopen(filename, "wb");
     if (!file) exit(1);
 
     // Custom forward declarations
