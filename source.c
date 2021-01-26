@@ -432,6 +432,12 @@ tokenizer_handle_binary_integer_end(
   return result;
 }
 
+typedef struct {
+  Token *token;
+  Array_Const_Token_Ptr children;
+} Tokenizer_Parent;
+typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
+
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
   const Allocator *allocator,
@@ -439,9 +445,9 @@ tokenize(
   Array_Const_Token_Ptr *out_tokens
 ) {
 
-  Array_Token_Ptr parent_stack = dyn_array_make(Array_Token_Ptr);
+  Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
+  // FIXME get rid of this
   Token *root = &(Token){0};
-  root->Group.children = dyn_array_make(Array_Const_Token_Ptr);
 
   assert(!dyn_array_is_initialized(file->line_ranges));
   file->line_ranges = dyn_array_make(Array_Range_u64);
@@ -461,7 +467,7 @@ tokenize(
   Range_u64 current_line = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
-  Token *parent = root;
+  Tokenizer_Parent parent = {root, dyn_array_make(Array_Const_Token_Ptr)};
   Fixed_Buffer *string_buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = 4096,
@@ -487,7 +493,7 @@ tokenize(
 #define do_push\
   do {\
     current_token->source = source_from_source_range(&current_token->source_range);\
-    dyn_array_push(parent->Group.children, current_token);\
+    dyn_array_push(parent.children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
   } while(0)
@@ -523,13 +529,13 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (parent->tag == Token_Tag_None || parent->Group.tag == Token_Group_Tag_Curly) {\
+    if (parent.token->tag == Token_Tag_None || parent.token->Group.tag == Token_Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
-      if (dyn_array_length(parent->Group.children)) {\
+      if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Operator);\
         current_token->source_range.offsets = (Range_u64){ i + 1, i + 1 };\
         current_token->source = slice_literal(";");\
-        dyn_array_push(parent->Group.children, current_token);\
+        dyn_array_push(parent.children, current_token);\
       }\
     }\
     current_token = 0;\
@@ -579,16 +585,15 @@ tokenize(
             ch == '(' ? Token_Group_Tag_Paren :
             ch == '{' ? Token_Group_Tag_Curly :
             Token_Group_Tag_Square;
-          current_token->Group.children = dyn_array_make(Array_Const_Token_Ptr, 4);
-          dyn_array_push(parent->Group.children, current_token);
+          dyn_array_push(parent.children, current_token);
           dyn_array_push(parent_stack, parent);
-          parent = current_token;
+          parent = (Tokenizer_Parent){current_token, dyn_array_make(Array_Const_Token_Ptr, 4)};
         } else if (ch == ')' || ch == '}' || ch == ']') {
-          if (parent->tag != Token_Tag_Group) {
+          if (parent.token->tag != Token_Tag_Group) {
             panic("Tokenizer: unexpected closing char for group");
           }
           s8 expected_paren = 0;
-          switch (parent->Group.tag) {
+          switch (parent.token->Group.tag) {
             case Token_Group_Tag_Paren: {
               expected_paren = ')';
               break;
@@ -599,14 +604,14 @@ tokenize(
               // }
               // is being interpreted as:
               // { 42 ; }
-              while (dyn_array_length(parent->Group.children)) {
-                const Token *last_token = *dyn_array_last(parent->Group.children);
+              while (dyn_array_length(parent.children)) {
+                const Token *last_token = *dyn_array_last(parent.children);
                 bool is_last_token_a_fake_semicolon = (
                   token_match(last_token, &token_pattern_semicolon) &&
                   range_length(last_token->source_range.offsets) == 0
                 );
                 if (!is_last_token_a_fake_semicolon) break;
-                dyn_array_pop(parent->Group.children);
+                dyn_array_pop(parent.children);
               }
 
               expected_paren = '}';
@@ -620,8 +625,9 @@ tokenize(
           if (ch != expected_paren) {
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
-          parent->source_range.offsets.to = i + 1;
-          parent->source = source_from_source_range(&parent->source_range);
+          parent.token->Group.children = parent.children;
+          parent.token->source_range.offsets.to = i + 1;
+          parent.token->source = source_from_source_range(&parent.token->source_range);
           if (!dyn_array_length(parent_stack)) {
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
           }
@@ -744,7 +750,7 @@ tokenize(
   current_line.to = file->text.length;
   dyn_array_push(file->line_ranges, current_line);
 
-  if (parent != root) {
+  if (parent.token != root) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
   // current_token can be null in case of an empty input
@@ -764,7 +770,7 @@ tokenize(
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
   if (result.tag == Mass_Result_Tag_Success) {
-    *out_tokens = root->Group.children;
+    *out_tokens = parent.children;
   } else {
     // TODO @Leak cleanup token memory
   }
