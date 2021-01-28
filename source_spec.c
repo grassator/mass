@@ -1327,7 +1327,7 @@ spec("source") {
   }
 
   describe("Complex Examples") {
-    xit("should be able to run fizz buzz") {
+    it("should be able to run fizz buzz") {
       Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
       Module *prelude_module = program_module_from_file(
         &test_context, slice_literal("lib\\prelude"), module_scope
