@@ -62,6 +62,10 @@ typedef struct Label_Location_Diff_Patch_Info Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info *) Array_Label_Location_Diff_Patch_Info_Ptr;
 typedef dyn_array_type(const Label_Location_Diff_Patch_Info *) Array_Const_Label_Location_Diff_Patch_Info_Ptr;
 
+typedef struct Number_Literal Number_Literal;
+typedef dyn_array_type(Number_Literal *) Array_Number_Literal_Ptr;
+typedef dyn_array_type(const Number_Literal *) Array_Const_Number_Literal_Ptr;
+
 typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
@@ -284,6 +288,12 @@ typedef struct Label_Location_Diff_Patch_Info {
   s32 * patch_target;
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
+
+typedef struct Number_Literal {
+  Slice text;
+  bool negative;
+} Number_Literal;
+typedef dyn_array_type(Number_Literal) Array_Number_Literal;
 
 typedef struct External_Symbol {
   Slice library_name;
