@@ -1335,7 +1335,7 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
     Value *target_arg = function_argument_value_at_index(context->allocator, descriptor, i);
-    move_value(context->allocator, builder, source_range, &target_arg->operand, &source_arg->operand);
+    assign(context, source_range, target_arg, source_arg);
   }
 
   // If we call a function, then we need to reserve space for the home
@@ -1415,12 +1415,24 @@ calculate_arguments_match_score(
         break;
       }
       case Function_Argument_Tag_Exact: {
-        if (
-          same_type(target_arg->Exact.descriptor, source_arg->descriptor) &&
-          source_arg->operand.tag == Operand_Tag_Immediate &&
-          operand_equal(&target_arg->Exact.operand, &source_arg->operand)
-        ) {
-          return Score_Exact_Literal;
+        if (same_type(target_arg->Exact.descriptor, source_arg->descriptor)) {
+          if(source_arg->descriptor == &descriptor_number_literal) {
+            assert(source_arg->operand.tag == Operand_Tag_Immediate);
+            assert(target_arg->Exact.operand.tag == Operand_Tag_Immediate);
+            Number_Literal *source_literal = source_arg->operand.Immediate.memory;
+            Number_Literal *target_literal = source_arg->operand.Immediate.memory;
+            if (
+              source_literal->bits == target_literal->bits &&
+              source_literal->negative == target_literal->negative
+            ) {
+              return Score_Exact_Literal;
+            }
+          } else if (
+            source_arg->operand.tag == Operand_Tag_Immediate &&
+            operand_equal(&target_arg->Exact.operand, &source_arg->operand)
+          ) {
+            return Score_Exact_Literal;
+          }
         }
         return -1;
       }

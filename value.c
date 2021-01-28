@@ -435,6 +435,13 @@ code_label32(
   };
 }
 
+#define operand_immediate(_VALUE_)\
+  ((Operand) {                    \
+    .tag = Operand_Tag_Immediate, \
+    .byte_size = sizeof(_VALUE_), \
+    .Immediate.memory = (_VALUE_),\
+  })
+
 static inline Operand
 imm8(
   const Allocator *allocator,
@@ -696,6 +703,51 @@ instruction_equal(
   return true;
 }
 
+
+static inline Value *
+value_make_internal(
+  Compiler_Source_Location compiler_source_location,
+  const Allocator *allocator,
+  Descriptor *descriptor,
+  Operand operand
+) {
+  Value *result = allocator_allocate(allocator, Value);
+  *result = (Value) {
+    .descriptor = descriptor,
+    .operand = operand,
+    .compiler_source_location = compiler_source_location,
+  };
+  return result;
+}
+
+#define value_make(...) value_make_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
+
+Value *
+value_number_literal(
+  const Allocator *allocator,
+  Slice digits,
+  Number_Base base
+) {
+  Number_Literal *literal = allocator_allocate(allocator, Number_Literal);
+  u64 bits = 0;
+  bool ok = true;
+  switch(base) {
+    case Number_Base_2: bits = slice_parse_binary(digits, &ok); break;
+    case Number_Base_10: bits = slice_parse_u64(digits, &ok); break;
+    case Number_Base_16: bits = slice_parse_hex(digits, &ok); break;
+    default: panic("Internal Error: Unexpected number base"); break;
+  }
+  if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
+
+  *literal = (Number_Literal) {
+    .digits = digits,
+    .base = base,
+    .negative = false,
+    .bits = bits,
+  };
+  return value_make(allocator, &descriptor_number_literal, operand_immediate(literal));
+}
+
 Value *
 value_global_internal(
   Compiler_Source_Location compiler_source_location,
@@ -723,24 +775,6 @@ value_global_internal(
   };
   return result;
 }
-
-static inline Value *
-value_make_internal(
-  Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
-  Descriptor *descriptor,
-  Operand operand
-) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .operand = operand,
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
-}
-
-#define value_make(...) value_make_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
 
 static inline Operand
 operand_eflags(
@@ -1244,6 +1278,57 @@ same_value_type(
   return same_type(a->descriptor, b->descriptor);
 }
 
+typedef enum {
+  Literal_Cast_Result_Success,
+  Literal_Cast_Result_Target_Not_An_Integer,
+  Literal_Cast_Result_Target_Too_Small,
+  Literal_Cast_Result_Target_Too_Big,
+  Literal_Cast_Result_Unsigned_Target_For_Negative_Literal,
+} Literal_Cast_Result;
+
+Literal_Cast_Result
+value_number_literal_cast_to(
+  Value *value,
+  Descriptor *target_descriptor,
+  u64 *out_bits,
+  u64 *out_bit_size
+) {
+  assert(value->descriptor == &descriptor_number_literal);
+  assert(value->operand.tag == Operand_Tag_Immediate);
+
+  if (!descriptor_is_integer(target_descriptor)) {
+    return Literal_Cast_Result_Target_Not_An_Integer;
+  }
+
+  Number_Literal *literal = value->operand.Immediate.memory;
+
+  u64 bits = literal->bits;
+  u64 max = UINT64_MAX;
+  u64 bit_size = target_descriptor->Opaque.bit_size;
+  if (bit_size > 64) {
+    return Literal_Cast_Result_Target_Too_Big;
+  }
+  u64 shift = 64 - bit_size;
+  max >>= shift;
+  if (descriptor_is_signed_integer(target_descriptor)) {
+    max >>= 1;
+    if (!literal->negative) max--;
+  } else if (literal->negative) {
+    return Literal_Cast_Result_Unsigned_Target_For_Negative_Literal;
+  }
+
+  if (bits > max) {
+    return Literal_Cast_Result_Target_Too_Small;
+  }
+
+  if(literal->negative) {
+    bits = UINT64_MAX - bits + 1;
+  }
+  *out_bits = bits;
+  *out_bit_size = bit_size;
+  return Literal_Cast_Result_Success;
+}
+
 bool
 same_value_type_or_can_implicitly_move_cast(
   Value *target,
@@ -1253,13 +1338,18 @@ same_value_type_or_can_implicitly_move_cast(
   // Allow literal `0` to be cast to a pointer
   if (
     target->descriptor->tag == Descriptor_Tag_Pointer &&
-    descriptor_is_integer(source->descriptor) &&
-    source->operand.tag == Operand_Tag_Immediate &&
-    operand_immediate_value_up_to_s64(&source->operand) == 0
+    source->descriptor == &descriptor_number_literal
   ) {
-    return true;
+    assert(source->operand.tag == Operand_Tag_Immediate);
+    Number_Literal *literal = source->operand.Immediate.memory;
+    return literal->bits == 0;
   }
   if (target->descriptor->tag != source->descriptor->tag) return false;
+  if (source->descriptor == &descriptor_number_literal) {
+    Literal_Cast_Result cast_result =
+      value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
+    return cast_result == Literal_Cast_Result_Success;
+  }
   // TODO deal with signess
   if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {

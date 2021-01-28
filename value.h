@@ -107,6 +107,7 @@ Descriptor descriptor_type = {
 // TODO maybe turn this into a proper pointer type
 MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope *);
 MASS_DEFINE_OPAQUE_C_TYPE(external_symbol, External_Symbol);
+MASS_DEFINE_OPAQUE_C_TYPE(number_literal, Number_Literal);
 
 #define MASS_ENUMERATE_BUILT_IN_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\

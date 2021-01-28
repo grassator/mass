@@ -195,10 +195,12 @@ spec("source") {
       const Token *token = token_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0xCAFE")));
-      check(token->Value.value->descriptor == &descriptor_u16);
+      check(token->Value.value->descriptor == &descriptor_number_literal);
       check(token->Value.value->operand.tag == Operand_Tag_Immediate);
-      u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
-      check(bits == 0xCAFE, "Expected 0xCAFE, got 0x%" PRIx64, bits);
+      Number_Literal *literal = token->Value.value->operand.Immediate.memory;
+      check(slice_equal(literal->digits, slice_literal("CAFE")));
+      check(!literal->negative);
+      check(literal->base == Number_Base_16);
     }
 
     it("should be able to parse binary integers") {
@@ -211,10 +213,12 @@ spec("source") {
       const Token *token = token_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0b100")));
-      check(token->Value.value->descriptor == &descriptor_u8);
+      check(token->Value.value->descriptor == &descriptor_number_literal);
       check(token->Value.value->operand.tag == Operand_Tag_Immediate);
-      u64 bits = operand_immediate_value_up_to_u64(&token->Value.value->operand);
-      check(bits == 0b100, "Expected 0x8, got 0x%" PRIx64, bits);
+      Number_Literal *literal = token->Value.value->operand.Immediate.memory;
+      check(slice_equal(literal->digits, slice_literal("100")));
+      check(!literal->negative);
+      check(literal->base == Number_Base_2);
     }
 
     it("should be able to tokenize a sum of integers") {
@@ -425,9 +429,9 @@ spec("source") {
 
   describe("if / else") {
     it("should be able to parse and run if expression") {
-      fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
+      fn_type_s32_to_s64 checker = (fn_type_s32_to_s64)test_program_inline_source_function(
         "is_positive", &test_context,
-        "is_positive :: (x : s32) -> (u8) {"
+        "is_positive :: (x : s32) -> (s64) {"
           "if x < 0 then 0 else 1"
         "}"
       );
@@ -561,7 +565,7 @@ spec("source") {
     it("should be able to parse and run multiple function definitions") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "proxy", &test_context,
-        "proxy :: () -> (s32) { plus(1, 2); plus(30 + 10, 2) }\n"
+        "proxy :: () -> (s32) { plus(1, 2); plus(40, 2) }\n"
         "plus :: (x : s32, y : s32) -> (s32) { x + y }"
       );
       check(checker);
@@ -634,7 +638,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Could not decide which overload to pick"), error->message));
+      check(slice_starts_with(
+        error->message, slice_literal("Could not decide which overload to pick")
+      ));
     }
 
     it("should be able to have an explicit return") {
@@ -936,7 +942,8 @@ spec("source") {
         "test :: () -> (u8) { broken_plus(41, 0) }"
       );
       check(checker);
-      check(checker() == 42);
+      s8 actual = checker();
+      check(actual == 42);
     }
 
     it("should allow changes to the passed arguments to macro function") {
@@ -1166,7 +1173,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Fixed size array size must be an unsigned integer"), error->message));
+      check(slice_starts_with(
+        error->message, slice_literal("Expected an integer")
+      ));
     }
 
     it("should be able to define a variable with a fixed size array type") {

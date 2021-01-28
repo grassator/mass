@@ -417,9 +417,17 @@ main(void) {
     { "s32 *", "patch_target" },
   }));
 
+   push_type(type_enum("Number_Base", (Enum_Item[]){
+    { "2", 2 },
+    { "10", 10 },
+    { "16", 16 },
+  }));
+
   push_type(type_struct("Number_Literal", (Struct_Item[]){
-    { "Slice", "text" },
+    { "Slice", "digits" },
+    { "Number_Base", "base" },
     { "bool", "negative" },
+    { "u64", "bits" },
   }));
 
   push_type(type_struct("External_Symbol", (Struct_Item[]){

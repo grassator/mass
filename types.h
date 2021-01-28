@@ -62,6 +62,8 @@ typedef struct Label_Location_Diff_Patch_Info Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info *) Array_Label_Location_Diff_Patch_Info_Ptr;
 typedef dyn_array_type(const Label_Location_Diff_Patch_Info *) Array_Const_Label_Location_Diff_Patch_Info_Ptr;
 
+typedef enum Number_Base Number_Base;
+
 typedef struct Number_Literal Number_Literal;
 typedef dyn_array_type(Number_Literal *) Array_Number_Literal_Ptr;
 typedef dyn_array_type(const Number_Literal *) Array_Const_Number_Literal_Ptr;
@@ -289,9 +291,17 @@ typedef struct Label_Location_Diff_Patch_Info {
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
 
+typedef enum Number_Base {
+  Number_Base_2 = 2,
+  Number_Base_10 = 10,
+  Number_Base_16 = 16,
+} Number_Base;
+
 typedef struct Number_Literal {
-  Slice text;
+  Slice digits;
+  Number_Base base;
   bool negative;
+  u64 bits;
 } Number_Literal;
 typedef dyn_array_type(Number_Literal) Array_Number_Literal;
 

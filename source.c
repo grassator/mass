@@ -119,6 +119,103 @@ scope_lookup(
   return 0;
 }
 
+Value *
+token_value_force_immediate_integer(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *value,
+  Descriptor *target_descriptor
+) {
+  MASS_ON_ERROR(*context->result) return 0;
+
+  assert(descriptor_is_integer(target_descriptor));
+  if (value->descriptor == &descriptor_number_literal) {
+    u64 bits = 0xCCccCCccCCccCCcc;
+    u64 bit_size = 0xCCccCCccCCccCCcc;
+    Literal_Cast_Result cast_result =
+      value_number_literal_cast_to(value, target_descriptor, &bits, &bit_size);
+    switch(cast_result) {
+      case Literal_Cast_Result_Success: {
+        // Always copy full value. Truncation is handled by the byte_size of the immediate
+        u64 *memory = allocator_allocate(context->allocator, u64);
+        *memory = bits;
+        return value_make(context->allocator, target_descriptor, (Operand) {
+          .tag = Operand_Tag_Immediate,
+          .byte_size = u64_to_u32(bit_size / 8),
+          .Immediate.memory = memory,
+        });
+      }
+      case Literal_Cast_Result_Target_Not_An_Integer: {
+        panic("We already checked that target is an integer");
+        return 0;
+      }
+      case Literal_Cast_Result_Target_Too_Small: {
+        context_error_snprintf(
+          context, *source_range,
+          // TODO maybe provide the range instead
+          "Literal value does not fit into the target integer size %u",
+          u64_to_u8(bit_size / 8)
+        );
+        return 0;
+      }
+      case Literal_Cast_Result_Target_Too_Big: {
+        context_error_snprintf(
+          context, *source_range, "Integers larger than 64 bits are not supported"
+        );
+        return 0;
+      }
+      case Literal_Cast_Result_Unsigned_Target_For_Negative_Literal: {
+        context_error_snprintf(
+          context, *source_range, "Can not convert a negative literal to an unsigned number"
+        );
+        return 0;
+      }
+    }
+    panic("Unexpected literal cast result");
+  }
+
+  if (!descriptor_is_integer(value->descriptor)) {
+    context_error_snprintf(
+      context, *source_range,
+      "Expected an integer"
+    );
+    return 0;
+  }
+
+  if (value->operand.tag != Operand_Tag_Immediate) {
+    context_error_snprintf(
+      context, *source_range,
+      "Value is not an immediate"
+    );
+    return 0;
+  }
+
+  u32 target_byte_size = descriptor_byte_size(target_descriptor);
+  if (target_byte_size > descriptor_byte_size(value->descriptor)) {
+    context_error_snprintf(
+      context, *source_range,
+      "Immediate value does not fit into the target integer size %u",
+      target_byte_size
+    );
+  }
+
+  // FIXME resize the value?
+
+  return value;
+}
+
+Value *
+maybe_coerce_number_literal_to_integer(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *value,
+  Descriptor *target_descriptor
+) {
+  if (!descriptor_is_integer(target_descriptor)) return value;
+  if (value->descriptor != &descriptor_number_literal) return value;
+  return token_value_force_immediate_integer(context, source_range, value, target_descriptor);
+}
+
 PRELUDE_NO_DISCARD Mass_Result
 assign(
   Compilation_Context *context,
@@ -140,6 +237,33 @@ assign(
     target->operand = source->operand;
     target->next_overload = source->next_overload;
     return *context->result;
+  }
+
+  if (source->descriptor == &descriptor_number_literal) {
+    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+      assert(source->operand.tag == Operand_Tag_Immediate);
+      Number_Literal *literal = source->operand.Immediate.memory;
+      if (literal->bits == 0) {
+        source = token_value_force_immediate_integer(
+          context, source_range, source, &descriptor_u64
+        );
+        source->descriptor = target->descriptor;
+      } else {
+        context_error_snprintf(
+          context, *source_range, "Trying to assign a non-zero literal number to a pointer"
+        );
+        return *context->result;
+      }
+    } else if (descriptor_is_integer(target->descriptor)) {
+      source = token_value_force_immediate_integer(
+        context, source_range, source, target->descriptor
+      );
+    } else {
+      context_error_snprintf(
+        context, *source_range, "Trying to assign a literal number to a non-integer value"
+      );
+      return *context->result;
+    }
   }
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
@@ -352,44 +476,6 @@ token_match(
   bool result = token_match_internal(token, pattern);
   if (!result && pattern->or) {
     return token_match(token, pattern->or);
-  }
-  return result;
-}
-
-u64
-tokenizer_handle_decimal_integer_end(
-  Slice digits
-) {
-  bool ok = true;
-  u64 result = slice_parse_u64(digits, &ok);
-  if (!ok) {
-    panic("Internal Error: Mismatch between tokenizer and decimal integer parser");
-  }
-  return result;
-}
-
-u64
-tokenizer_handle_hex_integer_end(
-  Slice digits
-) {
-  digits = slice_sub(digits, 2, digits.length); // Skip over 0x
-  bool ok = true;
-  u64 result = slice_parse_hex(digits, &ok);
-  if (!ok) {
-    panic("Internal Error: Mismatch between tokenizer and hex integer parser");
-  }
-  return result;
-}
-
-u64
-tokenizer_handle_binary_integer_end(
-  Slice digits
-) {
-  digits = slice_sub(digits, 2, digits.length); // Skip over 0b
-  bool ok = true;
-  u64 result = slice_parse_binary(digits, &ok);
-  if (!ok) {
-    panic("Internal Error: Mismatch between tokenizer and binary integer parser");
   }
   return result;
 }
@@ -627,8 +713,8 @@ tokenize(
       }
       case Tokenizer_State_Decimal_Integer: {
         if (!isdigit(ch)) {
-          u64 bits = tokenizer_handle_decimal_integer_end(current_token_source());
-          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+          Slice digits = current_token_source();
+          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_10);
           reject_and_push;
           goto retry;
         }
@@ -636,8 +722,10 @@ tokenize(
       }
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
-          u64 bits = tokenizer_handle_hex_integer_end(current_token_source());
-          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+          Slice digits = current_token_source();
+          // Cut off `0x` prefix
+          digits = slice_sub(digits, 2, digits.length);
+          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_16);
           reject_and_push;
           goto retry;
         }
@@ -645,8 +733,10 @@ tokenize(
       }
       case Tokenizer_State_Binary_Integer: {
         if (ch != '0' && ch != '1') {
-          u64 bits = tokenizer_handle_binary_integer_end(current_token_source());
-          current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+          Slice digits = current_token_source();
+          // Cut off `0b` prefix
+          digits = slice_sub(digits, 2, digits.length);
+          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_2);
           reject_and_push;
           goto retry;
         }
@@ -713,18 +803,20 @@ tokenize(
     }
 
     case Tokenizer_State_Decimal_Integer: {
-      u64 bits = tokenizer_handle_decimal_integer_end(current_token_source());
-      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+      Slice digits = current_token_source();
+      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_10);
       break;
     }
     case Tokenizer_State_Hex_Integer: {
-      u64 bits = tokenizer_handle_hex_integer_end(current_token_source());
-      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+      Slice digits = current_token_source();
+      digits = slice_sub(digits, 2, digits.length); // Cut off `0x` prefix
+      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_16);
       break;
     }
     case Tokenizer_State_Binary_Integer: {
-      u64 bits = tokenizer_handle_binary_integer_end(current_token_source());
-      current_token->Value.value = value_from_unsigned_immediate(allocator, bits);
+      Slice digits = current_token_source();
+      digits = slice_sub(digits, 2, digits.length); // Cut off `0b` prefix
+      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_2);
       break;
     }
     case Tokenizer_State_String:
@@ -1572,19 +1664,13 @@ token_parse_operator_definition(
 
   Value *precedence_value = value_any(context->allocator);
   MASS_ON_ERROR(token_force_value(context, precedence_token, precedence_value)) goto err;
-
-  if (!precedence_value || !descriptor_is_unsigned_integer(precedence_value->descriptor)) {
-    context_error_snprintf(
-      context, precedence_token->source_range,
-      "Operator precedence must be an unsigned number"
-    );
-    goto err;
-  }
+  precedence_value = token_value_force_immediate_integer(
+    context, &precedence_token->source_range, precedence_value, &descriptor_u64
+  );
+  MASS_ON_ERROR(*context->result) goto err;
 
   assert(precedence_value->operand.tag == Operand_Tag_Immediate);
-
   u64 precendence = operand_immediate_value_up_to_u64(&precedence_value->operand);
-  (void)precendence;
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -1965,20 +2051,11 @@ token_process_bit_type_definition(
   Token_View args_view = { .tokens = &args, .length = 1, .source_range = args->source_range };
   Value *bit_size_value = value_any(context->allocator);
   compile_time_eval(context, args_view, bit_size_value);
-  if (!bit_size_value) {
-    context_error_snprintf(context, args->source_range, "Could not parse bit type size");
-    goto err;
-  }
-
-  if (!descriptor_is_integer(bit_size_value->descriptor)) {
-    context_error_snprintf(context, args->source_range, "Bit type size must be an integer");
-    goto err;
-  }
-  if (bit_size_value->operand.tag != Operand_Tag_Immediate) {
-    context_error_snprintf(context, args->source_range, "Bit type size must be a constant");
-    goto err;
-  }
-  u64 bit_size = s64_to_u64(operand_immediate_value_up_to_s64(&bit_size_value->operand));
+  bit_size_value = maybe_coerce_number_literal_to_integer(
+    context, &args->source_range, bit_size_value, &descriptor_u64
+  );
+  MASS_ON_ERROR(*context->result) return 0;
+  u64 bit_size = operand_immediate_value_up_to_u64(&bit_size_value->operand);
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Opaque,
@@ -1988,9 +2065,6 @@ token_process_bit_type_definition(
   Value *result = allocator_allocate(context->allocator, Value);
   *result = type_value_for_descriptor(descriptor);
   return token_value_make(context, result, args->source_range);
-
-  err:
-  return 0;
 }
 
 Token *
@@ -2420,97 +2494,20 @@ token_handle_cast(
     value_ensure_type(context, type, *source_range, slice_literal("TODO cast source"));
 
   assert(descriptor_is_integer(cast_to_descriptor));
-  assert(value->descriptor->tag == cast_to_descriptor->tag);
-
+  Value *after_cast_value = value;
   u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
   u32 original_byte_size = descriptor_byte_size(value->descriptor);
-  Value *after_cast_value = value;
-  if (cast_to_byte_size != original_byte_size) {
+  if (value->descriptor == &descriptor_number_literal) {
+    after_cast_value = token_value_force_immediate_integer(
+      context, source_range, value, cast_to_descriptor
+    );
+  } else if (cast_to_byte_size < original_byte_size) {
     after_cast_value = allocator_allocate(context->allocator, Value);
-
-    if (value->operand.tag == Operand_Tag_Immediate) {
-      if (descriptor_is_signed_integer(cast_to_descriptor)) {
-        s64 integer = operand_immediate_value_up_to_s64(&value->operand);
-        switch(cast_to_byte_size) {
-          case 1: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm8(context->allocator, (s8)integer),
-            };
-            break;
-          }
-          case 2: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm16(context->allocator, (s16)integer),
-            };
-            break;
-          }
-          case 4: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm32(context->allocator, (s32)integer),
-            };
-            break;
-          }
-          case 8: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm64(context->allocator, (s64)integer),
-            };
-            break;
-          }
-          default: {
-            panic("Unsupported integer size when casting");
-            break;
-          }
-        }
-      } else {
-        u64 integer = operand_immediate_value_up_to_u64(&value->operand);
-        switch(cast_to_byte_size) {
-          case 1: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm8(context->allocator, (u8)integer),
-            };
-            break;
-          }
-          case 2: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm16(context->allocator, (u16)integer),
-            };
-            break;
-          }
-          case 4: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm32(context->allocator, (u32)integer),
-            };
-            break;
-          }
-          case 8: {
-            *after_cast_value = (Value) {
-              .descriptor = cast_to_descriptor,
-              .operand = imm64(context->allocator, (u64)integer),
-            };
-            break;
-          }
-          default: {
-            panic("Unsupported integer size when casting");
-            break;
-          }
-        }
-      }
-    } else if (cast_to_byte_size < original_byte_size) {
-      *after_cast_value = (Value) {
-        .descriptor = cast_to_descriptor,
-        .operand = value->operand,
-      };
-      after_cast_value->operand.byte_size = cast_to_byte_size;
-    } else if (cast_to_byte_size > original_byte_size) {
-      panic("Not implemented cast to a larger type");
-    }
+    *after_cast_value = (Value) {
+      .descriptor = cast_to_descriptor,
+      .operand = value->operand,
+    };
+    after_cast_value->operand.byte_size = cast_to_byte_size;
   }
   MASS_ON_ERROR(assign(context, source_range, result_value, after_cast_value));
 }
@@ -2529,33 +2526,19 @@ token_handle_negation(
   // FIXME use result_value here
   Value *value = value_any(context->allocator);
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
-  Value *negated_value = 0;
-  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {\
-    // FIXME this is broken for originally unsigned values larger than their signed counterpart
-    switch(value->operand.byte_size) {
-      case 1: {
-        negated_value = value_from_s8(context->allocator, -operand_immediate_memory_as_s8(&value->operand));
-        break;
-      }
-      case 2: {
-        negated_value = value_from_s16(context->allocator, -operand_immediate_memory_as_s16(&value->operand));
-        break;
-      }
-      case 4: {
-        negated_value = value_from_s32(context->allocator, -operand_immediate_memory_as_s32(&value->operand));
-        break;
-      }
-      case 8: {
-        negated_value = value_from_s64(context->allocator, -operand_immediate_memory_as_s64(&value->operand));
-        break;
-      }
-      default: {
-        panic("Internal error, unexpected integer immediate size");
-        break;
-      }
-    }
+  Value *negated_value;
+  if (value->descriptor == &descriptor_number_literal) {
+    assert(value->operand.tag == Operand_Tag_Immediate);
+    Number_Literal *original = value->operand.Immediate.memory;
+    Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
+    *negated = *original;
+    negated->negative = !negated->negative;
+    negated_value = value_make(
+      context->allocator, &descriptor_number_literal, operand_immediate(negated)
+    );
   } else {
-    panic("TODO");
+    panic("TODO support general negation");
+    negated_value = 0;
   }
   MASS_ON_ERROR(assign(context, &token->source_range, result_value, negated_value));
 }
@@ -2940,12 +2923,16 @@ token_handle_function_call(
     Descriptor_Function *descriptor = &to_call_descriptor->Function;
     if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
+    if (score == -1) continue; // no match
     if (score == match.score) {
-      // TODO improve error message
+      Slice previous_source = match.value->descriptor->Function.body->source;
+      Slice current_source = descriptor->body->source;
       // TODO provide names of matched overloads
       context_error_snprintf(
         context, target_token->source_range,
-        "Could not decide which overload to pick"
+        "Could not decide which overload to pick."
+        "Candidates are %"PRIslice" and %"PRIslice,
+        SLICE_EXPAND_PRINTF(previous_source), SLICE_EXPAND_PRINTF(current_source)
       );
       return;
     } else if (score > match.score) {
@@ -2955,6 +2942,17 @@ token_handle_function_call(
       // Skip a worse match
     }
   }
+
+  if (match.score == -1) {
+    // TODO provide types of actual arguments
+    context_error_snprintf(
+      context, target_token->source_range,
+      "Could not find matching overload for call %"PRIslice,
+      SLICE_EXPAND_PRINTF(target_token->source)
+    );
+    return;
+  }
+
 
   Value *overload = match.value;
   if (overload) {
@@ -2978,6 +2976,9 @@ token_handle_function_call(
           }
           case Function_Argument_Tag_Any_Of_Type: {
             Value *arg_value = *dyn_array_get(args, i);
+            arg_value = maybe_coerce_number_literal_to_integer(
+              context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
+            );
             scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
               .tag = Scope_Entry_Tag_Value,
               .Value.value = arg_value,
@@ -3086,40 +3087,6 @@ extend_signed_integer_value_to_next_size(
   return extend_integer_value(context, source_range, value, one_size_larger);
 }
 
-Value *
-maybe_coerce_immediate_value_to_signed(
-  Compilation_Context *context,
-  Value *value,
-  Descriptor *target_descriptor
-) {
-  if (!descriptor_is_signed_integer(target_descriptor)) return value;
-  if (!descriptor_is_unsigned_integer(value->descriptor)) return value;
-  if (value->operand.tag != Operand_Tag_Immediate) return value;
-  u64 integer = operand_immediate_value_up_to_u64(&value->operand);
-  if (target_descriptor == &descriptor_s8) {
-    if (u64_fits_into_s8(integer)) {
-      return value_from_s8(context->allocator, u64_to_s8(integer));
-    }
-    return value;
-  } else if (target_descriptor == &descriptor_s16) {
-    if (u64_fits_into_s16(integer)) {
-      return value_from_s16(context->allocator, u64_to_s16(integer));
-    }
-    return value;
-  } else if (target_descriptor == &descriptor_s32) {
-    if (u64_fits_into_s32(integer)) {
-      return value_from_s32(context->allocator, u64_to_s32(integer));
-    }
-    return value;
-  } else if (target_descriptor == &descriptor_s64) {
-    if (u64_fits_into_s64(integer)) {
-      return value_from_s64(context->allocator, u64_to_s64(integer));
-    }
-    return value;
-  }
-  return value;
-}
-
 void
 maybe_resize_values_for_integer_math_operation(
   Compilation_Context *context,
@@ -3127,11 +3094,11 @@ maybe_resize_values_for_integer_math_operation(
   Value **lhs_pointer,
   Value **rhs_pointer
 ) {
-  *lhs_pointer = maybe_coerce_immediate_value_to_signed(
-    context, *lhs_pointer, (*rhs_pointer)->descriptor
+  *lhs_pointer = maybe_coerce_number_literal_to_integer(
+    context, source_range, *lhs_pointer, (*rhs_pointer)->descriptor
   );
-  *rhs_pointer = maybe_coerce_immediate_value_to_signed(
-    context, *rhs_pointer, (*lhs_pointer)->descriptor
+  *rhs_pointer = maybe_coerce_number_literal_to_integer(
+    context, source_range, *rhs_pointer, (*lhs_pointer)->descriptor
   );
 
   Descriptor *ld = (*lhs_pointer)->descriptor;
@@ -3260,6 +3227,9 @@ token_eval_operator(
       .descriptor = item_descriptor,
       .operand = array->operand
     };
+    index_value = maybe_coerce_number_literal_to_integer(
+      context, &index_tokens.source_range, index_value, &descriptor_u64
+    );
     array_element_value->operand.byte_size = item_byte_size;
     if (index_value->operand.tag == Operand_Tag_Immediate) {
       s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
@@ -3442,19 +3412,31 @@ token_eval_operator(
     Value *rhs_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
+    bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
+    bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
+    if (lhs_is_literal && rhs_is_literal) {
+      // FIXME support large unsigned numbers
+      lhs_value = token_value_force_immediate_integer(
+        context, &lhs->source_range, lhs_value, &descriptor_s64
+      );
+      rhs_value = token_value_force_immediate_integer(
+        context, &rhs->source_range, rhs_value, &descriptor_s64
+      );
+      MASS_ON_ERROR(*context->result) return;
+    }
 
-    if (!descriptor_is_integer(lhs_value->descriptor)) {
+    if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
       context_error_snprintf(
         context, lhs->source_range,
-        "Left hand side of the  %"PRIslice" is not an integer",
+        "Left hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
     }
-    if (!descriptor_is_integer(rhs_value->descriptor)) {
+    if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
       context_error_snprintf(
         context, rhs->source_range,
-        "Right hand side of the  %"PRIslice" is not an integer",
+        "Right hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
@@ -3496,18 +3478,31 @@ token_eval_operator(
     Value *rhs_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
-    if (!descriptor_is_integer(lhs_value->descriptor)) {
+    bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
+    bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
+    if (lhs_is_literal && rhs_is_literal) {
+      // FIXME support large unsigned numbers
+      lhs_value = token_value_force_immediate_integer(
+        context, &lhs->source_range, lhs_value, &descriptor_s64
+      );
+      rhs_value = token_value_force_immediate_integer(
+        context, &rhs->source_range, rhs_value, &descriptor_s64
+      );
+      MASS_ON_ERROR(*context->result) return;
+    }
+
+    if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
       context_error_snprintf(
         context, lhs->source_range,
-        "Left hand side of the  %"PRIslice" is not an integer",
+        "Left hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
     }
-    if (!descriptor_is_integer(rhs_value->descriptor)) {
+    if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
       context_error_snprintf(
         context, rhs->source_range,
-        "Right hand side of the  %"PRIslice" is not an integer",
+        "Right hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
@@ -3716,6 +3711,7 @@ token_parse_if_expression(
 
   Value *condition_value = value_any(context->allocator);
   token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
+  MASS_ON_ERROR(*context->result) goto err;
 
   Label_Index else_label = make_if(
     context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
@@ -3725,7 +3721,11 @@ token_parse_if_expression(
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
 
   if (if_value->operand.tag == Operand_Tag_Immediate) {
-    Value *on_stack = reserve_stack(context->allocator, context->builder, if_value->descriptor);
+    Descriptor *stack_descriptor = if_value->descriptor;
+    if (stack_descriptor == &descriptor_number_literal) {
+      stack_descriptor = &descriptor_s64;
+    }
+    Value *on_stack = reserve_stack(context->allocator, context->builder, stack_descriptor);
     MASS_ON_ERROR(assign(context, &view.source_range, on_stack, if_value)) {
       goto err;
     }
@@ -4212,7 +4212,10 @@ token_parse_explicit_return(
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
   if (is_any_return) {
-    Value *stack_return = reserve_stack(context->allocator, context->builder, fn_return->descriptor);
+    Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
+      ? &descriptor_s64
+      : fn_return->descriptor;
+    Value *stack_return = reserve_stack(context->allocator, context->builder, stack_descriptor);
     MASS_ON_ERROR(assign(context, &keyword->source_range, stack_return, fn_return)) return true;
     *fn_return = *stack_return;
   }
@@ -4257,21 +4260,10 @@ token_match_fixed_array_type(
   Token_View size_view = square_brace->Group.children;
   Value *size_value = value_any(context->allocator);
   compile_time_eval(context, size_view, size_value);
-  if (!descriptor_is_unsigned_integer(size_value->descriptor)) {
-    context_error_snprintf(
-      context, size_view.source_range,
-      "Fixed size array size must be an unsigned integer"
-    );
-    return 0;
-  }
+  size_value = token_value_force_immediate_integer(
+    context, &size_view.source_range, size_value, &descriptor_u32
+  );
   MASS_ON_ERROR(*context->result) return 0;
-  if (size_value->operand.tag != Operand_Tag_Immediate) {
-    context_error_snprintf(
-      context, size_view.source_range,
-      "Fixed size array size must be known at compile time"
-    );
-    return 0;
-  }
   u32 length = u64_to_u32(operand_immediate_value_up_to_u64(&size_value->operand));
 
   // TODO extract into a helper
@@ -4339,29 +4331,10 @@ token_parse_inline_machine_code_bytes(
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
     } else {
-      if (!descriptor_is_integer(value->descriptor)) {
-        context_error_snprintf(
-          context, args_token->source_range,
-          "inline_machine_code_bytes expects arguments to be integers"
-        );
-        goto err;
-      }
-      if (value->operand.tag != Operand_Tag_Immediate) {
-        context_error_snprintf(
-          context, args_token->source_range,
-          "inline_machine_code_bytes expects arguments to be compile-time known"
-        );
-        goto err;
-      }
-      u64 byte = operand_immediate_value_up_to_u64(&value->operand);
-      if (!u64_fits_into_u8(byte)) {
-        context_error_snprintf(
-          context, args_token->source_range,
-          "Expected integer between 0 and 255, got %"PRIu64,
-          byte
-        );
-        goto err;
-      }
+      value = token_value_force_immediate_integer(
+        context, &args_token->source_range, value, &descriptor_u8
+      );
+      u8 byte = u64_to_u8(operand_immediate_value_up_to_u64(&value->operand));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     }
   }
@@ -4451,8 +4424,10 @@ token_parse_definition_and_assignment_statements(
   token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (descriptor_is_integer(value->descriptor) && value->operand.tag == Operand_Tag_Immediate) {
-    value = value_from_s64(context->allocator, operand_immediate_value_up_to_s64(&value->operand));
+  if (value->descriptor == &descriptor_number_literal) {
+    value = token_value_force_immediate_integer(
+      context, &rhs.source_range, value, &descriptor_s64
+    );
   } else if (
     value->descriptor->tag == Descriptor_Tag_Opaque &&
     value->operand.tag == Operand_Tag_Immediate
