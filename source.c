@@ -2166,7 +2166,8 @@ token_process_function_literal(
 
   Value *result = value_make(context->allocator, descriptor, (Operand){0});
   if (body->tag == Token_Tag_Value) {
-    result->descriptor = descriptor_pointer_to(context->allocator, descriptor);
+    result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
+    result->descriptor = descriptor;
     result->operand = body->Value.value->operand;
   } else {
     descriptor->Function.scope = function_scope;
@@ -2639,7 +2640,10 @@ token_dispatch_constant_operator(
     Value *function_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
-      if (function_value->descriptor->tag == Descriptor_Tag_Function) {
+      if (
+        function_value->descriptor->tag == Descriptor_Tag_Function &&
+        !(function_value->descriptor->Function.flags & Descriptor_Function_Flags_External)
+      ) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
         descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
