@@ -83,6 +83,11 @@ Descriptor descriptor_scope = {
   .Opaque = { .bit_size = sizeof(Scope *) * 8 },
 };
 
+Descriptor descriptor_external_symbol = {
+  .tag = Descriptor_Tag_Opaque,
+  .Opaque = { .bit_size = sizeof(External_Symbol) * 8 },
+};
+
 Descriptor descriptor_type = {
   .tag = Descriptor_Tag_Opaque,
   .Opaque = { .bit_size = sizeof(Descriptor) * 8 },

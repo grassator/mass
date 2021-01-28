@@ -2089,13 +2089,21 @@ token_import_match_arguments(
     );
     return 0;
   }
-  Slice library_name = library_name_token->String.slice;
-  Slice symbol_name = symbol_name_token->String.slice;
+
+  External_Symbol *symbol = allocator_allocate(context->allocator, External_Symbol);
+  *symbol = (External_Symbol) {
+    .library_name = library_name_token->String.slice,
+    .symbol_name = symbol_name_token->String.slice,
+  };
 
   Value *result = allocator_allocate(context->allocator, Value);
   *result = (Value) {
-    .descriptor = 0,
-    .operand = import_symbol(context, library_name, symbol_name),
+    .descriptor = &descriptor_external_symbol,
+    .operand = {
+      .tag = Operand_Tag_Immediate,
+      .byte_size = sizeof(External_Symbol),
+      .Immediate.memory = symbol,
+    },
   };
   return token_value_make(context, result, view.source_range);
 }
@@ -2165,13 +2173,19 @@ token_process_function_literal(
   }
 
   Value *result = value_make(context->allocator, descriptor, (Operand){0});
+  descriptor->Function.body = body;
+  descriptor->Function.scope = function_scope;
   if (body->tag == Token_Tag_Value) {
-    result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
-    result->descriptor = descriptor;
-    result->operand = body->Value.value->operand;
-  } else {
-    descriptor->Function.scope = function_scope;
-    descriptor->Function.body = body;
+    Value *body_value = body->Value.value;
+    if (body_value->descriptor == &descriptor_external_symbol) {
+      result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
+    } else {
+      context_error_snprintf(
+        context, body->source_range,
+        "Only External_Symbol values are allowed as non-literal function bodies"
+      );
+      return 0;
+    }
   }
 
   return result;

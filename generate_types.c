@@ -417,6 +417,11 @@ main(void) {
     { "s32 *", "patch_target" },
   }));
 
+  push_type(type_struct("External_Symbol", (Struct_Item[]){
+    { "Slice", "library_name" },
+    { "Slice", "symbol_name" },
+  }));
+
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
     { "Label_Index", "label32" },

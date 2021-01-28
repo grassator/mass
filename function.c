@@ -1183,6 +1183,16 @@ ensure_compiled_function_body(
   if (function->flags & Descriptor_Function_Flags_Macro) return;
   assert(function->body);
 
+  if (function->flags & Descriptor_Function_Flags_External) {
+    assert(function->body->tag == Token_Tag_Value);
+    Value *body_value = function->body->Value.value;
+    assert(body_value->descriptor == &descriptor_external_symbol);
+    assert(body_value->operand.tag == Operand_Tag_Immediate);
+    External_Symbol *symbol = body_value->operand.Immediate.memory;
+    fn_value->operand = import_symbol(context, symbol->library_name, symbol->symbol_name);
+    return;
+  }
+
   Program *program = context->program;
   // FIXME @Speed switch this to a hash map lookup
   // If we already built the function for the target program just set the operand
