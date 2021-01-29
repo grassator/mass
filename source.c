@@ -1232,6 +1232,71 @@ token_apply_macro_syntax(
 
     Value *result =
       token_make_macro_capture_function(context, capture_view, captured_scope, return_descriptor);
+    // This overload allows the macro implementation to pass in a scope into a captured that
+    // will be expanded with `using` to bring in values from into a local scope. It is used
+    // to expose `break` and `continue` statements to the body of the loop while avoiding their
+    // definition in the captured scope of an expansion
+    // TODO @Speed figure out a better way to do this
+    {
+      Value *scope_overload =
+        token_make_macro_capture_function(context, capture_view, captured_scope, return_descriptor);
+      Array_Function_Argument overload_arguments = dyn_array_make(
+        Array_Function_Argument, .capacity = 1, .allocator = context->allocator
+      );
+      dyn_array_push(overload_arguments, (Function_Argument) {
+        .tag = Function_Argument_Tag_Any_Of_Type,
+        .Any_Of_Type = {
+          .name = slice_literal("@spliced_scope"),
+          .descriptor = &descriptor_scope,
+        },
+      });
+      Descriptor_Function *overload_function = &scope_overload->descriptor->Function;
+      overload_function->arguments = overload_arguments;
+      result->next_overload = scope_overload;
+
+      Token *using = allocator_allocate(context->allocator, Token);
+      *using = (Token) {
+        .tag = Token_Tag_Id,
+        .source = slice_literal("using"),
+        .source_range = capture_view.source_range,
+      };
+      Token *scope_id = allocator_allocate(context->allocator, Token);
+      *scope_id = (Token) {
+        .tag = Token_Tag_Id,
+        .source = slice_literal("@spliced_scope"),
+        .source_range = capture_view.source_range,
+      };
+      Token *semicolon = allocator_allocate(context->allocator, Token);
+      *semicolon = (Token) {
+        .tag = Token_Tag_Operator,
+        .source = slice_literal(";"),
+        .source_range = capture_view.source_range,
+      };
+
+      const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
+      scope_body_tokens[0] = using;
+      scope_body_tokens[1] = scope_id;
+      scope_body_tokens[2] = semicolon;
+      scope_body_tokens[3] = overload_function->body;
+
+      Token_View scope_token_view = (Token_View) {
+        .tokens = scope_body_tokens,
+        .length = 4,
+        .source_range = capture_view.source_range,
+      };
+
+      Token *scope_body = allocator_allocate(context->allocator, Token);
+      *scope_body = (Token) {
+        .tag = Token_Tag_Group,
+        .source_range = capture_view.source_range,
+        .source = source_from_source_range(&capture_view.source_range),
+        .Group = {
+          .tag = Token_Group_Tag_Curly,
+          .children = scope_token_view,
+        }
+      };
+      overload_function->body = scope_body;
+    }
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
