@@ -3404,17 +3404,6 @@ token_eval_operator(
     MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
 
     load_address(context, &pointee_token->source_range, result_value, pointee);
-  } else if (slice_equal(operator, slice_literal("^"))) {
-    const Token *body = token_view_get(args_view, 0);
-    if (body->tag == Token_Tag_Group && body->Group.tag == Token_Group_Tag_Curly) {
-      token_parse_block_no_scope(context, body, result_value);
-    } else {
-      context_error_snprintf(
-        context, body->source_range,
-        "^ operator must be followed by {}"
-      );
-      return;
-    }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
     if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
@@ -4651,10 +4640,6 @@ scope_define_builtins(
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
-  scope_define(scope, slice_literal("^"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
