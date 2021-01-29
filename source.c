@@ -4004,6 +4004,26 @@ token_parse_block(
   token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
+Value *
+token_define_label(
+  Compilation_Context *context,
+  Scope *label_scope,
+  Slice name
+) {
+  Program *program = context->program;
+  Label_Index label = make_label(program, &program->code_section, name);
+  Value *value = allocator_allocate(context->allocator, Value);
+  *value = (Value) {
+    .descriptor = &descriptor_void,
+    .operand = code_label32(label),
+  };
+  scope_define(label_scope, name, (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = value,
+  });
+  return value;
+}
+
 u64
 token_parse_statement_label(
   Compilation_Context *context,
@@ -4021,10 +4041,7 @@ token_parse_statement_label(
     rest.length != 1 ||
     !token_match(token_view_get(rest, 0), &(Token_Pattern){ .tag = Token_Tag_Id })
   ) {
-    context_error_snprintf(
-      context, keyword->source_range,
-      "`label` must be followed by an identifier"
-    );
+    context_error_snprintf(context, rest.source_range, "Expected a label identifier identifier");
     goto err;
   }
 
@@ -4054,18 +4071,7 @@ token_parse_statement_label(
       );
       goto err;
     }
-    Program *program = context->program;
-    Label_Index label = make_label(program, &program->code_section, id->source);
-
-    value = allocator_allocate(context->allocator, Value);
-    *value = (Value) {
-      .descriptor = &descriptor_void,
-      .operand = code_label32(label),
-    };
-    scope_define(label_scope, id->source, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = value,
-    });
+    value = token_define_label(context, label_scope, id->source);
   }
 
   if (
@@ -4140,7 +4146,7 @@ token_parse_goto(
       if (label_scope->flags & Scope_Flags_Labels) break;
       label_scope = label_scope->parent;
     }
-    if (!label_scope) {\
+    if (!label_scope) {
       context_error_snprintf(
         context, id->source_range,
         "Trying to execute `goto` outside of a label scope"
@@ -4150,19 +4156,7 @@ token_parse_goto(
     // :ForwardLabelRef
     // If we didn't find an identifier with this name, declare one and hope
     // that some label will resolve it
-    Program *program = context->program;
-    Label_Index label = make_label(program, &program->code_section, id->source);
-    value = allocator_allocate(context->allocator, Value);
-    *value = (Value) {
-      .descriptor = &descriptor_void,
-      .operand = code_label32(label),
-    };
-    // Label declarations are always done in the function scope as they
-    // might need to jump out of a nested block.
-    scope_define(label_scope, id->source, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = value,
-    });
+    value = token_define_label(context, label_scope, id->source);
   }
 
   if (
