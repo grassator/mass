@@ -182,12 +182,11 @@ typedef struct Token_View {
 typedef dyn_array_type(Token_View) Array_Token_View;
 
 typedef enum {
-  Token_Tag_None = 0,
-  Token_Tag_Id = 1,
-  Token_Tag_Operator = 2,
-  Token_Tag_Value = 3,
-  Token_Tag_String = 4,
-  Token_Tag_Group = 5,
+  Token_Tag_Id = 0,
+  Token_Tag_Operator = 1,
+  Token_Tag_Value = 2,
+  Token_Tag_String = 3,
+  Token_Tag_Group = 4,
 } Token_Tag;
 
 typedef struct {

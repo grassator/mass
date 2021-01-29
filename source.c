@@ -1018,10 +1018,6 @@ token_force_type(
 
   Descriptor *descriptor = 0;
   switch (token->tag) {
-    case Token_Tag_None: {
-      panic("Internal Error: Encountered token with an uninitialized tag");
-      break;
-    }
     case Token_Tag_Id: {
       descriptor = scope_lookup_type(context, scope, token->source_range, token->source);
       if (!descriptor) {
@@ -1516,10 +1512,6 @@ token_force_value(
   MASS_TRY(*context->result);
 
   switch(token->tag) {
-    case Token_Tag_None: {
-      panic("Internal Error: Encountered token with an uninitialized tag");
-      break;
-    }
     case Token_Tag_String: {
       Slice string = token->String.slice;
       Value *value = value_global_c_string_from_slice(context, string);
@@ -1962,10 +1954,6 @@ token_parse_syntax_definition(
     const Token *token = token_view_get(definition, i);
 
     switch(token->tag) {
-      case Token_Tag_None: {
-        panic("Unexpected None Token");
-        break;
-      }
       case Token_Tag_String: {
         dyn_array_push(pattern, (Macro_Pattern) {
           .tag = Macro_Pattern_Tag_Single_Token,
@@ -3662,10 +3650,6 @@ token_parse_expression(
       : Operator_Fixity_Infix | Operator_Fixity_Postfix;
 
     switch(token->tag) {
-      case Token_Tag_None: {
-        panic("Internal Error: Encountered token with an uninitialized tag");
-        break;
-      }
       case Token_Tag_String:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
