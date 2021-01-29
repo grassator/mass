@@ -1141,6 +1141,51 @@ token_match_pattern(
   return view_index;
 }
 
+Value *
+token_make_macro_capture_function(
+  Compilation_Context *context,
+  Token_View capture_view,
+  Scope *captured_scope,
+  Descriptor *return_descriptor
+) {
+  Token *fake_body = allocator_allocate(context->allocator, Token);
+  *fake_body = (Token) {
+    .tag = Token_Tag_Group,
+    .source_range = capture_view.source_range,
+    .source = source_from_source_range(&capture_view.source_range),
+    .Group = {
+      .tag = Token_Group_Tag_Curly,
+      .children = capture_view,
+    }
+  };
+
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
+      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .scope = captured_scope,
+      .body = fake_body,
+      .flags
+        = Descriptor_Function_Flags_Macro
+        | Descriptor_Function_Flags_No_Own_Scope
+        | Descriptor_Function_Flags_No_Own_Return,
+      .returns = {
+        .name = {0},
+        .descriptor = return_descriptor,
+      }
+    },
+  };
+
+  Value *result = allocator_allocate(context->allocator, Value);
+  *result = (Value) {
+    .descriptor = descriptor,
+    .operand = {.tag = Operand_Tag_None },
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+  };
+  return result;
+}
+
 void
 token_apply_macro_syntax(
   Compilation_Context *context,
@@ -1183,42 +1228,10 @@ token_apply_macro_syntax(
     if (!capture_name.length) continue;
 
     Token_View capture_view = *dyn_array_get(match, i);
+    Descriptor *return_descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void;
 
-    Token *fake_body = allocator_allocate(context->allocator, Token);
-    *fake_body = (Token) {
-      .tag = Token_Tag_Group,
-      .source_range = capture_view.source_range,
-      .source = source_from_source_range(&capture_view.source_range),
-      .Group = {
-        .tag = Token_Group_Tag_Curly,
-        .children = capture_view,
-      }
-    };
-
-    Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-    *descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Function,
-      .Function = {
-        .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-        .scope = captured_scope,
-        .body = fake_body,
-        .flags
-          = Descriptor_Function_Flags_Macro
-          | Descriptor_Function_Flags_No_Own_Scope
-          | Descriptor_Function_Flags_No_Own_Return,
-        .returns = {
-          .name = {0},
-          .descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void,
-        }
-      },
-    };
-
-    Value *result = allocator_allocate(context->allocator, Value);
-    *result = (Value) {
-      .descriptor = descriptor,
-      .operand = {.tag = Operand_Tag_None },
-      .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-    };
+    Value *result =
+      token_make_macro_capture_function(context, capture_view, captured_scope, return_descriptor);
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
