@@ -305,7 +305,8 @@ scope_entry_force(
       Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
       Compilation_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
-      Value *result = token_parse_constant_expression(&lazy_context, expr->tokens);
+      Value *result = value_any(context->allocator);
+      compile_time_eval(&lazy_context, expr->tokens, result);
       *entry = (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = result,
@@ -1520,7 +1521,6 @@ token_force_value(
 ) {
   MASS_TRY(*context->result);
 
-  Scope *scope = context->scope;
   switch(token->tag) {
     case Token_Tag_None: {
       panic("Internal Error: Encountered token with an uninitialized tag");
@@ -1533,9 +1533,10 @@ token_force_value(
     }
     case Token_Tag_Id: {
       Slice name = token->source;
-      Value *value = scope_lookup_force(context, scope, name);
+      Value *value = scope_lookup_force(context, context->scope, name);
       MASS_TRY(*context->result);
       if (!value) {
+        scope_print_names(context->scope);
         context_error_snprintf(
           context, token->source_range,
           "Undefined variable %"PRIslice,
@@ -2350,7 +2351,8 @@ compile_time_eval(
   Jit *jit = context->compile_time_jit;
   Compilation_Context eval_context = *context;
   eval_context.program = jit->program;
-  eval_context.scope = scope_make(context->allocator, context->scope);
+  // TODO consider if compile-time eval should create a nested scope
+  //eval_context.scope = scope_make(context->allocator, context->scope);
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
@@ -3389,6 +3391,18 @@ token_eval_operator(
       MASS_ON_ERROR(token_force_value(context, import_token, result_value)) return;
     } else if (
       target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("bit_type"))
+    ) {
+      Token *result_token = token_process_bit_type_definition(context, args_token);
+      MASS_ON_ERROR(token_force_value(context, result_token, result_value)) return;
+    } else if (
+      target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("c_struct"))
+    ) {
+      Token *result_token = token_process_c_struct_definition(context, args_token);
+      MASS_ON_ERROR(token_force_value(context, result_token, result_value)) return;
+    } else if (
+      target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("operand_variant_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -3629,7 +3643,10 @@ token_eval_operator(
     Value *function_value = value_any(context->allocator);
     MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
-      if (function_value->descriptor->tag == Descriptor_Tag_Function) {
+      if (
+        function_value->descriptor->tag == Descriptor_Tag_Function &&
+        !(function_value->descriptor->Function.flags & Descriptor_Function_Flags_External)
+      ) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
         descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
@@ -4116,6 +4133,8 @@ token_parse_statement_using(
   // FIXME We should either be able to freeze a scope or change the implementation
   //       to not use dynamic arrays as they might point to new memory. Or we could
   //       introduce an explicit proxy
+  // FIXME this only allows to access a specific level of scope, not its parent.
+  //       probably should flatten here instead.
   *proxy = *using_scope;
   proxy->parent = current_scope;
   Scope *new_scope = scope_make(context->allocator, proxy);
