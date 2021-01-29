@@ -533,8 +533,10 @@ fn_encode(
 
   Label_Index label_index = builder->label_index;
 
-  // TODO Maybe we can check if label is already resolved and stop here
   Label *label = program_get_label(program, label_index);
+
+  // Calls to `fn_encode` do not do anything if we already encoded
+  if (label->resolved) return;
 
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);

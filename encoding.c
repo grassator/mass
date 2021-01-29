@@ -304,6 +304,7 @@ encode_instruction(
   // TODO turn into a switch statement on type
   if (instruction->type == Instruction_Type_Label) {
     Label *label = program_get_label(program, instruction->label);
+    assert(!label->resolved);
     label->section = &program->code_section;
     label->offset_in_section = u64_to_u32(buffer->occupied);
     label->resolved = true;
