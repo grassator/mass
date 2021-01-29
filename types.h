@@ -1,3 +1,4 @@
+_Pragma("warning (push)") _Pragma("warning (default: 4820)")
 typedef void(*fn_type_opaque)();
 
 typedef struct Scope Scope;
@@ -197,10 +198,12 @@ typedef struct {
 } Token_String;
 typedef struct {
   Token_Group_Tag tag;
+  u32 _tag_padding;
   Token_View children;
 } Token_Group;
 typedef struct Token {
   Token_Tag tag;
+  char _tag_padding[4];
   Source_Range source_range;
   Slice source;
   union {
@@ -277,10 +280,10 @@ typedef struct Label_Index {
 typedef dyn_array_type(Label_Index) Array_Label_Index;
 
 typedef struct Label {
-  bool resolved;
+  u32 resolved;
+  u32 offset_in_section;
   Slice name;
   Section * section;
-  u32 offset_in_section;
 } Label;
 typedef dyn_array_type(Label) Array_Label;
 
@@ -300,7 +303,7 @@ typedef enum Number_Base {
 typedef struct Number_Literal {
   Slice digits;
   Number_Base base;
-  bool negative;
+  u32 negative;
   u64 bits;
 } Number_Literal;
 typedef dyn_array_type(Number_Literal) Array_Number_Literal;
@@ -338,7 +341,7 @@ typedef enum Compare_Type {
 
 typedef struct Maybe_Register {
   Register index;
-  bool has_value;
+  u32 has_value;
 } Maybe_Register;
 typedef dyn_array_type(Maybe_Register) Array_Maybe_Register;
 
@@ -352,11 +355,13 @@ typedef struct {
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct {
   Register base_register;
+  u32 _base_register_padding;
   Maybe_Register maybe_index_register;
   s64 offset;
 } Memory_Location_Indirect;
 typedef struct Memory_Location {
   Memory_Location_Tag tag;
+  char _tag_padding[4];
   union {
     Memory_Location_Instruction_Pointer_Relative Instruction_Pointer_Relative;
     Memory_Location_Indirect Indirect;
@@ -390,7 +395,8 @@ typedef struct {
 } Operand_Memory;
 typedef struct Operand {
   Operand_Tag tag;
-  u32 byte_size;
+  char _tag_padding[4];
+  u64 byte_size;
   union {
     Operand_Eflags Eflags;
     Operand_Register Register;
@@ -403,7 +409,7 @@ typedef dyn_array_type(Operand) Array_Operand;
 typedef struct Compiler_Source_Location {
   const char * filename;
   const char * function_name;
-  u32 line_number;
+  u64 line_number;
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
@@ -428,6 +434,7 @@ typedef struct {
 } Scope_Entry_Lazy_Expression;
 typedef struct {
   Operator_Fixity fixity;
+  u32 _fixity_padding;
   u64 precedence;
   u64 argument_count;
   Token_Handle_Operator_Proc handler;
@@ -435,6 +442,7 @@ typedef struct {
 } Scope_Entry_Operator;
 typedef struct Scope_Entry {
   Scope_Entry_Tag tag;
+  char _tag_padding[4];
   Scope_Entry * next_overload;
   union {
     Scope_Entry_Value Value;
@@ -462,7 +470,7 @@ typedef enum Descriptor_Function_Flags {
 typedef struct Descriptor_Struct_Field {
   Slice name;
   Descriptor * descriptor;
-  s32 offset;
+  u64 offset;
 } Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
@@ -481,6 +489,7 @@ typedef struct {
 } Function_Argument_Exact;
 typedef struct Function_Argument {
   Function_Argument_Tag tag;
+  char _tag_padding[4];
   union {
     Function_Argument_Any_Of_Type Any_Of_Type;
     Function_Argument_Exact Exact;
@@ -508,6 +517,7 @@ typedef struct {
 } Descriptor_Opaque;
 typedef struct {
   Descriptor_Function_Flags flags;
+  u32 _flags_padding;
   Array_Function_Argument arguments;
   const Token * body;
   Scope * scope;
@@ -515,7 +525,7 @@ typedef struct {
 } Descriptor_Function;
 typedef struct {
   Descriptor * item;
-  u32 length;
+  u64 length;
 } Descriptor_Fixed_Size_Array;
 typedef struct {
   Slice name;
@@ -526,6 +536,7 @@ typedef struct {
 } Descriptor_Pointer;
 typedef struct Descriptor {
   Descriptor_Tag tag;
+  char _tag_padding[4];
   union {
     Descriptor_Opaque Opaque;
     Descriptor_Function Function;
@@ -545,8 +556,10 @@ typedef struct {
 } Mass_Result_Error;
 typedef struct Mass_Result {
   Mass_Result_Tag tag;
+  char _tag_padding[4];
   union {
     Mass_Result_Error Error;
   };
 } Mass_Result;
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
+_Pragma("warning (pop)")

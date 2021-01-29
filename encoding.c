@@ -430,7 +430,7 @@ encode_instruction(
   }
   const Compiler_Source_Location *compiler_location = &instruction->compiler_source_location;
   printf(
-    "Added in compiler at %s:%u (fn: %s)\n",
+    "Added in compiler at %s:%"PRIu64" (fn: %s)\n",
     compiler_location->filename,
     compiler_location->line_number,
     compiler_location->function_name

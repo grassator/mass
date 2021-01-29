@@ -213,7 +213,7 @@ maybe_unwrap_pointer_descriptor(
   return descriptor;
 }
 
-u32
+u64
 descriptor_byte_size(
   const Descriptor *descriptor
 );

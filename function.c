@@ -18,7 +18,7 @@ reserve_stack(
   Function_Builder *fn,
   Descriptor *descriptor
 ) {
-  u32 byte_size = descriptor_byte_size(descriptor);
+  s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
   fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
   Operand operand = stack(-fn->stack_reserve, byte_size);
@@ -144,8 +144,8 @@ move_value(
     panic("Internal Error: Trying to move into Eflags");
   }
 
-  u32 target_size = target->byte_size;
-  u32 source_size = source->byte_size;
+  u64 target_size = target->byte_size;
+  u64 source_size = source->byte_size;
 
   if (target->tag == Operand_Tag_Xmm || source->tag == Operand_Tag_Xmm) {
     assert(target_size == source_size);
@@ -632,7 +632,7 @@ function_return_value_for_descriptor(
     };
   }
   // :ReturnTypeLargerThanRegister
-  u32 byte_size = descriptor_byte_size(descriptor);
+  u64 byte_size = descriptor_byte_size(descriptor);
   if (byte_size <= 8) {
     return (Value) {
       .descriptor = descriptor,
@@ -720,7 +720,7 @@ make_if(
         }
       }
     } else {
-      u32 byte_size = descriptor_byte_size(value->descriptor);
+      u64 byte_size = descriptor_byte_size(value->descriptor);
       if (byte_size == 4 || byte_size == 8) {
         push_instruction(
           instructions, *source_range,
@@ -809,8 +809,8 @@ plus_or_minus(
     b = temp_immediate;
   }
 
-  u32 a_size = descriptor_byte_size(a->descriptor);
-  u32 b_size = descriptor_byte_size(b->descriptor);
+  u64 a_size = descriptor_byte_size(a->descriptor);
+  u64 b_size = descriptor_byte_size(b->descriptor);
   Value *maybe_a_or_b_temp = 0;
 
   if (a_size != b_size) {
@@ -1347,7 +1347,7 @@ call_function_overload(
   Value fn_return_value = function_return_value_for_descriptor(descriptor->returns.descriptor);
 
   // :ReturnTypeLargerThanRegister
-  u32 return_size = descriptor_byte_size(descriptor->returns.descriptor);
+  u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
   if (return_size > 8) {
     parameters_stack_size += return_size;
     Descriptor *return_pointer_descriptor =

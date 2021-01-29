@@ -166,6 +166,7 @@ print_c_type(
       {
         fprintf(file, "typedef struct %s {\n", type->union_.name);
         fprintf(file, "  %s_Tag tag;\n", type->union_.name);
+        fprintf(file, "  char _tag_padding[4];\n");
         for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
           Struct_Item *item = &type->union_.common.items[i];
           fprintf(file, "  %s %s;\n", item->type, item->name);
@@ -327,6 +328,7 @@ main(void) {
     }),
     struct_fields("Group", (Struct_Item[]){
       { "Token_Group_Tag", "tag" },
+      { "u32", "_tag_padding" },
       { "Token_View", "children" },
     }),
   }), (Struct_Item[]){
@@ -405,10 +407,10 @@ main(void) {
   }));
 
   push_type(type_struct("Label", (Struct_Item[]){
-    { "bool", "resolved" },
+    { "u32", "resolved" },
+    { "u32", "offset_in_section" },
     { "Slice", "name" },
     { "Section *", "section" },
-    { "u32", "offset_in_section" },
   }));
 
   push_type(type_struct("Label_Location_Diff_Patch_Info", (Struct_Item[]){
@@ -426,7 +428,7 @@ main(void) {
   push_type(type_struct("Number_Literal", (Struct_Item[]){
     { "Slice", "digits" },
     { "Number_Base", "base" },
-    { "bool", "negative" },
+    { "u32", "negative" },
     { "u64", "bits" },
   }));
 
@@ -464,7 +466,7 @@ main(void) {
 
   push_type(type_struct("Maybe_Register", (Struct_Item[]){
     { "Register", "index" },
-    { "bool", "has_value" },
+    { "u32", "has_value" },
   }));
 
   push_type(type_union("Memory_Location", (Struct[]){
@@ -473,6 +475,7 @@ main(void) {
     }),
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },
+      { "u32", "_base_register_padding" },
       { "Maybe_Register", "maybe_index_register" },
       { "s64", "offset" },
     }),
@@ -498,13 +501,13 @@ main(void) {
     }),
   }), (Struct_Item[]){
     // TODO change to bit_size
-    { "u32", "byte_size" },
+    { "u64", "byte_size" },
   }));
 
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
     { "const char *", "filename" },
     { "const char *", "function_name" },
-    { "u32", "line_number" },
+    { "u64", "line_number" },
   }));
 
   push_type(type_enum("Operator_Fixity", (Enum_Item[]){
@@ -523,6 +526,7 @@ main(void) {
     }),
     struct_fields("Operator", (Struct_Item[]){
       { "Operator_Fixity", "fixity" },
+      { "u32", "_fixity_padding" },
       { "u64", "precedence" },
       { "u64", "argument_count" },
       { "Token_Handle_Operator_Proc", "handler" },
@@ -550,7 +554,7 @@ main(void) {
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
     { "Slice", "name" },
     { "Descriptor *", "descriptor" },
-    { "s32", "offset" },
+    { "u64", "offset" },
   }));
 
   push_type(type_union("Function_Argument", (Struct[]){
@@ -577,6 +581,7 @@ main(void) {
     }),
     struct_fields("Function", (Struct_Item[]){
       { "Descriptor_Function_Flags", "flags" },
+      { "u32", "_flags_padding" },
       { "Array_Function_Argument", "arguments" },
       { "const Token *", "body" },
       { "Scope *", "scope" },
@@ -584,7 +589,7 @@ main(void) {
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "Descriptor *", "item" },
-      { "u32", "length" },
+      { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
       { "Slice", "name" },
@@ -615,6 +620,9 @@ main(void) {
     FILE *file = fopen(filename, "wb");
     if (!file) exit(1);
 
+    // Make sure our generated structs have explicit padding
+    fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");
+
     // Custom forward declarations
     {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
@@ -633,6 +641,7 @@ main(void) {
     for (uint32_t i = 0; i < type_count; ++i) {
       print_c_type(file, &types[i]);
     }
+    fprintf(file, "_Pragma(\"warning (pop)\")\n");
 
     fclose(file);
     printf("C Types Generated at: %s\n", filename);

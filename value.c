@@ -88,7 +88,7 @@ same_type(
   }
 }
 
-u32
+u64
 descriptor_alignment(
   Descriptor *descriptor
 ) {
@@ -98,28 +98,28 @@ descriptor_alignment(
   return descriptor_byte_size(descriptor);
 }
 
-u32
+u64
 struct_byte_size(
   const Descriptor_Struct *Struct
 ) {
-  s64 count = dyn_array_length(Struct->fields);
+  u64 count = dyn_array_length(Struct->fields);
   assert(count);
-  u32 alignment = 0;
-  u32 raw_size = 0;
-  for (s32 i = 0; i < count; ++i) {
+  u64 alignment = 0;
+  u64 raw_size = 0;
+  for (u64 i = 0; i < count; ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(Struct->fields, i);
-    u32 field_alignment = descriptor_alignment(field->descriptor);
-    alignment = u32_max(alignment, field_alignment);
+    u64 field_alignment = descriptor_alignment(field->descriptor);
+    alignment = u64_max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
-    u32 field_size_with_alignment = u32_max(field_alignment, descriptor_byte_size(field->descriptor));
+    u64 field_size_with_alignment = u64_max(field_alignment, descriptor_byte_size(field->descriptor));
     if (is_last_field) {
       raw_size = field->offset + field_size_with_alignment;
     }
   }
-  return s32_align(raw_size, alignment);
+  return u64_align(raw_size, alignment);
 }
 
-u32
+u64
 descriptor_byte_size(
   const Descriptor *descriptor
 ) {
@@ -280,13 +280,13 @@ print_operand(
       break;
     }
     case Operand_Tag_Register: {
-      u32 bits = operand->byte_size * 8;
-      printf("r%d", bits);
+      u64 bits = operand->byte_size * 8;
+      printf("r%"PRIu64, bits);
       break;
     }
     case Operand_Tag_Xmm: {
-      u32 bits = operand->byte_size * 8;
-      printf("xmm%d", bits);
+      u64 bits = operand->byte_size * 8;
+      printf("xmm%"PRIu64, bits);
       break;
     }
     case Operand_Tag_Immediate: {
@@ -316,8 +316,8 @@ print_operand(
     }
     case Operand_Tag_Memory: {
       // TODO print better info
-      u32 bits = operand->byte_size * 8;
-      printf("m%d", bits);
+      u64 bits = operand->byte_size * 8;
+      printf("m%"PRIu64, bits);
       break;
     }
     default: {
@@ -407,7 +407,7 @@ make_label(
 static inline Operand
 data_label32(
   Label_Index label_index,
-  u32 byte_size
+  u64 byte_size
 ) {
   return (const Operand) {
     .tag = Operand_Tag_Memory,
@@ -533,7 +533,7 @@ imm_auto(
 static inline Operand
 stack(
   s32 offset,
-  u32 byte_size
+  u64 byte_size
 ) {
   assert(byte_size);
   return (const Operand) {
@@ -569,16 +569,16 @@ descriptor_struct_add_field(
   Descriptor *field_descriptor,
   Slice field_name
 ) {
-  u32 offset = 0;
+  u64 offset = 0;
   for (u64 i = 0; i < dyn_array_length(struct_descriptor->Struct.fields); ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(struct_descriptor->Struct.fields, i);
-    u32 size = descriptor_byte_size(field->descriptor);
-    offset = u32_align(offset, size);
+    u64 size = descriptor_byte_size(field->descriptor);
+    offset = u64_align(offset, size);
     offset += size;
   }
 
-  u32 size = descriptor_byte_size(field_descriptor);
-  offset = u32_align(offset, size);
+  u64 size = descriptor_byte_size(field_descriptor);
+  offset = u64_align(offset, size);
   dyn_array_push(struct_descriptor->Struct.fields, (Descriptor_Struct_Field) {
     .name = field_name,
     .descriptor = field_descriptor,
@@ -755,8 +755,8 @@ value_global_internal(
   Descriptor *descriptor
 ) {
   Program *program = context->program;
-  u32 byte_size = descriptor_byte_size(descriptor);
-  u32 alignment = descriptor_alignment(descriptor);
+  u64 byte_size = descriptor_byte_size(descriptor);
+  u64 alignment = descriptor_alignment(descriptor);
   void *allocation =
     bucket_buffer_allocate_bytes(program->data_section.buffer, byte_size, alignment);
   s64 offset_in_data_section =
@@ -873,7 +873,7 @@ operand_register_for_descriptor(
   Register reg,
   Descriptor *descriptor
 ) {
-  u32 byte_size = descriptor_byte_size(descriptor);
+  u64 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
   Operand result = {
@@ -1003,7 +1003,7 @@ function_argument_value_at_index_internal(
       break;
     }
   }
-  u32 byte_size = descriptor_byte_size(arg_descriptor);
+  u64 byte_size = descriptor_byte_size(arg_descriptor);
   assert(byte_size <= 8);
 
   // :ReturnTypeLargerThanRegister

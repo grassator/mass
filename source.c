@@ -190,11 +190,11 @@ token_value_force_immediate_integer(
     return 0;
   }
 
-  u32 target_byte_size = descriptor_byte_size(target_descriptor);
+  u64 target_byte_size = descriptor_byte_size(target_descriptor);
   if (target_byte_size > descriptor_byte_size(value->descriptor)) {
     context_error_snprintf(
       context, *source_range,
-      "Immediate value does not fit into the target integer size %u",
+      "Immediate value does not fit into the target integer size %"PRIu64,
       target_byte_size
     );
   }
@@ -2324,10 +2324,10 @@ compile_time_eval(
     return;
   }
 
-  u32 result_byte_size = expression_result_value->operand.byte_size;
+  u64 result_byte_size = expression_result_value->operand.byte_size;
   // Need to ensure 16-byte alignment here because result value might be __m128
   // TODO When we support AVX-2 or AVX-512, this might need to increase further
-  u32 alignment = 16;
+  u64 alignment = 16;
   void *result = allocator_allocate_bytes(context->allocator, result_byte_size, alignment);
 
   // Load the address of the result
@@ -2495,8 +2495,8 @@ token_handle_cast(
 
   assert(descriptor_is_integer(cast_to_descriptor));
   Value *after_cast_value = value;
-  u32 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
-  u32 original_byte_size = descriptor_byte_size(value->descriptor);
+  u64 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
+  u64 original_byte_size = descriptor_byte_size(value->descriptor);
   if (value->descriptor == &descriptor_number_literal) {
     after_cast_value = token_value_force_immediate_integer(
       context, source_range, value, cast_to_descriptor
@@ -3107,8 +3107,8 @@ maybe_resize_values_for_integer_math_operation(
   bool ld_signed = descriptor_is_signed_integer(ld);
   bool rd_signed = descriptor_is_signed_integer(rd);
 
-  u32 ld_size = descriptor_byte_size(ld);
-  u32 rd_size = descriptor_byte_size(rd);
+  u64 ld_size = descriptor_byte_size(ld);
+  u64 rd_size = descriptor_byte_size(rd);
 
   if (ld_signed == rd_signed) {
     if (ld_size == rd_size) return;
@@ -3220,7 +3220,7 @@ token_eval_operator(
     assert(!array->operand.Memory.location.Indirect.maybe_index_register.has_value);
 
     Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
-    u32 item_byte_size = descriptor_byte_size(item_descriptor);
+    u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
     Value *array_element_value = allocator_allocate(context->allocator, Value);
     *array_element_value = (Value) {
