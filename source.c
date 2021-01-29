@@ -923,20 +923,16 @@ token_split_next(
   return token_view_rest(&it->view, start_index);
 }
 
-Descriptor *
+static inline Descriptor *
 value_ensure_type(
   Compilation_Context *context,
   Value *value,
-  Source_Range source_range,
-  Slice type_name
+  Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
   if (value->descriptor != &descriptor_type) {
-    context_error_snprintf(
-      context, source_range, "%"PRIslice" is not a type",
-      SLICE_EXPAND_PRINTF(type_name)
-    );
+    context_error_snprintf(context, source_range, "Expected a type");
     return 0;
   }
   Descriptor *descriptor = operand_immediate_memory_as_descriptor(&value->operand);
@@ -960,7 +956,7 @@ scope_lookup_type(
     return 0;
   }
   Value *value = scope_entry_force(context, scope_entry);
-  return value_ensure_type(context, value, source_range, type_name);
+  return value_ensure_type(context, value, source_range);
 }
 
 static inline Token *
@@ -1058,7 +1054,7 @@ token_force_type(
       break;
     }
     case Token_Tag_Value: {
-      return value_ensure_type(context, token->Value.value, token->source_range, token->source);
+      return value_ensure_type(context, token->Value.value, token->source_range);
     }
     case Token_Tag_Operator:
     default: {
@@ -2557,8 +2553,7 @@ token_handle_cast(
 
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
-  Descriptor *cast_to_descriptor =
-    value_ensure_type(context, type, *source_range, slice_literal("TODO cast source"));
+  Descriptor *cast_to_descriptor = value_ensure_type(context, type, *source_range);
 
   assert(descriptor_is_integer(cast_to_descriptor));
   Value *after_cast_value = value;

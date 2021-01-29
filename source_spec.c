@@ -753,7 +753,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("foo is not a type"), error->message));
+      check(slice_equal(slice_literal("Expected a type"), error->message));
     }
 
     it("should report an error when non-type token is being used as a type") {
@@ -763,7 +763,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("42 is not a type"), error->message));
+      check(slice_equal(slice_literal("Expected a type"), error->message));
     }
 
     it("should report an error when encountering an unknown type") {
