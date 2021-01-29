@@ -1202,13 +1202,7 @@ token_apply_macro_syntax(
   // or switch / pattern matching.
   // Ideally there should be a way to control this explicitly somehow.
   Scope *captured_scope = scope_make(context->allocator, context->scope);
-
-  Scope *expansion_scope;
-  if (macro->transparent) {
-    expansion_scope = captured_scope;
-  } else {
-    expansion_scope = scope_make(context->allocator, macro->scope);
-  }
+  Scope *expansion_scope = scope_make(context->allocator, macro->scope);
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
@@ -1953,7 +1947,6 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
   Token_Maybe_Match(statement, .tag = Token_Tag_Id, .source = slice_literal("statement"));
-  Token_Maybe_Match(transparent, .tag = Token_Tag_Id, .source = slice_literal("transparent"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -2077,8 +2070,7 @@ token_parse_syntax_definition(
   *macro = (Macro){
     .pattern = pattern,
     .replacement = replacement,
-    .scope = context->scope,
-    .transparent = !!transparent
+    .scope = context->scope
   };
   if (statement) {
     if (!dyn_array_is_initialized(context->scope->statement_matchers)) {

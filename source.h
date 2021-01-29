@@ -44,7 +44,6 @@ typedef struct {
   Array_Macro_Pattern pattern;
   Token_View replacement;
   Scope *scope;
-  bool transparent;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
