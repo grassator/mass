@@ -2485,12 +2485,6 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-typedef void (*Operator_Dispatch_Proc)(
-  Compilation_Context *,
-  Array_Const_Token_Ptr *token_stack,
-  Operator_Stack_Entry *operator
-);
-
 void
 token_handle_operand_variant_of(
   Compilation_Context *context,
@@ -2609,11 +2603,17 @@ token_handle_negation(
   MASS_ON_ERROR(assign(context, &token->source_range, result_value, negated_value));
 }
 
+void
+token_dispatch_operator(
+  Compilation_Context *context,
+  Array_Const_Token_Ptr *token_stack,
+  Operator_Stack_Entry *operator_entry
+);
+
 bool
 token_handle_operator(
   Compilation_Context *context,
   Token_View view,
-  Operator_Dispatch_Proc dispatch_proc,
   Array_Const_Token_Ptr *token_stack,
   Array_Operator_Stack_Entry *operator_stack,
   Slice new_operator,
@@ -2658,7 +2658,7 @@ token_handle_operator(
     dyn_array_pop(*operator_stack);
 
     // apply the operator on the stack
-    dispatch_proc(context, token_stack, last_operator);
+    token_dispatch_operator(context, token_stack, last_operator);
   }
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source = new_operator,
@@ -3437,8 +3437,6 @@ token_eval_operator(
   }
 }
 
-
-
 void
 token_dispatch_operator(
   Compilation_Context *context,
@@ -3678,8 +3676,7 @@ token_parse_expression(
         Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
         if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
           if (!token_handle_operator(
-            context, view, token_dispatch_operator,
-            &token_stack, &operator_stack, token->source, token->source_range,
+            context, view, &token_stack, &operator_stack, token->source, token->source_range,
             // FIXME figure out how to deal with fixity for non-symbol operators
             Operator_Fixity_Prefix
           )) goto err;
@@ -3696,9 +3693,8 @@ token_parse_expression(
           case Token_Group_Tag_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("()"), token->source_range,
-                Operator_Fixity_Postfix
+                context, view, &token_stack, &operator_stack, slice_literal("()"),
+                token->source_range, Operator_Fixity_Postfix
               )) goto err;
             }
             break;
@@ -3710,9 +3706,8 @@ token_parse_expression(
           case Token_Group_Tag_Square: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
-                context, view, token_dispatch_operator,
-                &token_stack, &operator_stack, slice_literal("[]"), token->source_range,
-                Operator_Fixity_Postfix
+                context, view, &token_stack, &operator_stack, slice_literal("[]"),
+                token->source_range, Operator_Fixity_Postfix
               )) goto err;
             }
             break;
@@ -3736,9 +3731,7 @@ token_parse_expression(
           }
         }
         if (!token_handle_operator(
-          context, view, token_dispatch_operator,
-          &token_stack, &operator_stack, operator, token->source_range,
-          fixity_mask
+          context, view, &token_stack, &operator_stack, operator, token->source_range, fixity_mask
         )) goto err;
         is_previous_an_operator = true;
         break;
