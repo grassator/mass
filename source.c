@@ -241,8 +241,7 @@ assign(
 
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
-      assert(source->operand.tag == Operand_Tag_Immediate);
-      Number_Literal *literal = source->operand.Immediate.memory;
+      Number_Literal *literal = operand_immediate_as_c_type(source->operand, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(
           context, source_range, source, &descriptor_u64
@@ -1905,15 +1904,8 @@ token_parse_import_statement(
   Module *module = program_module_from_file(context, *path, module_scope);
   program_import_module(context, module);
 
-  Value *module_value = value_make(
-    context->allocator,
-    &descriptor_scope,
-    (Operand){
-      .tag = Operand_Tag_Immediate,
-      .byte_size = sizeof(Scope *),
-      .Immediate.memory = module_scope,
-    }
-  );
+  Value *module_value =
+    value_make(context->allocator, &descriptor_scope, operand_immediate(module_scope));
 
   // TODO consider making imports lazy
   scope_define(context->scope, name->source, (Scope_Entry) {
@@ -2593,8 +2585,7 @@ token_handle_negation(
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
-    assert(value->operand.tag == Operand_Tag_Immediate);
-    Number_Literal *original = value->operand.Immediate.memory;
+    Number_Literal *original = operand_immediate_as_c_type(value->operand, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
@@ -3203,15 +3194,8 @@ token_eval_operator(
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
     if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
-      Value *scope_value = value_make(
-        context->allocator,
-        &descriptor_scope,
-        (Operand){
-          .tag = Operand_Tag_Immediate,
-          .byte_size = sizeof(Scope *),
-          .Immediate.memory = context->scope,
-        }
-      );
+      Value *scope_value =
+        value_make(context->allocator, &descriptor_scope, operand_immediate(context->scope));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
@@ -3232,8 +3216,7 @@ token_eval_operator(
       if (struct_value->descriptor->tag == Descriptor_Tag_Struct) {
         struct_get_field(context, &rhs->source_range, struct_value, rhs->source, result_value);
       } else if (struct_value->descriptor == &descriptor_scope) {
-        assert(struct_value->operand.tag == Operand_Tag_Immediate);
-        Scope *module_scope = struct_value->operand.Immediate.memory;
+        Scope *module_scope = operand_immediate_as_c_type(struct_value->operand, Scope);
         Compilation_Context module_context = *context;
         module_context.scope = module_scope;
         module_context.builder = 0;
@@ -3898,7 +3881,7 @@ token_parse_statement_using(
 
   // This code injects a proxy scope that just uses the same data as the other
   Scope *current_scope = context->scope;
-  Scope *using_scope = result->operand.Immediate.memory;
+  Scope *using_scope = operand_immediate_as_c_type(result->operand, Scope);
   Scope *proxy = allocator_allocate(context->allocator, Scope);
   // FIXME We should either be able to freeze a scope or change the implementation
   //       to not use dynamic arrays as they might point to new memory. Or we could

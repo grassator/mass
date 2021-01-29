@@ -438,9 +438,22 @@ code_label32(
 #define operand_immediate(_VALUE_)\
   ((Operand) {                    \
     .tag = Operand_Tag_Immediate, \
-    .byte_size = sizeof(_VALUE_), \
+    .byte_size = sizeof(*_VALUE_), \
     .Immediate.memory = (_VALUE_),\
   })
+
+static inline void *
+operand_immediate_as_c_type_internal(
+  Operand operand,
+  u64 byte_size
+) {
+  assert(operand.byte_size == byte_size);
+  assert(operand.tag == Operand_Tag_Immediate);
+  return operand.Immediate.memory;
+}
+
+#define operand_immediate_as_c_type(_OPERAND_, _TYPE_)\
+  ((_TYPE_ *)operand_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 static inline Operand
 imm8(
@@ -758,7 +771,7 @@ value_as_immediate_string(
   if (value->operand.tag != Operand_Tag_Immediate) {
     return 0;
   }
-  return value->operand.Immediate.memory;
+  return operand_immediate_as_c_type(value->operand, Slice);
 }
 
 Value *
