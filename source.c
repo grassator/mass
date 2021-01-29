@@ -76,13 +76,97 @@ scope_make(
   const Allocator *allocator,
   Scope *parent
 ) {
+  // TODO use _Atomic when supported
+  static u64 id = 0;
+
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
+    .id = ++id,
     .allocator = allocator,
     .parent = parent,
     .map = 0,
   };
   return scope;
+}
+
+Scope *
+scope_maybe_find_common_ancestor(
+  Scope *a,
+  Scope *b
+) {
+  while (a && b) {
+    if (a->id > b->id) a = a->parent;
+    else if (b->id > a->id) b = b->parent;
+    else return a;
+  }
+  return 0;
+}
+
+static inline Scope *
+scope_flatten_till_internal(
+  const Allocator *allocator,
+  Scope *scope,
+  const Scope *till,
+  u64 macro_count,
+  u64 statement_matcher_count
+) {
+  // On the way up we calculate how many things all levels combined contain to avoid resizes
+  // TODO allow to pre-size a hashmap
+  if (scope != till) {
+    if (dyn_array_is_initialized(scope->macros)) {
+      macro_count += dyn_array_length(scope->macros);
+    }
+    if (dyn_array_is_initialized(scope->statement_matchers)) {
+      statement_matcher_count += dyn_array_length(scope->statement_matchers);
+    }
+  } else {
+    Scope *result = scope_make(allocator, 0);
+    result->map = Scope_Map__make(result->allocator);
+    if (macro_count) {
+      result->macros = dyn_array_make(
+        Array_Macro_Ptr, .capacity = macro_count, .allocator = allocator
+      );
+    }
+    if (statement_matcher_count) {
+      result->statement_matchers = dyn_array_make(
+        Array_Token_Statement_Matcher, .capacity = statement_matcher_count, .allocator = allocator
+      );
+    }
+    return result;
+  }
+
+  Scope *result = scope_flatten_till_internal(
+    allocator, scope->parent, till, macro_count, statement_matcher_count
+  );
+  if (dyn_array_is_initialized(scope->macros)) {
+    for (u64 i = 0; i < dyn_array_length(scope->macros); ++i) {
+      dyn_array_push(result->macros, *dyn_array_get(scope->macros, i));
+    }
+  }
+  if (dyn_array_is_initialized(scope->statement_matchers)) {
+    for (u64 i = 0; i < dyn_array_length(scope->statement_matchers); ++i) {
+      dyn_array_push(result->statement_matchers, *dyn_array_get(scope->statement_matchers, i));
+    }
+  }
+
+  if (scope->map) {
+    for (u64 i = 0; i < scope->map->capacity; ++i) {
+      Scope_Map__Entry *entry = &scope->map->entries[i];
+      if (entry->occupied) {
+        hash_map_set_by_hash(result->map, entry->bookkeeping.hash, entry->key, entry->value);
+      }
+    }
+  }
+  return result;
+}
+
+Scope *
+scope_flatten_till(
+  const Allocator *allocator,
+  Scope *scope,
+  const Scope *till
+) {
+  return scope_flatten_till_internal(allocator, scope, till, 0, 0);
 }
 
 void
@@ -3888,13 +3972,10 @@ token_parse_statement_using(
   // This code injects a proxy scope that just uses the same data as the other
   Scope *current_scope = context->scope;
   Scope *using_scope = operand_immediate_as_c_type(result->operand, Scope);
-  Scope *proxy = allocator_allocate(context->allocator, Scope);
-  // FIXME We should either be able to freeze a scope or change the implementation
-  //       to not use dynamic arrays as they might point to new memory. Or we could
-  //       introduce an explicit proxy
-  // FIXME this only allows to access a specific level of scope, not its parent.
-  //       probably should flatten here instead.
-  *proxy = *using_scope;
+  Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
+  assert(common_ancestor);
+  // TODO @Speed This is quite inefficient but I can't really think of something faster
+  Scope *proxy = scope_flatten_till(context->allocator, using_scope, common_ancestor);
   proxy->parent = current_scope;
   Scope *new_scope = scope_make(context->allocator, proxy);
 

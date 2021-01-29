@@ -12,9 +12,8 @@ syntax statement("while" ..@condition {}@body) {
 
   syntax statement("break") { goto _loop_end; }
   syntax statement("continue") { goto _loop_start; }
-  _loop_body_scope :: @scope
   if condition() {
-    body(_loop_body_scope);
+    body(@scope);
     goto _loop_start;
   }
   label _loop_end;
@@ -26,9 +25,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_start;
   syntax statement("break") { goto _loop_end; }
   syntax statement("continue") { goto _loop_start; }
-  _loop_body_scope :: @scope
   if condition() {
-    body(_loop_body_scope);
+    body(@scope);
     post();
     goto _loop_start;
   }

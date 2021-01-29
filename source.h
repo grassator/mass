@@ -63,6 +63,7 @@ typedef enum {
 
 typedef struct Scope {
   const Allocator *allocator;
+  u64 id;
   Scope_Flags flags;
   struct Scope *parent;
   Scope_Map *map;
