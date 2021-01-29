@@ -80,12 +80,14 @@ typedef struct Function_Builder Function_Builder;
 
 Descriptor descriptor_type = {
   .tag = Descriptor_Tag_Opaque,
+  .name = slice_literal_fields("type"),
   .Opaque = { .bit_size = sizeof(Descriptor) * 8 },
 };
 
 #define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\
   Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
+    .name = slice_literal_fields(#_NAME_),\
     .Opaque = { .bit_size = (_BIT_SIZE_) },\
   };\
   Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
@@ -155,6 +157,7 @@ Value void_value = {
 
 Descriptor descriptor_any = {
   .tag = Descriptor_Tag_Any,
+  .name = slice_literal_fields("any"),
 };
 
 Value *type_any_value = &(Value) {

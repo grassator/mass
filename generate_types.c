@@ -517,6 +517,7 @@ main(void) {
       { "Value *", "value" },
     }),
     struct_fields("Lazy_Expression", (Struct_Item[]){
+      { "Slice", "name" },
       { "Scope *", "scope" },
       { "Token_View", "tokens" },
     }),
@@ -569,7 +570,7 @@ main(void) {
     { "Descriptor *", "descriptor" },
   }));
 
-  push_type(type_union("Descriptor", (Struct[]){
+  push_type(add_common_fields(type_union("Descriptor", (Struct[]){
     struct_empty("Void"),
     struct_empty("Any"),
     struct_fields("Opaque", (Struct_Item[]){
@@ -594,6 +595,8 @@ main(void) {
     struct_fields("Pointer", (Struct_Item[]){
       { "Descriptor *", "to" },
     }),
+  }), (Struct_Item[]){
+    { "Slice", "name" },
   }));
 
   push_type(type_union("Mass_Result", (Struct[]){

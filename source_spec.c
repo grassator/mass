@@ -629,6 +629,18 @@ spec("source") {
       }
     }
 
+    it("should report type mismatch when assigning") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: () -> () { x : s32 = 0; y : s64 = 1; x = y; }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_equal(
+        error->message, slice_literal("Incompatible type: expected s32, got s64")
+      ));
+    }
+
     it("should report an overload overlap") {
       test_program_inline_source_base(
         "test", &test_context,

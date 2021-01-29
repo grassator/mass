@@ -423,6 +423,7 @@ typedef struct {
   Value * value;
 } Scope_Entry_Value;
 typedef struct {
+  Slice name;
   Scope * scope;
   Token_View tokens;
 } Scope_Entry_Lazy_Expression;
@@ -531,6 +532,7 @@ typedef struct {
 typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
+  Slice name;
   union {
     Descriptor_Opaque Opaque;
     Descriptor_Function Function;

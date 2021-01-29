@@ -270,9 +270,10 @@ assign(
     move_value(context->allocator, context->builder, source_range, &target->operand, &source->operand);
     return *context->result;
   }
-  // TODO elaborate the error
   context_error_snprintf(
-    context, *source_range, "Incompatible type"
+    context, *source_range,
+    "Incompatible type: expected %"PRIslice", got %"PRIslice,
+    SLICE_EXPAND_PRINTF(target->descriptor->name), SLICE_EXPAND_PRINTF(source->descriptor->name)
   );
   return *context->result;
 }
@@ -300,6 +301,9 @@ scope_entry_force(
       lazy_context.scope = expr->scope;
       Value *result = value_any(context->allocator);
       compile_time_eval(&lazy_context, expr->tokens, result);
+      if (result && result->descriptor->name.length == 0) {
+        result->descriptor->name = expr->name;
+      }
       *entry = (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = result,
@@ -1048,6 +1052,7 @@ token_force_type(
       descriptor = allocator_allocate(context->allocator, Descriptor);
       *descriptor = (Descriptor) {
         .tag = Descriptor_Tag_Pointer,
+        .name = token->source,
         .Pointer.to = scope_lookup_type(context, scope, child->source_range, child->source),
       };
       break;
@@ -1138,7 +1143,8 @@ token_make_macro_capture_function(
   Compilation_Context *context,
   Token_View capture_view,
   Scope *captured_scope,
-  Descriptor *return_descriptor
+  Descriptor *return_descriptor,
+  Slice capture_name
 ) {
   Token *fake_body = allocator_allocate(context->allocator, Token);
   *fake_body = (Token) {
@@ -1154,6 +1160,7 @@ token_make_macro_capture_function(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
+    .name = capture_name,
     .Function = {
       .arguments = (Array_Function_Argument){&dyn_array_zero_items},
       .scope = captured_scope,
@@ -1216,16 +1223,18 @@ token_apply_macro_syntax(
     Token_View capture_view = *dyn_array_get(match, i);
     Descriptor *return_descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void;
 
-    Value *result =
-      token_make_macro_capture_function(context, capture_view, captured_scope, return_descriptor);
+    Value *result = token_make_macro_capture_function(
+      context, capture_view, captured_scope, return_descriptor, capture_name
+    );
     // This overload allows the macro implementation to pass in a scope into a captured that
     // will be expanded with `using` to bring in values from into a local scope. It is used
     // to expose `break` and `continue` statements to the body of the loop while avoiding their
     // definition in the captured scope of an expansion
     // TODO @Speed figure out a better way to do this
     {
-      Value *scope_overload =
-        token_make_macro_capture_function(context, capture_view, captured_scope, return_descriptor);
+      Value *scope_overload = token_make_macro_capture_function(
+        context, capture_view, captured_scope, return_descriptor, capture_name
+      );
       Array_Function_Argument overload_arguments = dyn_array_make(
         Array_Function_Argument, .capacity = 1, .allocator = context->allocator
       );
@@ -2282,6 +2291,7 @@ compile_time_eval(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
+    .name = slice_literal("$compile_time_eval$"),
     .Function = {
       .returns = {
         .descriptor = &descriptor_void,
@@ -2696,6 +2706,7 @@ token_parse_constant_definitions(
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Lazy_Expression,
     .Lazy_Expression = {
+      .name = name->source,
       .tokens = rhs,
       .scope = context->scope,
     },
@@ -4139,6 +4150,7 @@ token_match_fixed_array_type(
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
   *array_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Fixed_Size_Array,
+    .name = source_from_source_range(&view.source_range),
     .Fixed_Size_Array = {
       .item = descriptor,
       .length = length,
