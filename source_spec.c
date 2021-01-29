@@ -730,7 +730,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Second argument to external() must be a literal string"), error->message));
+      check(slice_equal(slice_literal("external requires 2 string arguments"), error->message));
     }
 
     it("should report an error when non-type id is being used as a type") {
@@ -1152,7 +1152,7 @@ spec("source") {
     it("should parse and return C-compatible strings") {
       fn_type_void_to_const_charp checker = (fn_type_void_to_const_charp)test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: () -> ([s8]) { &\"test\" }"
+        "checker :: () -> ([s8]) { c_string(\"test\") }"
       );
       check(checker);
       const char *string = checker();

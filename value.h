@@ -108,6 +108,7 @@ Descriptor descriptor_type = {
 MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope *);
 MASS_DEFINE_OPAQUE_C_TYPE(external_symbol, External_Symbol);
 MASS_DEFINE_OPAQUE_C_TYPE(number_literal, Number_Literal);
+MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
 
 #define MASS_ENUMERATE_BUILT_IN_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\

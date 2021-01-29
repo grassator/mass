@@ -641,7 +641,7 @@ tokenize(
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
           string_buffer->occupied = 0;
-          start_token(Token_Tag_String);
+          start_token(Token_Tag_Value);
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
           start_token(Token_Tag_Group);
@@ -755,9 +755,12 @@ tokenize(
         if (ch == '\\') {
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
-          char *string = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
-          memcpy(string, string_buffer->memory, string_buffer->occupied);
-          current_token->String.slice = (Slice){string, string_buffer->occupied};
+          char *bytes = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
+          memcpy(bytes, string_buffer->memory, string_buffer->occupied);
+          Slice *string = allocator_allocate(allocator, Slice);
+          *string = (Slice){bytes, string_buffer->occupied};
+          current_token->Value.value =
+            value_make(allocator, &descriptor_string, operand_immediate(string));
           accept_and_push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
@@ -1054,7 +1057,6 @@ token_force_type(
       return value_ensure_type(context, token->Value.value, token->source_range, token->source);
     }
     case Token_Tag_Operator:
-    case Token_Tag_String:
     default: {
       panic("TODO");
       break;
@@ -1512,11 +1514,6 @@ token_force_value(
   MASS_TRY(*context->result);
 
   switch(token->tag) {
-    case Token_Tag_String: {
-      Slice string = token->String.slice;
-      Value *value = value_global_c_string_from_slice(context, string);
-      return assign(context, &token->source_range, result_value, value);
-    }
     case Token_Tag_Id: {
       Slice name = token->source;
       Value *value = scope_lookup_force(context, context->scope, name);
@@ -1865,17 +1862,26 @@ token_parse_import_statement(
   // import "foo" as foo
   u64 peek_index = 0;
   Token_Match(import_keywors, .tag = Token_Tag_Id, .source = slice_literal("import"));
-  Token_Maybe_Match(file_path, .tag = Token_Tag_String);
+  Token_Maybe_Match(file_path, .tag = Token_Tag_Value);
   Token_Maybe_Match(as_keyword, .tag = Token_Tag_Id, .source = slice_literal("as"));
   Token_Maybe_Match(name, .tag = Token_Tag_Id);
 
-  if (!file_path) {
+  if (!file_path ) {
     context_error_snprintf(
       context, name->source_range,
       "import keyword must be followed by a path to the imported file"
     );
     goto err;
   }
+  Slice *path = value_as_immediate_string(file_path->Value.value);
+  if (!path) {
+    context_error_snprintf(
+      context, file_path->source_range,
+      "file path for import must be a compile time string"
+    );
+    goto err;
+  }
+
   if (!as_keyword) {
     context_error_snprintf(
       context, name->source_range,
@@ -1896,9 +1902,7 @@ token_parse_import_statement(
   while (root_scope->parent) root_scope = root_scope->parent;
 
   Scope *module_scope = scope_make(context->allocator, root_scope);
-  Module *module = program_module_from_file(
-    context, file_path->String.slice, module_scope
-  );
+  Module *module = program_module_from_file(context, *path, module_scope);
   program_import_module(context, module);
 
   Value *module_value = value_make(
@@ -1954,15 +1958,23 @@ token_parse_syntax_definition(
     const Token *token = token_view_get(definition, i);
 
     switch(token->tag) {
-      case Token_Tag_String: {
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .source = token->String.slice,
-            }
-          },
-        });
+      case Token_Tag_Value: {
+        Slice *slice = value_as_immediate_string(token->Value.value);
+        if (slice) {
+          dyn_array_push(pattern, (Macro_Pattern) {
+            .tag = Macro_Pattern_Tag_Single_Token,
+            .Single_Token = {
+              .token_pattern = {
+                .source = *slice,
+              }
+            },
+          });
+        } else {
+          context_error_snprintf(
+            context, token->source_range,
+            "Only compile time strings are allowed as values in the pattern"
+          );
+        }
         break;
       }
       case Token_Tag_Group: {
@@ -2038,8 +2050,7 @@ token_parse_syntax_definition(
         }
         break;
       }
-      case Token_Tag_Id:
-      case Token_Tag_Value: {
+      case Token_Tag_Id: {
         context_error_snprintf(
           context, token->source_range,
           "Unsupported token tag in a syntax definition"
@@ -2174,65 +2185,6 @@ token_process_c_struct_definition(
 
   err:
   return 0;
-}
-
-Token *
-token_import_match_arguments(
-  Source_Range source_range,
-  Token_View view,
-  Compilation_Context *context
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  const Token *library_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .tag = Token_Tag_String,
-  });
-  if (!library_name_token) {
-    context_error_snprintf(
-      context, source_range,
-      "First argument to external() must be a literal string"
-    );
-    return 0;
-  }
-  const Token *comma = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .tag = Token_Tag_Operator,
-    .source = slice_literal(","),
-  });
-  if (!comma) {
-    context_error_snprintf(
-      context, source_range,
-      "external(\"library_name\", \"symbol_name\") requires two arguments"
-    );
-    return 0;
-  }
-  const Token *symbol_name_token = token_peek_match(view, peek_index++, &(Token_Pattern) {
-    .tag = Token_Tag_String,
-  });
-  if (!symbol_name_token) {
-    context_error_snprintf(
-      context, source_range,
-      "Second argument to external() must be a literal string"
-    );
-    return 0;
-  }
-
-  External_Symbol *symbol = allocator_allocate(context->allocator, External_Symbol);
-  *symbol = (External_Symbol) {
-    .library_name = library_name_token->String.slice,
-    .symbol_name = symbol_name_token->String.slice,
-  };
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  *result = (Value) {
-    .descriptor = &descriptor_external_symbol,
-    .operand = {
-      .tag = Operand_Tag_Immediate,
-      .byte_size = sizeof(External_Symbol),
-      .Immediate.memory = symbol,
-    },
-  };
-  return token_value_make(context, result, view.source_range);
 }
 
 Value *
@@ -2525,6 +2477,71 @@ token_handle_operand_variant_of(
     }
   }
   MASS_ON_ERROR(assign(context, source_range, result_value, operand_value));
+}
+
+void
+token_handle_c_string(
+  Compilation_Context *context,
+  const Token *args_token,
+  Value *result_value
+) {
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  if (dyn_array_length(args) != 1) goto err;
+  Slice *c_string = value_as_immediate_string(*dyn_array_get(args, 0));
+  if (!c_string) goto err;
+
+  const Value *c_string_bytes = value_global_c_string_from_slice(context, *c_string);
+  Value *c_string_pointer = value_any(context->allocator);
+  load_address(context, &args_token->source_range, c_string_pointer, c_string_bytes);
+  MASS_ON_ERROR(assign(context, &args_token->source_range, result_value, c_string_pointer));
+
+  goto defer;
+
+  err:
+  context_error_snprintf(
+    context, args_token->source_range,
+    "c_string expects a single compile-time known string"
+  );
+
+  defer:
+  dyn_array_destroy(args);
+}
+
+
+void
+token_handle_external(
+  Compilation_Context *context,
+  const Token *args_token,
+  Value *result_value
+) {
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  if (dyn_array_length(args) != 2) goto err;
+  Slice *library_name = value_as_immediate_string(*dyn_array_get(args, 0));
+  Slice *symbol_name = value_as_immediate_string(*dyn_array_get(args, 1));
+
+  if (!library_name || !symbol_name) goto err;
+
+  External_Symbol *symbol = allocator_allocate(context->allocator, External_Symbol);
+  *symbol = (External_Symbol) {
+    .library_name = *library_name,
+    .symbol_name = *symbol_name,
+  };
+
+  Value *external_value =
+    value_make(context->allocator, &descriptor_external_symbol, operand_immediate(symbol));
+
+  MASS_ON_ERROR(assign(context, &args_token->source_range, result_value, external_value));
+
+  goto defer;
+
+  err:
+  context_error_snprintf(
+    context, args_token->source_range,
+    "external requires 2 string arguments"
+  );
+
+  defer:
+  dyn_array_destroy(args);
 }
 
 void
@@ -3146,12 +3163,14 @@ token_eval_operator(
       dyn_array_destroy(args);
     } else if (
       target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("c_string"))
+    ) {
+      token_handle_c_string(context, args_token, result_value);
+    } else if (
+      target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("external"))
     ) {
-      Token *import_token = token_import_match_arguments(
-        args_token->source_range, args_token->Group.children, context
-      );
-      MASS_ON_ERROR(token_force_value(context, import_token, result_value)) return;
+      token_handle_external(context, args_token, result_value);
     } else if (
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("bit_type"))
@@ -3650,7 +3669,6 @@ token_parse_expression(
       : Operator_Fixity_Infix | Operator_Fixity_Postfix;
 
     switch(token->tag) {
-      case Token_Tag_String:
       case Token_Tag_Value: {
         dyn_array_push(token_stack, token);
         is_previous_an_operator = false;

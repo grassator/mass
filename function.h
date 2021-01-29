@@ -133,7 +133,7 @@ load_address(
   Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
-  Value *memory
+  const Value *memory
 );
 
 Value *

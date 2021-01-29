@@ -322,9 +322,6 @@ main(void) {
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
-    struct_fields("String", (Struct_Item[]){
-      { "Slice", "slice" },
-    }),
     struct_fields("Group", (Struct_Item[]){
       { "Token_Group_Tag", "tag" },
       { "u32", "_tag_padding" },

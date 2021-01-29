@@ -1136,7 +1136,7 @@ load_address(
   Compilation_Context *context,
   const Source_Range *source_range,
   Value *result_value,
-  Value *memory
+  const Value *memory
 ) {
   assert(memory->operand.tag == Operand_Tag_Memory);
   Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, memory->descriptor);

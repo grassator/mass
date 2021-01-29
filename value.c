@@ -748,6 +748,19 @@ value_number_literal(
   return value_make(allocator, &descriptor_number_literal, operand_immediate(literal));
 }
 
+Slice *
+value_as_immediate_string(
+  const Value *value
+) {
+  if (value->descriptor != &descriptor_string) {
+    return 0;
+  }
+  if (value->operand.tag != Operand_Tag_Immediate) {
+    return 0;
+  }
+  return value->operand.Immediate.memory;
+}
+
 Value *
 value_global_internal(
   Compiler_Source_Location compiler_source_location,

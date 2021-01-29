@@ -185,16 +185,12 @@ typedef enum {
   Token_Tag_Id = 0,
   Token_Tag_Operator = 1,
   Token_Tag_Value = 2,
-  Token_Tag_String = 3,
-  Token_Tag_Group = 4,
+  Token_Tag_Group = 3,
 } Token_Tag;
 
 typedef struct {
   Value * value;
 } Token_Value;
-typedef struct {
-  Slice slice;
-} Token_String;
 typedef struct {
   Token_Group_Tag tag;
   u32 _tag_padding;
@@ -207,7 +203,6 @@ typedef struct Token {
   Slice source;
   union {
     Token_Value Value;
-    Token_String String;
     Token_Group Group;
   };
 } Token;
