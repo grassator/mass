@@ -4038,6 +4038,50 @@ token_define_label(
 }
 
 u64
+token_parse_statement_using(
+  Compilation_Context *context,
+  Token_View view,
+  Value *unused_result,
+  void *unused_payload
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("using"));
+  Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
+
+  Value *result = value_any(context->allocator);
+  token_parse_expression(context, rest, result, Expression_Parse_Mode_Default);
+
+  if (result->descriptor != &descriptor_scope) {
+    context_error_snprintf(context, rest.source_range, "Expected a scope");
+    goto err;
+  }
+
+  if (result->operand.tag != Operand_Tag_Immediate) {
+    context_error_snprintf(context, rest.source_range, "Scope for `using` must be compile-time known");
+    goto err;
+  }
+
+  // This code injects a proxy scope that just uses the same data as the other
+  Scope *current_scope = context->scope;
+  Scope *using_scope = result->operand.Immediate.memory;
+  Scope *proxy = allocator_allocate(context->allocator, Scope);
+  // FIXME We should either be able to freeze a scope or change the implementation
+  //       to not use dynamic arrays as they might point to new memory. Or we could
+  //       introduce an explicit proxy
+  *proxy = *using_scope;
+  proxy->parent = current_scope;
+  Scope *new_scope = scope_make(context->allocator, proxy);
+
+  // FIXME introduce a more generic mechanism for the statements to introduce a new scope
+  context->scope = new_scope;
+
+  err:
+  return peek_index;
+}
+
+u64
 token_parse_statement_label(
   Compilation_Context *context,
   Token_View view,
@@ -4674,6 +4718,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition});
     scope->statement_matchers = matchers;
   }
