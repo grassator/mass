@@ -278,12 +278,6 @@ assign(
   return *context->result;
 }
 
-Value *
-token_parse_constant_expression(
-  Compilation_Context *context,
-  Token_View view
-);
-
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Compilation_Context *context,
@@ -2615,118 +2609,6 @@ token_handle_negation(
   MASS_ON_ERROR(assign(context, &token->source_range, result_value, negated_value));
 }
 
-void
-token_dispatch_constant_operator(
-  Compilation_Context *context,
-  Array_Const_Token_Ptr *token_stack,
-  Operator_Stack_Entry *operator_entry
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  Slice operator = operator_entry->source;
-
-  if (
-    slice_equal(operator, slice_literal("-")) &&
-    operator_entry->scope_entry.fixity == Operator_Fixity_Prefix
-  ) {
-    const Token *token = *dyn_array_pop(*token_stack);
-    Token_View args_view = {
-      .tokens = &token,
-      .length = 1,
-      .source_range = token->source_range,
-    };
-    Value *negation_result = value_any(context->allocator);
-    token_handle_negation(context, args_view, negation_result, 0);
-    const Token *new_token = token_value_make(context, negation_result, token->source_range);
-    dyn_array_push(*token_stack, new_token);
-  } else if (slice_equal(operator, slice_literal("()"))) {
-    const Token *args = *dyn_array_pop(*token_stack);
-    const Token *function = *dyn_array_pop(*token_stack);
-
-    const Token *result;
-    // TODO turn `external` into a compile-time function call
-    if (
-      function->tag == Token_Tag_Id &&
-      slice_equal(function->source, slice_literal("external"))
-    ) {
-      result = token_import_match_arguments(args->source_range, args->Group.children, context);
-    } else if (
-      function->tag == Token_Tag_Id &&
-      slice_equal(function->source, slice_literal("bit_type"))
-    ) {
-      result = token_process_bit_type_definition(context, args);
-    } else if (
-      function->tag == Token_Tag_Id &&
-      slice_equal(function->source, slice_literal("c_struct"))
-    ) {
-      result = token_process_c_struct_definition(context, args);
-    } else {
-      // TODO somehow generalize this for all operators
-      const Token *call_tokens[] = {function, args};
-      Token_View call_view = {
-        .tokens = call_tokens,
-        .length = 2,
-        .source_range = {
-          .file = function->source_range.file,
-          .offsets = {
-            .from = function->source_range.offsets.from,
-            .to = args->source_range.offsets.to,
-          },
-        },
-      };
-      Value *comp_time_result = value_any(context->allocator);
-      compile_time_eval(context, call_view, comp_time_result);
-      result = token_value_make(context, comp_time_result, call_view.source_range);
-    }
-    dyn_array_push(*token_stack, result);
-  } else if (slice_equal(operator, slice_literal("@"))) {
-    const Token *keyword = *dyn_array_pop(*token_stack);
-    if (!token_match(keyword, &(Token_Pattern){ .source = slice_literal("scope") })) {
-      panic("TODO");
-    }
-    Value *scope_value = value_make(
-      context->allocator,
-      &descriptor_scope,
-      (Operand){
-        .tag = Operand_Tag_Immediate,
-        .byte_size = sizeof(Scope *),
-        .Immediate.memory = context->scope,
-      }
-    );
-    const Token *result = token_value_make(context, scope_value, keyword->source_range);
-    dyn_array_push(*token_stack, result);
-  } else if (slice_equal(operator, slice_literal("->"))) {
-    const Token *body = *dyn_array_pop(*token_stack);
-    const Token *return_types = *dyn_array_pop(*token_stack);
-    const Token *arguments = *dyn_array_pop(*token_stack);
-    Value *function_value = token_process_function_literal(
-      context, context->scope, arguments, return_types, body
-    );
-    Token *result = token_value_make(context, function_value, arguments->source_range);
-    dyn_array_push(*token_stack, result);
-  } else if (slice_equal(operator, slice_literal("macro"))) {
-    const Token *function = *dyn_array_last(*token_stack);
-    Value *function_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
-    if (function_value) {
-      if (
-        function_value->descriptor->tag == Descriptor_Tag_Function &&
-        !(function_value->descriptor->Function.flags & Descriptor_Function_Flags_External)
-      ) {
-        Descriptor_Function *descriptor = &function_value->descriptor->Function;
-        descriptor->flags |= Descriptor_Function_Flags_Macro;
-      } else {
-        context_error_snprintf(
-          context, function->source_range,
-          "Only literal functions (with a body) can be marked as macro"
-        );
-      }
-    }
-  } else {
-    panic("TODO: Unknown operator");
-  }
-}
-
 bool
 token_handle_operator(
   Compilation_Context *context,
@@ -2784,113 +2666,6 @@ token_handle_operator(
     .scope_entry = *operator_entry,
   });
   return true;
-}
-
-Value *
-token_parse_constant_expression(
-  Compilation_Context *context,
-  Token_View view
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  if (!view.length) {
-    return &void_value;
-  }
-  Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
-  Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
-
-  Value *result = 0;
-  bool is_previous_an_operator = true;
-  for (u64 i = 0; i < view.length; ++i) {
-    const Token *token = token_view_get(view, i);
-    Operator_Fixity fixity_mask = is_previous_an_operator
-      ? Operator_Fixity_Prefix
-      : Operator_Fixity_Infix | Operator_Fixity_Postfix;
-
-    switch(token->tag) {
-      case Token_Tag_None: {
-        panic("Internal Error: Encountered token with an uninitialized tag");
-        break;
-      }
-      case Token_Tag_String:
-      case Token_Tag_Value: {
-        dyn_array_push(token_stack, token);
-        is_previous_an_operator = false;
-        break;
-      }
-      case Token_Tag_Group: {
-        dyn_array_push(token_stack, token);
-        switch (token->Group.tag) {
-          case Token_Group_Tag_Paren: {
-            if (!is_previous_an_operator) {
-              if (!token_handle_operator(
-                context, view, token_dispatch_constant_operator,
-                &token_stack, &operator_stack, slice_literal("()"), token->source_range,
-                Operator_Fixity_Postfix
-              )) goto err;
-            }
-            break;
-          }
-          case Token_Group_Tag_Curly: {
-            // Nothing special to do for now?
-            break;
-          }
-          case Token_Group_Tag_Square: {
-            panic("TODO support parsing [] in constant expressions");
-            break;
-          }
-        }
-        is_previous_an_operator = false;
-        break;
-      }
-      case Token_Tag_Id: {
-        Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
-        if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
-          if (!token_handle_operator(
-            context, view, token_dispatch_constant_operator,
-            &token_stack, &operator_stack, token->source, token->source_range,
-            // FIXME figure out how to deal with fixity for non-symbol operators
-            Operator_Fixity_Prefix
-          )) goto err;
-          is_previous_an_operator = true;
-        } else {
-          is_previous_an_operator = false;
-          dyn_array_push(token_stack, token);
-        }
-
-        break;
-      }
-      case Token_Tag_Operator: {
-        Slice operator = token->source;
-        if (!token_handle_operator(
-          context, view, token_dispatch_constant_operator,
-          &token_stack, &operator_stack, operator, token->source_range,
-          fixity_mask
-        )) goto err;
-        is_previous_an_operator = true;
-        break;
-      }
-    }
-  }
-
-  while (dyn_array_length(operator_stack)) {
-    Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
-    token_dispatch_constant_operator(context, &token_stack, entry);
-  }
-  if (dyn_array_length(token_stack) == 1) {
-    const Token *token = *dyn_array_last(token_stack);
-    result = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, token, result)) goto err;
-  } else {
-    // FIXME user error
-  }
-
-  err:
-
-  dyn_array_destroy(token_stack);
-  dyn_array_destroy(operator_stack);
-
-  return result;
 }
 
 u64
@@ -3903,7 +3678,7 @@ token_parse_expression(
         Scope_Entry *scope_entry = scope_lookup(context->scope, token->source);
         if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
           if (!token_handle_operator(
-            context, view, token_dispatch_constant_operator,
+            context, view, token_dispatch_operator,
             &token_stack, &operator_stack, token->source, token->source_range,
             // FIXME figure out how to deal with fixity for non-symbol operators
             Operator_Fixity_Prefix
