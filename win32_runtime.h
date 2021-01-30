@@ -205,6 +205,10 @@ win32_program_jit(
   win32_program_jit_resolve_dll_imports(jit);
   Program *program = jit->program;
 
+  // The Layout of the final code is as follows:
+  // |--RW-DATA--|--CODE--|--RO-DATA--|
+  // This allows code to grow to 1 GB potentially while maintaining
+  // access to RW and RO segments with RIP-relative addressing
   static const u64 MAX_RW_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
   static const u64 MAX_CODE_SIZE = 1024 * 1024 * 1024; // 1Gb
   static const u64 MAX_RO_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
@@ -233,7 +237,6 @@ win32_program_jit(
     allocator_system, RUNTIME_FUNCTION, function_count
   );
 
-  // Making a contiguous buffer holding both data and memory to ensure
   virtual_memory_buffer_init(&jit->buffer, program_size);
 
   { // Copying and repointing the data segment into contiguous buffer
@@ -255,6 +258,7 @@ win32_program_jit(
   program->data_section.base_rva = 0;
   program->code_section.base_rva = 0;
 
+  u32 unwind_data_rva = u64_to_u32(jit->buffer.occupied);
   UNWIND_INFO *unwind_info_array = virtual_memory_buffer_allocate_bytes(
     &jit->buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
   );
@@ -284,8 +288,6 @@ win32_program_jit(
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = dyn_array_get(info->layouts, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
-    // TODO remove this calculation
-    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - jit->buffer.memory);
     win32_fn_init_unwind_info(
       builder, layout, unwind_info, &info->function_table[i], unwind_data_rva
     );
