@@ -645,7 +645,8 @@ fn_encode(
 
 Value
 function_return_value_for_descriptor(
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Function_Argument_Mode mode
 ) {
   if (descriptor->tag == Descriptor_Tag_Void) {
     return void_value;
@@ -657,13 +658,19 @@ function_return_value_for_descriptor(
       .operand = operand_register_for_descriptor(Register_Xmm0, descriptor),
     };
   }
-  // :ReturnTypeLargerThanRegister
   u64 byte_size = descriptor_byte_size(descriptor);
   if (byte_size <= 8) {
     return (Value) {
       .descriptor = descriptor,
       .operand = operand_register_for_descriptor(Register_A, descriptor),
     };
+  }
+  // :ReturnTypeLargerThanRegister
+  // Inside the function large returns are pointed to by RCX,
+  // but this pointer is also returned in A
+  Register base_register = Register_A;
+  if (mode == Function_Argument_Mode_Body) {
+    base_register = Register_C;
   }
   return (Value){
     .descriptor = descriptor,
@@ -1256,7 +1263,9 @@ ensure_compiled_function_body(
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     switch(argument->tag) {
       case Function_Argument_Tag_Any_Of_Type: {
-        Value *arg_value = function_argument_value_at_index(context->allocator, function, index);
+        Value *arg_value = function_argument_value_at_index(
+          context->allocator, function, index, Function_Argument_Mode_Body
+        );
         scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
           .Value.value = arg_value,
@@ -1277,7 +1286,9 @@ ensure_compiled_function_body(
   }
 
   Value *return_value = allocator_allocate(context->allocator, Value);
-  *return_value = function_return_value_for_descriptor(function->returns.descriptor);
+  *return_value = function_return_value_for_descriptor(
+    function->returns.descriptor, Function_Argument_Mode_Body
+  );
 
   scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
@@ -1366,23 +1377,40 @@ call_function_overload(
 
   for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
     Value *source_arg = *dyn_array_get(arguments, i);
-    Value *target_arg = function_argument_value_at_index(context->allocator, descriptor, i);
-    assign(context, source_range, target_arg, source_arg);
+    Value *target_arg = function_argument_value_at_index(
+      context->allocator, descriptor, i, Function_Argument_Mode_Call
+    );
+    if (
+      descriptor_byte_size(source_arg->descriptor) <= 8 ||
+      // TODO Number literals are larger than a register, but only converted into
+      //      a proper value in the assign below so need this explicit check.
+      //      Maybe we should do the conversion at some step before?
+      source_arg->descriptor == &descriptor_number_literal
+    ) {
+      assign(context, source_range, target_arg, source_arg);
+    } else {
+      // Large values are copied to the stack and passed by a reference
+      Value *stack_value = reserve_stack(context->allocator, builder, source_arg->descriptor);
+      assign(context, source_range, stack_value, source_arg);
+      load_address(context, source_range, target_arg, stack_value);
+    }
   }
 
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
-  Value fn_return_value = function_return_value_for_descriptor(descriptor->returns.descriptor);
+  Value fn_return_value = function_return_value_for_descriptor(
+    descriptor->returns.descriptor, Function_Argument_Mode_Call
+  );
 
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
   if (return_size > 8) {
+    s32 offset = u64_to_s32(parameters_stack_size);
+    fn_return_value.operand = stack(offset, return_size);
     parameters_stack_size += return_size;
-    Descriptor *return_pointer_descriptor =
-      descriptor_pointer_to(context->allocator, descriptor->returns.descriptor);
-    Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, return_pointer_descriptor);
+    Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, &descriptor_s64);
     push_instruction(
       instructions, *source_range,
       (Instruction) {.assembly = {lea, {reg_c->operand, fn_return_value.operand}}}
