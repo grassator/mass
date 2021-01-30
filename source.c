@@ -2589,6 +2589,17 @@ token_handle_c_string(
   dyn_array_destroy(args);
 }
 
+External_Symbol
+mass_compiler_external(
+  Slice library_name,
+  Slice symbol_name
+) {
+  return (External_Symbol) {
+    .library_name = library_name,
+    .symbol_name = symbol_name,
+  };
+}
+
 
 void
 token_handle_external(
@@ -4495,6 +4506,10 @@ scope_define_builtins(
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
   });
+  scope_define(scope, slice_literal("@"), (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Operator,
+    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
+  });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
@@ -4506,10 +4521,6 @@ scope_define_builtins(
   scope_define(scope, slice_literal("macro"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
-  scope_define(scope, slice_literal("@"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 18, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
   });
 
   scope_define(scope, slice_literal("-"), (Scope_Entry) {
@@ -4615,6 +4626,39 @@ scope_define_builtins(
     });
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
+
+  {
+    Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
+    *descriptor = (Descriptor) {
+      .tag = Descriptor_Tag_Function,
+      .name = slice_literal("mass_compiler_external"),
+      .Function = {
+        .arguments = dyn_array_make(Array_Function_Argument, .capacity = 2, .allocator = allocator),
+        .returns = {
+          .descriptor = &descriptor_external_symbol,
+        }
+      },
+    };
+    dyn_array_push(descriptor->Function.arguments, (Function_Argument) {
+      .tag = Function_Argument_Tag_Any_Of_Type,
+      .Any_Of_Type = {
+        .name = slice_literal("library_name"),
+        .descriptor = &descriptor_string
+      },
+    });
+    dyn_array_push(descriptor->Function.arguments, (Function_Argument) {
+      .tag = Function_Argument_Tag_Any_Of_Type,
+      .Any_Of_Type = {
+        .name = slice_literal("symbol_name"),
+        .descriptor = &descriptor_string
+      },
+    });
+    Value *value = value_make(allocator, descriptor, imm64(allocator, (u64)mass_compiler_external));
+    scope_define(scope, slice_literal("mass_compiler_external"), (Scope_Entry) {
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = value
+    });
+  }
 
   {
     Array_Token_Statement_Matcher matchers =
