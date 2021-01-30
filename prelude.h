@@ -230,6 +230,22 @@ memory_page_size() {
   return size;
 }
 
+
+s32
+memory_allocation_granularity() {
+  static s32 size = -1;
+  if (size == -1) {
+    #ifdef _WIN32
+    SYSTEM_INFO system_info;
+    GetSystemInfo(&system_info);
+    size = system_info.dwAllocationGranularity;
+    #else
+    size = sysconf(_SC_PAGESIZE);
+    #endif
+  }
+  return size;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // System
 //////////////////////////////////////////////////////////////////////////////
@@ -2379,6 +2395,127 @@ utf16_null_terminated_to_utf8(
 ) {
   u64 source_byte_size = utf16_string_length(source) * sizeof(u16);
   return utf16_to_utf8(allocator, source, source_byte_size);
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Virtual Memory Buffer
+//////////////////////////////////////////////////////////////////////////////
+
+typedef struct {
+  u64 capacity;
+  u64 occupied;
+  u64 committed;
+  s8 *memory;
+} Virtual_Memory_Buffer;
+
+void
+virtual_memory_buffer_init(
+  Virtual_Memory_Buffer *buffer,
+  u64 minimum_capacity
+) {
+  u64 granularity = s32_to_u64(memory_allocation_granularity());
+  u64 capacity = u64_align(minimum_capacity, granularity);
+#ifdef _WIN32
+  void *memory = VirtualAlloc(0, capacity, MEM_RESERVE, PAGE_READWRITE);
+#else
+  void *address = 0; // system chosen
+  int prot = PROT_READ | PROT_WRITE;
+  int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
+  int fd = -1; // Required by MAP_ANONYMOUS
+  size_t offset = 0; // Required by MAP_ANONYMOUS
+  void *memory = mmap(0, capacity, prot, flags, fd, offset);
+#endif
+  *buffer = (Virtual_Memory_Buffer) {
+    .capacity = capacity,
+    .occupied = 0,
+    .committed = 0,
+    .memory = memory,
+  };
+}
+
+void
+virtual_memory_buffer_deinit(
+  Virtual_Memory_Buffer *buffer
+) {
+#ifdef _WIN32
+  VirtualFree(buffer->memory, buffer->capacity, MEM_RELEASE);
+#else
+  munmap(buffer->memory, buffer->capacity);
+#endif
+}
+
+static void *
+virtual_memory_buffer_allocate_bytes(
+  Virtual_Memory_Buffer *buffer,
+  u64 byte_size,
+  u64 alignment
+) {
+  u64 aligned_occupied = buffer->occupied;
+  if (alignment != 1) {
+    aligned_occupied = u64_align(aligned_occupied, alignment);
+    byte_size = u64_align(byte_size, alignment);
+  }
+  assert(buffer->capacity >= byte_size + aligned_occupied);
+  buffer->occupied = aligned_occupied;
+  void *result = buffer->memory + buffer->occupied;
+  buffer->occupied += byte_size;
+  u64 page_size = s32_to_u64(memory_page_size());
+  u64 required_to_commit = u64_align(buffer->occupied, page_size);
+  #ifdef _WIN32
+  if (required_to_commit > buffer->committed) {
+    void *commit_pointer = buffer->memory + buffer->committed;
+    u64 commit_size = required_to_commit - buffer->committed;
+    VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
+    buffer->committed = required_to_commit;
+  }
+  #endif
+  return result;
+}
+
+#define virtual_memory_buffer_allocate_unaligned(_buffer_, _type_)\
+  ((_type_ *)virtual_memory_buffer_allocate_bytes((_buffer_), sizeof(_type_), 1))
+
+#define virtual_memory_buffer_allocate_array(_buffer_, _type_, _count_)\
+  ((_type_ *)virtual_memory_buffer_allocate_bytes((_buffer_), (_count_) * sizeof(_type_), _Alignof(_type_)))
+
+#define virtual_memory_buffer_allocate(_buffer_, _type_)\
+  ((_type_ *)virtual_memory_buffer_allocate_bytes((_buffer_), sizeof(_type_), _Alignof(_type_)))
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  static inline u64 virtual_memory_buffer_append_##_type_(Virtual_Memory_Buffer *buffer, _type_ value) {\
+    _type_ *result = virtual_memory_buffer_allocate_bytes(buffer, sizeof(_type_), 1);\
+    *result = value;\
+    return (s8 *)result - buffer->memory;\
+  }
+PRELUDE_ENUMERATE_NUMERIC_TYPES
+#undef PRELUDE_PROCESS_TYPE
+
+static inline Slice
+virtual_memory_buffer_as_slice(
+  Virtual_Memory_Buffer *buffer
+) {
+  return (Slice){
+    .bytes = (char *)buffer->memory,
+    .length = buffer->occupied
+  };
+}
+
+static inline u64
+virtual_memory_buffer_remaining_capacity(
+  Virtual_Memory_Buffer *buffer
+) {
+  return buffer->capacity - buffer->occupied;
+}
+
+static inline Slice
+virtual_memory_buffer_append_slice(
+  Virtual_Memory_Buffer *buffer,
+  Slice slice
+) {
+  if (!slice.length) return (Slice) {0};
+  void *target = virtual_memory_buffer_allocate_bytes(buffer, slice.length, _Alignof(s8));
+  memcpy(target, slice.bytes, slice.length);
+  return (Slice) { .bytes = target, .length = slice.length, };
 }
 
 //////////////////////////////////////////////////////////////////////////////
