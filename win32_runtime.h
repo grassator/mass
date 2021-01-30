@@ -205,25 +205,21 @@ win32_program_jit(
   win32_program_jit_resolve_dll_imports(jit);
   Program *program = jit->program;
 
-  static const u64 MAX_RW_DATA_SIZE = 1024 * 1024 * 10; // 1Gb
-  static const u64 MAX_CODE_SIZE = 1024 * 1024 * 10; // 1Gb
-  static const u64 MAX_RO_DATA_SIZE = 1024 * 1024 * 10; // 1Gb
-
-  //u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
-  //u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
-  //u64 data_segment_size = global_data_size + unwind_info_size;
+  static const u64 MAX_RW_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
+  static const u64 MAX_CODE_SIZE = 1024 * 1024 * 1024; // 1Gb
+  static const u64 MAX_RO_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
 
   u64 program_size = MAX_CODE_SIZE + MAX_RW_DATA_SIZE + MAX_RO_DATA_SIZE;
   u64 function_count = dyn_array_length(program->functions);
 
   Win32_Jit_Info *info;
-  if (jit->buffer) {
+  if (jit->platform_specific_payload) {
+    dyn_array_clear(jit->program->patch_info_array);
     assert(jit->platform_specific_payload);
     info = jit->platform_specific_payload;
     // TODO @Speed use RtlInstallFunctionTableCallback
     RtlDeleteFunctionTable(info->function_table);
-    fixed_buffer_destroy(jit->buffer);
-    jit->buffer = 0;
+    virtual_memory_buffer_deinit(&jit->buffer);
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
     *info = (Win32_Jit_Info) {
@@ -238,19 +234,19 @@ win32_program_jit(
   );
 
   // Making a contiguous buffer holding both data and memory to ensure
-  Fixed_Buffer *result_buffer = fixed_buffer_make(
-    .allocator = allocator_system,
-    .capacity = program_size,
-  );
+  virtual_memory_buffer_init(&jit->buffer, program_size);
 
   { // Copying and repointing the data segment into contiguous buffer
     u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
-    void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
-    bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
-    // Setup permissions for the data segment
-    DWORD win32_permissions =
-      win32_section_permissions_to_virtual_protect_flags(program->data_section.permissions);
-    VirtualProtect(global_data, global_data_size, win32_permissions, &(DWORD){0});
+    if (global_data_size) {
+      void *global_data =
+        virtual_memory_buffer_allocate_bytes(&jit->buffer, global_data_size, sizeof(s8));
+      bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
+      // Setup permissions for the data segment
+      DWORD win32_permissions =
+        win32_section_permissions_to_virtual_protect_flags(program->data_section.permissions);
+      VirtualProtect(global_data, global_data_size, win32_permissions, &(DWORD){0});
+    }
   }
 
   // Since we are writing to the same buffer both data segment and code segment,
@@ -259,23 +255,28 @@ win32_program_jit(
   program->data_section.base_rva = 0;
   program->code_section.base_rva = 0;
 
-  UNWIND_INFO *unwind_info_array = fixed_buffer_allocate_bytes(
-    result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
+  UNWIND_INFO *unwind_info_array = virtual_memory_buffer_allocate_bytes(
+    &jit->buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
   );
 
   u64 code_start_rva = MAX_RW_DATA_SIZE;
-  assert(result_buffer->occupied < MAX_RW_DATA_SIZE);
-  result_buffer->occupied = code_start_rva;
-  s8 *code_memory = fixed_buffer_first_free_byte_address(result_buffer);
+  assert(jit->buffer.occupied < MAX_RW_DATA_SIZE);
+
+  jit->buffer.occupied = code_start_rva;
+  // FIXME this might break if we change virtual_memory_buffer implementation
+  //       so ideally we should use custom code to handle this.
+  jit->buffer.committed = code_start_rva;
+
+  s8 *code_memory = jit->buffer.memory + jit->buffer.occupied;
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
-  u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
+  u32 trampoline_virtual_address = make_trampoline(program, &jit->buffer, trampoline_target);
 
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = i >= previously_encoded_count
       ? dyn_array_push(info->layouts, (Function_Layout){0})
       : dyn_array_get(info->layouts, i);
-    fn_encode(program, result_buffer, builder, layout);
+    fn_encode(program, &jit->buffer, builder, layout);
   }
 
   // It is a separate loop from above to make sure unwinding data is not in executable memory
@@ -283,7 +284,8 @@ win32_program_jit(
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = dyn_array_get(info->layouts, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
-    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
+    // TODO remove this calculation
+    u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - jit->buffer.memory);
     win32_fn_init_unwind_info(
       builder, layout, unwind_info, &info->function_table[i], unwind_data_rva
     );
@@ -306,7 +308,8 @@ win32_program_jit(
 
   // Setup permissions for the code segment
   {
-    u64 code_segment_size = u64_align(code_start_rva, memory_page_size());
+    u64 code_segment_size = jit->buffer.occupied - code_start_rva;
+    code_segment_size = u64_align(code_segment_size, memory_page_size());
     DWORD win32_permissions =
       win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
     VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
@@ -318,12 +321,11 @@ win32_program_jit(
   // TODO consider if we want to not do JIT at all in this case?
   if (function_count) {
     if (!RtlAddFunctionTable(
-      info->function_table, u64_to_u32(function_count), (s64) result_buffer->memory
+      info->function_table, u64_to_u32(function_count), (s64) jit->buffer.memory
     )) {
       panic("Could not add function table definition");
     }
   }
-  jit->buffer = result_buffer;
 }
 
 

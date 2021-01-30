@@ -234,7 +234,7 @@ encode_rdata_section(
 }
 
 typedef struct {
-  Fixed_Buffer *buffer;
+  Virtual_Memory_Buffer buffer;
   s32 entry_point_rva;
 } Encoded_Text_Section;
 
@@ -248,10 +248,9 @@ encode_text_section(
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
   max_code_size = u64_align(max_code_size, PE32_FILE_ALIGNMENT);
 
-  Encoded_Text_Section result = {
-    .buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = max_code_size),
-  };
-  Fixed_Buffer *buffer = result.buffer;
+  Encoded_Text_Section result = {0};
+  virtual_memory_buffer_init(&result.buffer, max_code_size);
+  Virtual_Memory_Buffer *buffer = &result.buffer;
 
   program->code_section.base_rva = header->VirtualAddress;
 
@@ -268,7 +267,7 @@ encode_text_section(
       found_entry_point = true;
     }
     Function_Layout *layout = dyn_array_push_uninitialized(layouts);
-    fn_encode(program, result.buffer, builder, layout);
+    fn_encode(program, buffer, builder, layout);
   }
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
@@ -384,7 +383,7 @@ write_executable(
   Encoded_Text_Section encoded_text_section = encode_text_section(
     context, text_section_header, &encoded_rdata_section
   );
-  Fixed_Buffer *text_section_buffer = encoded_text_section.buffer;
+  Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
 
   // Calculate total size of image in memory once loaded
   s32 virtual_size_of_image =
@@ -497,7 +496,7 @@ write_executable(
   fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
   fclose(file);
 
-  fixed_buffer_destroy(text_section_buffer);
+  virtual_memory_buffer_deinit(&encoded_text_section.buffer);
   fixed_buffer_destroy(rdata_section_buffer);
   fixed_buffer_destroy(exe_buffer);
 }

@@ -52,7 +52,7 @@ instruction_add_source_location_internal(
 u32
 make_trampoline(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   s64 address
 );
 
@@ -68,7 +68,7 @@ move_value(
 void
 fn_encode(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   const Function_Builder *builder,
   Function_Layout *out_layout
 );

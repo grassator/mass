@@ -2442,6 +2442,7 @@ virtual_memory_buffer_deinit(
 #else
   munmap(buffer->memory, buffer->capacity);
 #endif
+  *buffer = (Virtual_Memory_Buffer){0};
 }
 
 static void *

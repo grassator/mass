@@ -19,7 +19,7 @@ typedef enum {
 void
 encode_instruction_assembly(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   Instruction *instruction,
   const Instruction_Encoding *encoding,
   u32 operand_count
@@ -181,23 +181,23 @@ encode_instruction_assembly(
   }
 
   if (rex_byte) {
-    fixed_buffer_append_u8(buffer, rex_byte);
+    virtual_memory_buffer_append_u8(buffer, rex_byte);
   }
 
   if (needs_16_bit_prefix) {
-    fixed_buffer_append_u8(buffer, 0x66);
+    virtual_memory_buffer_append_u8(buffer, 0x66);
   }
 
   if (op_code[0]) {
-    fixed_buffer_append_u8(buffer, op_code[0]);
+    virtual_memory_buffer_append_u8(buffer, op_code[0]);
   }
   if (op_code[1]) {
-    fixed_buffer_append_u8(buffer, op_code[1]);
+    virtual_memory_buffer_append_u8(buffer, op_code[1]);
   }
   if (op_code[2]) {
-    fixed_buffer_append_u8(buffer, op_code[2]);
+    virtual_memory_buffer_append_u8(buffer, op_code[2]);
   }
-  fixed_buffer_append_u8(buffer, op_code[3]);
+  virtual_memory_buffer_append_u8(buffer, op_code[3]);
 
   if (mod_r_m_operand_index != -1) {
     u8 mod_r_m = (
@@ -205,11 +205,11 @@ encode_instruction_assembly(
       ((reg_or_op_code & 0b111) << 3) |
       ((r_m & 0b111))
     );
-    fixed_buffer_append_u8(buffer, mod_r_m);
+    virtual_memory_buffer_append_u8(buffer, mod_r_m);
   }
 
   if (needs_sib) {
-    fixed_buffer_append_u8(buffer, sib_byte);
+    virtual_memory_buffer_append_u8(buffer, sib_byte);
   }
 
   // :AfterInstructionPatch
@@ -232,7 +232,7 @@ encode_instruction_assembly(
         Label_Index label_index =
           operand->Memory.location.Instruction_Pointer_Relative.label_index;
         // :OperandNormalization
-        s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
+        s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
         // :AfterInstructionPatch
         mod_r_m_patch_info =
           dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
@@ -244,9 +244,9 @@ encode_instruction_assembly(
       }
       case Memory_Location_Tag_Indirect: {
         if (mod == MOD_Displacement_s32) {
-          fixed_buffer_append_s32(buffer, displacement);
+          virtual_memory_buffer_append_s32(buffer, displacement);
         } else if (mod == MOD_Displacement_s8) {
-          fixed_buffer_append_s8(buffer, s32_to_s8(displacement));
+          virtual_memory_buffer_append_s8(buffer, s32_to_s8(displacement));
         } else {
           assert(mod == MOD_Displacement_0);
         }
@@ -264,7 +264,7 @@ encode_instruction_assembly(
     Operand *operand = &instruction->assembly.operands[operand_index];
     if (operand_is_label(operand)) {
       Label_Index label_index = operand->Memory.location.Instruction_Pointer_Relative.label_index;
-      s32 *patch_target = fixed_buffer_allocate_unaligned(buffer, s32);
+      s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
       // :AfterInstructionPatch
       immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
@@ -277,7 +277,7 @@ encode_instruction_assembly(
         .bytes = operand->Immediate.memory,
         .length = operand->byte_size,
       };
-      fixed_buffer_append_slice(buffer, slice);
+      virtual_memory_buffer_append_slice(buffer, slice);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }
@@ -298,7 +298,7 @@ encode_instruction_assembly(
 void
 encode_instruction(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   Instruction *instruction
 ) {
   // TODO turn into a switch statement on type
@@ -316,7 +316,7 @@ encode_instruction(
       .bytes = (char *)instruction->Bytes.memory,
       .length = instruction->Bytes.length,
     };
-    fixed_buffer_append_slice(buffer, slice);
+    virtual_memory_buffer_append_slice(buffer, slice);
 
     if (instruction->Bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
       u64 patch_offset_in_buffer =

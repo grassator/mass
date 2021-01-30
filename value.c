@@ -1001,12 +1001,12 @@ value_as_function(
   Value *value
 ) {
   assert(operand_is_label(&value->operand));
-  assert(jit->buffer);
+  assert(jit->buffer.memory);
   Label *label = program_get_label(
     jit->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
   assert(label->section == &jit->program->code_section);
-  s8 *target = jit->buffer->memory + label->section->base_rva + label->offset_in_section;
+  s8 *target = jit->buffer.memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1115,8 +1115,8 @@ jit_deinit(
   Jit *jit
 ) {
   hash_map_destroy(jit->import_library_handles);
-  if (jit->buffer) {
-    fixed_buffer_destroy(jit->buffer);
+  if (jit->buffer.memory) {
+    virtual_memory_buffer_deinit(&jit->buffer);
   }
 }
 

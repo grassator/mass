@@ -490,7 +490,7 @@ fn_end(
 u32
 make_trampoline(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
@@ -514,7 +514,7 @@ typedef struct {
 void
 fn_encode(
   Program *program,
-  Fixed_Buffer *buffer,
+  Virtual_Memory_Buffer *buffer,
   const Function_Builder *builder,
   Function_Layout *out_layout
 ) {
@@ -1207,13 +1207,17 @@ ensure_compiled_function_body(
   }
 
   // TODO better name (coming from the function)
-  Label_Index fn_label = make_label(program, &program->code_section, slice_literal("fn"));
+  Slice fn_name = fn_value->descriptor->name.length
+    ? fn_value->descriptor->name
+    : slice_literal("anonymous_function");
+  Label_Index fn_label = make_label(program, &program->code_section, fn_name);
   fn_value->operand = code_label32(fn_label);
 
   Function_Builder builder = (Function_Builder){
     .function = function,
     .label_index = fn_label,
     .code_block = {
+      // FIXME use fn_value->descriptor->name
       .end_label = make_label(program, &program->code_section, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
