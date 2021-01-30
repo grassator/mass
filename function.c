@@ -1407,13 +1407,12 @@ call_function_overload(
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
   if (return_size > 8) {
-    s32 offset = u64_to_s32(parameters_stack_size);
-    fn_return_value.operand = stack(offset, return_size);
+    fn_return_value = *reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
     parameters_stack_size += return_size;
-    Value *reg_c = value_register_for_descriptor(context->allocator, Register_C, &descriptor_s64);
+    Operand reg_c = operand_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
       instructions, *source_range,
-      (Instruction) {.assembly = {lea, {reg_c->operand, fn_return_value.operand}}}
+      (Instruction) {.assembly = {lea, {reg_c, fn_return_value.operand}}}
     );
   }
 
