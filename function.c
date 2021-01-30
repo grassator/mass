@@ -228,6 +228,32 @@ move_value(
   }
 
   if (source->tag == Operand_Tag_Immediate) {
+    if (source->byte_size > 8) {
+      // TODO use XMM or 64 bit registers where appropriate
+      // TODO support packed structs
+      static const u64 chunk_size = 4;
+      assert(source->byte_size % chunk_size == 0);
+      // TODO can there be something else?
+      assert(target->tag == Operand_Tag_Memory);
+      Memory_Location location = target->Memory.location;
+      // TODO support other ones
+      assert(location.tag == Memory_Location_Tag_Indirect);
+      for (u64 offset = 0; offset < source->byte_size; offset += chunk_size) {
+        Operand adjusted_target = *target;
+        adjusted_target.byte_size = chunk_size;
+        adjusted_target.Memory.location.Indirect.offset += offset;
+        Operand adjusted_source = (Operand) {
+          .tag = Operand_Tag_Immediate,
+          .byte_size = chunk_size,
+          .Immediate.memory = (s8 *)source->Immediate.memory + offset,
+        };
+        push_instruction(
+          instructions, *source_range,
+          (Instruction) {.assembly = {mov, {adjusted_target, adjusted_source}}}
+        );
+      }
+      return;
+    }
     s64 immediate = operand_immediate_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Operand_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
