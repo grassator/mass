@@ -204,12 +204,17 @@ win32_program_jit(
 ) {
   win32_program_jit_resolve_dll_imports(jit);
   Program *program = jit->program;
-  u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
+
+  static const u64 MAX_CODE_SIZE = 1024 * 1024 * 1024; // 1Gb
+  static const u64 MAX_RW_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
+  static const u64 MAX_RO_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
+
+  //u64 code_segment_size = estimate_max_code_size_in_bytes(program) + MAX_ESTIMATED_TRAMPOLINE_SIZE;
+  //u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
+  //u64 data_segment_size = global_data_size + unwind_info_size;
+
+  u64 program_size = MAX_CODE_SIZE + MAX_RW_DATA_SIZE + MAX_RO_DATA_SIZE;
   u64 function_count = dyn_array_length(program->functions);
-  u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
-  u64 unwind_info_size = u64_align(sizeof(UNWIND_INFO) * function_count, sizeof(DWORD));
-  u64 data_segment_size = global_data_size + unwind_info_size;
-  u64 program_size = data_segment_size + code_segment_size;
 
   Win32_Jit_Info *info;
   if (jit->buffer) {
@@ -239,6 +244,7 @@ win32_program_jit(
   );
 
   { // Copying and repointing the data segment into contiguous buffer
+    u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
     void *global_data = fixed_buffer_allocate_bytes(result_buffer, global_data_size, sizeof(s8));
     bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
     // Setup permissions for the data segment
@@ -257,7 +263,8 @@ win32_program_jit(
     result_buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
   );
 
-  s8 *code_memory = result_buffer->memory + result_buffer->occupied;
+  u64 code_start_rva = result_buffer->occupied;
+  s8 *code_memory = result_buffer->memory + code_start_rva;
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
   u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
 
@@ -297,6 +304,7 @@ win32_program_jit(
 
   // Setup permissions for the code segment
   {
+    u64 code_segment_size = u64_align(code_start_rva, memory_page_size());
     DWORD win32_permissions =
       win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
     VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
