@@ -2271,13 +2271,13 @@ token_process_c_struct_definition(
 Value *
 token_process_function_literal(
   Compilation_Context *context,
-  Scope *scope,
   const Token *args,
   const Token *return_types,
   const Token *body
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  // FIXME This parent stuff is a bit weird
   Scope *parent_scope = context->scope;
   Scope *function_scope = scope_make(context->allocator, parent_scope);
   function_scope->flags |= Scope_Flags_Labels;
@@ -3489,9 +3489,7 @@ token_eval_operator(
     const Token *arguments = token_view_get(args_view, 0);
     const Token *return_types = token_view_get(args_view, 1);
     const Token *body = token_view_get(args_view, 2);
-    Value *function_value = token_process_function_literal(
-      context, context->scope, arguments, return_types, body
-    );
+    Value *function_value = token_process_function_literal(context, arguments, return_types, body);
     MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = token_view_get(args_view, 0);
