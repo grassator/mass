@@ -3997,6 +3997,8 @@ token_parse_statement_label(
 
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("label"));
+  Token_Maybe_Match(placeholder, .tag = Token_Tag_Id, .source = slice_literal("placeholder"));
+
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
 
   if (
@@ -4022,6 +4024,10 @@ token_parse_statement_label(
     value = scope_entry_force(context, scope_entry);
   } else {
     Scope *label_scope = context->scope;
+    if (placeholder) {
+      value = token_define_label(context, label_scope, id->source);
+      return peek_index;
+    }
     while (label_scope) {
       if (label_scope->flags & Scope_Flags_Labels) break;
       label_scope = label_scope->parent;

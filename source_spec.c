@@ -379,13 +379,12 @@ spec("source") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "foo", &test_context,
         "foo :: () -> (s64) {"
-          "goto start;"
-          "label from_machine_code;"
-          "return 42;"
-          "label start;"
+          "label placeholder from_machine_code;"
           // "goto from_machine_code;"
           "inline_machine_code_bytes(0xE9, from_machine_code);"
-          "10"
+          "return 10;"
+          "label from_machine_code;"
+          "42"
         "}"
       );
       check(checker);
