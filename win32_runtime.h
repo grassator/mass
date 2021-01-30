@@ -195,6 +195,7 @@ win32_program_jit_resolve_dll_imports(
 
 typedef struct {
   RUNTIME_FUNCTION *function_table;
+  Array_Function_Layout layouts;
 } Win32_Jit_Info;
 
 void
@@ -220,9 +221,12 @@ win32_program_jit(
     jit->buffer = 0;
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
-    *info = (Win32_Jit_Info) {0};
+    *info = (Win32_Jit_Info) {
+      .layouts = dyn_array_make(Array_Function_Layout),
+    };
     jit->platform_specific_payload = info;
   }
+  u64 previously_encoded_count = dyn_array_length(info->layouts);
 
   info->function_table = allocator_allocate_array(
     allocator_system, RUNTIME_FUNCTION, function_count
@@ -257,19 +261,18 @@ win32_program_jit(
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
   u32 trampoline_virtual_address = make_trampoline(program, result_buffer, trampoline_target);
 
-  Array_Function_Layout layouts =
-    dyn_array_make(Array_Function_Layout, .capacity = function_count);
-
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_push(layouts, (Function_Layout){0});
+    Function_Layout *layout = i >= previously_encoded_count
+      ? dyn_array_push(info->layouts, (Function_Layout){0})
+      : dyn_array_get(info->layouts, i);
     fn_encode(program, result_buffer, builder, layout);
   }
 
   // It is a separate loop from above to make sure unwinding data is not in executable memory
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_get(layouts, i);
+    Function_Layout *layout = dyn_array_get(info->layouts, i);
     UNWIND_INFO *unwind_info = &unwind_info_array[i];
     u32 unwind_data_rva = s64_to_u32((s8 *)unwind_info - result_buffer->memory);
     win32_fn_init_unwind_info(
@@ -311,8 +314,6 @@ win32_program_jit(
     }
   }
   jit->buffer = result_buffer;
-
-  dyn_array_destroy(layouts);
 }
 
 
