@@ -438,7 +438,7 @@ code_label32(
 #define operand_immediate(_VALUE_)\
   ((Operand) {                    \
     .tag = Operand_Tag_Immediate, \
-    .byte_size = sizeof(*_VALUE_), \
+    .byte_size = sizeof(*(_VALUE_)), \
     .Immediate.memory = (_VALUE_),\
   })
 
@@ -801,6 +801,8 @@ value_global_internal(
   };
   return result;
 }
+#define value_global(...)\
+  value_global_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Operand
 operand_eflags(
