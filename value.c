@@ -1017,7 +1017,8 @@ function_argument_value_at_index_internal(
   Compiler_Source_Location source_location,
   Allocator *allocator,
   Descriptor_Function *function,
-  u64 argument_index
+  u64 argument_index,
+  Function_Argument_Mode mode
 ) {
   Descriptor *arg_descriptor = 0;
   Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
@@ -1032,7 +1033,6 @@ function_argument_value_at_index_internal(
     }
   }
   u64 byte_size = descriptor_byte_size(arg_descriptor);
-  assert(byte_size <= 8);
 
   // :ReturnTypeLargerThanRegister
   // If return type is larger than register, the pointer to stack location
@@ -1049,9 +1049,31 @@ function_argument_value_at_index_internal(
 
   if (argument_index < countof(general_registers)) {
     Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
-    return value_register_for_descriptor_internal(
-      source_location, allocator, registers[argument_index], arg_descriptor
-    );
+    Register reg = registers[argument_index];
+    if (byte_size <= 8) {
+      return value_register_for_descriptor_internal(source_location, allocator, reg, arg_descriptor);
+    } else {
+      switch(mode) {
+        case Function_Argument_Mode_Call: {
+          // For the caller we pretend that the type is a pointer since we do not have references
+          Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
+          return value_register_for_descriptor_internal(source_location, allocator, reg, pointer_descriptor);
+        }
+        case Function_Argument_Mode_Body: {
+          // Large arguments are passed "by reference", i.e. their memory location in the register
+          return value_make_internal(source_location, allocator, arg_descriptor, (Operand) {
+            .tag = Operand_Tag_Memory,
+            .byte_size = byte_size,
+            .Memory.location = {
+              .tag = Memory_Location_Tag_Indirect,
+              .Indirect = { .base_register = reg },
+            }
+          });
+        }
+      }
+      panic("Unexpected function argument mode");
+      return 0;
+    }
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
     Operand operand = stack(offset, byte_size);

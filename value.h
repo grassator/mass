@@ -284,6 +284,11 @@ typedef struct {
   u64 register_occupied_bitset;
 } Code_Block;
 
+typedef enum {
+  Function_Argument_Mode_Call,
+  Function_Argument_Mode_Body,
+} Function_Argument_Mode;
+
 typedef struct {
   s32 stack_reserve;
   u8 size_of_prolog;
