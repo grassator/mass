@@ -3287,6 +3287,10 @@ token_eval_operator(
       Value *scope_value =
         value_make(context->allocator, &descriptor_scope, operand_immediate(context->scope));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
+    } else if (token_match(body, &(Token_Pattern){ .source = slice_literal("context") })) {
+      Value *scope_value =
+        value_make(context->allocator, &descriptor_compilation_context, operand_immediate(context));
+      MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
     } else {

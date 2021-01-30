@@ -71,6 +71,8 @@ typedef struct Scope {
   Array_Token_Statement_Matcher statement_matchers;
 } Scope;
 
+MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope);
+
 PRELUDE_NO_DISCARD Mass_Result
 assign(
   Compilation_Context *context,

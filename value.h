@@ -106,12 +106,6 @@ Descriptor descriptor_type = {
 #define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * 8)
 
-// TODO maybe turn this into a proper pointer type
-MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope *);
-MASS_DEFINE_OPAQUE_C_TYPE(external_symbol, External_Symbol);
-MASS_DEFINE_OPAQUE_C_TYPE(number_literal, Number_Literal);
-MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
-
 #define MASS_ENUMERATE_BUILT_IN_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\
   MASS_PROCESS_BUILT_IN_TYPE(s16, 16)\
@@ -376,5 +370,10 @@ program_set_label_offset(
   Label_Index label_index,
   u32 offset_in_section
 );
+
+MASS_DEFINE_OPAQUE_C_TYPE(external_symbol, External_Symbol);
+MASS_DEFINE_OPAQUE_C_TYPE(number_literal, Number_Literal);
+MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
+MASS_DEFINE_OPAQUE_C_TYPE(compilation_context, Compilation_Context);
 
 #endif
