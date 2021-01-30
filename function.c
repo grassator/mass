@@ -1422,7 +1422,14 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
+  if (to_call->operand.tag == Operand_Tag_Immediate) {
+    // TODO it will not be safe to use this register with other calling conventions
+    Operand reg = operand_register_for_descriptor(Register_A, to_call_descriptor);
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg, to_call->operand}}});
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {reg}}});
+  } else {
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->operand, 0, 0}}});
+  }
 
   Value *saved_result = &fn_return_value;
   if (return_size <= 8) {
