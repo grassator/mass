@@ -1,5 +1,5 @@
-ExitProcess :: (status : s32) -> (s64) @(mass_compiler_external("kernel32.dll", "ExitProcess"))
-GetStdHandle :: (handle : s32) -> (s64) @(mass_compiler_external("kernel32.dll", "GetStdHandle"))
+ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
+GetStdHandle :: (handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
 WriteFile :: (
   status : s64,
   buffer : [s8],

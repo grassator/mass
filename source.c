@@ -2600,43 +2600,6 @@ mass_compiler_external(
   };
 }
 
-
-void
-token_handle_external(
-  Compilation_Context *context,
-  const Token *args_token,
-  Value *result_value
-) {
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-  if (dyn_array_length(args) != 2) goto err;
-  Slice *library_name = value_as_immediate_string(*dyn_array_get(args, 0));
-  Slice *symbol_name = value_as_immediate_string(*dyn_array_get(args, 1));
-
-  if (!library_name || !symbol_name) goto err;
-
-  External_Symbol *symbol = allocator_allocate(context->allocator, External_Symbol);
-  *symbol = (External_Symbol) {
-    .library_name = *library_name,
-    .symbol_name = *symbol_name,
-  };
-
-  Value *external_value =
-    value_make(context->allocator, &descriptor_external_symbol, operand_immediate(symbol));
-
-  MASS_ON_ERROR(assign(context, &args_token->source_range, result_value, external_value));
-
-  goto defer;
-
-  err:
-  context_error_snprintf(
-    context, args_token->source_range,
-    "external requires 2 string arguments"
-  );
-
-  defer:
-  dyn_array_destroy(args);
-}
-
 void
 token_handle_cast(
   Compilation_Context *context,
@@ -2937,12 +2900,12 @@ token_handle_function_call(
       Program *program = context->program;
       Label_Index fake_return_label_index = make_label(program, &program->data_section, MASS_RETURN_LABEL_NAME);
 
-      Value return_label = {
-        .descriptor = &descriptor_void,
-        .operand = code_label32(fake_return_label_index),
-        .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-      };
       if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
+        Value return_label = {
+          .descriptor = &descriptor_void,
+          .operand = code_label32(fake_return_label_index),
+          .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+        };
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
           .Value.value = &return_label,
@@ -2960,14 +2923,21 @@ token_handle_function_call(
         token_parse_block_no_scope(&body_context, body, result_value);
       }
 
-      push_instruction(
-        &context->builder->code_block.instructions,
-        target_token->source_range,
-        (Instruction) {
-          .type = Instruction_Type_Label,
-          .label = fake_return_label_index
+      if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
+        // @Hack if there are no instructions generated so far there definitely was no jumps
+        //       to return so we can avoid generating this instructions which also can enable
+        //       optimizations in the compile_time_eval that check for the instruction count.
+        if (dyn_array_length(context->builder->code_block.instructions)) {
+          push_instruction(
+            &context->builder->code_block.instructions,
+            target_token->source_range,
+            (Instruction) {
+              .type = Instruction_Type_Label,
+              .label = fake_return_label_index
+            }
+          );
         }
-      );
+      }
     } else {
       call_function_overload(context, source_range, overload, args, result_value);
     }
@@ -3258,11 +3228,6 @@ token_eval_operator(
       slice_equal(target->source, slice_literal("c_string"))
     ) {
       token_handle_c_string(context, args_token, result_value);
-    } else if (
-      target->tag == Token_Tag_Id &&
-      slice_equal(target->source, slice_literal("external"))
-    ) {
-      token_handle_external(context, args_token, result_value);
     } else if (
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("bit_type"))
@@ -4617,6 +4582,16 @@ scope_define_builtins(
   scope_define(scope, slice_literal("Register_64"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = type_register_64_value
+  });
+
+  scope_define(scope, slice_literal("External_Symbol"), (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_external_symbol_value
+  });
+
+  scope_define(scope, slice_literal("String"), (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_string_value
   });
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\

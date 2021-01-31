@@ -680,7 +680,7 @@ function_return_value_for_descriptor(
       .Memory.location = {
         .tag = Memory_Location_Tag_Indirect,
         .Indirect = {
-          .base_register = Register_C,
+          .base_register = base_register,
         }
       }
     },
@@ -1407,12 +1407,18 @@ call_function_overload(
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
   if (return_size > 8) {
-    fn_return_value = *reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
-    parameters_stack_size += return_size;
+    Operand result_operand;
+    // If we want the result at a memory location can just pass that address to the callee
+    if (result_value->operand.tag == Operand_Tag_Memory) {
+      result_operand = result_value->operand;
+    } else {
+      result_operand =
+        reserve_stack(context->allocator, builder, descriptor->returns.descriptor)->operand;
+    }
     Operand reg_c = operand_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
       instructions, *source_range,
-      (Instruction) {.assembly = {lea, {reg_c, fn_return_value.operand}}}
+      (Instruction) {.assembly = {lea, {reg_c, result_operand}}}
     );
   }
 

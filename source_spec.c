@@ -741,7 +741,8 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("external requires 2 string arguments"), error->message));
+      slice_print(error->message);
+      check(slice_equal(slice_literal("Could not find matching overload for call external"), error->message));
     }
 
     it("should report an error when non-type id is being used as a type") {
@@ -1309,34 +1310,32 @@ spec("source") {
 
   describe("PE32 Executables") {
     it("should parse and write out an executable that exits with status code 42") {
-      Slice source = slice_literal(
+      Program *test_program = test_context.program;
+      test_program->entry_point = test_program_inline_source_base(
+        "main", &test_context,
         "main :: () -> () { ExitProcess(42) }\n"
         "ExitProcess :: (status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
-
-      test_init_module(source);
-      MASS_ON_ERROR(program_parse(&test_context)) {
-        check(false, "Failed parsing");
-      }
-
-      Program *test_program = test_context.program;
-      test_program->entry_point =
-        scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
-      ensure_compiled_function_body(&test_context, test_program->entry_point);
-      check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
 
+      check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
     }
 
     it("should parse and write an executable that prints Hello, world!") {
+      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
+      Module *prelude_module = program_module_from_file(
+        &test_context, slice_literal("lib\\prelude"), module_scope
+      );
+      Mass_Result result = program_import_module(&test_context, prelude_module);
+      check(result.tag == Mass_Result_Tag_Success);
       Module *module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\hello_world"), test_context.scope
+        &test_context, slice_literal("fixtures\\hello_world"), module_scope
       );
       program_import_module(&test_context, module);
       Program *test_program = test_context.program;
       test_program->entry_point =
-        scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
+        scope_lookup_force(&test_context, module_scope, slice_literal("main"));
       ensure_compiled_function_body(&test_context, test_program->entry_point);
       check(test_program->entry_point);
       check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
