@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <string.h>
+#include <ctype.h>
 #include <assert.h>
 
 #ifndef countof
@@ -62,12 +64,10 @@ typedef enum {
 
 typedef struct Type {
   Type_Tag tag;
-  union {
-    Struct struct_;
-    Enum enum_;
-    Tagged_Union union_;
-    Function function;
-  };
+  Struct struct_;
+  Enum enum_;
+  Tagged_Union union_;
+  Function function;
 } Type;
 
 void
@@ -188,6 +188,41 @@ print_c_type(
     }
     case Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
+      break;
+    }
+  }
+}
+
+char *
+strtolower(
+  const char *str
+) {
+  char *result = strdup(str);
+  for(size_t i = 0; result[i]; i++){
+    result[i] = (char)tolower(result[i]);
+  }
+  return result;
+}
+
+void
+print_mass_descriptor_and_type(
+  FILE *file,
+  Type *type
+) {
+  switch(type->tag) {
+    case Type_Tag_Struct: {
+      break;
+    }
+    case Type_Tag_Enum: {
+      char *lowercase_name = strtolower(type->enum_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->enum_.name);
+      break;
+    }
+    case Type_Tag_Tagged_Union: {
+      break;
+    }
+    case Type_Tag_Function: {
+
       break;
     }
   }
@@ -615,10 +650,13 @@ main(void) {
   }));
 
   {
-    const char *filename = "../types.h";
+    const char *filename = "../generated_types.h";
     #pragma warning(disable : 4996)
     FILE *file = fopen(filename, "wb");
     if (!file) exit(1);
+
+    fprintf(file, "#ifndef GENERATED_TYPES_H\n");
+    fprintf(file, "#define GENERATED_TYPES_H\n");
 
     // Make sure our generated structs have explicit padding
     fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");
@@ -642,6 +680,18 @@ main(void) {
       print_c_type(file, &types[i]);
     }
     fprintf(file, "_Pragma(\"warning (pop)\")\n");
+
+    fprintf(file, "\n// Mass Type Reflection\n\n");
+
+    // The type of type needs to be defined manually
+    {
+      fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
+    }
+
+    for (uint32_t i = 0; i < type_count; ++i) {
+      print_mass_descriptor_and_type(file, &types[i]);
+    }
+    fprintf(file, "\n#endif // GENERATED_TYPES_H\n");
 
     fclose(file);
     printf("C Types Generated at: %s\n", filename);

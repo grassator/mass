@@ -39,7 +39,6 @@ register_bitset_get(
 #define MASS_ON_ERROR(...)\
   if ((__VA_ARGS__).tag != Mass_Result_Tag_Success)
 
-
 #define MASS_TRY(...)\
   for (Mass_Result _result = (__VA_ARGS__); _result.tag != Mass_Result_Tag_Success;) return _result;
 
@@ -58,53 +57,6 @@ MASS_ERROR(Slice message, Source_Range source_range) {
     }
   };
 }
-
-#define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
-  {\
-    .filename = __FILE__,\
-    .function_name = "GLOBAL",\
-    .line_number = __LINE__,\
-  }
-
-#define COMPILER_SOURCE_LOCATION_FIELDS\
-  {\
-    .filename = __FILE__,\
-    .function_name = __func__,\
-    .line_number = __LINE__,\
-  }
-#define COMPILER_SOURCE_LOCATION\
-  ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
-
-typedef struct Scope Scope;
-typedef struct Function_Builder Function_Builder;
-
-Descriptor descriptor_type = {
-  .tag = Descriptor_Tag_Opaque,
-  .name = slice_literal_fields("type"),
-  .Opaque = { .bit_size = sizeof(Descriptor) * 8 },
-};
-
-#define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\
-  Descriptor descriptor_##_NAME_ = {\
-    .tag = Descriptor_Tag_Opaque,\
-    .name = slice_literal_fields(#_NAME_),\
-    .Opaque = { .bit_size = (_BIT_SIZE_) },\
-  };\
-  Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
-
-#define MASS_TYPE_VALUE(_DESCRIPTOR_)\
-  (Value) {\
-    .descriptor = &descriptor_type,\
-    .operand = {\
-      .tag = Operand_Tag_Immediate,\
-      .byte_size = sizeof(Descriptor),\
-      .Immediate.memory = (_DESCRIPTOR_),\
-    },\
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
-  }
-
-#define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
-  MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * 8)
 
 #define MASS_ENUMERATE_BUILT_IN_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\
