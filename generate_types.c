@@ -6,6 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include "prelude.h"
 
 #ifndef countof
 #define countof(...)\
@@ -205,12 +206,81 @@ strtolower(
 }
 
 void
+print_mass_descriptor_and_type_forward_declaration(
+  FILE *file,
+  Type *type
+) {
+  switch(type->tag) {
+    case Type_Tag_Struct: {
+      char *lowercase_name = strtolower(type->struct_.name);
+      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      break;
+    }
+    case Type_Tag_Enum: {
+      char *lowercase_name = strtolower(type->enum_.name);
+      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      break;
+    }
+    case Type_Tag_Tagged_Union: {
+      char *lowercase_name = strtolower(type->union_.name);
+      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
+      break;
+    }
+    case Type_Tag_Function: {
+
+      break;
+    }
+  }
+}
+
+void
 print_mass_descriptor_and_type(
   FILE *file,
   Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
+      char *lowercase_name = strtolower(type->struct_.name);
+      fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
+      for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
+        Struct_Item *item = &type->struct_.items[i];
+        fprintf(file, "  {\n");
+        fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
+        Slice lowercase_type = slice_from_c_string(strtolower(item->type));
+        if (slice_equal(lowercase_type, slice_literal("const char *"))) {
+          lowercase_type = slice_literal("c_string");
+        } else if (slice_equal(lowercase_type, slice_literal("slice"))) {
+          lowercase_type = slice_literal("string");
+        }
+        // TODO support const
+        Slice const_prefix = slice_literal("const ");
+        if (slice_starts_with(lowercase_type, const_prefix)) {
+          lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
+        }
+        Slice original_lowercase_type = lowercase_type;
+        Slice pointer_suffix = slice_literal(" *");
+        while (slice_ends_with(lowercase_type, pointer_suffix)) {
+          lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+        }
+        fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+        lowercase_type = original_lowercase_type;
+        while (slice_ends_with(lowercase_type, pointer_suffix)) {
+          fprintf(file, "_pointer");
+          lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+        }
+        fprintf(file, ",\n");
+        fprintf(file, "    .offset = offsetof(%s, %s),\n", type->struct_.name, item->name);
+        fprintf(file, "  },\n");
+      }
+      fprintf(file, ");\n");
+      fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
       break;
     }
     case Type_Tag_Enum: {
@@ -346,7 +416,7 @@ main(void) {
   }));
 
   push_type(type_struct("Token_View", (Struct_Item[]){
-    { "const Token **", "tokens" },
+    { "const Token * *", "tokens" },
     { "u64", "length" },
     { "Source_Range", "source_range" },
   }));
@@ -683,11 +753,26 @@ main(void) {
 
     fprintf(file, "\n// Mass Type Reflection\n\n");
 
-    // The type of type needs to be defined manually
-    {
-      fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
-    }
+    fprintf(file, "Descriptor descriptor_scope_pointer;\n");
 
+    // The type of type needs to be defined manually
+    fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
+
+    // Also need to define built-in types
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(bucket_buffer, Bucket_Buffer);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol);\n");
+    fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\\\n");
+    fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\n");
+    fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");
+    fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
+
+    for (uint32_t i = 0; i < type_count; ++i) {
+      print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
+    }
     for (uint32_t i = 0; i < type_count; ++i) {
       print_mass_descriptor_and_type(file, &types[i]);
     }

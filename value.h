@@ -58,18 +58,6 @@ MASS_ERROR(Slice message, Source_Range source_range) {
   };
 }
 
-#define MASS_ENUMERATE_BUILT_IN_TYPES\
-  MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\
-  MASS_PROCESS_BUILT_IN_TYPE(s16, 16)\
-  MASS_PROCESS_BUILT_IN_TYPE(s32, 32)\
-  MASS_PROCESS_BUILT_IN_TYPE(s64, 64)\
-  MASS_PROCESS_BUILT_IN_TYPE(u8, 8)\
-  MASS_PROCESS_BUILT_IN_TYPE(u16, 16)\
-  MASS_PROCESS_BUILT_IN_TYPE(u32, 32)\
-  MASS_PROCESS_BUILT_IN_TYPE(u64, 64)\
-  MASS_PROCESS_BUILT_IN_TYPE(f32, 32)\
-  MASS_PROCESS_BUILT_IN_TYPE(f64, 64)
-
 
 static inline Value
 type_value_for_descriptor(
@@ -77,11 +65,6 @@ type_value_for_descriptor(
 ) {
   return MASS_TYPE_VALUE(descriptor);
 }
-
-#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
-  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)
-MASS_ENUMERATE_BUILT_IN_TYPES
-#undef MASS_PROCESS_BUILT_IN_TYPE
 
 // TODO Shrink to 4 bits when supported
 MASS_DEFINE_OPAQUE_TYPE(register_8, 8);
@@ -93,6 +76,7 @@ MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Operand_Eflags));
 
 Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Void,
+  .name = slice_literal_fields("void"),
 };
 
 Value void_value = {
@@ -323,9 +307,6 @@ program_set_label_offset(
   u32 offset_in_section
 );
 
-MASS_DEFINE_OPAQUE_C_TYPE(external_symbol, External_Symbol);
-MASS_DEFINE_OPAQUE_C_TYPE(number_literal, Number_Literal);
-MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
 MASS_DEFINE_OPAQUE_C_TYPE(compilation_context, Compilation_Context);
 
 #endif

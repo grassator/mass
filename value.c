@@ -1367,12 +1367,12 @@ same_value_type_or_can_implicitly_move_cast(
     Number_Literal *literal = source->operand.Immediate.memory;
     return literal->bits == 0;
   }
-  if (target->descriptor->tag != source->descriptor->tag) return false;
   if (source->descriptor == &descriptor_number_literal) {
     Literal_Cast_Result cast_result =
       value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
     return cast_result == Literal_Cast_Result_Success;
   }
+  if (target->descriptor->tag != source->descriptor->tag) return false;
   // TODO deal with signess
   if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
