@@ -1138,6 +1138,7 @@ spec("source") {
         "test", &test_context,
         "test :: () -> (s32) {"
           "x : s32 = 42;"
+          "label placeholder skip;"
           "goto skip;"
           "x = 0;"
           "label skip;"

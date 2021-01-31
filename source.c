@@ -2213,7 +2213,6 @@ token_process_function_literal(
   // FIXME This parent stuff is a bit weird
   Scope *parent_scope = context->scope;
   Scope *function_scope = scope_make(context->allocator, parent_scope);
-  function_scope->flags |= Scope_Flags_Labels;
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
@@ -3937,11 +3936,6 @@ token_parse_statement_label(
 
   const Token *id = token_view_get(rest, 0);
 
-  if (slice_equal(id->source, slice_literal("scope"))) {
-    context->scope->flags |= Scope_Flags_Labels;
-    return peek_index;
-  }
-
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
@@ -3950,22 +3944,10 @@ token_parse_statement_label(
     value = scope_entry_force(context, scope_entry);
   } else {
     Scope *label_scope = context->scope;
+    value = token_define_label(context, label_scope, id->source);
     if (placeholder) {
-      value = token_define_label(context, label_scope, id->source);
       return peek_index;
     }
-    while (label_scope) {
-      if (label_scope->flags & Scope_Flags_Labels) break;
-      label_scope = label_scope->parent;
-    }
-    if (!label_scope) {
-      context_error_snprintf(
-        context, id->source_range,
-        "Trying to add `label` outside of a label scope"
-      );
-      goto err;
-    }
-    value = token_define_label(context, label_scope, id->source);
   }
 
   if (
@@ -4031,29 +4013,10 @@ token_parse_goto(
   }
 
   Scope_Entry *scope_entry = scope_lookup(context->scope, id->source);
-  Value *value;
-  if (scope_entry) {
-    value = scope_entry_force(context, scope_entry);
-  } else {
-    Scope *label_scope = context->scope;
-    while (label_scope) {
-      if (label_scope->flags & Scope_Flags_Labels) break;
-      label_scope = label_scope->parent;
-    }
-    if (!label_scope) {
-      context_error_snprintf(
-        context, id->source_range,
-        "Trying to execute `goto` outside of a label scope"
-      );
-      goto err;
-    }
-    // :ForwardLabelRef
-    // If we didn't find an identifier with this name, declare one and hope
-    // that some label will resolve it
-    value = token_define_label(context, label_scope, id->source);
-  }
+  Value *value = scope_entry_force(context, scope_entry);
 
   if (
+    !value ||
     value->descriptor != &descriptor_void ||
     value->operand.tag != Operand_Tag_Memory ||
     value->operand.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative

@@ -58,7 +58,6 @@ typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
 typedef enum {
   Scope_Flags_None = 0,
-  Scope_Flags_Labels = 1 << 0,
 } Scope_Flags;
 
 typedef struct Scope {
