@@ -1311,7 +1311,7 @@ typedef enum {
 
 Literal_Cast_Result
 value_number_literal_cast_to(
-  Value *value,
+  const Value *value,
   Descriptor *target_descriptor,
   u64 *out_bits,
   u64 *out_bit_size

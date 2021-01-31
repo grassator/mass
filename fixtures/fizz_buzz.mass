@@ -23,7 +23,7 @@ print :: (integer : s32) -> () {
   }
   buffer_start_index : s32 = 0
   if (integer < 0) {
-    buffer[0] = minus_code
+    buffer.0 = minus_code
     integer = 42
     buffer_start_index = 1
   }
@@ -34,7 +34,7 @@ print :: (integer : s32) -> () {
     digit_s32 := integer % 10
     digit := cast(s8, digit_s32)
     digit_index := buffer_size - integer_index
-    buffer[digit_index] = zero_code + digit
+    buffer.(digit_index) = zero_code + digit
     integer = integer / 10
   }
   WriteFile(GetStdHandle(-11), &buffer, buffer_size, 0, 0)

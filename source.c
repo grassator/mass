@@ -3056,6 +3056,87 @@ struct_get_field(
   return;
 }
 
+void
+token_handle_array_access(
+  Compilation_Context *context,
+  const Source_Range *source_range,
+  Value *array_value,
+  Value *index_value,
+  Value *result_value
+) {
+  assert(array_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+  assert(array_value->operand.tag == Operand_Tag_Memory);
+  assert(array_value->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
+  assert(!array_value->operand.Memory.location.Indirect.maybe_index_register.has_value);
+
+  Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
+  u64 item_byte_size = descriptor_byte_size(item_descriptor);
+
+  Value *array_element_value = allocator_allocate(context->allocator, Value);
+  *array_element_value = (Value) {
+    .descriptor = item_descriptor,
+    .operand = array_value->operand
+  };
+  index_value = maybe_coerce_number_literal_to_integer(
+    context, source_range, index_value, &descriptor_u64
+  );
+  array_element_value->operand.byte_size = item_byte_size;
+  if (index_value->operand.tag == Operand_Tag_Immediate) {
+    s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
+    array_element_value->operand.Memory.location.Indirect.offset = index * item_byte_size;
+  } else {
+    // @InstructionQuality
+    // This code is very general in terms of the operands where the base
+    // or the index are stored, but it is
+
+    Register reg = register_acquire_temp(context->builder);
+    Value *new_base_register =
+      value_register_for_descriptor(context->allocator, reg, &descriptor_s64);
+
+    // Move the index into the register
+    move_value(
+      context->allocator,
+      context->builder,
+      source_range,
+      &new_base_register->operand,
+      &index_value->operand
+    );
+
+    Value *byte_size_value = value_from_s64(context->allocator, item_byte_size);
+    // Multiply index by the item byte size
+    multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
+
+    {
+      // @InstructionQuality
+      // TODO If the source does not have index, on X64 it should be possible to avoid
+      //      using an extra register and put the index into SIB
+
+      // Load previous address into a temp register
+      Register temp_register = register_acquire_temp(context->builder);
+      Value temp_value = {
+        .descriptor = &descriptor_s64,
+        .operand = operand_register_for_descriptor(temp_register, &descriptor_s64)
+      };
+
+      load_address(context, source_range, &temp_value, array_value);
+      plus(context, source_range, new_base_register, new_base_register, &temp_value);
+      register_release(context->builder, temp_register);
+    }
+
+    array_element_value->operand = (Operand) {
+      .tag = Operand_Tag_Memory,
+      .byte_size = item_byte_size,
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = {
+          .base_register = new_base_register->operand.Register.index,
+        }
+      }
+    };
+  }
+  // FIXME this might actually cause problems in assigning to an array element
+  MASS_ON_ERROR(assign(context, source_range, result_value, array_element_value)) return;
+}
 
 void
 token_eval_operator(
@@ -3072,99 +3153,6 @@ token_eval_operator(
     operator_entry->scope_entry.handler(
       context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
-  } else if (slice_equal(operator, slice_literal("[]"))) {
-    const Token *target_token = token_view_get(args_view, 0);
-    const Token *brackets = token_view_get(args_view, 1);
-
-    Value *array = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, target_token, array)) return;
-    Value *index_value = value_any(context->allocator);
-    Token_View index_tokens = brackets->Group.children;
-    token_parse_expression(context, index_tokens, index_value, Expression_Parse_Mode_Default);
-    assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-    assert(array->operand.tag == Operand_Tag_Memory);
-    assert(array->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-    assert(!array->operand.Memory.location.Indirect.maybe_index_register.has_value);
-
-    Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
-    u64 item_byte_size = descriptor_byte_size(item_descriptor);
-
-    Value *array_element_value = allocator_allocate(context->allocator, Value);
-    *array_element_value = (Value) {
-      .descriptor = item_descriptor,
-      .operand = array->operand
-    };
-    index_value = maybe_coerce_number_literal_to_integer(
-      context, &index_tokens.source_range, index_value, &descriptor_u64
-    );
-    array_element_value->operand.byte_size = item_byte_size;
-    if (index_value->operand.tag == Operand_Tag_Immediate) {
-      s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
-      array_element_value->operand.Memory.location.Indirect.offset = index * item_byte_size;
-    } else {
-      // @InstructionQuality
-      // This code is very general in terms of the operands where the base
-      // or the index are stored, but it is
-
-      Register reg = register_acquire_temp(context->builder);
-      Value *new_base_register =
-        value_register_for_descriptor(context->allocator, reg, &descriptor_s64);
-
-      // Move the index into the register
-      move_value(
-        context->allocator,
-        context->builder,
-        &target_token->source_range,
-        &new_base_register->operand,
-        &index_value->operand
-      );
-
-      // Multiply index by the item byte size
-      multiply(
-        context,
-        &target_token->source_range,
-        new_base_register,
-        new_base_register,
-        value_from_s64(context->allocator, item_byte_size)
-      );
-
-      {
-        // @InstructionQuality
-        // TODO If the source does not have index, on X64 it should be possible to avoid
-        //      using an extra register and put the index into SIB
-
-        // Load previous address into a temp register
-        Register temp_register = register_acquire_temp(context->builder);
-        Value temp_value = {
-          .descriptor = &descriptor_s64,
-          .operand = operand_register_for_descriptor(temp_register, &descriptor_s64)
-        };
-
-        load_address(context, &target_token->source_range, &temp_value, array);
-
-        plus(
-          context,
-          &target_token->source_range,
-          new_base_register,
-          new_base_register,
-          &temp_value
-        );
-        register_release(context->builder, temp_register);
-      }
-
-      array_element_value->operand = (Operand) {
-        .tag = Operand_Tag_Memory,
-        .byte_size = item_byte_size,
-        .Memory.location = {
-          .tag = Memory_Location_Tag_Indirect,
-          .Indirect = {
-            .base_register = new_base_register->operand.Register.index,
-          }
-        }
-      };
-    }
-    // FIXME this might actually cause problems in assigning to an array element
-    MASS_ON_ERROR(assign(context, &brackets->source_range, result_value, array_element_value)) return;
   } else if (slice_equal(operator, slice_literal("()"))) {
     const Token *target = token_view_get(args_view, 0);
     const Token *args_token = token_view_get(args_view, 1);
@@ -3227,28 +3215,49 @@ token_eval_operator(
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
 
-    if (rhs->tag == Token_Tag_Id) {
-      Value *struct_value = value_any(context->allocator);
-      MASS_ON_ERROR(token_force_value(context, lhs, struct_value)) return;
-      if (struct_value->descriptor->tag == Descriptor_Tag_Struct) {
-        struct_get_field(context, &rhs->source_range, struct_value, rhs->source, result_value);
-      } else if (struct_value->descriptor == &descriptor_scope) {
-        Scope *module_scope = operand_immediate_as_c_type(struct_value->operand, Scope);
-        Compilation_Context module_context = *context;
-        module_context.scope = module_scope;
-        module_context.builder = 0;
-        MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
+    Value *lhs_value = value_any(context->allocator);
+    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
+    if (
+      lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
+      lhs_value->descriptor == &descriptor_scope
+    ) {
+      if (rhs->tag == Token_Tag_Id) {
+        if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
+          struct_get_field(context, &rhs->source_range, lhs_value, rhs->source, result_value);
+        } else {
+          assert(lhs_value->descriptor == &descriptor_scope);
+          Scope *module_scope = operand_immediate_as_c_type(lhs_value->operand, Scope);
+          Compilation_Context module_context = *context;
+          module_context.scope = module_scope;
+          module_context.builder = 0;
+          MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
+        }
       } else {
         context_error_snprintf(
           context, rhs->source_range,
-          "Left hand side of the . operator must be a struct"
+          "Right hand side of the . operator on structs must be an identifier"
+        );
+        return;
+      }
+    } else if (lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+      if (
+        token_match(rhs, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}) ||
+        (rhs->tag == Token_Tag_Value && rhs->Value.value->descriptor == &descriptor_number_literal)
+      ) {
+        Value *index = value_any(context->allocator);
+        token_force_value(context, rhs, index);
+        token_handle_array_access(context, &lhs->source_range, lhs_value, index, result_value);
+      } else {
+        context_error_snprintf(
+          context, rhs->source_range,
+          "Right hand side of the . operator for an array must be a (expr) or a literal number"
         );
         return;
       }
     } else {
       context_error_snprintf(
         context, rhs->source_range,
-        "Right hand side of the . operator must be an identifier"
+        "Left hand side of the . operator must be a struct"
       );
       return;
     }
@@ -3704,12 +3713,10 @@ token_parse_expression(
             break;
           }
           case Token_Group_Tag_Square: {
-            if (!is_previous_an_operator) {
-              if (!token_handle_operator(
-                context, view, &token_stack, &operator_stack, slice_literal("[]"),
-                token->source_range, Operator_Fixity_Postfix
-              )) goto err;
-            }
+            context_error_snprintf(
+              context, token->source_range,
+              "Unexpected [] in an expression"
+            );
             break;
           }
         }
@@ -4371,10 +4378,6 @@ scope_define_builtins(
   const Allocator *allocator,
   Scope *scope
 ) {
-  scope_define(scope, slice_literal("[]"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
-  });
   scope_define(scope, slice_literal("()"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }

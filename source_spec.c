@@ -1179,8 +1179,8 @@ spec("source") {
         "BAR :: \"foo\"; "
         "test :: () -> (s8) {"
           "foo : s8[BAR];"
-          "foo[0] = 42;"
-          "foo[0]"
+          "foo.0 = 42;"
+          "foo.0"
         "}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1195,8 +1195,8 @@ spec("source") {
         "test", &test_context,
         "test :: () -> (s8) {"
           "foo : s8[64];"
-          "foo[0] = 42;"
-          "foo[0]"
+          "foo.0 = 42;"
+          "foo.0"
         "}"
       );
       check(checker);
@@ -1240,7 +1240,7 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
       check(slice_equal(slice_literal(
-        "Right hand side of the . operator must be an identifier"), error->message
+        "Right hand side of the . operator on structs must be an identifier"), error->message
       ));
     }
 
