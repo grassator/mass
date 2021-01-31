@@ -741,7 +741,6 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      slice_print(error->message);
       check(slice_equal(slice_literal("Could not find matching overload for call external"), error->message));
     }
 

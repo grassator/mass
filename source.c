@@ -4623,39 +4623,44 @@ scope_define_builtins(
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
-  {
-    Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
-    *descriptor = (Descriptor) {
-      .tag = Descriptor_Tag_Function,
-      .name = slice_literal("external"),
-      .Function = {
-        .flags = Descriptor_Function_Flags_Compile_Time,
-        .arguments = dyn_array_make(Array_Function_Argument, .capacity = 2, .allocator = allocator),
-        .returns = {
-          .descriptor = &descriptor_external_symbol,
-        }
-      },
-    };
-    dyn_array_push(descriptor->Function.arguments, (Function_Argument) {
-      .tag = Function_Argument_Tag_Any_Of_Type,
-      .Any_Of_Type = {
-        .name = slice_literal("library_name"),
-        .descriptor = &descriptor_string
-      },
-    });
-    dyn_array_push(descriptor->Function.arguments, (Function_Argument) {
-      .tag = Function_Argument_Tag_Any_Of_Type,
-      .Any_Of_Type = {
-        .name = slice_literal("symbol_name"),
-        .descriptor = &descriptor_string
-      },
-    });
-    Value *value = value_make(allocator, descriptor, imm64(allocator, (u64)mass_compiler_external));
-    scope_define(scope, slice_literal("external"), (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = value
-    });
+  #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
+    {\
+      .tag = Function_Argument_Tag_Any_Of_Type,\
+      .Any_Of_Type = {\
+        .name = slice_literal_fields(_NAME_),\
+        .descriptor = (_DESCRIPTOR_)\
+      },\
+    }
+
+  #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+  {\
+    static dyn_array_struct(Function_Argument) args_internal = {\
+      .length = countof((const Function_Argument[]){__VA_ARGS__}),\
+      .items = {__VA_ARGS__},\
+    };\
+    Descriptor *descriptor = allocator_allocate(allocator, Descriptor);\
+    *descriptor = (Descriptor) {\
+      .tag = Descriptor_Tag_Function,\
+      .name = slice_literal(_NAME_),\
+      .Function = {\
+        .flags = Descriptor_Function_Flags_Compile_Time,\
+        .arguments = {(Dyn_Array_Internal *)&args_internal},\
+        .returns = {\
+          .descriptor = (_RETURN_DESCRIPTOR_),\
+        }\
+      },\
+    };\
+    scope_define(scope, slice_literal(_NAME_), (Scope_Entry) {\
+      .tag = Scope_Entry_Tag_Value,\
+      .Value.value = value_make(allocator, descriptor, imm64(allocator, (u64)_FN_)),\
+    });\
   }
+
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_compiler_external, "external", &descriptor_external_symbol,
+    MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_string),
+    MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_string)
+  );
 
   {
     Array_Token_Statement_Matcher matchers =
