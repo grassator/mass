@@ -1019,7 +1019,7 @@ value_ensure_type(
     context_error_snprintf(context, source_range, "Expected a type");
     return 0;
   }
-  Descriptor *descriptor = operand_immediate_memory_as_descriptor(&value->operand);
+  Descriptor *descriptor = operand_immediate_as_c_type(value->operand, Descriptor);
   return descriptor;
 }
 
@@ -2186,30 +2186,14 @@ token_match_struct_field(
   return true;
 }
 
-Token *
-token_process_bit_type_definition(
-  Compilation_Context *context,
-  const Token *args
+Descriptor
+mass_bit_type(
+  u64 bit_size
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Token_View args_view = { .tokens = &args, .length = 1, .source_range = args->source_range };
-  Value *bit_size_value = value_any(context->allocator);
-  compile_time_eval(context, args_view, bit_size_value);
-  bit_size_value = maybe_coerce_number_literal_to_integer(
-    context, &args->source_range, bit_size_value, &descriptor_u64
-  );
-  MASS_ON_ERROR(*context->result) return 0;
-  u64 bit_size = operand_immediate_value_up_to_u64(&bit_size_value->operand);
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
+  return (Descriptor) {
     .tag = Descriptor_Tag_Opaque,
     .Opaque = { .bit_size = bit_size },
   };
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  *result = type_value_for_descriptor(descriptor);
-  return token_value_make(context, result, args->source_range);
 }
 
 Token *
@@ -3249,12 +3233,6 @@ token_eval_operator(
       slice_equal(target->source, slice_literal("c_string"))
     ) {
       token_handle_c_string(context, args_token, result_value);
-    } else if (
-      target->tag == Token_Tag_Id &&
-      slice_equal(target->source, slice_literal("bit_type"))
-    ) {
-      Token *result_token = token_process_bit_type_definition(context, args_token);
-      MASS_ON_ERROR(token_force_value(context, result_token, result_value)) return;
     } else if (
       target->tag == Token_Tag_Id &&
       slice_equal(target->source, slice_literal("c_struct"))
@@ -4660,6 +4638,11 @@ scope_define_builtins(
     mass_compiler_external, "external", &descriptor_external_symbol,
     MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_string),
     MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_string)
+  );
+
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_bit_type, "bit_type", &descriptor_type,
+    MASS_FN_ARG_ANY_OF_TYPE("bit_size", &descriptor_u64),
   );
 
   {

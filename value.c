@@ -203,15 +203,6 @@ source_range_print_start_position(
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
 
-static inline Descriptor *
-operand_immediate_memory_as_descriptor(
-  const Operand *operand
-) {
-  assert(operand->tag == Operand_Tag_Immediate);
-  assert(operand->byte_size == sizeof(Descriptor));
-  return operand->Immediate.memory;
-}
-
 #define OPERAND_IMMEDIATE_CAST(_TYPE_)\
   static inline _TYPE_\
   operand_immediate_memory_as_##_TYPE_(\
