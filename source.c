@@ -1940,71 +1940,20 @@ token_parse_operator_definition(
   return true;
 }
 
-bool
-token_parse_import_statement(
-  Compilation_Context *context,
-  Token_View view
+Scope
+mass_import(
+  Compilation_Context context,
+  Slice file_path
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  // import "foo" as foo
-  u64 peek_index = 0;
-  Token_Match(import_keywors, .tag = Token_Tag_Id, .source = slice_literal("import"));
-  Token_Maybe_Match(file_path, .tag = Token_Tag_Value);
-  Token_Maybe_Match(as_keyword, .tag = Token_Tag_Id, .source = slice_literal("as"));
-  Token_Maybe_Match(name, .tag = Token_Tag_Id);
-
-  if (!file_path ) {
-    context_error_snprintf(
-      context, name->source_range,
-      "import keyword must be followed by a path to the imported file"
-    );
-    goto err;
-  }
-  Slice *path = value_as_immediate_string(file_path->Value.value);
-  if (!path) {
-    context_error_snprintf(
-      context, file_path->source_range,
-      "file path for import must be a compile time string"
-    );
-    goto err;
-  }
-
-  if (!as_keyword) {
-    context_error_snprintf(
-      context, name->source_range,
-      "import path must be followed by `as` keyword"
-    );
-    goto err;
-  }
-  if (!name) {
-    context_error_snprintf(
-      context, name->source_range,
-      "`as` keyword must be followed by a name you can use to access imported scope"
-    );
-    goto err;
-  }
-
   // TODO Probably want to cache the root scope somewhere
-  Scope *root_scope = context->scope;
+  Scope *root_scope = context.scope;
   while (root_scope->parent) root_scope = root_scope->parent;
 
-  Scope *module_scope = scope_make(context->allocator, root_scope);
-  Module *module = program_module_from_file(context, *path, module_scope);
-  program_import_module(context, module);
+  Scope *module_scope = scope_make(context.allocator, root_scope);
+  Module *module = program_module_from_file(&context, file_path, module_scope);
+  program_import_module(&context, module);
 
-  Value *module_value =
-    value_make(context->allocator, &descriptor_scope, operand_immediate(module_scope));
-
-  // TODO consider making imports lazy
-  scope_define(context->scope, name->source, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = module_value,
-  });
-
-  err:
-
-  return true;
+  return *module_scope;
 }
 
 u64
@@ -4436,9 +4385,6 @@ token_parse(
     if (token_parse_syntax_definition(context, statement, &void_value, 0)) {
       continue;
     }
-    if (token_parse_import_statement(context, statement)) {
-      continue;
-    }
     if (token_parse_operator_definition(context, statement)) {
       continue;
     }
@@ -4593,6 +4539,11 @@ scope_define_builtins(
     .Value.value = type_string_value
   });
 
+  scope_define(scope, slice_literal("Scope"), (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = type_scope_value
+  });
+
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
     scope_define(scope, slice_literal(#_NAME_), (Scope_Entry) {\
       .tag = Scope_Entry_Tag_Value,\
@@ -4638,6 +4589,12 @@ scope_define_builtins(
     mass_compiler_external, "external", &descriptor_external_symbol,
     MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_string),
     MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_string)
+  );
+
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_import, "mass_import", &descriptor_scope,
+    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_compilation_context),
+    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_string)
   );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(

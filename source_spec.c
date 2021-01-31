@@ -1299,7 +1299,7 @@ spec("source") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
         // FIXME normalize slashes when importing
-        "import \"fixtures\\\\sample_module\" as sample_module\n"
+        "sample_module :: import(\"fixtures\\\\sample_module\")\n"
         "checker :: () -> (s32) { sample_module.the_answer }"
       );
       check(checker);

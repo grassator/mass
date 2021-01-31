@@ -19,6 +19,10 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end;
 }
 
+import :: macro (file_path : String) -> (Scope) {
+  mass_import(@context, file_path)
+}
+
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label scope;
   pre();
