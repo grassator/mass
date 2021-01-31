@@ -2782,6 +2782,27 @@ token_handle_function_call(
   MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
   assert(token_match(args_token, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}));
 
+  if (
+    target->descriptor->tag == Descriptor_Tag_Function &&
+    (target->descriptor->Function.flags & Descriptor_Function_Flags_Compile_Time)
+  ) {
+    Source_Range source_range = target_token->source_range; // TODO add args as well
+    Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
+    *non_compile_time_descriptor = *target->descriptor;
+    // Need to remove Compile_Time flag otherwise we will go into an infinite loop
+    non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
+    Value *fake_target_value =
+      value_make(context->allocator, non_compile_time_descriptor, target->operand);
+    const Token *fake_target = token_value_make(context, fake_target_value, source_range);
+    Token_View fake_eval_view = {
+      .tokens = (const Token*[]){fake_target, args_token},
+      .length = 2,
+      .source_range = source_range,
+    };
+    compile_time_eval(context, fake_eval_view, result_value);
+    return;
+  }
+
   Array_Value_Ptr args;
 
   // FIXME this is a bit of hack to make sure we don't use argument registers for
@@ -4606,8 +4627,9 @@ scope_define_builtins(
     Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
     *descriptor = (Descriptor) {
       .tag = Descriptor_Tag_Function,
-      .name = slice_literal("mass_compiler_external"),
+      .name = slice_literal("external"),
       .Function = {
+        .flags = Descriptor_Function_Flags_Compile_Time,
         .arguments = dyn_array_make(Array_Function_Argument, .capacity = 2, .allocator = allocator),
         .returns = {
           .descriptor = &descriptor_external_symbol,
@@ -4629,7 +4651,7 @@ scope_define_builtins(
       },
     });
     Value *value = value_make(allocator, descriptor, imm64(allocator, (u64)mass_compiler_external));
-    scope_define(scope, slice_literal("mass_compiler_external"), (Scope_Entry) {
+    scope_define(scope, slice_literal("external"), (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value
     });

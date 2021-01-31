@@ -19,10 +19,6 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end;
 }
 
-external :: macro (library_name : String, symbol_name : String) -> (External_Symbol) {
-  @(mass_compiler_external(library_name, symbol_name))
-}
-
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label scope;
   pre();
