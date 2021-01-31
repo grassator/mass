@@ -203,33 +203,28 @@ source_range_print_start_position(
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
 
-#define OPERAND_IMMEDIATE_CAST(_TYPE_)\
-  static inline _TYPE_\
-  operand_immediate_memory_as_##_TYPE_(\
-    const Operand *operand\
-  ) {\
-    assert(operand->byte_size == sizeof(_TYPE_));\
-    return *((_TYPE_ *)operand->Immediate.memory);\
-  }
+static inline void *
+operand_immediate_as_c_type_internal(
+  Operand operand,
+  u64 byte_size
+) {
+  assert(operand.byte_size == byte_size);
+  assert(operand.tag == Operand_Tag_Immediate);
+  return operand.Immediate.memory;
+}
 
-OPERAND_IMMEDIATE_CAST(u8)
-OPERAND_IMMEDIATE_CAST(s8)
-OPERAND_IMMEDIATE_CAST(u16)
-OPERAND_IMMEDIATE_CAST(s16)
-OPERAND_IMMEDIATE_CAST(u32)
-OPERAND_IMMEDIATE_CAST(s32)
-OPERAND_IMMEDIATE_CAST(u64)
-OPERAND_IMMEDIATE_CAST(s64)
+#define operand_immediate_as_c_type(_OPERAND_, _TYPE_)\
+  ((_TYPE_ *)operand_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 s64
 operand_immediate_value_up_to_s64(
   const Operand *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return operand_immediate_memory_as_s8(operand);
-    case 2: return operand_immediate_memory_as_s16(operand);
-    case 4: return operand_immediate_memory_as_s32(operand);
-    case 8: return operand_immediate_memory_as_s64(operand);
+    case 1: return *operand_immediate_as_c_type(*operand, s8);
+    case 2: return *operand_immediate_as_c_type(*operand, s16);
+    case 4: return *operand_immediate_as_c_type(*operand, s32);
+    case 8: return *operand_immediate_as_c_type(*operand, s64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -242,10 +237,10 @@ operand_immediate_value_up_to_u64(
   const Operand *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return operand_immediate_memory_as_u8(operand);
-    case 2: return operand_immediate_memory_as_u16(operand);
-    case 4: return operand_immediate_memory_as_u32(operand);
-    case 8: return operand_immediate_memory_as_u64(operand);
+    case 1: return *operand_immediate_as_c_type(*operand, u8);
+    case 2: return *operand_immediate_as_c_type(*operand, u16);
+    case 4: return *operand_immediate_as_c_type(*operand, u32);
+    case 8: return *operand_immediate_as_c_type(*operand, u64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -283,19 +278,19 @@ print_operand(
     case Operand_Tag_Immediate: {
       switch(operand->byte_size) {
         case 1: {
-          printf("imm8(0x%02x)", operand_immediate_memory_as_u8(operand));
+          printf("imm8(0x%02x)", *operand_immediate_as_c_type(*operand, u8));
           break;
         }
         case 2: {
-          printf("imm16(0x%04x)", operand_immediate_memory_as_u16(operand));
+          printf("imm16(0x%04x)", *operand_immediate_as_c_type(*operand, u16));
           break;
         }
         case 4: {
-          printf("imm32(0x%08x)", operand_immediate_memory_as_u32(operand));
+          printf("imm32(0x%08x)", *operand_immediate_as_c_type(*operand, u32));
           break;
         }
         case 8: {
-          printf("imm64(0x%016" PRIx64 ")", operand_immediate_memory_as_u64(operand));
+          printf("imm64(0x%016" PRIx64 ")", *operand_immediate_as_c_type(*operand, u64));
           break;
         }
         default: {
@@ -432,19 +427,6 @@ code_label32(
     .byte_size = sizeof(*(_VALUE_)), \
     .Immediate.memory = (_VALUE_),\
   })
-
-static inline void *
-operand_immediate_as_c_type_internal(
-  Operand operand,
-  u64 byte_size
-) {
-  assert(operand.byte_size == byte_size);
-  assert(operand.tag == Operand_Tag_Immediate);
-  return operand.Immediate.memory;
-}
-
-#define operand_immediate_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)operand_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 static inline Operand
 imm8(
@@ -1402,7 +1384,7 @@ same_value_type_or_can_implicitly_move_cast(
         if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
           assert(target->descriptor == &descriptor_##_TARGET_TYPE_);\
           return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(\
-            operand_immediate_memory_as_##_SOURCE_TYPE_(&source->operand)\
+            *operand_immediate_as_c_type(source->operand, _SOURCE_TYPE_)\
           );\
         }
 
