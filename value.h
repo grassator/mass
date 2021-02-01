@@ -253,6 +253,7 @@ typedef struct Program {
 } Program;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
+hash_map_slice_template(Imported_Module_Map, Module *)
 
 typedef struct Jit {
   Virtual_Memory_Buffer buffer;
@@ -269,6 +270,7 @@ typedef struct Compilation_Context {
   Jit *compile_time_jit;
   Scope *scope;
   Function_Builder *builder;
+  Imported_Module_Map *module_map;
   Module *module;
   Mass_Result *result;
 } Compilation_Context;

@@ -1306,6 +1306,17 @@ spec("source") {
       check(checker);
       check(checker() == 42);
     }
+    // TODO somehow test that modules are only imported once
+    it("should support importing the same module multiple times") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "A :: import(\"fixtures\\\\sample_module\")\n"
+        "B :: import(\"fixtures\\\\sample_module\")\n"
+        "checker :: () -> (s64) { A.the_answer + B.the_answer }"
+      );
+      check(checker);
+      check(checker() == 84);
+    }
   }
 
   describe("PE32 Executables") {

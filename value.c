@@ -1140,6 +1140,7 @@ compilation_context_init(
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .program = runtime_program,
+    .module_map = hash_map_make(Imported_Module_Map),
     .compile_time_jit = jit,
     .scope = root_scope,
     .result = allocator_allocate(compilation_allocator, Mass_Result)
@@ -1150,6 +1151,7 @@ void
 compilation_context_deinit(
   Compilation_Context *context
 ) {
+  hash_map_destroy(context->module_map);
   program_deinit(context->program);
   program_deinit(context->compile_time_jit->program);
   jit_deinit(context->compile_time_jit);

@@ -1945,15 +1945,21 @@ mass_import(
   Compilation_Context context,
   Slice file_path
 ) {
-  // TODO Probably want to cache the root scope somewhere
-  Scope *root_scope = context.scope;
-  while (root_scope->parent) root_scope = root_scope->parent;
+  Module *module;
 
-  Scope *module_scope = scope_make(context.allocator, root_scope);
-  Module *module = program_module_from_file(&context, file_path, module_scope);
-  program_import_module(&context, module);
+  Module **module_pointer = hash_map_get(context.module_map, file_path);
+  if (module_pointer) {
+    module = *module_pointer;
+  } else {
+    Scope *root_scope = context.scope;
+    while (root_scope->parent) root_scope = root_scope->parent;
+    Scope *module_scope = scope_make(context.allocator, root_scope);
+    module = program_module_from_file(&context, file_path, module_scope);
+    program_import_module(&context, module);
+    hash_map_set(context.module_map, file_path, module);
+  }
 
-  return *module_scope;
+  return *module->scope;
 }
 
 u64
