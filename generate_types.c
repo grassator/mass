@@ -722,7 +722,7 @@ main(void) {
   }));
 
   push_type(type_function("Token_Handle_Operator_Proc", "void", (Argument[]){
-    { "Compilation_Context *", "context" },
+    { "Execution_Context *", "context" },
     { "Token_View", "view" },
     { "Value *", "result_value" },
     { "void *", "payload" },
@@ -745,7 +745,7 @@ main(void) {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
-      fprintf(file, "typedef struct Compilation_Context Compilation_Context;\n\n");
+      fprintf(file, "typedef struct Execution_Context Execution_Context;\n\n");
     }
 
     fprintf(file, "// Forward declarations\n\n");

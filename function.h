@@ -75,7 +75,7 @@ fn_encode(
 
 void
 plus(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -84,7 +84,7 @@ plus(
 
 void
 minus(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -93,7 +93,7 @@ minus(
 
 void
 multiply(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *x,
@@ -102,7 +102,7 @@ multiply(
 
 void
 divide(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -111,7 +111,7 @@ divide(
 
 void
 value_remainder(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -120,7 +120,7 @@ value_remainder(
 
 void
 compare(
-  Compilation_Context *context,
+  Execution_Context *context,
   Compare_Type operation,
   const Source_Range *source_range,
   Value *result_value,
@@ -130,7 +130,7 @@ compare(
 
 void
 load_address(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   const Value *memory
@@ -138,7 +138,7 @@ load_address(
 
 Value *
 make_and(
-  Compilation_Context *context,
+  Execution_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
@@ -147,7 +147,7 @@ make_and(
 
 Value *
 make_or(
-  Compilation_Context *context,
+  Execution_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,

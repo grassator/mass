@@ -7,7 +7,7 @@ typedef struct Scope Scope;
 
 typedef struct Function_Builder Function_Builder;
 
-typedef struct Compilation_Context Compilation_Context;
+typedef struct Execution_Context Execution_Context;
 
 // Forward declarations
 
@@ -136,7 +136,7 @@ typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
 typedef void (*Token_Handle_Operator_Proc)
-  (Compilation_Context * context, Token_View view, Value * result_value, void * payload);
+  (Execution_Context * context, Token_View view, Value * result_value, void * payload);
 
 
 // Type Definitions

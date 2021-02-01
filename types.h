@@ -2,12 +2,6 @@
 #define C_MACRO_H
 #include <stddef.h>
 
-#define STATIC_DYN_ARRAY_FIELDS(_TYPE_, ...)\
-  {(Dyn_Array_Internal *)&(dyn_array_struct(_TYPE_)){\
-    .length = countof((const _TYPE_[]){__VA_ARGS__}),\
-    .items = {__VA_ARGS__},\
-  }}
-
 #define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
   {\
     .filename = __FILE__,\

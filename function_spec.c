@@ -18,7 +18,7 @@ spec("function") {
   static Function_Builder *builder = 0;
   static Bucket_Buffer *temp_buffer = 0;
   static Allocator *temp_allocator = 0;
-  static Compilation_Context *temp_context = 0;
+  static Execution_Context *temp_context = 0;
 
   before() {
     builder = malloc(sizeof(Function_Builder));
@@ -30,14 +30,14 @@ spec("function") {
   before_each() {
     temp_buffer = bucket_buffer_make(.allocator = allocator_system);
     temp_allocator = bucket_buffer_allocator_make(temp_buffer);
-    temp_context = allocator_allocate(temp_allocator, Compilation_Context);
+    temp_context = allocator_allocate(temp_allocator, Execution_Context);
     dyn_array_clear(builder->code_block.instructions);
     *builder = (Function_Builder){
       .code_block.instructions = builder->code_block.instructions,
     };
     Mass_Result *result = allocator_allocate(temp_allocator, Mass_Result);
     *result = (Mass_Result){0};
-    *temp_context = (Compilation_Context) {
+    *temp_context = (Execution_Context) {
       .allocator = temp_allocator,
       .builder = builder,
       .result = result,

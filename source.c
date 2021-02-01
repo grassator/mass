@@ -205,7 +205,7 @@ scope_lookup(
 
 Value *
 token_value_force_immediate_integer(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *value,
   Descriptor *target_descriptor
@@ -290,7 +290,7 @@ token_value_force_immediate_integer(
 
 Value *
 maybe_coerce_number_literal_to_integer(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *value,
   Descriptor *target_descriptor
@@ -302,7 +302,7 @@ maybe_coerce_number_literal_to_integer(
 
 PRELUDE_NO_DISCARD Mass_Result
 assign(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *target,
   Value *source
@@ -364,14 +364,14 @@ assign(
 
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *token,
   Value *result_value
 );
 
 Value *
 scope_entry_force(
-  Compilation_Context *context,
+  Execution_Context *context,
   Scope_Entry *entry
 ) {
   switch(entry->tag) {
@@ -381,7 +381,7 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Lazy_Expression: {
       Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
-      Compilation_Context lazy_context = *context;
+      Execution_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
       Value *result = value_any(context->allocator);
       compile_time_eval(&lazy_context, expr->tokens, result);
@@ -406,7 +406,7 @@ scope_entry_force(
 
 Value *
 scope_lookup_force(
-  Compilation_Context *context,
+  Execution_Context *context,
   Scope *scope,
   Slice name
 ) {
@@ -1010,7 +1010,7 @@ token_split_next(
 
 static inline Descriptor *
 value_ensure_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Value *value,
   Source_Range source_range
 ) {
@@ -1026,7 +1026,7 @@ value_ensure_type(
 
 Descriptor *
 scope_lookup_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Scope *scope,
   Source_Range source_range,
   Slice type_name
@@ -1046,7 +1046,7 @@ scope_lookup_type(
 
 static inline Token *
 token_value_make(
-  Compilation_Context *context,
+  Execution_Context *context,
   Value *result,
   Source_Range source_range
 ) {
@@ -1096,7 +1096,7 @@ typedef struct {
 
 Descriptor *
 token_force_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Scope *scope,
   const Token *token
 ) {
@@ -1221,7 +1221,7 @@ token_match_pattern(
 
 Value *
 token_make_macro_capture_function(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View capture_view,
   Scope *captured_scope,
   Descriptor *return_descriptor,
@@ -1268,7 +1268,7 @@ token_make_macro_capture_function(
 
 void
 token_apply_macro_syntax(
-  Compilation_Context *context,
+  Execution_Context *context,
   Array_Token_View match,
   Macro *macro,
   Value *result_value
@@ -1381,7 +1381,7 @@ token_apply_macro_syntax(
     });
   }
 
-  Compilation_Context body_context = *context;
+  Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
   token_parse_expression(&body_context, macro->replacement, result_value, Expression_Parse_Mode_Default);
@@ -1389,7 +1389,7 @@ token_apply_macro_syntax(
 
 u64
 token_parse_macro_statement(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View token_view,
   Value *result_value,
   void *payload
@@ -1417,7 +1417,7 @@ token_parse_macro_statement(
 
 const Token *
 token_parse_macros(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View token_view,
   u64 *match_length
 ) {
@@ -1454,13 +1454,13 @@ token_parse_macros(
 
 Descriptor *
 token_match_fixed_array_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 );
 
 Descriptor *
 token_match_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -1510,7 +1510,7 @@ token_maybe_split_on_operator(
 
 Function_Argument
 token_match_argument(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Descriptor_Function *function
 ) {
@@ -1561,7 +1561,7 @@ token_match_argument(
 
 Function_Return
 token_match_return_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   Function_Return returns = {0};
@@ -1597,7 +1597,7 @@ token_match_return_type(
 
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *token,
   Value *result_value
 ) {
@@ -1662,7 +1662,7 @@ token_force_value(
 // FIXME pass in the function definition
 Array_Value_Ptr
 token_match_call_arguments(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *token
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
@@ -1702,7 +1702,7 @@ scope_add_macro(
 
 void
 token_handle_user_defined_operator(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View args,
   Value *result_value,
   User_Defined_Operator *operator
@@ -1750,7 +1750,7 @@ token_handle_user_defined_operator(
 
   const Token *body = operator->body;
   {
-    Compilation_Context body_context = *context;
+    Execution_Context body_context = *context;
     body_context.scope = body_scope;
     token_parse_block(&body_context, body, result_value);
   }
@@ -1767,7 +1767,7 @@ token_handle_user_defined_operator(
 
 void
 token_handle_user_defined_operator_proc(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View args,
   Value *result_value,
   void *payload
@@ -1777,7 +1777,7 @@ token_handle_user_defined_operator_proc(
 
 bool
 token_parse_exports(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -1857,7 +1857,7 @@ operator_fixity_to_lowercase_slice(
 
 bool
 token_parse_operator_definition(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2032,7 +2032,7 @@ mass_normalize_import_path(
 
 Scope
 mass_import(
-  Compilation_Context context,
+  Execution_Context context,
   Slice file_path
 ) {
   Module *module;
@@ -2058,7 +2058,7 @@ mass_import(
 
 u64
 token_parse_syntax_definition(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value,
   void *payload
@@ -2218,7 +2218,7 @@ token_parse_syntax_definition(
 
 bool
 token_match_struct_field(
-  Compilation_Context *context,
+  Execution_Context *context,
   Descriptor *struct_descriptor,
   Token_View view
 ) {
@@ -2247,7 +2247,7 @@ mass_bit_type(
 
 Token *
 token_process_c_struct_definition(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *args
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2303,7 +2303,7 @@ token_process_c_struct_definition(
 
 Value *
 token_process_function_literal(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *args,
   const Token *return_types,
   const Token *body
@@ -2338,7 +2338,7 @@ token_process_function_literal(
       }
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
 
-      Compilation_Context arg_context = *context;
+      Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
       arg_context.builder = 0;
       descriptor->Function.returns = token_match_return_type(&arg_context, arg_view);
@@ -2355,7 +2355,7 @@ token_process_function_literal(
     Token_View_Split_Iterator it = { .view = args->Group.children };
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-      Compilation_Context arg_context = *context;
+      Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
       arg_context.builder = 0;
       Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
@@ -2387,7 +2387,7 @@ typedef void (*Compile_Time_Eval_Proc)(void *);
 
 void
 compile_time_eval(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value
 ) {
@@ -2396,7 +2396,7 @@ compile_time_eval(
   const Source_Range *source_range = &view.source_range;
 
   Jit *jit = context->compile_time_jit;
-  Compilation_Context eval_context = *context;
+  Execution_Context eval_context = *context;
   eval_context.program = jit->program;
   // TODO consider if compile-time eval should create a nested scope
   //eval_context.scope = scope_make(context->allocator, context->scope);
@@ -2541,7 +2541,7 @@ typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
 void
 token_handle_operand_variant_of(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Array_Value_Ptr args,
   Value *result_value
@@ -2595,7 +2595,7 @@ token_handle_operand_variant_of(
 
 void
 token_handle_c_string(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *args_token,
   Value *result_value
 ) {
@@ -2634,7 +2634,7 @@ mass_compiler_external(
 
 void
 token_handle_cast(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Array_Value_Ptr args,
   Value *result_value
@@ -2666,7 +2666,7 @@ token_handle_cast(
 
 void
 token_handle_negation(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View args,
   Value *result_value,
   void *unused_payload
@@ -2696,14 +2696,14 @@ token_handle_negation(
 
 void
 token_dispatch_operator(
-  Compilation_Context *context,
+  Execution_Context *context,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator_entry
 );
 
 bool
 token_handle_operator(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Array_Const_Token_Ptr *token_stack,
   Array_Operator_Stack_Entry *operator_stack,
@@ -2761,7 +2761,7 @@ token_handle_operator(
 
 u64
 token_parse_constant_definitions(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -2804,7 +2804,7 @@ token_parse_constant_definitions(
 
 void
 token_handle_function_call(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *target_token,
   const Token *args_token,
   Value *result_value
@@ -2973,7 +2973,7 @@ token_handle_function_call(
 
       const Token *body = function->body;
       {
-        Compilation_Context body_context = *context;
+        Execution_Context body_context = *context;
         body_context.scope = body_scope;
         token_parse_block_no_scope(&body_context, body, result_value);
       }
@@ -3010,7 +3010,7 @@ token_handle_function_call(
 
 static inline Value *
 extend_integer_value(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *value,
   Descriptor *target_descriptor
@@ -3025,7 +3025,7 @@ extend_integer_value(
 
 static inline Value *
 extend_signed_integer_value_to_next_size(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *value
 ) {
@@ -3058,7 +3058,7 @@ extend_signed_integer_value_to_next_size(
 
 void
 maybe_resize_values_for_integer_math_operation(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value **lhs_pointer,
   Value **rhs_pointer
@@ -3125,7 +3125,7 @@ maybe_resize_values_for_integer_math_operation(
 
 void
 struct_get_field(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *raw_value,
   Slice name,
@@ -3160,7 +3160,7 @@ struct_get_field(
 
 void
 token_handle_array_access(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *array_value,
   Value *index_value,
@@ -3242,7 +3242,7 @@ token_handle_array_access(
 
 void
 token_eval_operator(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View args_view,
   Operator_Stack_Entry *operator_entry,
   Value *result_value
@@ -3302,7 +3302,7 @@ token_eval_operator(
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .source = slice_literal("context") })) {
       Value *scope_value =
-        value_make(context->allocator, &descriptor_compilation_context, operand_immediate(context));
+        value_make(context->allocator, &descriptor_execution_context, operand_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
@@ -3329,7 +3329,7 @@ token_eval_operator(
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
           Scope *module_scope = operand_immediate_as_c_type(lhs_value->operand, Scope);
-          Compilation_Context module_context = *context;
+          Execution_Context module_context = *context;
           module_context.scope = module_scope;
           module_context.builder = 0;
           MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
@@ -3555,7 +3555,7 @@ token_eval_operator(
 
 void
 token_dispatch_operator(
-  Compilation_Context *context,
+  Execution_Context *context,
   Array_Const_Token_Ptr *token_stack,
   Operator_Stack_Entry *operator_entry
 ) {
@@ -3601,7 +3601,7 @@ token_dispatch_operator(
 
 const Token *
 token_parse_if_expression(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   u64 *matched_length
 ) {
@@ -3725,7 +3725,7 @@ token_parse_if_expression(
 
 PRELUDE_NO_DISCARD u64
 token_parse_expression(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value,
   Expression_Parse_Mode mode
@@ -3876,7 +3876,7 @@ token_parse_expression(
 
 void
 token_parse_block_no_scope(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *block,
   Value *block_result_value
 ) {
@@ -3947,11 +3947,11 @@ token_parse_block_no_scope(
 
 void
 token_parse_block(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *block,
   Value *block_result_value
 ) {
-  Compilation_Context body_context = *context;
+  Execution_Context body_context = *context;
   Scope *block_scope = scope_make(context->allocator, context->scope);
   body_context.scope = block_scope;
   token_parse_block_no_scope(&body_context, block, block_result_value);
@@ -3959,7 +3959,7 @@ token_parse_block(
 
 u64
 token_parse_statement_using(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4002,7 +4002,7 @@ token_parse_statement_using(
 
 u64
 token_parse_statement_label(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4077,7 +4077,7 @@ token_parse_statement_label(
 
 u64
 token_parse_goto(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4140,7 +4140,7 @@ token_parse_goto(
 
 u64
 token_parse_explicit_return(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4197,7 +4197,7 @@ token_parse_explicit_return(
 
 Descriptor *
 token_match_fixed_array_type(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4232,7 +4232,7 @@ token_match_fixed_array_type(
 
 u64
 token_parse_inline_machine_code_bytes(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4305,7 +4305,7 @@ token_parse_inline_machine_code_bytes(
 
 u64
 token_parse_definition(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value
 ) {
@@ -4333,7 +4333,7 @@ token_parse_definition(
 
 u64
 token_parse_definitions(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View state,
   Value *value_result,
   void *unused_payload
@@ -4345,7 +4345,7 @@ token_parse_definitions(
 
 u64
 token_parse_definition_and_assignment_statements(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4410,7 +4410,7 @@ token_parse_definition_and_assignment_statements(
 
 u64
 token_parse_assignment(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *unused_result,
   void *unused_payload
@@ -4437,7 +4437,7 @@ token_parse_assignment(
 
 PRELUDE_NO_DISCARD Mass_Result
 token_parse(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view
 ) {
   if (!view.length) return *context->result;
@@ -4657,7 +4657,7 @@ scope_define_builtins(
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
-    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_compilation_context),
+    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context),
     MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_string)
   );
 
@@ -4686,7 +4686,7 @@ scope_define_builtins(
 
 Mass_Result
 program_parse(
-  Compilation_Context *context
+  Execution_Context *context
 ) {
   assert(context->module);
   Token_View tokens;
@@ -4767,7 +4767,7 @@ program_module_init(
 
 Module *
 program_module_from_file(
-  Compilation_Context *context,
+  Execution_Context *context,
   Slice file_path,
   Scope *scope
 ) {
@@ -4793,11 +4793,11 @@ program_module_from_file(
 
 Mass_Result
 program_import_module(
-  Compilation_Context *context,
+  Execution_Context *context,
   Module *module
 ) {
   MASS_TRY(*context->result);
-  Compilation_Context import_context = *context;
+  Execution_Context import_context = *context;
   import_context.module = module;
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);

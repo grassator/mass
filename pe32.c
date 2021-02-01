@@ -240,7 +240,7 @@ typedef struct {
 
 Encoded_Text_Section
 encode_text_section(
-  Compilation_Context *context,
+  Execution_Context *context,
   IMAGE_SECTION_HEADER *header,
   Encoded_Rdata_Section *encoded_rdata_section
 ) {
@@ -324,7 +324,7 @@ typedef enum {
 void
 write_executable(
   const char *file_path,
-  Compilation_Context *context,
+  Execution_Context *context,
   Executable_Type executable_type
 ) {
   Program *program = context->program;

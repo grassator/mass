@@ -689,7 +689,7 @@ function_return_value_for_descriptor(
 
 Label_Index
 make_if(
-  Compilation_Context *context,
+  Execution_Context *context,
   Array_Instruction *instructions,
   const Source_Range *source_range,
   Value *value
@@ -795,7 +795,7 @@ typedef enum {
 
 void
 plus_or_minus(
-  Compilation_Context *context,
+  Execution_Context *context,
   Arithmetic_Operation operation,
   const Source_Range *source_range,
   Value *result_value,
@@ -913,7 +913,7 @@ plus_or_minus(
 
 void
 plus(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -924,7 +924,7 @@ plus(
 
 void
 minus(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -935,7 +935,7 @@ minus(
 
 void
 multiply(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *x,
@@ -976,7 +976,7 @@ typedef enum {
 
 void
 divide_or_remainder(
-  Compilation_Context *context,
+  Execution_Context *context,
   Divide_Operation operation,
   const Source_Range *source_range,
   Value *result_value,
@@ -1062,7 +1062,7 @@ divide_or_remainder(
 
 void
 divide(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -1073,7 +1073,7 @@ divide(
 
 void
 value_remainder(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   Value *a,
@@ -1085,7 +1085,7 @@ value_remainder(
 
 void
 compare(
-  Compilation_Context *context,
+  Execution_Context *context,
   Compare_Type operation,
   const Source_Range *source_range,
   Value *result_value,
@@ -1166,7 +1166,7 @@ compare(
 
 void
 load_address(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
   const Value *memory
@@ -1205,7 +1205,7 @@ typedef dyn_array_type(Saved_Register) Array_Saved_Register;
 
 void
 ensure_compiled_function_body(
-  Compilation_Context *context,
+  Execution_Context *context,
   Value *fn_value
 ) {
   // If the value already has the operand we assume it is compiled
@@ -1258,7 +1258,7 @@ ensure_compiled_function_body(
 
   win32_set_volatile_registers_for_function(&builder);
 
-  Compilation_Context body_context = *context;
+  Execution_Context body_context = *context;
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     switch(argument->tag) {
@@ -1339,7 +1339,7 @@ ensure_compiled_function_body(
 
 void
 call_function_overload(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *to_call,
   Array_Value_Ptr arguments,
@@ -1516,7 +1516,7 @@ calculate_arguments_match_score(
 
 Value *
 make_and(
-  Compilation_Context *context,
+  Execution_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,
@@ -1552,7 +1552,7 @@ make_and(
 
 Value *
 make_or(
-  Compilation_Context *context,
+  Execution_Context *context,
   Function_Builder *builder,
   const Source_Range *source_range,
   Value *a,

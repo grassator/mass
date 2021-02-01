@@ -750,7 +750,7 @@ value_as_immediate_string(
 Value *
 value_global_internal(
   Compiler_Source_Location compiler_source_location,
-  Compilation_Context *context,
+  Execution_Context *context,
   Descriptor *descriptor
 ) {
   Program *program = context->program;
@@ -918,7 +918,7 @@ rip_value_pointer(
 Value *
 value_global_c_string_from_slice_internal(
   Compiler_Source_Location compiler_source_location,
-  Compilation_Context *context,
+  Execution_Context *context,
   Slice slice
 ) {
   s32 length = (s32)slice.length + 1;
@@ -1118,9 +1118,9 @@ jit_deinit(
 }
 
 void
-compilation_context_init(
+execution_context_init(
   const Allocator *allocator,
-  Compilation_Context *context
+  Execution_Context *context
 ) {
   Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
   Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
@@ -1136,7 +1136,7 @@ compilation_context_init(
   Scope *root_scope = scope_make(compilation_allocator, 0);
   scope_define_builtins(compilation_allocator, root_scope);
 
-  *context = (Compilation_Context) {
+  *context = (Execution_Context) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
     .program = runtime_program,
@@ -1148,8 +1148,8 @@ compilation_context_init(
 }
 
 void
-compilation_context_deinit(
-  Compilation_Context *context
+execution_context_deinit(
+  Execution_Context *context
 ) {
   hash_map_destroy(context->module_map);
   program_deinit(context->program);
@@ -1250,7 +1250,7 @@ program_find_import(
 
 Operand
 import_symbol(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Slice library_name,
   const Slice symbol_name
 ) {

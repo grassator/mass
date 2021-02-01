@@ -52,7 +52,7 @@ spec_check_mass_result(
   return false;
 }
 
-static Compilation_Context test_context = {0};
+static Execution_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
 static Module test_module = {0};
 
@@ -67,7 +67,7 @@ test_init_module(
 static Value *
 test_program_inline_source_base(
   const char *id,
-  Compilation_Context *context,
+  Execution_Context *context,
   const char *source
 ) {
   Module *prelude_module = program_module_from_file(
@@ -88,7 +88,7 @@ test_program_inline_source_base(
 fn_type_opaque
 test_program_inline_source_function(
   const char *function_id,
-  Compilation_Context *context,
+  Execution_Context *context,
   const char *source
 ) {
   Value *value = test_program_inline_source_base(function_id, context, source);
@@ -105,11 +105,11 @@ test_program_inline_source_function(
 spec("source") {
 
   before_each() {
-    compilation_context_init(allocator_system, &test_context);
+    execution_context_init(allocator_system, &test_context);
   }
 
   after_each() {
-    compilation_context_deinit(&test_context);
+    execution_context_deinit(&test_context);
   }
 
   describe("Scope") {

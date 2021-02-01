@@ -48,7 +48,7 @@ typedef struct {
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
 typedef u64 (*Token_Statement_Matcher_Proc)
-(Compilation_Context *context, Token_View, Value *result_value, void *payload);
+(Execution_Context *context, Token_View, Value *result_value, void *payload);
 typedef struct {
   Token_Statement_Matcher_Proc proc;
   void *payload;
@@ -74,7 +74,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope);
 
 PRELUDE_NO_DISCARD Mass_Result
 assign(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Source_Range *source_range,
   Value *target,
   Value *source
@@ -101,14 +101,14 @@ scope_define_builtins(
 
 void
 compile_time_eval(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value
 );
 
 void
 token_handle_negation(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View args,
   Value *result_value,
   void *unused_payload
@@ -121,7 +121,7 @@ typedef enum {
 
 u64
 token_parse_expression(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value,
   Expression_Parse_Mode mode
@@ -129,77 +129,77 @@ token_parse_expression(
 
 void
 token_parse_block_no_scope(
-  Compilation_Context *context,
+  Execution_Context *context,
   const Token *block,
   Value *block_result_value
 );
 
 void
 token_parse_block(
-  Compilation_Context *program,
+  Execution_Context *program,
   const Token *block,
   Value *result_value
 );
 
 u64
 token_parse_syntax_definition(
-  Compilation_Context *context,
+  Execution_Context *context,
   Token_View view,
   Value *result_value,
   void *payload
 );
 u64
 token_parse_statement_label(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_inline_machine_code_bytes(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_assignment(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_definition_and_assignment_statements(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_definitions(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_explicit_return(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_goto(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *unused_result,
   void *unused_payload
 );
 u64
 token_parse_constant_definitions(
-  Compilation_Context *program,
+  Execution_Context *program,
   Token_View state,
   Value *result_value,
   void *unused_payload
@@ -207,20 +207,20 @@ token_parse_constant_definitions(
 
 Module *
 program_module_from_file(
-  Compilation_Context *context,
+  Execution_Context *context,
   Slice file_path,
   Scope *scope
 );
 
 Mass_Result
 program_import_module(
-  Compilation_Context *context,
+  Execution_Context *context,
   Module *module
 );
 
 void
 program_push_error_from_bucket_buffer(
-  Compilation_Context *context,
+  Execution_Context *context,
   Source_Range source_range,
   Bucket_Buffer *buffer
 );

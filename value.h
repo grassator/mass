@@ -263,7 +263,7 @@ typedef struct Jit {
   void *platform_specific_payload;
 } Jit;
 
-typedef struct Compilation_Context {
+typedef struct Execution_Context {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Program *program;
@@ -273,7 +273,7 @@ typedef struct Compilation_Context {
   Imported_Module_Map *module_map;
   Module *module;
   Mass_Result *result;
-} Compilation_Context;
+} Execution_Context;
 
 void *
 rip_value_pointer(
@@ -309,6 +309,6 @@ program_set_label_offset(
   u32 offset_in_section
 );
 
-MASS_DEFINE_OPAQUE_C_TYPE(compilation_context, Compilation_Context);
+MASS_DEFINE_OPAQUE_C_TYPE(execution_context, Execution_Context);
 
 #endif
