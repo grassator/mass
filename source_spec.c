@@ -1299,8 +1299,7 @@ spec("source") {
     it("should support importing modules") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
-        // FIXME normalize slashes when importing
-        "sample_module :: import(\"fixtures\\\\sample_module\")\n"
+        "sample_module :: import(\"fixtures/sample_module\")\n"
         "checker :: () -> (s32) { sample_module.the_answer }"
       );
       check(checker);
@@ -1310,7 +1309,7 @@ spec("source") {
     it("should support importing the same module multiple times") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "checker", &test_context,
-        "A :: import(\"fixtures\\\\sample_module\")\n"
+        "A :: import(\"fixtures/foo/../sample_module\")\n"
         "B :: import(\"fixtures\\\\sample_module\")\n"
         "checker :: () -> (s64) { A.the_answer + B.the_answer }"
       );

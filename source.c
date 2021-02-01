@@ -1940,13 +1940,31 @@ token_parse_operator_definition(
   return true;
 }
 
+Slice
+mass_normalize_import_path(
+  const Allocator *allocator,
+  Slice raw
+) {
+  // @Speed
+  u8 *bytes = allocator_allocate_bytes(allocator, raw.length, _Alignof(u8));
+  Slice normalized_slashes = {
+    .bytes = bytes,
+    .length = raw.length
+  };
+  // Copy and normalize the slashes
+  for (u64 i = 0; i < raw.length; ++i) {
+    bytes[i] = (raw.bytes[i] == '\\') ? '/' : raw.bytes[i];
+  }
+  return slice_normalize_path(allocator, normalized_slashes);
+}
+
 Scope
 mass_import(
   Compilation_Context context,
   Slice file_path
 ) {
   Module *module;
-
+  file_path = mass_normalize_import_path(context.allocator, file_path);
   Module **module_pointer = hash_map_get(context.module_map, file_path);
   if (module_pointer) {
     module = *module_pointer;
