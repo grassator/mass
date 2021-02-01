@@ -400,9 +400,16 @@ main(void) {
     { "Range_u64", "offsets" },
   }));
 
+  push_type(type_enum("Module_Flags", (Enum_Item[]){
+    { "Has_Exports", 1 << 0 },
+  }));
+
   push_type(type_struct("Module", (Struct_Item[]){
+    { "Module_Flags", "flags" },
+    { "u32", "_flags_padding" },
     { "Source_File", "source_file" },
-    { "Scope *", "scope" },
+    { "Scope *", "own_scope" },
+    { "Scope *", "export_scope" },
   }));
 
   push_type(type_struct("Parse_Error", (Struct_Item[]){

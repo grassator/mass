@@ -97,7 +97,8 @@ int main(s32 argc, char **argv) {
     return mass_cli_print_error(&result.Error.details);
   }
 
-  Value *main = scope_lookup_force(&context, root_module->scope, slice_literal("main"));
+  // FIXME use export scope for this
+  Value *main = scope_lookup_force(&context, root_module->own_scope, slice_literal("main"));
   if (!main) {
     printf("Could not find entry point function `main`");
     return -1;

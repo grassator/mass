@@ -23,6 +23,8 @@ typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
 
+typedef enum Module_Flags Module_Flags;
+
 typedef struct Module Module;
 typedef dyn_array_type(Module *) Array_Module_Ptr;
 typedef dyn_array_type(const Module *) Array_Const_Module_Ptr;
@@ -158,9 +160,16 @@ typedef struct Source_Range {
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
 
+typedef enum Module_Flags {
+  Module_Flags_Has_Exports = 1,
+} Module_Flags;
+
 typedef struct Module {
+  Module_Flags flags;
+  u32 _flags_padding;
   Source_File source_file;
-  Scope * scope;
+  Scope * own_scope;
+  Scope * export_scope;
 } Module;
 typedef dyn_array_type(Module) Array_Module;
 
@@ -587,6 +596,9 @@ Descriptor descriptor_source_file_pointer_pointer;
 Descriptor descriptor_source_range;
 Descriptor descriptor_source_range_pointer;
 Descriptor descriptor_source_range_pointer_pointer;
+Descriptor descriptor_module_flags;
+Descriptor descriptor_module_flags_pointer;
+Descriptor descriptor_module_flags_pointer_pointer;
 Descriptor descriptor_module;
 Descriptor descriptor_module_pointer;
 Descriptor descriptor_module_pointer_pointer;
@@ -731,16 +743,32 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_range);
+MASS_DEFINE_OPAQUE_C_TYPE(module_flags, Module_Flags)
 MASS_DEFINE_STRUCT_DESCRIPTOR(module,
+  {
+    .name = slice_literal_fields("flags"),
+    .descriptor = &descriptor_module_flags,
+    .offset = offsetof(Module, flags),
+  },
+  {
+    .name = slice_literal_fields("_flags_padding"),
+    .descriptor = &descriptor_u32,
+    .offset = offsetof(Module, _flags_padding),
+  },
   {
     .name = slice_literal_fields("source_file"),
     .descriptor = &descriptor_source_file,
     .offset = offsetof(Module, source_file),
   },
   {
-    .name = slice_literal_fields("scope"),
+    .name = slice_literal_fields("own_scope"),
     .descriptor = &descriptor_scope_pointer,
-    .offset = offsetof(Module, scope),
+    .offset = offsetof(Module, own_scope),
+  },
+  {
+    .name = slice_literal_fields("export_scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .offset = offsetof(Module, export_scope),
   },
 );
 MASS_DEFINE_TYPE_VALUE(module);

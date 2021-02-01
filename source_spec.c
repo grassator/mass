@@ -77,7 +77,8 @@ test_program_inline_source_base(
   if (result.tag != Mass_Result_Tag_Success) return 0;
   test_init_module(slice_from_c_string(source));
   program_parse(context);
-  Value *value = scope_lookup_force(context, test_context.module->scope, slice_from_c_string(id));
+  // FIXME lookup main in exported scope
+  Value *value = scope_lookup_force(context, test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
     ensure_compiled_function_body(context, value);
   }
@@ -403,7 +404,8 @@ spec("source") {
       );
       Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
-      Value *main = scope_lookup_force(&test_context, module->scope, slice_literal("main"));
+      // FIXME lookup main in exported scope
+      Value *main = scope_lookup_force(&test_context, module->own_scope, slice_literal("main"));
       check(main);
       ensure_compiled_function_body(&test_context, main);
 

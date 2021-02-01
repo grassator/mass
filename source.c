@@ -1771,6 +1771,48 @@ token_handle_user_defined_operator_proc(
   token_handle_user_defined_operator(context, args, result_value, payload);
 }
 
+bool
+token_parse_exports(
+  Compilation_Context *context,
+  Token_View view
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  u64 peek_index = 0;
+  Token_Match(keyword_token, .tag = Token_Tag_Id, .source = slice_literal("exports"));
+  Token_Maybe_Match(block, .group_tag = Token_Group_Tag_Curly);
+
+  if (!block) {
+    context_error_snprintf(
+      context, keyword_token->source_range,
+      "exports keyword must be followed {}"
+    );
+    goto err;
+  }
+
+  if (context->module->flags & Module_Flags_Has_Exports) {
+    // TODO track original exports
+    context_error_snprintf(
+      context, keyword_token->source_range,
+      "A module can not have multiple exports statements"
+    );
+    goto err;
+  }
+
+  Token_View children = block->Group.children;
+  if (children.length == 1) {
+    const Token *only_child = token_view_get(children, 0);
+    if (token_match(only_child, &(Token_Pattern){.source = slice_literal("..")})) {
+      context->module->export_scope = context->module->own_scope;
+      return true;
+    }
+  }
+
+  panic("FIXME Implement partial exports");
+
+  err:
+  return true;
+}
+
 static inline Slice
 operator_fixity_to_lowercase_slice(
   Operator_Fixity fixity
@@ -1977,7 +2019,11 @@ mass_import(
     hash_map_set(context.module_map, file_path, module);
   }
 
-  return *module->scope;
+  if (!module->export_scope) {
+    return (Scope){0};
+  }
+
+  return *module->export_scope;
 }
 
 u64
@@ -4382,6 +4428,9 @@ token_parse(
     if (token_parse_operator_definition(context, statement)) {
       continue;
     }
+    if (token_parse_exports(context, statement)) {
+      continue;
+    }
     if (token_parse_constant_definitions(context, statement, &void_value, 0)) {
       continue;
     }
@@ -4687,7 +4736,7 @@ program_module_init(
       .path = file_path,
       .text = text,
     },
-    .scope = scope,
+    .own_scope = scope,
   };
 }
 
@@ -4725,7 +4774,7 @@ program_import_module(
   MASS_TRY(*context->result);
   Compilation_Context import_context = *context;
   import_context.module = module;
-  import_context.scope = module->scope;
+  import_context.scope = module->own_scope;
   return program_parse(&import_context);
 }
 
