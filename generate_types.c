@@ -6,12 +6,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
-#include "prelude.h"
 
-#ifndef countof
-#define countof(...)\
-  ((sizeof(__VA_ARGS__)) / (sizeof((__VA_ARGS__)[0])))
-#endif
+#define WIN32_LEAN_AND_MEAN
+#include "prelude.h"
 
 typedef struct {
   const char *name;
@@ -214,23 +211,23 @@ print_mass_descriptor_and_type_forward_declaration(
   switch(type->tag) {
     case Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
-      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
     case Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
-      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
     case Type_Tag_Tagged_Union: {
       char *lowercase_name = strtolower(type->union_.name);
-      fprintf(file, "Descriptor descriptor_%s;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer;\n", lowercase_name);
-      fprintf(file, "Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
       break;
     }
@@ -762,7 +759,7 @@ main(void) {
 
     fprintf(file, "\n// Mass Type Reflection\n\n");
 
-    fprintf(file, "Descriptor descriptor_scope_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
 
     // The type of type needs to be defined manually
     fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");

@@ -19,14 +19,14 @@
   ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
 
 #define MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_)\
-  Descriptor descriptor_##_NAME_##_pointer = {\
+  static Descriptor descriptor_##_NAME_##_pointer = {\
     .tag = Descriptor_Tag_Pointer,\
     .name = slice_literal_fields(#_NAME_),\
     .Pointer.to = &descriptor_##_NAME_,\
   }
 
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_)\
-  Descriptor descriptor_##_NAME_ = {\
+  static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
     .name = slice_literal_fields(#_NAME_),\
     .Opaque = { .bit_size = (_BIT_SIZE_) },\
@@ -39,7 +39,7 @@
     .length = countof((const Descriptor_Struct_Field[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
-  Descriptor descriptor_##_NAME_ = {\
+  static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
     .name = slice_literal_fields(#_NAME_),\
     .Struct = {\
@@ -61,7 +61,7 @@
   }
 
 #define MASS_DEFINE_TYPE_VALUE(_NAME_)\
-  Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_)
+  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_)
 
 #define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\
   MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_);\

@@ -1,3 +1,5 @@
+#define WIN32_LEAN_AND_MEAN
+
 #include "pe32.c"
 #include "value.c"
 #include "instruction.c"
