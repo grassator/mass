@@ -4799,6 +4799,22 @@ program_import_module(
   Compilation_Context import_context = *context;
   import_context.module = module;
   import_context.scope = module->own_scope;
-  return program_parse(&import_context);
+  Mass_Result parse_result = program_parse(&import_context);
+  MASS_TRY(parse_result);
+  if (module->export_scope && module->export_scope->map) {
+    for (u64 i = 0; i < module->export_scope->map->capacity; ++i) {
+      Scope_Map__Entry *entry = &module->export_scope->map->entries[i];
+      if (!entry->occupied) continue;
+      if (!module->own_scope->map || !hash_map_has(module->own_scope->map, entry->key)) {
+        // FIXME store source_range on scope entries
+        context_error_snprintf(
+          context, (Source_Range){0},
+          "Trying to export a missing declaration %"PRIslice, SLICE_EXPAND_PRINTF(entry->key)
+        );
+        break;
+      }
+    }
+  }
+  return *context->result;
 }
 
