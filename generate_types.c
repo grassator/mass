@@ -198,7 +198,8 @@ char *
 strtolower(
   const char *str
 ) {
-  char *result = strdup(str);
+  size_t length = strlen(str) + 1;
+  char *result = memcpy(malloc(length), str, length);
   for(size_t i = 0; result[i]; i++){
     result[i] = (char)tolower(result[i]);
   }

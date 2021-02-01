@@ -1,5 +1,6 @@
 #ifndef C_MACRO_H
 #define C_MACRO_H
+#include <stddef.h>
 
 #define STATIC_DYN_ARRAY_FIELDS(_TYPE_, ...)\
   {(Dyn_Array_Internal *)&(dyn_array_struct(_TYPE_)){\
