@@ -1800,14 +1800,38 @@ token_parse_exports(
 
   Token_View children = block->Group.children;
   if (children.length == 1) {
-    const Token *only_child = token_view_get(children, 0);
-    if (token_match(only_child, &(Token_Pattern){.source = slice_literal("..")})) {
+    if (token_match(token_view_get(children, 0), &(Token_Pattern){.source = slice_literal("..")})) {
       context->module->export_scope = context->module->own_scope;
       return true;
     }
   }
+  context->module->export_scope =
+    scope_make(context->allocator, context->module->own_scope->parent);
 
-  panic("FIXME Implement partial exports");
+  if (children.length != 0) {
+    Token_View_Split_Iterator it = { .view = children };
+
+    while (!it.done) {
+      if (context->result->tag != Mass_Result_Tag_Success) return true;
+      Token_View item = token_split_next(&it, &token_pattern_comma_operator);
+      if (item.length != 1 || token_view_get(item, 0)->tag != Token_Tag_Id) {
+        context_error_snprintf(
+          context, item.source_range,
+          "Exports {} block must contain a comma-separated identifier list"
+        );
+        goto err;
+      }
+      const Token *name = token_view_get(item, 0);
+      scope_define(context->module->export_scope, name->source, (Scope_Entry) {
+        .tag = Scope_Entry_Tag_Lazy_Expression,
+        .Lazy_Expression = {
+          .name = name->source,
+          .tokens = item,
+          .scope = context->module->own_scope,
+        },
+      });
+    }
+  }
 
   err:
   return true;

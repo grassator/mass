@@ -1,5 +1,5 @@
-exports {..}
-//exports {the_answer, foo}
+//exports {..}
+exports {the_answer}
 //exports {bar :: the_answer }
 
 the_answer :: 42
