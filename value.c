@@ -1111,6 +1111,7 @@ void
 jit_deinit(
   Jit *jit
 ) {
+  program_deinit(jit->program);
   hash_map_destroy(jit->import_library_handles);
   if (jit->buffer.memory) {
     virtual_memory_buffer_deinit(&jit->buffer);
@@ -1118,13 +1119,11 @@ jit_deinit(
 }
 
 void
-execution_context_init(
-  const Allocator *allocator,
-  Execution_Context *context
+compilation_init(
+  Compilation *compilation
 ) {
   Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
   Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
-
   Program *jit_program = allocator_allocate(compilation_allocator, Program);
   program_init(compilation_allocator, jit_program);
   Jit *jit = allocator_allocate(compilation_allocator, Jit);
@@ -1136,26 +1135,38 @@ execution_context_init(
   Scope *root_scope = scope_make(compilation_allocator, 0);
   scope_define_builtins(compilation_allocator, root_scope);
 
-  *context = (Execution_Context) {
+  *compilation = (Compilation) {
     .allocation_buffer = compilation_buffer,
     .allocator = compilation_allocator,
-    .program = runtime_program,
+    .runtime_program = runtime_program,
     .module_map = hash_map_make(Imported_Module_Map),
-    .compile_time_jit = jit,
-    .scope = root_scope,
-    .result = allocator_allocate(compilation_allocator, Mass_Result)
+    .jit = jit,
+    .root_scope = root_scope,
   };
 }
 
 void
-execution_context_deinit(
-  Execution_Context *context
+compilation_deinit(
+  Compilation *compilation
 ) {
-  hash_map_destroy(context->module_map);
-  program_deinit(context->program);
-  program_deinit(context->compile_time_jit->program);
-  jit_deinit(context->compile_time_jit);
-  bucket_buffer_destroy(context->allocation_buffer);
+  hash_map_destroy(compilation->module_map);
+  program_deinit(compilation->runtime_program);
+  jit_deinit(compilation->jit);
+  bucket_buffer_destroy(compilation->allocation_buffer);
+}
+
+Execution_Context
+execution_context_from_compilation(
+  Compilation *compilation
+) {
+  return (Execution_Context) {
+    .allocator = compilation->allocator,
+    .program = compilation->runtime_program,
+    .compilation = compilation,
+    .scope = compilation->root_scope,
+    // FIXME make it non-heap
+    .result = allocator_allocate(compilation->allocator, Mass_Result)
+  };
 }
 
 void

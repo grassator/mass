@@ -52,6 +52,7 @@ spec_check_mass_result(
   return false;
 }
 
+static Compilation test_compilation = {0};
 static Execution_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
 static Module test_module = {0};
@@ -105,11 +106,8 @@ test_program_inline_source_function(
 spec("source") {
 
   before_each() {
-    execution_context_init(allocator_system, &test_context);
-  }
-
-  after_each() {
-    execution_context_deinit(&test_context);
+    compilation_init(&test_compilation);
+    test_context = execution_context_from_compilation(&test_compilation);
   }
 
   describe("Scope") {

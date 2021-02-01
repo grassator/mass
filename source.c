@@ -2037,7 +2037,7 @@ mass_import(
 ) {
   Module *module;
   file_path = mass_normalize_import_path(context.allocator, file_path);
-  Module **module_pointer = hash_map_get(context.module_map, file_path);
+  Module **module_pointer = hash_map_get(context.compilation->module_map, file_path);
   if (module_pointer) {
     module = *module_pointer;
   } else {
@@ -2046,7 +2046,7 @@ mass_import(
     Scope *module_scope = scope_make(context.allocator, root_scope);
     module = program_module_from_file(&context, file_path, module_scope);
     program_import_module(&context, module);
-    hash_map_set(context.module_map, file_path, module);
+    hash_map_set(context.compilation->module_map, file_path, module);
   }
 
   if (!module->export_scope) {
@@ -2395,7 +2395,7 @@ compile_time_eval(
 
   const Source_Range *source_range = &view.source_range;
 
-  Jit *jit = context->compile_time_jit;
+  Jit *jit = context->compilation->jit;
   Execution_Context eval_context = *context;
   eval_context.program = jit->program;
   // TODO consider if compile-time eval should create a nested scope

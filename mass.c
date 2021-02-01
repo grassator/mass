@@ -79,8 +79,9 @@ int main(s32 argc, char **argv) {
   }
   Slice file_path = slice_from_c_string(raw_file_path);
 
-  Execution_Context context;
-  execution_context_init(allocator_system, &context);
+  Compilation compilation;
+  compilation_init(&compilation);
+  Execution_Context context = execution_context_from_compilation(&compilation);
 
   Scope *module_scope = scope_make(context.allocator, context.scope);
   Module *prelude_module = program_module_from_file(

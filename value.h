@@ -263,14 +263,21 @@ typedef struct Jit {
   void *platform_specific_payload;
 } Jit;
 
-typedef struct Execution_Context {
+typedef struct Compilation {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
+  Jit *jit;
+  Imported_Module_Map *module_map;
+  Scope *root_scope;
+  Program *runtime_program;
+} Compilation;
+
+typedef struct Execution_Context {
+  Allocator *allocator;
+  Compilation *compilation;
   Program *program;
-  Jit *compile_time_jit;
   Scope *scope;
   Function_Builder *builder;
-  Imported_Module_Map *module_map;
   Module *module;
   Mass_Result *result;
 } Execution_Context;
