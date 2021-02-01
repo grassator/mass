@@ -266,7 +266,8 @@ typedef struct Jit {
 typedef struct Compilation {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
-  Jit *jit;
+  Jit jit;
+  Module compiler_module;
   Imported_Module_Map *module_map;
   Scope *root_scope;
   Program *runtime_program;

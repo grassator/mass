@@ -2036,6 +2036,10 @@ mass_import(
   Slice file_path
 ) {
   Module *module;
+  if (slice_equal(file_path, slice_literal("mass"))) {
+    return *context.compilation->compiler_module.export_scope;
+  }
+
   file_path = mass_normalize_import_path(context.allocator, file_path);
   Module **module_pointer = hash_map_get(context.compilation->module_map, file_path);
   if (module_pointer) {
@@ -2395,7 +2399,7 @@ compile_time_eval(
 
   const Source_Range *source_range = &view.source_range;
 
-  Jit *jit = context->compilation->jit;
+  Jit *jit = &context->compilation->jit;
   Execution_Context eval_context = *context;
   eval_context.program = jit->program;
   // TODO consider if compile-time eval should create a nested scope
