@@ -1142,6 +1142,7 @@ compilation_init(
     .module_map = hash_map_make(Imported_Module_Map),
     .jit = jit,
     .root_scope = root_scope,
+    .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 }
 
@@ -1164,8 +1165,7 @@ execution_context_from_compilation(
     .program = compilation->runtime_program,
     .compilation = compilation,
     .scope = compilation->root_scope,
-    // FIXME make it non-heap
-    .result = allocator_allocate(compilation->allocator, Mass_Result)
+    .result = compilation->result,
   };
 }
 

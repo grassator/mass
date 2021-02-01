@@ -270,6 +270,7 @@ typedef struct Compilation {
   Imported_Module_Map *module_map;
   Scope *root_scope;
   Program *runtime_program;
+  Mass_Result *result;
 } Compilation;
 
 typedef struct Execution_Context {
