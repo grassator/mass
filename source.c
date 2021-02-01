@@ -392,6 +392,7 @@ scope_entry_force(
         .tag = Scope_Entry_Tag_Value,
         .Value.value = result,
         .next_overload = entry->next_overload,
+        .source_range = entry->source_range,
       };
       return result;
     }
@@ -1376,6 +1377,7 @@ token_apply_macro_syntax(
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = result,
+      .source_range = capture_view.source_range,
     });
   }
 
@@ -1717,10 +1719,12 @@ token_handle_user_defined_operator(
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
     Value *arg_value = value_any(context->allocator);
-    MASS_ON_ERROR(token_force_value(context, token_view_get(args, i), arg_value)) return;
+    const Token *arg = token_view_get(args, i);
+    MASS_ON_ERROR(token_force_value(context, arg, arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
+      .source_range = arg->source_range,
     });
   }
 
@@ -1829,6 +1833,7 @@ token_parse_exports(
           .tokens = item,
           .scope = context->module->own_scope,
         },
+        .source_range = name->source_range,
       });
     }
   }
@@ -1990,6 +1995,7 @@ token_parse_operator_definition(
 
   scope_define(context->scope, operator_token->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
+    .source_range = operator_token->source_range,
     .Operator = {
       .precedence = precendence,
       .argument_count = operator->argument_count,
@@ -2789,6 +2795,7 @@ token_parse_constant_definitions(
       .tokens = rhs,
       .scope = context->scope,
     },
+    .source_range = name->source_range,
   });
 
   err:
@@ -2936,6 +2943,7 @@ token_handle_function_call(
             scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
               .tag = Scope_Entry_Tag_Value,
               .Value.value = arg_value,
+              .source_range = args_token->source_range,
             });
             break;
           }
@@ -3949,26 +3957,6 @@ token_parse_block(
   token_parse_block_no_scope(&body_context, block, block_result_value);
 }
 
-Value *
-token_define_label(
-  Compilation_Context *context,
-  Scope *label_scope,
-  Slice name
-) {
-  Program *program = context->program;
-  Label_Index label = make_label(program, &program->code_section, name);
-  Value *value = allocator_allocate(context->allocator, Value);
-  *value = (Value) {
-    .descriptor = &descriptor_void,
-    .operand = code_label32(label),
-  };
-  scope_define(label_scope, name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = value,
-  });
-  return value;
-}
-
 u64
 token_parse_statement_using(
   Compilation_Context *context,
@@ -4045,7 +4033,18 @@ token_parse_statement_label(
     value = scope_entry_force(context, scope_entry);
   } else {
     Scope *label_scope = context->scope;
-    value = token_define_label(context, label_scope, id->source);
+
+    Label_Index label = make_label(context->program, &context->program->code_section, id->source);
+    value = allocator_allocate(context->allocator, Value);
+    *value = (Value) {
+      .descriptor = &descriptor_void,
+      .operand = code_label32(label),
+    };
+    scope_define(label_scope, id->source, (Scope_Entry) {
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = value,
+      .source_range = id->source_range,
+    });
     if (placeholder) {
       return peek_index;
     }
@@ -4324,6 +4323,7 @@ token_parse_definition(
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = value,
+    .source_range = name->source_range,
   });
   MASS_ON_ERROR(assign(context, &define->source_range, result_value, value));
 
@@ -4401,6 +4401,7 @@ token_parse_definition_and_assignment_statements(
   scope_define(context->scope, name->source, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = on_stack,
+    .source_range = name->source_range,
   });
 
   err:
@@ -4806,9 +4807,8 @@ program_import_module(
       Scope_Map__Entry *entry = &module->export_scope->map->entries[i];
       if (!entry->occupied) continue;
       if (!module->own_scope->map || !hash_map_has(module->own_scope->map, entry->key)) {
-        // FIXME store source_range on scope entries
         context_error_snprintf(
-          context, (Source_Range){0},
+          context, entry->value->source_range,
           "Trying to export a missing declaration %"PRIslice, SLICE_EXPAND_PRINTF(entry->key)
         );
         break;

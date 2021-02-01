@@ -643,6 +643,7 @@ main(void) {
       { "void *", "handler_payload" },
     }),
   }), (Struct_Item[]){
+    { "Source_Range", "source_range" },
     { "Scope_Entry *", "next_overload" },
   }));
 
