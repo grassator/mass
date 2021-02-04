@@ -247,11 +247,8 @@ win32_program_jit(
 
   assert(dyn_array_length(info->layouts) == info->previous_counts.functions);
   assert(dyn_array_length(info->function_table) == info->previous_counts.functions);
-  // TODO provide a way to do this non-incrementally
-  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
-    dyn_array_push(info->layouts, (Function_Layout){0});
-    dyn_array_push(info->function_table, (RUNTIME_FUNCTION){0});
-  }
+  dyn_array_reserve_uninitialized(info->layouts, function_count);
+  dyn_array_reserve_uninitialized(info->function_table, function_count);
 
   // Encode newly added functions
   for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
