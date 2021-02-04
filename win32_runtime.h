@@ -159,8 +159,10 @@ typedef struct {
   u64 imports;
 } Win32_Jit_Counters;
 
+typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
+
 typedef struct {
-  RUNTIME_FUNCTION *function_table;
+  Array_RUNTIME_FUNCTION function_table;
   Array_Function_Layout layouts;
   Fixed_Buffer *temp_buffer;
   Allocator temp_allocator;
@@ -184,7 +186,7 @@ win32_program_jit(
     assert(jit->platform_specific_payload);
     info = jit->platform_specific_payload;
     // TODO @Speed use RtlInstallFunctionTableCallback
-    RtlDeleteFunctionTable(info->function_table);
+    RtlDeleteFunctionTable(dyn_array_raw(info->function_table));
     info->temp_buffer->occupied = 0;
 
     // Memory protection works on per-page level so with incremental JIT there are two options:
@@ -205,6 +207,9 @@ win32_program_jit(
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
       .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
         program, code_buffer, (u64)win32_program_test_exception_handler
+      ),
+      .function_table = dyn_array_make(
+        Array_RUNTIME_FUNCTION, .allocator = allocator_system, .capacity = 128,
       ),
       .previous_counts = {0},
     };
@@ -240,28 +245,30 @@ win32_program_jit(
   }
   u64 function_count = dyn_array_length(program->functions);
 
-  info->function_table = allocator_allocate_array(
-    allocator_system, RUNTIME_FUNCTION, function_count
-  );
+  assert(dyn_array_length(info->layouts) == info->previous_counts.functions);
+  assert(dyn_array_length(info->function_table) == info->previous_counts.functions);
+  // TODO provide a way to do this non-incrementally
+  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
+    dyn_array_push(info->layouts, (Function_Layout){0});
+    dyn_array_push(info->function_table, (RUNTIME_FUNCTION){0});
+  }
 
-  assert(info->previous_counts.functions == dyn_array_length(info->layouts));
+  // Encode newly added functions
   for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_push(info->layouts, (Function_Layout){0});
+    Function_Layout *layout = dyn_array_get(info->layouts, i);
     fn_encode(program, code_buffer, builder, layout);
   }
 
   // It is a separate loop from above to make sure unwinding data is not in executable memory
-  for (u64 i = 0; i < function_count; ++i) {
+  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = dyn_array_get(info->layouts, i);
+    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
     u64 unwind_data_rva = memory->sections.data.base_rva + data_buffer->occupied;
     UNWIND_INFO *unwind_info =
       virtual_memory_buffer_allocate_bytes(data_buffer, sizeof(UNWIND_INFO), sizeof(DWORD));
-    // FIXME only update changed info
-    win32_fn_init_unwind_info(
-      builder, layout, unwind_info, &info->function_table[i], u64_to_u32(unwind_data_rva)
-    );
+    win32_fn_init_unwind_info(builder, layout, unwind_info, function, u64_to_u32(unwind_data_rva));
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
@@ -292,7 +299,7 @@ win32_program_jit(
   // TODO consider if we want to not do JIT at all in this case?
   if (function_count) {
     if (!RtlAddFunctionTable(
-      info->function_table, u64_to_u32(function_count), (s64)memory->buffer.memory
+      dyn_array_raw(info->function_table), u64_to_u32(function_count), (s64)memory->buffer.memory
     )) {
       panic("Could not add function table definition");
     }
