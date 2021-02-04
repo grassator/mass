@@ -140,6 +140,7 @@ win32_program_test_exception_handler(
   }
 
   u64 current_offset = 0;
+  // TODO do a binary search here
   for (u64 i = 0; i < dyn_array_length(exception_data->builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(exception_data->builder->code_block.instructions, i);
     // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
@@ -163,13 +164,39 @@ typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
 
 typedef struct {
   Array_RUNTIME_FUNCTION function_table;
-  Array_Function_Layout layouts;
   Fixed_Buffer *temp_buffer;
   Allocator temp_allocator;
   u32 trampoline_rva;
 
   Win32_Jit_Counters previous_counts;
 } Win32_Jit_Info;
+
+RUNTIME_FUNCTION *
+win32_get_runtime_function_callback(
+  DWORD64 instruction_address,
+  void *context
+) {
+  Jit *jit = context;
+  Win32_Jit_Info *info = jit->platform_specific_payload;
+  Section *code_section = &jit->program->memory.sections.code;
+  Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
+  assert(instruction_address >= (DWORD64)code_buffer->memory);
+  u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
+  // TODO use binary search
+  for (u64 i = 0; i < dyn_array_length(info->function_table); ++i) {
+    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
+    if (rva < function->BeginAddress) continue;
+    if (rva < function->EndAddress) {
+      return function;
+    } else {
+      break;
+    }
+  }
+  panic("Could not find matching RUNTIME_FUNCTION");
+
+  return 0;
+}
+
 
 void
 win32_program_jit(
@@ -185,8 +212,6 @@ win32_program_jit(
     dyn_array_clear(jit->program->patch_info_array);
     assert(jit->platform_specific_payload);
     info = jit->platform_specific_payload;
-    // TODO @Speed use RtlInstallFunctionTableCallback
-    RtlDeleteFunctionTable(dyn_array_raw(info->function_table));
     info->temp_buffer->occupied = 0;
 
     // Memory protection works on per-page level so with incremental JIT there are two options:
@@ -202,7 +227,6 @@ win32_program_jit(
       .capacity = 1024 * 1024 // 1Mb
     );
     *info = (Win32_Jit_Info) {
-      .layouts = dyn_array_make(Array_Function_Layout),
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
       .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
@@ -214,6 +238,17 @@ win32_program_jit(
       .previous_counts = {0},
     };
     jit->platform_specific_payload = info;
+    // https://docs.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-rtlinstallfunctiontablecallback
+    {
+      // IMPORTANT this needs to use full program memory address space
+      //           otherwise RVA calculation will be broken
+      DWORD64 base_address = (s64)memory->buffer.memory;
+      DWORD64 table_id = base_address | 0x3;
+      DWORD length = u64_to_u32(memory->buffer.capacity);
+      RtlInstallFunctionTableCallback(
+        table_id, base_address, length, win32_get_runtime_function_callback, jit, 0
+      );
+    }
   }
 
   u64 import_count = dyn_array_length(program->import_libraries);
@@ -245,27 +280,20 @@ win32_program_jit(
   }
   u64 function_count = dyn_array_length(program->functions);
 
-  assert(dyn_array_length(info->layouts) == info->previous_counts.functions);
   assert(dyn_array_length(info->function_table) == info->previous_counts.functions);
-  dyn_array_reserve_uninitialized(info->layouts, function_count);
   dyn_array_reserve_uninitialized(info->function_table, function_count);
 
   // Encode newly added functions
   for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_get(info->layouts, i);
-    fn_encode(program, code_buffer, builder, layout);
-  }
+    Function_Layout layout;
+    fn_encode(program, code_buffer, builder, &layout);
 
-  // It is a separate loop from above to make sure unwinding data is not in executable memory
-  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_get(info->layouts, i);
     RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
     u64 unwind_data_rva = memory->sections.data.base_rva + data_buffer->occupied;
     UNWIND_INFO *unwind_info =
       virtual_memory_buffer_allocate_bytes(data_buffer, sizeof(UNWIND_INFO), sizeof(DWORD));
-    win32_fn_init_unwind_info(builder, layout, unwind_info, function, u64_to_u32(unwind_data_rva));
+    win32_fn_init_unwind_info(builder, &layout, unwind_info, function, u64_to_u32(unwind_data_rva));
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
@@ -293,14 +321,6 @@ win32_program_jit(
     }
   }
 
-  // TODO consider if we want to not do JIT at all in this case?
-  if (function_count) {
-    if (!RtlAddFunctionTable(
-      dyn_array_raw(info->function_table), u64_to_u32(function_count), (s64)memory->buffer.memory
-    )) {
-      panic("Could not add function table definition");
-    }
-  }
   info->previous_counts.functions = function_count;
   info->previous_counts.imports = import_count;;
 }
