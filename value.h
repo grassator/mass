@@ -243,8 +243,7 @@ typedef struct Function_Builder {
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef struct {
-  s8 *raw;
-  u64 size;
+  Virtual_Memory_Buffer buffer;
   union {
     struct {
       Section data;
@@ -267,7 +266,6 @@ hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
 
 typedef struct Jit {
-  Virtual_Memory_Buffer buffer;
   bool is_stack_unwinding_in_progress;
   Program *program;
   Jit_Import_Library_Handle_Map *import_library_handles;

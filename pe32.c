@@ -98,7 +98,8 @@ encode_rdata_section(
     expected_encoded_size += sizeof(UNWIND_INFO) * dyn_array_length(program->functions);
   }
 
-  u64 global_data_size = u64_align(program->memory.sections.data.buffer->occupied, 16);
+  Virtual_Memory_Buffer *global_buffer = &program->memory.sections.data.buffer;
+  u64 global_data_size = u64_align(global_buffer->occupied, 16);
   expected_encoded_size += global_data_size;
 
   Encoded_Rdata_Section result = {
@@ -108,7 +109,7 @@ encode_rdata_section(
   Fixed_Buffer *buffer = result.buffer;
 
   void *global_data = fixed_buffer_allocate_bytes(buffer, global_data_size, sizeof(s8));
-  bucket_buffer_copy_to_memory(program->memory.sections.data.buffer, global_data);
+  memcpy(global_data, global_buffer->memory, global_buffer->occupied);
 
   Bucket_Buffer *temp_buffer = bucket_buffer_make();
   Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);

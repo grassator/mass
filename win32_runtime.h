@@ -164,6 +164,7 @@ typedef struct {
   Array_Function_Layout layouts;
   Fixed_Buffer *temp_buffer;
   Allocator temp_allocator;
+  u32 trampoline_rva;
 
   Win32_Jit_Counters previous_counts;
 } Win32_Jit_Info;
@@ -173,6 +174,9 @@ win32_program_jit(
   Jit *jit
 ) {
   Program *program = jit->program;
+  Program_Memory *memory = &jit->program->memory;
+  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+  Virtual_Memory_Buffer *data_buffer = &memory->sections.data.buffer;
 
   Win32_Jit_Info *info;
   if (jit->platform_specific_payload) {
@@ -181,8 +185,14 @@ win32_program_jit(
     info = jit->platform_specific_payload;
     // TODO @Speed use RtlInstallFunctionTableCallback
     RtlDeleteFunctionTable(info->function_table);
-    virtual_memory_buffer_deinit(&jit->buffer);
     info->temp_buffer->occupied = 0;
+
+    // Memory protection works on per-page level so with incremental JIT there are two options:
+    // 1. Waste memory every time we do JIT due to padding to page size.
+    // 2. Switch memory back to writable before new writes.
+    // On Windows options 2 is preferable, however some unix-like system disallow multiple
+    // transitions between writable and executable so might have to resort to 1 there.
+    VirtualProtect(code_buffer->memory, code_buffer->occupied, PAGE_READWRITE, &(DWORD){0});
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
     Fixed_Buffer *temp_buffer = fixed_buffer_make(
@@ -193,11 +203,13 @@ win32_program_jit(
       .layouts = dyn_array_make(Array_Function_Layout),
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
+      .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
+        program, code_buffer, (u64)win32_program_test_exception_handler
+      ),
       .previous_counts = {0},
     };
     jit->platform_specific_payload = info;
   }
-  Program_Memory *memory = &jit->program->memory;
 
   u64 import_count = dyn_array_length(program->import_libraries);
   for (u64 i = info->previous_counts.imports; i < import_count; ++i) {
@@ -220,86 +232,41 @@ win32_program_jit(
         char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
         fn_type_opaque address = GetProcAddress(handle, symbol_name);
         assert(address);
-        u64 offset = bucket_buffer_append_u64(memory->sections.data.buffer, (u64)address);
+        u64 offset = virtual_memory_buffer_append_u64(data_buffer, (u64)address);
         label->offset_in_section = u64_to_u32(offset);
         label->resolved = true;
       }
     }
   }
-
-  // The Layout of the final code is as follows:
-  // |--RW-DATA--|--CODE--|--RO-DATA--|
-  // This allows code to grow to 1 GB potentially while maintaining
-  // access to RW and RO segments with RIP-relative addressing
-  static const u64 MAX_RW_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
-  static const u64 MAX_CODE_SIZE = 1024 * 1024 * 1024; // 1Gb
-  static const u64 MAX_RO_DATA_SIZE = 1024 * 1024 * 1024; // 1Gb
-
-  u64 program_size = MAX_CODE_SIZE + MAX_RW_DATA_SIZE + MAX_RO_DATA_SIZE;
   u64 function_count = dyn_array_length(program->functions);
 
   info->function_table = allocator_allocate_array(
     allocator_system, RUNTIME_FUNCTION, function_count
   );
 
-  virtual_memory_buffer_init(&jit->buffer, program_size);
-
-  { // Copying and repointing the data segment into contiguous buffer
-    u64 global_data_size = u64_align(memory->sections.data.buffer->occupied, 16);
-    if (global_data_size) {
-      void *global_data =
-        virtual_memory_buffer_allocate_bytes(&jit->buffer, global_data_size, sizeof(s8));
-      bucket_buffer_copy_to_memory(memory->sections.data.buffer, global_data);
-      // Setup permissions for the data segment
-      DWORD win32_permissions =
-        win32_section_permissions_to_virtual_protect_flags(memory->sections.data.permissions);
-      VirtualProtect(global_data, global_data_size, win32_permissions, &(DWORD){0});
-    }
-  }
-
-  // Since we are writing to the same buffer both data segment and code segment,
-  // and there is no weird file vs virtual address stuff going on like in PE32,
-  // we can just use natural offsets and ignore the base RVA
-  memory->sections.data.base_rva = 0;
-  memory->sections.code.base_rva = 0;
-
-  u32 unwind_data_rva = u64_to_u32(jit->buffer.occupied);
-  UNWIND_INFO *unwind_info_array = virtual_memory_buffer_allocate_bytes(
-    &jit->buffer, sizeof(UNWIND_INFO) * function_count, sizeof(DWORD)
-  );
-
-  u64 code_start_rva = MAX_RW_DATA_SIZE;
-  assert(jit->buffer.occupied < MAX_RW_DATA_SIZE);
-
-  jit->buffer.occupied = code_start_rva;
-  // FIXME this might break if we change virtual_memory_buffer implementation
-  //       so ideally we should use custom code to handle this.
-  jit->buffer.committed = code_start_rva;
-
-  s8 *code_memory = jit->buffer.memory + jit->buffer.occupied;
-  u64 trampoline_target = (u64)win32_program_test_exception_handler;
-  u32 trampoline_virtual_address = make_trampoline(program, &jit->buffer, trampoline_target);
-
   assert(info->previous_counts.functions == dyn_array_length(info->layouts));
   for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = dyn_array_push(info->layouts, (Function_Layout){0});
-    fn_encode(program, &jit->buffer, builder, layout);
+    fn_encode(program, code_buffer, builder, layout);
   }
 
   // It is a separate loop from above to make sure unwinding data is not in executable memory
   for (u64 i = 0; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout *layout = dyn_array_get(info->layouts, i);
-    UNWIND_INFO *unwind_info = &unwind_info_array[i];
+    u64 unwind_data_rva = memory->sections.data.base_rva + data_buffer->occupied;
+    UNWIND_INFO *unwind_info =
+      virtual_memory_buffer_allocate_bytes(data_buffer, sizeof(UNWIND_INFO), sizeof(DWORD));
+    // FIXME only update changed info
     win32_fn_init_unwind_info(
-      builder, layout, unwind_info, &info->function_table[i], unwind_data_rva
+      builder, layout, unwind_info, &info->function_table[i], u64_to_u32(unwind_data_rva)
     );
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
       u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
-      *exception_handler_address = trampoline_virtual_address;
+      *exception_handler_address = info->trampoline_rva;
       Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
@@ -314,12 +281,10 @@ win32_program_jit(
 
   // Setup permissions for the code segment
   {
-    u64 code_segment_size = jit->buffer.occupied - code_start_rva;
-    code_segment_size = u64_align(code_segment_size, memory_page_size());
     DWORD win32_permissions =
       win32_section_permissions_to_virtual_protect_flags(memory->sections.code.permissions);
-    VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
-    if (!FlushInstructionCache(GetCurrentProcess(), code_memory, code_segment_size)) {
+    VirtualProtect(code_buffer->memory, code_buffer->occupied, win32_permissions, &(DWORD){0});
+    if (!FlushInstructionCache(GetCurrentProcess(), code_buffer->memory, code_buffer->occupied)) {
       panic("Unable to flush instruction cache");
     }
   }
@@ -327,7 +292,7 @@ win32_program_jit(
   // TODO consider if we want to not do JIT at all in this case?
   if (function_count) {
     if (!RtlAddFunctionTable(
-      info->function_table, u64_to_u32(function_count), (s64) jit->buffer.memory
+      info->function_table, u64_to_u32(function_count), (s64)memory->buffer.memory
     )) {
       panic("Could not add function table definition");
     }

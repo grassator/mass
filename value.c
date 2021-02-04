@@ -754,17 +754,16 @@ value_global_internal(
   Descriptor *descriptor
 ) {
   Program *program = context->program;
+  Section *section = &program->memory.sections.data;
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_alignment(descriptor);
-  void *allocation =
-    bucket_buffer_allocate_bytes(program->memory.sections.data.buffer, byte_size, alignment);
-  s64 offset_in_data_section =
-    bucket_buffer_pointer_to_offset(program->memory.sections.data.buffer, allocation);
+  u64 offset_in_data_section = section->buffer.occupied;
+  virtual_memory_buffer_allocate_bytes(&section->buffer, byte_size, alignment);
 
   Value *result = allocator_allocate(context->allocator, Value);
-  Label_Index label_index = make_label(program, &program->memory.sections.data, slice_literal("global"));
+  Label_Index label_index = make_label(program, section, slice_literal("global"));
   Label *label = program_get_label(program, label_index);
-  label->offset_in_section = s64_to_u32(offset_in_data_section);
+  label->offset_in_section = u64_to_u32(offset_in_data_section);
   label->resolved = true;
 
   *result = (Value) {
@@ -912,7 +911,7 @@ rip_value_pointer(
   Label *label = program_get_label(
     program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  return bucket_buffer_offset_to_pointer(label->section->buffer, label->offset_in_section);
+  return (s8 *)label->section->buffer.memory + label->offset_in_section;
 }
 
 Value *
@@ -976,12 +975,12 @@ value_as_function(
   Value *value
 ) {
   assert(operand_is_label(&value->operand));
-  assert(jit->buffer.memory);
   Label *label = program_get_label(
     jit->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  assert(label->section == &jit->program->memory.sections.code);
-  s8 *target = jit->buffer.memory + label->section->base_rva + label->offset_in_section;
+  Section *section = label->section;
+  assert(section == &jit->program->memory.sections.code);
+  s8 *target = section->buffer.memory + label->offset_in_section;
   return (fn_type_opaque)target;
 }
 
@@ -1068,18 +1067,34 @@ program_init(
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
-    .memory = {
-      .sections = {
-        .data = {
-          .buffer = bucket_buffer_make(.allocator = allocator_system),
-          .permissions = Section_Permissions_Read | Section_Permissions_Write,
-        },
-        .code = {
-          .buffer = bucket_buffer_make(.allocator = allocator_system),
-          .permissions = Section_Permissions_Execute,
-        }
-      },
+  };
+
+  // The Layout of the final code is as follows:
+  // |--RW-DATA--|--CODE--|--RO-DATA--|
+  // This allows code to grow to 1 GB potentially while maintaining
+  // access to RW and RO segments with RIP-relative addressing
+  #define MAX_RW_DATA_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
+  #define MAX_CODE_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
+  #define MAX_RO_DATA_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
+  #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
+  virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
+
+  program->memory.sections.data = (Section){
+    .buffer = {
+      .memory = program->memory.buffer.memory,
+      .capacity = MAX_RW_DATA_SIZE,
     },
+    .base_rva = 0,
+    .permissions = Section_Permissions_Read | Section_Permissions_Write,
+  };
+
+  program->memory.sections.code = (Section){
+    .buffer = {
+      .memory = program->memory.buffer.memory + program->memory.sections.data.buffer.capacity,
+      .capacity = MAX_CODE_SIZE,
+    },
+    .base_rva = u64_to_u32(program->memory.sections.data.buffer.capacity),
+    .permissions = Section_Permissions_Execute,
   };
 };
 
@@ -1091,8 +1106,7 @@ program_deinit(
     Import_Library *library = dyn_array_get(program->import_libraries, i);
     dyn_array_destroy(library->symbols);
   }
-  bucket_buffer_destroy(program->memory.sections.data.buffer);
-  bucket_buffer_destroy(program->memory.sections.code.buffer);
+  virtual_memory_buffer_deinit(&program->memory.buffer);
   dyn_array_destroy(program->labels);
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
@@ -1105,7 +1119,6 @@ jit_init(
   Program *program
 ) {
   *jit = (Jit) {
-    .buffer = 0,
     .import_library_handles = hash_map_make(Jit_Import_Library_Handle_Map),
     .program = program,
   };
@@ -1117,9 +1130,6 @@ jit_deinit(
 ) {
   program_deinit(jit->program);
   hash_map_destroy(jit->import_library_handles);
-  if (jit->buffer.memory) {
-    virtual_memory_buffer_deinit(&jit->buffer);
-  }
 }
 
 void

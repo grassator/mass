@@ -233,7 +233,7 @@ typedef enum Section_Permissions {
 } Section_Permissions;
 
 typedef struct Section {
-  Bucket_Buffer * buffer;
+  Virtual_Memory_Buffer buffer;
   Slice name;
   u32 base_rva;
   Section_Permissions permissions;
@@ -579,7 +579,7 @@ static Descriptor descriptor_scope_pointer;
 MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
 MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
 MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);
-MASS_DEFINE_OPAQUE_C_TYPE(bucket_buffer, Bucket_Buffer);
+MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol);
@@ -832,7 +832,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section,
   {
     .name = slice_literal_fields("buffer"),
-    .descriptor = &descriptor_bucket_buffer_pointer,
+    .descriptor = &descriptor_virtual_memory_buffer,
     .offset = offsetof(Section, buffer),
   },
   {

@@ -456,7 +456,7 @@ main(void) {
   }));
 
   push_type(type_struct("Section", (Struct_Item[]){
-    { "Bucket_Buffer *", "buffer" },
+    { "Virtual_Memory_Buffer", "buffer" },
     { "Slice", "name" },
     { "u32", "base_rva" },
     { "Section_Permissions", "permissions" },
@@ -767,7 +767,7 @@ main(void) {
     // Also need to define built-in types
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);\n");
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(bucket_buffer, Bucket_Buffer);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol);\n");
