@@ -885,17 +885,43 @@ dyn_array_bounds_check(
   ((_array_).data->length = 0)
 
 static inline void
-dyn_array_ensure_capacity(
+dyn_array_ensure_capacity_internal(
   Dyn_Array_Internal **internal,
   u64 item_byte_size,
-  u64 extra
+  u64 new_capacity
 ) {
-  if ((*internal)->length + extra <= (*internal)->capacity) return;
-  u64 new_capacity = (*internal)->capacity + u64_max((*internal)->capacity >> 1, extra);
+  if (new_capacity <= (*internal)->capacity) return;
+  u64 one_and_a_half = (*internal)->capacity + ((*internal)->capacity >> 1);
+  new_capacity = u64_max(one_and_a_half, new_capacity);
   *internal = dyn_array_realloc_internal(
     *internal, (*internal)->length, item_byte_size, new_capacity
   );
 }
+
+static inline void
+dyn_array_ensure_extra_capacity_internal(
+  Dyn_Array_Internal **internal,
+  u64 item_byte_size,
+  u64 extra
+) {
+  dyn_array_ensure_capacity_internal(internal, item_byte_size, (*internal)->length + extra);
+}
+
+static inline void
+dyn_array_reserve_uninitialized_internal(
+  Dyn_Array_Internal **internal,
+  u64 item_byte_size,
+  u64 new_capacity
+) {
+  dyn_array_ensure_capacity_internal(internal, item_byte_size, new_capacity);
+  (*internal)->length = new_capacity;
+}
+
+#define dyn_array_ensure_capacity(_array_, _new_capacity_)\
+  dyn_array_ensure_capacity_internal(&((_array_).internal), sizeof((_array_).data->items[0]), _new_capacity_)
+
+#define dyn_array_reserve_uninitialized(_array_, _new_capacity_)\
+  dyn_array_reserve_uninitialized_internal(&((_array_).internal), sizeof((_array_).data->items[0]), _new_capacity_)
 
 #define dyn_array_item_size(_array_type_)\
   sizeof(((_array_type_ *) 0)->data->items[0])
@@ -982,7 +1008,7 @@ dyn_array_insert_internal(
   u64 length,
   u64 item_byte_size
 ) {
-  dyn_array_ensure_capacity(internal, item_byte_size, length);
+  dyn_array_ensure_extra_capacity_internal(internal, item_byte_size, length);
   u64 original_length = (*internal)->length;
   assert(index <= (*internal)->length);
   (*internal)->length += length;
@@ -1026,13 +1052,13 @@ dyn_array_insert_internal(
 
 #define dyn_array_push_uninitialized(_array_)\
   (\
-    dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
+    dyn_array_ensure_extra_capacity_internal(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
     &(_array_).data->items[(_array_).data->length++]\
   )
 
 #define dyn_array_push(_array_, ...)\
   (\
-    dyn_array_ensure_capacity(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
+    dyn_array_ensure_extra_capacity_internal(&((_array_).internal), sizeof((_array_).data->items[0]), 1),\
     ((_array_).data->items[(_array_).data->length] = (__VA_ARGS__)),\
     &(_array_).data->items[(_array_).data->length++]\
   )
@@ -2445,6 +2471,24 @@ virtual_memory_buffer_deinit(
   *buffer = (Virtual_Memory_Buffer){0};
 }
 
+static inline void
+virtual_memory_buffer_ensure_committed(
+  Virtual_Memory_Buffer *buffer,
+  u64 size
+) {
+  assert(buffer->capacity >= size);
+  #ifdef _WIN32
+  u64 page_size = s32_to_u64(memory_page_size());
+  u64 required_to_commit = u64_align(size, page_size);
+  if (required_to_commit > buffer->committed) {
+    void *commit_pointer = buffer->memory + buffer->committed;
+    u64 commit_size = required_to_commit - buffer->committed;
+    VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
+    buffer->committed = required_to_commit;
+  }
+  #endif
+}
+
 static void *
 virtual_memory_buffer_allocate_bytes(
   Virtual_Memory_Buffer *buffer,
@@ -2460,16 +2504,8 @@ virtual_memory_buffer_allocate_bytes(
   buffer->occupied = aligned_occupied;
   void *result = buffer->memory + buffer->occupied;
   buffer->occupied += byte_size;
-  u64 page_size = s32_to_u64(memory_page_size());
-  u64 required_to_commit = u64_align(buffer->occupied, page_size);
-  #ifdef _WIN32
-  if (required_to_commit > buffer->committed) {
-    void *commit_pointer = buffer->memory + buffer->committed;
-    u64 commit_size = required_to_commit - buffer->committed;
-    VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
-    buffer->committed = required_to_commit;
-  }
-  #endif
+  virtual_memory_buffer_ensure_committed(buffer, buffer->occupied);
+
   return result;
 }
 
