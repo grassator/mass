@@ -154,15 +154,20 @@ win32_program_test_exception_handler(
   return ExceptionContinueSearch;
 }
 
+typedef struct {
+  RUNTIME_FUNCTION *function_table;
+  Array_Function_Layout layouts;
+  Fixed_Buffer *temp_buffer;
+  Allocator temp_allocator;
+} Win32_Jit_Info;
+
 void
 win32_program_jit_resolve_dll_imports(
-  Jit *jit
+  Jit *jit,
+  Win32_Jit_Info *jit_info
 ) {
   Program *program = jit->program;
   if (!dyn_array_is_initialized(program->import_libraries)) return;
-
-  Bucket_Buffer *temp_buffer = bucket_buffer_make();
-  Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);
 
   for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
@@ -171,7 +176,7 @@ win32_program_jit_resolve_dll_imports(
     if (maybe_handle_pointer) {
       handle = *maybe_handle_pointer;
     } else {
-      char *library_name = slice_to_c_string(temp_allocator, lib->name);
+      char *library_name = slice_to_c_string(&jit_info->temp_allocator, lib->name);
       handle = LoadLibraryA(library_name);
       assert(handle);
       hash_map_set(jit->import_library_handles, lib->name, handle);
@@ -181,7 +186,7 @@ win32_program_jit_resolve_dll_imports(
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       Label *label = program_get_label(program, symbol->label32);
       if (!label->resolved) {
-        char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        char *symbol_name = slice_to_c_string(&jit_info->temp_allocator, symbol->name);
         fn_type_opaque address = GetProcAddress(handle, symbol_name);
         assert(address);
         u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)address);
@@ -190,20 +195,37 @@ win32_program_jit_resolve_dll_imports(
       }
     }
   }
-  bucket_buffer_destroy(temp_buffer);
 }
-
-typedef struct {
-  RUNTIME_FUNCTION *function_table;
-  Array_Function_Layout layouts;
-} Win32_Jit_Info;
 
 void
 win32_program_jit(
   Jit *jit
 ) {
-  win32_program_jit_resolve_dll_imports(jit);
   Program *program = jit->program;
+
+  Win32_Jit_Info *info;
+  if (jit->platform_specific_payload) {
+    dyn_array_clear(jit->program->patch_info_array);
+    assert(jit->platform_specific_payload);
+    info = jit->platform_specific_payload;
+    // TODO @Speed use RtlInstallFunctionTableCallback
+    RtlDeleteFunctionTable(info->function_table);
+    virtual_memory_buffer_deinit(&jit->buffer);
+    info->temp_buffer->occupied = 0;
+  } else {
+    info = allocator_allocate(allocator_default, Win32_Jit_Info);
+    Fixed_Buffer *temp_buffer = fixed_buffer_make(
+      .allocator = allocator_system,
+      .capacity = 1024 * 1024 // 1Mb
+    );
+    *info = (Win32_Jit_Info) {
+      .layouts = dyn_array_make(Array_Function_Layout),
+      .temp_buffer = temp_buffer,
+      .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
+    };
+    jit->platform_specific_payload = info;
+  }
+  win32_program_jit_resolve_dll_imports(jit, info);
 
   // The Layout of the final code is as follows:
   // |--RW-DATA--|--CODE--|--RO-DATA--|
@@ -215,22 +237,6 @@ win32_program_jit(
 
   u64 program_size = MAX_CODE_SIZE + MAX_RW_DATA_SIZE + MAX_RO_DATA_SIZE;
   u64 function_count = dyn_array_length(program->functions);
-
-  Win32_Jit_Info *info;
-  if (jit->platform_specific_payload) {
-    dyn_array_clear(jit->program->patch_info_array);
-    assert(jit->platform_specific_payload);
-    info = jit->platform_specific_payload;
-    // TODO @Speed use RtlInstallFunctionTableCallback
-    RtlDeleteFunctionTable(info->function_table);
-    virtual_memory_buffer_deinit(&jit->buffer);
-  } else {
-    info = allocator_allocate(allocator_default, Win32_Jit_Info);
-    *info = (Win32_Jit_Info) {
-      .layouts = dyn_array_make(Array_Function_Layout),
-    };
-    jit->platform_specific_payload = info;
-  }
   u64 previously_encoded_count = dyn_array_length(info->layouts);
 
   info->function_table = allocator_allocate_array(
