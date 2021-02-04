@@ -757,12 +757,12 @@ value_global_internal(
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_alignment(descriptor);
   void *allocation =
-    bucket_buffer_allocate_bytes(program->data_section.buffer, byte_size, alignment);
+    bucket_buffer_allocate_bytes(program->memory.sections.data.buffer, byte_size, alignment);
   s64 offset_in_data_section =
-    bucket_buffer_pointer_to_offset(program->data_section.buffer, allocation);
+    bucket_buffer_pointer_to_offset(program->memory.sections.data.buffer, allocation);
 
   Value *result = allocator_allocate(context->allocator, Value);
-  Label_Index label_index = make_label(program, &program->data_section, slice_literal("global"));
+  Label_Index label_index = make_label(program, &program->memory.sections.data, slice_literal("global"));
   Label *label = program_get_label(program, label_index);
   label->offset_in_section = s64_to_u32(offset_in_data_section);
   label->resolved = true;
@@ -980,7 +980,7 @@ value_as_function(
   Label *label = program_get_label(
     jit->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  assert(label->section == &jit->program->code_section);
+  assert(label->section == &jit->program->memory.sections.code);
   s8 *target = jit->buffer.memory + label->section->base_rva + label->offset_in_section;
   return (fn_type_opaque)target;
 }
@@ -1068,13 +1068,17 @@ program_init(
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
-    .data_section = {
-      .buffer = bucket_buffer_make(.allocator = allocator_system),
-      .permissions = Section_Permissions_Read | Section_Permissions_Write,
-    },
-    .code_section = {
-      .buffer = bucket_buffer_make(.allocator = allocator_system),
-      .permissions = Section_Permissions_Execute,
+    .memory = {
+      .sections = {
+        .data = {
+          .buffer = bucket_buffer_make(.allocator = allocator_system),
+          .permissions = Section_Permissions_Read | Section_Permissions_Write,
+        },
+        .code = {
+          .buffer = bucket_buffer_make(.allocator = allocator_system),
+          .permissions = Section_Permissions_Execute,
+        }
+      },
     },
   };
 };
@@ -1087,8 +1091,8 @@ program_deinit(
     Import_Library *library = dyn_array_get(program->import_libraries, i);
     dyn_array_destroy(library->symbols);
   }
-  bucket_buffer_destroy(program->data_section.buffer);
-  bucket_buffer_destroy(program->code_section.buffer);
+  bucket_buffer_destroy(program->memory.sections.data.buffer);
+  bucket_buffer_destroy(program->memory.sections.code.buffer);
   dyn_array_destroy(program->labels);
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
@@ -1287,7 +1291,7 @@ import_symbol(
 
   if (!symbol) {
     // FIXME move to a readonly section
-    Label_Index label = make_label(program, &program->data_section, slice_literal("import"));
+    Label_Index label = make_label(program, &program->memory.sections.data, slice_literal("import"));
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,

@@ -237,7 +237,7 @@ encode_instruction_assembly(
         mod_r_m_patch_info =
           dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
             .target_label_index = label_index,
-            .from = {.section = &program->code_section},
+            .from = {.section = &program->memory.sections.code},
             .patch_target = patch_target,
           });
         break;
@@ -269,7 +269,7 @@ encode_instruction_assembly(
       immediate_label_patch_info =
         dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
           .target_label_index = label_index,
-          .from = {.section = &program->code_section},
+          .from = {.section = &program->memory.sections.code},
           .patch_target = patch_target,
         });
     } else if (operand->tag == Operand_Tag_Immediate) {
@@ -305,7 +305,7 @@ encode_instruction(
   if (instruction->type == Instruction_Type_Label) {
     Label *label = program_get_label(program, instruction->label);
     assert(!label->resolved);
-    label->section = &program->code_section;
+    label->section = &program->memory.sections.code;
     label->offset_in_section = u64_to_u32(buffer->occupied);
     label->resolved = true;
     instruction->encoded_byte_size = 0;
@@ -324,7 +324,7 @@ encode_instruction(
       dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
         .target_label_index = instruction->Bytes.label_index,
         .from = {
-          .section = &program->code_section,
+          .section = &program->memory.sections.code,
           .offset_in_section = u64_to_u32(buffer->occupied),
         },
         .patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer),

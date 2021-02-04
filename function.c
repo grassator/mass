@@ -696,7 +696,7 @@ make_if(
 ) {
   Program *program = context->program;
   bool is_always_true = false;
-  Label_Index label = make_label(program, &program->code_section, slice_literal("if"));
+  Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("if"));
   if(value->operand.tag == Operand_Tag_Immediate) {
     s64 imm = operand_immediate_value_up_to_s64(&value->operand);
     if (imm == 0) return label;
@@ -1243,7 +1243,7 @@ ensure_compiled_function_body(
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("anonymous_function");
-  Label_Index fn_label = make_label(program, &program->code_section, fn_name);
+  Label_Index fn_label = make_label(program, &program->memory.sections.code, fn_name);
   fn_value->operand = code_label32(fn_label);
 
   Function_Builder builder = (Function_Builder){
@@ -1251,7 +1251,7 @@ ensure_compiled_function_body(
     .label_index = fn_label,
     .code_block = {
       // FIXME use fn_value->descriptor->name
-      .end_label = make_label(program, &program->code_section, slice_literal("fn end")),
+      .end_label = make_label(program, &program->memory.sections.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
@@ -1525,7 +1525,7 @@ make_and(
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
-  Label_Index label = make_label(program, &program->code_section, slice_literal("&&"));
+  Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("&&"));
 
   Value zero = {
     .descriptor = &descriptor_s8,
@@ -1561,7 +1561,7 @@ make_or(
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
   Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
-  Label_Index label = make_label(program, &program->code_section, slice_literal("||"));
+  Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("||"));
 
   Value zero = {
     .descriptor = &descriptor_s8,

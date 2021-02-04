@@ -242,14 +242,25 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
+typedef struct {
+  s8 *raw;
+  u64 size;
+  union {
+    struct {
+      Section data;
+      Section code;
+    };
+    Section list[2];
+  } sections;
+} Program_Memory;
+
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
   Value *entry_point;
   Array_Function_Builder functions;
-  Section data_section;
-  Section code_section;
+  Program_Memory memory;
 } Program;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)

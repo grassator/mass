@@ -56,7 +56,7 @@ encode_rdata_section(
   #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
   u64 expected_encoded_size = 0;
-  program->data_section.base_rva = header->VirtualAddress;
+  program->memory.sections.data.base_rva = header->VirtualAddress;
 
   {
     // Volatile: This code estimates encoded size based on the code below
@@ -98,7 +98,7 @@ encode_rdata_section(
     expected_encoded_size += sizeof(UNWIND_INFO) * dyn_array_length(program->functions);
   }
 
-  u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
+  u64 global_data_size = u64_align(program->memory.sections.data.buffer->occupied, 16);
   expected_encoded_size += global_data_size;
 
   Encoded_Rdata_Section result = {
@@ -108,7 +108,7 @@ encode_rdata_section(
   Fixed_Buffer *buffer = result.buffer;
 
   void *global_data = fixed_buffer_allocate_bytes(buffer, global_data_size, sizeof(s8));
-  bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
+  bucket_buffer_copy_to_memory(program->memory.sections.data.buffer, global_data);
 
   Bucket_Buffer *temp_buffer = bucket_buffer_make();
   Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);
@@ -252,7 +252,7 @@ encode_text_section(
   virtual_memory_buffer_init(&result.buffer, max_code_size);
   Virtual_Memory_Buffer *buffer = &result.buffer;
 
-  program->code_section.base_rva = header->VirtualAddress;
+  program->memory.sections.code.base_rva = header->VirtualAddress;
 
   bool found_entry_point = false;
 
@@ -338,7 +338,7 @@ write_executable(
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->data_section.permissions
+        program->memory.sections.data.permissions
       ),
     },
     {
@@ -348,7 +348,7 @@ write_executable(
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->code_section.permissions
+        program->memory.sections.code.permissions
       ),
     },
     {0}

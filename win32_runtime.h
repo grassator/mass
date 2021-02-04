@@ -197,6 +197,7 @@ win32_program_jit(
     };
     jit->platform_specific_payload = info;
   }
+  Program_Memory *memory = &jit->program->memory;
 
   u64 import_count = dyn_array_length(program->import_libraries);
   for (u64 i = info->previous_counts.imports; i < import_count; ++i) {
@@ -219,7 +220,7 @@ win32_program_jit(
         char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
         fn_type_opaque address = GetProcAddress(handle, symbol_name);
         assert(address);
-        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)address);
+        u64 offset = bucket_buffer_append_u64(memory->sections.data.buffer, (u64)address);
         label->offset_in_section = u64_to_u32(offset);
         label->resolved = true;
       }
@@ -244,14 +245,14 @@ win32_program_jit(
   virtual_memory_buffer_init(&jit->buffer, program_size);
 
   { // Copying and repointing the data segment into contiguous buffer
-    u64 global_data_size = u64_align(program->data_section.buffer->occupied, 16);
+    u64 global_data_size = u64_align(memory->sections.data.buffer->occupied, 16);
     if (global_data_size) {
       void *global_data =
         virtual_memory_buffer_allocate_bytes(&jit->buffer, global_data_size, sizeof(s8));
-      bucket_buffer_copy_to_memory(program->data_section.buffer, global_data);
+      bucket_buffer_copy_to_memory(memory->sections.data.buffer, global_data);
       // Setup permissions for the data segment
       DWORD win32_permissions =
-        win32_section_permissions_to_virtual_protect_flags(program->data_section.permissions);
+        win32_section_permissions_to_virtual_protect_flags(memory->sections.data.permissions);
       VirtualProtect(global_data, global_data_size, win32_permissions, &(DWORD){0});
     }
   }
@@ -259,8 +260,8 @@ win32_program_jit(
   // Since we are writing to the same buffer both data segment and code segment,
   // and there is no weird file vs virtual address stuff going on like in PE32,
   // we can just use natural offsets and ignore the base RVA
-  program->data_section.base_rva = 0;
-  program->code_section.base_rva = 0;
+  memory->sections.data.base_rva = 0;
+  memory->sections.code.base_rva = 0;
 
   u32 unwind_data_rva = u64_to_u32(jit->buffer.occupied);
   UNWIND_INFO *unwind_info_array = virtual_memory_buffer_allocate_bytes(
@@ -316,7 +317,7 @@ win32_program_jit(
     u64 code_segment_size = jit->buffer.occupied - code_start_rva;
     code_segment_size = u64_align(code_segment_size, memory_page_size());
     DWORD win32_permissions =
-      win32_section_permissions_to_virtual_protect_flags(program->code_section.permissions);
+      win32_section_permissions_to_virtual_protect_flags(memory->sections.code.permissions);
     VirtualProtect(code_memory, code_segment_size, win32_permissions, &(DWORD){0});
     if (!FlushInstructionCache(GetCurrentProcess(), code_memory, code_segment_size)) {
       panic("Unable to flush instruction cache");
