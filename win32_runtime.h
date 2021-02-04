@@ -155,47 +155,18 @@ win32_program_test_exception_handler(
 }
 
 typedef struct {
+  u64 functions;
+  u64 imports;
+} Win32_Jit_Counters;
+
+typedef struct {
   RUNTIME_FUNCTION *function_table;
   Array_Function_Layout layouts;
   Fixed_Buffer *temp_buffer;
   Allocator temp_allocator;
+
+  Win32_Jit_Counters previous_counts;
 } Win32_Jit_Info;
-
-void
-win32_program_jit_resolve_dll_imports(
-  Jit *jit,
-  Win32_Jit_Info *jit_info
-) {
-  Program *program = jit->program;
-  if (!dyn_array_is_initialized(program->import_libraries)) return;
-
-  for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
-    void *handle;
-    if (maybe_handle_pointer) {
-      handle = *maybe_handle_pointer;
-    } else {
-      char *library_name = slice_to_c_string(&jit_info->temp_allocator, lib->name);
-      handle = LoadLibraryA(library_name);
-      assert(handle);
-      hash_map_set(jit->import_library_handles, lib->name, handle);
-    }
-
-    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      Label *label = program_get_label(program, symbol->label32);
-      if (!label->resolved) {
-        char *symbol_name = slice_to_c_string(&jit_info->temp_allocator, symbol->name);
-        fn_type_opaque address = GetProcAddress(handle, symbol_name);
-        assert(address);
-        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)address);
-        label->offset_in_section = u64_to_u32(offset);
-        label->resolved = true;
-      }
-    }
-  }
-}
 
 void
 win32_program_jit(
@@ -222,10 +193,38 @@ win32_program_jit(
       .layouts = dyn_array_make(Array_Function_Layout),
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
+      .previous_counts = {0},
     };
     jit->platform_specific_payload = info;
   }
-  win32_program_jit_resolve_dll_imports(jit, info);
+
+  u64 import_count = dyn_array_length(program->import_libraries);
+  for (u64 i = info->previous_counts.imports; i < import_count; ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
+    void *handle;
+    if (maybe_handle_pointer) {
+      handle = *maybe_handle_pointer;
+    } else {
+      char *library_name = slice_to_c_string(&info->temp_allocator, lib->name);
+      handle = LoadLibraryA(library_name);
+      assert(handle);
+      hash_map_set(jit->import_library_handles, lib->name, handle);
+    }
+
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
+      Label *label = program_get_label(program, symbol->label32);
+      if (!label->resolved) {
+        char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
+        fn_type_opaque address = GetProcAddress(handle, symbol_name);
+        assert(address);
+        u64 offset = bucket_buffer_append_u64(program->data_section.buffer, (u64)address);
+        label->offset_in_section = u64_to_u32(offset);
+        label->resolved = true;
+      }
+    }
+  }
 
   // The Layout of the final code is as follows:
   // |--RW-DATA--|--CODE--|--RO-DATA--|
@@ -237,7 +236,6 @@ win32_program_jit(
 
   u64 program_size = MAX_CODE_SIZE + MAX_RW_DATA_SIZE + MAX_RO_DATA_SIZE;
   u64 function_count = dyn_array_length(program->functions);
-  u64 previously_encoded_count = dyn_array_length(info->layouts);
 
   info->function_table = allocator_allocate_array(
     allocator_system, RUNTIME_FUNCTION, function_count
@@ -281,11 +279,10 @@ win32_program_jit(
   u64 trampoline_target = (u64)win32_program_test_exception_handler;
   u32 trampoline_virtual_address = make_trampoline(program, &jit->buffer, trampoline_target);
 
-  for (u64 i = 0; i < function_count; ++i) {
+  assert(info->previous_counts.functions == dyn_array_length(info->layouts));
+  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = i >= previously_encoded_count
-      ? dyn_array_push(info->layouts, (Function_Layout){0})
-      : dyn_array_get(info->layouts, i);
+    Function_Layout *layout = dyn_array_push(info->layouts, (Function_Layout){0});
     fn_encode(program, &jit->buffer, builder, layout);
   }
 
@@ -334,6 +331,8 @@ win32_program_jit(
       panic("Could not add function table definition");
     }
   }
+  info->previous_counts.functions = function_count;
+  info->previous_counts.imports = import_count;;
 }
 
 
