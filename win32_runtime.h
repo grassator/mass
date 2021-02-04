@@ -140,7 +140,6 @@ win32_program_test_exception_handler(
   }
 
   u64 current_offset = 0;
-  // TODO do a binary search here
   for (u64 i = 0; i < dyn_array_length(exception_data->builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(exception_data->builder->code_block.instructions, i);
     // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
@@ -182,14 +181,20 @@ win32_get_runtime_function_callback(
   Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
   assert(instruction_address >= (DWORD64)code_buffer->memory);
   u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
-  // TODO use binary search
-  for (u64 i = 0; i < dyn_array_length(info->function_table); ++i) {
-    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
-    if (rva < function->BeginAddress) continue;
-    if (rva < function->EndAddress) {
-      return function;
+
+  // Do binary search
+  s64 left_bound = 0;
+  s64 right_bound = u64_to_s64(dyn_array_length(info->function_table)) - 1;
+  while (left_bound <= right_bound) {
+    s64 middle = left_bound + (right_bound - left_bound) / 2;
+    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, middle);
+
+    if (rva < function->BeginAddress) {
+      right_bound = middle - 1;
+    } else if (rva > function->EndAddress) {
+      left_bound = middle + 1;
     } else {
-      break;
+      return function;
     }
   }
   panic("Could not find matching RUNTIME_FUNCTION");
@@ -197,7 +202,7 @@ win32_get_runtime_function_callback(
   return 0;
 }
 
-
+// TODO make this return MASS_RESULT
 void
 win32_program_jit(
   Jit *jit
