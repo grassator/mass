@@ -210,7 +210,6 @@ win32_program_jit(
   Win32_Jit_Info *info;
   if (jit->platform_specific_payload) {
     dyn_array_clear(jit->program->patch_info_array);
-    assert(jit->platform_specific_payload);
     info = jit->platform_specific_payload;
     info->temp_buffer->occupied = 0;
 
