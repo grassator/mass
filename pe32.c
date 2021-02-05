@@ -284,6 +284,22 @@ typedef enum {
   Executable_Type_Cli,
 } Executable_Type;
 
+typedef struct {
+  s32 file;
+  s32 virtual;
+} PE32_Offsets;
+
+static inline PE32_Offsets
+pe32_offset_after_size(
+  const PE32_Offsets *offsets,
+  s32 size
+) {
+  return (PE32_Offsets) {
+    .file = offsets->file + s32_align(size, PE32_FILE_ALIGNMENT),
+    .virtual = offsets->virtual + s32_align(size, PE32_SECTION_ALIGNMENT),
+  };
+}
+
 void
 write_executable(
   const char *file_path,
@@ -324,45 +340,40 @@ write_executable(
     sizeof(IMAGE_OPTIONAL_HEADER64) +
     sizeof(sections);
 
-  file_size_of_headers = s32_align(file_size_of_headers, PE32_FILE_ALIGNMENT);
-  s32 virtual_size_of_headers = s32_align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
+  PE32_Offsets offsets = {0};
+
+  offsets = pe32_offset_after_size(&offsets, file_size_of_headers);
 
   Encoded_Exception_Directory exception_directory = encode_exception_directory(context);
 
   // Prepare .data section
   IMAGE_SECTION_HEADER *data_section_header = &sections[0];
-  data_section_header->PointerToRawData = file_size_of_headers;
-  data_section_header->VirtualAddress = virtual_size_of_headers;
+  data_section_header->PointerToRawData = offsets.file;
+  data_section_header->VirtualAddress = offsets.virtual;
   Encoded_Data_Section encoded_data_section = encode_data_section(
     program, data_section_header
   );
   Virtual_Memory_Buffer *data_section_buffer = encoded_data_section.buffer;
+  offsets = pe32_offset_after_size(&offsets, data_section_header->SizeOfRawData);
 
   // Prepare .text section
   IMAGE_SECTION_HEADER *text_section_header = &sections[1];
-  text_section_header->PointerToRawData =
-    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
-  text_section_header->VirtualAddress =
-    data_section_header->VirtualAddress +
-    s32_align(data_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
+  text_section_header->PointerToRawData = offsets.file;
+  text_section_header->VirtualAddress = offsets.virtual;
   Encoded_Text_Section encoded_text_section = encode_text_section(
     context, text_section_header, &exception_directory
   );
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
+  offsets = pe32_offset_after_size(&offsets, text_section_header->SizeOfRawData);
 
   // After all the sections are encoded we should know all the offsets
   // and can patch all the label locations
   program_patch_labels(program);
 
   // Calculate total size of image in memory once loaded
-  s32 virtual_size_of_image =
-    text_section_header->VirtualAddress +
-    s32_align(text_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
+  s32 virtual_size_of_image = offsets.virtual;
 
-  u64 max_exe_buffer =
-    file_size_of_headers +
-    data_section_header->SizeOfRawData +
-    text_section_header->SizeOfRawData;
+  u64 max_exe_buffer = offsets.file;
   Fixed_Buffer *exe_buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = max_exe_buffer
