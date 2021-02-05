@@ -278,6 +278,38 @@ pe32_offset_after_size(
 }
 
 void
+pe32_checksum(
+  Fixed_Buffer *buffer,
+  IMAGE_OPTIONAL_HEADER64 *header
+) {
+  // Unaligned checksum would require some modification
+  // however since PE32+ executables are always section-aligned
+  // we can just assert for sanity.
+  assert(buffer->occupied % sizeof(u32) == 0);
+
+  u32 *chunk = (u32 *)buffer->memory;
+  u32 *chunk_end = (u32 *)(buffer->memory + buffer->occupied);
+
+  u64 checksum = 0;
+  for (; chunk != chunk_end; ++chunk) {
+    // Checksum does not include itself so need to skip over 4 bytes
+    // where it will be written to in the output file
+    if (chunk == &header->CheckSum) continue;
+    checksum = (checksum & 0xffffffff) + (*chunk) + (checksum >> 32);
+    if (checksum > (1llu << 32)) {
+      checksum = (checksum & 0xffffffff) + (checksum >> 32);
+    }
+  }
+  checksum = (checksum & 0xffff) + (checksum >> 16);
+  checksum = (checksum) + (checksum >> 16);
+  checksum = checksum & 0xffff;
+
+  checksum += buffer->occupied;
+
+  header->CheckSum = u64_to_u32(checksum);
+}
+
+void
 write_executable(
   const char *file_path,
   Execution_Context *context,
@@ -451,6 +483,8 @@ write_executable(
   // correct alignment of the file size
   exe_buffer->occupied = offsets.file;
   assert(exe_buffer->occupied % PE32_FILE_ALIGNMENT == 0);
+
+  pe32_checksum(exe_buffer, optional_header);
 
   /////////
 
