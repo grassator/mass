@@ -1071,11 +1071,11 @@ program_init(
 
   // The Layout of the final code is as follows:
   // |--RW-DATA--|--CODE--|--RO-DATA--|
-  // This allows code to grow to 1 GB potentially while maintaining
-  // access to RW and RO segments with RIP-relative addressing
-  #define MAX_RW_DATA_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
-  #define MAX_CODE_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
-  #define MAX_RO_DATA_SIZE (1024llu * 1024llu * 1024llu) // 1Gb
+  #define MAX_RW_DATA_SIZE (640llu * 1024llu * 1024llu) // 640Mb
+  #define MAX_CODE_SIZE (640llu * 1024llu * 1024llu) // 640Mb
+  #define MAX_RO_DATA_SIZE (640llu * 1024llu * 1024llu) // 640Mb
+  // :FunctionTableCallbackMax2Gb
+  // (640 + 640 + 640 == 1920) < 2048
   #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
   virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
 

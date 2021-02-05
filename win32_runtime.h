@@ -229,7 +229,7 @@ win32_program_jit(
     *info = (Win32_Jit_Info) {
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
-      .trampoline_rva = make_trampoline(
+      .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
         program, code_buffer, (u64)win32_program_test_exception_handler
       ),
       .function_table = dyn_array_make(
@@ -245,9 +245,16 @@ win32_program_jit(
       DWORD64 base_address = (s64)memory->buffer.memory;
       DWORD64 table_id = base_address | 0x3;
       DWORD length = u64_to_u32(memory->buffer.capacity);
-      RtlInstallFunctionTableCallback(
+      // :FunctionTableCallbackMax2Gb
+      // The definition of RtlInstallFunctionTableCallback says that the length
+      // parameter is DWORD, which is an alias for `unsigned long`. This should allow
+      // for up to 4GB sizes, however the function actually fails if you provide
+      // length more than 2Gb. Sigh.
+      if (!RtlInstallFunctionTableCallback(
         table_id, base_address, length, win32_get_runtime_function_callback, jit, 0
-      );
+      )) {
+        panic("RtlInstallFunctionTableCallback failed");
+      }
     }
   }
 
