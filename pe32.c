@@ -42,14 +42,15 @@ typedef struct {
   s32 import_directory_rva;
   s32 import_directory_size;
 
-  s32 unwind_info_base_rva;
-  UNWIND_INFO *unwind_info_array;
+  s32 exception_directory_rva;
+  s32 exception_directory_size;
 } Encoded_Data_Section;
 
 Encoded_Data_Section
 encode_data_section(
   Program * program,
-  IMAGE_SECTION_HEADER *header
+  IMAGE_SECTION_HEADER *header,
+  Array_Function_Layout layouts
 ) {
   #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
@@ -159,12 +160,21 @@ encode_data_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
-
-  //result.unwind_info_base_rva = get_rva();
-  //// :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
-  //result.unwind_info_array = virtual_memory_buffer_allocate_bytes(
-    //buffer, sizeof(UNWIND_INFO) * dyn_array_length(program->functions), sizeof(DWORD)
-  //);
+  // Exception Directory
+  {
+    u64 size = sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
+    result.exception_directory_rva = get_rva();
+    result.exception_directory_size = u64_to_s32(size);
+    RUNTIME_FUNCTION *functions =
+      virtual_memory_buffer_allocate_bytes(&section->buffer, size, _Alignof(RUNTIME_FUNCTION));
+    for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+      Function_Builder *builder = dyn_array_get(program->functions, i);
+      RUNTIME_FUNCTION *function = &functions[i];
+      Function_Layout *layout = dyn_array_get(layouts, i);
+      win32_init_runtime_info_for_function(builder, layout, function, section);
+    }
+    dyn_array_destroy(layouts);
+  }
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
@@ -175,40 +185,15 @@ encode_data_section(
 }
 
 typedef struct {
-  Section *section;
-  s32 offset;
-  s32 size;
-  RUNTIME_FUNCTION *runtime_function_array;
-} Encoded_Exception_Directory;
-
-Encoded_Exception_Directory
-encode_exception_directory(
-  Execution_Context *context
-) {
-  Program *program = context->program;
-  Section *section = &program->memory.sections.data;
-
-  Encoded_Exception_Directory result = {0};
-  result.section = section;
-  result.offset = u64_to_s32(section->buffer.occupied);
-  u64 size = sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
-  result.size = u64_to_s32(size);
-  result.runtime_function_array =
-    virtual_memory_buffer_allocate_bytes(&section->buffer, size, _Alignof(RUNTIME_FUNCTION));
-
-  return result;
-}
-
-typedef struct {
   Virtual_Memory_Buffer buffer;
   s32 entry_point_rva;
+  Array_Function_Layout layouts;
 } Encoded_Text_Section;
 
 Encoded_Text_Section
 encode_text_section(
   Execution_Context *context,
-  IMAGE_SECTION_HEADER *header,
-  Encoded_Exception_Directory *exception_directory
+  IMAGE_SECTION_HEADER *header
 ) {
   Program *program = context->program;
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
@@ -222,7 +207,7 @@ encode_text_section(
 
   bool found_entry_point = false;
 
-  Array_Function_Layout layouts =
+  result.layouts =
     dyn_array_make(Array_Function_Layout, .capacity = dyn_array_length(program->functions));
   assert(program->entry_point->descriptor->tag == Descriptor_Tag_Function);
 
@@ -232,19 +217,9 @@ encode_text_section(
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
-    Function_Layout *layout = dyn_array_push_uninitialized(layouts);
+    Function_Layout *layout = dyn_array_push_uninitialized(result.layouts);
     fn_encode(program, buffer, builder, layout);
   }
-
-  // FIXME write out UNWIND INFO
-  //for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
-    //Function_Builder *builder = dyn_array_get(program->functions, i);
-    //Function_Layout *layout = dyn_array_get(layouts, i);
-    //RUNTIME_FUNCTION *runtime_function = &encoded_data_section->runtime_function_array[i];
-    //UNWIND_INFO *unwind_info = &encoded_data_section->unwind_info_array[i];
-    //u32 unwind_info_rva = encoded_data_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
-    //win32_fn_init_unwind_info(builder, layout, unwind_info, runtime_function, unwind_info_rva);
-  //}
 
   if (!found_entry_point) {
     panic("Internal error: Could not find entry point in the list of program functions");
@@ -253,7 +228,6 @@ encode_text_section(
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
 
-  dyn_array_destroy(layouts);
 
   #undef get_rva
   return result;
@@ -344,15 +318,11 @@ write_executable(
 
   offsets = pe32_offset_after_size(&offsets, file_size_of_headers);
 
-  Encoded_Exception_Directory exception_directory = encode_exception_directory(context);
-
   // Prepare .text section
   IMAGE_SECTION_HEADER *text_section_header = &sections[0];
   text_section_header->PointerToRawData = offsets.file;
   text_section_header->VirtualAddress = offsets.virtual;
-  Encoded_Text_Section encoded_text_section = encode_text_section(
-    context, text_section_header, &exception_directory
-  );
+  Encoded_Text_Section encoded_text_section = encode_text_section(context, text_section_header);
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
   offsets = pe32_offset_after_size(&offsets, text_section_header->SizeOfRawData);
 
@@ -361,7 +331,7 @@ write_executable(
   data_section_header->PointerToRawData = offsets.file;
   data_section_header->VirtualAddress = offsets.virtual;
   Encoded_Data_Section encoded_data_section = encode_data_section(
-    program, data_section_header
+    program, data_section_header, encoded_text_section.layouts
   );
   Virtual_Memory_Buffer *data_section_buffer = encoded_data_section.buffer;
   offsets = pe32_offset_after_size(&offsets, data_section_header->SizeOfRawData);
@@ -442,9 +412,9 @@ write_executable(
     encoded_data_section.import_directory_size;
 
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
-    exception_directory.section->base_rva + exception_directory.offset;
+    encoded_data_section.exception_directory_rva;
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].Size =
-    exception_directory.size;
+    encoded_data_section.exception_directory_size;
 
   // Write out sections
   for (u32 i = 0; i < countof(sections); ++i) {
