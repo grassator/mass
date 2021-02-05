@@ -1069,32 +1069,30 @@ program_init(
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
   };
 
-  // The Layout of the final code is as follows:
-  // |--RW-DATA--|--CODE--|--RO-DATA--|
-  #define MAX_RW_DATA_SIZE (640llu * 1024llu * 1024llu) // 640Mb
   #define MAX_CODE_SIZE (640llu * 1024llu * 1024llu) // 640Mb
+  #define MAX_RW_DATA_SIZE (640llu * 1024llu * 1024llu) // 640Mb
   #define MAX_RO_DATA_SIZE (640llu * 1024llu * 1024llu) // 640Mb
   // :FunctionTableCallbackMax2Gb
   // (640 + 640 + 640 == 1920) < 2048
   #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
   virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
 
-  program->memory.sections.data = (Section){
-    .buffer = {
-      .memory = program->memory.buffer.memory,
-      .capacity = MAX_RW_DATA_SIZE,
-    },
-    .base_rva = 0,
-    .permissions = Section_Permissions_Read | Section_Permissions_Write,
-  };
-
   program->memory.sections.code = (Section){
     .buffer = {
-      .memory = program->memory.buffer.memory + program->memory.sections.data.buffer.capacity,
+      .memory = program->memory.buffer.memory,
       .capacity = MAX_CODE_SIZE,
     },
-    .base_rva = u64_to_u32(program->memory.sections.data.buffer.capacity),
+    .base_rva = 0,
     .permissions = Section_Permissions_Execute,
+  };
+
+  program->memory.sections.data = (Section){
+    .buffer = {
+      .memory = program->memory.buffer.memory + program->memory.sections.code.buffer.capacity,
+      .capacity = MAX_RW_DATA_SIZE,
+    },
+    .base_rva = u64_to_u32(program->memory.sections.code.buffer.capacity),
+    .permissions = Section_Permissions_Read | Section_Permissions_Write,
   };
 };
 
