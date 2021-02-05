@@ -177,7 +177,7 @@ typedef struct {
   u8 FrameRegister : 4;
   u8 FrameOffset   : 4;
   // :UnwindCodeAlignment
-  // This struct must be DWORD aligned which means
+  // This struct must be DWORD (32bit) aligned which means
   // there is always an even unwind codes allocated
   UNWIND_CODE UnwindCode[];
 } UNWIND_INFO;
@@ -191,7 +191,7 @@ win32_init_runtime_info_for_function(
 ) {
   u32 unwind_data_rva = u64_to_u32(section->base_rva + section->buffer.occupied);
   UNWIND_INFO *unwind_info = virtual_memory_buffer_allocate_bytes(
-    &section->buffer, sizeof(UNWIND_INFO), sizeof(DWORD)
+    &section->buffer, sizeof(UNWIND_INFO), sizeof(u32)
   );
   *unwind_info = (UNWIND_INFO) {
     .Version = 1,
@@ -251,7 +251,7 @@ win32_init_runtime_info_for_function(
     WIN32_WRITE_UNWIND_CODE((UNWIND_CODE){0});
   }
 
-  assert(section->buffer.occupied % sizeof(DWORD) == 0);
+  assert(section->buffer.occupied % sizeof(u32) == 0);
 
   *function = (RUNTIME_FUNCTION) {
     .BeginAddress = layout->begin_rva,
