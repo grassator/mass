@@ -1731,7 +1731,8 @@ token_handle_user_defined_operator(
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
   Program *program = context->program;
-  Label_Index fake_return_label_index = make_label(program, &program->memory.sections.data, MASS_RETURN_LABEL_NAME);
+  Label_Index fake_return_label_index =
+    make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
   {
     Value *return_label_value = allocator_allocate(context->allocator, Value);
     *return_label_value = (Value) {
@@ -2957,7 +2958,8 @@ token_handle_function_call(
       // Define a new return target label and value so that explicit return statements
       // jump to correct location and put value in the right place
       Program *program = context->program;
-      Label_Index fake_return_label_index = make_label(program, &program->memory.sections.data, MASS_RETURN_LABEL_NAME);
+      Label_Index fake_return_label_index =
+        make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
 
       if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
         Value return_label = {

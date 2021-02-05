@@ -206,7 +206,7 @@ win32_program_jit(
   Program *program = jit->program;
   Program_Memory *memory = &jit->program->memory;
   Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
-  Virtual_Memory_Buffer *data_buffer = &memory->sections.data.buffer;
+  Virtual_Memory_Buffer *ro_data_buffer = &memory->sections.ro_data.buffer;
 
   Win32_Jit_Info *info;
   if (jit->platform_specific_payload) {
@@ -220,6 +220,7 @@ win32_program_jit(
     // On Windows options 2 is preferable, however some unix-like system disallow multiple
     // transitions between writable and executable so might have to resort to 1 there.
     VirtualProtect(code_buffer->memory, code_buffer->occupied, PAGE_READWRITE, &(DWORD){0});
+    VirtualProtect(ro_data_buffer->memory, ro_data_buffer->occupied, PAGE_READWRITE, &(DWORD){0});
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
     Fixed_Buffer *temp_buffer = fixed_buffer_make(
@@ -279,7 +280,7 @@ win32_program_jit(
         char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
         fn_type_opaque address = GetProcAddress(handle, symbol_name);
         assert(address);
-        u64 offset = virtual_memory_buffer_append_u64(data_buffer, (u64)address);
+        u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
         label->offset_in_section = u64_to_u32(offset);
         label->resolved = true;
       }
@@ -298,12 +299,14 @@ win32_program_jit(
 
     RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
     UNWIND_INFO *unwind_info = win32_init_runtime_info_for_function(
-      builder, &layout, function, &memory->sections.data
+      builder, &layout, function, &memory->sections.ro_data
     );
     // Handler (if present) must immediately follow the unwind info struct
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
-      u64 offset = virtual_memory_buffer_append_u32(&memory->sections.data.buffer, info->trampoline_rva);
+      u64 offset = virtual_memory_buffer_append_u32(
+        &memory->sections.ro_data.buffer, info->trampoline_rva
+      );
       assert(offset % sizeof(DWORD) == 0);
       // :ExceptionDataAlignment
       // This data might end up misaligned on 64 bit OSes because UNWIND_INFO
@@ -313,7 +316,7 @@ win32_program_jit(
       // to just mark the struct as packed and let the compiler deal with
       // potentially misaligned reads and writes.
       Win32_Exception_Data *exception_data = virtual_memory_buffer_allocate_bytes(
-        &memory->sections.data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
+        &memory->sections.ro_data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
       );
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
@@ -325,6 +328,13 @@ win32_program_jit(
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations
   program_patch_labels(program);
+
+  // Setup permissions for read-only data segment
+  {
+    DWORD win32_permissions =
+      win32_section_permissions_to_virtual_protect_flags(memory->sections.ro_data.permissions);
+    VirtualProtect(ro_data_buffer->memory, ro_data_buffer->occupied, win32_permissions, &(DWORD){0});
+  }
 
   // Setup permissions for the code segment
   {

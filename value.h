@@ -246,10 +246,11 @@ typedef struct {
   Virtual_Memory_Buffer buffer;
   union {
     struct {
-      Section data;
+      Section rw_data;
       Section code;
+      Section ro_data;
     };
-    Section list[2];
+    Section list[3];
   } sections;
 } Program_Memory;
 
@@ -297,11 +298,6 @@ void *
 rip_value_pointer(
   Program *program,
   Value *value
-);
-
-u64
-estimate_max_code_size_in_bytes(
-  Program *program
 );
 
 void

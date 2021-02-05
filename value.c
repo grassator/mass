@@ -754,7 +754,7 @@ value_global_internal(
   Descriptor *descriptor
 ) {
   Program *program = context->program;
-  Section *section = &program->memory.sections.data;
+  Section *section = &program->memory.sections.rw_data;
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_alignment(descriptor);
   u64 offset_in_data_section = section->buffer.occupied;
@@ -1077,22 +1077,35 @@ program_init(
   #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
   virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
 
+  u64 offset_in_memory = 0;
+
   program->memory.sections.code = (Section){
     .buffer = {
-      .memory = program->memory.buffer.memory,
+      .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_CODE_SIZE,
     },
-    .base_rva = 0,
+    .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Execute,
   };
+  offset_in_memory += program->memory.sections.code.buffer.capacity;
 
-  program->memory.sections.data = (Section){
+  program->memory.sections.rw_data = (Section){
     .buffer = {
-      .memory = program->memory.buffer.memory + program->memory.sections.code.buffer.capacity,
+      .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_RW_DATA_SIZE,
     },
-    .base_rva = u64_to_u32(program->memory.sections.code.buffer.capacity),
+    .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Read | Section_Permissions_Write,
+  };
+  offset_in_memory += program->memory.sections.rw_data.buffer.capacity;
+
+  program->memory.sections.ro_data = (Section){
+    .buffer = {
+      .memory = program->memory.buffer.memory + offset_in_memory,
+      .capacity = MAX_RO_DATA_SIZE,
+    },
+    .base_rva = u64_to_u32(offset_in_memory),
+    .permissions = Section_Permissions_Read,
   };
 };
 
@@ -1298,8 +1311,7 @@ import_symbol(
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
-    // FIXME move to a readonly section
-    Label_Index label = make_label(program, &program->memory.sections.data, slice_literal("import"));
+    Label_Index label = make_label(program, &program->memory.sections.ro_data, symbol_name);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,
@@ -1308,23 +1320,6 @@ import_symbol(
 
   u32 byte_size = 8;
   return data_label32(symbol->label32, byte_size);
-}
-
-#define FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT 16
-
-u64
-estimate_max_code_size_in_bytes(
-  Program *program
-) {
-  u64 total_instruction_count = 0;
-  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    total_instruction_count += dyn_array_length(builder->code_block.instructions);
-    total_instruction_count += FUNCTION_PROLOG_EPILOG_MAX_INSTRUCTION_COUNT;
-  }
-  // TODO this should be architecture-dependent
-  const u64 max_bytes_per_instruction = 15;
-  return total_instruction_count * max_bytes_per_instruction;
 }
 
 inline bool
