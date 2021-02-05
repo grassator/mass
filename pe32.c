@@ -36,7 +36,7 @@ typedef struct {
 typedef dyn_array_type(Import_Library_Pe32) Array_Import_Library_Pe32;
 
 typedef struct {
-  Fixed_Buffer *buffer;
+  Virtual_Memory_Buffer *buffer;
   s32 iat_rva;
   s32 iat_size;
   s32 import_directory_rva;
@@ -46,70 +46,22 @@ typedef struct {
   s32 unwind_info_base_rva;
   RUNTIME_FUNCTION *runtime_function_array;
   UNWIND_INFO *unwind_info_array;
-} Encoded_Rdata_Section;
+} Encoded_Data_Section;
 
-Encoded_Rdata_Section
-encode_rdata_section(
+Encoded_Data_Section
+encode_data_section(
   Program * program,
   IMAGE_SECTION_HEADER *header
 ) {
   #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
-  u64 expected_encoded_size = 0;
   program->memory.sections.data.base_rva = header->VirtualAddress;
 
-  {
-    // Volatile: This code estimates encoded size based on the code below
-    //           and needs to be modified accordingly
-    for (u64 i = 0; i < dyn_array_length(program->import_libraries); ++i) {
-      Import_Library *lib = dyn_array_get(program->import_libraries, i);
-      // Library names
-      u64 aligned_name_size = u64_align(lib->name.length + 1, 2);
-      expected_encoded_size += aligned_name_size;
-
-      expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
-
-      for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-        Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-        expected_encoded_size += sizeof(s16); // Ordinal Hint
-
-        // Symbol names
-        u64 aligned_symbol_name_size = u64_align(symbol->name.length + 1, 2);
-        expected_encoded_size += aligned_symbol_name_size;
-
-        expected_encoded_size += sizeof(u64); // IAT
-        expected_encoded_size += sizeof(u64); // Image thunk
-      }
-
-      expected_encoded_size += sizeof(u64); // End of IAT list
-      expected_encoded_size += sizeof(u64); // End of Image thunk list
-    }
-
-    // End of IMAGE_IMPORT_DESCRIPTOR list
-    expected_encoded_size += sizeof(IMAGE_IMPORT_DESCRIPTOR);
-
-    // Exception Directory Entry
-    expected_encoded_size += sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
-
-    // :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
-    expected_encoded_size = u64_align(expected_encoded_size, sizeof(u32));
-
-    // Unwind Info
-    expected_encoded_size += sizeof(UNWIND_INFO) * dyn_array_length(program->functions);
-  }
-
-  Virtual_Memory_Buffer *global_buffer = &program->memory.sections.data.buffer;
-  u64 global_data_size = u64_align(global_buffer->occupied, 16);
-  expected_encoded_size += global_data_size;
-
-  Encoded_Rdata_Section result = {
-    .buffer = fixed_buffer_make(.allocator = allocator_system, .capacity = expected_encoded_size),
+  Encoded_Data_Section result = {
+    .buffer = &program->memory.sections.data.buffer,
   };
 
-  Fixed_Buffer *buffer = result.buffer;
-
-  void *global_data = fixed_buffer_allocate_bytes(buffer, global_data_size, sizeof(s8));
-  memcpy(global_data, global_buffer->memory, global_buffer->occupied);
+  Virtual_Memory_Buffer *buffer = result.buffer;
 
   Bucket_Buffer *temp_buffer = bucket_buffer_make();
   Allocator *temp_allocator = bucket_buffer_allocator_make(temp_buffer);
@@ -132,11 +84,11 @@ encode_rdata_section(
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       dyn_array_push(pe32_lib->symbol_rvas, get_rva());
-      fixed_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
+      virtual_memory_buffer_append_s16(buffer, 0); // Ordinal Hint, value not required
       u64 name_size = symbol->name.length;
       u64 aligned_name_size = u64_align(name_size + 1, 2);
       memcpy(
-        fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
+        virtual_memory_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
         symbol->name.bytes,
         name_size
       );
@@ -154,10 +106,10 @@ encode_rdata_section(
       u32 offset = get_rva() - header->VirtualAddress;
       program_set_label_offset(program, fn->label32, offset);
       u32 symbol_rva = *dyn_array_get(pe32_lib->symbol_rvas, symbol_index);
-      fixed_buffer_append_u64(buffer, symbol_rva);
+      virtual_memory_buffer_append_u64(buffer, symbol_rva);
     }
 
-    fixed_buffer_append_u64(buffer, 0);
+    virtual_memory_buffer_append_u64(buffer, 0);
   }
   result.iat_size = (s32)buffer->occupied;
 
@@ -169,10 +121,10 @@ encode_rdata_section(
 
     for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
       u32 symbol_rva = *dyn_array_get(pe32_lib->symbol_rvas, symbol_index);
-      fixed_buffer_append_u64(buffer, symbol_rva);
+      virtual_memory_buffer_append_u64(buffer, symbol_rva);
     }
     // End of Image thunks list
-    fixed_buffer_append_u64(buffer, 0);
+    virtual_memory_buffer_append_u64(buffer, 0);
   }
 
   // Library Names
@@ -183,7 +135,7 @@ encode_rdata_section(
     u64 name_size = lib->name.length;
     u64 aligned_name_size = u64_align(name_size + 1, 2);
     memcpy(
-      fixed_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
+      virtual_memory_buffer_allocate_bytes(buffer, aligned_name_size, sizeof(s8)),
       lib->name.bytes,
       name_size
     );
@@ -196,7 +148,7 @@ encode_rdata_section(
     Import_Library_Pe32 *pe32_lib = dyn_array_get(pe32_libraries, i);
 
     IMAGE_IMPORT_DESCRIPTOR *image_import_descriptor =
-      fixed_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR);
+      virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR);
     *image_import_descriptor = (IMAGE_IMPORT_DESCRIPTOR) {
       .OriginalFirstThunk = pe32_lib->image_thunk_rva,
       .Name = pe32_lib->name_rva,
@@ -206,12 +158,12 @@ encode_rdata_section(
   result.import_directory_size = get_rva() - result.import_directory_rva;
 
   // End of IMAGE_IMPORT_DESCRIPTOR list
-  *fixed_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
+  *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
   // Exception Directory
 
   result.exception_directory_rva = get_rva();
-  result.runtime_function_array = fixed_buffer_allocate_bytes(
+  result.runtime_function_array = virtual_memory_buffer_allocate_bytes(
     buffer, sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions), sizeof(s8)
   );
   result.exception_directory_size = get_rva() - result.exception_directory_rva;
@@ -220,11 +172,9 @@ encode_rdata_section(
   buffer->occupied = u64_align(buffer->occupied, sizeof(u32));
 
   result.unwind_info_base_rva = get_rva();
-  result.unwind_info_array = fixed_buffer_allocate_bytes(
+  result.unwind_info_array = virtual_memory_buffer_allocate_bytes(
     buffer, sizeof(UNWIND_INFO) * dyn_array_length(program->functions), sizeof(s8)
   );
-
-  assert(buffer->occupied == expected_encoded_size);
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
@@ -243,7 +193,7 @@ Encoded_Text_Section
 encode_text_section(
   Execution_Context *context,
   IMAGE_SECTION_HEADER *header,
-  Encoded_Rdata_Section *encoded_rdata_section
+  Encoded_Data_Section *encoded_data_section
 ) {
   Program *program = context->program;
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
@@ -275,9 +225,9 @@ encode_text_section(
   //for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     //Function_Builder *builder = dyn_array_get(program->functions, i);
     //Function_Layout *layout = dyn_array_get(layouts, i);
-    //RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
-    //UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
-    //u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
+    //RUNTIME_FUNCTION *runtime_function = &encoded_data_section->runtime_function_array[i];
+    //UNWIND_INFO *unwind_info = &encoded_data_section->unwind_info_array[i];
+    //u32 unwind_info_rva = encoded_data_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
     //win32_fn_init_unwind_info(builder, layout, unwind_info, runtime_function, unwind_info_rva);
   //}
 
@@ -334,7 +284,7 @@ write_executable(
   // Sections
   IMAGE_SECTION_HEADER sections[] = {
     {
-      .Name = ".rdata",
+      .Name = ".data",
       .Misc = {0},
       .VirtualAddress = 0,
       .SizeOfRawData = 0,
@@ -366,24 +316,24 @@ write_executable(
   file_size_of_headers = s32_align(file_size_of_headers, PE32_FILE_ALIGNMENT);
   s32 virtual_size_of_headers = s32_align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
 
-  // Prepare .rdata section
-  IMAGE_SECTION_HEADER *rdata_section_header = &sections[0];
-  rdata_section_header->PointerToRawData = file_size_of_headers;
-  rdata_section_header->VirtualAddress = virtual_size_of_headers;
-  Encoded_Rdata_Section encoded_rdata_section = encode_rdata_section(
-    program, rdata_section_header
+  // Prepare .data section
+  IMAGE_SECTION_HEADER *data_section_header = &sections[0];
+  data_section_header->PointerToRawData = file_size_of_headers;
+  data_section_header->VirtualAddress = virtual_size_of_headers;
+  Encoded_Data_Section encoded_data_section = encode_data_section(
+    program, data_section_header
   );
-  Fixed_Buffer *rdata_section_buffer = encoded_rdata_section.buffer;
+  Virtual_Memory_Buffer *data_section_buffer = encoded_data_section.buffer;
 
   // Prepare .text section
   IMAGE_SECTION_HEADER *text_section_header = &sections[1];
   text_section_header->PointerToRawData =
-    rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
+    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
   text_section_header->VirtualAddress =
-    rdata_section_header->VirtualAddress +
-    s32_align(rdata_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
+    data_section_header->VirtualAddress +
+    s32_align(data_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
   Encoded_Text_Section encoded_text_section = encode_text_section(
-    context, text_section_header, &encoded_rdata_section
+    context, text_section_header, &encoded_data_section
   );
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
 
@@ -394,7 +344,7 @@ write_executable(
 
   u64 max_exe_buffer =
     file_size_of_headers +
-    rdata_section_header->SizeOfRawData +
+    data_section_header->SizeOfRawData +
     text_section_header->SizeOfRawData;
   Fixed_Buffer *exe_buffer = fixed_buffer_make(
     .allocator = allocator_system,
@@ -425,7 +375,7 @@ write_executable(
   *optional_header = (IMAGE_OPTIONAL_HEADER64) {
     .Magic = IMAGE_NT_OPTIONAL_HDR64_MAGIC,
     .SizeOfCode = text_section_header->SizeOfRawData,
-    .SizeOfInitializedData = rdata_section_header->SizeOfRawData,
+    .SizeOfInitializedData = data_section_header->SizeOfRawData,
     .AddressOfEntryPoint = encoded_text_section.entry_point_rva,
     .BaseOfCode = text_section_header->VirtualAddress,
     .ImageBase = 0x0000000140000000, // Does not matter as we are using dynamic base
@@ -454,33 +404,33 @@ write_executable(
     .DataDirectory = {0},
   };
   optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
-    encoded_rdata_section.iat_rva;
+    encoded_data_section.iat_rva;
   optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
-    encoded_rdata_section.iat_size;
+    encoded_data_section.iat_size;
 
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress =
-    encoded_rdata_section.import_directory_rva;
+    encoded_data_section.import_directory_rva;
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
-    encoded_rdata_section.import_directory_size;
+    encoded_data_section.import_directory_size;
 
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
-    encoded_rdata_section.exception_directory_rva;
+    encoded_data_section.exception_directory_rva;
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].Size =
-    encoded_rdata_section.exception_directory_size;
+    encoded_data_section.exception_directory_size;
 
   // Write out sections
   for (u32 i = 0; i < countof(sections); ++i) {
     *fixed_buffer_allocate_unaligned(exe_buffer, IMAGE_SECTION_HEADER) = sections[i];
   }
 
-  // .rdata segment
-  exe_buffer->occupied = rdata_section_header->PointerToRawData;
-  s8 *rdata_memory = fixed_buffer_allocate_bytes(
-    exe_buffer, rdata_section_buffer->occupied, sizeof(s8)
+  // .data segment
+  exe_buffer->occupied = data_section_header->PointerToRawData;
+  s8 *data_memory = fixed_buffer_allocate_bytes(
+    exe_buffer, data_section_buffer->occupied, sizeof(s8)
   );
-  memcpy(rdata_memory, rdata_section_buffer->memory, rdata_section_buffer->occupied);
+  memcpy(data_memory, data_section_buffer->memory, data_section_buffer->occupied);
   exe_buffer->occupied =
-    rdata_section_header->PointerToRawData + rdata_section_header->SizeOfRawData;
+    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
 
   // .text segment
   exe_buffer->occupied = text_section_header->PointerToRawData;
@@ -498,7 +448,5 @@ write_executable(
   fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
   fclose(file);
 
-  virtual_memory_buffer_deinit(&encoded_text_section.buffer);
-  fixed_buffer_destroy(rdata_section_buffer);
   fixed_buffer_destroy(exe_buffer);
 }
