@@ -41,10 +41,12 @@ typedef struct {
   s32 iat_size;
   s32 import_directory_rva;
   s32 import_directory_size;
-  s32 exception_directory_rva;
+
   s32 exception_directory_size;
-  s32 unwind_info_base_rva;
+  s32 exception_directory_offset_in_section;
   RUNTIME_FUNCTION *runtime_function_array;
+
+  s32 unwind_info_base_rva;
   UNWIND_INFO *unwind_info_array;
 } Encoded_Data_Section;
 
@@ -55,10 +57,11 @@ encode_data_section(
 ) {
   #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
-  program->memory.sections.data.base_rva = header->VirtualAddress;
+  Section *section = &program->memory.sections.data;
+  section->base_rva = header->VirtualAddress;
 
   Encoded_Data_Section result = {
-    .buffer = &program->memory.sections.data.buffer,
+    .buffer = &section->buffer,
   };
 
   Virtual_Memory_Buffer *buffer = result.buffer;
@@ -161,12 +164,12 @@ encode_data_section(
   *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
   // Exception Directory
-
-  result.exception_directory_rva = get_rva();
+  result.exception_directory_offset_in_section = u64_to_s32(buffer->occupied);
+  result.exception_directory_size =
+    u64_to_u32(sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions));
   result.runtime_function_array = virtual_memory_buffer_allocate_bytes(
-    buffer, sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions), sizeof(s8)
+    buffer, result.exception_directory_size, _Alignof(RUNTIME_FUNCTION)
   );
-  result.exception_directory_size = get_rva() - result.exception_directory_rva;
 
   // :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
   buffer->occupied = u64_align(buffer->occupied, sizeof(u32));
@@ -413,8 +416,10 @@ write_executable(
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
     encoded_data_section.import_directory_size;
 
-  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
-    encoded_data_section.exception_directory_rva;
+  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress = (
+    program->memory.sections.data.base_rva +
+    encoded_data_section.exception_directory_offset_in_section
+  );
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].Size =
     encoded_data_section.exception_directory_size;
 
