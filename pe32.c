@@ -311,16 +311,6 @@ write_executable(
   // Sections
   IMAGE_SECTION_HEADER sections[] = {
     {
-      .Name = ".data",
-      .Misc = {0},
-      .VirtualAddress = 0,
-      .SizeOfRawData = 0,
-      .PointerToRawData = 0,
-      .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->memory.sections.data.permissions
-      ),
-    },
-    {
       .Name = ".text",
       .Misc = {0},
       .VirtualAddress = 0,
@@ -328,6 +318,16 @@ write_executable(
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
         program->memory.sections.code.permissions
+      ),
+    },
+    {
+      .Name = ".data",
+      .Misc = {0},
+      .VirtualAddress = 0,
+      .SizeOfRawData = 0,
+      .PointerToRawData = 0,
+      .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
+        program->memory.sections.data.permissions
       ),
     },
     {0}
@@ -346,18 +346,8 @@ write_executable(
 
   Encoded_Exception_Directory exception_directory = encode_exception_directory(context);
 
-  // Prepare .data section
-  IMAGE_SECTION_HEADER *data_section_header = &sections[0];
-  data_section_header->PointerToRawData = offsets.file;
-  data_section_header->VirtualAddress = offsets.virtual;
-  Encoded_Data_Section encoded_data_section = encode_data_section(
-    program, data_section_header
-  );
-  Virtual_Memory_Buffer *data_section_buffer = encoded_data_section.buffer;
-  offsets = pe32_offset_after_size(&offsets, data_section_header->SizeOfRawData);
-
   // Prepare .text section
-  IMAGE_SECTION_HEADER *text_section_header = &sections[1];
+  IMAGE_SECTION_HEADER *text_section_header = &sections[0];
   text_section_header->PointerToRawData = offsets.file;
   text_section_header->VirtualAddress = offsets.virtual;
   Encoded_Text_Section encoded_text_section = encode_text_section(
@@ -365,6 +355,16 @@ write_executable(
   );
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
   offsets = pe32_offset_after_size(&offsets, text_section_header->SizeOfRawData);
+
+  // Prepare .data section
+  IMAGE_SECTION_HEADER *data_section_header = &sections[1];
+  data_section_header->PointerToRawData = offsets.file;
+  data_section_header->VirtualAddress = offsets.virtual;
+  Encoded_Data_Section encoded_data_section = encode_data_section(
+    program, data_section_header
+  );
+  Virtual_Memory_Buffer *data_section_buffer = encoded_data_section.buffer;
+  offsets = pe32_offset_after_size(&offsets, data_section_header->SizeOfRawData);
 
   // After all the sections are encoded we should know all the offsets
   // and can patch all the label locations
@@ -451,15 +451,6 @@ write_executable(
     *fixed_buffer_allocate_unaligned(exe_buffer, IMAGE_SECTION_HEADER) = sections[i];
   }
 
-  // .data segment
-  exe_buffer->occupied = data_section_header->PointerToRawData;
-  s8 *data_memory = fixed_buffer_allocate_bytes(
-    exe_buffer, data_section_buffer->occupied, sizeof(s8)
-  );
-  memcpy(data_memory, data_section_buffer->memory, data_section_buffer->occupied);
-  exe_buffer->occupied =
-    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
-
   // .text segment
   exe_buffer->occupied = text_section_header->PointerToRawData;
   s8 *code_memory = fixed_buffer_allocate_bytes(
@@ -468,6 +459,15 @@ write_executable(
   memcpy(code_memory, text_section_buffer->memory, text_section_buffer->occupied);
   exe_buffer->occupied =
     text_section_header->PointerToRawData + text_section_header->SizeOfRawData;
+
+  // .data segment
+  exe_buffer->occupied = data_section_header->PointerToRawData;
+  s8 *data_memory = fixed_buffer_allocate_bytes(
+    exe_buffer, data_section_buffer->occupied, sizeof(s8)
+  );
+  memcpy(data_memory, data_section_buffer->memory, data_section_buffer->occupied);
+  exe_buffer->occupied =
+    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
 
   /////////
 
