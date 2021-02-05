@@ -271,14 +271,15 @@ encode_text_section(
     fn_encode(program, buffer, builder, layout);
   }
 
-  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout *layout = dyn_array_get(layouts, i);
-    RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
-    UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
-    u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
-    win32_fn_init_unwind_info(builder, layout, unwind_info, runtime_function, unwind_info_rva);
-  }
+  // FIXME write out UNWIND INFO
+  //for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    //Function_Builder *builder = dyn_array_get(program->functions, i);
+    //Function_Layout *layout = dyn_array_get(layouts, i);
+    //RUNTIME_FUNCTION *runtime_function = &encoded_rdata_section->runtime_function_array[i];
+    //UNWIND_INFO *unwind_info = &encoded_rdata_section->unwind_info_array[i];
+    //u32 unwind_info_rva = encoded_rdata_section->unwind_info_base_rva + (s32)(sizeof(UNWIND_INFO) * i);
+    //win32_fn_init_unwind_info(builder, layout, unwind_info, runtime_function, unwind_info_rva);
+  //}
 
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations

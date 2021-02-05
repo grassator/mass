@@ -24,14 +24,10 @@ win32_section_permissions_to_virtual_protect_flags(
 }
 
 typedef struct {
-  const Function_Builder *builder;
-  Jit *jit;
+  // :ExceptionDataAlignment
+  _Alignas(DWORD) const Function_Builder *builder;
+  _Alignas(DWORD) Jit *jit;
 } Win32_Exception_Data;
-
-static_assert(
-  sizeof(Win32_Exception_Data) <= UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE,
-  Win32_Exception_Data__must_fit_into_UNWIND_INFO
-);
 
 EXCEPTION_DISPOSITION
 win32_program_test_exception_handler(
@@ -233,7 +229,7 @@ win32_program_jit(
     *info = (Win32_Jit_Info) {
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
-      .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
+      .trampoline_rva = make_trampoline(
         program, code_buffer, (u64)win32_program_test_exception_handler
       ),
       .function_table = dyn_array_make(
@@ -294,16 +290,24 @@ win32_program_jit(
     fn_encode(program, code_buffer, builder, &layout);
 
     RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
-    u64 unwind_data_rva = memory->sections.data.base_rva + data_buffer->occupied;
-    UNWIND_INFO *unwind_info =
-      virtual_memory_buffer_allocate_bytes(data_buffer, sizeof(UNWIND_INFO), sizeof(DWORD));
-    win32_fn_init_unwind_info(builder, &layout, unwind_info, function, u64_to_u32(unwind_data_rva));
+    UNWIND_INFO *unwind_info = win32_init_runtime_info_for_function(
+      builder, &layout, function, &memory->sections.data
+    );
+    // Handler (if present) must immediately follow the unwind info struct
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
-      u64 exception_handler_index = u64_align(unwind_info->CountOfCodes, 2);
-      u32 *exception_handler_address = (u32 *)&unwind_info->UnwindCode[exception_handler_index];
-      *exception_handler_address = info->trampoline_rva;
-      Win32_Exception_Data *exception_data = (void *)(exception_handler_address + 1);
+      u64 offset = virtual_memory_buffer_append_u32(&memory->sections.data.buffer, info->trampoline_rva);
+      assert(offset % sizeof(DWORD) == 0);
+      // :ExceptionDataAlignment
+      // This data might end up misaligned on 64 bit OSes because UNWIND_INFO
+      // as well as trampoline_rva are both 32-bit aligned while exception
+      // data contains addresses which are 64 bits. Whether it is misaligned or
+      // not would depend on the count of unwind codes so the best we can do is
+      // to just mark the struct as packed and let the compiler deal with
+      // potentially misaligned reads and writes.
+      Win32_Exception_Data *exception_data = virtual_memory_buffer_allocate_bytes(
+        &memory->sections.data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
+      );
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
         .jit = jit,

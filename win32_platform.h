@@ -169,13 +169,6 @@ typedef union {
   u16 DataForPreviousCode;
 } UNWIND_CODE;
 
-#define UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE sizeof(void *) * 2
-
-#define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK 2
-#define UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_NON_VOLATILE_REGISTER_PUSH 16
-#define UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES (sizeof(u32) / sizeof(UNWIND_CODE))
-#define UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES  (UNWIND_INFO_EXCEPTION_DATA_MAX_SIZE / sizeof(UNWIND_CODE))
-
 typedef struct {
   u8 Version       : 3;
   u8 Flags         : 5;
@@ -183,26 +176,23 @@ typedef struct {
   u8 CountOfCodes;
   u8 FrameRegister : 4;
   u8 FrameOffset   : 4;
-  // FIXME actually turn this into a variadic struct with getter functions
-  // :RegisterAllocation need to add more reserved space for UnwindCode
-  UNWIND_CODE UnwindCode[
-    UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_STACK +
-    UNWIND_INFO_MAX_COUNT_OF_CODES_FOR_NON_VOLATILE_REGISTER_PUSH +
-    UNWIND_INFO_EXCEPTION_HANDLER_SIZE_IN_UNWIND_CODES +
-    UNWIND_INFO_EXCEPTION_DATA_SIZE_IN_INWIND_CODES
-  ];
+  // :UnwindCodeAlignment
+  // This struct must be DWORD aligned which means
+  // there is always an even unwind codes allocated
+  UNWIND_CODE UnwindCode[];
 } UNWIND_INFO;
 
-void
-win32_fn_init_unwind_info(
+UNWIND_INFO *
+win32_init_runtime_info_for_function(
   const Function_Builder *builder,
   const Function_Layout *layout,
-  UNWIND_INFO *unwind_info,
-  RUNTIME_FUNCTION *function_exception_info,
-  u32 unwind_data_rva
+  RUNTIME_FUNCTION *function,
+  Section *section
 ) {
-  assert(unwind_info);
-  assert(function_exception_info);
+  u32 unwind_data_rva = u64_to_u32(section->base_rva + section->buffer.occupied);
+  UNWIND_INFO *unwind_info = virtual_memory_buffer_allocate_bytes(
+    &section->buffer, sizeof(UNWIND_INFO), sizeof(DWORD)
+  );
   *unwind_info = (UNWIND_INFO) {
     .Version = 1,
     .Flags = 0,
@@ -212,17 +202,22 @@ win32_fn_init_unwind_info(
     .FrameOffset = 0,
   };
 
+  #define WIN32_WRITE_UNWIND_CODE(...)\
+    do {\
+      *virtual_memory_buffer_allocate(&section->buffer, UNWIND_CODE) = (__VA_ARGS__);\
+      unwind_code_index++;\
+    } while(0)
+
   // :Win32UnwindCodes Must match what happens in the function encoding
   u8 unwind_code_index = 0;
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
-        unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE) {
+        WIN32_WRITE_UNWIND_CODE((UNWIND_CODE) {
           .CodeOffset = layout->volatile_register_push_offsets[unwind_code_index],
           .UnwindOp = UWOP_PUSH_NONVOL,
           .OpInfo = s32_to_u8(reg_index),
-        };
-        unwind_code_index++;
+        });
       }
     }
   }
@@ -231,33 +226,41 @@ win32_fn_init_unwind_info(
     assert(layout->stack_reserve >= 8);
     assert(layout->stack_reserve % 8 == 0);
     if (layout->stack_reserve <= 128) {
-      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
+      WIN32_WRITE_UNWIND_CODE((UNWIND_CODE){
         .CodeOffset = layout->stack_allocation_offset_in_prolog,
         .UnwindOp = UWOP_ALLOC_SMALL,
         .OpInfo = (layout->stack_reserve - 8) / 8,
-      };
-      unwind_code_index++;
+      });
     } else {
-      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
+      WIN32_WRITE_UNWIND_CODE((UNWIND_CODE){
         .CodeOffset = layout->stack_allocation_offset_in_prolog,
         .UnwindOp = UWOP_ALLOC_LARGE,
         .OpInfo = 0,
-      };
-      unwind_code_index++;
-      unwind_info->UnwindCode[unwind_code_index] = (UNWIND_CODE){
+      });
+      WIN32_WRITE_UNWIND_CODE((UNWIND_CODE){
         .DataForPreviousCode = u32_to_u16(layout->stack_reserve / 8),
-      };
-      unwind_code_index++;
+      });
       // TODO support 512k + allocations
     }
-    unwind_info->CountOfCodes = unwind_code_index;
   }
-  // TODO do this on the outside
-  *function_exception_info = (RUNTIME_FUNCTION) {
+  unwind_info->CountOfCodes = unwind_code_index;
+
+  // :UnwindCodeAlignment
+  if (unwind_info->CountOfCodes % 2) {
+    // Write a dummy code to ensure alignment
+    WIN32_WRITE_UNWIND_CODE((UNWIND_CODE){0});
+  }
+
+  assert(section->buffer.occupied % sizeof(DWORD) == 0);
+
+  *function = (RUNTIME_FUNCTION) {
     .BeginAddress = layout->begin_rva,
     .EndAddress = layout->end_rva,
     .UnwindData = unwind_data_rva,
   };
+
+  return unwind_info;
+  #undef WIN32_WRITE_UNWIND_CODE
 }
 
 #endif
