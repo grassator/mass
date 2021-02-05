@@ -457,8 +457,6 @@ write_executable(
     exe_buffer, text_section_buffer->occupied, sizeof(s8)
   );
   memcpy(code_memory, text_section_buffer->memory, text_section_buffer->occupied);
-  exe_buffer->occupied =
-    text_section_header->PointerToRawData + text_section_header->SizeOfRawData;
 
   // .data segment
   exe_buffer->occupied = data_section_header->PointerToRawData;
@@ -466,8 +464,11 @@ write_executable(
     exe_buffer, data_section_buffer->occupied, sizeof(s8)
   );
   memcpy(data_memory, data_section_buffer->memory, data_section_buffer->occupied);
-  exe_buffer->occupied =
-    data_section_header->PointerToRawData + data_section_header->SizeOfRawData;
+
+  // Set the occupied to the expected end of file to ensure
+  // correct alignment of the file size
+  exe_buffer->occupied = offsets.file;
+  assert(exe_buffer->occupied % PE32_FILE_ALIGNMENT == 0);
 
   /////////
 
