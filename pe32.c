@@ -42,10 +42,6 @@ typedef struct {
   s32 import_directory_rva;
   s32 import_directory_size;
 
-  s32 exception_directory_size;
-  s32 exception_directory_offset_in_section;
-  RUNTIME_FUNCTION *runtime_function_array;
-
   s32 unwind_info_base_rva;
   UNWIND_INFO *unwind_info_array;
 } Encoded_Data_Section;
@@ -163,26 +159,42 @@ encode_data_section(
   // End of IMAGE_IMPORT_DESCRIPTOR list
   *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
 
-  // Exception Directory
-  result.exception_directory_offset_in_section = u64_to_s32(buffer->occupied);
-  result.exception_directory_size =
-    u64_to_u32(sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions));
-  result.runtime_function_array = virtual_memory_buffer_allocate_bytes(
-    buffer, result.exception_directory_size, _Alignof(RUNTIME_FUNCTION)
-  );
 
-  // :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
-  buffer->occupied = u64_align(buffer->occupied, sizeof(u32));
-
-  result.unwind_info_base_rva = get_rva();
-  result.unwind_info_array = virtual_memory_buffer_allocate_bytes(
-    buffer, sizeof(UNWIND_INFO) * dyn_array_length(program->functions), sizeof(s8)
-  );
+  //result.unwind_info_base_rva = get_rva();
+  //// :UnwindInfoAlignment Unwind Info must be DWORD(u32) aligned
+  //result.unwind_info_array = virtual_memory_buffer_allocate_bytes(
+    //buffer, sizeof(UNWIND_INFO) * dyn_array_length(program->functions), sizeof(DWORD)
+  //);
 
   header->Misc.VirtualSize = u64_to_s32(buffer->occupied);
   header->SizeOfRawData = u64_to_s32(u64_align(buffer->occupied, PE32_FILE_ALIGNMENT));
 
   bucket_buffer_destroy(temp_buffer);
+
+  return result;
+}
+
+typedef struct {
+  Section *section;
+  s32 offset;
+  s32 size;
+  RUNTIME_FUNCTION *runtime_function_array;
+} Encoded_Exception_Directory;
+
+Encoded_Exception_Directory
+encode_exception_directory(
+  Execution_Context *context
+) {
+  Program *program = context->program;
+  Section *section = &program->memory.sections.data;
+
+  Encoded_Exception_Directory result = {0};
+  result.section = section;
+  result.offset = u64_to_s32(section->buffer.occupied);
+  u64 size = sizeof(RUNTIME_FUNCTION) * dyn_array_length(program->functions);
+  result.size = u64_to_s32(size);
+  result.runtime_function_array =
+    virtual_memory_buffer_allocate_bytes(&section->buffer, size, _Alignof(RUNTIME_FUNCTION));
 
   return result;
 }
@@ -196,7 +208,7 @@ Encoded_Text_Section
 encode_text_section(
   Execution_Context *context,
   IMAGE_SECTION_HEADER *header,
-  Encoded_Data_Section *encoded_data_section
+  Encoded_Exception_Directory *exception_directory
 ) {
   Program *program = context->program;
   u64 max_code_size = estimate_max_code_size_in_bytes(program);
@@ -319,6 +331,8 @@ write_executable(
   file_size_of_headers = s32_align(file_size_of_headers, PE32_FILE_ALIGNMENT);
   s32 virtual_size_of_headers = s32_align(file_size_of_headers, PE32_SECTION_ALIGNMENT);
 
+  Encoded_Exception_Directory exception_directory = encode_exception_directory(context);
+
   // Prepare .data section
   IMAGE_SECTION_HEADER *data_section_header = &sections[0];
   data_section_header->PointerToRawData = file_size_of_headers;
@@ -336,7 +350,7 @@ write_executable(
     data_section_header->VirtualAddress +
     s32_align(data_section_header->SizeOfRawData, PE32_SECTION_ALIGNMENT);
   Encoded_Text_Section encoded_text_section = encode_text_section(
-    context, text_section_header, &encoded_data_section
+    context, text_section_header, &exception_directory
   );
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
 
@@ -416,12 +430,10 @@ write_executable(
   optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
     encoded_data_section.import_directory_size;
 
-  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress = (
-    program->memory.sections.data.base_rva +
-    encoded_data_section.exception_directory_offset_in_section
-  );
+  optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
+    exception_directory.section->base_rva + exception_directory.offset;
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].Size =
-    encoded_data_section.exception_directory_size;
+    exception_directory.size;
 
   // Write out sections
   for (u32 i = 0; i < countof(sections); ++i) {
