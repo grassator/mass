@@ -157,8 +157,11 @@ encode_data_section(
   }
   result.import_directory_size = get_rva() - result.import_directory_rva;
 
-  // End of IMAGE_IMPORT_DESCRIPTOR list
-  *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) = (IMAGE_IMPORT_DESCRIPTOR) {0};
+  if (result.import_directory_size) {
+    // End of IMAGE_IMPORT_DESCRIPTOR list
+    *virtual_memory_buffer_allocate_unaligned(buffer, IMAGE_IMPORT_DESCRIPTOR) =
+      (IMAGE_IMPORT_DESCRIPTOR) {0};
+  }
 
   // Exception Directory
   {
@@ -401,15 +404,24 @@ write_executable(
     .NumberOfRvaAndSizes = IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
     .DataDirectory = {0},
   };
-  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
-    encoded_data_section.iat_rva;
-  optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
-    encoded_data_section.iat_size;
 
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress =
-    encoded_data_section.import_directory_rva;
-  optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
-    encoded_data_section.import_directory_size;
+  // :ZeroSizeDirectory
+  // If the directory is empty, the RVA also must be 0
+  if (encoded_data_section.iat_size) {
+    optional_header->DataDirectory[IAT_DIRECTORY_INDEX].VirtualAddress =
+      encoded_data_section.iat_rva;
+    optional_header->DataDirectory[IAT_DIRECTORY_INDEX].Size =
+      encoded_data_section.iat_size;
+  }
+
+  // :ZeroSizeDirectory
+  // If the directory is empty, the RVA also must be 0
+  if (encoded_data_section.import_directory_size) {
+    optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].VirtualAddress =
+      encoded_data_section.import_directory_rva;
+    optional_header->DataDirectory[IMPORT_DIRECTORY_INDEX].Size =
+      encoded_data_section.import_directory_size;
+  }
 
   optional_header->DataDirectory[EXCEPTION_DIRECTORY_INDEX].VirtualAddress =
     encoded_data_section.exception_directory_rva;
