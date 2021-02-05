@@ -246,10 +246,6 @@ encode_text_section(
     //win32_fn_init_unwind_info(builder, layout, unwind_info, runtime_function, unwind_info_rva);
   //}
 
-  // After all the functions are encoded we should know all the offsets
-  // and can patch all the label locations
-  program_patch_labels(program);
-
   if (!found_entry_point) {
     panic("Internal error: Could not find entry point in the list of program functions");
   }
@@ -353,6 +349,10 @@ write_executable(
     context, text_section_header, &exception_directory
   );
   Virtual_Memory_Buffer *text_section_buffer = &encoded_text_section.buffer;
+
+  // After all the sections are encoded we should know all the offsets
+  // and can patch all the label locations
+  program_patch_labels(program);
 
   // Calculate total size of image in memory once loaded
   s32 virtual_size_of_image =
