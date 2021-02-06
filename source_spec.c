@@ -498,9 +498,9 @@ spec("source") {
         "main :: () -> () { if (1 < 0) { 0 } 42; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      // TODO improve error message
-      //Parse_Error *error = &test_context.result->Error.details;
-      //check(slice_equal(slice_literal("Could not parse the expression"), error->message));
+      Parse_Error *error = &test_context.result->Error.details;
+      slice_print(error->message);
+      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
     }
   }
 
