@@ -675,6 +675,11 @@ main(void) {
       { "Descriptor *", "descriptor" },
       { "Operand", "operand" },
     }),
+    struct_fields("Default_Value", (Struct_Item[]){
+      { "Slice", "name" },
+      { "Descriptor *", "descriptor" },
+      { "Token_View", "expression" },
+    }),
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){

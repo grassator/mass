@@ -67,13 +67,23 @@ same_type(
         if (a_arg->tag != b_arg->tag) return false;
         switch(a_arg->tag) {
           case Function_Argument_Tag_Any_Of_Type: {
-            return same_type(a_arg->Any_Of_Type.descriptor, b_arg->Any_Of_Type.descriptor);
+            if(!same_type(a_arg->Any_Of_Type.descriptor, b_arg->Any_Of_Type.descriptor)) {
+              return false;
+            }
+            break;
+          }
+          case Function_Argument_Tag_Default_Value: {
+            if(!same_type(a_arg->Default_Value.descriptor, b_arg->Default_Value.descriptor)) {
+              return false;
+            }
+            break;
           }
           case Function_Argument_Tag_Exact: {
-            return (
+            if(!(
               same_type(a_arg->Exact.descriptor, b_arg->Exact.descriptor) &&
               operand_equal(&a_arg->Exact.operand, &b_arg->Exact.operand)
-            );
+            )) return false;
+            break;
           }
         }
         panic("Unknown argument tag");
@@ -1001,6 +1011,10 @@ function_argument_value_at_index_internal(
     }
     case Function_Argument_Tag_Exact: {
       arg_descriptor = argument->Exact.descriptor;
+      break;
+    }
+    case Function_Argument_Tag_Default_Value: {
+      arg_descriptor = argument->Default_Value.descriptor;
       break;
     }
   }

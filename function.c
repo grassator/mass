@@ -1262,11 +1262,15 @@ ensure_compiled_function_body(
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     switch(argument->tag) {
+      case Function_Argument_Tag_Default_Value:
       case Function_Argument_Tag_Any_Of_Type: {
         Value *arg_value = function_argument_value_at_index(
           context->allocator, function, index, Function_Argument_Mode_Body
         );
-        scope_define(function->scope, argument->Any_Of_Type.name, (Scope_Entry) {
+        Slice name = argument->tag == Function_Argument_Tag_Default_Value
+          ? argument->Default_Value.name
+          : argument->Any_Of_Type.name;
+        scope_define(function->scope, name, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
           .Value.value = arg_value,
         });
@@ -1350,7 +1354,6 @@ call_function_overload(
   Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
   assert(to_call_descriptor->tag == Descriptor_Tag_Function);
   Descriptor_Function *descriptor = &to_call_descriptor->Function;
-  assert(dyn_array_length(descriptor->arguments) == dyn_array_length(arguments));
 
   ensure_compiled_function_body(context, to_call);
 
@@ -1375,11 +1378,30 @@ call_function_overload(
     }
   }
 
-  for (u64 i = 0; i < dyn_array_length(arguments); ++i) {
-    Value *source_arg = *dyn_array_get(arguments, i);
+  Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
+  for (u64 i = 0; i < dyn_array_length(descriptor->arguments); ++i) {
+    Function_Argument *target_arg_definition = dyn_array_get(descriptor->arguments, i);
     Value *target_arg = function_argument_value_at_index(
       context->allocator, descriptor, i, Function_Argument_Mode_Call
     );
+    Value *source_arg;
+    if (i >= dyn_array_length(arguments)) {
+      assert(target_arg_definition->tag == Function_Argument_Tag_Default_Value);
+      // FIXME do not force the result on the stack
+      source_arg = reserve_stack(
+        context->allocator, context->builder, target_arg_definition->Default_Value.descriptor
+      );
+      Execution_Context arg_context = *context;
+      arg_context.scope = default_arguments_scope;
+      token_parse_expression(
+        &arg_context,
+        target_arg_definition->Default_Value.expression,
+        source_arg,
+        Expression_Parse_Mode_Default
+      );
+    } else {
+      source_arg = *dyn_array_get(arguments, i);
+    }
     if (
       descriptor_byte_size(source_arg->descriptor) <= 8 ||
       // TODO Number literals are larger than a register, but only converted into
@@ -1462,19 +1484,36 @@ calculate_arguments_match_score(
 ) {
   enum {
     // TODO consider relationship between casts and literal types
-    Score_Exact_Literal = 1000000,
-    Score_Exact_Type = 1000,
+    Score_Exact_Literal = 1000 * 1000 * 1000,
+    Score_Exact_Type = 1000 * 1000,
+    Score_Exact_Default = 1000,
     Score_Cast = 1,
   };
   assert(dyn_array_length(arguments) < 1000);
   s64 score = 0;
-  for (u64 arg_index = 0; arg_index < dyn_array_length(arguments); ++arg_index) {
-    Value *source_arg = *dyn_array_get(arguments, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->arguments); ++arg_index) {
     Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
+    Value *source_arg;
+    Value fake_source_value = {0};
+    if (arg_index >= dyn_array_length(arguments)) {
+      if (target_arg->tag != Function_Argument_Tag_Default_Value) {
+        return -1;
+      }
+      fake_source_value = (Value) {
+        .descriptor = target_arg->Default_Value.descriptor,
+        .operand = {.tag = Operand_Tag_Any },
+      };
+      source_arg = &fake_source_value;
+    } else {
+      source_arg = *dyn_array_get(arguments, arg_index);
+    }
     switch(target_arg->tag) {
+      case Function_Argument_Tag_Default_Value:
       case Function_Argument_Tag_Any_Of_Type: {
         Value fake_target_value = {
-          .descriptor = target_arg->Any_Of_Type.descriptor,
+          .descriptor = target_arg->tag == Function_Argument_Tag_Default_Value
+            ? target_arg->Default_Value.descriptor
+            : target_arg->Any_Of_Type.descriptor,
           .operand = {.tag = Operand_Tag_Any },
         };
         if (same_value_type(&fake_target_value, source_arg)) {

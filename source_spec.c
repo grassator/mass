@@ -99,7 +99,9 @@ test_program_inline_source_function(
   jit_init(&jit, context->program);
   program_jit(&jit);
   if (!spec_check_mass_result(context->result)) return 0;
-  return value_as_function(&jit, value);
+  fn_type_opaque fn = value_as_function(&jit, value);
+  if (!spec_check_mass_result(context->result)) return 0;
+  return fn;
 }
 
 
@@ -652,6 +654,17 @@ spec("source") {
       check(slice_starts_with(
         error->message, slice_literal("Could not decide which overload to pick")
       ));
+    }
+
+    it("should support default arguments") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "test_default :: (x : s64, y : s64 = 20) -> (s64) { x + y }\n"
+        "test :: () -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 42);
     }
 
     it("should be able to have an explicit return") {

@@ -1517,18 +1517,36 @@ token_match_argument(
   Function_Argument arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
-  Token_View lhs;
-  Token_View rhs;
+
+  Token_View default_expression;
+  Token_View definition;
+
+  bool has_default_value = false;
+  if (token_maybe_split_on_operator(
+    view, slice_literal("="), &definition, &default_expression, &(Token *){0}
+  )) {
+    has_default_value = true;
+  } else {
+    definition = view;
+  }
+
+  Token_View type_expression;
+  Token_View name_tokens;
   const Token *operator;
-  if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
-    if (lhs.length == 0) {
+  if (token_maybe_split_on_operator(
+    definition, slice_literal(":"), &name_tokens, &type_expression, &operator
+  )) {
+    if (name_tokens.length == 0) {
       context_error_snprintf(
         context, operator->source_range,
         "':' operator expects an identifier on the left hand side"
       );
       goto err;
     }
-    if (lhs.length > 1 || !token_match(lhs.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })) {
+    if (
+      name_tokens.length > 1 ||
+      !token_match(name_tokens.tokens[0], &(Token_Pattern){ .tag = Token_Tag_Id })
+    ) {
       context_error_snprintf(
         context, operator->source_range,
         "':' operator expects only a single identifier on the left hand side"
@@ -1536,13 +1554,24 @@ token_match_argument(
       goto err;
     }
 
-    arg = (Function_Argument) {
-      .tag = Function_Argument_Tag_Any_Of_Type,
-      .Any_Of_Type = {
-        .descriptor = token_match_type(context, rhs),
-        .name = lhs.tokens[0]->source,
-      },
-    };
+    if (has_default_value) {
+      arg = (Function_Argument) {
+        .tag = Function_Argument_Tag_Default_Value,
+        .Default_Value = {
+          .descriptor = token_match_type(context, type_expression),
+          .name = name_tokens.tokens[0]->source,
+          .expression = default_expression,
+        },
+      };
+    } else {
+      arg = (Function_Argument) {
+        .tag = Function_Argument_Tag_Any_Of_Type,
+        .Any_Of_Type = {
+          .descriptor = token_match_type(context, type_expression),
+          .name = name_tokens.tokens[0]->source,
+        },
+      };
+    }
   } else {
     Value *value = value_any(context->allocator);
     compile_time_eval(context, view, value);
@@ -2887,7 +2916,7 @@ token_handle_function_call(
     Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
     Descriptor_Function *descriptor = &to_call_descriptor->Function;
-    if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
+    //if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == -1) continue; // no match
     if (score == match.score) {
@@ -2950,6 +2979,41 @@ token_handle_function_call(
               .Value.value = arg_value,
               .source_range = args_token->source_range,
             });
+            break;
+          }
+          case Function_Argument_Tag_Default_Value: {
+            if (i >= dyn_array_length(args)) {
+              // default value
+              Value *arg_value =
+                reserve_stack(context->allocator, context->builder, arg->Default_Value.descriptor);
+              {
+                Execution_Context arg_context = *context;
+                arg_context.scope = body_scope;
+                token_parse_expression(
+                  &arg_context,
+                  arg->Default_Value.expression,
+                  arg_value,
+                  Expression_Parse_Mode_Default
+                );
+              }
+              scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
+                .tag = Scope_Entry_Tag_Value,
+                .Value.value = arg_value,
+                .source_range = args_token->source_range,
+              });
+            } else {
+              // user-specified value
+              // TODO @CopyPaste from above
+              Value *arg_value = *dyn_array_get(args, i);
+              arg_value = maybe_coerce_number_literal_to_integer(
+                context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
+              );
+              scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
+                .tag = Scope_Entry_Tag_Value,
+                .Value.value = arg_value,
+                .source_range = args_token->source_range,
+              });
+            }
             break;
           }
         }
