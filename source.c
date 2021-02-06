@@ -2344,9 +2344,7 @@ token_process_function_literal(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  // FIXME This parent stuff is a bit weird
-  Scope *parent_scope = context->scope;
-  Scope *function_scope = scope_make(context->allocator, parent_scope);
+  Scope *function_scope = scope_make(context->allocator, context->scope);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {

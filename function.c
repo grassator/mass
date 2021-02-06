@@ -1259,6 +1259,7 @@ ensure_compiled_function_body(
   win32_set_volatile_registers_for_function(&builder);
 
   Execution_Context body_context = *context;
+  Scope *body_scope = scope_make(context->allocator, function->scope);
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     switch(argument->tag) {
@@ -1270,7 +1271,7 @@ ensure_compiled_function_body(
         Slice name = argument->tag == Function_Argument_Tag_Default_Value
           ? argument->Default_Value.name
           : argument->Any_Of_Type.name;
-        scope_define(function->scope, name, (Scope_Entry) {
+        scope_define(body_scope, name, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
           .Value.value = arg_value,
         });
@@ -1294,7 +1295,7 @@ ensure_compiled_function_body(
     function->returns.descriptor, Function_Argument_Mode_Body
   );
 
-  scope_define(function->scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
+  scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = return_value,
   });
@@ -1304,7 +1305,7 @@ ensure_compiled_function_body(
     .descriptor = &descriptor_void,
     .operand = code_label32(builder.code_block.end_label),
   };
-  scope_define(function->scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
+  scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = return_label_value,
   });
@@ -1324,14 +1325,14 @@ ensure_compiled_function_body(
 
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
-    scope_define(function->scope, function->returns.name, (Scope_Entry) {
+    scope_define(body_scope, function->returns.name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = return_value,
     });
   }
 
   // TODO Should this set compilation_mode?
-  body_context.scope = function->scope;
+  body_context.scope = body_scope;
   body_context.builder = &builder;
   token_parse_block_no_scope(&body_context, function->body, return_value);
 
@@ -1399,6 +1400,7 @@ call_function_overload(
         source_arg,
         Expression_Parse_Mode_Default
       );
+      MASS_ON_ERROR(*arg_context.result) return;
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
@@ -1415,6 +1417,28 @@ call_function_overload(
       Value *stack_value = reserve_stack(context->allocator, builder, source_arg->descriptor);
       assign(context, source_range, stack_value, source_arg);
       load_address(context, source_range, target_arg, stack_value);
+    }
+    Slice name;
+    switch(target_arg_definition->tag) {
+      case Function_Argument_Tag_Any_Of_Type: {
+        name = target_arg_definition->Any_Of_Type.name;
+        break;
+      }
+      case Function_Argument_Tag_Default_Value: {
+        name = target_arg_definition->Default_Value.name;
+        break;
+      }
+      default:
+      case Function_Argument_Tag_Exact: {
+        name = (Slice){0};
+        break;
+      }
+    }
+    if (name.length) {
+      scope_define(default_arguments_scope, name, (Scope_Entry) {
+        .tag = Scope_Entry_Tag_Value,
+        .Value.value = target_arg,
+      });
     }
   }
 
