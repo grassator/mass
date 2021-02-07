@@ -670,15 +670,11 @@ main(void) {
     struct_fields("Any_Of_Type", (Struct_Item[]){
       { "Slice", "name" },
       { "Descriptor *", "descriptor" },
+      { "Token_View", "maybe_default_expression" },
     }),
     struct_fields("Exact", (Struct_Item[]){
       { "Descriptor *", "descriptor" },
       { "Operand", "operand" },
-    }),
-    struct_fields("Default_Value", (Struct_Item[]){
-      { "Slice", "name" },
-      { "Descriptor *", "descriptor" },
-      { "Token_View", "expression" },
     }),
   }));
 

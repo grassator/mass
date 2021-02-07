@@ -485,29 +485,23 @@ typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 typedef enum {
   Function_Argument_Tag_Any_Of_Type = 0,
   Function_Argument_Tag_Exact = 1,
-  Function_Argument_Tag_Default_Value = 2,
 } Function_Argument_Tag;
 
 typedef struct {
   Slice name;
   Descriptor * descriptor;
+  Token_View maybe_default_expression;
 } Function_Argument_Any_Of_Type;
 typedef struct {
   Descriptor * descriptor;
   Operand operand;
 } Function_Argument_Exact;
-typedef struct {
-  Slice name;
-  Descriptor * descriptor;
-  Token_View expression;
-} Function_Argument_Default_Value;
 typedef struct Function_Argument {
   Function_Argument_Tag tag;
   char _tag_padding[4];
   union {
     Function_Argument_Any_Of_Type Any_Of_Type;
     Function_Argument_Exact Exact;
-    Function_Argument_Default_Value Default_Value;
   };
 } Function_Argument;
 typedef dyn_array_type(Function_Argument) Array_Function_Argument;

@@ -1517,17 +1517,20 @@ token_match_argument(
   Function_Argument arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
-
   Token_View default_expression;
   Token_View definition;
+  const Token *equals;
 
-  bool has_default_value = false;
   if (token_maybe_split_on_operator(
-    view, slice_literal("="), &definition, &default_expression, &(Token *){0}
+    view, slice_literal("="), &definition, &default_expression, &equals
   )) {
-    has_default_value = true;
+    if (default_expression.length == 0) {
+      context_error_snprintf(context, equals->source_range, "Expected an expression after `=`");
+      goto err;
+    }
   } else {
     definition = view;
+    default_expression = (Token_View){0};
   }
 
   Token_View type_expression;
@@ -1554,24 +1557,14 @@ token_match_argument(
       goto err;
     }
 
-    if (has_default_value) {
-      arg = (Function_Argument) {
-        .tag = Function_Argument_Tag_Default_Value,
-        .Default_Value = {
-          .descriptor = token_match_type(context, type_expression),
-          .name = name_tokens.tokens[0]->source,
-          .expression = default_expression,
-        },
-      };
-    } else {
-      arg = (Function_Argument) {
-        .tag = Function_Argument_Tag_Any_Of_Type,
-        .Any_Of_Type = {
-          .descriptor = token_match_type(context, type_expression),
-          .name = name_tokens.tokens[0]->source,
-        },
-      };
-    }
+    arg = (Function_Argument) {
+      .tag = Function_Argument_Tag_Any_Of_Type,
+      .Any_Of_Type = {
+        .descriptor = token_match_type(context, type_expression),
+        .name = name_tokens.tokens[0]->source,
+        .maybe_default_expression = default_expression,
+      },
+    };
   } else {
     Value *value = value_any(context->allocator);
     compile_time_eval(context, view, value);
@@ -2968,30 +2961,19 @@ token_handle_function_call(
             break;
           }
           case Function_Argument_Tag_Any_Of_Type: {
-            Value *arg_value = *dyn_array_get(args, i);
-            arg_value = maybe_coerce_number_literal_to_integer(
-              context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
-            );
-            scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
-              .tag = Scope_Entry_Tag_Value,
-              .Value.value = arg_value,
-              .source_range = args_token->source_range,
-            });
-            break;
-          }
-          case Function_Argument_Tag_Default_Value: {
+            Value *arg_value;
             if (i >= dyn_array_length(args)) {
-              // default value
-              Value *arg_value =
-                reserve_stack(context->allocator, context->builder, arg->Default_Value.descriptor);
+              // We should catch the missing default expression in the matcher
+              Token_View default_expression = arg->Any_Of_Type.maybe_default_expression;
+              assert(default_expression.length);
+              Descriptor *arg_descriptor = arg->Any_Of_Type.descriptor;
+              // FIXME avoid using a stack value
+              arg_value = reserve_stack(context->allocator, context->builder, arg_descriptor);
               {
                 Execution_Context arg_context = *context;
                 arg_context.scope = body_scope;
                 token_parse_expression(
-                  &arg_context,
-                  arg->Default_Value.expression,
-                  arg_value,
-                  Expression_Parse_Mode_Default
+                  &arg_context, default_expression, arg_value, Expression_Parse_Mode_Default
                 );
               }
               scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
@@ -3000,18 +2982,17 @@ token_handle_function_call(
                 .source_range = args_token->source_range,
               });
             } else {
-              // user-specified value
-              // TODO @CopyPaste from above
-              Value *arg_value = *dyn_array_get(args, i);
-              arg_value = maybe_coerce_number_literal_to_integer(
-                context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
-              );
-              scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
-                .tag = Scope_Entry_Tag_Value,
-                .Value.value = arg_value,
-                .source_range = args_token->source_range,
-              });
+              arg_value = *dyn_array_get(args, i);
             }
+
+            arg_value = maybe_coerce_number_literal_to_integer(
+              context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
+            );
+            scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
+              .tag = Scope_Entry_Tag_Value,
+              .Value.value = arg_value,
+              .source_range = args_token->source_range,
+            });
             break;
           }
         }

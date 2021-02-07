@@ -1263,14 +1263,11 @@ ensure_compiled_function_body(
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     switch(argument->tag) {
-      case Function_Argument_Tag_Default_Value:
       case Function_Argument_Tag_Any_Of_Type: {
         Value *arg_value = function_argument_value_at_index(
           context->allocator, function, index, Function_Argument_Mode_Body
         );
-        Slice name = argument->tag == Function_Argument_Tag_Default_Value
-          ? argument->Default_Value.name
-          : argument->Any_Of_Type.name;
+        Slice name = argument->Any_Of_Type.name;
         scope_define(body_scope, name, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
           .Value.value = arg_value,
@@ -1387,18 +1384,16 @@ call_function_overload(
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
-      assert(target_arg_definition->tag == Function_Argument_Tag_Default_Value);
+      Token_View default_expression = target_arg_definition->Any_Of_Type.maybe_default_expression;
+      assert(default_expression.length);
       // FIXME do not force the result on the stack
       source_arg = reserve_stack(
-        context->allocator, context->builder, target_arg_definition->Default_Value.descriptor
+        context->allocator, context->builder, target_arg_definition->Any_Of_Type.descriptor
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
       token_parse_expression(
-        &arg_context,
-        target_arg_definition->Default_Value.expression,
-        source_arg,
-        Expression_Parse_Mode_Default
+        &arg_context, default_expression, source_arg, Expression_Parse_Mode_Default
       );
       MASS_ON_ERROR(*arg_context.result) return;
     } else {
@@ -1422,10 +1417,6 @@ call_function_overload(
     switch(target_arg_definition->tag) {
       case Function_Argument_Tag_Any_Of_Type: {
         name = target_arg_definition->Any_Of_Type.name;
-        break;
-      }
-      case Function_Argument_Tag_Default_Value: {
-        name = target_arg_definition->Default_Value.name;
         break;
       }
       default:
@@ -1520,11 +1511,10 @@ calculate_arguments_match_score(
     Value *source_arg;
     Value fake_source_value = {0};
     if (arg_index >= dyn_array_length(arguments)) {
-      if (target_arg->tag != Function_Argument_Tag_Default_Value) {
-        return -1;
-      }
+      if (target_arg->tag != Function_Argument_Tag_Any_Of_Type) return -1;
+      if (!target_arg->Any_Of_Type.maybe_default_expression.length) return -1;
       fake_source_value = (Value) {
-        .descriptor = target_arg->Default_Value.descriptor,
+        .descriptor = target_arg->Any_Of_Type.descriptor,
         .operand = {.tag = Operand_Tag_Any },
       };
       source_arg = &fake_source_value;
@@ -1532,12 +1522,9 @@ calculate_arguments_match_score(
       source_arg = *dyn_array_get(arguments, arg_index);
     }
     switch(target_arg->tag) {
-      case Function_Argument_Tag_Default_Value:
       case Function_Argument_Tag_Any_Of_Type: {
         Value fake_target_value = {
-          .descriptor = target_arg->tag == Function_Argument_Tag_Default_Value
-            ? target_arg->Default_Value.descriptor
-            : target_arg->Any_Of_Type.descriptor,
+          .descriptor = target_arg->Any_Of_Type.descriptor,
           .operand = {.tag = Operand_Tag_Any },
         };
         if (same_value_type(&fake_target_value, source_arg)) {

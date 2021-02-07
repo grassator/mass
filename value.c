@@ -72,12 +72,6 @@ same_type(
             }
             break;
           }
-          case Function_Argument_Tag_Default_Value: {
-            if(!same_type(a_arg->Default_Value.descriptor, b_arg->Default_Value.descriptor)) {
-              return false;
-            }
-            break;
-          }
           case Function_Argument_Tag_Exact: {
             if(!(
               same_type(a_arg->Exact.descriptor, b_arg->Exact.descriptor) &&
@@ -1011,10 +1005,6 @@ function_argument_value_at_index_internal(
     }
     case Function_Argument_Tag_Exact: {
       arg_descriptor = argument->Exact.descriptor;
-      break;
-    }
-    case Function_Argument_Tag_Default_Value: {
-      arg_descriptor = argument->Default_Value.descriptor;
       break;
     }
   }
