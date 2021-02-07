@@ -678,6 +678,18 @@ spec("source") {
       check(actual == 42);
     }
 
+    it("should disallow default arguments coming after non-default ones") {
+      test_program_inline_source_function(
+        "test", &test_context,
+        "test :: (x : s64, y : s64 = x, z : s32) -> () {}\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      check(slice_starts_with(
+        error->message, slice_literal("Non-default argument can not come after a default one")
+      ));
+    }
+
     it("should be able to have an explicit return") {
       fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
         "checker", &test_context,

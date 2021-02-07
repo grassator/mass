@@ -2370,6 +2370,7 @@ token_process_function_literal(
     }
   }
 
+  bool previous_argument_has_default_value = false;
   if (args->Group.children.length != 0) {
     descriptor->Function.arguments = dyn_array_make(
       Array_Function_Argument,
@@ -2386,6 +2387,23 @@ token_process_function_literal(
       Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
       dyn_array_push(descriptor->Function.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
+      if (previous_argument_has_default_value) {
+        if (
+          arg.tag != Function_Argument_Tag_Any_Of_Type ||
+          !arg.Any_Of_Type.maybe_default_expression.length
+        ) {
+          context_error_snprintf(
+            context, arg_view.source_range,
+            "Non-default argument can not come after a default one"
+          );
+          return 0;
+        }
+      } else {
+        previous_argument_has_default_value = (
+          arg.tag == Function_Argument_Tag_Any_Of_Type &&
+          !!arg.Any_Of_Type.maybe_default_expression.length
+        );
+      }
     }
   }
 
