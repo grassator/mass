@@ -52,8 +52,8 @@
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\
     .descriptor = &descriptor_type,\
-    .operand = {\
-      .tag = Operand_Tag_Immediate,\
+    .storage = {\
+      .tag = Storage_Tag_Immediate,\
       .byte_size = sizeof(Descriptor),\
       .Immediate.memory = (_DESCRIPTOR_),\
     },\

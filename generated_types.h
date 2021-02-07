@@ -95,9 +95,9 @@ typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
 typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
 
-typedef struct Operand Operand;
-typedef dyn_array_type(Operand *) Array_Operand_Ptr;
-typedef dyn_array_type(const Operand *) Array_Const_Operand_Ptr;
+typedef struct Storage Storage;
+typedef dyn_array_type(Storage *) Array_Storage_Ptr;
+typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
 
 typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
@@ -374,43 +374,43 @@ typedef struct Memory_Location {
 } Memory_Location;
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
 typedef enum {
-  Operand_Tag_None = 0,
-  Operand_Tag_Any = 1,
-  Operand_Tag_Eflags = 2,
-  Operand_Tag_Register = 3,
-  Operand_Tag_Xmm = 4,
-  Operand_Tag_Immediate = 5,
-  Operand_Tag_Memory = 6,
-} Operand_Tag;
+  Storage_Tag_None = 0,
+  Storage_Tag_Any = 1,
+  Storage_Tag_Eflags = 2,
+  Storage_Tag_Register = 3,
+  Storage_Tag_Xmm = 4,
+  Storage_Tag_Immediate = 5,
+  Storage_Tag_Memory = 6,
+} Storage_Tag;
 
 typedef struct {
   Compare_Type compare_type;
-} Operand_Eflags;
+} Storage_Eflags;
 typedef struct {
   Register index;
-} Operand_Register;
+} Storage_Register;
 typedef struct {
   Register index;
-} Operand_Xmm;
+} Storage_Xmm;
 typedef struct {
   void * memory;
-} Operand_Immediate;
+} Storage_Immediate;
 typedef struct {
   Memory_Location location;
-} Operand_Memory;
-typedef struct Operand {
-  Operand_Tag tag;
+} Storage_Memory;
+typedef struct Storage {
+  Storage_Tag tag;
   char _tag_padding[4];
   u64 byte_size;
   union {
-    Operand_Eflags Eflags;
-    Operand_Register Register;
-    Operand_Xmm Xmm;
-    Operand_Immediate Immediate;
-    Operand_Memory Memory;
+    Storage_Eflags Eflags;
+    Storage_Register Register;
+    Storage_Xmm Xmm;
+    Storage_Immediate Immediate;
+    Storage_Memory Memory;
   };
-} Operand;
-typedef dyn_array_type(Operand) Array_Operand;
+} Storage;
+typedef dyn_array_type(Storage) Array_Storage;
 typedef struct Compiler_Source_Location {
   const char * filename;
   const char * function_name;
@@ -460,7 +460,7 @@ typedef struct Scope_Entry {
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 typedef struct Value {
   Descriptor * descriptor;
-  Operand operand;
+  Storage storage;
   Value * next_overload;
   Compiler_Source_Location compiler_source_location;
 } Value;
@@ -494,7 +494,7 @@ typedef struct {
 } Function_Argument_Any_Of_Type;
 typedef struct {
   Descriptor * descriptor;
-  Operand operand;
+  Storage storage;
 } Function_Argument_Exact;
 typedef struct Function_Argument {
   Function_Argument_Tag tag;
@@ -663,10 +663,10 @@ static Descriptor descriptor_memory_location;
 static Descriptor descriptor_memory_location_pointer;
 static Descriptor descriptor_memory_location_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
-static Descriptor descriptor_operand;
-static Descriptor descriptor_operand_pointer;
-static Descriptor descriptor_operand_pointer_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(operand_tag, Operand_Tag)
+static Descriptor descriptor_storage;
+static Descriptor descriptor_storage_pointer;
+static Descriptor descriptor_storage_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static Descriptor descriptor_compiler_source_location;
 static Descriptor descriptor_compiler_source_location_pointer;
 static Descriptor descriptor_compiler_source_location_pointer_pointer;
@@ -1006,9 +1006,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
     .offset = offsetof(Value, descriptor),
   },
   {
-    .name = slice_literal_fields("operand"),
-    .descriptor = &descriptor_operand,
-    .offset = offsetof(Value, operand),
+    .name = slice_literal_fields("storage"),
+    .descriptor = &descriptor_storage,
+    .offset = offsetof(Value, storage),
   },
   {
     .name = slice_literal_fields("next_overload"),

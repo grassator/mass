@@ -13,9 +13,9 @@ register_is_xmm(
 }
 
 static inline bool
-operand_equal(
-  const Operand *a,
-  const Operand *b
+storage_equal(
+  const Storage *a,
+  const Storage *b
 );
 
 static inline void
@@ -72,7 +72,7 @@ MASS_DEFINE_OPAQUE_TYPE(register_16, 8);
 MASS_DEFINE_OPAQUE_TYPE(register_32, 8);
 MASS_DEFINE_OPAQUE_TYPE(register_64, 8);
 MASS_DEFINE_OPAQUE_TYPE(immediate, sizeof(Slice));
-MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Operand_Eflags));
+MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Storage_Eflags));
 
 Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Void,
@@ -81,7 +81,7 @@ Descriptor descriptor_void = {
 
 Value void_value = {
   .descriptor = &descriptor_void,
-  .operand = { .tag = Operand_Tag_None },
+  .storage = { .tag = Storage_Tag_None },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
@@ -92,8 +92,8 @@ Descriptor descriptor_any = {
 
 Value *type_any_value = &(Value) {
   .descriptor = &descriptor_type,
-  .operand = {
-    .tag = Operand_Tag_Immediate,
+  .storage = {
+    .tag = Storage_Tag_Immediate,
     .Immediate.memory = &descriptor_any,
   },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
@@ -182,7 +182,7 @@ typedef enum {
 
 typedef struct {
   const X64_Mnemonic *mnemonic;
-  Operand operands[3];
+  Storage operands[3];
 } Instruction_Assembly;
 
 #define INSTRUCTION_BYTES_NO_LABEL 255

@@ -61,8 +61,8 @@ move_value(
   Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
-  const Operand *target,
-  const Operand *source
+  const Storage *target,
+  const Storage *source
 );
 
 void

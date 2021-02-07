@@ -587,7 +587,7 @@ main(void) {
     }),
   }));
 
-  push_type(add_common_fields(type_union("Operand", (Struct[]){
+  push_type(add_common_fields(type_union("Storage", (Struct[]){
     struct_empty("None"),
     struct_empty("Any"),
     struct_fields("Eflags", (Struct_Item[]){
@@ -646,7 +646,7 @@ main(void) {
 
   push_type(type_struct("Value", (Struct_Item[]){
     { "Descriptor *", "descriptor" },
-    { "Operand", "operand" },
+    { "Storage", "storage" },
     { "Value *", "next_overload" },
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
@@ -674,7 +674,7 @@ main(void) {
     }),
     struct_fields("Exact", (Struct_Item[]){
       { "Descriptor *", "descriptor" },
-      { "Operand", "operand" },
+      { "Storage", "storage" },
     }),
   }));
 

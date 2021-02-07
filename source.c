@@ -223,8 +223,8 @@ token_value_force_immediate_integer(
         // Always copy full value. Truncation is handled by the byte_size of the immediate
         u64 *memory = allocator_allocate(context->allocator, u64);
         *memory = bits;
-        return value_make(context->allocator, target_descriptor, (Operand) {
-          .tag = Operand_Tag_Immediate,
+        return value_make(context->allocator, target_descriptor, (Storage) {
+          .tag = Storage_Tag_Immediate,
           .byte_size = u64_to_u32(bit_size / 8),
           .Immediate.memory = memory,
         });
@@ -266,7 +266,7 @@ token_value_force_immediate_integer(
     return 0;
   }
 
-  if (value->operand.tag != Operand_Tag_Immediate) {
+  if (value->storage.tag != Storage_Tag_Immediate) {
     context_error_snprintf(
       context, *source_range,
       "Value is not an immediate"
@@ -309,23 +309,23 @@ assign(
 ) {
   MASS_TRY(*context->result);
 
-  if (target->operand.tag == Operand_Tag_Eflags) {
+  if (target->storage.tag == Storage_Tag_Eflags) {
     panic("Internal Error: Trying to move into Eflags");
   }
   if (target->descriptor->tag == Descriptor_Tag_Void) {
     return *context->result;
   }
   if (target->descriptor->tag == Descriptor_Tag_Any) {
-    assert(target->operand.tag == Operand_Tag_Any);
+    assert(target->storage.tag == Storage_Tag_Any);
     target->descriptor = source->descriptor;
-    target->operand = source->operand;
+    target->storage = source->storage;
     target->next_overload = source->next_overload;
     return *context->result;
   }
 
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
-      Number_Literal *literal = operand_immediate_as_c_type(source->operand, Number_Literal);
+      Number_Literal *literal = storage_immediate_as_c_type(source->storage, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(
           context, source_range, source, &descriptor_u64
@@ -351,7 +351,7 @@ assign(
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
   if (same_value_type_or_can_implicitly_move_cast(target, source)) {
-    move_value(context->allocator, context->builder, source_range, &target->operand, &source->operand);
+    move_value(context->allocator, context->builder, source_range, &target->storage, &source->storage);
     return *context->result;
   }
   context_error_snprintf(
@@ -848,7 +848,7 @@ tokenize(
           Slice *string = allocator_allocate(allocator, Slice);
           *string = (Slice){bytes, string_buffer->occupied};
           current_token->Value.value =
-            value_make(allocator, &descriptor_string, operand_immediate(string));
+            value_make(allocator, &descriptor_string, storage_immediate(string));
           accept_and_push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
@@ -1020,7 +1020,7 @@ value_ensure_type(
     context_error_snprintf(context, source_range, "Expected a type");
     return 0;
   }
-  Descriptor *descriptor = operand_immediate_as_c_type(value->operand, Descriptor);
+  Descriptor *descriptor = storage_immediate_as_c_type(value->storage, Descriptor);
   return descriptor;
 }
 
@@ -1260,7 +1260,7 @@ token_make_macro_capture_function(
   Value *result = allocator_allocate(context->allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
-    .operand = {.tag = Operand_Tag_None },
+    .storage = {.tag = Storage_Tag_None },
     .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
   };
   return result;
@@ -1330,29 +1330,26 @@ token_apply_macro_syntax(
       overload_function->arguments = overload_arguments;
       result->next_overload = scope_overload;
 
-      Token *using = allocator_allocate(context->allocator, Token);
-      *using = (Token) {
+      static const Token using = {
         .tag = Token_Tag_Id,
-        .source = slice_literal("using"),
-        .source_range = capture_view.source_range,
+        .source = slice_literal_fields("using"),
+        .source_range = {0},
       };
-      Token *scope_id = allocator_allocate(context->allocator, Token);
-      *scope_id = (Token) {
+      static const Token scope_id = {
         .tag = Token_Tag_Id,
-        .source = slice_literal("@spliced_scope"),
-        .source_range = capture_view.source_range,
+        .source = slice_literal_fields("@spliced_scope"),
+        .source_range = {0},
       };
-      Token *semicolon = allocator_allocate(context->allocator, Token);
-      *semicolon = (Token) {
+      static const Token semicolon = {
         .tag = Token_Tag_Operator,
-        .source = slice_literal(";"),
-        .source_range = capture_view.source_range,
+        .source = slice_literal_fields(";"),
+        .source_range = {0},
       };
 
       const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
-      scope_body_tokens[0] = using;
-      scope_body_tokens[1] = scope_id;
-      scope_body_tokens[2] = semicolon;
+      scope_body_tokens[0] = &using;
+      scope_body_tokens[1] = &scope_id;
+      scope_body_tokens[2] = &semicolon;
       scope_body_tokens[3] = overload_function->body;
 
       Token_View scope_token_view = (Token_View) {
@@ -1572,7 +1569,7 @@ token_match_argument(
       .tag = Function_Argument_Tag_Exact,
       .Exact = {
         .descriptor = value->descriptor,
-        .operand = value->operand,
+        .storage = value->storage,
       },
     };
   }
@@ -1759,7 +1756,7 @@ token_handle_user_defined_operator(
     Value *return_label_value = allocator_allocate(context->allocator, Value);
     *return_label_value = (Value) {
       .descriptor = &descriptor_void,
-      .operand = code_label32(fake_return_label_index),
+      .storage = code_label32(fake_return_label_index),
     };
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
@@ -1907,8 +1904,8 @@ token_parse_operator_definition(
   );
   MASS_ON_ERROR(*context->result) goto err;
 
-  assert(precedence_value->operand.tag == Operand_Tag_Immediate);
-  u64 precendence = operand_immediate_value_up_to_u64(&precedence_value->operand);
+  assert(precedence_value->storage.tag == Storage_Tag_Immediate);
+  u64 precendence = storage_immediate_value_up_to_u64(&precedence_value->storage);
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -2407,7 +2404,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context->allocator, descriptor, (Operand){0});
+  Value *result = value_make(context->allocator, descriptor, (Storage){0});
   descriptor->Function.body = body;
   descriptor->Function.scope = function_scope;
   if (body->tag == Token_Tag_Value) {
@@ -2481,13 +2478,13 @@ compile_time_eval(
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
     if (expression_result_value->descriptor->tag == Descriptor_Tag_Function) {
       // It is only allowed to to pass through funciton definitions not compiled ones
-      assert(expression_result_value->operand.tag == Operand_Tag_None);
+      assert(expression_result_value->storage.tag == Storage_Tag_None);
     }
     MASS_ON_ERROR(assign(context, source_range, result_value, expression_result_value));
     return;
   }
 
-  u64 result_byte_size = expression_result_value->operand.byte_size;
+  u64 result_byte_size = expression_result_value->storage.byte_size;
   // Need to ensure 16-byte alignment here because result value might be __m128
   // TODO When we support AVX-2 or AVX-512, this might need to increase further
   u64 alignment = 16;
@@ -2497,15 +2494,15 @@ compile_time_eval(
   Register out_register = register_acquire_temp(&eval_builder);
   Value out_value_register = {
     .descriptor = &descriptor_s64,
-    .operand = {
-      .tag = Operand_Tag_Register,
+    .storage = {
+      .tag = Storage_Tag_Register,
       .byte_size = 8,
       .Register.index = out_register
     }
   };
   Value result_address = {
     .descriptor = &descriptor_s64,
-    .operand = imm64(context->allocator, (u64)result),
+    .storage = imm64(context->allocator, (u64)result),
   };
 
   MASS_ON_ERROR(assign(&eval_context, source_range, &out_value_register, &result_address)) {
@@ -2517,9 +2514,9 @@ compile_time_eval(
   Value *out_value = allocator_allocate(context->allocator, Value);
   *out_value = (Value) {
     .descriptor = expression_result_value->descriptor,
-    .operand = (Operand){
-      .tag = Operand_Tag_Memory,
-      .byte_size = expression_result_value->operand.byte_size,
+    .storage = (Storage){
+      .tag = Storage_Tag_Memory,
+      .byte_size = expression_result_value->storage.byte_size,
       .Memory.location = {
         .tag = Memory_Location_Tag_Indirect,
         .Indirect = {
@@ -2541,10 +2538,10 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = value_make(context->allocator, out_value->descriptor, (Operand){0});
+  Value *temp_result = value_make(context->allocator, out_value->descriptor, (Storage){0});
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
-      temp_result->operand = (Operand){0};
+      temp_result->storage = (Storage){0};
       break;
     }
     case Descriptor_Tag_Any: {
@@ -2558,8 +2555,8 @@ compile_time_eval(
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
-      temp_result->operand = (Operand){
-        .tag = Operand_Tag_Immediate,
+      temp_result->storage = (Storage){
+        .tag = Storage_Tag_Immediate,
         .byte_size = result_byte_size,
         .Immediate = {
           .memory = result,
@@ -2568,7 +2565,7 @@ compile_time_eval(
       break;
     }
     case Descriptor_Tag_Function: {
-      assert(out_value->operand.tag == Operand_Tag_None);
+      assert(out_value->storage.tag == Storage_Tag_None);
       break;
     }
   }
@@ -2583,7 +2580,7 @@ typedef struct {
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
 void
-token_handle_operand_variant_of(
+token_handle_storage_variant_of(
   Execution_Context *context,
   const Source_Range *source_range,
   Array_Value_Ptr args,
@@ -2594,29 +2591,29 @@ token_handle_operand_variant_of(
   if (dyn_array_length(args) != 1) {
     context_error_snprintf(
       context, *source_range,
-      "operand_variant_of expects a single argument"
+      "storage_variant_of expects a single argument"
     );
     return;
   }
 
   Value *value = *dyn_array_get(args, 0);
 
-  Value *operand_value;
-  switch(value->operand.tag) {
+  Value *storage_value;
+  switch(value->storage.tag) {
     default:
-    case Operand_Tag_None:
-    case Operand_Tag_Any:
-    case Operand_Tag_Immediate:
-    case Operand_Tag_Eflags:
-    case Operand_Tag_Xmm:
-    case Operand_Tag_Memory: {
+    case Storage_Tag_None:
+    case Storage_Tag_Any:
+    case Storage_Tag_Immediate:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Xmm:
+    case Storage_Tag_Memory: {
       panic("TODO implement operand reflection for more types");
-      operand_value = 0;
+      storage_value = 0;
       break;
     }
-    case Operand_Tag_Register: {
+    case Storage_Tag_Register: {
       Descriptor *result_descriptor = 0;
-      switch(value->operand.byte_size) {
+      switch(value->storage.byte_size) {
         case 1: result_descriptor = &descriptor_register_8; break;
         case 2: result_descriptor = &descriptor_register_16; break;
         case 4: result_descriptor = &descriptor_register_32; break;
@@ -2626,14 +2623,14 @@ token_handle_operand_variant_of(
           break;
         }
       }
-      operand_value = value_make(
+      storage_value = value_make(
         context->allocator,
         result_descriptor,
-        imm8(context->allocator, value->operand.Register.index)
+        imm8(context->allocator, value->storage.Register.index)
       );
     }
   }
-  MASS_ON_ERROR(assign(context, source_range, result_value, operand_value));
+  MASS_ON_ERROR(assign(context, source_range, result_value, storage_value));
 }
 
 void
@@ -2700,9 +2697,9 @@ token_handle_cast(
     after_cast_value = allocator_allocate(context->allocator, Value);
     *after_cast_value = (Value) {
       .descriptor = cast_to_descriptor,
-      .operand = value->operand,
+      .storage = value->storage,
     };
-    after_cast_value->operand.byte_size = cast_to_byte_size;
+    after_cast_value->storage.byte_size = cast_to_byte_size;
   }
   MASS_ON_ERROR(assign(context, source_range, result_value, after_cast_value));
 }
@@ -2723,12 +2720,12 @@ token_handle_negation(
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
-    Number_Literal *original = operand_immediate_as_c_type(value->operand, Number_Literal);
+    Number_Literal *original = storage_immediate_as_c_type(value->storage, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
     negated_value = value_make(
-      context->allocator, &descriptor_number_literal, operand_immediate(negated)
+      context->allocator, &descriptor_number_literal, storage_immediate(negated)
     );
   } else {
     panic("TODO support general negation");
@@ -2868,7 +2865,7 @@ token_handle_function_call(
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
     non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
     Value *fake_target_value =
-      value_make(context->allocator, non_compile_time_descriptor, target->operand);
+      value_make(context->allocator, non_compile_time_descriptor, target->storage);
     const Token *fake_target = token_value_make(context, fake_target_value, source_range);
     Token_View fake_eval_view = {
       .tokens = (const Token*[]){fake_target, args_token},
@@ -3025,7 +3022,7 @@ token_handle_function_call(
       if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
         Value return_label = {
           .descriptor = &descriptor_void,
-          .operand = code_label32(fake_return_label_index),
+          .storage = code_label32(fake_return_label_index),
           .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
         };
         scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
@@ -3086,7 +3083,7 @@ extend_integer_value(
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
   Value *result = reserve_stack(context->allocator, context->builder, target_descriptor);
-  move_value(context->allocator, context->builder, source_range, &result->operand, &value->operand);
+  move_value(context->allocator, context->builder, source_range, &result->storage, &value->storage);
   return result;
 }
 
@@ -3205,15 +3202,15 @@ struct_get_field(
     Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
     if (slice_equal(name, field->name)) {
       Value *field_value = allocator_allocate(context->allocator, Value);
-      Operand operand = struct_value->operand;
+      Storage operand = struct_value->storage;
       // FIXME support more operands
-      assert(operand.tag == Operand_Tag_Memory);
+      assert(operand.tag == Storage_Tag_Memory);
       assert(operand.Memory.location.tag == Memory_Location_Tag_Indirect);
       operand.byte_size = descriptor_byte_size(field->descriptor);
       operand.Memory.location.Indirect.offset += field->offset;
       *field_value = (const Value) {
         .descriptor = field->descriptor,
-        .operand = operand,
+        .storage = operand,
       };
 
       MASS_ON_ERROR(assign(context, source_range, result_value, field_value));
@@ -3234,9 +3231,9 @@ token_handle_array_access(
   Value *result_value
 ) {
   assert(array_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-  assert(array_value->operand.tag == Operand_Tag_Memory);
-  assert(array_value->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-  assert(!array_value->operand.Memory.location.Indirect.maybe_index_register.has_value);
+  assert(array_value->storage.tag == Storage_Tag_Memory);
+  assert(array_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+  assert(!array_value->storage.Memory.location.Indirect.maybe_index_register.has_value);
 
   Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
@@ -3244,15 +3241,15 @@ token_handle_array_access(
   Value *array_element_value = allocator_allocate(context->allocator, Value);
   *array_element_value = (Value) {
     .descriptor = item_descriptor,
-    .operand = array_value->operand
+    .storage = array_value->storage
   };
   index_value = maybe_coerce_number_literal_to_integer(
     context, source_range, index_value, &descriptor_u64
   );
-  array_element_value->operand.byte_size = item_byte_size;
-  if (index_value->operand.tag == Operand_Tag_Immediate) {
-    s32 index = s64_to_s32(operand_immediate_value_up_to_s64(&index_value->operand));
-    array_element_value->operand.Memory.location.Indirect.offset = index * item_byte_size;
+  array_element_value->storage.byte_size = item_byte_size;
+  if (index_value->storage.tag == Storage_Tag_Immediate) {
+    s32 index = s64_to_s32(storage_immediate_value_up_to_s64(&index_value->storage));
+    array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
   } else {
     // @InstructionQuality
     // This code is very general in terms of the operands where the base
@@ -3267,8 +3264,8 @@ token_handle_array_access(
       context->allocator,
       context->builder,
       source_range,
-      &new_base_register->operand,
-      &index_value->operand
+      &new_base_register->storage,
+      &index_value->storage
     );
 
     Value *byte_size_value = value_from_s64(context->allocator, item_byte_size);
@@ -3284,7 +3281,7 @@ token_handle_array_access(
       Register temp_register = register_acquire_temp(context->builder);
       Value temp_value = {
         .descriptor = &descriptor_s64,
-        .operand = operand_register_for_descriptor(temp_register, &descriptor_s64)
+        .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
       };
 
       load_address(context, source_range, &temp_value, array_value);
@@ -3292,13 +3289,13 @@ token_handle_array_access(
       register_release(context->builder, temp_register);
     }
 
-    array_element_value->operand = (Operand) {
-      .tag = Operand_Tag_Memory,
+    array_element_value->storage = (Storage) {
+      .tag = Storage_Tag_Memory,
       .byte_size = item_byte_size,
       .Memory.location = {
         .tag = Memory_Location_Tag_Indirect,
         .Indirect = {
-          .base_register = new_base_register->operand.Register.index,
+          .base_register = new_base_register->storage.Register.index,
         }
       }
     };
@@ -3346,10 +3343,10 @@ token_eval_operator(
       MASS_ON_ERROR(token_force_value(context, result_token, result_value)) return;
     } else if (
       target->tag == Token_Tag_Id &&
-      slice_equal(target->source, slice_literal("operand_variant_of"))
+      slice_equal(target->source, slice_literal("storage_variant_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      token_handle_operand_variant_of(context, &args_token->source_range, args, result_value);
+      token_handle_storage_variant_of(context, &args_token->source_range, args, result_value);
       dyn_array_destroy(args);
     } else {
       token_handle_function_call(context, target, args_token, result_value);
@@ -3365,11 +3362,11 @@ token_eval_operator(
     const Token *body = token_view_get(args_view, 0);
     if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
       Value *scope_value =
-        value_make(context->allocator, &descriptor_scope, operand_immediate(context->scope));
+        value_make(context->allocator, &descriptor_scope, storage_immediate(context->scope));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .source = slice_literal("context") })) {
       Value *scope_value =
-        value_make(context->allocator, &descriptor_execution_context, operand_immediate(context));
+        value_make(context->allocator, &descriptor_execution_context, storage_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
@@ -3395,7 +3392,7 @@ token_eval_operator(
           struct_get_field(context, &rhs->source_range, lhs_value, rhs->source, result_value);
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
-          Scope *module_scope = operand_immediate_as_c_type(lhs_value->operand, Scope);
+          Scope *module_scope = storage_immediate_as_c_type(lhs_value->storage, Scope);
           Execution_Context module_context = *context;
           module_context.scope = module_scope;
           module_context.builder = 0;
@@ -3752,7 +3749,7 @@ token_parse_if_expression(
   Value *if_value = value_any(context->allocator);
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
 
-  if (if_value->operand.tag == Operand_Tag_Immediate) {
+  if (if_value->storage.tag == Storage_Tag_Immediate) {
     Descriptor *stack_descriptor = if_value->descriptor;
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
@@ -3964,7 +3961,7 @@ token_parse_block_no_scope(
     MASS_ON_ERROR(*context->result) return;
     last_result = (Value) {
       .descriptor = &descriptor_any,
-      .operand = {.tag = Operand_Tag_Any},
+      .storage = {.tag = Storage_Tag_Any},
     };
     Token_View rest = token_view_rest(&children_view, start_index);
     // Skipping over empty statements
@@ -4045,14 +4042,14 @@ token_parse_statement_using(
     goto err;
   }
 
-  if (result->operand.tag != Operand_Tag_Immediate) {
+  if (result->storage.tag != Storage_Tag_Immediate) {
     context_error_snprintf(context, rest.source_range, "Scope for `using` must be compile-time known");
     goto err;
   }
 
   // This code injects a proxy scope that just uses the same data as the other
   Scope *current_scope = context->scope;
-  Scope *using_scope = operand_immediate_as_c_type(result->operand, Scope);
+  Scope *using_scope = storage_immediate_as_c_type(result->storage, Scope);
   Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
   assert(common_ancestor);
   // TODO @Speed This is quite inefficient but I can't really think of something faster
@@ -4105,7 +4102,7 @@ token_parse_statement_label(
     value = allocator_allocate(context->allocator, Value);
     *value = (Value) {
       .descriptor = &descriptor_void,
-      .operand = code_label32(label),
+      .storage = code_label32(label),
     };
     scope_define(label_scope, id->source, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
@@ -4119,8 +4116,8 @@ token_parse_statement_label(
 
   if (
     value->descriptor != &descriptor_void ||
-    value->operand.tag != Operand_Tag_Memory ||
-    value->operand.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
+    value->storage.tag != Storage_Tag_Memory ||
+    value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -4134,7 +4131,7 @@ token_parse_statement_label(
     &context->builder->code_block.instructions, keyword->source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
-      .label = value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+      .label = value->storage.Memory.location.Instruction_Pointer_Relative.label_index
     }
   );
 
@@ -4185,8 +4182,8 @@ token_parse_goto(
   if (
     !value ||
     value->descriptor != &descriptor_void ||
-    value->operand.tag != Operand_Tag_Memory ||
-    value->operand.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
+    value->storage.tag != Storage_Tag_Memory ||
+    value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     context_error_snprintf(
       context, keyword->source_range,
@@ -4198,7 +4195,7 @@ token_parse_goto(
 
   push_instruction(
     &context->builder->code_block.instructions, keyword->source_range,
-    (Instruction) {.assembly = {jmp, {value->operand, 0, 0}}}
+    (Instruction) {.assembly = {jmp, {value->storage, 0, 0}}}
   );
 
   err:
@@ -4251,12 +4248,12 @@ token_parse_explicit_return(
   Value *return_label = scope_entry_force(context, scope_label_entry);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
-  assert(operand_is_label(&return_label->operand));
+  assert(storage_is_label(&return_label->storage));
 
   push_instruction(
     &context->builder->code_block.instructions,
     keyword->source_range,
-    (Instruction) {.assembly = {jmp, {return_label->operand, 0, 0}}}
+    (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
   );
 
   return peek_index;
@@ -4282,7 +4279,7 @@ token_match_fixed_array_type(
     context, &size_view.source_range, size_value, &descriptor_u32
   );
   MASS_ON_ERROR(*context->result) return 0;
-  u32 length = u64_to_u32(operand_immediate_value_up_to_u64(&size_value->operand));
+  u32 length = u64_to_u32(storage_immediate_value_up_to_u64(&size_value->storage));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -4335,7 +4332,7 @@ token_parse_inline_machine_code_bytes(
     }
     Value *value = *dyn_array_get(args, i);
     if (!value) continue;
-    if (operand_is_label(&value->operand)) {
+    if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error_snprintf(
           context, args_token->source_range,
@@ -4343,7 +4340,7 @@ token_parse_inline_machine_code_bytes(
         );
         goto err;
       }
-      bytes.label_index = value->operand.Memory.location.Instruction_Pointer_Relative.label_index;
+      bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
       bytes.label_offset_in_instruction = u64_to_u8(i);
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
@@ -4353,7 +4350,7 @@ token_parse_inline_machine_code_bytes(
       value = token_value_force_immediate_integer(
         context, &args_token->source_range, value, &descriptor_u8
       );
-      u8 byte = u64_to_u8(operand_immediate_value_up_to_u64(&value->operand));
+      u8 byte = u64_to_u8(storage_immediate_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     }
   }
@@ -4450,7 +4447,7 @@ token_parse_definition_and_assignment_statements(
     );
   } else if (
     value->descriptor->tag == Descriptor_Tag_Opaque &&
-    value->operand.tag == Operand_Tag_Immediate
+    value->storage.tag == Storage_Tag_Immediate
   ) {
     panic("TODO decide how to handle opaque types");
   }

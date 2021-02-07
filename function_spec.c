@@ -51,26 +51,26 @@ spec("function") {
   describe("stack") {
     it("should correctly align allocated values") {
       Value *a = reserve_stack(temp_allocator, builder, &descriptor_s8);
-      check(a->operand.tag == Operand_Tag_Memory);
-      check(a->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-      check(a->operand.Memory.location.Indirect.offset == -1);
+      check(a->storage.tag == Storage_Tag_Memory);
+      check(a->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      check(a->storage.Memory.location.Indirect.offset == -1);
       Value *b = reserve_stack(temp_allocator, builder, &descriptor_s32);
-      check(b->operand.tag == Operand_Tag_Memory);
-      check(b->operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-      check(b->operand.Memory.location.Indirect.offset == -8);
+      check(b->storage.tag == Storage_Tag_Memory);
+      check(b->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      check(b->storage.Memory.location.Indirect.offset == -8);
     }
   }
 
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
       Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
-      move_value(temp_allocator, builder, &test_range, &reg_a->operand, &reg_a->operand);
+      move_value(temp_allocator, builder, &test_range, &reg_a->storage, &reg_a->storage);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
     it("should not add any instructions when moving value to itself (value equality)") {
       Value *reg_a1 = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
       Value *reg_a2 = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
-      move_value(temp_allocator, builder, &test_range, &reg_a1->operand, &reg_a2->operand);
+      move_value(temp_allocator, builder, &test_range, &reg_a1->storage, &reg_a2->storage);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
     it("should be use `xor` to clear the register instead of move of 0") {
@@ -89,11 +89,11 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates)); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(temp_allocator, builder, &test_range, &reg_a->operand, &immediates[j]->operand);
+          move_value(temp_allocator, builder, &test_range, &reg_a->storage, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction_equal(
-            instruction, &(Instruction){.assembly = {xor, reg_a->operand, reg_a->operand}}
+            instruction, &(Instruction){.assembly = {xor, reg_a->storage, reg_a->storage}}
           ));
         }
       }
@@ -114,13 +114,13 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(temp_allocator, builder, &test_range, &reg_a->operand, &immediates[j]->operand);
+          move_value(temp_allocator, builder, &test_range, &reg_a->storage, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
-          check(operand_equal(&instruction->assembly.operands[0], &reg_a->operand));
-          s64 actual_immediate = operand_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
-          s64 expected_immediate = operand_immediate_value_up_to_s64(&immediates[j]->operand);
+          check(storage_equal(&instruction->assembly.operands[0], &reg_a->storage));
+          s64 actual_immediate = storage_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
+          s64 expected_immediate = storage_immediate_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
       }
@@ -140,40 +140,40 @@ spec("function") {
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(temp_allocator, builder, &test_range, &memory->operand, &immediates[j]->operand);
+          move_value(temp_allocator, builder, &test_range, &memory->storage, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
-          check(operand_equal(&instruction->assembly.operands[0], &memory->operand));
-          s64 actual_immediate = operand_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
-          s64 expected_immediate = operand_immediate_value_up_to_s64(&immediates[j]->operand);
+          check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
+          s64 actual_immediate = storage_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
+          s64 expected_immediate = storage_immediate_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
       }
     }
     it("should use a 32bit immediate when the value fits for a move to a 64bit value") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
-      Operand immediate = imm64(temp_allocator, 42000);
-      move_value(temp_allocator, builder, &test_range, &memory->operand, &immediate);
+      Storage immediate = imm64(temp_allocator, 42000);
+      move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction->assembly.mnemonic == mov);
-      check(operand_equal(&instruction->assembly.operands[0], &memory->operand));
+      check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
       check(instruction->assembly.operands[1].byte_size == 4);
     }
     it("should use a temp register for a imm64 to memory move") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
       Value *immediate = value_from_s64(temp_allocator, 42ll << 32);
-      move_value(temp_allocator, builder, &test_range, &memory->operand, &immediate->operand);
+      move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate->storage);
       check(dyn_array_length(builder->code_block.instructions) == 2);
       Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s64);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, temp_reg->operand, immediate->operand}}
+        &(Instruction){.assembly = {mov, temp_reg->storage, immediate->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {mov, memory->operand, temp_reg->operand}}
+        &(Instruction){.assembly = {mov, memory->storage, temp_reg->storage}}
       ));
     }
     it("should use appropriate setCC instruction when moving from eflags") {
@@ -186,12 +186,12 @@ spec("function") {
         dyn_array_clear(builder->code_block.instructions);
         Value *memory = &(Value){&descriptor_s8, stack(0, 1)};
         Value *eflags = value_from_compare(temp_allocator, tests[i].compare_type);
-        move_value(temp_allocator, builder, &test_range, &memory->operand, &eflags->operand);
+        move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 1);
         Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
         check(instruction->assembly.mnemonic == tests[i].mnemonic);
-        check(operand_equal(&instruction->assembly.operands[0], &memory->operand));
-        check(operand_equal(&instruction->assembly.operands[1], &eflags->operand));
+        check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
+        check(storage_equal(&instruction->assembly.operands[1], &eflags->storage));
       }
     }
     it("should use a temporary register for setCC to more than a byte") {
@@ -209,19 +209,19 @@ spec("function") {
         Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s8);
         Value *resized_temp_reg = value_register_for_descriptor(temp_allocator, Register_C, tests[i].descriptor);
         Value *eflags = value_from_compare(temp_allocator, Compare_Type_Equal);
-        move_value(temp_allocator, builder, &test_range, &memory->operand, &eflags->operand);
+        move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 3);
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 0),
-          &(Instruction){.assembly = {sete, temp_reg->operand, eflags->operand}}
+          &(Instruction){.assembly = {sete, temp_reg->storage, eflags->storage}}
         ));
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 1),
-          &(Instruction){.assembly = {movsx, resized_temp_reg->operand, temp_reg->operand}}
+          &(Instruction){.assembly = {movsx, resized_temp_reg->storage, temp_reg->storage}}
         ));
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 2),
-          &(Instruction){.assembly = {mov, memory->operand, resized_temp_reg->operand}}
+          &(Instruction){.assembly = {mov, memory->storage, resized_temp_reg->storage}}
         ));
       }
     }
@@ -233,7 +233,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, reg_a->operand, imm8(temp_allocator, 42)}}
+        instruction, &(Instruction){.assembly = {mov, reg_a->storage, imm8(temp_allocator, 42)}}
       ));
     }
     it("should move `a` to result and add `b` to it when result is neither `a` or `b`") {
@@ -245,11 +245,11 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 2);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, reg_a->operand, reg_b->operand}}
+        &(Instruction){.assembly = {mov, reg_a->storage, reg_b->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {add, reg_a->operand, reg_c->operand}}
+        &(Instruction){.assembly = {add, reg_a->storage, reg_c->storage}}
       ));
     }
     it("should avoid moving `a` to result when result is also `a`") {
@@ -260,7 +260,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {add, reg_a->operand, reg_b->operand}}
+        &(Instruction){.assembly = {add, reg_a->storage, reg_b->storage}}
       ));
     }
     it("should flip operands and avoid moving `b` to result when result is also `b`") {
@@ -271,7 +271,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {add, reg_b->operand, reg_a->operand}}
+        &(Instruction){.assembly = {add, reg_b->storage, reg_a->storage}}
       ));
     }
     it("should use the larger operand's size for the result") {
@@ -283,15 +283,15 @@ spec("function") {
       Value *temp = value_register_for_descriptor(temp_allocator, register_acquire_temp(builder), &descriptor_s32);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {movsx, temp->operand, m8->operand}}
+        &(Instruction){.assembly = {movsx, temp->storage, m8->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {add, temp->operand, r32->operand}}
+        &(Instruction){.assembly = {add, temp->storage, r32->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 2),
-        &(Instruction){.assembly = {mov, result_m32->operand, temp->operand}}
+        &(Instruction){.assembly = {mov, result_m32->storage, temp->storage}}
       ));
     }
     it("should use a temp register when result is also `a`, but both operands are memory") {
@@ -303,15 +303,15 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, temp_reg->operand, m_a->operand}}
+        &(Instruction){.assembly = {mov, temp_reg->storage, m_a->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {add, temp_reg->operand, m_b->operand}}
+        &(Instruction){.assembly = {add, temp_reg->storage, m_b->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 2),
-        &(Instruction){.assembly = {mov, m_a->operand, temp_reg->operand}}
+        &(Instruction){.assembly = {mov, m_a->storage, temp_reg->storage}}
       ));
     }
   }
@@ -322,7 +322,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, temp_reg->operand, imm8(temp_allocator, 42)}}
+        instruction, &(Instruction){.assembly = {mov, temp_reg->storage, imm8(temp_allocator, 42)}}
       ));
     }
     it("should move `a` to result and sub `b` from it when result is neither `a` or `b`") {
@@ -334,11 +334,11 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 2);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, reg_a->operand, reg_b->operand}}
+        &(Instruction){.assembly = {mov, reg_a->storage, reg_b->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {sub, reg_a->operand, reg_c->operand}}
+        &(Instruction){.assembly = {sub, reg_a->storage, reg_c->storage}}
       ));
     }
     it("should avoid moving `a` to result when result is also `a`") {
@@ -349,7 +349,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {sub, reg_a->operand, reg_b->operand}}
+        &(Instruction){.assembly = {sub, reg_a->storage, reg_b->storage}}
       ));
     }
     it("should use a temp A register when result is also `b`") {
@@ -363,15 +363,15 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 3);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, temp_reg->operand, reg_b->operand}}
+        &(Instruction){.assembly = {mov, temp_reg->storage, reg_b->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {sub, temp_reg->operand, reg_c->operand}}
+        &(Instruction){.assembly = {sub, temp_reg->storage, reg_c->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 2),
-        &(Instruction){.assembly = {mov, reg_c->operand, temp_reg->operand}}
+        &(Instruction){.assembly = {mov, reg_c->storage, temp_reg->storage}}
       ));
     }
   }

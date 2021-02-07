@@ -75,7 +75,7 @@ same_type(
           case Function_Argument_Tag_Exact: {
             if(!(
               same_type(a_arg->Exact.descriptor, b_arg->Exact.descriptor) &&
-              operand_equal(&a_arg->Exact.operand, &b_arg->Exact.operand)
+              storage_equal(&a_arg->Exact.storage, &b_arg->Exact.storage)
             )) return false;
             break;
           }
@@ -208,27 +208,27 @@ source_range_print_start_position(
 }
 
 static inline void *
-operand_immediate_as_c_type_internal(
-  Operand operand,
+storage_immediate_as_c_type_internal(
+  Storage operand,
   u64 byte_size
 ) {
   assert(operand.byte_size == byte_size);
-  assert(operand.tag == Operand_Tag_Immediate);
+  assert(operand.tag == Storage_Tag_Immediate);
   return operand.Immediate.memory;
 }
 
-#define operand_immediate_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)operand_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
+#define storage_immediate_as_c_type(_OPERAND_, _TYPE_)\
+  ((_TYPE_ *)storage_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 s64
-operand_immediate_value_up_to_s64(
-  const Operand *operand
+storage_immediate_value_up_to_s64(
+  const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *operand_immediate_as_c_type(*operand, s8);
-    case 2: return *operand_immediate_as_c_type(*operand, s16);
-    case 4: return *operand_immediate_as_c_type(*operand, s32);
-    case 8: return *operand_immediate_as_c_type(*operand, s64);
+    case 1: return *storage_immediate_as_c_type(*operand, s8);
+    case 2: return *storage_immediate_as_c_type(*operand, s16);
+    case 4: return *storage_immediate_as_c_type(*operand, s32);
+    case 8: return *storage_immediate_as_c_type(*operand, s64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -237,14 +237,14 @@ operand_immediate_value_up_to_s64(
 }
 
 u64
-operand_immediate_value_up_to_u64(
-  const Operand *operand
+storage_immediate_value_up_to_u64(
+  const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *operand_immediate_as_c_type(*operand, u8);
-    case 2: return *operand_immediate_as_c_type(*operand, u16);
-    case 4: return *operand_immediate_as_c_type(*operand, u32);
-    case 8: return *operand_immediate_as_c_type(*operand, u64);
+    case 1: return *storage_immediate_as_c_type(*operand, u8);
+    case 2: return *storage_immediate_as_c_type(*operand, u16);
+    case 4: return *storage_immediate_as_c_type(*operand, u32);
+    case 8: return *storage_immediate_as_c_type(*operand, u64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -254,47 +254,47 @@ operand_immediate_value_up_to_u64(
 
 void
 print_operand(
-  const Operand *operand
+  const Storage *operand
 ) {
   switch (operand->tag) {
-    case Operand_Tag_None: {
+    case Storage_Tag_None: {
       printf("_");
       break;
     }
-    case Operand_Tag_Any: {
+    case Storage_Tag_Any: {
       printf("any");
       break;
     }
-    case Operand_Tag_Eflags: {
+    case Storage_Tag_Eflags: {
       printf("eflags");
       break;
     }
-    case Operand_Tag_Register: {
+    case Storage_Tag_Register: {
       u64 bits = operand->byte_size * 8;
       printf("r%"PRIu64, bits);
       break;
     }
-    case Operand_Tag_Xmm: {
+    case Storage_Tag_Xmm: {
       u64 bits = operand->byte_size * 8;
       printf("xmm%"PRIu64, bits);
       break;
     }
-    case Operand_Tag_Immediate: {
+    case Storage_Tag_Immediate: {
       switch(operand->byte_size) {
         case 1: {
-          printf("imm8(0x%02x)", *operand_immediate_as_c_type(*operand, u8));
+          printf("imm8(0x%02x)", *storage_immediate_as_c_type(*operand, u8));
           break;
         }
         case 2: {
-          printf("imm16(0x%04x)", *operand_immediate_as_c_type(*operand, u16));
+          printf("imm16(0x%04x)", *storage_immediate_as_c_type(*operand, u16));
           break;
         }
         case 4: {
-          printf("imm32(0x%08x)", *operand_immediate_as_c_type(*operand, u32));
+          printf("imm32(0x%08x)", *storage_immediate_as_c_type(*operand, u32));
           break;
         }
         case 8: {
-          printf("imm64(0x%016" PRIx64 ")", *operand_immediate_as_c_type(*operand, u64));
+          printf("imm64(0x%016" PRIx64 ")", *storage_immediate_as_c_type(*operand, u64));
           break;
         }
         default: {
@@ -304,7 +304,7 @@ print_operand(
       }
       break;
     }
-    case Operand_Tag_Memory: {
+    case Storage_Tag_Memory: {
       // TODO print better info
       u64 bits = operand->byte_size * 8;
       printf("m%"PRIu64, bits);
@@ -318,8 +318,8 @@ print_operand(
 }
 
 #define define_register(reg_name, reg_index, reg_byte_size) \
-const Operand reg_name = { \
-  .tag = Operand_Tag_Register, \
+const Storage reg_name = { \
+  .tag = Storage_Tag_Register, \
   .byte_size = (reg_byte_size), \
   .Register = {.index = (reg_index)}, \
 };
@@ -363,13 +363,13 @@ define_register(r15d, 0b1111, 4);
 #undef define_register
 
 #define define_xmm_register(reg_name, reg_index) \
-const Operand reg_name##_32 = { \
-  .tag = Operand_Tag_Xmm, \
+const Storage reg_name##_32 = { \
+  .tag = Storage_Tag_Xmm, \
   .byte_size = 4, \
   .Register = {.index = (reg_index)}, \
 };\
-const Operand reg_name##_64 = { \
-  .tag = Operand_Tag_Xmm, \
+const Storage reg_name##_64 = { \
+  .tag = Storage_Tag_Xmm, \
   .byte_size = 8, \
   .Register = {.index = (reg_index)}, \
 };
@@ -394,13 +394,13 @@ make_label(
   return index;
 }
 
-static inline Operand
+static inline Storage
 data_label32(
   Label_Index label_index,
   u64 byte_size
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Memory,
+  return (const Storage) {
+    .tag = Storage_Tag_Memory,
     .byte_size = byte_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
@@ -409,12 +409,12 @@ data_label32(
   };
 }
 
-static inline Operand
+static inline Storage
 code_label32(
   Label_Index label_index
 ) {
-  return (const Operand) {
-    .tag = Operand_Tag_Memory,
+  return (const Storage) {
+    .tag = Storage_Tag_Memory,
     // FIXME this is set at 4 as otherwise current encoder is unhappy
     //       about the size mismatch. It should be zero instead.
     .byte_size = 4,
@@ -425,20 +425,20 @@ code_label32(
   };
 }
 
-#define operand_immediate(_VALUE_)\
-  ((Operand) {                    \
-    .tag = Operand_Tag_Immediate, \
+#define storage_immediate(_VALUE_)\
+  ((Storage) {                    \
+    .tag = Storage_Tag_Immediate, \
     .byte_size = sizeof(*(_VALUE_)), \
     .Immediate.memory = (_VALUE_),\
   })
 
-static inline Operand
+static inline Storage
 imm8(
   const Allocator *allocator,
   u8 value
 ) {
-  return (Operand) {
-    .tag = Operand_Tag_Immediate,
+  return (Storage) {
+    .tag = Storage_Tag_Immediate,
     .byte_size = sizeof(value),
     .Immediate.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
@@ -446,13 +446,13 @@ imm8(
   };
 }
 
-static inline Operand
+static inline Storage
 imm16(
   const Allocator *allocator,
   u16 value
 ) {
-  return (Operand) {
-    .tag = Operand_Tag_Immediate,
+  return (Storage) {
+    .tag = Storage_Tag_Immediate,
     .byte_size = sizeof(value),
     .Immediate.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
@@ -460,13 +460,13 @@ imm16(
   };
 }
 
-static inline Operand
+static inline Storage
 imm32(
   const Allocator *allocator,
   u32 value
 ) {
-  return (Operand) {
-    .tag = Operand_Tag_Immediate,
+  return (Storage) {
+    .tag = Storage_Tag_Immediate,
     .byte_size = sizeof(value),
     .Immediate.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
@@ -474,13 +474,13 @@ imm32(
   };
 }
 
-static inline Operand
+static inline Storage
 imm64(
   const Allocator *allocator,
   u64 value
 ) {
-  return (Operand) {
-    .tag = Operand_Tag_Immediate,
+  return (Storage) {
+    .tag = Storage_Tag_Immediate,
     .byte_size = sizeof(value),
     .Immediate.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
@@ -488,7 +488,7 @@ imm64(
   };
 }
 
-static inline Operand
+static inline Storage
 imm_auto_8_or_32(
   const Allocator *allocator,
   s64 value
@@ -499,11 +499,11 @@ imm_auto_8_or_32(
   if (s64_fits_into_s32(value)) {
     return imm32(allocator, (s32) value);
   }
-  panic("Operand is does not fit into either s8 or s32");
-  return (Operand){0};
+  panic("Storage is does not fit into either s8 or s32");
+  return (Storage){0};
 }
 
-static inline Operand
+static inline Storage
 imm_auto(
   const Allocator *allocator,
   s64 value
@@ -520,14 +520,14 @@ imm_auto(
   return imm64(allocator, value);
 }
 
-static inline Operand
+static inline Storage
 stack(
   s32 offset,
   u64 byte_size
 ) {
   assert(byte_size);
-  return (const Operand) {
-    .tag = Operand_Tag_Memory,
+  return (const Storage) {
+    .tag = Storage_Tag_Memory,
     .byte_size = byte_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Indirect,
@@ -601,35 +601,35 @@ register_bitset_get(
 }
 
 static inline bool
-operand_is_label(
-  const Operand *operand
+storage_is_label(
+  const Storage *operand
 ) {
-  return operand->tag == Operand_Tag_Memory
+  return operand->tag == Storage_Tag_Memory
     && operand->Memory.location.tag == Memory_Location_Tag_Instruction_Pointer_Relative;
 }
 
 static inline bool
-operand_is_register_or_memory(
-  const Operand *operand
+storage_is_register_or_memory(
+  const Storage *operand
 ) {
-  return operand->tag == Operand_Tag_Register || operand->tag == Operand_Tag_Memory;
+  return operand->tag == Storage_Tag_Register || operand->tag == Storage_Tag_Memory;
 }
 
 static inline bool
-operand_equal(
-  const Operand *a,
-  const Operand *b
+storage_equal(
+  const Storage *a,
+  const Storage *b
 ) {
   if (a->tag != b->tag) return false;
   if (a->byte_size != b->byte_size) return false;
   switch(a->tag) {
-    case Operand_Tag_Eflags: {
+    case Storage_Tag_Eflags: {
       return a->Eflags.compare_type == b->Eflags.compare_type;
     }
-    case Operand_Tag_Immediate: {
+    case Storage_Tag_Immediate: {
       return !memcmp(a->Immediate.memory, b->Immediate.memory, a->byte_size);
     }
-    case Operand_Tag_Memory: {
+    case Storage_Tag_Memory: {
       const Memory_Location *a_location = &a->Memory.location;
       const Memory_Location *b_location = &b->Memory.location;
       if (a_location->tag != b_location->tag) return false;
@@ -651,14 +651,14 @@ operand_equal(
       panic("Internal Error: Unexpected Memory_Location_Tag");
       return false;
     }
-    case Operand_Tag_Xmm:
-    case Operand_Tag_Register: {
+    case Storage_Tag_Xmm:
+    case Storage_Tag_Register: {
       return a->Register.index == b->Register.index;
     }
-    case Operand_Tag_Any: {
+    case Storage_Tag_Any: {
       return false; // Is this the semantics I want though?
     }
-    case Operand_Tag_None: {
+    case Storage_Tag_None: {
       return true;
     }
   }
@@ -676,7 +676,7 @@ instruction_equal(
     case Instruction_Type_Assembly: {
       if (a->assembly.mnemonic != b->assembly.mnemonic) return false;
       for (u64 i = 0; i < countof(a->assembly.operands); ++i) {
-        if (!operand_equal(&a->assembly.operands[i], &b->assembly.operands[i])) {
+        if (!storage_equal(&a->assembly.operands[i], &b->assembly.operands[i])) {
           return false;
         }
       }
@@ -699,12 +699,12 @@ value_make_internal(
   Compiler_Source_Location compiler_source_location,
   const Allocator *allocator,
   Descriptor *descriptor,
-  Operand operand
+  Storage operand
 ) {
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
-    .operand = operand,
+    .storage = operand,
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -735,7 +735,7 @@ value_number_literal(
     .negative = false,
     .bits = bits,
   };
-  return value_make(allocator, &descriptor_number_literal, operand_immediate(literal));
+  return value_make(allocator, &descriptor_number_literal, storage_immediate(literal));
 }
 
 Slice *
@@ -745,10 +745,10 @@ value_as_immediate_string(
   if (value->descriptor != &descriptor_string) {
     return 0;
   }
-  if (value->operand.tag != Operand_Tag_Immediate) {
+  if (value->storage.tag != Storage_Tag_Immediate) {
     return 0;
   }
-  return operand_immediate_as_c_type(value->operand, Slice);
+  return storage_immediate_as_c_type(value->storage, Slice);
 }
 
 Value *
@@ -772,7 +772,7 @@ value_global_internal(
 
   *result = (Value) {
     .descriptor = descriptor,
-    .operand = data_label32(label_index, byte_size),
+    .storage = data_label32(label_index, byte_size),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -780,12 +780,12 @@ value_global_internal(
 #define value_global(...)\
   value_global_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-static inline Operand
-operand_eflags(
+static inline Storage
+storage_eflags(
   Compare_Type compare_type
 ) {
-  return (Operand){
-    .tag = Operand_Tag_Eflags,
+  return (Storage){
+    .tag = Storage_Tag_Eflags,
     .byte_size = 1,
     .Eflags = { .compare_type = compare_type }
   };
@@ -793,11 +793,11 @@ operand_eflags(
 
 // TODO consider adding explicit boolean descriptor type
 #define value_from_compare(_allocator_, _compare_type_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, operand_eflags(_compare_type_)\
+  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_)\
 )
 
 #define value_any(_allocator_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_any, (Operand){.tag = Operand_Tag_Any}\
+  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}\
 )
 
 #define value_from_s64(_allocator_, _integer_) value_make_internal(\
@@ -872,16 +872,16 @@ value_from_unsigned_immediate_internal(
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-static inline Operand
-operand_register_for_descriptor(
+static inline Storage
+storage_register_for_descriptor(
   Register reg,
   Descriptor *descriptor
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
-  Operand result = {
-    .tag = register_is_xmm(reg) ? Operand_Tag_Xmm : Operand_Tag_Register,
+  Storage result = {
+    .tag = register_is_xmm(reg) ? Storage_Tag_Xmm : Storage_Tag_Register,
     .Register.index = reg,
     .byte_size = byte_size,
   };
@@ -898,7 +898,7 @@ value_register_for_descriptor_internal(
   Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
     .descriptor = descriptor,
-    .operand = operand_register_for_descriptor(reg, descriptor),
+    .storage = storage_register_for_descriptor(reg, descriptor),
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -911,9 +911,9 @@ rip_value_pointer(
   Program *program,
   Value *value
 ) {
-  assert(operand_is_label(&value->operand));
+  assert(storage_is_label(&value->storage));
   Label *label = program_get_label(
-    program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+    program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
   );
   return (s8 *)label->section->buffer.memory + label->offset_in_section;
 }
@@ -978,9 +978,9 @@ value_as_function(
   const Jit *jit,
   Value *value
 ) {
-  assert(operand_is_label(&value->operand));
+  assert(storage_is_label(&value->storage));
   Label *label = program_get_label(
-    jit->program, value->operand.Memory.location.Instruction_Pointer_Relative.label_index
+    jit->program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
   );
   Section *section = label->section;
   assert(section == &jit->program->memory.sections.code);
@@ -1037,8 +1037,8 @@ function_argument_value_at_index_internal(
         }
         case Function_Argument_Mode_Body: {
           // Large arguments are passed "by reference", i.e. their memory location in the register
-          return value_make_internal(source_location, allocator, arg_descriptor, (Operand) {
-            .tag = Operand_Tag_Memory,
+          return value_make_internal(source_location, allocator, arg_descriptor, (Storage) {
+            .tag = Storage_Tag_Memory,
             .byte_size = byte_size,
             .Memory.location = {
               .tag = Memory_Location_Tag_Indirect,
@@ -1052,9 +1052,9 @@ function_argument_value_at_index_internal(
     }
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
-    Operand operand = stack(offset, byte_size);
+    Storage operand = stack(offset, byte_size);
     Value *value = allocator_allocate(allocator, Value);
-    *value = (Value) { .descriptor = arg_descriptor, .operand = operand };
+    *value = (Value) { .descriptor = arg_descriptor, .storage = operand };
     return value;
   }
 }
@@ -1297,7 +1297,7 @@ program_find_import(
   return import_library_find_symbol(lib, symbol_name);
 }
 
-Operand
+Storage
 import_symbol(
   Execution_Context *context,
   const Slice library_name,
@@ -1350,13 +1350,13 @@ value_number_literal_cast_to(
   u64 *out_bit_size
 ) {
   assert(value->descriptor == &descriptor_number_literal);
-  assert(value->operand.tag == Operand_Tag_Immediate);
+  assert(value->storage.tag == Storage_Tag_Immediate);
 
   if (!descriptor_is_integer(target_descriptor)) {
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  Number_Literal *literal = value->operand.Immediate.memory;
+  Number_Literal *literal = value->storage.Immediate.memory;
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1396,8 +1396,8 @@ same_value_type_or_can_implicitly_move_cast(
     target->descriptor->tag == Descriptor_Tag_Pointer &&
     source->descriptor == &descriptor_number_literal
   ) {
-    assert(source->operand.tag == Operand_Tag_Immediate);
-    Number_Literal *literal = source->operand.Immediate.memory;
+    assert(source->storage.tag == Storage_Tag_Immediate);
+    Number_Literal *literal = source->storage.Immediate.memory;
     return literal->bits == 0;
   }
   if (source->descriptor == &descriptor_number_literal) {
@@ -1411,13 +1411,13 @@ same_value_type_or_can_implicitly_move_cast(
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
       return true;
     }
-    if (source->operand.tag == Operand_Tag_Immediate) {
+    if (source->storage.tag == Storage_Tag_Immediate) {
 
       #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_TYPE_, _TARGET_TYPE_)\
         if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
           assert(target->descriptor == &descriptor_##_TARGET_TYPE_);\
           return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(\
-            *operand_immediate_as_c_type(source->operand, _SOURCE_TYPE_)\
+            *storage_immediate_as_c_type(source->storage, _SOURCE_TYPE_)\
           );\
         }
 
