@@ -272,9 +272,9 @@ encode_instruction_assembly(
           .from = {.section = &program->memory.sections.code},
           .patch_target = patch_target,
         });
-    } else if (storage->tag == Storage_Tag_Immediate) {
+    } else if (storage->tag == Storage_Tag_Static) {
       Slice slice = {
-        .bytes = storage->Immediate.memory,
+        .bytes = storage->Static.memory,
         .length = storage->byte_size,
       };
       virtual_memory_buffer_append_slice(buffer, slice);
@@ -411,7 +411,7 @@ encode_instruction(
         continue;
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
-        if (storage->tag == Storage_Tag_Immediate) {
+        if (storage->tag == Storage_Tag_Static) {
           assert(encoding_size == storage->byte_size);
           continue;
         } else if (storage_is_label(storage)) {

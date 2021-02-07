@@ -379,7 +379,7 @@ typedef enum {
   Storage_Tag_Eflags = 2,
   Storage_Tag_Register = 3,
   Storage_Tag_Xmm = 4,
-  Storage_Tag_Immediate = 5,
+  Storage_Tag_Static = 5,
   Storage_Tag_Memory = 6,
 } Storage_Tag;
 
@@ -394,7 +394,7 @@ typedef struct {
 } Storage_Xmm;
 typedef struct {
   void * memory;
-} Storage_Immediate;
+} Storage_Static;
 typedef struct {
   Memory_Location location;
 } Storage_Memory;
@@ -406,7 +406,7 @@ typedef struct Storage {
     Storage_Eflags Eflags;
     Storage_Register Register;
     Storage_Xmm Xmm;
-    Storage_Immediate Immediate;
+    Storage_Static Static;
     Storage_Memory Memory;
   };
 } Storage;

@@ -227,7 +227,7 @@ move_value(
     return;
   }
 
-  if (source->tag == Storage_Tag_Immediate) {
+  if (source->tag == Storage_Tag_Static) {
     if (source->byte_size > 8) {
       // TODO use XMM or 64 bit registers where appropriate
       // TODO support packed structs
@@ -243,9 +243,9 @@ move_value(
         adjusted_target.byte_size = chunk_size;
         adjusted_target.Memory.location.Indirect.offset += offset;
         Storage adjusted_source = (Storage) {
-          .tag = Storage_Tag_Immediate,
+          .tag = Storage_Tag_Static,
           .byte_size = chunk_size,
-          .Immediate.memory = (s8 *)source->Immediate.memory + offset,
+          .Static.memory = (s8 *)source->Static.memory + offset,
         };
         push_instruction(
           instructions, *source_range,
@@ -697,7 +697,7 @@ make_if(
   Program *program = context->program;
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("if"));
-  if(value->storage.tag == Storage_Tag_Immediate) {
+  if(value->storage.tag == Storage_Tag_Static) {
     s64 imm = storage_immediate_value_up_to_s64(&value->storage);
     if (imm == 0) return label;
     is_always_true = true;
@@ -784,7 +784,7 @@ typedef enum {
   do {\
     Storage *a_operand = &(_a_)->storage;\
     Storage *b_operand = &(_b_)->storage;\
-    if (a_operand->tag == Storage_Tag_Immediate && b_operand->tag == Storage_Tag_Immediate) {\
+    if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
       s64 a_s64 = storage_immediate_value_up_to_s64(a_operand);\
       s64 b_s64 = storage_immediate_value_up_to_s64(b_operand);\
       Value *imm_value = value_from_signed_immediate((_context_)->allocator, a_s64 _operator_ b_s64);\
@@ -828,13 +828,13 @@ plus_or_minus(
   //      that we do support but it is currently very messy to handle
   // There is no `add r/m64 imm64` so use a temp register
   Value *temp_immediate = 0;
-  if (a->storage.tag == Storage_Tag_Immediate && a->storage.byte_size == 8) {
+  if (a->storage.tag == Storage_Tag_Static && a->storage.byte_size == 8) {
     temp_immediate = value_register_for_descriptor(
       context->allocator, register_acquire_temp(context->builder), a->descriptor
     );
     move_value(context->allocator, context->builder, source_range, &temp_immediate->storage, &a->storage);
     a = temp_immediate;
-  } else if (b->storage.tag == Storage_Tag_Immediate && b->storage.byte_size == 8) {
+  } else if (b->storage.tag == Storage_Tag_Static && b->storage.byte_size == 8) {
     temp_immediate = value_register_for_descriptor(
       context->allocator, register_acquire_temp(context->builder), b->descriptor
     );
@@ -1222,8 +1222,8 @@ ensure_compiled_function_body(
     assert(function->body->tag == Token_Tag_Value);
     Value *body_value = function->body->Value.value;
     assert(body_value->descriptor == &descriptor_external_symbol);
-    assert(body_value->storage.tag == Storage_Tag_Immediate);
-    External_Symbol *symbol = body_value->storage.Immediate.memory;
+    assert(body_value->storage.tag == Storage_Tag_Static);
+    External_Symbol *symbol = body_value->storage.Static.memory;
     fn_value->storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     return;
   }
@@ -1464,7 +1464,7 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (to_call->storage.tag == Storage_Tag_Immediate) {
+  if (to_call->storage.tag == Storage_Tag_Static) {
     // TODO it will not be safe to use this register with other calling conventions
     Storage reg = storage_register_for_descriptor(Register_A, to_call_descriptor);
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg, to_call->storage}}});
@@ -1539,10 +1539,10 @@ calculate_arguments_match_score(
       case Function_Argument_Tag_Exact: {
         if (same_type(target_arg->Exact.descriptor, source_arg->descriptor)) {
           if(source_arg->descriptor == &descriptor_number_literal) {
-            assert(source_arg->storage.tag == Storage_Tag_Immediate);
-            assert(target_arg->Exact.storage.tag == Storage_Tag_Immediate);
-            Number_Literal *source_literal = source_arg->storage.Immediate.memory;
-            Number_Literal *target_literal = source_arg->storage.Immediate.memory;
+            assert(source_arg->storage.tag == Storage_Tag_Static);
+            assert(target_arg->Exact.storage.tag == Storage_Tag_Static);
+            Number_Literal *source_literal = source_arg->storage.Static.memory;
+            Number_Literal *target_literal = source_arg->storage.Static.memory;
             if (
               source_literal->bits == target_literal->bits &&
               source_literal->negative == target_literal->negative
@@ -1550,7 +1550,7 @@ calculate_arguments_match_score(
               return Score_Exact_Literal;
             }
           } else if (
-            source_arg->storage.tag == Storage_Tag_Immediate &&
+            source_arg->storage.tag == Storage_Tag_Static &&
             storage_equal(&target_arg->Exact.storage, &source_arg->storage)
           ) {
             return Score_Exact_Literal;

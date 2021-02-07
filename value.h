@@ -93,8 +93,8 @@ Descriptor descriptor_any = {
 Value *type_any_value = &(Value) {
   .descriptor = &descriptor_type,
   .storage = {
-    .tag = Storage_Tag_Immediate,
-    .Immediate.memory = &descriptor_any,
+    .tag = Storage_Tag_Static,
+    .Static.memory = &descriptor_any,
   },
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };

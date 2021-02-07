@@ -224,9 +224,9 @@ token_value_force_immediate_integer(
         u64 *memory = allocator_allocate(context->allocator, u64);
         *memory = bits;
         return value_make(context->allocator, target_descriptor, (Storage) {
-          .tag = Storage_Tag_Immediate,
+          .tag = Storage_Tag_Static,
           .byte_size = u64_to_u32(bit_size / 8),
-          .Immediate.memory = memory,
+          .Static.memory = memory,
         });
       }
       case Literal_Cast_Result_Target_Not_An_Integer: {
@@ -266,7 +266,7 @@ token_value_force_immediate_integer(
     return 0;
   }
 
-  if (value->storage.tag != Storage_Tag_Immediate) {
+  if (value->storage.tag != Storage_Tag_Static) {
     context_error_snprintf(
       context, *source_range,
       "Value is not an immediate"
@@ -278,7 +278,7 @@ token_value_force_immediate_integer(
   if (target_byte_size > descriptor_byte_size(value->descriptor)) {
     context_error_snprintf(
       context, *source_range,
-      "Immediate value does not fit into the target integer size %"PRIu64,
+      "Static value does not fit into the target integer size %"PRIu64,
       target_byte_size
     );
   }
@@ -1904,7 +1904,7 @@ token_parse_operator_definition(
   );
   MASS_ON_ERROR(*context->result) goto err;
 
-  assert(precedence_value->storage.tag == Storage_Tag_Immediate);
+  assert(precedence_value->storage.tag == Storage_Tag_Static);
   u64 precendence = storage_immediate_value_up_to_u64(&precedence_value->storage);
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
@@ -2556,9 +2556,9 @@ compile_time_eval(
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
       temp_result->storage = (Storage){
-        .tag = Storage_Tag_Immediate,
+        .tag = Storage_Tag_Static,
         .byte_size = result_byte_size,
-        .Immediate = {
+        .Static = {
           .memory = result,
         },
       };
@@ -2603,7 +2603,7 @@ token_handle_storage_variant_of(
     default:
     case Storage_Tag_None:
     case Storage_Tag_Any:
-    case Storage_Tag_Immediate:
+    case Storage_Tag_Static:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
     case Storage_Tag_Memory: {
@@ -3247,7 +3247,7 @@ token_handle_array_access(
     context, source_range, index_value, &descriptor_u64
   );
   array_element_value->storage.byte_size = item_byte_size;
-  if (index_value->storage.tag == Storage_Tag_Immediate) {
+  if (index_value->storage.tag == Storage_Tag_Static) {
     s32 index = s64_to_s32(storage_immediate_value_up_to_s64(&index_value->storage));
     array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
   } else {
@@ -3749,7 +3749,7 @@ token_parse_if_expression(
   Value *if_value = value_any(context->allocator);
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
 
-  if (if_value->storage.tag == Storage_Tag_Immediate) {
+  if (if_value->storage.tag == Storage_Tag_Static) {
     Descriptor *stack_descriptor = if_value->descriptor;
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
@@ -4042,7 +4042,7 @@ token_parse_statement_using(
     goto err;
   }
 
-  if (result->storage.tag != Storage_Tag_Immediate) {
+  if (result->storage.tag != Storage_Tag_Static) {
     context_error_snprintf(context, rest.source_range, "Scope for `using` must be compile-time known");
     goto err;
   }
@@ -4447,7 +4447,7 @@ token_parse_definition_and_assignment_statements(
     );
   } else if (
     value->descriptor->tag == Descriptor_Tag_Opaque &&
-    value->storage.tag == Storage_Tag_Immediate
+    value->storage.tag == Storage_Tag_Static
   ) {
     panic("TODO decide how to handle opaque types");
   }

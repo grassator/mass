@@ -53,9 +53,9 @@
   (Value) {\
     .descriptor = &descriptor_type,\
     .storage = {\
-      .tag = Storage_Tag_Immediate,\
+      .tag = Storage_Tag_Static,\
       .byte_size = sizeof(Descriptor),\
-      .Immediate.memory = (_DESCRIPTOR_),\
+      .Static.memory = (_DESCRIPTOR_),\
     },\
     .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
   }

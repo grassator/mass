@@ -599,7 +599,7 @@ main(void) {
     struct_fields("Xmm", (Struct_Item[]){
       { "Register", "index" },
     }),
-    struct_fields("Immediate", (Struct_Item[]){
+    struct_fields("Static", (Struct_Item[]){
       { "void *", "memory" },
     }),
     struct_fields("Memory", (Struct_Item[]){

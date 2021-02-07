@@ -197,8 +197,8 @@ spec("source") {
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0xCAFE")));
       check(token->Value.value->descriptor == &descriptor_number_literal);
-      check(token->Value.value->storage.tag == Storage_Tag_Immediate);
-      Number_Literal *literal = token->Value.value->storage.Immediate.memory;
+      check(token->Value.value->storage.tag == Storage_Tag_Static);
+      Number_Literal *literal = token->Value.value->storage.Static.memory;
       check(slice_equal(literal->digits, slice_literal("CAFE")));
       check(!literal->negative);
       check(literal->base == Number_Base_16);
@@ -215,8 +215,8 @@ spec("source") {
       check(token->tag == Token_Tag_Value);
       check(slice_equal(token->source, slice_literal("0b100")));
       check(token->Value.value->descriptor == &descriptor_number_literal);
-      check(token->Value.value->storage.tag == Storage_Tag_Immediate);
-      Number_Literal *literal = token->Value.value->storage.Immediate.memory;
+      check(token->Value.value->storage.tag == Storage_Tag_Static);
+      Number_Literal *literal = token->Value.value->storage.Static.memory;
       check(slice_equal(literal->digits, slice_literal("100")));
       check(!literal->negative);
       check(literal->base == Number_Base_2);
@@ -925,7 +925,7 @@ spec("source") {
 
       check(status);
       check(descriptor_is_integer(status->descriptor));
-      check(status->storage.tag == Storage_Tag_Immediate);
+      check(status->storage.tag == Storage_Tag_Static);
       check(status->storage.byte_size == 1);
       check(*storage_immediate_as_c_type(status->storage, s8) == 42);
     }
@@ -941,7 +941,7 @@ spec("source") {
 
       check(result);
       check(descriptor_is_integer(result->descriptor));
-      check(result->storage.tag == Storage_Tag_Immediate);
+      check(result->storage.tag == Storage_Tag_Static);
       check(result->storage.byte_size == 1);
       check(*storage_immediate_as_c_type(result->storage, s8) == 42);
     }

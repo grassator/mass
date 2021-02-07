@@ -213,8 +213,8 @@ storage_immediate_as_c_type_internal(
   u64 byte_size
 ) {
   assert(operand.byte_size == byte_size);
-  assert(operand.tag == Storage_Tag_Immediate);
-  return operand.Immediate.memory;
+  assert(operand.tag == Storage_Tag_Static);
+  return operand.Static.memory;
 }
 
 #define storage_immediate_as_c_type(_OPERAND_, _TYPE_)\
@@ -279,7 +279,7 @@ print_operand(
       printf("xmm%"PRIu64, bits);
       break;
     }
-    case Storage_Tag_Immediate: {
+    case Storage_Tag_Static: {
       switch(operand->byte_size) {
         case 1: {
           printf("imm8(0x%02x)", *storage_immediate_as_c_type(*operand, u8));
@@ -427,9 +427,9 @@ code_label32(
 
 #define storage_immediate(_VALUE_)\
   ((Storage) {                    \
-    .tag = Storage_Tag_Immediate, \
+    .tag = Storage_Tag_Static, \
     .byte_size = sizeof(*(_VALUE_)), \
-    .Immediate.memory = (_VALUE_),\
+    .Static.memory = (_VALUE_),\
   })
 
 static inline Storage
@@ -438,9 +438,9 @@ imm8(
   u8 value
 ) {
   return (Storage) {
-    .tag = Storage_Tag_Immediate,
+    .tag = Storage_Tag_Static,
     .byte_size = sizeof(value),
-    .Immediate.memory = memcpy(
+    .Static.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
     ),
   };
@@ -452,9 +452,9 @@ imm16(
   u16 value
 ) {
   return (Storage) {
-    .tag = Storage_Tag_Immediate,
+    .tag = Storage_Tag_Static,
     .byte_size = sizeof(value),
-    .Immediate.memory = memcpy(
+    .Static.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
     ),
   };
@@ -466,9 +466,9 @@ imm32(
   u32 value
 ) {
   return (Storage) {
-    .tag = Storage_Tag_Immediate,
+    .tag = Storage_Tag_Static,
     .byte_size = sizeof(value),
-    .Immediate.memory = memcpy(
+    .Static.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
     ),
   };
@@ -480,9 +480,9 @@ imm64(
   u64 value
 ) {
   return (Storage) {
-    .tag = Storage_Tag_Immediate,
+    .tag = Storage_Tag_Static,
     .byte_size = sizeof(value),
-    .Immediate.memory = memcpy(
+    .Static.memory = memcpy(
       allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
     ),
   };
@@ -626,8 +626,8 @@ storage_equal(
     case Storage_Tag_Eflags: {
       return a->Eflags.compare_type == b->Eflags.compare_type;
     }
-    case Storage_Tag_Immediate: {
-      return !memcmp(a->Immediate.memory, b->Immediate.memory, a->byte_size);
+    case Storage_Tag_Static: {
+      return !memcmp(a->Static.memory, b->Static.memory, a->byte_size);
     }
     case Storage_Tag_Memory: {
       const Memory_Location *a_location = &a->Memory.location;
@@ -745,7 +745,7 @@ value_as_immediate_string(
   if (value->descriptor != &descriptor_string) {
     return 0;
   }
-  if (value->storage.tag != Storage_Tag_Immediate) {
+  if (value->storage.tag != Storage_Tag_Static) {
     return 0;
   }
   return storage_immediate_as_c_type(value->storage, Slice);
@@ -1350,13 +1350,13 @@ value_number_literal_cast_to(
   u64 *out_bit_size
 ) {
   assert(value->descriptor == &descriptor_number_literal);
-  assert(value->storage.tag == Storage_Tag_Immediate);
+  assert(value->storage.tag == Storage_Tag_Static);
 
   if (!descriptor_is_integer(target_descriptor)) {
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  Number_Literal *literal = value->storage.Immediate.memory;
+  Number_Literal *literal = value->storage.Static.memory;
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1396,8 +1396,8 @@ same_value_type_or_can_implicitly_move_cast(
     target->descriptor->tag == Descriptor_Tag_Pointer &&
     source->descriptor == &descriptor_number_literal
   ) {
-    assert(source->storage.tag == Storage_Tag_Immediate);
-    Number_Literal *literal = source->storage.Immediate.memory;
+    assert(source->storage.tag == Storage_Tag_Static);
+    Number_Literal *literal = source->storage.Static.memory;
     return literal->bits == 0;
   }
   if (source->descriptor == &descriptor_number_literal) {
@@ -1411,7 +1411,7 @@ same_value_type_or_can_implicitly_move_cast(
     if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
       return true;
     }
-    if (source->storage.tag == Storage_Tag_Immediate) {
+    if (source->storage.tag == Storage_Tag_Static) {
 
       #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_TYPE_, _TARGET_TYPE_)\
         if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
