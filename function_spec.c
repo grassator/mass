@@ -63,13 +63,13 @@ spec("function") {
 
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s8);
       move_value(temp_allocator, builder, &test_range, &reg_a->storage, &reg_a->storage);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
     it("should not add any instructions when moving value to itself (value equality)") {
-      Value *reg_a1 = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
-      Value *reg_a2 = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
+      Value *reg_a1 = value_register_for_descriptor(temp_context, Register_A, &descriptor_s8);
+      Value *reg_a2 = value_register_for_descriptor(temp_context, Register_A, &descriptor_s8);
       move_value(temp_allocator, builder, &test_range, &reg_a1->storage, &reg_a2->storage);
       check(dyn_array_length(builder->code_block.instructions) == 0);
     }
@@ -78,13 +78,13 @@ spec("function") {
         &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
       };
       Value *immediates[] = {
-        value_from_s8(temp_allocator, 0),
-        value_from_s16(temp_allocator, 0),
-        value_from_s32(temp_allocator, 0),
-        value_from_s64(temp_allocator, 0),
+        value_from_s8(temp_context, 0),
+        value_from_s16(temp_context, 0),
+        value_from_s32(temp_context, 0),
+        value_from_s64(temp_context, 0),
       };
       for (u64 i = 0; i < countof(descriptors); ++i) {
-        Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, descriptors[i]);
+        Value *reg_a = value_register_for_descriptor(temp_context, Register_A, descriptors[i]);
         // We end at the current descriptor index to make sure we do not
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates)); ++j) {
@@ -103,13 +103,13 @@ spec("function") {
         &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
       };
       Value *immediates[] = {
-        value_from_s8(temp_allocator, 42),
-        value_from_s16(temp_allocator, 4200),
-        value_from_s32(temp_allocator, 42000),
-        value_from_s64(temp_allocator, 42ll << 32ll),
+        value_from_s8(temp_context, 42),
+        value_from_s16(temp_context, 4200),
+        value_from_s32(temp_context, 42000),
+        value_from_s64(temp_context, 42ll << 32ll),
       };
       for (u64 i = 0; i < countof(descriptors); ++i) {
-        Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, descriptors[i]);
+        Value *reg_a = value_register_for_descriptor(temp_context, Register_A, descriptors[i]);
         // We end at the current descriptor index to make sure we do not
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
@@ -130,9 +130,9 @@ spec("function") {
         &descriptor_s8, &descriptor_s16, &descriptor_s32, &descriptor_s64,
       };
       Value *immediates[] = {
-        value_from_s8(temp_allocator, 42),
-        value_from_s16(temp_allocator, 4200),
-        value_from_s32(temp_allocator, 42000),
+        value_from_s8(temp_context, 42),
+        value_from_s16(temp_context, 4200),
+        value_from_s32(temp_context, 42000),
       };
       for (u64 i = 0; i < countof(descriptors); ++i) {
         Value *memory = &(Value){descriptors[i], stack(0, descriptor_byte_size(descriptors[i]))};
@@ -163,10 +163,10 @@ spec("function") {
     }
     it("should use a temp register for a imm64 to memory move") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
-      Value *immediate = value_from_s64(temp_allocator, 42ll << 32);
+      Value *immediate = value_from_s64(temp_context, 42ll << 32);
       move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate->storage);
       check(dyn_array_length(builder->code_block.instructions) == 2);
-      Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s64);
+      Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s64);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
         &(Instruction){.assembly = {mov, temp_reg->storage, immediate->storage}}
@@ -185,7 +185,7 @@ spec("function") {
       for (u64 i = 0; i < countof(tests); ++i) {
         dyn_array_clear(builder->code_block.instructions);
         Value *memory = &(Value){&descriptor_s8, stack(0, 1)};
-        Value *eflags = value_from_compare(temp_allocator, tests[i].compare_type);
+        Value *eflags = value_from_compare(temp_context, tests[i].compare_type);
         move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 1);
         Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
@@ -206,9 +206,9 @@ spec("function") {
           tests[i].descriptor,
           stack(0, descriptor_byte_size(tests[i].descriptor))
         };
-        Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s8);
-        Value *resized_temp_reg = value_register_for_descriptor(temp_allocator, Register_C, tests[i].descriptor);
-        Value *eflags = value_from_compare(temp_allocator, Compare_Type_Equal);
+        Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s8);
+        Value *resized_temp_reg = value_register_for_descriptor(temp_context, Register_C, tests[i].descriptor);
+        Value *eflags = value_from_compare(temp_context, Compare_Type_Equal);
         move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 3);
         check(instruction_equal(
@@ -228,8 +228,8 @@ spec("function") {
   }
   describe("plus") {
     it("should fold s8 immediates and move them to the result value") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s8);
-      plus(temp_context, &test_range, reg_a, value_from_s8(temp_allocator, 30), value_from_s8(temp_allocator, 12));
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s8);
+      plus(temp_context, &test_range, reg_a, value_from_s8(temp_context, 30), value_from_s8(temp_context, 12));
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
@@ -237,9 +237,9 @@ spec("function") {
       ));
     }
     it("should move `a` to result and add `b` to it when result is neither `a` or `b`") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
-      Value *reg_c = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
+      Value *reg_c = value_register_for_descriptor(temp_context, Register_C, &descriptor_s32);
 
       plus(temp_context, &test_range, reg_a, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 2);
@@ -253,8 +253,8 @@ spec("function") {
       ));
     }
     it("should avoid moving `a` to result when result is also `a`") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
 
       plus(temp_context, &test_range, reg_a, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
@@ -264,8 +264,8 @@ spec("function") {
       ));
     }
     it("should flip operands and avoid moving `b` to result when result is also `b`") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
 
       plus(temp_context, &test_range, reg_b, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
@@ -275,12 +275,12 @@ spec("function") {
       ));
     }
     it("should use the larger operand's size for the result") {
-      Value *r32 = value_register_for_descriptor(temp_allocator, register_acquire_temp(builder), &descriptor_s32);
+      Value *r32 = value_register_for_descriptor(temp_context, register_acquire_temp(builder), &descriptor_s32);
       Value *result_m32 = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m8 = &(Value){&descriptor_s8, stack(0, 1)};
       plus(temp_context, &test_range, result_m32, r32, m8);
       check(dyn_array_length(builder->code_block.instructions) == 3);
-      Value *temp = value_register_for_descriptor(temp_allocator, register_acquire_temp(builder), &descriptor_s32);
+      Value *temp = value_register_for_descriptor(temp_context, register_acquire_temp(builder), &descriptor_s32);
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
         &(Instruction){.assembly = {movsx, temp->storage, m8->storage}}
@@ -295,7 +295,7 @@ spec("function") {
       ));
     }
     it("should use a temp register when result is also `a`, but both operands are memory") {
-      Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s32);
+      Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s32);
       Value *m_a = &(Value){&descriptor_s32, stack(0, 4)};
       Value *m_b = &(Value){&descriptor_s32, stack(4, 4)};
 
@@ -317,8 +317,8 @@ spec("function") {
   }
   describe("minus") {
     it("should fold s8 immediates and move them to the result value") {
-      Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s8);
-      minus(temp_context, &test_range, temp_reg, value_from_s8(temp_allocator, 52), value_from_s8(temp_allocator, 10));
+      Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s8);
+      minus(temp_context, &test_range, temp_reg, value_from_s8(temp_context, 52), value_from_s8(temp_context, 10));
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
@@ -326,9 +326,9 @@ spec("function") {
       ));
     }
     it("should move `a` to result and sub `b` from it when result is neither `a` or `b`") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
-      Value *reg_c = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
+      Value *reg_c = value_register_for_descriptor(temp_context, Register_C, &descriptor_s32);
 
       minus(temp_context, &test_range, reg_a, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 2);
@@ -342,8 +342,8 @@ spec("function") {
       ));
     }
     it("should avoid moving `a` to result when result is also `a`") {
-      Value *reg_a = value_register_for_descriptor(temp_allocator, Register_A, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
+      Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
 
       minus(temp_context, &test_range, reg_a, reg_a, reg_b);
       check(dyn_array_length(builder->code_block.instructions) == 1);
@@ -353,11 +353,11 @@ spec("function") {
       ));
     }
     it("should use a temp A register when result is also `b`") {
-      Value *temp_reg = value_register_for_descriptor(temp_allocator, Register_D, &descriptor_s32);
-      Value *reg_b = value_register_for_descriptor(temp_allocator, Register_B, &descriptor_s32);
+      Value *temp_reg = value_register_for_descriptor(temp_context, Register_D, &descriptor_s32);
+      Value *reg_b = value_register_for_descriptor(temp_context, Register_B, &descriptor_s32);
       register_acquire(builder, Register_B);
       register_acquire(builder, Register_C);
-      Value *reg_c = value_register_for_descriptor(temp_allocator, Register_C, &descriptor_s32);
+      Value *reg_c = value_register_for_descriptor(temp_context, Register_C, &descriptor_s32);
 
       minus(temp_context, &test_range, reg_c, reg_b, reg_c);
       check(dyn_array_length(builder->code_block.instructions) == 3);

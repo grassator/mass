@@ -287,6 +287,7 @@ typedef struct Compilation {
 typedef struct Execution_Context {
   Allocator *allocator;
   Compilation *compilation;
+  u64 epoch;
   Program *program;
   Scope *scope;
   Function_Builder *builder;

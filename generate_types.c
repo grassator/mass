@@ -648,6 +648,7 @@ main(void) {
     { "Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Value *", "next_overload" },
+    { "u64", "epoch" },
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 

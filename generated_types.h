@@ -462,6 +462,7 @@ typedef struct Value {
   Descriptor * descriptor;
   Storage storage;
   Value * next_overload;
+  u64 epoch;
   Compiler_Source_Location compiler_source_location;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
@@ -1014,6 +1015,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
     .name = slice_literal_fields("next_overload"),
     .descriptor = &descriptor_value_pointer,
     .offset = offsetof(Value, next_overload),
+  },
+  {
+    .name = slice_literal_fields("epoch"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Value, epoch),
   },
   {
     .name = slice_literal_fields("compiler_source_location"),

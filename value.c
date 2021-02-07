@@ -693,24 +693,46 @@ instruction_equal(
   return true;
 }
 
-
 static inline Value *
-value_make_internal(
+value_init_internal(
   Compiler_Source_Location compiler_source_location,
-  const Allocator *allocator,
+  Value *result,
+  Execution_Context *context,
   Descriptor *descriptor,
-  Storage operand
+  Storage storage
 ) {
-  Value *result = allocator_allocate(allocator, Value);
   *result = (Value) {
+    .epoch = context->epoch,
     .descriptor = descriptor,
-    .storage = operand,
+    .storage = storage,
     .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
-#define value_make(...) value_make_internal(COMPILER_SOURCE_LOCATION, ##__VA_ARGS__)
+#define value_init(...) value_init_internal(\
+  COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
+)
+
+static inline Value *
+value_make_internal(
+  Compiler_Source_Location compiler_source_location,
+  Execution_Context *context,
+  Descriptor *descriptor,
+  Storage storage
+) {
+  return value_init_internal(
+    compiler_source_location,
+    allocator_allocate(context->allocator, Value),
+    context,
+    descriptor,
+    storage
+  );
+}
+
+#define value_make(...) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
+)
 
 Value *
 value_number_literal(
@@ -735,7 +757,14 @@ value_number_literal(
     .negative = false,
     .bits = bits,
   };
-  return value_make(allocator, &descriptor_number_literal, storage_immediate(literal));
+  Value *value = allocator_allocate(allocator, Value);
+  *value = (Value) {
+    .epoch = 0,
+    .descriptor = &descriptor_number_literal,
+    .storage = storage_immediate(literal),
+    .compiler_source_location = COMPILER_SOURCE_LOCATION,
+  };
+  return value;
 }
 
 Slice *
@@ -771,6 +800,7 @@ value_global_internal(
   label->resolved = true;
 
   *result = (Value) {
+    .epoch = context->epoch,
     .descriptor = descriptor,
     .storage = data_label32(label_index, byte_size),
     .compiler_source_location = compiler_source_location,
@@ -796,58 +826,58 @@ storage_eflags(
   COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_)\
 )
 
-#define value_any(_allocator_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}\
+#define value_any(_CONTEXT_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}\
 )
 
-#define value_from_s64(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s64, imm64((_allocator_), (_integer_))\
+#define value_from_s64(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_s32(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s32, imm32((_allocator_), (_integer_))\
+#define value_from_s32(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_s16(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s16, imm16((_allocator_), (_integer_))\
+#define value_from_s16(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_s8(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_s8, imm8((_allocator_), (_integer_))\
+#define value_from_s8(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_u64(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u64, imm64((_allocator_), (_integer_))\
+#define value_from_u64(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_u32(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u32, imm32((_allocator_), (_integer_))\
+#define value_from_u32(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_CONTEXT_)->allocator, (_integer_))\
 )
 
-#define value_from_u16(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u16, imm16((_allocator_), (_integer_))\
+#define value_from_u16(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_allocator_)->allocator, (_integer_))\
 )
 
-#define value_from_u8(_allocator_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_allocator_), &descriptor_u8, imm8((_allocator_), (_integer_))\
+#define value_from_u8(_CONTEXT_, _integer_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_CONTEXT_)->allocator, (_integer_))\
 )
 
 static inline Value *
 value_from_signed_immediate_internal(
   Compiler_Source_Location location,
-  const Allocator *allocator,
+  Execution_Context *context,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return value_make_internal(location, allocator, &descriptor_s8, imm8(allocator, (s8)value));
+    return value_make_internal(location, context, &descriptor_s8, imm8(context->allocator, (s8)value));
   }
   if (s64_fits_into_s16(value)) {
-    return value_make_internal(location, allocator, &descriptor_s16, imm16(allocator, (s16)value));
+    return value_make_internal(location, context, &descriptor_s16, imm16(context->allocator, (s16)value));
   }
   if (s64_fits_into_s32(value)) {
-    return value_make_internal(location, allocator, &descriptor_s32, imm32(allocator, (s32)value));
+    return value_make_internal(location, context, &descriptor_s32, imm32(context->allocator, (s32)value));
   }
-  return value_make_internal(location, allocator, &descriptor_s64, imm64(allocator, value));
+  return value_make_internal(location, context, &descriptor_s64, imm64(context->allocator, value));
 }
 #define value_from_signed_immediate(...)\
   value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -855,19 +885,19 @@ value_from_signed_immediate_internal(
 static inline Value *
 value_from_unsigned_immediate_internal(
   Compiler_Source_Location location,
-  const Allocator *allocator,
+  Execution_Context *context,
   u64 value
 ) {
   if (u64_fits_into_u8(value)) {
-    return value_make_internal(location, allocator, &descriptor_u8, imm8(allocator, (u8)value));
+    return value_make_internal(location, context, &descriptor_u8, imm8(context->allocator, (u8)value));
   }
   if (u64_fits_into_u16(value)) {
-    return value_make_internal(location, allocator, &descriptor_u16, imm16(allocator, (u16)value));
+    return value_make_internal(location, context, &descriptor_u16, imm16(context->allocator, (u16)value));
   }
   if (u64_fits_into_u32(value)) {
-    return value_make_internal(location, allocator, &descriptor_u32, imm32(allocator, (u32)value));
+    return value_make_internal(location, context, &descriptor_u32, imm32(context->allocator, (u32)value));
   }
-  return value_make_internal(location, allocator, &descriptor_u64, imm64(allocator, value));
+  return value_make_internal(location, context, &descriptor_u64, imm64(context->allocator, value));
 }
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -891,17 +921,13 @@ storage_register_for_descriptor(
 static inline Value *
 value_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  Execution_Context *context,
   Register reg,
   Descriptor *descriptor
 ) {
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .storage = storage_register_for_descriptor(reg, descriptor),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
+  return value_make_internal(
+    compiler_source_location, context, descriptor, storage_register_for_descriptor(reg, descriptor)
+  );
 }
 #define value_register_for_descriptor(...)\
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -991,7 +1017,7 @@ value_as_function(
 Value *
 function_argument_value_at_index_internal(
   Compiler_Source_Location source_location,
-  Allocator *allocator,
+  Execution_Context *context,
   Descriptor_Function *function,
   u64 argument_index,
   Function_Argument_Mode mode
@@ -1023,21 +1049,22 @@ function_argument_value_at_index_internal(
 
   assert(countof(general_registers) == countof(float_registers));
 
+  Allocator *allocator = context->allocator;
   if (argument_index < countof(general_registers)) {
     Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
     Register reg = registers[argument_index];
     if (byte_size <= 8) {
-      return value_register_for_descriptor_internal(source_location, allocator, reg, arg_descriptor);
+      return value_register_for_descriptor_internal(source_location, context, reg, arg_descriptor);
     } else {
       switch(mode) {
         case Function_Argument_Mode_Call: {
           // For the caller we pretend that the type is a pointer since we do not have references
           Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
-          return value_register_for_descriptor_internal(source_location, allocator, reg, pointer_descriptor);
+          return value_register_for_descriptor_internal(source_location, context, reg, pointer_descriptor);
         }
         case Function_Argument_Mode_Body: {
           // Large arguments are passed "by reference", i.e. their memory location in the register
-          return value_make_internal(source_location, allocator, arg_descriptor, (Storage) {
+          return value_make_internal(source_location, context, arg_descriptor, (Storage) {
             .tag = Storage_Tag_Memory,
             .byte_size = byte_size,
             .Memory.location = {

@@ -223,7 +223,7 @@ token_value_force_immediate_integer(
         // Always copy full value. Truncation is handled by the byte_size of the immediate
         u64 *memory = allocator_allocate(context->allocator, u64);
         *memory = bits;
-        return value_make(context->allocator, target_descriptor, (Storage) {
+        return value_make(context, target_descriptor, (Storage) {
           .tag = Storage_Tag_Static,
           .byte_size = u64_to_u32(bit_size / 8),
           .Static.memory = memory,
@@ -383,7 +383,7 @@ scope_entry_force(
       Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
       Execution_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
-      Value *result = value_any(context->allocator);
+      Value *result = value_any(context);
       compile_time_eval(&lazy_context, expr->tokens, result);
       if (result && result->descriptor->name.length == 0) {
         result->descriptor->name = expr->name;
@@ -847,8 +847,13 @@ tokenize(
           memcpy(bytes, string_buffer->memory, string_buffer->occupied);
           Slice *string = allocator_allocate(allocator, Slice);
           *string = (Slice){bytes, string_buffer->occupied};
-          current_token->Value.value =
-            value_make(allocator, &descriptor_string, storage_immediate(string));
+          current_token->Value.value = allocator_allocate(allocator, Value);
+          *current_token->Value.value = (Value) {
+            .epoch = 0,
+            .descriptor = &descriptor_string,
+            .storage = storage_immediate(string),
+            .compiler_source_location = COMPILER_SOURCE_LOCATION,
+          };
           accept_and_push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
@@ -1257,13 +1262,7 @@ token_make_macro_capture_function(
     },
   };
 
-  Value *result = allocator_allocate(context->allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .storage = {.tag = Storage_Tag_None },
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-  };
-  return result;
+  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None});
 }
 
 void
@@ -1431,7 +1430,7 @@ token_parse_macros(
       *match_length = token_match_pattern(token_view, macro, &match, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
 
-      Value *macro_result = value_any(context->allocator);
+      Value *macro_result = value_any(context);
       token_apply_macro_syntax(context, match, macro, macro_result);
       Token_View matched_view = token_view_rest(&token_view, *match_length);
       replacement = allocator_allocate(context->allocator, Token);
@@ -1563,7 +1562,7 @@ token_match_argument(
       },
     };
   } else {
-    Value *value = value_any(context->allocator);
+    Value *value = value_any(context);
     compile_time_eval(context, view, value);
     arg = (Function_Argument) {
       .tag = Function_Argument_Tag_Exact,
@@ -1637,6 +1636,18 @@ token_force_value(
 
         return *context->result;
       } else {
+        if (value->storage.tag != Storage_Tag_Static && value->storage.tag != Storage_Tag_None) {
+          if (value->epoch != context->epoch) {
+            context_error_snprintf(
+              context, token->source_range,
+              "Trying to access a runtime variable %"PRIslice" from a different epoch. "
+              "This happens when you access value from runtime in compile-time execution "
+              "or a runtime value of one compile time execution in a diffrent one.",
+              SLICE_EXPAND_PRINTF(name)
+            );
+            return *context->result;
+          }
+        }
         return assign(context, &token->source_range, result_value, value);
       }
     }
@@ -1700,7 +1711,7 @@ token_match_call_arguments(
       // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
-      Value *result_value = value_any(context->allocator);
+      Value *result_value = value_any(context);
       token_parse_expression(context, view, result_value, Expression_Parse_Mode_Default);
       dyn_array_push(result, result_value);
     }
@@ -1737,7 +1748,7 @@ token_handle_user_defined_operator(
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
-    Value *arg_value = value_any(context->allocator);
+    Value *arg_value = value_any(context);
     const Token *arg = token_view_get(args, i);
     MASS_ON_ERROR(token_force_value(context, arg, arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
@@ -1753,11 +1764,8 @@ token_handle_user_defined_operator(
   Label_Index fake_return_label_index =
     make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
   {
-    Value *return_label_value = allocator_allocate(context->allocator, Value);
-    *return_label_value = (Value) {
-      .descriptor = &descriptor_void,
-      .storage = code_label32(fake_return_label_index),
-    };
+    Value *return_label_value =
+      value_make(context, &descriptor_void, code_label32(fake_return_label_index));
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = return_label_value,
@@ -1897,7 +1905,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Value *precedence_value = value_any(context->allocator);
+  Value *precedence_value = value_any(context);
   MASS_ON_ERROR(token_force_value(context, precedence_token, precedence_value)) goto err;
   precedence_value = token_value_force_immediate_integer(
     context, &precedence_token->source_range, precedence_value, &descriptor_u64
@@ -2404,7 +2412,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context->allocator, descriptor, (Storage){0});
+  Value *result = value_make(context, descriptor, (Storage){0});
   descriptor->Function.body = body;
   descriptor->Function.scope = function_scope;
   if (body->tag == Token_Tag_Value) {
@@ -2425,6 +2433,12 @@ token_process_function_literal(
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
+static u64 get_new_epoch() {
+  // FIXME make atomic
+  static u64 epoch = 1;
+  return epoch++;
+}
+
 void
 compile_time_eval(
   Execution_Context *context,
@@ -2437,6 +2451,7 @@ compile_time_eval(
 
   Jit *jit = &context->compilation->jit;
   Execution_Context eval_context = *context;
+  eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
   // TODO consider if compile-time eval should create a nested scope
   //eval_context.scope = scope_make(context->allocator, context->scope);
@@ -2451,7 +2466,7 @@ compile_time_eval(
     },
   };
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval"));
-  Value *eval_value = value_make(context->allocator, descriptor, code_label32(eval_label_index));
+  Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index));
   Function_Builder eval_builder = {
     .function = &descriptor->Function,
     .label_index = eval_label_index,
@@ -2466,7 +2481,7 @@ compile_time_eval(
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.
   //       Ideally there would be a type-only eval available instead
-  Value *expression_result_value = value_any(context->allocator);
+  Value *expression_result_value = value_any(context);
   token_parse_expression(&eval_context, view, expression_result_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
@@ -2511,20 +2526,16 @@ compile_time_eval(
   }
 
   // Use memory-indirect addressing to copy
-  Value *out_value = allocator_allocate(context->allocator, Value);
-  *out_value = (Value) {
-    .descriptor = expression_result_value->descriptor,
-    .storage = (Storage){
-      .tag = Storage_Tag_Memory,
-      .byte_size = expression_result_value->storage.byte_size,
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = {
-          .base_register = out_register
-        },
+  Value *out_value = value_make(&eval_context, expression_result_value->descriptor, (Storage){
+    .tag = Storage_Tag_Memory,
+    .byte_size = expression_result_value->storage.byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base_register = out_register
       },
     },
-  };
+  });
 
   MASS_ON_ERROR(assign(&eval_context, source_range, out_value, expression_result_value)) {
     context->result = eval_context.result;
@@ -2538,7 +2549,7 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = value_make(context->allocator, out_value->descriptor, (Storage){0});
+  Value *temp_result = value_make(context, out_value->descriptor, (Storage){0});
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
       temp_result->storage = (Storage){0};
@@ -2624,7 +2635,7 @@ token_handle_storage_variant_of(
         }
       }
       storage_value = value_make(
-        context->allocator,
+        context,
         result_descriptor,
         imm8(context->allocator, value->storage.Register.index)
       );
@@ -2645,7 +2656,7 @@ token_handle_c_string(
   if (!c_string) goto err;
 
   const Value *c_string_bytes = value_global_c_string_from_slice(context, *c_string);
-  Value *c_string_pointer = value_any(context->allocator);
+  Value *c_string_pointer = value_any(context);
   load_address(context, &args_token->source_range, c_string_pointer, c_string_bytes);
   MASS_ON_ERROR(assign(context, &args_token->source_range, result_value, c_string_pointer));
 
@@ -2694,11 +2705,7 @@ token_handle_cast(
       context, source_range, value, cast_to_descriptor
     );
   } else if (cast_to_byte_size < original_byte_size) {
-    after_cast_value = allocator_allocate(context->allocator, Value);
-    *after_cast_value = (Value) {
-      .descriptor = cast_to_descriptor,
-      .storage = value->storage,
-    };
+    after_cast_value = value_make(context, cast_to_descriptor, value->storage);
     after_cast_value->storage.byte_size = cast_to_byte_size;
   }
   MASS_ON_ERROR(assign(context, source_range, result_value, after_cast_value));
@@ -2716,7 +2723,7 @@ token_handle_negation(
   const Token *token = token_view_get(args, 0);
 
   // FIXME use result_value here
-  Value *value = value_any(context->allocator);
+  Value *value = value_any(context);
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
@@ -2725,7 +2732,7 @@ token_handle_negation(
     *negated = *original;
     negated->negative = !negated->negative;
     negated_value = value_make(
-      context->allocator, &descriptor_number_literal, storage_immediate(negated)
+      context, &descriptor_number_literal, storage_immediate(negated)
     );
   } else {
     panic("TODO support general negation");
@@ -2851,7 +2858,7 @@ token_handle_function_call(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *target = value_any(context->allocator);
+  Value *target = value_any(context);
   MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
   assert(token_match(args_token, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}));
 
@@ -2865,7 +2872,7 @@ token_handle_function_call(
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
     non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
     Value *fake_target_value =
-      value_make(context->allocator, non_compile_time_descriptor, target->storage);
+      value_make(context, non_compile_time_descriptor, target->storage);
     const Token *fake_target = token_value_make(context, fake_target_value, source_range);
     Token_View fake_eval_view = {
       .tokens = (const Token*[]){fake_target, args_token},
@@ -3238,11 +3245,7 @@ token_handle_array_access(
   Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
-  Value *array_element_value = allocator_allocate(context->allocator, Value);
-  *array_element_value = (Value) {
-    .descriptor = item_descriptor,
-    .storage = array_value->storage
-  };
+  Value *array_element_value = value_make(context, item_descriptor, array_value->storage);
   index_value = maybe_coerce_number_literal_to_integer(
     context, source_range, index_value, &descriptor_u64
   );
@@ -3256,8 +3259,7 @@ token_handle_array_access(
     // or the index are stored, but it is
 
     Register reg = register_acquire_temp(context->builder);
-    Value *new_base_register =
-      value_register_for_descriptor(context->allocator, reg, &descriptor_s64);
+    Value *new_base_register = value_register_for_descriptor(context, reg, &descriptor_s64);
 
     // Move the index into the register
     move_value(
@@ -3268,7 +3270,7 @@ token_handle_array_access(
       &index_value->storage
     );
 
-    Value *byte_size_value = value_from_s64(context->allocator, item_byte_size);
+    Value *byte_size_value = value_from_s64(context, item_byte_size);
     // Multiply index by the item byte size
     multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
 
@@ -3354,7 +3356,7 @@ token_eval_operator(
   } else if (slice_equal(operator, slice_literal("&"))) {
     const Token *pointee_token = token_view_get(args_view, 0);
 
-    Value *pointee = value_any(context->allocator);
+    Value *pointee = value_any(context);
     MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
 
     load_address(context, &pointee_token->source_range, result_value, pointee);
@@ -3362,11 +3364,11 @@ token_eval_operator(
     const Token *body = token_view_get(args_view, 0);
     if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
       Value *scope_value =
-        value_make(context->allocator, &descriptor_scope, storage_immediate(context->scope));
+        value_make(context, &descriptor_scope, storage_immediate(context->scope));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .source = slice_literal("context") })) {
       Value *scope_value =
-        value_make(context->allocator, &descriptor_execution_context, storage_immediate(context));
+        value_make(context, &descriptor_execution_context, storage_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
     } else if (token_match(body, &(Token_Pattern){ .group_tag = Token_Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
@@ -3381,7 +3383,7 @@ token_eval_operator(
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
 
-    Value *lhs_value = value_any(context->allocator);
+    Value *lhs_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
     if (
       lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
@@ -3410,7 +3412,7 @@ token_eval_operator(
         token_match(rhs, &(Token_Pattern){.group_tag = Token_Group_Tag_Paren}) ||
         (rhs->tag == Token_Tag_Value && rhs->Value.value->descriptor == &descriptor_number_literal)
       ) {
-        Value *index = value_any(context->allocator);
+        Value *index = value_any(context);
         token_force_value(context, rhs, index);
         token_handle_array_access(context, &lhs->source_range, lhs_value, index, result_value);
       } else {
@@ -3437,9 +3439,9 @@ token_eval_operator(
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
 
-    Value *lhs_value = value_any(context->allocator);
+    Value *lhs_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context->allocator);
+    Value *rhs_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
@@ -3503,9 +3505,9 @@ token_eval_operator(
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
 
-    Value *lhs_value = value_any(context->allocator);
+    Value *lhs_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context->allocator);
+    Value *rhs_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
@@ -3595,7 +3597,7 @@ token_eval_operator(
     MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = token_view_get(args_view, 0);
-    Value *function_value = value_any(context->allocator);
+    Value *function_value = value_any(context);
     MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
       if (
@@ -3653,7 +3655,7 @@ token_dispatch_operator(
       },
     },
   };
-  Value *result_value = value_any(context->allocator);
+  Value *result_value = value_any(context);
   token_eval_operator(context, args_view, operator_entry, result_value);
   MASS_ON_ERROR(*context->result) return;
 
@@ -3738,7 +3740,7 @@ token_parse_if_expression(
     goto err;
   }
 
-  Value *condition_value = value_any(context->allocator);
+  Value *condition_value = value_any(context);
   token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*context->result) goto err;
 
@@ -3746,7 +3748,7 @@ token_parse_if_expression(
     context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
   );
 
-  Value *if_value = value_any(context->allocator);
+  Value *if_value = value_any(context);
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
 
   if (if_value->storage.tag == Storage_Tag_Static) {
@@ -3959,10 +3961,7 @@ token_parse_block_no_scope(
   // FIXME deal with terminated vs unterminated statements
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) return;
-    last_result = (Value) {
-      .descriptor = &descriptor_any,
-      .storage = {.tag = Storage_Tag_Any},
-    };
+    value_init(&last_result, context, &descriptor_any, (Storage){.tag = Storage_Tag_Any});
     Token_View rest = token_view_rest(&children_view, start_index);
     // Skipping over empty statements
     if (token_match(token_view_get(rest, 0), &token_pattern_semicolon)) {
@@ -4034,7 +4033,7 @@ token_parse_statement_using(
   Token_Match(keyword, .tag = Token_Tag_Id, .source = slice_literal("using"));
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
 
-  Value *result = value_any(context->allocator);
+  Value *result = value_any(context);
   token_parse_expression(context, rest, result, Expression_Parse_Mode_Default);
 
   if (result->descriptor != &descriptor_scope) {
@@ -4099,11 +4098,7 @@ token_parse_statement_label(
     Scope *label_scope = context->scope;
 
     Label_Index label = make_label(context->program, &context->program->memory.sections.code, id->source);
-    value = allocator_allocate(context->allocator, Value);
-    *value = (Value) {
-      .descriptor = &descriptor_void,
-      .storage = code_label32(label),
-    };
+    value = value_make(context, &descriptor_void, code_label32(label));
     scope_define(label_scope, id->source, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
@@ -4273,7 +4268,7 @@ token_match_fixed_array_type(
     scope_lookup_type(context, context->scope, type->source_range, type->source);
 
   Token_View size_view = square_brace->Group.children;
-  Value *size_value = value_any(context->allocator);
+  Value *size_value = value_any(context);
   compile_time_eval(context, size_view, size_value);
   size_value = token_value_force_immediate_integer(
     context, &size_view.source_range, size_value, &descriptor_u32
@@ -4437,7 +4432,7 @@ token_parse_definition_and_assignment_statements(
     goto err;
   }
 
-  Value *value = value_any(context->allocator);
+  Value *value = value_any(context);
   token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -4490,7 +4485,7 @@ token_parse_assignment(
     return 0;
   }
 
-  Value *target = value_any(context->allocator);
+  Value *target = value_any(context);
   if (!token_parse_definition(context, lhs, target)) {
     token_parse_expression(context, lhs, target, Expression_Parse_Mode_Default);
   }
@@ -4707,9 +4702,16 @@ scope_define_builtins(
         }\
       },\
     };\
+    Value *value = allocator_allocate(allocator, Value);\
+    *value = (Value){\
+      .epoch = 0,\
+      .descriptor = descriptor,\
+      .storage = imm64(allocator, (u64)_FN_),\
+      .compiler_source_location = COMPILER_SOURCE_LOCATION,\
+    };\
     scope_define(scope, slice_literal(_NAME_), (Scope_Entry) {\
       .tag = Scope_Entry_Tag_Value,\
-      .Value.value = value_make(allocator, descriptor, imm64(allocator, (u64)_FN_)),\
+      .Value.value = value,\
     });\
   }
 

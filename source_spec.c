@@ -114,7 +114,7 @@ spec("source") {
 
   describe("Scope") {
     it("should be able to set and lookup values") {
-      Value *test = value_from_s64(test_context.allocator, 42);
+      Value *test = value_from_s64(&test_context, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("test"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
@@ -126,21 +126,21 @@ spec("source") {
     }
 
     it("should be able to lookup things from parent scopes") {
-      Value *global = value_from_s64(test_context.allocator, 42);
+      Value *global = value_from_s64(&test_context, 42);
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("global"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = global,
       });
 
-      Value *level_1_test = value_from_s64(test_context.allocator, 1);
+      Value *level_1_test = value_from_s64(&test_context, 1);
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define(scope_level_1, slice_literal("test"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = level_1_test,
       });
 
-      Value *level_2_test = value_from_s64(test_context.allocator, 1);
+      Value *level_2_test = value_from_s64(&test_context, 1);
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define(scope_level_2, slice_literal("test"),  (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
@@ -946,16 +946,16 @@ spec("source") {
       check(*storage_immediate_as_c_type(result->storage, s8) == 42);
     }
 
-    xit("should not be able to use runtime values in a static context") {
+    it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test", &test_context,
         "test :: () -> (s64) { foo := 42; @( foo ) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("Undefined variable foo"),
-        error->message
+      check(slice_starts_with(
+        error->message,
+        slice_literal("Trying to access a runtime variable foo")
       ));
     }
   }
