@@ -9,18 +9,18 @@ WriteFile :: (
 ) -> (s64) external("kernel32.dll", "WriteFile")
 
 fn print(integer : s64) {
-  count := {
-    count := 0
-    for temp := integer ; temp ; temp = temp / 10 {
+  const count = {
+    mut count = 0
+    for mut temp = integer ; temp ; temp = temp / 10 {
       count = count + 1
     }
     if count then count else 1
   }
 
-  buffer : s8[64]
-  output_size := {
+  stack buffer s8[64]
+  const output_size = {
     if integer < 0 then {
-      minus_code :: 0x2d
+      static minus_code = 0x2d
       buffer.0 = minus_code
       integer = 0 - integer
       count + 1
@@ -29,18 +29,18 @@ fn print(integer : s64) {
     }
   }
 
-  for integer_index := 0 ; integer_index < count ; {
+  for mut integer_index = 0 ; integer_index < count ; {
     integer_index = integer_index + 1
-    digit := cast(s8, integer % 10)
-    digit_index := output_size - integer_index
-    zero_code :: 0x30
+    const digit = cast(s8, integer % 10)
+    const digit_index = output_size - integer_index
+    static zero_code = 0x30
     buffer.(digit_index) = zero_code + digit
     integer = integer / 10
   }
   WriteFile(GetStdHandle(-11), &buffer, cast(s32, output_size), 0, 0)
 }
 
-fizz_buzz :: () -> () {
+fn fizz_buzz() {
   stdout_handle := GetStdHandle(-11)
   for i : s8 = 1; i <= 100; i = i + 1 {
     print_number := true
