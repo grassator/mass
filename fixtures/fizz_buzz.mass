@@ -24,7 +24,7 @@ print :: (integer : s32) -> () {
   buffer_start_index : s32 = 0
   if (integer < 0) {
     buffer.0 = minus_code
-    integer = 42
+    integer = 0 - integer
     buffer_start_index = 1
   }
   buffer_size := buffer_start_index + count
