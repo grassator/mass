@@ -1413,15 +1413,15 @@ spec("source") {
         &test_context, slice_literal("fixtures\\fizz_buzz"), module_scope
       );
       result = program_import_module(&test_context, fizz_buzz_module);
-      check(result.tag == Mass_Result_Tag_Success);
+      check(spec_check_mass_result(test_context.result));
       Program *test_program = test_context.program;
 
       Value *fizz_buzz = scope_lookup_force(
         &test_context, module_scope, slice_literal("fizz_buzz")
       );
-      ensure_compiled_function_body(&test_context, fizz_buzz);
       check(fizz_buzz);
-      check(test_context.result->tag == Mass_Result_Tag_Success);
+      ensure_compiled_function_body(&test_context, fizz_buzz);
+      check(spec_check_mass_result(test_context.result));
 
       Jit jit;
       jit_init(&jit, test_program);

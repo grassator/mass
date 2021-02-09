@@ -6,6 +6,14 @@ syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
   () = if condition() then { then_branch(); () } else { else_branch(); () }
 }
 
+// TODO think about a better solution
+// It is a bit unfortunate that we have to define this wrapper, however
+// otherwise we match the block version of this which will complain that
+// will fail parsing (@condition() then) as an expression
+syntax statement("if" ..@condition "then" {}@then_branch "else" {}@else_branch) (
+  if condition() then then_branch() else else_branch()
+)
+
 syntax statement("while" ..@condition {}@body) {
   label _loop_start;
   label placeholder _loop_end;

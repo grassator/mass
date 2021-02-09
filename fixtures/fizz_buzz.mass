@@ -18,13 +18,15 @@ print :: (integer : s64) -> () {
   }
 
   buffer : s8[64]
-  output_size := if integer < 0 then {
-    minus_code :: 0x2d
-    buffer.0 = minus_code
-    integer = 0 - integer
-    count + 1
-  } else {
-    count
+  output_size := {
+    if integer < 0 then {
+      minus_code :: 0x2d
+      buffer.0 = minus_code
+      integer = 0 - integer
+      count + 1
+    } else {
+      count
+    }
   }
 
   for integer_index := 0 ; integer_index < count ; {
