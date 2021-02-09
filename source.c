@@ -1410,6 +1410,83 @@ token_parse_macro_statement(
   return match_length;
 }
 
+hash_map_slice_template(Raw_Macro_Map, Token_View)
+
+void
+token_parse_block_view(
+  Execution_Context *context,
+  Token_View children_view,
+  Value *block_result_value
+);
+
+u64
+token_parse_macro_transform(
+  Execution_Context *context,
+  Token_View token_view,
+  Value *result_value,
+  void *payload
+) {
+  assert(payload);
+  if (!token_view.length) return 0;
+  Macro *macro = payload;
+  // TODO @Speed would be nice to not need this copy
+  Array_Token_View match = dyn_array_make(Array_Token_View);
+  u64 match_length = token_match_pattern(token_view, macro, &match, Macro_Match_Mode_Statement);
+  if (!match_length) return 0;
+  Token_View rest = token_view_rest(&token_view, match_length);
+  if (rest.length) {
+    if (token_match(token_view_get(rest, 0), &token_pattern_semicolon)) {
+      match_length += 1;
+    } else {
+      return 0;
+    }
+  }
+
+  Raw_Macro_Map *macro_map = hash_map_make(Raw_Macro_Map);
+  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
+    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
+    Slice capture_name = {0};
+
+    switch(item->tag) {
+      case Macro_Pattern_Tag_Single_Token: {
+        capture_name = item->Single_Token.capture_name;
+        break;
+      }
+      case Macro_Pattern_Tag_Any_Token_Sequence: {
+        capture_name = item->Any_Token_Sequence.capture_name;
+        break;
+      }
+    }
+    Token_View capture_view = *dyn_array_get(match, i);
+    hash_map_set(macro_map, capture_name, capture_view);
+  }
+
+  Array_Const_Token_Ptr result_tokens = dyn_array_make(Array_Const_Token_Ptr);
+
+  for (u64 i = 0; i < macro->replacement.length; ++i) {
+    const Token *token = token_view_get(macro->replacement, i);
+    if (token->tag == Token_Tag_Id) {
+      Slice name = token->source;
+      Token_View *maybe_replacement = hash_map_get(macro_map, name);
+      if (maybe_replacement) {
+        for (u64 splice_index = 0; splice_index < maybe_replacement->length; ++splice_index) {
+          dyn_array_push(result_tokens, token_view_get(*maybe_replacement, splice_index));
+        }
+        continue;
+      }
+    }
+    dyn_array_push(result_tokens, token);
+  }
+
+  Token_View block_tokens =
+    token_view_from_token_array(result_tokens, &macro->replacement.source_range);
+  token_parse_block_view(context, block_tokens, result_value);
+
+  dyn_array_destroy(result_tokens);
+  dyn_array_destroy(match);
+  hash_map_destroy(macro_map);
+  return match_length;
+}
 
 const Token *
 token_parse_macros(
@@ -2104,6 +2181,7 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
   Token_Maybe_Match(statement, .tag = Token_Tag_Id, .source = slice_literal("statement"));
+  Token_Maybe_Match(transform, .tag = Token_Tag_Id, .source = slice_literal("transform"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -2237,10 +2315,17 @@ token_parse_syntax_definition(
       context->scope->statement_matchers =
         dyn_array_make(Array_Token_Statement_Matcher, .allocator = context->allocator);
     }
-    dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
-      .proc = token_parse_macro_statement,
-      .payload = macro,
-    });
+    if (transform) {
+      dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
+        .proc = token_parse_macro_transform,
+        .payload = macro,
+      });
+    } else {
+      dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
+        .proc = token_parse_macro_statement,
+        .payload = macro,
+      });
+    }
   } else {
     scope_add_macro(context->scope, macro);
   }
@@ -3946,18 +4031,15 @@ token_parse_expression(
 }
 
 void
-token_parse_block_no_scope(
+token_parse_block_view(
   Execution_Context *context,
-  const Token *block,
+  Token_View children_view,
   Value *block_result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  assert(block->tag == Token_Tag_Group);
-  assert(block->Group.tag == Token_Group_Tag_Curly);
-  Token_View children_view = block->Group.children;
   if (!children_view.length) {
-    MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
+    MASS_ON_ERROR(assign(context, &children_view.source_range, block_result_value, &void_value));
     return;
   }
 
@@ -3992,7 +4074,7 @@ token_parse_block_no_scope(
         }
         if (match_length) {
           if (last_result.descriptor->tag == Descriptor_Tag_Any) {
-            MASS_ON_ERROR(assign(context, &block->source_range, &last_result, &void_value));
+            MASS_ON_ERROR(assign(context, &children_view.source_range, &last_result, &void_value));
           }
           goto check_match;
         }
@@ -4014,6 +4096,24 @@ token_parse_block_no_scope(
 
   // TODO This is not optimal as we might generate extra temp values
   MASS_ON_ERROR(assign(context, &children_view.source_range, block_result_value, &last_result));
+}
+
+void
+token_parse_block_no_scope(
+  Execution_Context *context,
+  const Token *block,
+  Value *block_result_value
+) {
+  assert(block->tag == Token_Tag_Group);
+  assert(block->Group.tag == Token_Group_Tag_Curly);
+
+  token_parse_block_view(context, block->Group.children, block_result_value);
+
+  Token_View children_view = block->Group.children;
+  if (!children_view.length) {
+    MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
+    return;
+  }
 }
 
 void

@@ -48,3 +48,18 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 bool :: s8
 true :: 1
 false :: 0
+
+syntax statement transform("fn" .@name ()@args {}@body) name :: args -> () body
+
+
+
+
+
+
+
+
+
+
+
+
+

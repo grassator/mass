@@ -8,7 +8,7 @@ WriteFile :: (
   overlapped : s64
 ) -> (s64) external("kernel32.dll", "WriteFile")
 
-print :: (integer : s64) -> () {
+fn print(integer : s64) {
   count := {
     count := 0
     for temp := integer ; temp ; temp = temp / 10 {
