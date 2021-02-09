@@ -198,6 +198,31 @@ win32_get_runtime_function_callback(
   return 0;
 }
 
+static u64
+win32_buffer_ensure_last_page_is_writable(
+  Virtual_Memory_Buffer *buffer
+) {
+  const s32 page_size = memory_page_size();
+  const u64 remainder = buffer->occupied % page_size;
+  const u64 protected = buffer->occupied - remainder;
+  if (remainder != 0) {
+    VirtualProtect(buffer->memory + protected, page_size, PAGE_READWRITE, &(DWORD){0});
+  }
+  return protected;
+}
+
+static void
+win32_section_protect_from(
+  Section *section,
+  u64 from
+) {
+  DWORD flags = win32_section_permissions_to_virtual_protect_flags(section->permissions);
+  u64 size_to_protect = section->buffer.occupied - from;
+  if (size_to_protect) {
+    VirtualProtect(section->buffer.memory + from, size_to_protect, flags, &(DWORD){0});
+  }
+}
+
 // TODO make this return MASS_RESULT
 void
 win32_program_jit(
@@ -208,19 +233,19 @@ win32_program_jit(
   Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
   Virtual_Memory_Buffer *ro_data_buffer = &memory->sections.ro_data.buffer;
 
+  // Memory protection works on per-page level so with incremental JIT there are two options:
+  // 1. Waste memory every time we do JIT due to padding to page size.
+  // 2. Switch memory back to writable before new writes.
+  // On Windows options 2 is preferable, however some unix-like system disallow multiple
+  // transitions between writable and executable so might have to resort to 1 there.
+  u64 code_protected_size = win32_buffer_ensure_last_page_is_writable(code_buffer);
+  u64 ro_data_protected_size = win32_buffer_ensure_last_page_is_writable(ro_data_buffer);
+
   Win32_Jit_Info *info;
   if (jit->platform_specific_payload) {
     dyn_array_clear(jit->program->patch_info_array);
     info = jit->platform_specific_payload;
     info->temp_buffer->occupied = 0;
-
-    // Memory protection works on per-page level so with incremental JIT there are two options:
-    // 1. Waste memory every time we do JIT due to padding to page size.
-    // 2. Switch memory back to writable before new writes.
-    // On Windows options 2 is preferable, however some unix-like system disallow multiple
-    // transitions between writable and executable so might have to resort to 1 there.
-    VirtualProtect(code_buffer->memory, code_buffer->occupied, PAGE_READWRITE, &(DWORD){0});
-    VirtualProtect(ro_data_buffer->memory, ro_data_buffer->occupied, PAGE_READWRITE, &(DWORD){0});
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
     Fixed_Buffer *temp_buffer = fixed_buffer_make(
@@ -330,17 +355,11 @@ win32_program_jit(
   program_patch_labels(program);
 
   // Setup permissions for read-only data segment
-  {
-    DWORD win32_permissions =
-      win32_section_permissions_to_virtual_protect_flags(memory->sections.ro_data.permissions);
-    VirtualProtect(ro_data_buffer->memory, ro_data_buffer->occupied, win32_permissions, &(DWORD){0});
-  }
+  win32_section_protect_from(&memory->sections.ro_data, ro_data_protected_size);
 
   // Setup permissions for the code segment
   {
-    DWORD win32_permissions =
-      win32_section_permissions_to_virtual_protect_flags(memory->sections.code.permissions);
-    VirtualProtect(code_buffer->memory, code_buffer->occupied, win32_permissions, &(DWORD){0});
+    win32_section_protect_from(&memory->sections.code, code_protected_size);
     if (!FlushInstructionCache(GetCurrentProcess(), code_buffer->memory, code_buffer->occupied)) {
       panic("Unable to flush instruction cache");
     }
