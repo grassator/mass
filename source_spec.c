@@ -332,17 +332,6 @@ spec("source") {
     }
   }
 
-  describe("Top Level Statements") {
-    it("should be reported when encountering unknown top level statement") {
-      test_program_inline_source_base("main", &test_context, "foo bar");
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      check(slice_equal(
-        slice_literal("Could not parse a top level statement"),
-        test_context.result->Error.details.message
-      ));
-    }
-  }
-
   describe("Raw Machine Code") {
     #ifdef _WIN32
     // This test relies on Windows calling convention

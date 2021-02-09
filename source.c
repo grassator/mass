@@ -1803,10 +1803,12 @@ token_handle_user_defined_operator_proc(
   token_handle_user_defined_operator(context, args, result_value, payload);
 }
 
-bool
+u64
 token_parse_exports(
   Execution_Context *context,
-  Token_View view
+  Token_View view,
+  Value *unused_result,
+  void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   u64 peek_index = 0;
@@ -1834,7 +1836,7 @@ token_parse_exports(
   if (children.length == 1) {
     if (token_match(token_view_get(children, 0), &(Token_Pattern){.source = slice_literal("..")})) {
       context->module->export_scope = context->module->own_scope;
-      return true;
+      return peek_index;
     }
   }
   context->module->export_scope =
@@ -1844,7 +1846,7 @@ token_parse_exports(
     Token_View_Split_Iterator it = { .view = children };
 
     while (!it.done) {
-      if (context->result->tag != Mass_Result_Tag_Success) return true;
+      if (context->result->tag != Mass_Result_Tag_Success) goto err;
       Token_View item = token_split_next(&it, &token_pattern_comma_operator);
       if (item.length != 1 || token_view_get(item, 0)->tag != Token_Tag_Id) {
         context_error_snprintf(
@@ -1867,7 +1869,7 @@ token_parse_exports(
   }
 
   err:
-  return true;
+  return peek_index;
 }
 
 static inline Slice
@@ -1883,10 +1885,12 @@ operator_fixity_to_lowercase_slice(
   return slice_literal("");
 }
 
-bool
+u64
 token_parse_operator_definition(
   Execution_Context *context,
-  Token_View view
+  Token_View view,
+  Value *unused_value,
+  void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2033,11 +2037,11 @@ token_parse_operator_definition(
     }
   });
 
-  return true;
+  return peek_index;
 
   err:
   if (operator) allocator_deallocate(context->allocator, operator, sizeof(*operator));
-  return true;
+  return peek_index;
 }
 
 Slice
@@ -4504,34 +4508,17 @@ token_parse(
   Execution_Context *context,
   Token_View view
 ) {
-  if (!view.length) return *context->result;
-
-  Token_View_Split_Iterator it = { .view = view };
-  while (!it.done) {
-    MASS_TRY(*context->result);
-    Token_View statement = token_split_next(&it, &token_pattern_semicolon);
-    if (!statement.length) continue;
-    if (token_parse_syntax_definition(context, statement, &void_value, 0)) {
-      continue;
-    }
-    if (token_parse_operator_definition(context, statement)) {
-      continue;
-    }
-    if (token_parse_exports(context, statement)) {
-      continue;
-    }
-    if (token_parse_constant_definitions(context, statement, &void_value, 0)) {
-      continue;
-    }
-
-    // Report unmatched statements
-    context_error_snprintf(
-      context, statement.source_range,
-      "Could not parse a top level statement"
-    );
-    break;
-  }
-
+  Token *fake_block = allocator_allocate(context->allocator, Token);
+  *fake_block = (Token){
+    .tag = Token_Tag_Group,
+    .source = source_from_source_range(&view.source_range),
+    .source_range = view.source_range,
+    .Group = {
+      .tag = Token_Group_Tag_Curly,
+      .children = view,
+    },
+  };
+  token_parse_block_no_scope(context, fake_block, &void_value);
   return *context->result;
 }
 
@@ -4751,6 +4738,9 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_operator_definition});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_exports});
+
     scope->statement_matchers = matchers;
   }
 }
