@@ -690,6 +690,16 @@ spec("source") {
       ));
     }
 
+    it("should support capturing static arguments") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: { ANSWER :: 42; () -> (s64) { ANSWER } }\n"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 42);
+    }
+
     it("should be able to have an explicit return") {
       fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)test_program_inline_source_function(
         "checker", &test_context,
