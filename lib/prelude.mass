@@ -49,11 +49,11 @@ bool :: s8
 true :: 1
 false :: 0
 
-syntax statement transform("fn" .@name ()@args {}@body) name :: args -> () body
-syntax statement transform("const" ..@binding "=" ..@expression) binding := expression
-syntax statement transform("mut" ..@binding "=" ..@expression) binding := expression
-syntax statement transform("stack" .@name ..@type) name : type
-syntax statement transform("static" ..@binding "=" ..@expression) binding :: expression
+syntax statement rewrite("fn" .@name ()@args {}@body) name :: args -> () body
+syntax statement rewrite("const" ..@binding "=" ..@expression) binding := expression
+syntax statement rewrite("mut" ..@binding "=" ..@expression) binding := expression
+syntax statement rewrite("stack" .@name ..@type) name : type
+syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expression
 
 
 

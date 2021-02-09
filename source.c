@@ -1420,7 +1420,7 @@ token_parse_block_view(
 );
 
 u64
-token_parse_macro_transform(
+token_parse_macro_rewrite(
   Execution_Context *context,
   Token_View token_view,
   Value *result_value,
@@ -2181,7 +2181,7 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Tag_Id, .source = slice_literal("syntax"));
   Token_Maybe_Match(statement, .tag = Token_Tag_Id, .source = slice_literal("statement"));
-  Token_Maybe_Match(transform, .tag = Token_Tag_Id, .source = slice_literal("transform"));
+  Token_Maybe_Match(rewrite, .tag = Token_Tag_Id, .source = slice_literal("rewrite"));
 
   Token_Maybe_Match(pattern_token, .group_tag = Token_Group_Tag_Paren);
 
@@ -2315,9 +2315,9 @@ token_parse_syntax_definition(
       context->scope->statement_matchers =
         dyn_array_make(Array_Token_Statement_Matcher, .allocator = context->allocator);
     }
-    if (transform) {
+    if (rewrite) {
       dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
-        .proc = token_parse_macro_transform,
+        .proc = token_parse_macro_rewrite,
         .payload = macro,
       });
     } else {
