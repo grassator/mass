@@ -1421,6 +1421,7 @@ spec("source") {
       );
       ensure_compiled_function_body(&test_context, fizz_buzz);
       check(fizz_buzz);
+      check(test_context.result->tag == Mass_Result_Tag_Success);
 
       Jit jit;
       jit_init(&jit, test_program);

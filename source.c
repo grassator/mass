@@ -3750,6 +3750,7 @@ token_parse_if_expression(
 
   Value *if_value = value_any(context);
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
+  MASS_ON_ERROR(*context->result) goto err;
 
   if (if_value->storage.tag == Storage_Tag_Static) {
     Descriptor *stack_descriptor = if_value->descriptor;
@@ -3982,6 +3983,9 @@ token_parse_block_no_scope(
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
         match_length = matcher->proc(context, rest, &last_result, matcher->payload);
+        MASS_ON_ERROR(*context->result) {
+            return;
+        }
         if (match_length) {
           if (last_result.descriptor->tag == Descriptor_Tag_Any) {
             MASS_ON_ERROR(assign(context, &block->source_range, &last_result, &void_value));
@@ -4434,6 +4438,7 @@ token_parse_definition_and_assignment_statements(
 
   Value *value = value_any(context);
   token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
+  MASS_ON_ERROR(*context->result) goto err;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (value->descriptor == &descriptor_number_literal) {
