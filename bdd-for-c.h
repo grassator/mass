@@ -58,10 +58,11 @@ SOFTWARE.
 #endif
 
 #define __BDD_COLOR_RESET__       "\x1B[0m"
-#define __BDD_COLOR_RED__         "\x1B[31m"             /* Red */
-#define __BDD_COLOR_GREEN__       "\x1B[32m"             /* Green */
-#define __BDD_COLOR_BOLD__        "\x1B[1m"              /* Bold White */
-#define __BDD_COLOR_MAGENTA__     "\x1B[35m"             /* Magenta */
+#define __BDD_COLOR_RED__         "\x1B[31m"
+#define __BDD_COLOR_GREEN__       "\x1B[32m"
+#define __BDD_COLOR_YELLOW__       "\x1B[33m"
+#define __BDD_COLOR_BOLD__        "\x1B[1m"  // Bold White
+#define __BDD_COLOR_MAGENTA__     "\x1B[35m"
 
 typedef struct __bdd_array__ {
     void **values;
@@ -122,17 +123,25 @@ typedef enum __bdd_node_type__ {
     __BDD_NODE_INTERIM__ = 3
 } __bdd_node_type__;
 
+typedef enum __bdd_node_flags__ {
+  __bdd_node_flags_none__  = 0,
+  __bdd_node_flags_focus__ = 1 << 0,
+  __bdd_node_flags_skip__  = 1 << 1,
+} __bdd_node_flags__;
+
 typedef struct __bdd_test_step__ {
     size_t level;
     int id;
     char *name;
     __bdd_node_type__ type;
+    __bdd_node_flags__ flags;
 } __bdd_test_step__;
 
 typedef struct __bdd_node__ {
     int id;
     int next_node_id;
     char *name;
+    __bdd_node_flags__ flags;
     __bdd_node_type__ type;
     __bdd_array__ *list_before;
     __bdd_array__ *list_after;
@@ -151,10 +160,11 @@ __bdd_test_step__ *__bdd_test_step_create__(size_t level, __bdd_node__ *node) {
     step->level = level;
     step->type = node->type;
     step->name = node->name;
+    step->flags = node->flags;
     return step;
 }
 
-__bdd_node__ *__bdd_node_create__(int id, char *name, __bdd_node_type__ type) {
+__bdd_node__ *__bdd_node_create__(int id, char *name, __bdd_node_type__ type, __bdd_node_flags__ flags) {
     __bdd_node__ *n = malloc(sizeof(__bdd_node__));
     if (!n) {
         perror("malloc(node)");
@@ -164,6 +174,7 @@ __bdd_node__ *__bdd_node_create__(int id, char *name, __bdd_node_type__ type) {
     n->next_node_id = id + 1;
     n->name = name; // node takes ownership of name
     n->type = type;
+    n->flags = flags;
     n->list_before = __bdd_array_create__();
     n->list_after = __bdd_array_create__();
     n->list_before_each = __bdd_array_create__();
@@ -267,6 +278,7 @@ typedef struct __bdd_config_type__ {
     char *location;
     bool use_color;
     bool use_tap;
+    bool has_focus_nodes;
 } __bdd_config_type__;
 
 char *__bdd_spec_name__;
@@ -279,7 +291,7 @@ void __bdd_indent__(FILE *fp, size_t level) {
     }
 }
 
-bool __bdd_enter_node__(__bdd_config_type__ *config, __bdd_node_type__ type, ptrdiff_t list_offset, char *fmt, ...) {
+bool __bdd_enter_node__(__bdd_node_flags__ node_flags, __bdd_config_type__ *config, __bdd_node_type__ type, ptrdiff_t list_offset, char *fmt, ...) {
     va_list va;
     va_start(va, fmt);
     char *name = __bdd_vformat__(fmt, va);
@@ -290,7 +302,10 @@ bool __bdd_enter_node__(__bdd_config_type__ *config, __bdd_node_type__ type, ptr
         __bdd_array__ *list = *(__bdd_array__ **)((unsigned char *)top + list_offset);
 
         int id = config->id++;
-        __bdd_node__ *node = __bdd_node_create__(id, name, type);
+        __bdd_node__ *node = __bdd_node_create__(id, name, type, node_flags);
+        if (node_flags & __bdd_node_flags_focus__) {
+            config->has_focus_nodes = true;
+        }
         __bdd_array_push__(list, node);
         __bdd_array_push__(config->nodes, node);
         if (type == __BDD_NODE_GROUP__) {
@@ -356,7 +371,18 @@ void __bdd_run__(__bdd_config_type__ *config) {
         return;
     }
 
-    __bdd_test_main__(config);
+    bool skipped = false;
+    if (step->type == __BDD_NODE_TEST__) {
+        if (config->has_focus_nodes && !(step->flags & __bdd_node_flags_focus__)) {
+          skipped = true;
+        } else if (step->flags & __bdd_node_flags_skip__) {
+          skipped = true;
+        }
+    }
+
+    if (!skipped) {
+      __bdd_test_main__(config);
+    }
 
     if (step->type != __BDD_NODE_TEST__) {
         return;
@@ -364,7 +390,23 @@ void __bdd_run__(__bdd_config_type__ *config) {
 
     ++config->test_tap_index;
 
-    if (config->error == NULL) {
+    if (skipped) {
+        if (config->run == __BDD_TEST_RUN__) {
+            if (config->use_tap) {
+                // We only to report tests and not setup / teardown success
+                if (config->test_tap_index) {
+                    printf("skipped %zu - %s\n", config->test_tap_index, step->name);
+                }
+            } else {
+                __bdd_indent__(stdout, step->level);
+                printf(
+                    "%s %s(SKIP)%s\n", step->name,
+                    config->use_color ? __BDD_COLOR_YELLOW__ : "",
+                    config->use_color ? __BDD_COLOR_RESET__ : ""
+                );
+            }
+        }
+    } else if (config->error == NULL) {
         if (config->run == __BDD_TEST_RUN__) {
             if (config->use_tap) {
                 // We only to report tests and not setup / teardown success
@@ -487,7 +529,7 @@ int main(void) {
         config.use_color = 1;
     }
 
-    __bdd_node__ *root = __bdd_node_create__(-1, __bdd_spec_name__, __BDD_NODE_GROUP__);
+    __bdd_node__ *root = __bdd_node_create__(-1, __bdd_spec_name__, __BDD_NODE_GROUP__, __bdd_node_flags_none__);
     __bdd_array_push__(config.node_stack, root);
 
     // During the first run we just gather the
@@ -548,24 +590,27 @@ int main(void) {
 char *__bdd_spec_name__ = (name);\
 void __bdd_test_main__ (__bdd_config_type__ *__bdd_config__)\
 
-#define __BDD_NODE__(node_list, type, ...)\
+#define __BDD_NODE__(flags, node_list, type, ...)\
 for(\
     bool __bdd_has_run__ = 0;\
     (\
       !__bdd_has_run__ && \
-      __bdd_enter_node__(__bdd_config__, (type), offsetof(struct __bdd_node__, node_list), __VA_ARGS__) \
+      __bdd_enter_node__(flags, __bdd_config__, (type), offsetof(struct __bdd_node__, node_list), __VA_ARGS__) \
     );\
     __bdd_exit_node__(__bdd_config__), \
     __bdd_has_run__ = 1 \
 )
 
-#define describe(...) __BDD_NODE__(list_children, __BDD_NODE_GROUP__, __VA_ARGS__)
-#define it(...)       __BDD_NODE__(list_children, __BDD_NODE_TEST__, __VA_ARGS__)
-#define xit(...) if(0)
-#define before_each() __BDD_NODE__(list_before_each, __BDD_NODE_INTERIM__, "before_each")
-#define after_each()  __BDD_NODE__(list_after_each, __BDD_NODE_INTERIM__, "after_each")
-#define before()      __BDD_NODE__(list_before, __BDD_NODE_INTERIM__, "before")
-#define after()       __BDD_NODE__(list_after, __BDD_NODE_INTERIM__, "after")
+#define describe(...) __BDD_NODE__(__bdd_node_flags_none__, list_children, __BDD_NODE_GROUP__, __VA_ARGS__)
+#define it(...)       __BDD_NODE__(__bdd_node_flags_none__, list_children, __BDD_NODE_TEST__, __VA_ARGS__)
+#define it_only(...)  __BDD_NODE__(__bdd_node_flags_focus__, list_children, __BDD_NODE_TEST__, __VA_ARGS__)
+#define fit(...)      it_only(__VA_ARGS__)
+#define it_skip(...)  __BDD_NODE__(__bdd_node_flags_skip__, list_children, __BDD_NODE_TEST__, __VA_ARGS__)
+#define xit(...)      it_skip(__VA_ARGS__)
+#define before_each() __BDD_NODE__(__bdd_node_flags_none__, list_before_each, __BDD_NODE_INTERIM__, "before_each")
+#define after_each()  __BDD_NODE__(__bdd_node_flags_none__, list_after_each, __BDD_NODE_INTERIM__, "after_each")
+#define before()      __BDD_NODE__(__bdd_node_flags_none__, list_before, __BDD_NODE_INTERIM__, "before")
+#define after()       __BDD_NODE__(__bdd_node_flags_none__, list_after, __BDD_NODE_INTERIM__, "after")
 
 #ifndef BDD_NO_CONTEXT_KEYWORD
 #define context(name) describe(name)
