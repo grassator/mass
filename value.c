@@ -780,6 +780,25 @@ value_as_immediate_string(
   return storage_immediate_as_c_type(value->storage, Slice);
 }
 
+Label_Index
+allocate_section_memory(
+  Execution_Context *context,
+  Section *section,
+  u64 byte_size,
+  u64 alignment
+) {
+  Program *program = context->program;
+  u64 offset_in_data_section = section->buffer.occupied;
+  virtual_memory_buffer_allocate_bytes(&section->buffer, byte_size, alignment);
+
+  Label_Index label_index = make_label(program, section, slice_literal("global"));
+  Label *label = program_get_label(program, label_index);
+  label->offset_in_section = u64_to_u32(offset_in_data_section);
+  label->resolved = true;
+
+  return label_index;
+}
+
 Value *
 value_global_internal(
   Compiler_Source_Location compiler_source_location,
@@ -790,15 +809,10 @@ value_global_internal(
   Section *section = &program->memory.sections.rw_data;
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_alignment(descriptor);
-  u64 offset_in_data_section = section->buffer.occupied;
-  virtual_memory_buffer_allocate_bytes(&section->buffer, byte_size, alignment);
+
+  Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
 
   Value *result = allocator_allocate(context->allocator, Value);
-  Label_Index label_index = make_label(program, section, slice_literal("global"));
-  Label *label = program_get_label(program, label_index);
-  label->offset_in_section = u64_to_u32(offset_in_data_section);
-  label->resolved = true;
-
   *result = (Value) {
     .epoch = context->epoch,
     .descriptor = descriptor,
@@ -933,15 +947,24 @@ value_register_for_descriptor_internal(
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 void *
+rip_value_pointer_from_label_index(
+  Program *program,
+  Label_Index label_index
+) {
+  Label *label = program_get_label(program, label_index);
+  return (s8 *)label->section->buffer.memory + label->offset_in_section;
+}
+
+
+void *
 rip_value_pointer(
   Program *program,
   Value *value
 ) {
   assert(storage_is_label(&value->storage));
-  Label *label = program_get_label(
+  return rip_value_pointer_from_label_index(
     program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
   );
-  return (s8 *)label->section->buffer.memory + label->offset_in_section;
 }
 
 Value *
