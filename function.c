@@ -1032,7 +1032,7 @@ divide_or_remainder(
         break;
       }
       case 1: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cwb, {0}}});
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cbw, {0}}});
         break;
       }
       default: {

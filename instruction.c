@@ -230,8 +230,8 @@ mnemonic(idiv,
   encoding(0xF7, _op_code(7), r_m64),
 );
 
-mnemonic(cwb,
-  encoding(0x98, none, 0),
+mnemonic(cbw,
+  encoding(0x6698, none, 0),
 );
 
 mnemonic(cwd,
