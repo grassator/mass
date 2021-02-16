@@ -2773,6 +2773,28 @@ mass_compiler_external(
   };
 }
 
+#define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+  _TYPE_ mass_##_TYPE_##_logical_shift_left(\
+    _TYPE_ input,\
+    u64 shift\
+  ) {\
+    return input << shift;\
+  }\
+  _TYPE_ mass_##_TYPE_##_bitwise_and(\
+    _TYPE_ a,\
+    _TYPE_ b\
+  ) {\
+    return a & b;\
+  }\
+  _TYPE_ mass_##_TYPE_##_bitwise_or(\
+    _TYPE_ a,\
+    _TYPE_ b\
+  ) {\
+    return a | b;\
+  }
+MASS_ENUMERATE_INTEGER_TYPES
+#undef MASS_PROCESS_BUILT_IN_TYPE
+
 void
 token_handle_cast(
   Execution_Context *context,
@@ -4807,6 +4829,33 @@ scope_define_builtins(
       .Value.value = value,\
     });\
   }
+
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
+      mass_##_TYPE_##_logical_shift_left, "logical_shift_left", &descriptor_##_TYPE_,\
+      MASS_FN_ARG_ANY_OF_TYPE("number", &descriptor_##_TYPE_),\
+      MASS_FN_ARG_ANY_OF_TYPE("shift", &descriptor_u64)\
+    )
+  MASS_ENUMERATE_INTEGER_TYPES
+  #undef MASS_PROCESS_BUILT_IN_TYPE
+
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
+      mass_##_TYPE_##_bitwise_and, "bitwise_and", &descriptor_##_TYPE_,\
+      MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\
+      MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_##_TYPE_)\
+    )
+  MASS_ENUMERATE_INTEGER_TYPES
+  #undef MASS_PROCESS_BUILT_IN_TYPE
+
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
+      mass_##_TYPE_##_bitwise_or, "bitwise_or", &descriptor_##_TYPE_,\
+      MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\
+      MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_##_TYPE_)\
+    )
+  MASS_ENUMERATE_INTEGER_TYPES
+  #undef MASS_PROCESS_BUILT_IN_TYPE
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_compiler_external, "external", &descriptor_external_symbol,

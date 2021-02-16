@@ -912,6 +912,37 @@ spec("source") {
         error->message
       ));
     }
+
+    it("should have a built-in compile-time shift operator") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "test :: () -> (u64) { 2 << 1 }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 4);
+    }
+
+    // FIXME :InfixPrefixOverload
+    xit("should have a built-in compile-time bitwise and operator") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "test :: () -> (u64) { 0b110 & 0b011 }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 0b10);
+    }
+
+    it("should have a built-in compile-time bitwise or operator") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "test :: () -> (u64) { 0b110 | 0b011 }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 0b111);
+    }
   }
 
   describe("Compile Time Execution") {
