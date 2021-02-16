@@ -1461,7 +1461,9 @@ token_parse_macro_rewrite(
     hash_map_set(macro_map, capture_name, capture_view);
   }
 
-  Array_Const_Token_Ptr result_tokens = dyn_array_make(Array_Const_Token_Ptr);
+  // TODO precalculate required capacity
+  Array_Const_Token_Ptr result_tokens =
+    dyn_array_make(Array_Const_Token_Ptr, .allocator = context->allocator);
 
   for (u64 i = 0; i < macro->replacement.length; ++i) {
     const Token *token = token_view_get(macro->replacement, i);
@@ -1482,7 +1484,6 @@ token_parse_macro_rewrite(
     token_view_from_token_array(result_tokens, &macro->replacement.source_range);
   token_parse_block_view(context, block_tokens, result_value);
 
-  dyn_array_destroy(result_tokens);
   dyn_array_destroy(match);
   hash_map_destroy(macro_map);
   return match_length;
