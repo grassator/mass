@@ -221,6 +221,7 @@ typedef dyn_array_type(Token) Array_Token;
 typedef struct Token_Pattern {
   Token_Tag tag;
   Token_Group_Tag group_tag;
+  Descriptor * value_descriptor;
   Slice source;
   const Token_Pattern * or;
 } Token_Pattern;
@@ -817,6 +818,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern,
     .name = slice_literal_fields("group_tag"),
     .descriptor = &descriptor_token_group_tag,
     .offset = offsetof(Token_Pattern, group_tag),
+  },
+  {
+    .name = slice_literal_fields("value_descriptor"),
+    .descriptor = &descriptor_descriptor_pointer,
+    .offset = offsetof(Token_Pattern, value_descriptor),
   },
   {
     .name = slice_literal_fields("source"),

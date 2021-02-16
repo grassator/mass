@@ -445,6 +445,7 @@ main(void) {
   push_type(type_struct("Token_Pattern", (Struct_Item[]){
     { "Token_Tag", "tag" },
     { "Token_Group_Tag", "group_tag" },
+    { "Descriptor *", "value_descriptor" },
     { "Slice", "source" },
     { "const Token_Pattern *", "or" },
   }));

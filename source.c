@@ -544,6 +544,10 @@ token_match_internal(
     if (token->tag != Token_Tag_Group) return false;
     return token->Group.tag == pattern->group_tag;
   }
+  if (pattern->value_descriptor) {
+    if (token->tag != Token_Tag_Value) return false;
+    return token->Value.value->descriptor == pattern->value_descriptor;
+  }
   if (pattern->tag && pattern->tag != token->tag) return false;
   if (pattern->source.length) {
     return slice_equal(token->source, pattern->source);
