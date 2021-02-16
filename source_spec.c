@@ -862,7 +862,7 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be possible to define an overloaded postfix and infix operator") {
+    it("should be possible to define an overloaded prefix and postfix operator") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
@@ -871,6 +871,17 @@ spec("source") {
       );
       check(checker);
       check(checker() == 42);
+    }
+
+    it("should be possible to define an overloaded prefix and infix operator") {
+      fn_type_s64_s64_to_s64 checker = (fn_type_s64_s64_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "operator 18 (++ x) { x = x + 1; x };"
+        "operator 14 (x ++ y) { x + y };"
+        "test :: (x: s64, y: s64) -> (s64) { x ++ ++y }"
+      );
+      check(checker);
+      check(checker(40, 1) == 42);
     }
 
     it("should be possible to define infix operators") {
@@ -923,8 +934,7 @@ spec("source") {
       check(actual == 4);
     }
 
-    // FIXME :InfixPrefixOverload
-    xit("should have a built-in compile-time bitwise and operator") {
+    it("should have a built-in compile-time bitwise and operator") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
         "test :: () -> (u64) { 0b110 & 0b011 }"
@@ -932,6 +942,16 @@ spec("source") {
       check(checker);
       s64 actual = checker();
       check(actual == 0b10);
+    }
+
+    it("should have correctly handle the difference between addressof and bitwise and operators") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "test :: () -> ([u64]) { x := 0 & 1; &x }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual);
     }
 
     it("should have a built-in compile-time bitwise or operator") {

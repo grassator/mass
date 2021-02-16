@@ -49,10 +49,11 @@ bool :: s8
 true :: 1
 false :: 0
 
+operator 16 (& x) { address_of(x) }
+
 operator 15 (x << y) { logical_shift_left(x, y) }
 operator 15 (x | y) { bitwise_or(x, y) }
-// FIXME :InfixPrefixOverload
-//operator 15 (x & y) { bitwise_and(x, y) }
+operator 15 (x & y) { bitwise_and(x, y) }
 
 syntax statement rewrite("fn" .@name ()@args {}@body) name :: args -> () body
 syntax statement rewrite("const" ..@binding "=" ..@expression) binding := expression

@@ -617,9 +617,9 @@ main(void) {
   }));
 
   push_type(type_enum("Operator_Fixity", (Enum_Item[]){
-    { "Infix", 0 },
-    { "Prefix", 1 << 0 },
-    { "Postfix", 1 << 1 },
+    { "Infix", 1 << 0 },
+    { "Prefix", 1 << 1 },
+    { "Postfix", 1 << 2 },
   }));
 
   push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){

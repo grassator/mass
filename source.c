@@ -2874,17 +2874,8 @@ token_handle_operator(
 
   Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
 
-  if (!scope_entry) {
-    context_error_snprintf(
-      context, source_range,
-      "Unknown operator %"PRIslice,
-      SLICE_EXPAND_PRINTF(new_operator)
-    );
-    return false;
-  }
-
   Scope_Entry_Operator *operator_entry = 0;
-  while (scope_entry) {
+  for (; scope_entry; scope_entry = scope_entry->next_overload) {
     if (scope_entry->tag != Scope_Entry_Tag_Operator) {
       context_error_snprintf(
         context, source_range,
@@ -2893,10 +2884,20 @@ token_handle_operator(
       );
       return false;
     }
-    operator_entry = &scope_entry->Operator;
-    if (operator_entry->fixity & fixity_mask) break;
-    scope_entry = scope_entry->next_overload;
+    if (scope_entry->Operator.fixity & fixity_mask) {
+      operator_entry = &scope_entry->Operator;
+    }
   }
+
+  if (!operator_entry) {
+    context_error_snprintf(
+      context, source_range,
+      "Unknown operator %"PRIslice,
+      SLICE_EXPAND_PRINTF(new_operator)
+    );
+    return false;
+  }
+
 
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
@@ -3014,6 +3015,7 @@ token_handle_function_call(
     }
 
     args = token_match_call_arguments(context, args_token);
+    MASS_ON_ERROR(*context->result) return;
 
     // Release any registers that we fake acquired to make sure that the actual call
     // does not unnecessarily store them to stack
@@ -3462,16 +3464,22 @@ token_eval_operator(
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
       token_handle_storage_variant_of(context, &args_token->source_range, args, result_value);
       dyn_array_destroy(args);
+    } else if (
+      target->tag == Token_Tag_Id &&
+      slice_equal(target->source, slice_literal("address_of"))
+    ) {
+      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+      if (dyn_array_length(args) != 1) {
+        context_error_snprintf(
+          context, args_token->source_range, "address_of expects a single argument"
+        );
+        return;
+      }
+      load_address(context, &args_token->source_range, result_value, *dyn_array_get(args, 0));
+      dyn_array_destroy(args);
     } else {
       token_handle_function_call(context, target, args_token, result_value);
     }
-  } else if (slice_equal(operator, slice_literal("&"))) {
-    const Token *pointee_token = token_view_get(args_view, 0);
-
-    Value *pointee = value_any(context);
-    MASS_ON_ERROR(token_force_value(context, pointee_token, pointee)) return;
-
-    load_address(context, &pointee_token->source_range, result_value, pointee);
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
     if (token_match(body, &(Token_Pattern){ .source = slice_literal("scope") })) {
@@ -4572,11 +4580,6 @@ token_parse_definition_and_assignment_statements(
     value = token_value_force_immediate_integer(
       context, &rhs.source_range, value, &descriptor_s64
     );
-  } else if (
-    value->descriptor->tag == Descriptor_Tag_Opaque &&
-    value->storage.tag == Storage_Tag_Static
-  ) {
-    panic("TODO decide how to handle opaque types");
   }
   Value *on_stack;
   if (value->descriptor->tag == Descriptor_Tag_Function) {
@@ -4681,10 +4684,6 @@ scope_define_builtins(
     }
   });
 
-  scope_define(scope, slice_literal("&"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 16, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
-  });
   scope_define(scope, slice_literal("*"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }

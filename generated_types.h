@@ -419,9 +419,9 @@ typedef struct Compiler_Source_Location {
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
 typedef enum Operator_Fixity {
-  Operator_Fixity_Infix = 0,
-  Operator_Fixity_Prefix = 1,
-  Operator_Fixity_Postfix = 2,
+  Operator_Fixity_Infix = 1,
+  Operator_Fixity_Prefix = 2,
+  Operator_Fixity_Postfix = 4,
 } Operator_Fixity;
 
 typedef enum {
