@@ -39,6 +39,10 @@ typedef struct Token_View Token_View;
 typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
 typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
 
+typedef struct Id Id;
+typedef dyn_array_type(Id *) Array_Id_Ptr;
+typedef dyn_array_type(const Id *) Array_Const_Id_Ptr;
+
 typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
 typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
@@ -192,11 +196,15 @@ typedef struct Token_View {
 } Token_View;
 typedef dyn_array_type(Token_View) Array_Token_View;
 
+typedef struct Id {
+  Slice name;
+} Id;
+typedef dyn_array_type(Id) Array_Id;
+
 typedef enum {
-  Token_Tag_Id = 0,
-  Token_Tag_Operator = 1,
-  Token_Tag_Value = 2,
-  Token_Tag_Group = 3,
+  Token_Tag_Operator = 0,
+  Token_Tag_Value = 1,
+  Token_Tag_Group = 2,
 } Token_Tag;
 
 typedef struct {
@@ -218,15 +226,43 @@ typedef struct Token {
   };
 } Token;
 typedef dyn_array_type(Token) Array_Token;
+typedef enum {
+  Token_Pattern_Tag_Invalid = 0,
+  Token_Pattern_Tag_Any = 1,
+  Token_Pattern_Tag_Operator = 2,
+  Token_Pattern_Tag_Id = 3,
+  Token_Pattern_Tag_Group = 4,
+  Token_Pattern_Tag_String = 5,
+  Token_Pattern_Tag_Source = 6,
+} Token_Pattern_Tag;
+
+typedef struct {
+  Slice symbol;
+} Token_Pattern_Operator;
+typedef struct {
+  Slice name;
+} Token_Pattern_Id;
+typedef struct {
+  Token_Group_Tag tag;
+} Token_Pattern_Group;
+typedef struct {
+  Slice slice;
+} Token_Pattern_String;
+typedef struct {
+  Slice slice;
+} Token_Pattern_Source;
 typedef struct Token_Pattern {
-  Token_Tag tag;
-  Token_Group_Tag group_tag;
-  Descriptor * value_descriptor;
-  Slice source;
-  const Token_Pattern * or;
+  Token_Pattern_Tag tag;
+  char _tag_padding[4];
+  union {
+    Token_Pattern_Operator Operator;
+    Token_Pattern_Id Id;
+    Token_Pattern_Group Group;
+    Token_Pattern_String String;
+    Token_Pattern_Source Source;
+  };
 } Token_Pattern;
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
-
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
   Section_Permissions_Write = 2,
@@ -615,6 +651,9 @@ static Descriptor descriptor_token_group_tag_pointer_pointer;
 static Descriptor descriptor_token_view;
 static Descriptor descriptor_token_view_pointer;
 static Descriptor descriptor_token_view_pointer_pointer;
+static Descriptor descriptor_id;
+static Descriptor descriptor_id_pointer;
+static Descriptor descriptor_id_pointer_pointer;
 static Descriptor descriptor_token;
 static Descriptor descriptor_token_pointer;
 static Descriptor descriptor_token_pointer_pointer;
@@ -622,6 +661,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(token_tag, Token_Tag)
 static Descriptor descriptor_token_pattern;
 static Descriptor descriptor_token_pattern_pointer;
 static Descriptor descriptor_token_pattern_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(token_pattern_tag, Token_Pattern_Tag)
 static Descriptor descriptor_section_permissions;
 static Descriptor descriptor_section_permissions_pointer;
 static Descriptor descriptor_section_permissions_pointer_pointer;
@@ -808,34 +848,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_view);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern,
+MASS_DEFINE_STRUCT_DESCRIPTOR(id,
   {
-    .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_token_tag,
-    .offset = offsetof(Token_Pattern, tag),
-  },
-  {
-    .name = slice_literal_fields("group_tag"),
-    .descriptor = &descriptor_token_group_tag,
-    .offset = offsetof(Token_Pattern, group_tag),
-  },
-  {
-    .name = slice_literal_fields("value_descriptor"),
-    .descriptor = &descriptor_descriptor_pointer,
-    .offset = offsetof(Token_Pattern, value_descriptor),
-  },
-  {
-    .name = slice_literal_fields("source"),
+    .name = slice_literal_fields("name"),
     .descriptor = &descriptor_string,
-    .offset = offsetof(Token_Pattern, source),
-  },
-  {
-    .name = slice_literal_fields("or"),
-    .descriptor = &descriptor_token_pattern_pointer,
-    .offset = offsetof(Token_Pattern, or),
+    .offset = offsetof(Id, name),
   },
 );
-MASS_DEFINE_TYPE_VALUE(token_pattern);
+MASS_DEFINE_TYPE_VALUE(id);
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section,
   {

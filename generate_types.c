@@ -426,8 +426,11 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
+  push_type(type_struct("Id", (Struct_Item[]){
+    { "Slice", "name" },
+  }));
+
   push_type(add_common_fields(type_union("Token", (Struct[]){
-    struct_empty("Id"),
     struct_empty("Operator"),
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
@@ -442,12 +445,24 @@ main(void) {
     { "Slice", "source" },
   }));
 
-  push_type(type_struct("Token_Pattern", (Struct_Item[]){
-    { "Token_Tag", "tag" },
-    { "Token_Group_Tag", "group_tag" },
-    { "Descriptor *", "value_descriptor" },
-    { "Slice", "source" },
-    { "const Token_Pattern *", "or" },
+  push_type(type_union("Token_Pattern", (Struct[]){
+    struct_empty("Invalid"),
+    struct_empty("Any"),
+    struct_fields("Operator", (Struct_Item[]){
+      { "Slice", "symbol" },
+    }),
+    struct_fields("Id", (Struct_Item[]){
+      { "Slice", "name" },
+    }),
+    struct_fields("Group", (Struct_Item[]){
+      { "Token_Group_Tag", "tag" },
+    }),
+    struct_fields("String", (Struct_Item[]){
+      { "Slice", "slice" },
+    }),
+    struct_fields("Source", (Struct_Item[]){
+      { "Slice", "slice" },
+    }),
   }));
 
   push_type(type_enum("Section_Permissions", (Enum_Item[]){

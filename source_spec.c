@@ -239,7 +239,7 @@ spec("source") {
       check(slice_equal(plus->source, slice_literal("+")));
 
       const Token *id = token_view_get(tokens, 2);
-      check(id->tag == Token_Tag_Id);
+      check(token_is_id(id));
       check(slice_equal(id->source, slice_literal("foo123")));
     }
 
@@ -258,7 +258,7 @@ spec("source") {
       check(slice_equal(paren->source, slice_literal("(x)")));
 
       const Token *id = token_view_get(paren->Group.children, 0);
-      check(id->tag == Token_Tag_Id);
+      check(token_is_id(id));
     }
 
     it("should be able to tokenize strings") {
@@ -1114,7 +1114,7 @@ spec("source") {
       check(checker() == -42);
     }
 
-    it("should be able to define and use a macro for while loop") {
+    it("should be able to use a while loop") {
       fn_type_s32_to_s32 sum_up_to = (fn_type_s32_to_s32)test_program_inline_source_function(
         "sum_up_to", &test_context,
         "sum_up_to :: (x : s32) -> (s32) {"
