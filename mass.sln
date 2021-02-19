@@ -1,33 +1,31 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
-VisualStudioVersion = 16.0.30104.148
+VisualStudioVersion = 16.0.31005.135
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "mass", "build\mass.exe", "{5F75B8CE-EC3E-4D1F-A0E5-32F94C2C527E}"
-	ProjectSection(DebuggerProjectSystem) = preProject
-		PortSupplier = 00000000-0000-0000-0000-000000000000
-		Executable = C:\dev\mass\build\source_spec.exe
-		RemoteMachine = DESKTOP-5J2C7M1
-		StartingDirectory = C:\dev\mass
-		Arguments = 
-		Environment = Default
-		LaunchingEngine = 00000000-0000-0000-0000-000000000000
-		UseLegacyDebugEngines = No
-		LaunchSQLEngine = No
-		AttachLaunchAction = No
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mass", "mass.vcxproj", "{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{5F75B8CE-EC3E-4D1F-A0E5-32F94C2C527E}.Release|x64.ActiveCfg = Release|x64
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Debug|x64.ActiveCfg = Debug|x64
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Debug|x64.Build.0 = Debug|x64
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Debug|x86.ActiveCfg = Debug|Win32
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Debug|x86.Build.0 = Debug|Win32
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Release|x64.ActiveCfg = Release|x64
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Release|x64.Build.0 = Release|x64
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Release|x86.ActiveCfg = Release|Win32
+		{9E9CBB36-7A44-4D97-A59E-1ADDEB4F7767}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {FD2520B3-6228-44C7-9B92-5971FBA84E3A}
+		SolutionGuid = {156BFFDD-E05E-419B-85D8-C0CFC8AA6E94}
 	EndGlobalSection
 EndGlobal

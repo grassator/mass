@@ -301,6 +301,10 @@ pe32_checksum(
   header->CheckSum = u64_to_u32(checksum);
 }
 
+#define PRAGMA_WARN_WRAP(ID, X)                                           \
+    _Pragma("warning (push)") _Pragma(ID) X; \
+    _Pragma("warning (pop)")
+
 void
 write_executable(
   const char *file_path,
@@ -522,7 +526,7 @@ write_executable(
 
   /////////
 
-  FILE *file = fopen(file_path, "wb");
+  FILE* file = PRAGMA_WARN_WRAP("warning (disable: 4996)", fopen(file_path, "wb"));
   assert(file);
   fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
   fclose(file);

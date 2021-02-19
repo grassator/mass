@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+    <Type Name="Slice">
+        <DisplayString>{bytes,[length]}[{length}]</DisplayString>
+    </Type>
+    <Type Name="Source_Range">
+        <DisplayString>{file->text.bytes + offsets.from,[offsets.to - offsets.from]}[{offsets.to - offsets.from}]</DisplayString>
+    </Type>
+    <Type Name="Array_Value_Ptr">
+        <DisplayString>[{data->length}]</DisplayString>
+        <Expand>
+            <Item Name="[length]">data->length</Item>
+            <ArrayItems>
+                <Size>data->length</Size>
+                <ValuePointer>data->items</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Array_Const_Token_Ptr">
+        <DisplayString>[{data->length}]</DisplayString>
+        <Expand>
+            <Item Name="[length]">data->length</Item>
+            <ArrayItems>
+                <Size>data->length</Size>
+                <ValuePointer>data->items</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+    <Type Name="Token_View">
+        <DisplayString>[{length}]</DisplayString>
+        <Expand>
+            <Item Name="[length]">length</Item>
+            <ArrayItems>
+                <Size>length</Size>
+                <ValuePointer>tokens</ValuePointer>
+            </ArrayItems>
+        </Expand>
+    </Type>
+</AutoVisualizer>
