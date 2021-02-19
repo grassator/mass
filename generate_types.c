@@ -426,7 +426,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Id", (Struct_Item[]){
+  push_type(type_struct("Symbol", (Struct_Item[]){
     { "Slice", "name" },
   }));
 
@@ -451,7 +451,7 @@ main(void) {
     struct_fields("Operator", (Struct_Item[]){
       { "Slice", "symbol" },
     }),
-    struct_fields("Id", (Struct_Item[]){
+    struct_fields("Symbol", (Struct_Item[]){
       { "Slice", "name" },
     }),
     struct_fields("Group", (Struct_Item[]){

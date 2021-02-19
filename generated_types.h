@@ -39,9 +39,9 @@ typedef struct Token_View Token_View;
 typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
 typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
 
-typedef struct Id Id;
-typedef dyn_array_type(Id *) Array_Id_Ptr;
-typedef dyn_array_type(const Id *) Array_Const_Id_Ptr;
+typedef struct Symbol Symbol;
+typedef dyn_array_type(Symbol *) Array_Symbol_Ptr;
+typedef dyn_array_type(const Symbol *) Array_Const_Symbol_Ptr;
 
 typedef struct Token Token;
 typedef dyn_array_type(Token *) Array_Token_Ptr;
@@ -196,10 +196,10 @@ typedef struct Token_View {
 } Token_View;
 typedef dyn_array_type(Token_View) Array_Token_View;
 
-typedef struct Id {
+typedef struct Symbol {
   Slice name;
-} Id;
-typedef dyn_array_type(Id) Array_Id;
+} Symbol;
+typedef dyn_array_type(Symbol) Array_Symbol;
 
 typedef enum {
   Token_Tag_Operator = 0,
@@ -230,7 +230,7 @@ typedef enum {
   Token_Pattern_Tag_Invalid = 0,
   Token_Pattern_Tag_Any = 1,
   Token_Pattern_Tag_Operator = 2,
-  Token_Pattern_Tag_Id = 3,
+  Token_Pattern_Tag_Symbol = 3,
   Token_Pattern_Tag_Group = 4,
   Token_Pattern_Tag_String = 5,
   Token_Pattern_Tag_Source = 6,
@@ -241,7 +241,7 @@ typedef struct {
 } Token_Pattern_Operator;
 typedef struct {
   Slice name;
-} Token_Pattern_Id;
+} Token_Pattern_Symbol;
 typedef struct {
   Token_Group_Tag tag;
 } Token_Pattern_Group;
@@ -256,7 +256,7 @@ typedef struct Token_Pattern {
   char _tag_padding[4];
   union {
     Token_Pattern_Operator Operator;
-    Token_Pattern_Id Id;
+    Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
     Token_Pattern_String String;
     Token_Pattern_Source Source;
@@ -651,9 +651,9 @@ static Descriptor descriptor_token_group_tag_pointer_pointer;
 static Descriptor descriptor_token_view;
 static Descriptor descriptor_token_view_pointer;
 static Descriptor descriptor_token_view_pointer_pointer;
-static Descriptor descriptor_id;
-static Descriptor descriptor_id_pointer;
-static Descriptor descriptor_id_pointer_pointer;
+static Descriptor descriptor_symbol;
+static Descriptor descriptor_symbol_pointer;
+static Descriptor descriptor_symbol_pointer_pointer;
 static Descriptor descriptor_token;
 static Descriptor descriptor_token_pointer;
 static Descriptor descriptor_token_pointer_pointer;
@@ -848,14 +848,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_view);
-MASS_DEFINE_STRUCT_DESCRIPTOR(id,
+MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
   {
     .name = slice_literal_fields("name"),
     .descriptor = &descriptor_string,
-    .offset = offsetof(Id, name),
+    .offset = offsetof(Symbol, name),
   },
 );
-MASS_DEFINE_TYPE_VALUE(id);
+MASS_DEFINE_TYPE_VALUE(symbol);
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section,
   {

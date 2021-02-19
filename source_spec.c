@@ -239,7 +239,7 @@ spec("source") {
       check(slice_equal(plus->source, slice_literal("+")));
 
       const Token *id = token_view_get(tokens, 2);
-      check(token_is_id(id));
+      check(token_is_symbol(id));
       check(slice_equal(id->source, slice_literal("foo123")));
     }
 
@@ -258,7 +258,7 @@ spec("source") {
       check(slice_equal(paren->source, slice_literal("(x)")));
 
       const Token *id = token_view_get(paren->Group.children, 0);
-      check(token_is_id(id));
+      check(token_is_symbol(id));
     }
 
     it("should be able to tokenize strings") {
