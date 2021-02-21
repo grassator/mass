@@ -448,7 +448,6 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Source_Range", "source_range" },
-    { "Slice", "source" },
   }));
 
   push_type(type_union("Token_Pattern", (Struct[]){
@@ -461,9 +460,6 @@ main(void) {
       { "Token_Group_Tag", "tag" },
     }),
     struct_fields("String", (Struct_Item[]){
-      { "Slice", "slice" },
-    }),
-    struct_fields("Source", (Struct_Item[]){
       { "Slice", "slice" },
     }),
   }));

@@ -578,9 +578,6 @@ token_match(
     case Token_Pattern_Tag_Any: {
       return true;
     }
-    case Token_Pattern_Tag_Source: {
-      return slice_equal(pattern->Source.slice, token->source);
-    }
     case Token_Pattern_Tag_Symbol: {
       if (token->tag != Token_Tag_Value) return false;
       if (!token->Value.value) return false;
@@ -705,7 +702,6 @@ tokenize(
 
 #define do_push\
   do {\
-    current_token->source = source_from_source_range(&current_token->source_range);\
     dyn_array_push(parent.children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
@@ -747,9 +743,8 @@ tokenize(
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Value);\
         current_token->source_range.offsets = (Range_u64){ i + 1, i + 1 };\
-        current_token->source = slice_literal(";");\
         current_token->Value.value =\
-          token_make_symbol(allocator, current_token->source, Symbol_Type_Operator_Like);\
+          token_make_symbol(allocator, slice_literal(";"), Symbol_Type_Operator_Like);\
         dyn_array_push(parent.children, current_token);\
       }\
     }\
@@ -841,7 +836,6 @@ tokenize(
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
           parent.token->source_range.offsets.to = i + 1;
-          parent.token->source = source_from_source_range(&parent.token->source_range);
           Source_Range children_range = parent.token->source_range;
           children_range.offsets.to -= 1;
           children_range.offsets.from -= 1;
@@ -1137,7 +1131,6 @@ token_value_make(
   *result_token = (Token){
     .tag = Token_Tag_Value,
     .source_range = source_range,
-    .source = slice_sub_range(source_range.file->text, source_range.offsets),
     .Value = { result },
   };
   return result_token;
@@ -1200,12 +1193,12 @@ token_force_type(
       if (!token_is_symbol(child)) {
         panic("TODO: should be recursive");
       }
+      Slice name = token_as_symbol(child)->name;
       descriptor = allocator_allocate(context->allocator, Descriptor);
       *descriptor = (Descriptor) {
         .tag = Descriptor_Tag_Pointer,
-        .name = token->source,
-        .Pointer.to =
-          scope_lookup_type(context, scope, child->source_range, token_as_symbol(child)->name),
+        .name = name,
+        .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
       };
       break;
     }
@@ -1218,7 +1211,7 @@ token_force_type(
           MASS_ON_ERROR(*context->result) return 0;
           context_error_snprintf(
             context, token->source_range, "Could not find type %"PRIslice,
-            SLICE_EXPAND_PRINTF(token->source)
+            SLICE_EXPAND_PRINTF(symbol->name)
           );
         }
       } else {
@@ -1315,7 +1308,6 @@ token_make_macro_capture_function(
   *fake_body = (Token) {
     .tag = Token_Tag_Group,
     .source_range = capture_view.source_range,
-    .source = source_from_source_range(&capture_view.source_range),
     .Group = {
       .tag = Token_Group_Tag_Curly,
       .children = capture_view,
@@ -1413,20 +1405,17 @@ token_apply_macro_syntax(
         token_make_symbol(context->allocator, slice_literal("using"), Symbol_Type_Id_Like),
         capture_view.source_range
       );
-      using->source = slice_literal("using");
       Token *scope_symbol = token_value_make(
         context,
         token_make_symbol(context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like),
         capture_view.source_range
       );
-      scope_symbol->source = slice_literal("@spliced_scope");
 
       Token *semicolon = token_value_make(
         context,
         token_make_symbol(context->allocator, slice_literal(";"), Symbol_Type_Operator_Like),
         capture_view.source_range
       );
-      semicolon->source = slice_literal(";");
 
       const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
       scope_body_tokens[0] = using;
@@ -1444,7 +1433,6 @@ token_apply_macro_syntax(
       *scope_body = (Token) {
         .tag = Token_Tag_Group,
         .source_range = capture_view.source_range,
-        .source = source_from_source_range(&capture_view.source_range),
         .Group = {
           .tag = Token_Group_Tag_Curly,
           .children = scope_token_view,
@@ -1598,7 +1586,6 @@ token_parse_macros(
       *replacement = (Token){
         .tag = Token_Tag_Value,
         .source_range = matched_view.source_range,
-        .source = source_from_source_range(&matched_view.source_range),
         .Value = { macro_result },
       };
       goto defer;
@@ -2146,8 +2133,8 @@ token_parse_operator_definition(
     operator->argument_names[i] = token_as_symbol(arguments[i])->name;
   }
 
-  Scope_Entry *existing_scope_entry =
-    scope_lookup(context->scope, operator_token->source);
+  Slice operator_name = token_as_symbol(operator_token)->name;
+  Scope_Entry *existing_scope_entry = scope_lookup(context->scope, operator_name);
   while (existing_scope_entry) {
     if (existing_scope_entry->tag != Scope_Entry_Tag_Operator) {
       panic("Internal Error: Found an operator-like scope entry that is not an operator");
@@ -2167,14 +2154,14 @@ token_parse_operator_definition(
         context, keyword_token->source_range,
         "There is already %"PRIslice" operator %"PRIslice
         ". You can only have one definition for prefix and one for infix or suffix.",
-        SLICE_EXPAND_PRINTF(existing), SLICE_EXPAND_PRINTF(operator_token->source)
+        SLICE_EXPAND_PRINTF(existing), SLICE_EXPAND_PRINTF(operator_name)
       );
       goto err;
     }
     existing_scope_entry = existing_scope_entry->next_overload;
   }
 
-  scope_define(context->scope, operator_token->source, (Scope_Entry) {
+  scope_define(context->scope, operator_name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .source_range = operator_token->source_range,
     .Operator = {
@@ -2282,8 +2269,8 @@ token_parse_syntax_definition(
             .tag = Macro_Pattern_Tag_Single_Token,
             .Single_Token = {
               .token_pattern = {
-                .tag = Token_Pattern_Tag_Source,
-                .Source.slice = *slice,
+                .tag = Token_Pattern_Tag_Symbol,
+                .Symbol.name = *slice,
               }
             },
           });
@@ -3087,11 +3074,13 @@ token_handle_function_call(
   }
 
   Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
+
   if (target_descriptor->tag != Descriptor_Tag_Function) {
+    Slice source = source_from_source_range(&target_token->source_range);
     context_error_snprintf(
       context, target_token->source_range,
       "%"PRIslice" is not a function",
-      SLICE_EXPAND_PRINTF(target_token->source)
+      SLICE_EXPAND_PRINTF(source)
     );
     return;
   }
@@ -3106,14 +3095,14 @@ token_handle_function_call(
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == -1) continue; // no match
     if (score == match.score) {
-      Slice previous_source = match.value->descriptor->Function.body->source;
-      Slice current_source = descriptor->body->source;
+      Slice previous_name = match.value->descriptor->name;
+      Slice current_name = to_call_descriptor->name;
       // TODO provide names of matched overloads
       context_error_snprintf(
         context, target_token->source_range,
         "Could not decide which overload to pick."
         "Candidates are %"PRIslice" and %"PRIslice,
-        SLICE_EXPAND_PRINTF(previous_source), SLICE_EXPAND_PRINTF(current_source)
+        SLICE_EXPAND_PRINTF(previous_name), SLICE_EXPAND_PRINTF(current_name)
       );
       return;
     } else if (score > match.score) {
@@ -3125,11 +3114,12 @@ token_handle_function_call(
   }
 
   if (match.score == -1) {
+    Slice source = source_from_source_range(&target_token->source_range);
     // TODO provide types of actual arguments
     context_error_snprintf(
       context, target_token->source_range,
       "Could not find matching overload for call %"PRIslice,
-      SLICE_EXPAND_PRINTF(target_token->source)
+      SLICE_EXPAND_PRINTF(source)
     );
     return;
   }
@@ -4044,7 +4034,7 @@ token_parse_expression(
           if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
             if (!token_handle_operator(
               context, view, &token_stack, &operator_stack,
-              token->source, token->source_range, fixity_mask
+              symbol_name, token->source_range, fixity_mask
             )) goto err;
             is_previous_an_operator = true;
           } else {
@@ -4168,10 +4158,11 @@ token_parse_block_view(
     check_match:
     if (!match_length) {
       const Token *token = token_view_get(rest, 0);
+      Slice source = source_from_source_range(&token->source_range);
       context_error_snprintf(
         context, token->source_range,
         "Can not parse statement. Unexpected token %"PRIslice".",
-        SLICE_EXPAND_PRINTF(token->source)
+        SLICE_EXPAND_PRINTF(source)
       );
       return;
     }
@@ -4303,10 +4294,11 @@ token_parse_statement_label(
     value->storage.tag != Storage_Tag_Memory ||
     value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
+    Slice source = source_from_source_range(&keyword->source_range);
     context_error_snprintf(
       context, keyword->source_range,
       "Trying to redefine variable %"PRIslice" as a label",
-      SLICE_EXPAND_PRINTF(symbol->source)
+      SLICE_EXPAND_PRINTF(source)
     );
     goto err;
   }
@@ -4455,7 +4447,7 @@ token_match_fixed_array_type(
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Square);
   Descriptor *descriptor =
-    scope_lookup_type(context, context->scope, type->source_range, type->source);
+    scope_lookup_type(context, context->scope, type->source_range, token_as_symbol(type)->name);
 
   Token_View size_view = square_brace->Group.children;
   Value *size_value = value_any(context);
@@ -4689,7 +4681,6 @@ token_parse(
   Token *fake_block = allocator_allocate(context->allocator, Token);
   *fake_block = (Token){
     .tag = Token_Tag_Group,
-    .source = source_from_source_range(&view.source_range),
     .source_range = view.source_range,
     .Group = {
       .tag = Token_Group_Tag_Curly,

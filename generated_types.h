@@ -227,7 +227,6 @@ typedef struct Token {
   Token_Tag tag;
   char _tag_padding[4];
   Source_Range source_range;
-  Slice source;
   union {
     Token_Value Value;
     Token_Group Group;
@@ -240,7 +239,6 @@ typedef enum {
   Token_Pattern_Tag_Symbol = 2,
   Token_Pattern_Tag_Group = 3,
   Token_Pattern_Tag_String = 4,
-  Token_Pattern_Tag_Source = 5,
 } Token_Pattern_Tag;
 
 typedef struct {
@@ -252,9 +250,6 @@ typedef struct {
 typedef struct {
   Slice slice;
 } Token_Pattern_String;
-typedef struct {
-  Slice slice;
-} Token_Pattern_Source;
 typedef struct Token_Pattern {
   Token_Pattern_Tag tag;
   char _tag_padding[4];
@@ -262,7 +257,6 @@ typedef struct Token_Pattern {
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
     Token_Pattern_String String;
-    Token_Pattern_Source Source;
   };
 } Token_Pattern;
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
