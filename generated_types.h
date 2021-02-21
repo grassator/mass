@@ -39,6 +39,8 @@ typedef struct Token_View Token_View;
 typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
 typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
 
+typedef enum Symbol_Type Symbol_Type;
+
 typedef struct Symbol Symbol;
 typedef dyn_array_type(Symbol *) Array_Symbol_Ptr;
 typedef dyn_array_type(const Symbol *) Array_Const_Symbol_Ptr;
@@ -196,15 +198,21 @@ typedef struct Token_View {
 } Token_View;
 typedef dyn_array_type(Token_View) Array_Token_View;
 
+typedef enum Symbol_Type {
+  Symbol_Type_Id_Like = 1,
+  Symbol_Type_Operator_Like = 2,
+} Symbol_Type;
+
 typedef struct Symbol {
+  Symbol_Type type;
+  u32 _type_padding;
   Slice name;
 } Symbol;
 typedef dyn_array_type(Symbol) Array_Symbol;
 
 typedef enum {
-  Token_Tag_Operator = 0,
-  Token_Tag_Value = 1,
-  Token_Tag_Group = 2,
+  Token_Tag_Value = 0,
+  Token_Tag_Group = 1,
 } Token_Tag;
 
 typedef struct {
@@ -229,16 +237,12 @@ typedef dyn_array_type(Token) Array_Token;
 typedef enum {
   Token_Pattern_Tag_Invalid = 0,
   Token_Pattern_Tag_Any = 1,
-  Token_Pattern_Tag_Operator = 2,
-  Token_Pattern_Tag_Symbol = 3,
-  Token_Pattern_Tag_Group = 4,
-  Token_Pattern_Tag_String = 5,
-  Token_Pattern_Tag_Source = 6,
+  Token_Pattern_Tag_Symbol = 2,
+  Token_Pattern_Tag_Group = 3,
+  Token_Pattern_Tag_String = 4,
+  Token_Pattern_Tag_Source = 5,
 } Token_Pattern_Tag;
 
-typedef struct {
-  Slice symbol;
-} Token_Pattern_Operator;
 typedef struct {
   Slice name;
 } Token_Pattern_Symbol;
@@ -255,7 +259,6 @@ typedef struct Token_Pattern {
   Token_Pattern_Tag tag;
   char _tag_padding[4];
   union {
-    Token_Pattern_Operator Operator;
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
     Token_Pattern_String String;
@@ -651,6 +654,9 @@ static Descriptor descriptor_token_group_tag_pointer_pointer;
 static Descriptor descriptor_token_view;
 static Descriptor descriptor_token_view_pointer;
 static Descriptor descriptor_token_view_pointer_pointer;
+static Descriptor descriptor_symbol_type;
+static Descriptor descriptor_symbol_type_pointer;
+static Descriptor descriptor_symbol_type_pointer_pointer;
 static Descriptor descriptor_symbol;
 static Descriptor descriptor_symbol_pointer;
 static Descriptor descriptor_symbol_pointer_pointer;
@@ -848,7 +854,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_view);
+MASS_DEFINE_OPAQUE_C_TYPE(symbol_type, Symbol_Type)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
+  {
+    .name = slice_literal_fields("type"),
+    .descriptor = &descriptor_symbol_type,
+    .offset = offsetof(Symbol, type),
+  },
+  {
+    .name = slice_literal_fields("_type_padding"),
+    .descriptor = &descriptor_u32,
+    .offset = offsetof(Symbol, _type_padding),
+  },
   {
     .name = slice_literal_fields("name"),
     .descriptor = &descriptor_string,

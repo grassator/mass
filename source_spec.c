@@ -182,8 +182,8 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       const Token *new_line = token_view_get(tokens, 1);
-      check(new_line->tag == Token_Tag_Operator);
-      check(slice_equal(new_line->source, slice_literal(";")));
+      check(token_is_symbol(new_line));
+      check(slice_equal(token_as_symbol(new_line)->name, slice_literal(";")));
     }
 
     it("should be able to parse hex integers") {
@@ -235,8 +235,8 @@ spec("source") {
       check(slice_equal(a_num->source, slice_literal("12")));
 
       const Token *plus = token_view_get(tokens, 1);
-      check(plus->tag == Token_Tag_Operator);
-      check(slice_equal(plus->source, slice_literal("+")));
+      check(token_is_symbol(plus));
+      check(slice_equal(token_as_symbol(plus)->name, slice_literal("+")));
 
       const Token *id = token_view_get(tokens, 2);
       check(token_is_symbol(id));

@@ -426,12 +426,18 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
+  push_type(type_enum("Symbol_Type", (Enum_Item[]){
+    { "Id_Like", 1 },
+    { "Operator_Like", 2 },
+  }));
+
   push_type(type_struct("Symbol", (Struct_Item[]){
+    { "Symbol_Type", "type" },
+    { "u32", "_type_padding" },
     { "Slice", "name" },
   }));
 
   push_type(add_common_fields(type_union("Token", (Struct[]){
-    struct_empty("Operator"),
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
@@ -448,9 +454,6 @@ main(void) {
   push_type(type_union("Token_Pattern", (Struct[]){
     struct_empty("Invalid"),
     struct_empty("Any"),
-    struct_fields("Operator", (Struct_Item[]){
-      { "Slice", "symbol" },
-    }),
     struct_fields("Symbol", (Struct_Item[]){
       { "Slice", "name" },
     }),

@@ -526,12 +526,16 @@ code_point_is_operator(
 }
 
 static inline Value *
-token_make_id(
+token_make_symbol(
   const Allocator *allocator,
-  Slice name
+  Slice name,
+  Symbol_Type type
 ) {
   Symbol *symbol = allocator_allocate(allocator, Symbol);
-  *symbol = (Symbol){.name = name};
+  *symbol = (Symbol){
+    .type = type,
+    .name = name,
+  };
   Value *value = allocator_allocate(allocator, Value);
   *value = (Value) {
     .epoch = 0,
@@ -552,13 +556,13 @@ token_as_symbol(
 }
 
 const Token_Pattern token_pattern_comma_operator = {
-  .tag = Token_Pattern_Tag_Operator,
-  .Operator.symbol = slice_literal_fields(","),
+  .tag = Token_Pattern_Tag_Symbol,
+  .Symbol.name = slice_literal_fields(","),
 };
 
 const Token_Pattern token_pattern_semicolon = {
-  .tag = Token_Pattern_Tag_Operator,
-  .Operator.symbol = slice_literal_fields(";"),
+  .tag = Token_Pattern_Tag_Symbol,
+  .Symbol.name = slice_literal_fields(";"),
 };
 
 bool
@@ -597,13 +601,6 @@ token_match(
       }
       return true;
     }
-    case Token_Pattern_Tag_Operator: {
-      if (token->tag != Token_Tag_Operator) return false;
-      if (pattern->Operator.symbol.length) {
-        if (!slice_equal(pattern->Operator.symbol, token->source)) return false;
-      }
-      return true;
-    }
     case Token_Pattern_Tag_Group: {
       if (token->tag != Token_Tag_Group) return false;
       return token->Group.tag == pattern->Group.tag;
@@ -613,18 +610,7 @@ token_match(
 }
 
 static inline bool
-token_match_operator(
-  const Token *token,
-  Slice symbol
-) {
-  return token_match(token, &(Token_Pattern){
-    .tag = Token_Pattern_Tag_Operator,
-    .Operator.symbol = symbol
-  });
-}
-
-static inline bool
-token_match_id(
+token_match_symbol(
   const Token *token,
   Slice name
 ) {
@@ -635,7 +621,7 @@ static inline bool
 token_is_symbol(
   const Token *token
 ) {
-  return token_match_id(token, (Slice){0});
+  return token_match_symbol(token, (Slice){0});
 }
 
 typedef struct {
@@ -759,9 +745,11 @@ tokenize(
     if (!parent.token || parent.token->Group.tag == Token_Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
-        start_token(Token_Tag_Operator);\
+        start_token(Token_Tag_Value);\
         current_token->source_range.offsets = (Range_u64){ i + 1, i + 1 };\
         current_token->source = slice_literal(";");\
+        current_token->Value.value =\
+          token_make_symbol(allocator, current_token->source, Symbol_Type_Operator_Like);\
         dyn_array_push(parent.children, current_token);\
       }\
     }\
@@ -800,7 +788,7 @@ tokenize(
         } else if(ch == '/' && peek == '/') {
           state = Tokenizer_State_Single_Line_Comment;
         } else if (code_point_is_operator(ch)) {
-          start_token(Token_Tag_Operator);
+          start_token(Token_Tag_Value);
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
           string_buffer->occupied = 0;
@@ -903,7 +891,7 @@ tokenize(
       case Tokenizer_State_Symbol: {
         if (!(isalpha(ch) || isdigit(ch) || ch == '_')) {
           Slice name = current_token_source();
-          current_token->Value.value = token_make_id(allocator, name);
+          current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Id_Like);
           reject_and_push;
           goto retry;
         }
@@ -911,6 +899,8 @@ tokenize(
       }
       case Tokenizer_State_Operator: {
         if (!code_point_is_operator(ch)) {
+          Slice name = current_token_source();
+          current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Operator_Like);
           reject_and_push;
           goto retry;
         }
@@ -963,13 +953,17 @@ tokenize(
 
   // Handle end of file
   switch(state) {
+    case Tokenizer_State_Operator: {
+      Slice name = current_token_source();
+      current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Operator_Like);
+      break;
+    }
     case Tokenizer_State_Symbol: {
       Slice name = current_token_source();
-      current_token->Value.value = token_make_id(allocator, name);
+      current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Id_Like);
       break;
     }
     case Tokenizer_State_Default:
-    case Tokenizer_State_Operator:
     case Tokenizer_State_Single_Line_Comment: {
       // Nothing to do
       break;
@@ -1157,7 +1151,7 @@ token_view_match_till_end_of_statement(
   u64 start_index = *peek_index;
   for (; *peek_index < view.length; *peek_index += 1) {
     const Token *token = token_view_get(view, *peek_index);
-    if (token->tag == Token_Tag_Operator && slice_equal(token->source, slice_literal(";"))) {
+    if (token_match_symbol(token, slice_literal(";"))) {
       *peek_index += 1;
       return token_view_slice(&view, start_index, *peek_index - 1);
     }
@@ -1174,7 +1168,7 @@ token_view_match_till_end_of_statement(
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
-  Token_Match(_id_, .tag = Token_Pattern_Tag_Operator, .Operator.symbol = slice_literal(_op_))
+  Token_Match(_id_, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal(_op_))
 
 typedef struct {
   Slice name;
@@ -1232,7 +1226,6 @@ token_force_type(
       }
       break;
     }
-    case Token_Tag_Operator:
     default: {
       panic("TODO");
       break;
@@ -1417,26 +1410,28 @@ token_apply_macro_syntax(
 
       Token *using = token_value_make(
         context,
-        token_make_id(context->allocator, slice_literal("using")),
+        token_make_symbol(context->allocator, slice_literal("using"), Symbol_Type_Id_Like),
         capture_view.source_range
       );
       using->source = slice_literal("using");
       Token *scope_symbol = token_value_make(
         context,
-        token_make_id(context->allocator, slice_literal("@spliced_scope")),
+        token_make_symbol(context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like),
         capture_view.source_range
       );
       scope_symbol->source = slice_literal("@spliced_scope");
-      static const Token semicolon = {
-        .tag = Token_Tag_Operator,
-        .source = slice_literal_fields(";"),
-        .source_range = {0},
-      };
+
+      Token *semicolon = token_value_make(
+        context,
+        token_make_symbol(context->allocator, slice_literal(";"), Symbol_Type_Operator_Like),
+        capture_view.source_range
+      );
+      semicolon->source = slice_literal(";");
 
       const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
       scope_body_tokens[0] = using;
       scope_body_tokens[1] = scope_symbol;
-      scope_body_tokens[2] = &semicolon;
+      scope_body_tokens[2] = semicolon;
       scope_body_tokens[3] = overload_function->body;
 
       Token_View scope_token_view = (Token_View) {
@@ -1654,7 +1649,7 @@ token_maybe_split_on_operator(
   bool found = false;
   for (u64 i = 0; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
-    if (token->tag == Token_Tag_Operator && slice_equal(token->source, operator)) {
+    if (token_match_symbol(token, operator)) {
       *operator_token = token;
       lhs_end = i;
       rhs_start = i + 1;
@@ -1843,11 +1838,6 @@ token_force_value(
       }
       break;
     }
-
-    case Token_Tag_Operator: {
-      panic("TODO");
-      return *context->result;
-    }
   }
   panic("Not reached");
   return *context->result;
@@ -1999,7 +1989,7 @@ token_parse_exports(
 
   Token_View children = block->Group.children;
   if (children.length == 1) {
-    if (token_match_operator(token_view_get(children, 0), slice_literal(".."))) {
+    if (token_match_symbol(token_view_get(children, 0), slice_literal(".."))) {
       context->module->export_scope = context->module->own_scope;
       return peek_index;
     }
@@ -2118,9 +2108,10 @@ token_parse_operator_definition(
 
   // prefix and postfix
   if (definition.length == 2) {
-    operator->fixity = token_view_get(definition, 0)->tag == Token_Tag_Operator
-      ? Operator_Fixity_Prefix
-      : Operator_Fixity_Postfix;
+    const Token *first =  token_view_get(definition, 0);
+    bool is_first_operator_like =
+      token_is_symbol(first) && token_as_symbol(first)->type == Symbol_Type_Operator_Like;
+    operator->fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
     operator->argument_count = 1;
     if (operator->fixity == Operator_Fixity_Prefix) {
       operator_token = token_view_get(definition, 0);
@@ -2153,14 +2144,6 @@ token_parse_operator_definition(
       goto err;
     }
     operator->argument_names[i] = token_as_symbol(arguments[i])->name;
-  }
-
-  if (operator_token->tag != Token_Tag_Operator) {
-    context_error_snprintf(
-      context, operator_token->source_range,
-      "Expected an operator token here"
-    );
-    goto err;
   }
 
   Scope_Entry *existing_scope_entry =
@@ -2304,39 +2287,10 @@ token_parse_syntax_definition(
               }
             },
           });
-        } else {
-          context_error_snprintf(
-            context, token->source_range,
-            "Only compile time strings are allowed as values in the pattern"
-          );
-          goto err;
-        }
-        break;
-      }
-      case Token_Tag_Group: {
-        if (token->Group.children.length) {
-          context_error_snprintf(
-            context, token->source_range,
-            "Nested group matches are not supported in syntax declarations (yet)"
-          );
-          goto err;
-        }
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .tag = Token_Pattern_Tag_Group,
-              .Group.tag = token->Group.tag,
-            }
-          },
-        });
-        break;
-      }
-      case Token_Tag_Operator: {
-        if (
-          slice_equal(token->source, slice_literal("..@")) ||
-          slice_equal(token->source, slice_literal(".@")) ||
-          slice_equal(token->source, slice_literal("@"))
+        } else if (
+          token_match_symbol(token, slice_literal("..@")) ||
+          token_match_symbol(token, slice_literal(".@")) ||
+          token_match_symbol(token, slice_literal("@"))
         ) {
           const Token *symbol_token = token_view_peek(definition, ++i);
           if (!symbol_token || !token_is_symbol(symbol_token)) {
@@ -2347,14 +2301,15 @@ token_parse_syntax_definition(
             goto err;
           }
           Macro_Pattern *last_pattern = 0;
-          if (slice_equal(token->source, slice_literal("@"))) {
+          Slice symbol_name = token_as_symbol(token)->name;
+          if (slice_equal(symbol_name, slice_literal("@"))) {
             last_pattern = dyn_array_last(pattern);
-          } else if (slice_equal(token->source, slice_literal(".@"))) {
+          } else if (slice_equal(symbol_name, slice_literal(".@"))) {
             last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
               .tag = Macro_Pattern_Tag_Single_Token,
               .Single_Token = { .token_pattern = { .tag = Token_Pattern_Tag_Any } },
             });
-          } else if (slice_equal(token->source, slice_literal("..@"))) {
+          } else if (slice_equal(symbol_name, slice_literal("..@"))) {
             last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
               .tag = Macro_Pattern_Tag_Any_Token_Sequence,
             });
@@ -2381,11 +2336,29 @@ token_parse_syntax_definition(
         } else {
           context_error_snprintf(
             context, token->source_range,
-            "Unsupported operator %"PRIslice" in a syntax definition",
-            SLICE_EXPAND_PRINTF(token->source)
+            "Only compile time strings are allowed as values in the pattern"
           );
           goto err;
         }
+        break;
+      }
+      case Token_Tag_Group: {
+        if (token->Group.children.length) {
+          context_error_snprintf(
+            context, token->source_range,
+            "Nested group matches are not supported in syntax declarations (yet)"
+          );
+          goto err;
+        }
+        dyn_array_push(pattern, (Macro_Pattern) {
+          .tag = Macro_Pattern_Tag_Single_Token,
+          .Single_Token = {
+            .token_pattern = {
+              .tag = Token_Pattern_Tag_Group,
+              .Group.tag = token->Group.tag,
+            }
+          },
+        });
         break;
       }
     }
@@ -3568,11 +3541,11 @@ token_eval_operator(
     }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
-    if (token_match_id(body, slice_literal("scope"))) {
+    if (token_match_symbol(body, slice_literal("scope"))) {
       Value *scope_value =
         value_make(context, &descriptor_scope, storage_immediate(context->scope));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
-    } else if (token_match_id(body, slice_literal("context"))) {
+    } else if (token_match_symbol(body, slice_literal("context"))) {
       Value *scope_value =
         value_make(context, &descriptor_execution_context, storage_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
@@ -3894,7 +3867,7 @@ token_parse_if_expression(
 
   for (u64 i = peek_index; i < view.length; ++i) {
     const Token *token = token_view_get(view, i);
-    if (token_match_id(token, slice_literal("then"))) {
+    if (token_match_symbol(token, slice_literal("then"))) {
       Token_View till_here = token_view_slice(&view, peek_index, i);
       if (parse_state != Parse_State_Condition) {
         context_error_snprintf(
@@ -3906,7 +3879,7 @@ token_parse_if_expression(
       parse_state = Parse_State_Then;
       condition = till_here;
       peek_index = i + 1;
-    } else if (token_match_id(token, slice_literal("else"))) {
+    } else if (token_match_symbol(token, slice_literal("else"))) {
       Token_View till_here = token_view_slice(&view, peek_index, i);
       if (parse_state != Parse_State_Then) {
         context_error_snprintf(
@@ -4053,12 +4026,25 @@ token_parse_expression(
     switch(token->tag) {
       case Token_Tag_Value: {
         if (token_is_symbol(token)) {
-          Scope_Entry *scope_entry = scope_lookup(context->scope, token_as_symbol(token)->name);
+          Slice symbol_name = token_as_symbol(token)->name;
+          if (slice_equal(symbol_name, slice_literal(";"))) {
+            matched_length = i + 1;
+            if (mode == Expression_Parse_Mode_Statement) {
+              goto drain;
+            } else {
+              context_error_snprintf(
+                context, token->source_range,
+                "Unexpected semicolon in an expression"
+              );
+              goto err;
+            }
+          }
+
+          Scope_Entry *scope_entry = scope_lookup(context->scope, symbol_name);
           if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
             if (!token_handle_operator(
-              context, view, &token_stack, &operator_stack, token->source, token->source_range,
-              // FIXME figure out how to deal with fixity for non-symbol operators
-              Operator_Fixity_Prefix
+              context, view, &token_stack, &operator_stack,
+              token->source, token->source_range, fixity_mask
             )) goto err;
             is_previous_an_operator = true;
           } else {
@@ -4096,26 +4082,6 @@ token_parse_expression(
           }
         }
         is_previous_an_operator = false;
-        break;
-      }
-      case Token_Tag_Operator: {
-        Slice operator = token->source;
-        if (slice_equal(operator, slice_literal(";"))) {
-          matched_length = i + 1;
-          if (mode == Expression_Parse_Mode_Statement) {
-            goto drain;
-          } else {
-            context_error_snprintf(
-              context, token->source_range,
-              "Unexpected semicolon in an expression"
-            );
-            goto err;
-          }
-        }
-        if (!token_handle_operator(
-          context, view, &token_stack, &operator_stack, operator, token->source_range, fixity_mask
-        )) goto err;
-        is_previous_an_operator = true;
         break;
       }
     }
