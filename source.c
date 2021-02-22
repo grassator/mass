@@ -549,19 +549,32 @@ token_make_symbol(
 
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
+  value_is_##_SUFFIX_(\
+    const Value *value\
+  ) {\
+    if (!value) return false;\
+    return value->descriptor == &descriptor_##_SUFFIX_;\
+  }\
+  static inline bool\
   token_is_##_SUFFIX_(\
     const Token *token\
   ) {\
     assert(token->tag == Token_Tag_Value);\
-    if (!token->Value.value) return false;\
-    return token->Value.value->descriptor == &descriptor_##_SUFFIX_;\
+    return value_is_##_SUFFIX_(token->Value.value);\
+  }\
+  static inline _C_TYPE_ *\
+  value_as_##_SUFFIX_(\
+    const Value *value\
+  ) {\
+    assert(value_is_##_SUFFIX_(value));\
+    return storage_immediate_as_c_type(value->storage, _C_TYPE_);\
   }\
   static inline _C_TYPE_ *\
   token_as_##_SUFFIX_(\
     const Token *token\
   ) {\
     assert(token_is_##_SUFFIX_(token));\
-    return storage_immediate_as_c_type(token->Value.value->storage, _C_TYPE_);\
+    return value_as_##_SUFFIX_(token->Value.value);\
   }
 
 DEFINE_VALUE_IS_AS_HELPERS(Slice, string)
