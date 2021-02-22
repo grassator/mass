@@ -191,7 +191,7 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
-      const Token *new_line = token_view_get(tokens, 1);
+      const Token *new_line = value_view_get(tokens, 1);
       check(token_is_symbol(new_line));
       spec_check_slice(token_as_symbol(new_line)->name, slice_literal(";"));
     }
@@ -203,7 +203,7 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *token = token_view_get(tokens, 0);
+      const Token *token = value_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
       spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0xCAFE"));
       check(token->Value.value->descriptor == &descriptor_number_literal);
@@ -221,7 +221,7 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *token = token_view_get(tokens, 0);
+      const Token *token = value_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
       spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0b100"));
       check(token->Value.value->descriptor == &descriptor_number_literal);
@@ -240,15 +240,15 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
-      const Token *a_num = token_view_get(tokens, 0);
+      const Token *a_num = value_view_get(tokens, 0);
       check(a_num->tag == Token_Tag_Value);
       spec_check_slice(source_from_source_range(&a_num->Value.value->source_range), slice_literal("12"));
 
-      const Token *plus = token_view_get(tokens, 1);
+      const Token *plus = value_view_get(tokens, 1);
       check(token_is_symbol(plus));
       spec_check_slice(token_as_symbol(plus)->name, slice_literal("+"));
 
-      const Token *id = token_view_get(tokens, 2);
+      const Token *id = value_view_get(tokens, 2);
       check(token_is_symbol(id));
       spec_check_slice(source_from_source_range(&id->Value.value->source_range), slice_literal("foo123"));
     }
@@ -261,13 +261,13 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      const Token *paren = token_view_get(tokens, 0);
+      const Token *paren = value_view_get(tokens, 0);
       check(token_is_group(paren));
       check(token_as_group(paren)->tag == Group_Tag_Paren);
       check(token_as_group(paren)->children.length == 1);
       spec_check_slice(source_from_source_range(&paren->Value.value->source_range), slice_literal("(x)"));
 
-      const Token *id = token_view_get(token_as_group(paren)->children, 0);
+      const Token *id = value_view_get(token_as_group(paren)->children, 0);
       check(token_is_symbol(id));
     }
 
@@ -278,7 +278,7 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *string = token_view_get(tokens, 0);
+      const Token *string = value_view_get(tokens, 0);
       spec_check_slice(source_from_source_range(&string->Value.value->source_range), slice_literal("\"foo 123\""));
     }
 
@@ -290,13 +290,13 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      const Token *curly = token_view_get(tokens, 0);
+      const Token *curly = value_view_get(tokens, 0);
       check(token_is_group(curly));
       check(token_as_group(curly)->tag == Group_Tag_Curly);
       check(token_as_group(curly)->children.length == 1);
       spec_check_slice(source_from_source_range(&curly->Value.value->source_range), slice_literal("{[]}"));
 
-      const Token *square = token_view_get(token_as_group(curly)->children, 0);
+      const Token *square = value_view_get(token_as_group(curly)->children, 0);
       check(token_is_group(square));
       check(token_as_group(square)->tag == Group_Tag_Square);
       check(token_as_group(square)->children.length == 0);
