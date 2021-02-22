@@ -698,7 +698,6 @@ tokenize(
   Range_u64 current_line = {0};
   Source_Range current_token_range = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
-  Token *current_token = 0;
   Tokenizer_Parent parent = {
     .value = 0,
     // FIXME only initialize on first push
@@ -714,22 +713,19 @@ tokenize(
 #define current_token_source()\
    slice_sub(file->text, current_token_range.offsets.from, i)
 
-#define start_token(_type_)\
+#define start_token()\
   do {\
     current_token_range = (Source_Range){\
       .file = file,\
       .offsets = {.from = i, .to = i}\
     };\
-    current_token = allocator_allocate(allocator, Token);\
-    *current_token = (Token) {\
-      .tag = (_type_),\
-    };\
   } while(0)
 
-#define push\
+#define push(_VALUE_)\
   do {\
-    dyn_array_push(parent.children, current_token);\
-    current_token = 0;\
+    Token *token = allocator_allocate(allocator, Token);\
+    *token = (Token) { .tag = Token_Tag_Value, .Value.value = (_VALUE_) };\
+    dyn_array_push(parent.children, token);\
     state = Tokenizer_State_Default;\
   } while(0)
 
@@ -753,16 +749,14 @@ tokenize(
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
     if (!parent.value || value_as_group(parent.value)->tag == Group_Tag_Curly) {\
-      /* Do not treating leading newlines as semicolons */ \
+      /* Do not treat leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
-        start_token(Token_Tag_Value);\
         current_token_range.offsets = (Range_u64){ i + 1, i + 1 };\
-        current_token->Value.value =\
-          token_make_symbol(allocator, slice_literal(";"), Symbol_Type_Operator_Like, current_token_range);\
-        dyn_array_push(parent.children, current_token);\
+        push(token_make_symbol(\
+          allocator, slice_literal(";"), Symbol_Type_Operator_Like, current_token_range\
+        ));\
       }\
     }\
-    current_token = 0;\
     state = Tokenizer_State_Default;\
   } while(0)
 
@@ -781,47 +775,47 @@ tokenize(
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
-          start_token(Token_Tag_Value);
+          start_token();
           i++;
           state = Tokenizer_State_Hex_Integer;
         } else if (ch == '0' && peek == 'b') {
-          start_token(Token_Tag_Value);
+          start_token();
           i++;
           state = Tokenizer_State_Binary_Integer;
         } else if (isdigit(ch)) {
-          start_token(Token_Tag_Value);
+          start_token();
           state = Tokenizer_State_Decimal_Integer;
         } else if (isalpha(ch) || ch == '_') {
-          start_token(Token_Tag_Value);
+          start_token();
           state = Tokenizer_State_Symbol;
         } else if(ch == '/' && peek == '/') {
           state = Tokenizer_State_Single_Line_Comment;
         } else if (code_point_is_operator(ch)) {
-          start_token(Token_Tag_Value);
+          start_token();
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
           string_buffer->occupied = 0;
-          start_token(Token_Tag_Value);
+          start_token();
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
-          start_token(Token_Tag_Value);
+          start_token();
           Group *group = allocator_allocate(allocator, Group);
           group->tag =
             ch == '(' ? Group_Tag_Paren :
             ch == '{' ? Group_Tag_Curly :
             Group_Tag_Square;
-          current_token->Value.value = allocator_allocate(allocator, Value);
-          *current_token->Value.value = (Value) {
+          Value *value = allocator_allocate(allocator, Value);
+          *value = (Value) {
             .epoch = 0,
             .descriptor = &descriptor_group,
             .storage = storage_immediate(group),
             .source_range = current_token_range,
             .compiler_source_location = COMPILER_SOURCE_LOCATION,
           };
-          dyn_array_push(parent.children, current_token);
+          push(value);
           dyn_array_push(parent_stack, parent);
           parent = (Tokenizer_Parent){
-            .value = current_token->Value.value,
+            .value = value,
             .children = dyn_array_make(Array_Const_Token_Ptr, 4),
           };
         } else if (ch == ')' || ch == '}' || ch == ']') {
@@ -872,7 +866,6 @@ tokenize(
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
           }
           parent = *dyn_array_pop(parent_stack);
-          current_token = 0;
         } else {
           TOKENIZER_HANDLE_ERROR("Unpexpected input");
         }
@@ -882,9 +875,7 @@ tokenize(
         if (!isdigit(ch)) {
           Slice digits = current_token_source();
           current_token_range.offsets.to = i;
-          current_token->Value.value =
-            value_number_literal(allocator, digits, Number_Base_10, current_token_range);
-          push;
+          push(value_number_literal(allocator, digits, Number_Base_10, current_token_range));
           goto retry;
         }
         break;
@@ -895,9 +886,7 @@ tokenize(
           current_token_range.offsets.to = i;
           // Cut off `0x` prefix
           digits = slice_sub(digits, 2, digits.length);
-          current_token->Value.value =
-            value_number_literal(allocator, digits, Number_Base_16, current_token_range);
-          push;
+          push(value_number_literal(allocator, digits, Number_Base_16, current_token_range));
           goto retry;
         }
         break;
@@ -908,9 +897,7 @@ tokenize(
           current_token_range.offsets.to = i;
           // Cut off `0b` prefix
           digits = slice_sub(digits, 2, digits.length);
-          current_token->Value.value =
-            value_number_literal(allocator, digits, Number_Base_2, current_token_range);
-          push;
+          push(value_number_literal(allocator, digits, Number_Base_2, current_token_range));
           goto retry;
         }
         break;
@@ -919,9 +906,7 @@ tokenize(
         if (!(isalpha(ch) || isdigit(ch) || ch == '_')) {
           Slice name = current_token_source();
           current_token_range.offsets.to = i;
-          current_token->Value.value =
-            token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range);
-          push;
+          push(token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range));
           goto retry;
         }
         break;
@@ -930,9 +915,7 @@ tokenize(
         if (!code_point_is_operator(ch)) {
           Slice name = current_token_source();
           current_token_range.offsets.to = i;
-          current_token->Value.value =
-            token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range);
-          push;
+          push(token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range));
           goto retry;
         }
         break;
@@ -946,15 +929,15 @@ tokenize(
           memcpy(bytes, string_buffer->memory, string_buffer->occupied);
           Slice *string = allocator_allocate(allocator, Slice);
           *string = (Slice){bytes, string_buffer->occupied};
-          current_token->Value.value = allocator_allocate(allocator, Value);
-          *current_token->Value.value = (Value) {
+          Value *value = allocator_allocate(allocator, Value);
+          *value = (Value) {
             .epoch = 0,
             .descriptor = &descriptor_string,
             .storage = storage_immediate(string),
             .source_range = current_token_range,
             .compiler_source_location = COMPILER_SOURCE_LOCATION,
           };
-          push;
+          push(value);
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
         }
@@ -988,14 +971,12 @@ tokenize(
   switch(state) {
     case Tokenizer_State_Operator: {
       Slice name = current_token_source();
-      current_token->Value.value =
-        token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range);
+      push(token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range));
       break;
     }
     case Tokenizer_State_Symbol: {
       Slice name = current_token_source();
-      current_token->Value.value =
-        token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range);
+      push(token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range));
       break;
     }
     case Tokenizer_State_Default:
@@ -1006,22 +987,19 @@ tokenize(
 
     case Tokenizer_State_Decimal_Integer: {
       Slice digits = current_token_source();
-      current_token->Value.value =
-        value_number_literal(allocator, digits, Number_Base_10, current_token_range);
+      push(value_number_literal(allocator, digits, Number_Base_10, current_token_range));
       break;
     }
     case Tokenizer_State_Hex_Integer: {
       Slice digits = current_token_source();
       digits = slice_sub(digits, 2, digits.length); // Cut off `0x` prefix
-      current_token->Value.value =
-        value_number_literal(allocator, digits, Number_Base_16, current_token_range);
+      push(value_number_literal(allocator, digits, Number_Base_16, current_token_range));
       break;
     }
     case Tokenizer_State_Binary_Integer: {
       Slice digits = current_token_source();
       digits = slice_sub(digits, 2, digits.length); // Cut off `0b` prefix
-      current_token->Value.value =
-        value_number_literal(allocator, digits, Number_Base_2, current_token_range);
+      push(value_number_literal(allocator, digits, Number_Base_2, current_token_range));
       break;
     }
     case Tokenizer_State_String:
@@ -1036,15 +1014,6 @@ tokenize(
 
   if (parent.value) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
-  }
-  // current_token can be null in case of an empty input
-  if (current_token) {
-    // Strings need to be terminated with a '"'
-    if (state == Tokenizer_State_String) {
-      TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a \".");
-    } else {
-      push;
-    }
   }
 
   err:
