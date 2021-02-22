@@ -75,7 +75,6 @@ MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope);
 PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
-  const Source_Range *source_range,
   Value *target,
   Value *source
 );

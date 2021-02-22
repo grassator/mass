@@ -8,7 +8,8 @@ Value *
 reserve_stack(
   Allocator *allocator,
   Function_Builder *fn,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Source_Range source_range
 );
 
 static inline Instruction  *

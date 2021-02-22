@@ -443,12 +443,10 @@ main(void) {
     { "Token_View", "children" },
   }));
 
-  push_type(add_common_fields(type_union("Token", (Struct[]){
+  push_type(type_union("Token", (Struct[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
-  }), (Struct_Item[]){
-    { "Source_Range", "source_range" },
   }));
 
   push_type(type_union("Token_Pattern", (Struct[]){
@@ -665,6 +663,7 @@ main(void) {
     { "Storage", "storage" },
     { "Value *", "next_overload" },
     { "u64", "epoch" },
+    { "Source_Range", "source_range" },
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
@@ -683,7 +682,7 @@ main(void) {
     { "u64", "offset" },
   }));
 
-  push_type(type_union("Function_Argument", (Struct[]){
+  push_type(add_common_fields(type_union("Function_Argument", (Struct[]){
     struct_fields("Any_Of_Type", (Struct_Item[]){
       { "Slice", "name" },
       { "Descriptor *", "descriptor" },
@@ -693,6 +692,8 @@ main(void) {
       { "Descriptor *", "descriptor" },
       { "Storage", "storage" },
     }),
+  }), (Struct_Item[]){
+    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){

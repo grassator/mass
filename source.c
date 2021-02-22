@@ -39,10 +39,10 @@ token_view_slice(
   Source_Range source_range = view->source_range;
   source_range.offsets.to = end_index == view->length
     ? view->source_range.offsets.to
-    : view->tokens[end_index]->source_range.offsets.from;
+    : view->tokens[end_index]->Value.value->source_range.offsets.from;
   source_range.offsets.from = start_index == end_index
     ? source_range.offsets.to
-    : view->tokens[start_index]->source_range.offsets.from;
+    : view->tokens[start_index]->Value.value->source_range.offsets.from;
 
   return (Token_View) {
     .tokens = view->tokens + start_index,
@@ -227,7 +227,7 @@ token_value_force_immediate_integer(
           .tag = Storage_Tag_Static,
           .byte_size = u64_to_u32(bit_size / 8),
           .Static.memory = memory,
-        });
+        }, value->source_range);
       }
       case Literal_Cast_Result_Target_Not_An_Integer: {
         panic("We already checked that target is an integer");
@@ -291,19 +291,17 @@ token_value_force_immediate_integer(
 Value *
 maybe_coerce_number_literal_to_integer(
   Execution_Context *context,
-  const Source_Range *source_range,
   Value *value,
   Descriptor *target_descriptor
 ) {
   if (!descriptor_is_integer(target_descriptor)) return value;
   if (value->descriptor != &descriptor_number_literal) return value;
-  return token_value_force_immediate_integer(context, source_range, value, target_descriptor);
+  return token_value_force_immediate_integer(context, &value->source_range, value, target_descriptor);
 }
 
 PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
-  const Source_Range *source_range,
   Value *target,
   Value *source
 ) {
@@ -322,28 +320,29 @@ assign(
     target->next_overload = source->next_overload;
     return *context->result;
   }
+  Source_Range source_range = target->source_range;
 
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
       Number_Literal *literal = storage_immediate_as_c_type(source->storage, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(
-          context, source_range, source, &descriptor_u64
+          context, &source_range, source, &descriptor_u64
         );
         source->descriptor = target->descriptor;
       } else {
         context_error_snprintf(
-          context, *source_range, "Trying to assign a non-zero literal number to a pointer"
+          context, source_range, "Trying to assign a non-zero literal number to a pointer"
         );
         return *context->result;
       }
     } else if (descriptor_is_integer(target->descriptor)) {
       source = token_value_force_immediate_integer(
-        context, source_range, source, target->descriptor
+        context, &source_range, source, target->descriptor
       );
     } else {
       context_error_snprintf(
-        context, *source_range, "Trying to assign a literal number to a non-integer value"
+        context, source_range, "Trying to assign a literal number to a non-integer value"
       );
       return *context->result;
     }
@@ -351,11 +350,11 @@ assign(
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
   if (same_value_type_or_can_implicitly_move_cast(target, source)) {
-    move_value(context->allocator, context->builder, source_range, &target->storage, &source->storage);
+    move_value(context->allocator, context->builder, &source_range, &target->storage, &source->storage);
     return *context->result;
   }
   context_error_snprintf(
-    context, *source_range,
+    context, source_range,
     "Incompatible type: expected %"PRIslice", got %"PRIslice,
     SLICE_EXPAND_PRINTF(target->descriptor->name), SLICE_EXPAND_PRINTF(source->descriptor->name)
   );
@@ -383,7 +382,7 @@ scope_entry_force(
       Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
       Execution_Context lazy_context = *context;
       lazy_context.scope = expr->scope;
-      Value *result = value_any(context);
+      Value *result = value_any(context, expr->tokens.source_range);
       compile_time_eval(&lazy_context, expr->tokens, result);
       if (result && result->descriptor->name.length == 0) {
         result->descriptor->name = expr->name;
@@ -529,7 +528,8 @@ static inline Value *
 token_make_symbol(
   const Allocator *allocator,
   Slice name,
-  Symbol_Type type
+  Symbol_Type type,
+  Source_Range source_range
 ) {
   Symbol *symbol = allocator_allocate(allocator, Symbol);
   *symbol = (Symbol){
@@ -541,6 +541,7 @@ token_make_symbol(
     .epoch = 0,
     .descriptor = &descriptor_symbol,
     .storage = storage_immediate(symbol),
+    .source_range = source_range,
     .compiler_source_location = COMPILER_SOURCE_LOCATION,
   };
   return value;
@@ -712,6 +713,7 @@ tokenize(
   };
 
   Range_u64 current_line = {0};
+  Source_Range current_token_range = {0};
   enum Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
   Tokenizer_Parent parent = {
@@ -727,37 +729,25 @@ tokenize(
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
 
 #define current_token_source()\
-   slice_sub(file->text, current_token->source_range.offsets.from, i)
+   slice_sub(file->text, current_token_range.offsets.from, i)
 
 #define start_token(_type_)\
   do {\
+    current_token_range = (Source_Range){\
+      .file = file,\
+      .offsets = {.from = i, .to = i}\
+    };\
     current_token = allocator_allocate(allocator, Token);\
     *current_token = (Token) {\
       .tag = (_type_),\
-      .source_range = {\
-        .file = file,\
-        .offsets = {.from = i, .to = i},\
-      }\
     };\
   } while(0)
 
-#define do_push\
+#define push\
   do {\
     dyn_array_push(parent.children, current_token);\
     current_token = 0;\
     state = Tokenizer_State_Default;\
-  } while(0)
-
-#define reject_and_push\
-  do {\
-    current_token->source_range.offsets.to = i;\
-    do_push;\
-  } while(0)
-
-#define accept_and_push\
-  do {\
-    current_token->source_range.offsets.to = i + 1;\
-    do_push;\
   } while(0)
 
 #define TOKENIZER_HANDLE_ERROR(_MESSAGE_)\
@@ -783,9 +773,9 @@ tokenize(
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Value);\
-        current_token->source_range.offsets = (Range_u64){ i + 1, i + 1 };\
+        current_token_range.offsets = (Range_u64){ i + 1, i + 1 };\
         current_token->Value.value =\
-          token_make_symbol(allocator, slice_literal(";"), Symbol_Type_Operator_Like);\
+          token_make_symbol(allocator, slice_literal(";"), Symbol_Type_Operator_Like, current_token_range);\
         dyn_array_push(parent.children, current_token);\
       }\
     }\
@@ -842,6 +832,7 @@ tokenize(
             .epoch = 0,
             .descriptor = &descriptor_group,
             .storage = storage_immediate(group),
+            .source_range = current_token_range,
             .compiler_source_location = COMPILER_SOURCE_LOCATION,
           };
           dyn_array_push(parent.children, current_token);
@@ -868,7 +859,7 @@ tokenize(
                 const Token *last_token = *dyn_array_last(parent.children);
                 bool is_last_token_a_fake_semicolon = (
                   token_match(last_token, &token_pattern_semicolon) &&
-                  range_length(last_token->source_range.offsets) == 0
+                  range_length(last_token->Value.value->source_range.offsets) == 0
                 );
                 if (!is_last_token_a_fake_semicolon) break;
                 dyn_array_pop(parent.children);
@@ -885,10 +876,10 @@ tokenize(
           if (ch != expected_paren) {
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
-          parent.token->source_range.offsets.to = i + 1;
-          Source_Range children_range = parent.token->source_range;
+          parent.token->Value.value->source_range.offsets.to = i + 1;
+          Source_Range children_range = parent.token->Value.value->source_range;
           children_range.offsets.to -= 1;
-          children_range.offsets.from -= 1;
+          children_range.offsets.from += 1;
           token_as_group(parent.token)->children =
             temp_token_array_into_token_view(allocator, &parent.children, children_range);
           if (!dyn_array_length(parent_stack)) {
@@ -904,8 +895,10 @@ tokenize(
       case Tokenizer_State_Decimal_Integer: {
         if (!isdigit(ch)) {
           Slice digits = current_token_source();
-          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_10);
-          reject_and_push;
+          current_token_range.offsets.to = i;
+          current_token->Value.value =
+            value_number_literal(allocator, digits, Number_Base_10, current_token_range);
+          push;
           goto retry;
         }
         break;
@@ -913,10 +906,12 @@ tokenize(
       case Tokenizer_State_Hex_Integer: {
         if (!code_point_is_hex_digit(ch)) {
           Slice digits = current_token_source();
+          current_token_range.offsets.to = i;
           // Cut off `0x` prefix
           digits = slice_sub(digits, 2, digits.length);
-          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_16);
-          reject_and_push;
+          current_token->Value.value =
+            value_number_literal(allocator, digits, Number_Base_16, current_token_range);
+          push;
           goto retry;
         }
         break;
@@ -924,10 +919,12 @@ tokenize(
       case Tokenizer_State_Binary_Integer: {
         if (ch != '0' && ch != '1') {
           Slice digits = current_token_source();
+          current_token_range.offsets.to = i;
           // Cut off `0b` prefix
           digits = slice_sub(digits, 2, digits.length);
-          current_token->Value.value = value_number_literal(allocator, digits, Number_Base_2);
-          reject_and_push;
+          current_token->Value.value =
+            value_number_literal(allocator, digits, Number_Base_2, current_token_range);
+          push;
           goto retry;
         }
         break;
@@ -935,8 +932,10 @@ tokenize(
       case Tokenizer_State_Symbol: {
         if (!(isalpha(ch) || isdigit(ch) || ch == '_')) {
           Slice name = current_token_source();
-          current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Id_Like);
-          reject_and_push;
+          current_token_range.offsets.to = i;
+          current_token->Value.value =
+            token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range);
+          push;
           goto retry;
         }
         break;
@@ -944,8 +943,10 @@ tokenize(
       case Tokenizer_State_Operator: {
         if (!code_point_is_operator(ch)) {
           Slice name = current_token_source();
-          current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Operator_Like);
-          reject_and_push;
+          current_token_range.offsets.to = i;
+          current_token->Value.value =
+            token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range);
+          push;
           goto retry;
         }
         break;
@@ -954,7 +955,7 @@ tokenize(
         if (ch == '\\') {
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
-
+          current_token_range.offsets.to = i + 1;
           char *bytes = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
           memcpy(bytes, string_buffer->memory, string_buffer->occupied);
           Slice *string = allocator_allocate(allocator, Slice);
@@ -964,9 +965,10 @@ tokenize(
             .epoch = 0,
             .descriptor = &descriptor_string,
             .storage = storage_immediate(string),
+            .source_range = current_token_range,
             .compiler_source_location = COMPILER_SOURCE_LOCATION,
           };
-          accept_and_push;
+          push;
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
         }
@@ -996,15 +998,18 @@ tokenize(
   }
 
   // Handle end of file
+  current_token_range.offsets.to = i;
   switch(state) {
     case Tokenizer_State_Operator: {
       Slice name = current_token_source();
-      current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Operator_Like);
+      current_token->Value.value =
+        token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range);
       break;
     }
     case Tokenizer_State_Symbol: {
       Slice name = current_token_source();
-      current_token->Value.value = token_make_symbol(allocator, name, Symbol_Type_Id_Like);
+      current_token->Value.value =
+        token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range);
       break;
     }
     case Tokenizer_State_Default:
@@ -1015,19 +1020,22 @@ tokenize(
 
     case Tokenizer_State_Decimal_Integer: {
       Slice digits = current_token_source();
-      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_10);
+      current_token->Value.value =
+        value_number_literal(allocator, digits, Number_Base_10, current_token_range);
       break;
     }
     case Tokenizer_State_Hex_Integer: {
       Slice digits = current_token_source();
       digits = slice_sub(digits, 2, digits.length); // Cut off `0x` prefix
-      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_16);
+      current_token->Value.value =
+        value_number_literal(allocator, digits, Number_Base_16, current_token_range);
       break;
     }
     case Tokenizer_State_Binary_Integer: {
       Slice digits = current_token_source();
       digits = slice_sub(digits, 2, digits.length); // Cut off `0b` prefix
-      current_token->Value.value = value_number_literal(allocator, digits, Number_Base_2);
+      current_token->Value.value =
+        value_number_literal(allocator, digits, Number_Base_2, current_token_range);
       break;
     }
     case Tokenizer_State_String:
@@ -1049,7 +1057,7 @@ tokenize(
     if (state == Tokenizer_State_String) {
       TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a \".");
     } else {
-      accept_and_push;
+      push;
     }
   }
 
@@ -1172,15 +1180,13 @@ scope_lookup_type(
 static inline Token *
 token_value_make(
   Execution_Context *context,
-  Value *result,
-  Source_Range source_range
+  Value *result
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Token *result_token = allocator_allocate(context->allocator, Token);
   *result_token = (Token){
     .tag = Token_Tag_Value,
-    .source_range = source_range,
     .Value = { result },
   };
   return result_token;
@@ -1228,6 +1234,7 @@ token_force_type(
   if (!token) return 0;
 
   Descriptor *descriptor = 0;
+  Source_Range source_range = token->Value.value->source_range;
   switch (token->tag) {
     case Token_Tag_Value: {
       if (token_is_group(token)) {
@@ -1237,7 +1244,7 @@ token_force_type(
         }
         if (group->children.length != 1) {
           context_error_snprintf(
-            context, token->source_range, "Pointer type must have a single type inside"
+            context, source_range, "Pointer type must have a single type inside"
           );
           return 0;
         }
@@ -1250,20 +1257,20 @@ token_force_type(
         *descriptor = (Descriptor) {
           .tag = Descriptor_Tag_Pointer,
           .name = name,
-          .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
+          .Pointer.to = scope_lookup_type(context, scope, child->Value.value->source_range, name),
         };
       } else if (token_is_symbol(token)) {
         Symbol *symbol = token_as_symbol(token);
-        descriptor = scope_lookup_type(context, scope, token->source_range, symbol->name);
+        descriptor = scope_lookup_type(context, scope, source_range, symbol->name);
         if (!descriptor) {
           MASS_ON_ERROR(*context->result) return 0;
           context_error_snprintf(
-            context, token->source_range, "Could not find type %"PRIslice,
+            context, source_range, "Could not find type %"PRIslice,
             SLICE_EXPAND_PRINTF(symbol->name)
           );
         }
       } else {
-        descriptor = value_ensure_type(context, token->Value.value, token->source_range);
+        descriptor = value_ensure_type(context, token->Value.value, source_range);
       }
       break;
     }
@@ -1355,8 +1362,8 @@ token_make_fake_body(
     .children = children,
   };
 
-  Value *value = value_make(context, &descriptor_group, storage_immediate(group));
-  return token_value_make(context, value, children.source_range);
+  Value *value = value_make(context, &descriptor_group, storage_immediate(group), children.source_range);
+  return token_value_make(context, value);
 }
 
 Value *
@@ -1388,7 +1395,7 @@ token_make_macro_capture_function(
     },
   };
 
-  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None});
+  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None}, capture_view.source_range);
 }
 
 void
@@ -1455,21 +1462,18 @@ token_apply_macro_syntax(
       overload_function->arguments = overload_arguments;
       result->next_overload = scope_overload;
 
+      Source_Range source_range = capture_view.source_range;
       Token *using = token_value_make(
         context,
-        token_make_symbol(context->allocator, slice_literal("using"), Symbol_Type_Id_Like),
-        capture_view.source_range
+        token_make_symbol(context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range)
       );
       Token *scope_symbol = token_value_make(
         context,
-        token_make_symbol(context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like),
-        capture_view.source_range
+        token_make_symbol(context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like, source_range)
       );
-
       Token *semicolon = token_value_make(
         context,
-        token_make_symbol(context->allocator, slice_literal(";"), Symbol_Type_Operator_Like),
-        capture_view.source_range
+        token_make_symbol(context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range)
       );
 
       const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
@@ -1625,15 +1629,9 @@ token_parse_macros(
       *match_length = token_match_pattern(token_view, macro, &match, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
 
-      Value *macro_result = value_any(context);
+      Value *macro_result = value_any(context, token_view.source_range);
       token_apply_macro_syntax(context, match, macro, macro_result);
-      Token_View matched_view = token_view_rest(&token_view, *match_length);
-      replacement = allocator_allocate(context->allocator, Token);
-      *replacement = (Token){
-        .tag = Token_Tag_Value,
-        .source_range = matched_view.source_range,
-        .Value = { macro_result },
-      };
+      replacement = token_value_make(context, macro_result);
       goto defer;
     }
   }
@@ -1662,7 +1660,7 @@ token_match_type(
   const Token *token = token_view_get(view, 0);
   if (view.length > 1) {
     context_error_snprintf(
-      context, token->source_range, "Can not resolve type"
+      context, token->Value.value->source_range, "Can not resolve type"
     );
     return 0;
   }
@@ -1715,7 +1713,7 @@ token_match_argument(
     view, slice_literal("="), &definition, &default_expression, &equals
   )) {
     if (default_expression.length == 0) {
-      context_error_snprintf(context, equals->source_range, "Expected an expression after `=`");
+      context_error_snprintf(context, equals->Value.value->source_range, "Expected an expression after `=`");
       goto err;
     }
   } else {
@@ -1731,7 +1729,7 @@ token_match_argument(
   )) {
     if (name_tokens.length == 0) {
       context_error_snprintf(
-        context, operator->source_range,
+        context, operator->Value.value->source_range,
         "':' operator expects an identifier on the left hand side"
       );
       goto err;
@@ -1739,7 +1737,7 @@ token_match_argument(
     const Token *name_token = name_tokens.tokens[0];
     if (name_tokens.length > 1 || !token_is_symbol(name_token)) {
       context_error_snprintf(
-        context, operator->source_range,
+        context, operator->Value.value->source_range,
         "':' operator expects only a single identifier on the left hand side"
       );
       goto err;
@@ -1752,9 +1750,10 @@ token_match_argument(
         .name = token_as_symbol(name_token)->name,
         .maybe_default_expression = default_expression,
       },
+      .source_range = definition.source_range,
     };
   } else {
-    Value *value = value_any(context);
+    Value *value = value_any(context, definition.source_range);
     compile_time_eval(context, view, value);
     arg = (Function_Argument) {
       .tag = Function_Argument_Tag_Exact,
@@ -1762,6 +1761,7 @@ token_match_argument(
         .descriptor = value->descriptor,
         .storage = value->storage,
       },
+      .source_range = definition.source_range,
     };
   }
 
@@ -1783,14 +1783,14 @@ token_match_return_type(
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
       context_error_snprintf(
-        context, operator->source_range,
+        context, operator->Value.value->source_range,
         "':' operator expects an identifier on the left hand side"
       );
       goto err;
     }
     if (lhs.length > 1 || !token_is_symbol(lhs.tokens[0])) {
       context_error_snprintf(
-        context, operator->source_range,
+        context, operator->Value.value->source_range,
         "':' operator expects only a single identifier on the left hand side"
       );
       goto err;
@@ -1842,7 +1842,7 @@ token_force_value(
           if (!value) {
             scope_print_names(context->scope);
             context_error_snprintf(
-              context, token->source_range,
+              context, value->source_range,
               "Undefined variable %"PRIslice,
               SLICE_EXPAND_PRINTF(name)
             );
@@ -1854,7 +1854,7 @@ token_force_value(
           ) {
             if (value->epoch != context->epoch) {
               context_error_snprintf(
-                context, token->source_range,
+                context, value->source_range,
                 "Trying to access a runtime variable %"PRIslice" from a different epoch. "
                 "This happens when you access value from runtime in compile-time execution "
                 "or a runtime value of one compile time execution in a diffrent one.",
@@ -1864,7 +1864,7 @@ token_force_value(
             }
           }
         }
-        return assign(context, &token->source_range, result_value, value);
+        return assign(context, result_value, value);
       } else {
         // TODO consider what should happen here
       }
@@ -1899,7 +1899,7 @@ token_match_call_arguments(
       // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
-      Value *result_value = value_any(context);
+      Value *result_value = value_any(context, view.source_range);
       token_parse_expression(context, view, result_value, Expression_Parse_Mode_Default);
       dyn_array_push(result, result_value);
     }
@@ -1936,13 +1936,14 @@ token_handle_user_defined_operator(
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
-    Value *arg_value = value_any(context);
     const Token *arg = token_view_get(args, i);
+    Source_Range source_range = arg->Value.value->source_range;
+    Value *arg_value = value_any(context, source_range);
     MASS_ON_ERROR(token_force_value(context, arg, arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
-      .source_range = arg->source_range,
+      .source_range = source_range,
     });
   }
 
@@ -1952,8 +1953,9 @@ token_handle_user_defined_operator(
   Label_Index fake_return_label_index =
     make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
   {
-    Value *return_label_value =
-      value_make(context, &descriptor_void, code_label32(fake_return_label_index));
+    Value *return_label_value = value_make(
+      context, &descriptor_void, code_label32(fake_return_label_index), result_value->source_range
+    );
     scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = return_label_value,
@@ -2005,7 +2007,7 @@ token_parse_exports(
 
   if (!block) {
     context_error_snprintf(
-      context, keyword_token->source_range,
+      context, keyword_token->Value.value->source_range,
       "exports keyword must be followed {}"
     );
     goto err;
@@ -2014,7 +2016,7 @@ token_parse_exports(
   if (context->module->flags & Module_Flags_Has_Exports) {
     // TODO track original exports
     context_error_snprintf(
-      context, keyword_token->source_range,
+      context, keyword_token->Value.value->source_range,
       "A module can not have multiple exports statements"
     );
     goto err;
@@ -2052,7 +2054,7 @@ token_parse_exports(
           .tokens = item,
           .scope = context->module->own_scope,
         },
-        .source_range = symbol_token->source_range,
+        .source_range = symbol_token->Value.value->source_range,
       });
     }
   }
@@ -2092,16 +2094,17 @@ token_parse_operator_definition(
 
   if (!precedence_token) {
     context_error_snprintf(
-      context, keyword_token->source_range,
+      context, keyword_token->Value.value->source_range,
       "'operator' keyword must be followed by a precedence number"
     );
     goto err;
   }
 
-  Value *precedence_value = value_any(context);
+  Source_Range precedence_source_range = precedence_token->Value.value->source_range;
+  Value *precedence_value = value_any(context, precedence_source_range);
   MASS_ON_ERROR(token_force_value(context, precedence_token, precedence_value)) goto err;
   precedence_value = token_value_force_immediate_integer(
-    context, &precedence_token->source_range, precedence_value, &descriptor_u64
+    context, &precedence_source_range, precedence_value, &descriptor_u64
   );
   MASS_ON_ERROR(*context->result) goto err;
 
@@ -2112,7 +2115,7 @@ token_parse_operator_definition(
 
   if (!pattern_token) {
     context_error_snprintf(
-      context, precedence_token->source_range,
+      context, precedence_source_range,
       "Operator definition have a pattern in () following the precedence"
     );
     goto err;
@@ -2122,7 +2125,7 @@ token_parse_operator_definition(
 
   if (!body_token) {
     context_error_snprintf(
-      context, pattern_token->source_range,
+      context, precedence_source_range,
       "Operator definition have a macro body in {} following the pattern"
     );
     goto err;
@@ -2162,7 +2165,7 @@ token_parse_operator_definition(
   } else {
     operator_token = 0;
     context_error_snprintf(
-      context, pattern_token->source_range,
+      context, pattern_token->Value.value->source_range,
       "Expected the pattern to have two (for prefix / postfix) or three tokens"
     );
     goto err;
@@ -2171,7 +2174,7 @@ token_parse_operator_definition(
   for (u8 i = 0; i < operator->argument_count; ++i) {
     if (!token_is_symbol(arguments[i])) {
       context_error_snprintf(
-        context, arguments[i]->source_range,
+        context, arguments[i]->Value.value->source_range,
         "Operator argument must be an identifier"
       );
       goto err;
@@ -2197,7 +2200,7 @@ token_parse_operator_definition(
     )) {
       Slice existing = operator_fixity_to_lowercase_slice(operator_entry->fixity);
       context_error_snprintf(
-        context, keyword_token->source_range,
+        context, keyword_token->Value.value->source_range,
         "There is already %"PRIslice" operator %"PRIslice
         ". You can only have one definition for prefix and one for infix or suffix.",
         SLICE_EXPAND_PRINTF(existing), SLICE_EXPAND_PRINTF(operator_name)
@@ -2209,7 +2212,7 @@ token_parse_operator_definition(
 
   scope_define(context->scope, operator_name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .source_range = operator_token->source_range,
+    .source_range = operator_token->Value.value->source_range,
     .Operator = {
       .precedence = precendence,
       .argument_count = operator->argument_count,
@@ -2292,7 +2295,7 @@ token_parse_syntax_definition(
 
   if (!pattern_token) {
     context_error_snprintf(
-      context, name->source_range,
+      context, name->Value.value->source_range,
       "Syntax definition requires a parenthesized pattern definitions"
     );
     goto err;
@@ -2324,7 +2327,7 @@ token_parse_syntax_definition(
           Group *group = token_as_group(token);
           if (group->children.length) {
             context_error_snprintf(
-              context, token->source_range,
+              context, token->Value.value->source_range,
               "Nested group matches are not supported in syntax declarations (yet)"
             );
             goto err;
@@ -2346,7 +2349,7 @@ token_parse_syntax_definition(
           const Token *symbol_token = token_view_peek(definition, ++i);
           if (!symbol_token || !token_is_symbol(symbol_token)) {
             context_error_snprintf(
-              context, token->source_range,
+              context, token->Value.value->source_range,
               "@ operator in a syntax definition requires an id after it"
             );
             goto err;
@@ -2369,7 +2372,7 @@ token_parse_syntax_definition(
           }
           if (!last_pattern) {
             context_error_snprintf(
-              context, token->source_range,
+              context, token->Value.value->source_range,
               "@ requires a valid pattern before it"
             );
             goto err;
@@ -2386,7 +2389,7 @@ token_parse_syntax_definition(
           }
         } else {
           context_error_snprintf(
-            context, token->source_range,
+            context, token->Value.value->source_range,
             "Only compile time strings are allowed as values in the pattern"
           );
           goto err;
@@ -2420,7 +2423,7 @@ token_parse_syntax_definition(
   } else {
     scope_add_macro(context->scope, macro);
   }
-  MASS_ON_ERROR(assign(context, &view.source_range, result_value, &void_value));
+  MASS_ON_ERROR(assign(context, result_value, &void_value));
   return peek_index;
 
   err:
@@ -2466,7 +2469,7 @@ token_process_c_struct_definition(
 
   if (!token_match_group(args, Group_Tag_Paren)) {
     context_error_snprintf(
-      context, args->source_range,
+      context, args->Value.value->source_range,
       "c_struct must be followed by ()"
     );
     goto err;
@@ -2474,7 +2477,7 @@ token_process_c_struct_definition(
   Group *args_group = token_as_group(args);
   if (args_group->children.length != 1) {
     context_error_snprintf(
-      context, args->source_range,
+      context, args->Value.value->source_range,
       "c_struct expects 1 argument, got %"PRIu64,
       args_group->children.length
     );
@@ -2483,7 +2486,7 @@ token_process_c_struct_definition(
   const Token *layout_block = token_view_get(args_group->children, 0);
   if (!token_match_group(layout_block, Group_Tag_Curly)) {
     context_error_snprintf(
-      context, args->source_range,
+      context, args->Value.value->source_range,
       "c_struct expects a {} block as the argument"
     );
     goto err;
@@ -2509,7 +2512,7 @@ token_process_c_struct_definition(
   }
 
   *result = type_value_for_descriptor(descriptor);
-  return token_value_make(context, result, args->source_range);
+  return token_value_make(context, result);
 
   err:
   return 0;
@@ -2544,7 +2547,7 @@ token_process_function_literal(
     for (u64 i = 0; !it.done; ++i) {
       if (i > 0) {
         context_error_snprintf(
-          context, return_types->source_range,
+          context, return_types->Value.value->source_range,
           "Multiple return types are not supported at the moment"
         );
         return 0;
@@ -2596,7 +2599,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context, descriptor, (Storage){0});
+  Value *result = value_make(context, descriptor, (Storage){0}, args->Value.value->source_range);
   descriptor->Function.body = body;
   descriptor->Function.scope = function_scope;
   if (!token_is_group(body)) {
@@ -2605,7 +2608,7 @@ token_process_function_literal(
       result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
     } else {
       context_error_snprintf(
-        context, body->source_range,
+        context, body->Value.value->source_range,
         "Only External_Symbol values are allowed as non-literal function bodies"
       );
       return 0;
@@ -2650,7 +2653,7 @@ compile_time_eval(
     },
   };
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval"));
-  Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index));
+  Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
   Function_Builder eval_builder = {
     .function = &descriptor->Function,
     .label_index = eval_label_index,
@@ -2665,7 +2668,7 @@ compile_time_eval(
   // FIXME We have to call token_parse_expression here before we figure out
   //       what is the return value because we need to figure out the return type.
   //       Symboleally there would be a type-only eval available instead
-  Value *expression_result_value = value_any(context);
+  Value *expression_result_value = value_any(context, view.source_range);
   token_parse_expression(&eval_context, view, expression_result_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
@@ -2679,7 +2682,7 @@ compile_time_eval(
       // It is only allowed to to pass through funciton definitions not compiled ones
       assert(expression_result_value->storage.tag == Storage_Tag_None);
     }
-    MASS_ON_ERROR(assign(context, source_range, result_value, expression_result_value));
+    MASS_ON_ERROR(assign(context, result_value, expression_result_value));
     return;
   }
 
@@ -2704,7 +2707,7 @@ compile_time_eval(
     .storage = imm64(context->allocator, (u64)result),
   };
 
-  MASS_ON_ERROR(assign(&eval_context, source_range, &out_value_register, &result_address)) {
+  MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
     context->result = eval_context.result;
     return;
   }
@@ -2719,9 +2722,9 @@ compile_time_eval(
         .base_register = out_register
       },
     },
-  });
+  }, view.source_range);
 
-  MASS_ON_ERROR(assign(&eval_context, source_range, out_value, expression_result_value)) {
+  MASS_ON_ERROR(assign(&eval_context, out_value, expression_result_value)) {
     context->result = eval_context.result;
     return;
   }
@@ -2733,7 +2736,7 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = value_make(context, out_value->descriptor, (Storage){0});
+  Value *temp_result = value_make(context, out_value->descriptor, (Storage){0}, view.source_range);
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
       temp_result->storage = (Storage){0};
@@ -2764,7 +2767,7 @@ compile_time_eval(
       break;
     }
   }
-  MASS_ON_ERROR(assign(context, source_range, result_value, temp_result));
+  MASS_ON_ERROR(assign(context, result_value, temp_result));
 }
 
 typedef struct {
@@ -2821,11 +2824,12 @@ token_handle_storage_variant_of(
       storage_value = value_make(
         context,
         result_descriptor,
-        imm8(context->allocator, value->storage.Register.index)
+        imm8(context->allocator, value->storage.Register.index),
+        *source_range
       );
     }
   }
-  MASS_ON_ERROR(assign(context, source_range, result_value, storage_value));
+  MASS_ON_ERROR(assign(context, result_value, storage_value));
 }
 
 void
@@ -2836,19 +2840,20 @@ token_handle_c_string(
 ) {
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   if (dyn_array_length(args) != 1) goto err;
-  Slice *c_string = value_as_immediate_string(*dyn_array_get(args, 0));
+  Value *arg_value = *dyn_array_get(args, 0);
+  Slice *c_string = value_as_immediate_string(arg_value);
   if (!c_string) goto err;
 
   const Value *c_string_bytes = value_global_c_string_from_slice(context, *c_string);
-  Value *c_string_pointer = value_any(context);
-  load_address(context, &args_token->source_range, c_string_pointer, c_string_bytes);
-  MASS_ON_ERROR(assign(context, &args_token->source_range, result_value, c_string_pointer));
+  Value *c_string_pointer = value_any(context, arg_value->source_range);
+  load_address(context, &arg_value->source_range, c_string_pointer, c_string_bytes);
+  MASS_ON_ERROR(assign(context, result_value, c_string_pointer));
 
   goto defer;
 
   err:
   context_error_snprintf(
-    context, args_token->source_range,
+    context, args_token->Value.value->source_range,
     "c_string expects a single compile-time known string"
   );
 
@@ -2911,10 +2916,10 @@ token_handle_cast(
       context, source_range, value, cast_to_descriptor
     );
   } else if (cast_to_byte_size < original_byte_size) {
-    after_cast_value = value_make(context, cast_to_descriptor, value->storage);
+    after_cast_value = value_make(context, cast_to_descriptor, value->storage, value->source_range);
     after_cast_value->storage.byte_size = cast_to_byte_size;
   }
-  MASS_ON_ERROR(assign(context, source_range, result_value, after_cast_value));
+  MASS_ON_ERROR(assign(context, result_value, after_cast_value));
 }
 
 void
@@ -2929,7 +2934,8 @@ token_handle_negation(
   const Token *token = token_view_get(args, 0);
 
   // FIXME use result_value here
-  Value *value = value_any(context);
+  Source_Range source_range = token->Value.value->source_range;
+  Value *value = value_any(context, source_range);
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
@@ -2938,13 +2944,13 @@ token_handle_negation(
     *negated = *original;
     negated->negative = !negated->negative;
     negated_value = value_make(
-      context, &descriptor_number_literal, storage_immediate(negated)
+      context, &descriptor_number_literal, storage_immediate(negated), source_range
     );
   } else {
     panic("TODO support general negation");
     negated_value = 0;
   }
-  MASS_ON_ERROR(assign(context, &token->source_range, result_value, negated_value));
+  MASS_ON_ERROR(assign(context, result_value, negated_value));
 }
 
 void
@@ -3050,7 +3056,7 @@ token_parse_constant_definitions(
       .tokens = rhs,
       .scope = context->scope,
     },
-    .source_range = symbol->source_range,
+    .source_range = lhs.source_range,
   });
 
   err:
@@ -3066,22 +3072,22 @@ token_handle_function_call(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *target = value_any(context);
+  Source_Range source_range = target_token->Value.value->source_range; // TODO add args as well
+  Value *target = value_any(context, source_range);
   MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
-  assert(token_match(args_token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren}));
+  assert(token_match_group(args_token, Group_Tag_Paren));
 
   if (
     target->descriptor->tag == Descriptor_Tag_Function &&
     (target->descriptor->Function.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
-    Source_Range source_range = target_token->source_range; // TODO add args as well
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
     non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
     Value *fake_target_value =
-      value_make(context, non_compile_time_descriptor, target->storage);
-    const Token *fake_target = token_value_make(context, fake_target_value, source_range);
+      value_make(context, non_compile_time_descriptor, target->storage, source_range);
+    const Token *fake_target = token_value_make(context, fake_target_value);
     Token_View fake_eval_view = {
       .tokens = (const Token*[]){fake_target, args_token},
       .length = 2,
@@ -3125,15 +3131,14 @@ token_handle_function_call(
   Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
 
   if (target_descriptor->tag != Descriptor_Tag_Function) {
-    Slice source = source_from_source_range(&target_token->source_range);
+    Slice source = source_from_source_range(&source_range);
     context_error_snprintf(
-      context, target_token->source_range,
+      context, source_range,
       "%"PRIslice" is not a function",
       SLICE_EXPAND_PRINTF(source)
     );
     return;
   }
-  const Source_Range *source_range = &target_token->source_range;
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
@@ -3148,7 +3153,7 @@ token_handle_function_call(
       Slice current_name = to_call_descriptor->name;
       // TODO provide names of matched overloads
       context_error_snprintf(
-        context, target_token->source_range,
+        context, source_range,
         "Could not decide which overload to pick."
         "Candidates are %"PRIslice" and %"PRIslice,
         SLICE_EXPAND_PRINTF(previous_name), SLICE_EXPAND_PRINTF(current_name)
@@ -3163,10 +3168,10 @@ token_handle_function_call(
   }
 
   if (match.score == -1) {
-    Slice source = source_from_source_range(&target_token->source_range);
+    Slice source = source_from_source_range(&source_range);
     // TODO provide types of actual arguments
     context_error_snprintf(
-      context, target_token->source_range,
+      context, source_range,
       "Could not find matching overload for call %"PRIslice,
       SLICE_EXPAND_PRINTF(source)
     );
@@ -3202,7 +3207,9 @@ token_handle_function_call(
               assert(default_expression.length);
               Descriptor *arg_descriptor = arg->Any_Of_Type.descriptor;
               // FIXME avoid using a stack value
-              arg_value = reserve_stack(context->allocator, context->builder, arg_descriptor);
+              arg_value = reserve_stack(
+                context->allocator, context->builder, arg_descriptor, default_expression.source_range
+              );
               {
                 Execution_Context arg_context = *context;
                 arg_context.scope = body_scope;
@@ -3213,19 +3220,19 @@ token_handle_function_call(
               scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
                 .tag = Scope_Entry_Tag_Value,
                 .Value.value = arg_value,
-                .source_range = args_token->source_range,
+                .source_range = arg_value->source_range,
               });
             } else {
               arg_value = *dyn_array_get(args, i);
             }
 
             arg_value = maybe_coerce_number_literal_to_integer(
-              context, &args_token->source_range, arg_value, arg->Any_Of_Type.descriptor
+              context, arg_value, arg->Any_Of_Type.descriptor
             );
             scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
               .tag = Scope_Entry_Tag_Value,
               .Value.value = arg_value,
-              .source_range = args_token->source_range,
+              .source_range = arg_value->source_range,
             });
             break;
           }
@@ -3268,7 +3275,7 @@ token_handle_function_call(
         if (dyn_array_length(context->builder->code_block.instructions)) {
           push_instruction(
             &context->builder->code_block.instructions,
-            target_token->source_range,
+            source_range,
             (Instruction) {
               .type = Instruction_Type_Label,
               .label = fake_return_label_index
@@ -3277,14 +3284,12 @@ token_handle_function_call(
         }
       }
     } else {
-      call_function_overload(context, source_range, overload, args, result_value);
+      call_function_overload(context, &source_range, overload, args, result_value);
     }
-
-
   } else {
     // TODO add better error message
     context_error_snprintf(
-      context, target_token->source_range,
+      context, source_range,
       "Could not find matching overload"
     );
   }
@@ -3301,7 +3306,7 @@ extend_integer_value(
   assert(descriptor_is_integer(value->descriptor));
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
-  Value *result = reserve_stack(context->allocator, context->builder, target_descriptor);
+  Value *result = reserve_stack(context->allocator, context->builder, target_descriptor, *source_range);
   move_value(context->allocator, context->builder, source_range, &result->storage, &value->storage);
   return result;
 }
@@ -3347,10 +3352,10 @@ maybe_resize_values_for_integer_math_operation(
   Value **rhs_pointer
 ) {
   *lhs_pointer = maybe_coerce_number_literal_to_integer(
-    context, source_range, *lhs_pointer, (*rhs_pointer)->descriptor
+    context, *lhs_pointer, (*rhs_pointer)->descriptor
   );
   *rhs_pointer = maybe_coerce_number_literal_to_integer(
-    context, source_range, *rhs_pointer, (*lhs_pointer)->descriptor
+    context, *rhs_pointer, (*lhs_pointer)->descriptor
   );
 
   Descriptor *ld = (*lhs_pointer)->descriptor;
@@ -3432,7 +3437,7 @@ struct_get_field(
         .storage = operand,
       };
 
-      MASS_ON_ERROR(assign(context, source_range, result_value, field_value));
+      MASS_ON_ERROR(assign(context, result_value, field_value));
       return;
     }
   }
@@ -3457,10 +3462,9 @@ token_handle_array_access(
   Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
   u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
-  Value *array_element_value = value_make(context, item_descriptor, array_value->storage);
-  index_value = maybe_coerce_number_literal_to_integer(
-    context, source_range, index_value, &descriptor_u64
-  );
+  Value *array_element_value =
+    value_make(context, item_descriptor, array_value->storage, array_value->source_range);
+  index_value = maybe_coerce_number_literal_to_integer(context, index_value, &descriptor_u64);
   array_element_value->storage.byte_size = item_byte_size;
   if (index_value->storage.tag == Storage_Tag_Static) {
     s32 index = s64_to_s32(storage_immediate_value_up_to_s64(&index_value->storage));
@@ -3471,7 +3475,8 @@ token_handle_array_access(
     // or the index are stored, but it is
 
     Register reg = register_acquire_temp(context->builder);
-    Value *new_base_register = value_register_for_descriptor(context, reg, &descriptor_s64);
+    Value *new_base_register =
+      value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
 
     // Move the index into the register
     move_value(
@@ -3482,7 +3487,7 @@ token_handle_array_access(
       &index_value->storage
     );
 
-    Value *byte_size_value = value_from_s64(context, item_byte_size);
+    Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
     // Multiply index by the item byte size
     multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
 
@@ -3515,7 +3520,7 @@ token_handle_array_access(
     };
   }
   // FIXME this might actually cause problems in assigning to an array element
-  MASS_ON_ERROR(assign(context, source_range, result_value, array_element_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
 void
@@ -3536,13 +3541,14 @@ token_eval_operator(
   } else if (slice_equal(operator, slice_literal("()"))) {
     const Token *target = token_view_get(args_view, 0);
     const Token *args_token = token_view_get(args_view, 1);
+    Source_Range args_range = args_token->Value.value->source_range;
     // TODO turn `cast` into a compile-time function call / macro
     if (
       token_is_symbol(target) &&
       slice_equal(token_as_symbol(target)->name, slice_literal("cast"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      token_handle_cast(context, &args_token->source_range, args, result_value);
+      token_handle_cast(context, &args_range, args, result_value);
       dyn_array_destroy(args);
     } else if (
       token_is_symbol(target) &&
@@ -3560,7 +3566,7 @@ token_eval_operator(
       slice_equal(token_as_symbol(target)->name, slice_literal("storage_variant_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      token_handle_storage_variant_of(context, &args_token->source_range, args, result_value);
+      token_handle_storage_variant_of(context, &args_range, args, result_value);
       dyn_array_destroy(args);
     } else if (
       token_is_symbol(target) &&
@@ -3569,30 +3575,31 @@ token_eval_operator(
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
       if (dyn_array_length(args) != 1) {
         context_error_snprintf(
-          context, args_token->source_range, "address_of expects a single argument"
+          context, args_range, "address_of expects a single argument"
         );
         return;
       }
-      load_address(context, &args_token->source_range, result_value, *dyn_array_get(args, 0));
+      load_address(context, &args_range, result_value, *dyn_array_get(args, 0));
       dyn_array_destroy(args);
     } else {
       token_handle_function_call(context, target, args_token, result_value);
     }
   } else if (slice_equal(operator, slice_literal("@"))) {
     const Token *body = token_view_get(args_view, 0);
+    Source_Range body_range = body->Value.value->source_range;
     if (token_match_symbol(body, slice_literal("scope"))) {
       Value *scope_value =
-        value_make(context, &descriptor_scope, storage_immediate(context->scope));
-      MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
+        value_make(context, &descriptor_scope, storage_immediate(context->scope), body_range);
+      MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
     } else if (token_match_symbol(body, slice_literal("context"))) {
       Value *scope_value =
-        value_make(context, &descriptor_execution_context, storage_immediate(context));
-      MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
+        value_make(context, &descriptor_execution_context, storage_immediate(context), body_range);
+      MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
     } else if (token_match_group(body, Group_Tag_Paren)) {
       compile_time_eval(context, token_as_group(body)->children, result_value);
     } else {
       context_error_snprintf(
-        context, body->source_range,
+        context, body_range,
         "@ operator must be followed by a parenthesized expression"
       );
       return;
@@ -3601,7 +3608,9 @@ token_eval_operator(
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
 
-    Value *lhs_value = value_any(context);
+    Source_Range rhs_range = rhs->Value.value->source_range;
+    Source_Range lhs_range = lhs->Value.value->source_range;
+    Value *lhs_value = value_any(context, lhs_range);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
     if (
       lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
@@ -3609,7 +3618,7 @@ token_eval_operator(
     ) {
       if (token_is_symbol(rhs)) {
         if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
-          struct_get_field(context, &rhs->source_range, lhs_value, token_as_symbol(rhs)->name, result_value);
+          struct_get_field(context, &rhs_range, lhs_value, token_as_symbol(rhs)->name, result_value);
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
           Scope *module_scope = storage_immediate_as_c_type(lhs_value->storage, Scope);
@@ -3620,7 +3629,7 @@ token_eval_operator(
         }
       } else {
         context_error_snprintf(
-          context, rhs->source_range,
+          context, rhs_range,
           "Right hand side of the . operator on structs must be an identifier"
         );
         return;
@@ -3630,19 +3639,19 @@ token_eval_operator(
         token_match(rhs, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren}) ||
         (rhs->tag == Token_Tag_Value && rhs->Value.value->descriptor == &descriptor_number_literal)
       ) {
-        Value *index = value_any(context);
+        Value *index = value_any(context, rhs_range);
         token_force_value(context, rhs, index);
-        token_handle_array_access(context, &lhs->source_range, lhs_value, index, result_value);
+        token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
       } else {
         context_error_snprintf(
-          context, rhs->source_range,
+          context, rhs_range,
           "Right hand side of the . operator for an array must be a (expr) or a literal number"
         );
         return;
       }
     } else {
       context_error_snprintf(
-        context, rhs->source_range,
+        context, rhs_range,
         "Left hand side of the . operator must be a struct"
       );
       return;
@@ -3656,10 +3665,12 @@ token_eval_operator(
   ) {
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
+    Source_Range rhs_range = rhs->Value.value->source_range;
+    Source_Range lhs_range = lhs->Value.value->source_range;
 
-    Value *lhs_value = value_any(context);
+    Value *lhs_value = value_any(context, lhs_range);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context);
+    Value *rhs_value = value_any(context, rhs_range);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
@@ -3667,17 +3678,17 @@ token_eval_operator(
     if (lhs_is_literal && rhs_is_literal) {
       // FIXME support large unsigned numbers
       lhs_value = token_value_force_immediate_integer(
-        context, &lhs->source_range, lhs_value, &descriptor_s64
+        context, &lhs_range, lhs_value, &descriptor_s64
       );
       rhs_value = token_value_force_immediate_integer(
-        context, &rhs->source_range, rhs_value, &descriptor_s64
+        context, &rhs_range, rhs_value, &descriptor_s64
       );
       MASS_ON_ERROR(*context->result) return;
     }
 
     if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
       context_error_snprintf(
-        context, lhs->source_range,
+        context, lhs_range,
         "Left hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
@@ -3685,33 +3696,34 @@ token_eval_operator(
     }
     if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
       context_error_snprintf(
-        context, rhs->source_range,
+        context, rhs_range,
         "Right hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
     }
 
-    maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs_value, &rhs_value);
+    maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
     MASS_ON_ERROR(*context->result) return;
 
     Function_Builder *builder = context->builder;
 
-    Value *stack_result = reserve_stack(context->allocator, builder, lhs_value->descriptor);
+    Value *stack_result =
+      reserve_stack(context->allocator, builder, lhs_value->descriptor, lhs_range);
     if (slice_equal(operator, slice_literal("+"))) {
-      plus(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      plus(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
-      minus(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      minus(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("*"))) {
-      multiply(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      multiply(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("/"))) {
-      divide(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      divide(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("%"))) {
-      value_remainder(context, &lhs->source_range, stack_result, lhs_value, rhs_value);
+      value_remainder(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else {
       panic("Internal error: Unexpected operator");
     }
-    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, stack_result)) return;
+    MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
   } else if (
     slice_equal(operator, slice_literal(">")) ||
     slice_equal(operator, slice_literal("<")) ||
@@ -3722,10 +3734,12 @@ token_eval_operator(
   ) {
     const Token *lhs = token_view_get(args_view, 0);
     const Token *rhs = token_view_get(args_view, 1);
+    Source_Range rhs_range = rhs->Value.value->source_range;
+    Source_Range lhs_range = lhs->Value.value->source_range;
 
-    Value *lhs_value = value_any(context);
+    Value *lhs_value = value_any(context, lhs_range);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context);
+    Value *rhs_value = value_any(context, rhs_range);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
@@ -3733,17 +3747,17 @@ token_eval_operator(
     if (lhs_is_literal && rhs_is_literal) {
       // FIXME support large unsigned numbers
       lhs_value = token_value_force_immediate_integer(
-        context, &lhs->source_range, lhs_value, &descriptor_s64
+        context, &lhs_range, lhs_value, &descriptor_s64
       );
       rhs_value = token_value_force_immediate_integer(
-        context, &rhs->source_range, rhs_value, &descriptor_s64
+        context, &rhs_range, rhs_value, &descriptor_s64
       );
       MASS_ON_ERROR(*context->result) return;
     }
 
     if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
       context_error_snprintf(
-        context, lhs->source_range,
+        context, lhs_range,
         "Left hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
@@ -3751,13 +3765,13 @@ token_eval_operator(
     }
     if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
       context_error_snprintf(
-        context, rhs->source_range,
+        context, rhs_range,
         "Right hand side of the %"PRIslice" is not an integer",
         SLICE_EXPAND_PRINTF(operator)
       );
       return;
     }
-    maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs_value, &rhs_value);
+    maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
     MASS_ON_ERROR(*context->result) return;
 
     Compare_Type compare_type = 0;
@@ -3806,16 +3820,17 @@ token_eval_operator(
       }
     }
 
-    compare(context, compare_type, &lhs->source_range, result_value, lhs_value, rhs_value);
+    compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
   } else if (slice_equal(operator, slice_literal("->"))) {
     const Token *arguments = token_view_get(args_view, 0);
     const Token *return_types = token_view_get(args_view, 1);
     const Token *body = token_view_get(args_view, 2);
     Value *function_value = token_process_function_literal(context, arguments, return_types, body);
-    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
+    MASS_ON_ERROR(assign(context, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     const Token *function = token_view_get(args_view, 0);
-    Value *function_value = value_any(context);
+    Source_Range source_range = function->Value.value->source_range;
+    Value *function_value = value_any(context, source_range);
     MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
     if (function_value) {
       if (
@@ -3826,12 +3841,12 @@ token_eval_operator(
         descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
         context_error_snprintf(
-          context, function->source_range,
+          context, source_range,
           "Only literal functions (with a body) can be marked as macro"
         );
       }
     }
-    MASS_ON_ERROR(assign(context, &args_view.source_range, result_value, function_value)) return;
+    MASS_ON_ERROR(assign(context, result_value, function_value)) return;
   } else {
     panic("TODO: Unknown operator");
   }
@@ -3866,18 +3881,18 @@ token_dispatch_operator(
     .tokens = dyn_array_get(*token_stack, start_index),
     .length = argument_count,
     .source_range = {
-      .file = last_arg->source_range.file,
+      .file = last_arg->Value.value->source_range.file,
       .offsets = {
-        .from = first_arg->source_range.offsets.from,
-        .to = last_arg->source_range.offsets.to,
+        .from = first_arg->Value.value->source_range.offsets.from,
+        .to = last_arg->Value.value->source_range.offsets.to,
       },
     },
   };
-  Value *result_value = value_any(context);
+  Value *result_value = value_any(context, args_view.source_range);
   token_eval_operator(context, args_view, operator_entry, result_value);
   MASS_ON_ERROR(*context->result) return;
 
-  Token *result_token = token_value_make(context, result_value, args_view.source_range);
+  Token *result_token = token_value_make(context, result_value);
 
   // Pop off current arguments and push a new one
   dyn_array_splice_raw(*token_stack, start_index, argument_count, &result_token, 1);
@@ -3958,15 +3973,16 @@ token_parse_if_expression(
     goto err;
   }
 
-  Value *condition_value = value_any(context);
+  Value *condition_value = value_any(context, condition.source_range);
   token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*context->result) goto err;
 
+  Source_Range keyword_range = keyword->Value.value->source_range;
   Label_Index else_label = make_if(
-    context, &context->builder->code_block.instructions, &keyword->source_range, condition_value
+    context, &context->builder->code_block.instructions, &keyword_range, condition_value
   );
 
-  Value *if_value = value_any(context);
+  Value *if_value = value_any(context, then_branch.source_range);
   token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*context->result) goto err;
 
@@ -3975,8 +3991,10 @@ token_parse_if_expression(
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
     }
-    Value *on_stack = reserve_stack(context->allocator, context->builder, stack_descriptor);
-    MASS_ON_ERROR(assign(context, &view.source_range, on_stack, if_value)) {
+    Value *on_stack = reserve_stack(
+      context->allocator, context->builder, stack_descriptor, if_value->source_range
+    );
+    MASS_ON_ERROR(assign(context, on_stack, if_value)) {
       goto err;
     }
     if_value = on_stack;
@@ -3985,12 +4003,12 @@ token_parse_if_expression(
   Label_Index after_label =
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
   push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
+    &context->builder->code_block.instructions, keyword_range,
     (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
   );
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
+    &context->builder->code_block.instructions, keyword_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
@@ -3999,10 +4017,10 @@ token_parse_if_expression(
   *matched_length = peek_index + else_length;
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
+    &context->builder->code_block.instructions, keyword_range,
     (Instruction) {.type = Instruction_Type_Label, .label = after_label}
   );
-  return token_value_make(context, if_value, view.source_range);
+  return token_value_make(context, if_value);
 
   err:
   return 0;
@@ -4018,7 +4036,7 @@ token_parse_expression(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if(!view.length) {
-    MASS_ON_ERROR(assign(context, &view.source_range, result_value, &void_value)) return true;
+    MASS_ON_ERROR(assign(context, result_value, &void_value)) return true;
     return true;
   }
 
@@ -4072,7 +4090,7 @@ token_parse_expression(
               if (!is_previous_an_operator) {
                 if (!token_handle_operator(
                   context, view, &token_stack, &operator_stack, slice_literal("()"),
-                  token->source_range, Operator_Fixity_Postfix
+                  token->Value.value->source_range, Operator_Fixity_Postfix
                 )) goto err;
               }
               break;
@@ -4083,7 +4101,7 @@ token_parse_expression(
             }
             case Group_Tag_Square: {
               context_error_snprintf(
-                context, token->source_range,
+                context, token->Value.value->source_range,
                 "Unexpected [] in an expression"
               );
               break;
@@ -4098,7 +4116,7 @@ token_parse_expression(
               goto drain;
             } else {
               context_error_snprintf(
-                context, token->source_range,
+                context, token->Value.value->source_range,
                 "Unexpected semicolon in an expression"
               );
               goto err;
@@ -4109,7 +4127,7 @@ token_parse_expression(
           if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
             if (!token_handle_operator(
               context, view, &token_stack, &operator_stack,
-              symbol_name, token->source_range, fixity_mask
+              symbol_name, token->Value.value->source_range, fixity_mask
             )) goto err;
             is_previous_an_operator = true;
           } else {
@@ -4160,7 +4178,7 @@ token_parse_block_view(
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   if (!children_view.length) {
-    MASS_ON_ERROR(assign(context, &children_view.source_range, block_result_value, &void_value));
+    MASS_ON_ERROR(assign(context, block_result_value, &void_value));
     return;
   }
 
@@ -4169,8 +4187,9 @@ token_parse_block_view(
   // FIXME deal with terminated vs unterminated statements
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) return;
-    value_init(&last_result, context, &descriptor_any, (Storage){.tag = Storage_Tag_Any});
     Token_View rest = token_view_rest(&children_view, start_index);
+    // TODO provide a better source range here
+    value_init(&last_result, context, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, rest.source_range);
     // Skipping over empty statements
     if (token_match(token_view_get(rest, 0), &token_pattern_semicolon)) {
       match_length = 1;
@@ -4195,7 +4214,7 @@ token_parse_block_view(
         }
         if (match_length) {
           if (last_result.descriptor->tag == Descriptor_Tag_Any) {
-            MASS_ON_ERROR(assign(context, &children_view.source_range, &last_result, &void_value));
+            MASS_ON_ERROR(assign(context, &last_result, &void_value));
           }
           goto check_match;
         }
@@ -4206,9 +4225,9 @@ token_parse_block_view(
     check_match:
     if (!match_length) {
       const Token *token = token_view_get(rest, 0);
-      Slice source = source_from_source_range(&token->source_range);
+      Slice source = source_from_source_range(&token->Value.value->source_range);
       context_error_snprintf(
-        context, token->source_range,
+        context, token->Value.value->source_range,
         "Can not parse statement. Unexpected token %"PRIslice".",
         SLICE_EXPAND_PRINTF(source)
       );
@@ -4217,7 +4236,7 @@ token_parse_block_view(
   }
 
   // TODO This is not optimal as we might generate extra temp values
-  MASS_ON_ERROR(assign(context, &children_view.source_range, block_result_value, &last_result));
+  MASS_ON_ERROR(assign(context, block_result_value, &last_result));
 }
 
 void
@@ -4234,7 +4253,7 @@ token_parse_block_no_scope(
 
   Token_View children_view = group->children;
   if (!children_view.length) {
-    MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
+    MASS_ON_ERROR(assign(context, block_result_value, &void_value));
     return;
   }
 }
@@ -4264,7 +4283,7 @@ token_parse_statement_using(
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("using"));
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
 
-  Value *result = value_any(context);
+  Value *result = value_any(context, rest.source_range);
   token_parse_expression(context, rest, result, Expression_Parse_Mode_Default);
 
   if (result->descriptor != &descriptor_scope) {
@@ -4326,26 +4345,28 @@ token_parse_statement_label(
   } else {
     Scope *label_scope = context->scope;
 
+    Source_Range source_range = symbol->Value.value->source_range;
     Label_Index label = make_label(context->program, &context->program->memory.sections.code, name);
-    value = value_make(context, &descriptor_void, code_label32(label));
+    value = value_make(context, &descriptor_void, code_label32(label), source_range);
     scope_define(label_scope, name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
-      .source_range = symbol->source_range,
+      .source_range = source_range,
     });
     if (placeholder) {
       return peek_index;
     }
   }
 
+  Source_Range keyword_range = keyword->Value.value->source_range;
   if (
     value->descriptor != &descriptor_void ||
     value->storage.tag != Storage_Tag_Memory ||
     value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
-    Slice source = source_from_source_range(&keyword->source_range);
+    Slice source = source_from_source_range(&keyword_range);
     context_error_snprintf(
-      context, keyword->source_range,
+      context, keyword_range,
       "Trying to redefine variable %"PRIslice" as a label",
       SLICE_EXPAND_PRINTF(source)
     );
@@ -4353,7 +4374,7 @@ token_parse_statement_label(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
+    &context->builder->code_block.instructions, keyword_range,
     (Instruction) {
       .type = Instruction_Type_Label,
       .label = value->storage.Memory.location.Instruction_Pointer_Relative.label_index
@@ -4379,7 +4400,7 @@ token_parse_goto(
 
   if (rest.length == 0) {
     context_error_snprintf(
-      context, keyword->source_range,
+      context, keyword->Value.value->source_range,
       "`goto` keyword must be followed by an identifier"
     );
     goto err;
@@ -4387,7 +4408,7 @@ token_parse_goto(
 
   if (rest.length > 1) {
     context_error_snprintf(
-      context, token_view_get(rest, 1)->source_range,
+      context, token_view_get(rest, 1)->Value.value->source_range,
       "Unexpected token"
     );
     goto err;
@@ -4395,7 +4416,7 @@ token_parse_goto(
   const Token *symbol = token_view_get(rest, 0);
   if (!token_is_symbol(symbol)) {
     context_error_snprintf(
-      context, symbol->source_range,
+      context, symbol->Value.value->source_range,
       "`goto` keyword must be followed by an identifier"
     );
     goto err;
@@ -4412,7 +4433,7 @@ token_parse_goto(
     value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     context_error_snprintf(
-      context, keyword->source_range,
+      context, keyword->Value.value->source_range,
       "%"PRIslice" is not a label",
       SLICE_EXPAND_PRINTF(name)
     );
@@ -4420,7 +4441,7 @@ token_parse_goto(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
+    &context->builder->code_block.instructions, keyword->Value.value->source_range,
     (Instruction) {.assembly = {jmp, {value->storage, 0, 0}}}
   );
 
@@ -4456,15 +4477,17 @@ token_parse_explicit_return(
     Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
       ? &descriptor_s64
       : fn_return->descriptor;
-    Value *stack_return = reserve_stack(context->allocator, context->builder, stack_descriptor);
-    MASS_ON_ERROR(assign(context, &keyword->source_range, stack_return, fn_return)) return true;
+    Value *stack_return = reserve_stack(
+      context->allocator, context->builder, stack_descriptor, fn_return->source_range
+    );
+    MASS_ON_ERROR(assign(context, stack_return, fn_return)) return true;
     *fn_return = *stack_return;
   }
 
   bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
     context_error_snprintf(
-      context, keyword->source_range,
+      context, fn_return->source_range,
       "Explicit return from a non-void function requires a value"
     );
   }
@@ -4478,7 +4501,7 @@ token_parse_explicit_return(
 
   push_instruction(
     &context->builder->code_block.instructions,
-    keyword->source_range,
+    fn_return->source_range,
     (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
   );
 
@@ -4495,11 +4518,12 @@ token_match_fixed_array_type(
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  Descriptor *descriptor =
-    scope_lookup_type(context, context->scope, type->source_range, token_as_symbol(type)->name);
+  Descriptor *descriptor = scope_lookup_type(
+    context, context->scope, type->Value.value->source_range, token_as_symbol(type)->name
+  );
 
   Token_View size_view = token_as_group(square_brace)->children;
-  Value *size_value = value_any(context);
+  Value *size_value = value_any(context, size_view.source_range);
   compile_time_eval(context, size_view, size_value);
   size_value = token_value_force_immediate_integer(
     context, &size_view.source_range, size_value, &descriptor_u32
@@ -4551,7 +4575,7 @@ token_parse_inline_machine_code_bytes(
   for (u64 i = 0; i < dyn_array_length(args); ++i) {
     if (bytes.length >= 15) {
       context_error_snprintf(
-        context, args_token->source_range,
+        context, args_token->Value.value->source_range,
         "Expected a maximum of 15 bytes"
       );
       goto err;
@@ -4561,7 +4585,7 @@ token_parse_inline_machine_code_bytes(
     if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error_snprintf(
-          context, args_token->source_range,
+          context, value->source_range,
           "inline_machine_code_bytes only supports one label"
         );
         goto err;
@@ -4574,7 +4598,7 @@ token_parse_inline_machine_code_bytes(
       bytes.memory[bytes.length++] = 0;
     } else {
       value = token_value_force_immediate_integer(
-        context, &args_token->source_range, value, &descriptor_u8
+        context, &value->source_range, value, &descriptor_u8
       );
       u8 byte = u64_to_u8(storage_immediate_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
@@ -4582,7 +4606,7 @@ token_parse_inline_machine_code_bytes(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, id_token->source_range,
+    &context->builder->code_block.instructions, id_token->Value.value->source_range,
     (Instruction) {
       .type = Instruction_Type_Bytes,
       .Bytes = bytes,
@@ -4609,13 +4633,14 @@ token_parse_definition(
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
   Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) goto err;
-  Value *value = reserve_stack(context->allocator, context->builder, descriptor);
+  Source_Range name_range = name->Value.value->source_range;
+  Value *value = reserve_stack(context->allocator, context->builder, descriptor, name_range);
   scope_define(context->scope, token_as_symbol(name)->name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = value,
-    .source_range = name->source_range,
+    .source_range = name_range,
   });
-  MASS_ON_ERROR(assign(context, &define->source_range, result_value, value));
+  MASS_ON_ERROR(assign(context, result_value, value));
 
   err:
   return peek_index;
@@ -4664,7 +4689,7 @@ token_parse_definition_and_assignment_statements(
   }
   Slice name = token_as_symbol(name_token)->name;
 
-  Value *value = value_any(context);
+  Value *value = value_any(context, name_token->Value.value->source_range);
   token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
   MASS_ON_ERROR(*context->result) goto err;
 
@@ -4678,11 +4703,11 @@ token_parse_definition_and_assignment_statements(
   if (value->descriptor->tag == Descriptor_Tag_Function) {
     Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
     ensure_compiled_function_body(context, value);
-    on_stack = reserve_stack(context->allocator, context->builder, fn_pointer);
+    on_stack = reserve_stack(context->allocator, context->builder, fn_pointer, view.source_range);
     load_address(context, &view.source_range, on_stack, value);
   } else {
-    on_stack = reserve_stack(context->allocator, context->builder, value->descriptor);
-    MASS_ON_ERROR(assign(context, &view.source_range, on_stack, value)) goto err;
+    on_stack = reserve_stack(context->allocator, context->builder, value->descriptor, view.source_range);
+    MASS_ON_ERROR(assign(context, on_stack, value)) goto err;
   }
 
   scope_define(context->scope, name, (Scope_Entry) {
@@ -4713,7 +4738,7 @@ token_parse_assignment(
     return 0;
   }
 
-  Value *target = value_any(context);
+  Value *target = value_any(context, lhs.source_range);
   if (!token_parse_definition(context, lhs, target)) {
     token_parse_expression(context, lhs, target, Expression_Parse_Mode_Default);
   }

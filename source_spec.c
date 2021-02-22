@@ -52,6 +52,16 @@ spec_check_mass_result(
   return false;
 }
 
+#define spec_check_slice(_ACTUAL_, _EXPECTED_)\
+  do {\
+    Slice actual = (_ACTUAL_);\
+    Slice expected = (_EXPECTED_);\
+    if (!slice_equal(actual, expected)) {\
+      check(false, "Expected %"PRIslice", got %"PRIslice,\
+        SLICE_EXPAND_PRINTF(expected), SLICE_EXPAND_PRINTF(actual));\
+    }\
+  } while(0)
+
 static Compilation test_compilation = {0};
 static Execution_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
@@ -114,7 +124,7 @@ spec("source") {
 
   describe("Scope") {
     it("should be able to set and lookup values") {
-      Value *test = value_from_s64(&test_context, 42);
+      Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("test"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
@@ -126,21 +136,21 @@ spec("source") {
     }
 
     it("should be able to lookup things from parent scopes") {
-      Value *global = value_from_s64(&test_context, 42);
+      Value *global = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define(root_scope, slice_literal("global"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = global,
       });
 
-      Value *level_1_test = value_from_s64(&test_context, 1);
+      Value *level_1_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define(scope_level_1, slice_literal("test"), (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = level_1_test,
       });
 
-      Value *level_2_test = value_from_s64(&test_context, 1);
+      Value *level_2_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define(scope_level_2, slice_literal("test"),  (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
@@ -183,7 +193,7 @@ spec("source") {
       check(tokens.length == 2);
       const Token *new_line = token_view_get(tokens, 1);
       check(token_is_symbol(new_line));
-      check(slice_equal(token_as_symbol(new_line)->name, slice_literal(";")));
+      spec_check_slice(token_as_symbol(new_line)->name, slice_literal(";"));
     }
 
     it("should be able to parse hex integers") {
@@ -195,11 +205,11 @@ spec("source") {
       check(tokens.length == 1);
       const Token *token = token_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
-      check(slice_equal(source_from_source_range(&token->source_range), slice_literal("0xCAFE")));
+      spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0xCAFE"));
       check(token->Value.value->descriptor == &descriptor_number_literal);
       check(token->Value.value->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = token->Value.value->storage.Static.memory;
-      check(slice_equal(literal->digits, slice_literal("CAFE")));
+      spec_check_slice(literal->digits, slice_literal("CAFE"));
       check(!literal->negative);
       check(literal->base == Number_Base_16);
     }
@@ -213,11 +223,11 @@ spec("source") {
       check(tokens.length == 1);
       const Token *token = token_view_get(tokens, 0);
       check(token->tag == Token_Tag_Value);
-      check(slice_equal(source_from_source_range(&token->source_range), slice_literal("0b100")));
+      spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0b100"));
       check(token->Value.value->descriptor == &descriptor_number_literal);
       check(token->Value.value->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = token->Value.value->storage.Static.memory;
-      check(slice_equal(literal->digits, slice_literal("100")));
+      spec_check_slice(literal->digits, slice_literal("100"));
       check(!literal->negative);
       check(literal->base == Number_Base_2);
     }
@@ -232,15 +242,15 @@ spec("source") {
 
       const Token *a_num = token_view_get(tokens, 0);
       check(a_num->tag == Token_Tag_Value);
-      check(slice_equal(source_from_source_range(&a_num->source_range), slice_literal("12")));
+      spec_check_slice(source_from_source_range(&a_num->Value.value->source_range), slice_literal("12"));
 
       const Token *plus = token_view_get(tokens, 1);
       check(token_is_symbol(plus));
-      check(slice_equal(token_as_symbol(plus)->name, slice_literal("+")));
+      spec_check_slice(token_as_symbol(plus)->name, slice_literal("+"));
 
       const Token *id = token_view_get(tokens, 2);
       check(token_is_symbol(id));
-      check(slice_equal(source_from_source_range(&id->source_range), slice_literal("foo123")));
+      spec_check_slice(source_from_source_range(&id->Value.value->source_range), slice_literal("foo123"));
     }
 
     it("should be able to tokenize groups") {
@@ -255,7 +265,7 @@ spec("source") {
       check(token_is_group(paren));
       check(token_as_group(paren)->tag == Group_Tag_Paren);
       check(token_as_group(paren)->children.length == 1);
-      check(slice_equal(source_from_source_range(&paren->source_range), slice_literal("(x)")));
+      spec_check_slice(source_from_source_range(&paren->Value.value->source_range), slice_literal("(x)"));
 
       const Token *id = token_view_get(token_as_group(paren)->children, 0);
       check(token_is_symbol(id));
@@ -269,7 +279,7 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       const Token *string = token_view_get(tokens, 0);
-      check(slice_equal(source_from_source_range(&string->source_range), slice_literal("\"foo 123\"")));
+      spec_check_slice(source_from_source_range(&string->Value.value->source_range), slice_literal("\"foo 123\""));
     }
 
     it("should be able to tokenize nested groups with different braces") {
@@ -284,13 +294,13 @@ spec("source") {
       check(token_is_group(curly));
       check(token_as_group(curly)->tag == Group_Tag_Curly);
       check(token_as_group(curly)->children.length == 1);
-      check(slice_equal(source_from_source_range(&curly->source_range), slice_literal("{[]}")));
+      spec_check_slice(source_from_source_range(&curly->Value.value->source_range), slice_literal("{[]}"));
 
       const Token *square = token_view_get(token_as_group(curly)->children, 0);
       check(token_is_group(square));
       check(token_as_group(square)->tag == Group_Tag_Square);
       check(token_as_group(square)->children.length == 0);
-      check(slice_equal(source_from_source_range(&square->source_range), slice_literal("[]")));
+      spec_check_slice(source_from_source_range(&square->Value.value->source_range), slice_literal("[]"));
     }
 
     it("should be able to tokenize complex input") {
@@ -312,10 +322,10 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Parse_Error *error = &result.Error.details;
-      check(slice_equal(error->source_range.file->path, test_file_name));
+      spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      check(slice_equal(error->message, slice_literal("Unexpected end of file. Expected a closing brace.")));
+      spec_check_slice(error->message, slice_literal("Unexpected end of file. Expected a closing brace."));
     }
 
     it("should report a failure when encountering a mismatched brace that") {
@@ -325,10 +335,10 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Parse_Error *error = &result.Error.details;
-      check(slice_equal(error->source_range.file->path, test_file_name));
+      spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      check(slice_equal(error->message, slice_literal("Mismatched closing brace")));
+      spec_check_slice(error->message, slice_literal("Mismatched closing brace"));
     }
   }
 
@@ -436,7 +446,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Expected `then`, encountered `else` inside an `if` expression"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("Expected `then`, encountered `else` inside an `if` expression")
+      );
     }
     it("should report an error on double `then` inside of an if expression") {
       test_program_inline_source_base(
@@ -445,7 +458,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Expected `else`, encountered `then` inside an `if` expression"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("Expected `else`, encountered `then` inside an `if` expression")
+      );
     }
     it("should be able to parse and run if statement") {
       fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
@@ -480,7 +496,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("`if` keyword must be followed by an expression")
+      );
     }
 
     it("should report an error for an `if` statement with an incorrect condition") {
@@ -491,7 +510,10 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
       slice_print(error->message);
-      check(slice_equal(slice_literal("`if` keyword must be followed by an expression"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("`if` keyword must be followed by an expression")
+      );
     }
   }
 
@@ -626,9 +648,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
+      spec_check_slice(
         error->message, slice_literal("Incompatible type: expected s32, got s64")
-      ));
+      );
     }
 
     it("should report an overload overlap") {
@@ -756,7 +778,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Pointer type must have a single type inside"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("Pointer type must have a single type inside")
+      );
     }
 
     it("should report an error when encountering multiple return types") {
@@ -766,7 +791,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Multiple return types are not supported at the moment"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("Multiple return types are not supported at the moment")
+      );
     }
 
     it("should report an error when encountering wrong argument type to external()") {
@@ -776,7 +804,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Could not find matching overload for call external"), error->message));
+      spec_check_slice(
+        error->message,
+        slice_literal("Could not find matching overload for call external")
+      );
     }
 
     it("should report an error when non-type id is being used as a type") {
@@ -787,7 +818,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Expected a type"), error->message));
+      spec_check_slice(error->message, slice_literal("Expected a type"));
     }
 
     it("should report an error when non-type token is being used as a type") {
@@ -797,7 +828,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Expected a type"), error->message));
+      spec_check_slice(error->message, slice_literal("Expected a type"));
     }
 
     it("should report an error when encountering an unknown type") {
@@ -809,7 +840,7 @@ spec("source") {
       scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("Could not find type s33"), error->message));
+      spec_check_slice(error->message, slice_literal("Could not find type s33"));
     }
   }
 
@@ -903,10 +934,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix."),
-        error->message
-      ));
+      spec_check_slice(
+        error->message,
+        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix.")
+      );
     }
 
     it("should report an error when defining an overloaded infix and postfix operator") {
@@ -918,10 +949,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(
-        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix."),
-        error->message
-      ));
+      spec_check_slice(
+        error->message,
+        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix.")
+      );
     }
 
     it("should have a built-in compile-time shift operator") {
@@ -1242,7 +1273,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal("x is not a label"), error->message));
+      spec_check_slice(error->message, slice_literal("x is not a label"));
     }
   }
 
@@ -1325,9 +1356,10 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      check(slice_equal(slice_literal(
-        "Right hand side of the . operator on structs must be an identifier"), error->message
-      ));
+      spec_check_slice(
+        error->message,
+        slice_literal("Right hand side of the . operator on structs must be an identifier")
+      );
     }
 
     it("should be able to return structs while accepting other arguments") {

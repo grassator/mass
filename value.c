@@ -699,12 +699,14 @@ value_init_internal(
   Value *result,
   Execution_Context *context,
   Descriptor *descriptor,
-  Storage storage
+  Storage storage,
+  Source_Range source_range
 ) {
   *result = (Value) {
     .epoch = context->epoch,
     .descriptor = descriptor,
     .storage = storage,
+    .source_range = source_range,
     .compiler_source_location = compiler_source_location,
   };
   return result;
@@ -719,14 +721,16 @@ value_make_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
   Descriptor *descriptor,
-  Storage storage
+  Storage storage,
+  Source_Range source_range
 ) {
   return value_init_internal(
     compiler_source_location,
     allocator_allocate(context->allocator, Value),
     context,
     descriptor,
-    storage
+    storage,
+    source_range
   );
 }
 
@@ -734,11 +738,12 @@ value_make_internal(
   COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
 )
 
-Value *
+static inline Value *
 value_number_literal(
   const Allocator *allocator,
   Slice digits,
-  Number_Base base
+  Number_Base base,
+  Source_Range source_range
 ) {
   Number_Literal *literal = allocator_allocate(allocator, Number_Literal);
   u64 bits = 0;
@@ -762,12 +767,13 @@ value_number_literal(
     .epoch = 0,
     .descriptor = &descriptor_number_literal,
     .storage = storage_immediate(literal),
+    .source_range = source_range,
     .compiler_source_location = COMPILER_SOURCE_LOCATION,
   };
   return value;
 }
 
-Slice *
+static inline Slice *
 value_as_immediate_string(
   const Value *value
 ) {
@@ -836,62 +842,71 @@ storage_eflags(
 }
 
 // TODO consider adding explicit boolean descriptor type
-#define value_from_compare(_allocator_, _compare_type_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_)\
+#define value_from_compare(_allocator_, _compare_type_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
 )
 
-#define value_any(_CONTEXT_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}\
+#define value_any(_CONTEXT_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}, (_SOURCE_RANGE_)\
 )
 
-#define value_from_s64(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s32(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_s32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s16(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_s16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s8(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_s8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u64(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_u64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u32(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_u32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u16(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_allocator_)->allocator, (_integer_))\
+#define value_from_u16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_allocator_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u8(_CONTEXT_, _integer_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_CONTEXT_)->allocator, (_integer_))\
+#define value_from_u8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_CONTEXT_)->allocator, (_integer_), (_SOURCE_RANGE_)\
 )
 
 static inline Value *
 value_from_signed_immediate_internal(
   Compiler_Source_Location location,
   Execution_Context *context,
-  s64 value
+  s64 value,
+  Source_Range source_range
 ) {
   if (s64_fits_into_s8(value)) {
-    return value_make_internal(location, context, &descriptor_s8, imm8(context->allocator, (s8)value));
+    return value_make_internal(
+      location, context, &descriptor_s8, imm8(context->allocator, (s8)value), source_range
+    );
   }
   if (s64_fits_into_s16(value)) {
-    return value_make_internal(location, context, &descriptor_s16, imm16(context->allocator, (s16)value));
+    return value_make_internal(
+      location, context, &descriptor_s16, imm16(context->allocator, (s16)value), source_range
+    );
   }
   if (s64_fits_into_s32(value)) {
-    return value_make_internal(location, context, &descriptor_s32, imm32(context->allocator, (s32)value));
+    return value_make_internal(
+      location, context, &descriptor_s32, imm32(context->allocator, (s32)value), source_range
+    );
   }
-  return value_make_internal(location, context, &descriptor_s64, imm64(context->allocator, value));
+  return value_make_internal(
+    location, context, &descriptor_s64, imm64(context->allocator, value), source_range
+  );
 }
 #define value_from_signed_immediate(...)\
   value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -900,18 +915,27 @@ static inline Value *
 value_from_unsigned_immediate_internal(
   Compiler_Source_Location location,
   Execution_Context *context,
-  u64 value
+  u64 value,
+  Source_Range source_range
 ) {
   if (u64_fits_into_u8(value)) {
-    return value_make_internal(location, context, &descriptor_u8, imm8(context->allocator, (u8)value));
+    return value_make_internal(
+      location, context, &descriptor_u8, imm8(context->allocator, (u8)value), source_range
+    );
   }
   if (u64_fits_into_u16(value)) {
-    return value_make_internal(location, context, &descriptor_u16, imm16(context->allocator, (u16)value));
+    return value_make_internal(
+      location, context, &descriptor_u16, imm16(context->allocator, (u16)value), source_range
+    );
   }
   if (u64_fits_into_u32(value)) {
-    return value_make_internal(location, context, &descriptor_u32, imm32(context->allocator, (u32)value));
+    return value_make_internal(
+      location, context, &descriptor_u32, imm32(context->allocator, (u32)value), source_range
+    );
   }
-  return value_make_internal(location, context, &descriptor_u64, imm64(context->allocator, value));
+  return value_make_internal(
+    location, context, &descriptor_u64, imm64(context->allocator, value), source_range
+  );
 }
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -937,10 +961,13 @@ value_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
   Register reg,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Source_Range source_range
 ) {
   return value_make_internal(
-    compiler_source_location, context, descriptor, storage_register_for_descriptor(reg, descriptor)
+    compiler_source_location, context, descriptor,
+    storage_register_for_descriptor(reg, descriptor),
+    source_range
   );
 }
 #define value_register_for_descriptor(...)\
@@ -1077,13 +1104,17 @@ function_argument_value_at_index_internal(
     Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
     Register reg = registers[argument_index];
     if (byte_size <= 8) {
-      return value_register_for_descriptor_internal(source_location, context, reg, arg_descriptor);
+      return value_register_for_descriptor_internal(
+        source_location, context, reg, arg_descriptor, argument->source_range
+      );
     } else {
       switch(mode) {
         case Function_Argument_Mode_Call: {
           // For the caller we pretend that the type is a pointer since we do not have references
           Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
-          return value_register_for_descriptor_internal(source_location, context, reg, pointer_descriptor);
+          return value_register_for_descriptor_internal(
+            source_location, context, reg, pointer_descriptor, argument->source_range
+          );
         }
         case Function_Argument_Mode_Body: {
           // Large arguments are passed "by reference", i.e. their memory location in the register
@@ -1094,7 +1125,7 @@ function_argument_value_at_index_internal(
               .tag = Memory_Location_Tag_Indirect,
               .Indirect = { .base_register = reg },
             }
-          });
+          }, argument->source_range);
         }
       }
       panic("Unexpected function argument mode");

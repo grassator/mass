@@ -231,7 +231,6 @@ typedef struct {
 typedef struct Token {
   Token_Tag tag;
   char _tag_padding[4];
-  Source_Range source_range;
   union {
     Token_Value Value;
   };
@@ -501,6 +500,7 @@ typedef struct Value {
   Storage storage;
   Value * next_overload;
   u64 epoch;
+  Source_Range source_range;
   Compiler_Source_Location compiler_source_location;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
@@ -538,6 +538,7 @@ typedef struct {
 typedef struct Function_Argument {
   Function_Argument_Tag tag;
   char _tag_padding[4];
+  Source_Range source_range;
   union {
     Function_Argument_Any_Of_Type Any_Of_Type;
     Function_Argument_Exact Exact;
@@ -1082,6 +1083,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
     .name = slice_literal_fields("epoch"),
     .descriptor = &descriptor_u64,
     .offset = offsetof(Value, epoch),
+  },
+  {
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .offset = offsetof(Value, source_range),
   },
   {
     .name = slice_literal_fields("compiler_source_location"),

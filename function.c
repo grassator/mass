@@ -12,11 +12,13 @@
 //    all the function calls within the body we do not know the max_call_parameters_stack_size
 //    so during initial encoding they are stored as negative numbers and then adjusted in
 //    fn_adjust_stack_displacement.
+// FIXME add COMPILER_SOURCE_LOCATION
 Value *
 reserve_stack(
   Allocator *allocator,
   Function_Builder *fn,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Source_Range source_range
 ) {
   s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
   fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
@@ -26,6 +28,7 @@ reserve_stack(
   *result = (Value) {
     .descriptor = descriptor,
     .storage = operand,
+    .source_range = source_range,
   };
   return result;
 }
@@ -767,7 +770,7 @@ make_if(
       } else {
         assert(!"Unsupported value inside `if`");
       }
-      Value *eflags = value_from_compare(context, Compare_Type_Equal);
+      Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
       push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), eflags->storage, 0}}});
     }
   }
@@ -787,8 +790,8 @@ typedef enum {
     if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
       s64 a_s64 = storage_immediate_value_up_to_s64(a_operand);\
       s64 b_s64 = storage_immediate_value_up_to_s64(b_operand);\
-      Value *imm_value = value_from_signed_immediate((_context_), a_s64 _operator_ b_s64);\
-      MASS_ON_ERROR(assign((_context_), (_loc_), (_result_), imm_value));\
+      Value *imm_value = value_from_signed_immediate((_context_), a_s64 _operator_ b_s64, *(_loc_));\
+      MASS_ON_ERROR(assign((_context_), (_result_), imm_value));\
       return;\
     }\
   } while(0)
@@ -830,13 +833,13 @@ plus_or_minus(
   Value *temp_immediate = 0;
   if (a->storage.tag == Storage_Tag_Static && a->storage.byte_size == 8) {
     temp_immediate = value_register_for_descriptor(
-      context, register_acquire_temp(context->builder), a->descriptor
+      context, register_acquire_temp(context->builder), a->descriptor, *source_range
     );
     move_value(context->allocator, context->builder, source_range, &temp_immediate->storage, &a->storage);
     a = temp_immediate;
   } else if (b->storage.tag == Storage_Tag_Static && b->storage.byte_size == 8) {
     temp_immediate = value_register_for_descriptor(
-      context, register_acquire_temp(context->builder), b->descriptor
+      context, register_acquire_temp(context->builder), b->descriptor, *source_range
     );
     move_value(context->allocator, context->builder, source_range, &temp_immediate->storage, &b->storage);
     b = temp_immediate;
@@ -849,14 +852,14 @@ plus_or_minus(
   if (a_size != b_size) {
     if (a_size > b_size) {
       Value *b_sized_to_a = value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), a->descriptor
+        context, register_acquire_temp(context->builder), a->descriptor, *source_range
       );
       move_value(context->allocator, context->builder, source_range, &b_sized_to_a->storage, &b->storage);
       b = b_sized_to_a;
       maybe_a_or_b_temp = b;
     } else {
       Value *a_sized_to_b = value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), b->descriptor
+        context, register_acquire_temp(context->builder), b->descriptor, *source_range
       );
       move_value(context->allocator, context->builder, source_range, &a_sized_to_b->storage, &b->storage);
       a = a_sized_to_b;
@@ -892,7 +895,7 @@ plus_or_minus(
     temp = a;
   } else {
     temp = value_register_for_descriptor(
-      context, register_acquire_temp(context->builder), a->descriptor
+      context, register_acquire_temp(context->builder), a->descriptor, *source_range
     );
   }
 
@@ -951,14 +954,16 @@ multiply(
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
-  Value *y_temp = reserve_stack(allocator, builder, y->descriptor);
+  Value *y_temp = reserve_stack(allocator, builder, y->descriptor, *source_range);
 
   Register temp_register_index = register_acquire_temp(builder);
-  Value *temp_register = value_register_for_descriptor(context, temp_register_index, y->descriptor);
+  Value *temp_register =
+    value_register_for_descriptor(context, temp_register_index, y->descriptor, *source_range);
   move_value(allocator, builder, source_range, &temp_register->storage, &y->storage);
   move_value(allocator, builder, source_range, &y_temp->storage, &temp_register->storage);
 
-  temp_register = value_register_for_descriptor(context, temp_register_index, x->descriptor);
+  temp_register =
+    value_register_for_descriptor(context, temp_register_index, x->descriptor, *source_range);
   move_value(allocator, builder, source_range, &temp_register->storage, &x->storage);
 
   push_instruction(
@@ -1011,10 +1016,10 @@ divide_or_remainder(
     : b->descriptor;
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(allocator, builder, larger_descriptor);
+  Value *divisor = reserve_stack(allocator, builder, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &divisor->storage, &b->storage);
 
-  Value *reg_a = value_register_for_descriptor(context, Register_A, larger_descriptor);
+  Value *reg_a = value_register_for_descriptor(context, Register_A, larger_descriptor, *source_range);
   {
     move_value(allocator, builder, source_range, &reg_a->storage, &a->storage);
 
@@ -1049,10 +1054,12 @@ divide_or_remainder(
     move_value(allocator, builder, source_range, &result_value->storage, &reg_a->storage);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
-      Value *temp_result = value_register_for_descriptor(context, Register_AH, larger_descriptor);
+      Value *temp_result =
+        value_register_for_descriptor(context, Register_AH, larger_descriptor, *source_range);
       move_value(allocator, builder, source_range, &result_value->storage, &temp_result->storage);
     } else {
-      Value *temp_result = value_register_for_descriptor(context, Register_D, larger_descriptor);
+      Value *temp_result =
+        value_register_for_descriptor(context, Register_D, larger_descriptor, *source_range);
       move_value(allocator, builder, source_range, &result_value->storage, &temp_result->storage);
     }
   }
@@ -1151,17 +1158,17 @@ compare(
     ? a->descriptor
     : b->descriptor;
 
-  Value *temp_b = reserve_stack(allocator, builder, larger_descriptor);
+  Value *temp_b = reserve_stack(allocator, builder, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &temp_b->storage, &b->storage);
 
-  Value *reg_r11 = value_register_for_descriptor(context, Register_R11, larger_descriptor);
+  Value *reg_r11 = value_register_for_descriptor(context, Register_R11, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &reg_r11->storage, &a->storage);
 
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {cmp, {reg_r11->storage, temp_b->storage, 0}}});
 
   // FIXME if the result_value operand is any we should create a temp value
-  Value *comparison_value = value_from_compare(context, operation);
-  MASS_ON_ERROR(assign(context, source_range, result_value, comparison_value));
+  Value *comparison_value = value_from_compare(context, operation, *source_range);
+  MASS_ON_ERROR(assign(context, result_value, comparison_value));
 }
 
 void
@@ -1177,7 +1184,7 @@ load_address(
   Value *temp_register = result_value->storage.tag == Storage_Tag_Register
     ? result_value
     : value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), result_descriptor
+        context, register_acquire_temp(context->builder), result_descriptor, *source_range
     );
 
   // TODO rethink operand sizing
@@ -1369,7 +1376,7 @@ call_function_overload(
           }
         };
         Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
-        Value *stack_value = reserve_stack(context->allocator, builder, to_save.descriptor);
+        Value *stack_value = reserve_stack(context->allocator, builder, to_save.descriptor, *source_range);
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
         dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
       }
@@ -1388,7 +1395,7 @@ call_function_overload(
       assert(default_expression.length);
       // FIXME do not force the result on the stack
       source_arg = reserve_stack(
-        context->allocator, context->builder, target_arg_definition->Any_Of_Type.descriptor
+        context->allocator, context->builder, target_arg_definition->Any_Of_Type.descriptor, *source_range
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
@@ -1406,11 +1413,11 @@ call_function_overload(
       //      Maybe we should do the conversion at some step before?
       source_arg->descriptor == &descriptor_number_literal
     ) {
-      assign(context, source_range, target_arg, source_arg);
+      assign(context, target_arg, source_arg);
     } else {
       // Large values are copied to the stack and passed by a reference
-      Value *stack_value = reserve_stack(context->allocator, builder, source_arg->descriptor);
-      assign(context, source_range, stack_value, source_arg);
+      Value *stack_value = reserve_stack(context->allocator, builder, source_arg->descriptor, *source_range);
+      assign(context, stack_value, source_arg);
       load_address(context, source_range, target_arg, stack_value);
     }
     Slice name;
@@ -1449,8 +1456,9 @@ call_function_overload(
     if (result_value->storage.tag == Storage_Tag_Memory) {
       result_operand = result_value->storage;
     } else {
-      result_operand =
-        reserve_stack(context->allocator, builder, descriptor->returns.descriptor)->storage;
+      result_operand = reserve_stack(
+        context->allocator, builder, descriptor->returns.descriptor, *source_range
+      )->storage;
     }
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
@@ -1477,12 +1485,13 @@ call_function_overload(
   if (return_size <= 8) {
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
-      saved_result = reserve_stack(context->allocator, builder, descriptor->returns.descriptor);
+      saved_result =
+        reserve_stack(context->allocator, builder, descriptor->returns.descriptor, *source_range);
       move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value.storage);
     }
   }
 
-  MASS_ON_ERROR(assign(context, source_range, result_value, saved_result));
+  MASS_ON_ERROR(assign(context, result_value, saved_result));
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
@@ -1574,7 +1583,7 @@ make_and(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
+  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("&&"));
 
   Value zero = {
@@ -1610,7 +1619,7 @@ make_or(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8);
+  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("||"));
 
   Value zero = {
