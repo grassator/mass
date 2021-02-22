@@ -647,7 +647,7 @@ token_match_group(
 }
 
 typedef struct {
-  Token *token;
+  Value *value;
   Array_Const_Token_Ptr children;
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
@@ -700,7 +700,7 @@ tokenize(
   enum Tokenizer_State state = Tokenizer_State_Default;
   Token *current_token = 0;
   Tokenizer_Parent parent = {
-    .token = 0,
+    .value = 0,
     // FIXME only initialize on first push
     .children = dyn_array_make(Array_Const_Token_Ptr)
   };
@@ -752,7 +752,7 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (!parent.token || token_as_group(parent.token)->tag == Group_Tag_Curly) {\
+    if (!parent.value || value_as_group(parent.value)->tag == Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Value);\
@@ -820,12 +820,15 @@ tokenize(
           };
           dyn_array_push(parent.children, current_token);
           dyn_array_push(parent_stack, parent);
-          parent = (Tokenizer_Parent){current_token, dyn_array_make(Array_Const_Token_Ptr, 4)};
+          parent = (Tokenizer_Parent){
+            .value = current_token->Value.value,
+            .children = dyn_array_make(Array_Const_Token_Ptr, 4),
+          };
         } else if (ch == ')' || ch == '}' || ch == ']') {
-          if (!parent.token || !token_is_group(parent.token)) {
+          if (!parent.value || !value_is_group(parent.value)) {
             panic("Tokenizer: unexpected closing char for group");
           }
-          const Group *group = token_as_group(parent.token);
+          const Group *group = value_as_group(parent.value);
           s8 expected_paren = 0;
           switch (group->tag) {
             case Group_Tag_Paren: {
@@ -859,11 +862,11 @@ tokenize(
           if (ch != expected_paren) {
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
-          parent.token->Value.value->source_range.offsets.to = i + 1;
-          Source_Range children_range = parent.token->Value.value->source_range;
+          parent.value->source_range.offsets.to = i + 1;
+          Source_Range children_range = parent.value->source_range;
           children_range.offsets.to -= 1;
           children_range.offsets.from += 1;
-          token_as_group(parent.token)->children =
+          value_as_group(parent.value)->children =
             temp_token_array_into_token_view(allocator, &parent.children, children_range);
           if (!dyn_array_length(parent_stack)) {
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
@@ -1031,7 +1034,7 @@ tokenize(
   current_line.to = file->text.length;
   dyn_array_push(file->line_ranges, current_line);
 
-  if (parent.token) {
+  if (parent.value) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
   // current_token can be null in case of an empty input
