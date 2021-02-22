@@ -546,13 +546,55 @@ token_make_symbol(
   return value;
 }
 
+static inline bool
+token_is_string(
+  const Token *token
+) {
+  assert(token->tag == Token_Tag_Value);
+  if (!token->Value.value) return false;
+  return token->Value.value->descriptor == &descriptor_string;
+}
+
+static inline bool
+token_is_symbol(
+  const Token *token
+) {
+  assert(token->tag == Token_Tag_Value);
+  if (!token->Value.value) return false;
+  return token->Value.value->descriptor == &descriptor_symbol;
+}
+
+static inline bool
+token_is_group(
+  const Token *token
+) {
+  assert(token->tag == Token_Tag_Value);
+  if (!token->Value.value) return false;
+  return token->Value.value->descriptor == &descriptor_group;
+}
+
 static inline Symbol *
 token_as_symbol(
   const Token *token
 ) {
-  assert(token->tag == Token_Tag_Value);
-  assert(token->Value.value->descriptor == &descriptor_symbol);
+  assert(token_is_symbol(token));
   return storage_immediate_as_c_type(token->Value.value->storage, Symbol);
+}
+
+static inline Group *
+token_as_group(
+  const Token *token
+) {
+  assert(token_is_group(token));
+  return storage_immediate_as_c_type(token->Value.value->storage, Group);
+}
+
+static inline Slice *
+token_as_string(
+  const Token *token
+) {
+  assert(token_is_string(token));
+  return storage_immediate_as_c_type(token->Value.value->storage, Slice);
 }
 
 const Token_Pattern token_pattern_comma_operator = {
@@ -570,6 +612,8 @@ token_match(
   const Token *token,
   const Token_Pattern *pattern
 ) {
+  assert(token->tag == Token_Tag_Value);
+  if (!token->Value.value) return false;
   switch(pattern->tag) {
     case Token_Pattern_Tag_Invalid: {
       panic("Invalid pattern tag");
@@ -579,9 +623,7 @@ token_match(
       return true;
     }
     case Token_Pattern_Tag_Symbol: {
-      if (token->tag != Token_Tag_Value) return false;
-      if (!token->Value.value) return false;
-      if (token->Value.value->descriptor != &descriptor_symbol) return false;
+      if (!token_is_symbol(token)) return false;
       if (pattern->Symbol.name.length) {
         Slice name = token_as_symbol(token)->name;
         if (!slice_equal(pattern->Symbol.name, name)) return false;
@@ -589,18 +631,16 @@ token_match(
       return true;
     }
     case Token_Pattern_Tag_String: {
-      if (token->tag != Token_Tag_Value) return false;
-      if (!token->Value.value) return false;
-      if (token->Value.value->descriptor != &descriptor_string) return false;
+      if (!token_is_string(token)) return false;
       if (pattern->String.slice.length) {
-        Slice *slice = storage_immediate_as_c_type(token->Value.value->storage, Slice);
+        Slice *slice = token_as_string(token);
         if (!slice_equal(pattern->String.slice, *slice)) return false;
       }
       return true;
     }
     case Token_Pattern_Tag_Group: {
-      if (token->tag != Token_Tag_Group) return false;
-      return token->Group.tag == pattern->Group.tag;
+      if (!token_is_group(token)) return false;
+      return token_as_group(token)->tag == pattern->Group.tag;
     }
   }
   return true;
@@ -615,10 +655,11 @@ token_match_symbol(
 }
 
 static inline bool
-token_is_symbol(
-  const Token *token
+token_match_group(
+  const Token *token,
+  Group_Tag tag
 ) {
-  return token_match_symbol(token, (Slice){0});
+  return token_match(token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = tag});
 }
 
 typedef struct {
@@ -738,7 +779,7 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (!parent.token || parent.token->Group.tag == Group_Tag_Curly) {\
+    if (!parent.token || token_as_group(parent.token)->tag == Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Value);\
@@ -790,20 +831,29 @@ tokenize(
           start_token(Token_Tag_Value);
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
-          start_token(Token_Tag_Group);
-          current_token->Group.tag =
+          start_token(Token_Tag_Value);
+          Group *group = allocator_allocate(allocator, Group);
+          group->tag =
             ch == '(' ? Group_Tag_Paren :
             ch == '{' ? Group_Tag_Curly :
             Group_Tag_Square;
+          current_token->Value.value = allocator_allocate(allocator, Value);
+          *current_token->Value.value = (Value) {
+            .epoch = 0,
+            .descriptor = &descriptor_group,
+            .storage = storage_immediate(group),
+            .compiler_source_location = COMPILER_SOURCE_LOCATION,
+          };
           dyn_array_push(parent.children, current_token);
           dyn_array_push(parent_stack, parent);
           parent = (Tokenizer_Parent){current_token, dyn_array_make(Array_Const_Token_Ptr, 4)};
         } else if (ch == ')' || ch == '}' || ch == ']') {
-          if (parent.token->tag != Token_Tag_Group) {
+          if (!parent.token || !token_is_group(parent.token)) {
             panic("Tokenizer: unexpected closing char for group");
           }
+          const Group *group = token_as_group(parent.token);
           s8 expected_paren = 0;
-          switch (parent.token->Group.tag) {
+          switch (group->tag) {
             case Group_Tag_Paren: {
               expected_paren = ')';
               break;
@@ -839,7 +889,7 @@ tokenize(
           Source_Range children_range = parent.token->source_range;
           children_range.offsets.to -= 1;
           children_range.offsets.from -= 1;
-          parent.token->Group.children =
+          token_as_group(parent.token)->children =
             temp_token_array_into_token_view(allocator, &parent.children, children_range);
           if (!dyn_array_length(parent_stack)) {
             TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
@@ -1179,33 +1229,31 @@ token_force_type(
 
   Descriptor *descriptor = 0;
   switch (token->tag) {
-    case Token_Tag_Group: {
-      if (token->Group.tag != Group_Tag_Square) {
-        panic("TODO");
-      }
-      if (token->Group.children.length != 1) {
-        context_error_snprintf(
-          context, token->source_range, "Pointer type must have a single type inside"
-        );
-        return 0;
-      }
-      const Token *child = token_view_get(token->Group.children, 0);
-      if (!token_is_symbol(child)) {
-        panic("TODO: should be recursive");
-      }
-      Slice name = token_as_symbol(child)->name;
-      descriptor = allocator_allocate(context->allocator, Descriptor);
-      *descriptor = (Descriptor) {
-        .tag = Descriptor_Tag_Pointer,
-        .name = name,
-        .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
-      };
-      break;
-    }
     case Token_Tag_Value: {
-      Value *value = token->Value.value;
-      if (token_is_symbol(token)) {
-        Symbol *symbol = storage_immediate_as_c_type(value->storage, Symbol);
+      if (token_is_group(token)) {
+        Group *group = token_as_group(token);
+        if (group->tag != Group_Tag_Square) {
+          panic("TODO");
+        }
+        if (group->children.length != 1) {
+          context_error_snprintf(
+            context, token->source_range, "Pointer type must have a single type inside"
+          );
+          return 0;
+        }
+        const Token *child = token_view_get(group->children, 0);
+        if (!token_is_symbol(child)) {
+          panic("TODO: should be recursive");
+        }
+        Slice name = token_as_symbol(child)->name;
+        descriptor = allocator_allocate(context->allocator, Descriptor);
+        *descriptor = (Descriptor) {
+          .tag = Descriptor_Tag_Pointer,
+          .name = name,
+          .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
+        };
+      } else if (token_is_symbol(token)) {
+        Symbol *symbol = token_as_symbol(token);
         descriptor = scope_lookup_type(context, scope, token->source_range, symbol->name);
         if (!descriptor) {
           MASS_ON_ERROR(*context->result) return 0;
@@ -1215,12 +1263,12 @@ token_force_type(
           );
         }
       } else {
-        descriptor = value_ensure_type(context, value, token->source_range);
+        descriptor = value_ensure_type(context, token->Value.value, token->source_range);
       }
       break;
     }
     default: {
-      panic("TODO");
+      panic("Unknown Token Tag");
       break;
     }
   }
@@ -1296,6 +1344,21 @@ token_match_pattern(
   return view_index;
 }
 
+Token *
+token_make_fake_body(
+  Execution_Context *context,
+  Token_View children
+) {
+  Group *group = allocator_allocate(context->allocator, Group);
+  *group = (Group){
+    .tag = Group_Tag_Curly,
+    .children = children,
+  };
+
+  Value *value = value_make(context, &descriptor_group, storage_immediate(group));
+  return token_value_make(context, value, children.source_range);
+}
+
 Value *
 token_make_macro_capture_function(
   Execution_Context *context,
@@ -1304,15 +1367,7 @@ token_make_macro_capture_function(
   Descriptor *return_descriptor,
   Slice capture_name
 ) {
-  Token *fake_body = allocator_allocate(context->allocator, Token);
-  *fake_body = (Token) {
-    .tag = Token_Tag_Group,
-    .source_range = capture_view.source_range,
-    .Group = {
-      .tag = Group_Tag_Curly,
-      .children = capture_view,
-    }
-  };
+  Token *fake_body = token_make_fake_body(context, capture_view);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
@@ -1428,17 +1483,8 @@ token_apply_macro_syntax(
         .length = 4,
         .source_range = capture_view.source_range,
       };
-
-      Token *scope_body = allocator_allocate(context->allocator, Token);
-      *scope_body = (Token) {
-        .tag = Token_Tag_Group,
-        .source_range = capture_view.source_range,
-        .Group = {
-          .tag = Group_Tag_Curly,
-          .children = scope_token_view,
-        }
-      };
-      overload_function->body = scope_body;
+      Token *fake_body = token_make_fake_body(context, scope_token_view);
+      overload_function->body = fake_body;
     }
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
@@ -1771,7 +1817,25 @@ token_force_value(
     case Token_Tag_Value: {
       if (token->Value.value) {
         Value *value = token->Value.value;
-        if (token_is_symbol(token)) {
+        if (token_is_group(token)) {
+          Group *group = token_as_group(token);
+          switch(group->tag) {
+            case Group_Tag_Paren: {
+              token_parse_expression(
+                context, group->children, result_value, Expression_Parse_Mode_Default
+              );
+              return *context->result;
+            }
+            case Group_Tag_Curly: {
+              token_parse_block(context, token, result_value);
+              return *context->result;
+            }
+            case Group_Tag_Square: {
+              panic("TODO");
+              return *context->result;
+            }
+          }
+        } else if(token_is_symbol(token)) {
           Slice name = token_as_symbol(token)->name;
           value = scope_lookup_force(context, context->scope, name);
           MASS_TRY(*context->result);
@@ -1806,25 +1870,6 @@ token_force_value(
       }
       return *context->result;
     }
-    case Token_Tag_Group: {
-      switch(token->Group.tag) {
-        case Group_Tag_Paren: {
-          token_parse_expression(
-            context, token->Group.children, result_value, Expression_Parse_Mode_Default
-          );
-          return *context->result;
-        }
-        case Group_Tag_Curly: {
-          token_parse_block(context, token, result_value);
-          return *context->result;
-        }
-        case Group_Tag_Square: {
-          panic("TODO");
-          return *context->result;
-        }
-      }
-      break;
-    }
   }
   panic("Not reached");
   return *context->result;
@@ -1839,9 +1884,10 @@ token_match_call_arguments(
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (context->result->tag != Mass_Result_Tag_Success) return result;
+  Group *group = token_as_group(token);
 
-  if (token->Group.children.length != 0) {
-    Token_View_Split_Iterator it = { .view = token->Group.children };
+  if (group->children.length != 0) {
+    Token_View_Split_Iterator it = { .view = group->children };
 
     while (!it.done) {
       if (context->result->tag != Mass_Result_Tag_Success) return result;
@@ -1974,7 +2020,7 @@ token_parse_exports(
     goto err;
   }
 
-  Token_View children = block->Group.children;
+  Token_View children = token_as_group(block)->children;
   if (children.length == 1) {
     if (token_match_symbol(token_view_get(children, 0), slice_literal(".."))) {
       context->module->export_scope = context->module->own_scope;
@@ -2082,7 +2128,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Token_View definition = pattern_token->Group.children;
+  Token_View definition = token_as_group(pattern_token)->children;
 
   operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *operator = (User_Defined_Operator) {
@@ -2253,7 +2299,7 @@ token_parse_syntax_definition(
   }
 
   Token_View replacement = token_view_match_till_end_of_statement(view, &peek_index);
-  Token_View definition = pattern_token->Group.children;
+  Token_View definition = token_as_group(pattern_token)->children;
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
 
@@ -2271,6 +2317,24 @@ token_parse_syntax_definition(
               .token_pattern = {
                 .tag = Token_Pattern_Tag_Symbol,
                 .Symbol.name = *slice,
+              }
+            },
+          });
+        } else if (token_is_group(token)) {
+          Group *group = token_as_group(token);
+          if (group->children.length) {
+            context_error_snprintf(
+              context, token->source_range,
+              "Nested group matches are not supported in syntax declarations (yet)"
+            );
+            goto err;
+          }
+          dyn_array_push(pattern, (Macro_Pattern) {
+            .tag = Macro_Pattern_Tag_Single_Token,
+            .Single_Token = {
+              .token_pattern = {
+                .tag = Token_Pattern_Tag_Group,
+                .Group.tag = group->tag,
               }
             },
           });
@@ -2327,25 +2391,6 @@ token_parse_syntax_definition(
           );
           goto err;
         }
-        break;
-      }
-      case Token_Tag_Group: {
-        if (token->Group.children.length) {
-          context_error_snprintf(
-            context, token->source_range,
-            "Nested group matches are not supported in syntax declarations (yet)"
-          );
-          goto err;
-        }
-        dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = {
-            .token_pattern = {
-              .tag = Token_Pattern_Tag_Group,
-              .Group.tag = token->Group.tag,
-            }
-          },
-        });
         break;
       }
     }
@@ -2419,23 +2464,24 @@ token_process_c_struct_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if (!token_match(args, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren })) {
+  if (!token_match_group(args, Group_Tag_Paren)) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct must be followed by ()"
     );
     goto err;
   }
-  if (args->Group.children.length != 1) {
+  Group *args_group = token_as_group(args);
+  if (args_group->children.length != 1) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct expects 1 argument, got %"PRIu64,
-      args->Group.children.length
+      args_group->children.length
     );
     goto err;
   }
-  const Token *layout_block = token_view_get(args->Group.children, 0);
-  if (!token_match(layout_block, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly })) {
+  const Token *layout_block = token_view_get(args_group->children, 0);
+  if (!token_match_group(layout_block, Group_Tag_Curly)) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct expects a {} block as the argument"
@@ -2453,8 +2499,9 @@ token_process_c_struct_definition(
     },
   };
 
-  if (layout_block->Group.children.length != 0) {
-    Token_View_Split_Iterator it = { .view = layout_block->Group.children };
+  Group *layout_group = token_as_group(layout_block);
+  if (layout_group->children.length != 0) {
+    Token_View_Split_Iterator it = { .view = layout_group->children };
     while (!it.done) {
       Token_View field_view = token_split_next(&it, &token_pattern_semicolon);
       token_match_struct_field(context, descriptor, field_view);
@@ -2488,10 +2535,11 @@ token_process_function_literal(
     },
   };
 
-  if (return_types->Group.children.length == 0) {
+  Token_View return_types_view = token_as_group(return_types)->children;
+  if (return_types_view.length == 0) {
     descriptor->Function.returns = (Function_Return) { .descriptor = &descriptor_void, };
   } else {
-    Token_View_Split_Iterator it = { .view = return_types->Group.children };
+    Token_View_Split_Iterator it = { .view = return_types_view };
 
     for (u64 i = 0; !it.done; ++i) {
       if (i > 0) {
@@ -2511,14 +2559,15 @@ token_process_function_literal(
   }
 
   bool previous_argument_has_default_value = false;
-  if (args->Group.children.length != 0) {
+  Token_View args_view = token_as_group(args)->children;
+  if (args_view.length != 0) {
     descriptor->Function.arguments = dyn_array_make(
       Array_Function_Argument,
       .allocator = context->allocator,
       .capacity = 4,
     );
 
-    Token_View_Split_Iterator it = { .view = args->Group.children };
+    Token_View_Split_Iterator it = { .view = args_view };
     while (!it.done) {
       Token_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
       Execution_Context arg_context = *context;
@@ -2550,7 +2599,7 @@ token_process_function_literal(
   Value *result = value_make(context, descriptor, (Storage){0});
   descriptor->Function.body = body;
   descriptor->Function.scope = function_scope;
-  if (body->tag == Token_Tag_Value) {
+  if (!token_is_group(body)) {
     Value *body_value = body->Value.value;
     if (body_value->descriptor == &descriptor_external_symbol) {
       result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
@@ -3539,8 +3588,8 @@ token_eval_operator(
       Value *scope_value =
         value_make(context, &descriptor_execution_context, storage_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
-    } else if (token_match(body, &(Token_Pattern){ .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren })) {
-      compile_time_eval(context, body->Group.children, result_value);
+    } else if (token_match_group(body, Group_Tag_Paren)) {
+      compile_time_eval(context, token_as_group(body)->children, result_value);
     } else {
       context_error_snprintf(
         context, body->source_range,
@@ -4015,7 +4064,33 @@ token_parse_expression(
 
     switch(token->tag) {
       case Token_Tag_Value: {
-        if (token_is_symbol(token)) {
+        if (token_is_group(token)) {
+          dyn_array_push(token_stack, token);
+          Group *group = token_as_group(token);
+          switch (group->tag) {
+            case Group_Tag_Paren: {
+              if (!is_previous_an_operator) {
+                if (!token_handle_operator(
+                  context, view, &token_stack, &operator_stack, slice_literal("()"),
+                  token->source_range, Operator_Fixity_Postfix
+                )) goto err;
+              }
+              break;
+            }
+            case Group_Tag_Curly: {
+              // Nothing special to do for now?
+              break;
+            }
+            case Group_Tag_Square: {
+              context_error_snprintf(
+                context, token->source_range,
+                "Unexpected [] in an expression"
+              );
+              break;
+            }
+          }
+          is_previous_an_operator = false;
+        } else if (token_is_symbol(token)) {
           Slice symbol_name = token_as_symbol(token)->name;
           if (slice_equal(symbol_name, slice_literal(";"))) {
             matched_length = i + 1;
@@ -4045,33 +4120,6 @@ token_parse_expression(
           dyn_array_push(token_stack, token);
           is_previous_an_operator = false;
         }
-        break;
-      }
-      case Token_Tag_Group: {
-        dyn_array_push(token_stack, token);
-        switch (token->Group.tag) {
-          case Group_Tag_Paren: {
-            if (!is_previous_an_operator) {
-              if (!token_handle_operator(
-                context, view, &token_stack, &operator_stack, slice_literal("()"),
-                token->source_range, Operator_Fixity_Postfix
-              )) goto err;
-            }
-            break;
-          }
-          case Group_Tag_Curly: {
-            // Nothing special to do for now?
-            break;
-          }
-          case Group_Tag_Square: {
-            context_error_snprintf(
-              context, token->source_range,
-              "Unexpected [] in an expression"
-            );
-            break;
-          }
-        }
-        is_previous_an_operator = false;
         break;
       }
     }
@@ -4178,12 +4226,13 @@ token_parse_block_no_scope(
   const Token *block,
   Value *block_result_value
 ) {
-  assert(block->tag == Token_Tag_Group);
-  assert(block->Group.tag == Group_Tag_Curly);
+  Group *group = token_as_group(block);
+  assert(group->tag == Group_Tag_Curly);
 
-  token_parse_block_view(context, block->Group.children, block_result_value);
+  // FIXME this seems weird to be before empty check
+  token_parse_block_view(context, group->children, block_result_value);
 
-  Token_View children_view = block->Group.children;
+  Token_View children_view = group->children;
   if (!children_view.length) {
     MASS_ON_ERROR(assign(context, &block->source_range, block_result_value, &void_value));
     return;
@@ -4449,7 +4498,7 @@ token_match_fixed_array_type(
   Descriptor *descriptor =
     scope_lookup_type(context, context->scope, type->source_range, token_as_symbol(type)->name);
 
-  Token_View size_view = square_brace->Group.children;
+  Token_View size_view = token_as_group(square_brace)->children;
   Value *size_value = value_any(context);
   compile_time_eval(context, size_view, size_value);
   size_value = token_value_force_immediate_integer(
@@ -4678,15 +4727,7 @@ token_parse(
   Execution_Context *context,
   Token_View view
 ) {
-  Token *fake_block = allocator_allocate(context->allocator, Token);
-  *fake_block = (Token){
-    .tag = Token_Tag_Group,
-    .source_range = view.source_range,
-    .Group = {
-      .tag = Group_Tag_Curly,
-      .children = view,
-    },
-  };
+  Token *fake_block = token_make_fake_body(context, view);
   token_parse_block_no_scope(context, fake_block, &void_value);
   return *context->result;
 }

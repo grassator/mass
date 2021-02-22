@@ -437,14 +437,15 @@ main(void) {
     { "Slice", "name" },
   }));
 
+  push_type(type_struct("Group", (Struct_Item[]){
+    { "Group_Tag", "tag" },
+    { "u32", "_tag_padding" },
+    { "Token_View", "children" },
+  }));
+
   push_type(add_common_fields(type_union("Token", (Struct[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
-    }),
-    struct_fields("Group", (Struct_Item[]){
-      { "Group_Tag", "tag" },
-      { "u32", "_tag_padding" },
-      { "Token_View", "children" },
     }),
   }), (Struct_Item[]){
     { "Source_Range", "source_range" },
