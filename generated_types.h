@@ -196,7 +196,7 @@ typedef enum Group_Tag {
 } Group_Tag;
 
 typedef struct Token_View {
-  const Token * * tokens;
+  Value * * tokens;
   u64 length;
   Source_Range source_range;
 } Token_View;
@@ -841,7 +841,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
   {
     .name = slice_literal_fields("tokens"),
-    .descriptor = &descriptor_token_pointer_pointer,
+    .descriptor = &descriptor_value_pointer_pointer,
     .offset = offsetof(Token_View, tokens),
   },
   {

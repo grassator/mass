@@ -421,7 +421,7 @@ main(void) {
   }));
 
   push_type(type_struct("Token_View", (Struct_Item[]){
-    { "const Token * *", "tokens" },
+    { "Value * *", "tokens" },
     { "u64", "length" },
     { "Source_Range", "source_range" },
   }));

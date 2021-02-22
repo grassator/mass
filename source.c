@@ -3,20 +3,31 @@
 #include "function.h"
 
 static inline const Token *
-token_view_get(
-  Token_View view,
-  u64 index
-) {
-  assert(index < view.length);
-  return view.tokens[index];
-}
-
-static inline const Token *
 token_view_peek(
   Token_View view,
   u64 index
 ) {
-  return index < view.length ? view.tokens[index] : 0;
+  Value *value =  index < view.length ? view.tokens[index] : 0;
+  // FIXME @Leak remove this after the transition is done
+  if (value) {
+    Token *token = allocator_allocate(allocator_default, Token);
+    *token = (Token) {
+      .tag = Token_Tag_Value,
+      .Value.value = value,
+    };
+    return token;
+  }
+  return 0;
+}
+
+static inline const Token *
+token_view_get(
+  Token_View view,
+  u64 index
+) {
+  const Token *result = token_view_peek(view, index);
+  assert(result);
+  return result;
 }
 
 static inline const Token *
@@ -24,7 +35,7 @@ token_view_last(
   Token_View view
 ) {
   assert(view.length);
-  return view.tokens[view.length - 1];
+  return token_view_get(view, view.length - 1);
 }
 
 static Token_View
@@ -39,10 +50,10 @@ token_view_slice(
   Source_Range source_range = view->source_range;
   source_range.offsets.to = end_index == view->length
     ? view->source_range.offsets.to
-    : view->tokens[end_index]->Value.value->source_range.offsets.from;
+    : view->tokens[end_index]->source_range.offsets.from;
   source_range.offsets.from = start_index == end_index
     ? source_range.offsets.to
-    : view->tokens[start_index]->Value.value->source_range.offsets.from;
+    : view->tokens[start_index]->source_range.offsets.from;
 
   return (Token_View) {
     .tokens = view->tokens + start_index,
@@ -60,13 +71,13 @@ token_view_rest(
 }
 
 static inline Token_View
-token_view_from_token_array(
-  Array_Const_Token_Ptr token_array,
+token_view_from_value_array(
+  Array_Value_Ptr value_array,
   const Source_Range *source_range
 ) {
   return (Token_View) {
-    .tokens = dyn_array_raw(token_array),
-    .length = dyn_array_length(token_array),
+    .tokens = dyn_array_raw(value_array),
+    .length = dyn_array_length(value_array),
     .source_range = *source_range
   };
 }
@@ -655,12 +666,8 @@ temp_token_array_into_token_view(
 ) {
   Token_View result = { .tokens = 0, .length = child_count, .source_range = children_range };
   if (child_count) {
-    Token **tokens = allocator_allocate_array(allocator, Token *, child_count);
-    for (u64 i = 0; i < child_count; ++i) {
-      Token *token = allocator_allocate(allocator, Token);
-      *token = (Token){.tag = Token_Tag_Value, .Value.value = children[i]};
-      tokens[i] = token;
-    }
+    Value **tokens = allocator_allocate_array(allocator, Value *, child_count);
+    memcpy(tokens, children, child_count * sizeof(tokens[0]));
     result.tokens = tokens;
   }
   return result;
@@ -1024,23 +1031,12 @@ tokenize(
 }
 
 const Token *
-token_peek(
-  Token_View view,
-  u64 index
-) {
-  if (index < view.length) {
-    return view.tokens[index];
-  }
-  return 0;
-}
-
-const Token *
 token_peek_match(
   Token_View view,
   u64 index,
   const Token_Pattern *pattern
 ) {
-  const Token *token = token_peek(view, index);
+  const Token *token = token_view_peek(view, index);
   if (!token) return 0;
   if (!token_match(token, pattern)) return 0;
   return token;
@@ -1410,24 +1406,21 @@ token_apply_macro_syntax(
       result->next_overload = scope_overload;
 
       Source_Range source_range = capture_view.source_range;
-      Token *using = token_value_make(
-        context,
-        token_make_symbol(context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range)
+      Value *using = token_make_symbol(
+        context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range
       );
-      Token *scope_symbol = token_value_make(
-        context,
-        token_make_symbol(context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like, source_range)
+      Value *scope_symbol = token_make_symbol(
+        context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like, source_range
       );
-      Token *semicolon = token_value_make(
-        context,
-        token_make_symbol(context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range)
+      Value *semicolon = token_make_symbol(
+        context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
       );
 
-      const Token **scope_body_tokens = allocator_allocate_array(context->allocator, Token *, 4);
+      Value **scope_body_tokens = allocator_allocate_array(context->allocator, Value *, 4);
       scope_body_tokens[0] = using;
       scope_body_tokens[1] = scope_symbol;
       scope_body_tokens[2] = semicolon;
-      scope_body_tokens[3] = overload_function->body;
+      scope_body_tokens[3] = overload_function->body->Value.value;
 
       Token_View scope_token_view = (Token_View) {
         .tokens = scope_body_tokens,
@@ -1530,8 +1523,7 @@ token_parse_macro_rewrite(
   }
 
   // TODO precalculate required capacity
-  Array_Const_Token_Ptr result_tokens =
-    dyn_array_make(Array_Const_Token_Ptr, .allocator = context->allocator);
+  Array_Value_Ptr result_tokens = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
 
   for (u64 i = 0; i < macro->replacement.length; ++i) {
     const Token *token = token_view_get(macro->replacement, i);
@@ -1540,16 +1532,16 @@ token_parse_macro_rewrite(
       Token_View *maybe_replacement = hash_map_get(macro_map, name);
       if (maybe_replacement) {
         for (u64 splice_index = 0; splice_index < maybe_replacement->length; ++splice_index) {
-          dyn_array_push(result_tokens, token_view_get(*maybe_replacement, splice_index));
+          dyn_array_push(result_tokens, token_view_get(*maybe_replacement, splice_index)->Value.value);
         }
         continue;
       }
     }
-    dyn_array_push(result_tokens, token);
+    dyn_array_push(result_tokens, token->Value.value);
   }
 
   Token_View block_tokens =
-    token_view_from_token_array(result_tokens, &macro->replacement.source_range);
+    token_view_from_value_array(result_tokens, &macro->replacement.source_range);
   token_parse_block_view(context, block_tokens, result_value);
 
   dyn_array_destroy(match);
@@ -1681,7 +1673,7 @@ token_match_argument(
       );
       goto err;
     }
-    const Token *name_token = name_tokens.tokens[0];
+    const Token *name_token = token_view_get(name_tokens, 0);
     if (name_tokens.length > 1 || !token_is_symbol(name_token)) {
       context_error_snprintf(
         context, operator->Value.value->source_range,
@@ -1735,7 +1727,7 @@ token_match_return_type(
       );
       goto err;
     }
-    if (lhs.length > 1 || !token_is_symbol(lhs.tokens[0])) {
+    if (lhs.length > 1 || !token_is_symbol(token_view_get(lhs, 0))) {
       context_error_snprintf(
         context, operator->Value.value->source_range,
         "':' operator expects only a single identifier on the left hand side"
@@ -1743,7 +1735,7 @@ token_match_return_type(
       goto err;
     }
     returns.descriptor = token_match_type(context, rhs);
-    returns.name = token_as_symbol(lhs.tokens[0])->name;
+    returns.name = token_as_symbol(token_view_get(lhs, 0))->name;
   } else {
     returns.descriptor = token_match_type(context, view);
   }
@@ -2903,7 +2895,7 @@ token_handle_negation(
 void
 token_dispatch_operator(
   Execution_Context *context,
-  Array_Const_Token_Ptr *token_stack,
+  Array_Value_Ptr *stack,
   Operator_Stack_Entry *operator_entry
 );
 
@@ -2911,7 +2903,7 @@ bool
 token_handle_operator(
   Execution_Context *context,
   Token_View view,
-  Array_Const_Token_Ptr *token_stack,
+  Array_Value_Ptr *stack,
   Array_Operator_Stack_Entry *operator_stack,
   Slice new_operator,
   Source_Range source_range,
@@ -2956,7 +2948,7 @@ token_handle_operator(
     dyn_array_pop(*operator_stack);
 
     // apply the operator on the stack
-    token_dispatch_operator(context, token_stack, last_operator);
+    token_dispatch_operator(context, stack, last_operator);
   }
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source = new_operator,
@@ -3034,9 +3026,8 @@ token_handle_function_call(
     non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
     Value *fake_target_value =
       value_make(context, non_compile_time_descriptor, target->storage, source_range);
-    const Token *fake_target = token_value_make(context, fake_target_value);
     Token_View fake_eval_view = {
-      .tokens = (const Token*[]){fake_target, args_token},
+      .tokens = (Value *[]){fake_target_value, args_token->Value.value},
       .length = 2,
       .source_range = source_range,
     };
@@ -3802,7 +3793,7 @@ token_eval_operator(
 void
 token_dispatch_operator(
   Execution_Context *context,
-  Array_Const_Token_Ptr *token_stack,
+  Array_Value_Ptr *stack,
   Operator_Stack_Entry *operator_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
@@ -3811,27 +3802,27 @@ token_dispatch_operator(
 
   u64 argument_count = operator_entry->scope_entry.argument_count;
 
-  if (dyn_array_length(*token_stack) < argument_count) {
+  if (dyn_array_length(*stack) < argument_count) {
     // FIXME provide source range
     context_error_snprintf(
       context, operator_entry->source_range,
       "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
-      SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*token_stack)
+      SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*stack)
     );
     return;
   }
   assert(argument_count);
-  u64 start_index = dyn_array_length(*token_stack) - argument_count;
-  const Token *first_arg = *dyn_array_get(*token_stack, start_index);
-  const Token *last_arg = *dyn_array_last(*token_stack);
+  u64 start_index = dyn_array_length(*stack) - argument_count;
+  Value *first_arg = *dyn_array_get(*stack, start_index);
+  Value *last_arg = *dyn_array_last(*stack);
   Token_View args_view = {
-    .tokens = dyn_array_get(*token_stack, start_index),
+    .tokens = dyn_array_get(*stack, start_index),
     .length = argument_count,
     .source_range = {
-      .file = last_arg->Value.value->source_range.file,
+      .file = last_arg->source_range.file,
       .offsets = {
-        .from = first_arg->Value.value->source_range.offsets.from,
-        .to = last_arg->Value.value->source_range.offsets.to,
+        .from = first_arg->source_range.offsets.from,
+        .to = last_arg->source_range.offsets.to,
       },
     },
   };
@@ -3839,10 +3830,8 @@ token_dispatch_operator(
   token_eval_operator(context, args_view, operator_entry, result_value);
   MASS_ON_ERROR(*context->result) return;
 
-  Token *result_token = token_value_make(context, result_value);
-
   // Pop off current arguments and push a new one
-  dyn_array_splice_raw(*token_stack, start_index, argument_count, &result_token, 1);
+  dyn_array_splice_raw(*stack, start_index, argument_count, &result_value, 1);
 }
 
 const Token *
@@ -3987,7 +3976,7 @@ token_parse_expression(
     return true;
   }
 
-  Array_Const_Token_Ptr token_stack = dyn_array_make(Array_Const_Token_Ptr);
+  Array_Value_Ptr value_stack = dyn_array_make(Array_Value_Ptr);
   Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
 
   bool is_previous_an_operator = true;
@@ -4001,7 +3990,7 @@ token_parse_expression(
       MASS_ON_ERROR(*context->result) goto err;
       if (macro_match_length) {
         assert(macro_result);
-        dyn_array_push(token_stack, macro_result);
+        dyn_array_push(value_stack, macro_result->Value.value);
         // Skip over the matched slice
         i += macro_match_length - 1;
         continue;
@@ -4014,7 +4003,7 @@ token_parse_expression(
       MASS_ON_ERROR(*context->result) goto err;
       if (if_match_length) {
         assert(if_expression);
-        dyn_array_push(token_stack, if_expression);
+        dyn_array_push(value_stack, if_expression->Value.value);
         // Skip over the matched slice
         i += if_match_length - 1;
         continue;
@@ -4029,14 +4018,15 @@ token_parse_expression(
 
     switch(token->tag) {
       case Token_Tag_Value: {
-        if (token_is_group(token)) {
-          dyn_array_push(token_stack, token);
-          Group *group = token_as_group(token);
+        Value *value = token->Value.value;
+        if (value_is_group(value)) {
+          dyn_array_push(value_stack, value);
+          Group *group = value_as_group(value);
           switch (group->tag) {
             case Group_Tag_Paren: {
               if (!is_previous_an_operator) {
                 if (!token_handle_operator(
-                  context, view, &token_stack, &operator_stack, slice_literal("()"),
+                  context, view, &value_stack, &operator_stack, slice_literal("()"),
                   token->Value.value->source_range, Operator_Fixity_Postfix
                 )) goto err;
               }
@@ -4073,16 +4063,16 @@ token_parse_expression(
           Scope_Entry *scope_entry = scope_lookup(context->scope, symbol_name);
           if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
             if (!token_handle_operator(
-              context, view, &token_stack, &operator_stack,
+              context, view, &value_stack, &operator_stack,
               symbol_name, token->Value.value->source_range, fixity_mask
             )) goto err;
             is_previous_an_operator = true;
           } else {
             is_previous_an_operator = false;
-            dyn_array_push(token_stack, token);
+            dyn_array_push(value_stack, value);
           }
         } else {
-          dyn_array_push(token_stack, token);
+          dyn_array_push(value_stack, value);
           is_previous_an_operator = false;
         }
         break;
@@ -4093,13 +4083,12 @@ token_parse_expression(
   drain:
   while (dyn_array_length(operator_stack)) {
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
-    token_dispatch_operator(context, &token_stack, entry);
+    token_dispatch_operator(context, &value_stack, entry);
   }
   if (context->result->tag == Mass_Result_Tag_Success) {
-    if (dyn_array_length(token_stack) == 1) {
-      const Token *token = *dyn_array_last(token_stack);
-      assert(token);
-      MASS_ON_ERROR(token_force_value(context, token, result_value)) goto err;
+    if (dyn_array_length(value_stack) == 1) {
+      Value *value = *dyn_array_last(value_stack);
+      MASS_ON_ERROR(token_force_value(context, token_value_make(context, value), result_value)) goto err;
     } else {
       context_error_snprintf(
         context, view.source_range,
@@ -4110,7 +4099,7 @@ token_parse_expression(
 
   err:
 
-  dyn_array_destroy(token_stack);
+  dyn_array_destroy(value_stack);
   dyn_array_destroy(operator_stack);
 
   return matched_length;
