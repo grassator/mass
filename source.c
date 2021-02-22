@@ -648,14 +648,14 @@ token_match_group(
 
 typedef struct {
   Value *value;
-  Array_Const_Token_Ptr children;
+  Array_Value_Ptr children;
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
 static inline Token_View
 temp_token_array_into_token_view(
   const Allocator *allocator,
-  Array_Const_Token_Ptr *array,
+  Array_Value_Ptr *array,
   Source_Range children_range
 ) {
   Token_View result = { .tokens = 0, .length = 0, .source_range = children_range };
@@ -663,12 +663,16 @@ temp_token_array_into_token_view(
   result.length = dyn_array_length(*array);
   if (!result.length) goto end;
   Token **tokens = allocator_allocate_array(allocator, Token *, result.length);
-  memcpy(tokens, dyn_array_raw(*array), sizeof(*tokens) * result.length);
+  for (u64 i = 0; i < result.length; ++i) {
+    Token *token = allocator_allocate(allocator, Token);
+    *token = (Token){.tag = Token_Tag_Value, .Value.value = *dyn_array_get(*array, i)};
+    tokens[i] = token;
+  }
   result.tokens = tokens;
 
   end:
   dyn_array_destroy(*array);
-  *array = (Array_Const_Token_Ptr){0};
+  *array = (Array_Value_Ptr){0};
   return result;
 }
 
@@ -701,7 +705,7 @@ tokenize(
   Tokenizer_Parent parent = {
     .value = 0,
     // FIXME only initialize on first push
-    .children = dyn_array_make(Array_Const_Token_Ptr)
+    .children = dyn_array_make(Array_Value_Ptr)
   };
   Fixed_Buffer *string_buffer = fixed_buffer_make(
     .allocator = allocator_system,
@@ -715,9 +719,7 @@ tokenize(
 
 #define push(_VALUE_)\
   do {\
-    Token *token = allocator_allocate(allocator, Token);\
-    *token = (Token) { .tag = Token_Tag_Value, .Value.value = (_VALUE_) };\
-    dyn_array_push(parent.children, token);\
+    dyn_array_push(parent.children, (_VALUE_));\
     state = Tokenizer_State_Default;\
   } while(0)
 
@@ -802,7 +804,7 @@ tokenize(
           dyn_array_push(parent_stack, parent);
           parent = (Tokenizer_Parent){
             .value = value,
-            .children = dyn_array_make(Array_Const_Token_Ptr, 4),
+            .children = dyn_array_make(Array_Value_Ptr, 4),
           };
         } else if (ch == ')' || ch == '}' || ch == ']') {
           if (!parent.value || !value_is_group(parent.value)) {
@@ -822,10 +824,11 @@ tokenize(
               // is being interpreted as:
               // { 42 ; }
               while (dyn_array_length(parent.children)) {
-                const Token *last_token = *dyn_array_last(parent.children);
+                Value *last = *dyn_array_last(parent.children);
                 bool is_last_token_a_fake_semicolon = (
-                  token_match(last_token, &token_pattern_semicolon) &&
-                  range_length(last_token->Value.value->source_range.offsets) == 0
+                  range_length(last->source_range.offsets) == 0 &&
+                  value_is_symbol(last) &&
+                  slice_equal(value_as_symbol(last)->name, slice_literal(";"))
                 );
                 if (!is_last_token_a_fake_semicolon) break;
                 dyn_array_pop(parent.children);
