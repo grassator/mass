@@ -1391,7 +1391,7 @@ call_function_overload(
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
-      Token_View default_expression = target_arg_definition->Any_Of_Type.maybe_default_expression;
+      Value_View default_expression = target_arg_definition->Any_Of_Type.maybe_default_expression;
       assert(default_expression.length);
       // FIXME do not force the result on the stack
       source_arg = reserve_stack(

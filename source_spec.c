@@ -168,7 +168,7 @@ spec("source") {
     it("should be able to tokenize an empty string") {
       Slice source = slice_literal("");
 
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -177,7 +177,7 @@ spec("source") {
 
     it("should be able to tokenize a comment") {
       Slice source = slice_literal("// foo\n");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -186,7 +186,7 @@ spec("source") {
 
     it("should be able to turn newlines into fake semicolon tokens on top level") {
       Slice source = slice_literal("foo\n");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -198,7 +198,7 @@ spec("source") {
 
     it("should be able to parse hex integers") {
       Slice source = slice_literal("0xCAFE");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -216,7 +216,7 @@ spec("source") {
 
     it("should be able to parse binary integers") {
       Slice source = slice_literal("0b100");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -234,7 +234,7 @@ spec("source") {
 
     it("should be able to tokenize a sum of integers") {
       Slice source = slice_literal("12 + foo123");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -255,7 +255,7 @@ spec("source") {
 
     it("should be able to tokenize groups") {
       Slice source = slice_literal("(x)");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -273,7 +273,7 @@ spec("source") {
 
     it("should be able to tokenize strings") {
       Slice source = slice_literal("\"foo 123\"");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -284,7 +284,7 @@ spec("source") {
 
     it("should be able to tokenize nested groups with different braces") {
       Slice source = slice_literal("{[]}");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -309,7 +309,7 @@ spec("source") {
         "  return x + 3;\n"
         "}"
       );
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
@@ -317,7 +317,7 @@ spec("source") {
 
     it("should report a failure when encountering a brace that is not closed") {
       Slice source = slice_literal("(foo");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
@@ -330,7 +330,7 @@ spec("source") {
 
     it("should report a failure when encountering a mismatched brace that") {
       Slice source = slice_literal("(foo}");
-      Token_View tokens;
+      Value_View tokens;
       Mass_Result result =
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);

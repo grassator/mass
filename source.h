@@ -15,7 +15,7 @@ typedef struct {
 } User_Defined_Operator;
 
 hash_map_slice_template(Scope_Map, Scope_Entry *)
-hash_map_slice_template(Macro_Replacement_Map, Token_View)
+hash_map_slice_template(Macro_Replacement_Map, Value_View)
 
 typedef enum {
   Macro_Pattern_Tag_Single_Token,
@@ -42,13 +42,13 @@ typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
 
 typedef struct {
   Array_Macro_Pattern pattern;
-  Token_View replacement;
+  Value_View replacement;
   Scope *scope;
 } Macro;
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
 typedef u64 (*Token_Statement_Matcher_Proc)
-(Execution_Context *context, Token_View, Value *result_value, void *payload);
+(Execution_Context *context, Value_View, Value *result_value, void *payload);
 typedef struct {
   Token_Statement_Matcher_Proc proc;
   void *payload;
@@ -101,14 +101,14 @@ scope_define_builtins(
 void
 compile_time_eval(
   Execution_Context *context,
-  Token_View view,
+  Value_View view,
   Value *result_value
 );
 
 void
 token_handle_negation(
   Execution_Context *context,
-  Token_View args,
+  Value_View args,
   Value *result_value,
   void *unused_payload
 );
@@ -121,7 +121,7 @@ typedef enum {
 u64
 token_parse_expression(
   Execution_Context *context,
-  Token_View view,
+  Value_View view,
   Value *result_value,
   Expression_Parse_Mode mode
 );
@@ -143,63 +143,63 @@ token_parse_block(
 u64
 token_parse_syntax_definition(
   Execution_Context *context,
-  Token_View view,
+  Value_View view,
   Value *result_value,
   void *payload
 );
 u64
 token_parse_statement_label(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_inline_machine_code_bytes(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_assignment(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_definition_and_assignment_statements(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_definitions(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_explicit_return(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );
 u64
 token_parse_goto(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *unused_result,
   void *unused_payload
 );
 u64
 token_parse_constant_definitions(
   Execution_Context *program,
-  Token_View state,
+  Value_View state,
   Value *result_value,
   void *unused_payload
 );

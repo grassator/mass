@@ -35,9 +35,9 @@ typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
 
 typedef enum Group_Tag Group_Tag;
 
-typedef struct Token_View Token_View;
-typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
-typedef dyn_array_type(const Token_View *) Array_Const_Token_View_Ptr;
+typedef struct Value_View Value_View;
+typedef dyn_array_type(Value_View *) Array_Value_View_Ptr;
+typedef dyn_array_type(const Value_View *) Array_Const_Value_View_Ptr;
 
 typedef enum Symbol_Type Symbol_Type;
 
@@ -146,7 +146,7 @@ typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
 typedef void (*Token_Handle_Operator_Proc)
-  (Execution_Context * context, Token_View view, Value * result_value, void * payload);
+  (Execution_Context * context, Value_View view, Value * result_value, void * payload);
 
 
 // Type Definitions
@@ -195,12 +195,12 @@ typedef enum Group_Tag {
   Group_Tag_Curly = 3,
 } Group_Tag;
 
-typedef struct Token_View {
+typedef struct Value_View {
   Value * * tokens;
   u64 length;
   Source_Range source_range;
-} Token_View;
-typedef dyn_array_type(Token_View) Array_Token_View;
+} Value_View;
+typedef dyn_array_type(Value_View) Array_Value_View;
 
 typedef enum Symbol_Type {
   Symbol_Type_Id_Like = 1,
@@ -217,7 +217,7 @@ typedef dyn_array_type(Symbol) Array_Symbol;
 typedef struct Group {
   Group_Tag tag;
   u32 _tag_padding;
-  Token_View children;
+  Value_View children;
 } Group;
 typedef dyn_array_type(Group) Array_Group;
 
@@ -473,7 +473,7 @@ typedef struct {
 typedef struct {
   Slice name;
   Scope * scope;
-  Token_View tokens;
+  Value_View tokens;
 } Scope_Entry_Lazy_Expression;
 typedef struct {
   Operator_Fixity fixity;
@@ -529,7 +529,7 @@ typedef enum {
 typedef struct {
   Slice name;
   Descriptor * descriptor;
-  Token_View maybe_default_expression;
+  Value_View maybe_default_expression;
 } Function_Argument_Any_Of_Type;
 typedef struct {
   Descriptor * descriptor;
@@ -650,9 +650,9 @@ static Descriptor descriptor_parse_error_pointer_pointer;
 static Descriptor descriptor_group_tag;
 static Descriptor descriptor_group_tag_pointer;
 static Descriptor descriptor_group_tag_pointer_pointer;
-static Descriptor descriptor_token_view;
-static Descriptor descriptor_token_view_pointer;
-static Descriptor descriptor_token_view_pointer_pointer;
+static Descriptor descriptor_value_view;
+static Descriptor descriptor_value_view_pointer;
+static Descriptor descriptor_value_view_pointer_pointer;
 static Descriptor descriptor_symbol_type;
 static Descriptor descriptor_symbol_type_pointer;
 static Descriptor descriptor_symbol_type_pointer_pointer;
@@ -838,24 +838,24 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
 MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
+MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
   {
     .name = slice_literal_fields("tokens"),
     .descriptor = &descriptor_value_pointer_pointer,
-    .offset = offsetof(Token_View, tokens),
+    .offset = offsetof(Value_View, tokens),
   },
   {
     .name = slice_literal_fields("length"),
     .descriptor = &descriptor_u64,
-    .offset = offsetof(Token_View, length),
+    .offset = offsetof(Value_View, length),
   },
   {
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
-    .offset = offsetof(Token_View, source_range),
+    .offset = offsetof(Value_View, source_range),
   },
 );
-MASS_DEFINE_TYPE_VALUE(token_view);
+MASS_DEFINE_TYPE_VALUE(value_view);
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_type, Symbol_Type)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
   {
@@ -888,7 +888,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group,
   },
   {
     .name = slice_literal_fields("children"),
-    .descriptor = &descriptor_token_view,
+    .descriptor = &descriptor_value_view,
     .offset = offsetof(Group, children),
   },
 );

@@ -420,7 +420,7 @@ main(void) {
     { "Curly", 3 },
   }));
 
-  push_type(type_struct("Token_View", (Struct_Item[]){
+  push_type(type_struct("Value_View", (Struct_Item[]){
     { "Value * *", "tokens" },
     { "u64", "length" },
     { "Source_Range", "source_range" },
@@ -440,7 +440,7 @@ main(void) {
   push_type(type_struct("Group", (Struct_Item[]){
     { "Group_Tag", "tag" },
     { "u32", "_tag_padding" },
-    { "Token_View", "children" },
+    { "Value_View", "children" },
   }));
 
   push_type(type_union("Token", (Struct[]){
@@ -643,7 +643,7 @@ main(void) {
     struct_fields("Lazy_Expression", (Struct_Item[]){
       { "Slice", "name" },
       { "Scope *", "scope" },
-      { "Token_View", "tokens" },
+      { "Value_View", "tokens" },
     }),
     struct_fields("Operator", (Struct_Item[]){
       { "Operator_Fixity", "fixity" },
@@ -686,7 +686,7 @@ main(void) {
     struct_fields("Any_Of_Type", (Struct_Item[]){
       { "Slice", "name" },
       { "Descriptor *", "descriptor" },
-      { "Token_View", "maybe_default_expression" },
+      { "Value_View", "maybe_default_expression" },
     }),
     struct_fields("Exact", (Struct_Item[]){
       { "Descriptor *", "descriptor" },
@@ -739,7 +739,7 @@ main(void) {
 
   push_type(type_function("Token_Handle_Operator_Proc", "void", (Argument[]){
     { "Execution_Context *", "context" },
-    { "Token_View", "view" },
+    { "Value_View", "view" },
     { "Value *", "result_value" },
     { "void *", "payload" },
   }));
