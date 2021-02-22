@@ -145,7 +145,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="source_spec.c" />
+    <ClCompile Include="source_spec.c">
+      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatWarningAsError>
+      <MultiProcessorCompilation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</MultiProcessorCompilation>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="debug.natvis" />

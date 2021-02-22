@@ -646,34 +646,45 @@ token_match_group(
   return token_match(token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = tag});
 }
 
-typedef struct {
-  Value *value;
-  Array_Value_Ptr children;
-} Tokenizer_Parent;
-typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
-
 static inline Token_View
 temp_token_array_into_token_view(
   const Allocator *allocator,
-  Array_Value_Ptr *array,
+  Value **children,
+  u64 child_count,
   Source_Range children_range
 ) {
-  Token_View result = { .tokens = 0, .length = 0, .source_range = children_range };
-  if (!dyn_array_is_initialized(*array)) return result;
-  result.length = dyn_array_length(*array);
-  if (!result.length) goto end;
-  Token **tokens = allocator_allocate_array(allocator, Token *, result.length);
-  for (u64 i = 0; i < result.length; ++i) {
-    Token *token = allocator_allocate(allocator, Token);
-    *token = (Token){.tag = Token_Tag_Value, .Value.value = *dyn_array_get(*array, i)};
-    tokens[i] = token;
+  Token_View result = { .tokens = 0, .length = child_count, .source_range = children_range };
+  if (child_count) {
+    Token **tokens = allocator_allocate_array(allocator, Token *, child_count);
+    for (u64 i = 0; i < child_count; ++i) {
+      Token *token = allocator_allocate(allocator, Token);
+      *token = (Token){.tag = Token_Tag_Value, .Value.value = children[i]};
+      tokens[i] = token;
+    }
+    result.tokens = tokens;
   }
-  result.tokens = tokens;
-
-  end:
-  dyn_array_destroy(*array);
-  *array = (Array_Value_Ptr){0};
   return result;
+}
+
+void
+tokenizer_maybe_push_fake_semicolon(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_u64 *parent_index_stack,
+  Source_Range source_range
+) {
+  bool has_children = dyn_array_length(*stack) != 0;
+  if (dyn_array_length(*parent_index_stack)) {
+    u64 parent_index = *dyn_array_last(*parent_index_stack);
+    Value *parent_value = *dyn_array_get(*stack, parent_index);
+    if(value_as_group(parent_value)->tag != Group_Tag_Curly) return;
+    has_children = parent_index + 1 != dyn_array_length(*stack);
+  }
+  // Do not treat leading newlines as semicolons
+  if (!has_children) return;
+  dyn_array_push(*stack, token_make_symbol(
+    allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
+  ));
 }
 
 PRELUDE_NO_DISCARD Mass_Result
@@ -682,8 +693,6 @@ tokenize(
   Source_File *file,
   Token_View *out_tokens
 ) {
-  Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
-
   assert(!dyn_array_is_initialized(file->line_ranges));
   file->line_ranges = dyn_array_make(Array_Range_u64);
 
@@ -702,11 +711,9 @@ tokenize(
   Range_u64 current_line = {0};
   Source_Range current_token_range = {.file = file};
   enum Tokenizer_State state = Tokenizer_State_Default;
-  Tokenizer_Parent parent = {
-    .value = 0,
-    // FIXME only initialize on first push
-    .children = dyn_array_make(Array_Value_Ptr)
-  };
+  Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
+  Array_u64 parent_index_stack = dyn_array_make(Array_u64);
+
   Fixed_Buffer *string_buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = 4096,
@@ -719,7 +726,7 @@ tokenize(
 
 #define push(_VALUE_)\
   do {\
-    dyn_array_push(parent.children, (_VALUE_));\
+    dyn_array_push(stack, (_VALUE_));\
     state = Tokenizer_State_Default;\
   } while(0)
 
@@ -742,16 +749,10 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (!parent.value || value_as_group(parent.value)->tag == Group_Tag_Curly) {\
-      /* Do not treat leading newlines as semicolons */ \
-      if (dyn_array_length(parent.children)) {\
-        current_token_range.offsets = (Range_u64){ i + 1, i + 1 };\
-        push(token_make_symbol(\
-          allocator, slice_literal(";"), Symbol_Type_Operator_Like, current_token_range\
-        ));\
-      }\
-    }\
-    state = Tokenizer_State_Default;\
+    current_token_range.offsets = (Range_u64){i + 1, i + 1};\
+    tokenizer_maybe_push_fake_semicolon(\
+      allocator, &stack, &parent_index_stack, current_token_range\
+    );\
   } while(0)
 
   u64 i = 0;
@@ -800,17 +801,19 @@ tokenize(
             .source_range = current_token_range,
             .compiler_source_location = COMPILER_SOURCE_LOCATION,
           };
+          dyn_array_push(parent_index_stack, dyn_array_length(stack));
           push(value);
-          dyn_array_push(parent_stack, parent);
-          parent = (Tokenizer_Parent){
-            .value = value,
-            .children = dyn_array_make(Array_Value_Ptr, 4),
-          };
         } else if (ch == ')' || ch == '}' || ch == ']') {
-          if (!parent.value || !value_is_group(parent.value)) {
+          Value *parent_value = 0;
+          u64 parent_index = 0;
+          if (dyn_array_length(parent_index_stack)) {
+            parent_index = *dyn_array_last(parent_index_stack);
+            parent_value = *dyn_array_get(stack, parent_index);
+          }
+          if (!parent_value || !value_is_group(parent_value)) {
             panic("Tokenizer: unexpected closing char for group");
           }
-          const Group *group = value_as_group(parent.value);
+          Group *group = value_as_group(parent_value);
           s8 expected_paren = 0;
           switch (group->tag) {
             case Group_Tag_Paren: {
@@ -823,15 +826,15 @@ tokenize(
               // }
               // is being interpreted as:
               // { 42 ; }
-              while (dyn_array_length(parent.children)) {
-                Value *last = *dyn_array_last(parent.children);
+              while (parent_index + 1 < dyn_array_length(stack)) {
+                Value *last = *dyn_array_last(stack);
                 bool is_last_token_a_fake_semicolon = (
                   range_length(last->source_range.offsets) == 0 &&
                   value_is_symbol(last) &&
                   slice_equal(value_as_symbol(last)->name, slice_literal(";"))
                 );
                 if (!is_last_token_a_fake_semicolon) break;
-                dyn_array_pop(parent.children);
+                dyn_array_pop(stack);
               }
 
               expected_paren = '}';
@@ -845,16 +848,17 @@ tokenize(
           if (ch != expected_paren) {
             TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
           }
-          parent.value->source_range.offsets.to = i + 1;
-          Source_Range children_range = parent.value->source_range;
+          parent_value->source_range.offsets.to = i + 1;
+          Source_Range children_range = parent_value->source_range;
           children_range.offsets.to -= 1;
           children_range.offsets.from += 1;
-          value_as_group(parent.value)->children =
-            temp_token_array_into_token_view(allocator, &parent.children, children_range);
-          if (!dyn_array_length(parent_stack)) {
-            TOKENIZER_HANDLE_ERROR("Encountered a closing brace without a matching open one");
-          }
-          parent = *dyn_array_pop(parent_stack);
+          Value **children_values = dyn_array_raw(stack) + parent_index + 1;
+          u64 child_count = dyn_array_length(stack) - parent_index - 1;
+          group->children = temp_token_array_into_token_view(
+            allocator, children_values, child_count, children_range
+          );
+          stack.data->length = parent_index + 1; // pop the children
+          dyn_array_pop(parent_index_stack);
         } else {
           TOKENIZER_HANDLE_ERROR("Unpexpected input");
         }
@@ -1001,20 +1005,21 @@ tokenize(
   current_line.to = file->text.length;
   dyn_array_push(file->line_ranges, current_line);
 
-  if (parent.value) {
+  if (dyn_array_length(parent_index_stack)) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
   err:
 #undef TOKENIZER_HANDLE_ERROR
-  fixed_buffer_destroy(string_buffer);
-  dyn_array_destroy(parent_stack);
   if (result.tag == Mass_Result_Tag_Success) {
     Source_Range children_range = { .file = file, .offsets = {.from = 0, .to = file->text.length} };
-    *out_tokens = temp_token_array_into_token_view(allocator, &parent.children, children_range);
-  } else {
-    // TODO @Leak cleanup token memory
+    *out_tokens = temp_token_array_into_token_view(
+      allocator, dyn_array_raw(stack), dyn_array_length(stack), children_range
+    );
   }
+  fixed_buffer_destroy(string_buffer);
+  dyn_array_destroy(stack);
+  dyn_array_destroy(parent_index_stack);
   return result;
 }
 
