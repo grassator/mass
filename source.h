@@ -10,7 +10,7 @@ typedef struct {
   Operator_Fixity fixity;
   u8 argument_count;
   Slice argument_names[2];
-  const Token *body;
+  Value *body;
   Scope *scope;
 } User_Defined_Operator;
 
@@ -129,14 +129,14 @@ token_parse_expression(
 void
 token_parse_block_no_scope(
   Execution_Context *context,
-  const Token *block,
+  Value *block,
   Value *block_result_value
 );
 
 void
 token_parse_block(
   Execution_Context *program,
-  const Token *block,
+  Value *block,
   Value *result_value
 );
 

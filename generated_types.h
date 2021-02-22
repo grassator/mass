@@ -49,10 +49,6 @@ typedef struct Group Group;
 typedef dyn_array_type(Group *) Array_Group_Ptr;
 typedef dyn_array_type(const Group *) Array_Const_Group_Ptr;
 
-typedef struct Token Token;
-typedef dyn_array_type(Token *) Array_Token_Ptr;
-typedef dyn_array_type(const Token *) Array_Const_Token_Ptr;
-
 typedef struct Token_Pattern Token_Pattern;
 typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
 typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
@@ -221,21 +217,6 @@ typedef struct Group {
 } Group;
 typedef dyn_array_type(Group) Array_Group;
 
-typedef enum {
-  Token_Tag_Value = 0,
-} Token_Tag;
-
-typedef struct {
-  Value * value;
-} Token_Value;
-typedef struct Token {
-  Token_Tag tag;
-  char _tag_padding[4];
-  union {
-    Token_Value Value;
-  };
-} Token;
-typedef dyn_array_type(Token) Array_Token;
 typedef enum {
   Token_Pattern_Tag_Invalid = 0,
   Token_Pattern_Tag_Any = 1,
@@ -568,7 +549,7 @@ typedef struct {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
   Array_Function_Argument arguments;
-  const Token * body;
+  Value * body;
   Scope * scope;
   Function_Return returns;
 } Descriptor_Function;
@@ -662,10 +643,6 @@ static Descriptor descriptor_symbol_pointer_pointer;
 static Descriptor descriptor_group;
 static Descriptor descriptor_group_pointer;
 static Descriptor descriptor_group_pointer_pointer;
-static Descriptor descriptor_token;
-static Descriptor descriptor_token_pointer;
-static Descriptor descriptor_token_pointer_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(token_tag, Token_Tag)
 static Descriptor descriptor_token_pattern;
 static Descriptor descriptor_token_pattern_pointer;
 static Descriptor descriptor_token_pattern_pointer_pointer;

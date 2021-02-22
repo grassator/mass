@@ -1226,11 +1226,9 @@ ensure_compiled_function_body(
   assert(function->body);
 
   if (function->flags & Descriptor_Function_Flags_External) {
-    assert(function->body->tag == Token_Tag_Value);
-    Value *body_value = function->body->Value.value;
-    assert(body_value->descriptor == &descriptor_external_symbol);
-    assert(body_value->storage.tag == Storage_Tag_Static);
-    External_Symbol *symbol = body_value->storage.Static.memory;
+    assert(function->body->descriptor == &descriptor_external_symbol);
+    assert(function->body->storage.tag == Storage_Tag_Static);
+    External_Symbol *symbol = function->body->storage.Static.memory;
     fn_value->storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     return;
   }

@@ -443,12 +443,6 @@ main(void) {
     { "Value_View", "children" },
   }));
 
-  push_type(type_union("Token", (Struct[]){
-    struct_fields("Value", (Struct_Item[]){
-      { "Value *", "value" },
-    }),
-  }));
-
   push_type(type_union("Token_Pattern", (Struct[]){
     struct_empty("Invalid"),
     struct_empty("Any"),
@@ -711,7 +705,7 @@ main(void) {
       { "Descriptor_Function_Flags", "flags" },
       { "u32", "_flags_padding" },
       { "Array_Function_Argument", "arguments" },
-      { "const Token *", "body" },
+      { "Value *", "body" },
       { "Scope *", "scope" },
       { "Function_Return", "returns" },
     }),

@@ -191,9 +191,9 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
-      const Token *new_line = value_view_get(tokens, 1);
-      check(token_is_symbol(new_line));
-      spec_check_slice(token_as_symbol(new_line)->name, slice_literal(";"));
+      Value *new_line = value_view_get(tokens, 1);
+      check(value_is_symbol(new_line));
+      spec_check_slice(value_as_symbol(new_line)->name, slice_literal(";"));
     }
 
     it("should be able to parse hex integers") {
@@ -203,12 +203,11 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *token = value_view_get(tokens, 0);
-      check(token->tag == Token_Tag_Value);
-      spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0xCAFE"));
-      check(token->Value.value->descriptor == &descriptor_number_literal);
-      check(token->Value.value->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = token->Value.value->storage.Static.memory;
+      Value *token = value_view_get(tokens, 0);
+      spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0xCAFE"));
+      check(token->descriptor == &descriptor_number_literal);
+      check(token->storage.tag == Storage_Tag_Static);
+      Number_Literal *literal = token->storage.Static.memory;
       spec_check_slice(literal->digits, slice_literal("CAFE"));
       check(!literal->negative);
       check(literal->base == Number_Base_16);
@@ -221,12 +220,11 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *token = value_view_get(tokens, 0);
-      check(token->tag == Token_Tag_Value);
-      spec_check_slice(source_from_source_range(&token->Value.value->source_range), slice_literal("0b100"));
-      check(token->Value.value->descriptor == &descriptor_number_literal);
-      check(token->Value.value->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = token->Value.value->storage.Static.memory;
+      Value *token = value_view_get(tokens, 0);
+      spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0b100"));
+      check(token->descriptor == &descriptor_number_literal);
+      check(token->storage.tag == Storage_Tag_Static);
+      Number_Literal *literal = token->storage.Static.memory;
       spec_check_slice(literal->digits, slice_literal("100"));
       check(!literal->negative);
       check(literal->base == Number_Base_2);
@@ -240,17 +238,16 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
-      const Token *a_num = value_view_get(tokens, 0);
-      check(a_num->tag == Token_Tag_Value);
-      spec_check_slice(source_from_source_range(&a_num->Value.value->source_range), slice_literal("12"));
+      Value *a_num = value_view_get(tokens, 0);
+      spec_check_slice(source_from_source_range(&a_num->source_range), slice_literal("12"));
 
-      const Token *plus = value_view_get(tokens, 1);
-      check(token_is_symbol(plus));
-      spec_check_slice(token_as_symbol(plus)->name, slice_literal("+"));
+      Value *plus = value_view_get(tokens, 1);
+      check(value_is_symbol(plus));
+      spec_check_slice(value_as_symbol(plus)->name, slice_literal("+"));
 
-      const Token *id = value_view_get(tokens, 2);
-      check(token_is_symbol(id));
-      spec_check_slice(source_from_source_range(&id->Value.value->source_range), slice_literal("foo123"));
+      Value *id = value_view_get(tokens, 2);
+      check(value_is_symbol(id));
+      spec_check_slice(source_from_source_range(&id->source_range), slice_literal("foo123"));
     }
 
     it("should be able to tokenize groups") {
@@ -261,14 +258,14 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      const Token *paren = value_view_get(tokens, 0);
-      check(token_is_group(paren));
-      check(token_as_group(paren)->tag == Group_Tag_Paren);
-      check(token_as_group(paren)->children.length == 1);
-      spec_check_slice(source_from_source_range(&paren->Value.value->source_range), slice_literal("(x)"));
+      Value *paren = value_view_get(tokens, 0);
+      check(value_is_group(paren));
+      check(value_as_group(paren)->tag == Group_Tag_Paren);
+      check(value_as_group(paren)->children.length == 1);
+      spec_check_slice(source_from_source_range(&paren->source_range), slice_literal("(x)"));
 
-      const Token *id = value_view_get(token_as_group(paren)->children, 0);
-      check(token_is_symbol(id));
+      Value *id = value_view_get(value_as_group(paren)->children, 0);
+      check(value_is_symbol(id));
     }
 
     it("should be able to tokenize strings") {
@@ -278,8 +275,8 @@ spec("source") {
         tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
-      const Token *string = value_view_get(tokens, 0);
-      spec_check_slice(source_from_source_range(&string->Value.value->source_range), slice_literal("\"foo 123\""));
+      Value *string = value_view_get(tokens, 0);
+      spec_check_slice(source_from_source_range(&string->source_range), slice_literal("\"foo 123\""));
     }
 
     it("should be able to tokenize nested groups with different braces") {
@@ -290,17 +287,17 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
-      const Token *curly = value_view_get(tokens, 0);
-      check(token_is_group(curly));
-      check(token_as_group(curly)->tag == Group_Tag_Curly);
-      check(token_as_group(curly)->children.length == 1);
-      spec_check_slice(source_from_source_range(&curly->Value.value->source_range), slice_literal("{[]}"));
+      Value *curly = value_view_get(tokens, 0);
+      check(value_is_group(curly));
+      check(value_as_group(curly)->tag == Group_Tag_Curly);
+      check(value_as_group(curly)->children.length == 1);
+      spec_check_slice(source_from_source_range(&curly->source_range), slice_literal("{[]}"));
 
-      const Token *square = value_view_get(token_as_group(curly)->children, 0);
-      check(token_is_group(square));
-      check(token_as_group(square)->tag == Group_Tag_Square);
-      check(token_as_group(square)->children.length == 0);
-      spec_check_slice(source_from_source_range(&square->Value.value->source_range), slice_literal("[]"));
+      Value *square = value_view_get(value_as_group(curly)->children, 0);
+      check(value_is_group(square));
+      check(value_as_group(square)->tag == Group_Tag_Square);
+      check(value_as_group(square)->children.length == 0);
+      spec_check_slice(source_from_source_range(&square->source_range), slice_literal("[]"));
     }
 
     it("should be able to tokenize complex input") {
