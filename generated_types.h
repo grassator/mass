@@ -33,7 +33,7 @@ typedef struct Parse_Error Parse_Error;
 typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
 typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
 
-typedef enum Token_Group_Tag Token_Group_Tag;
+typedef enum Group_Tag Group_Tag;
 
 typedef struct Token_View Token_View;
 typedef dyn_array_type(Token_View *) Array_Token_View_Ptr;
@@ -185,11 +185,11 @@ typedef struct Parse_Error {
 } Parse_Error;
 typedef dyn_array_type(Parse_Error) Array_Parse_Error;
 
-typedef enum Token_Group_Tag {
-  Token_Group_Tag_Paren = 1,
-  Token_Group_Tag_Square = 2,
-  Token_Group_Tag_Curly = 3,
-} Token_Group_Tag;
+typedef enum Group_Tag {
+  Group_Tag_Paren = 1,
+  Group_Tag_Square = 2,
+  Group_Tag_Curly = 3,
+} Group_Tag;
 
 typedef struct Token_View {
   const Token * * tokens;
@@ -219,7 +219,7 @@ typedef struct {
   Value * value;
 } Token_Value;
 typedef struct {
-  Token_Group_Tag tag;
+  Group_Tag tag;
   u32 _tag_padding;
   Token_View children;
 } Token_Group;
@@ -245,7 +245,7 @@ typedef struct {
   Slice name;
 } Token_Pattern_Symbol;
 typedef struct {
-  Token_Group_Tag tag;
+  Group_Tag tag;
 } Token_Pattern_Group;
 typedef struct {
   Slice slice;
@@ -642,9 +642,9 @@ static Descriptor descriptor_module_pointer_pointer;
 static Descriptor descriptor_parse_error;
 static Descriptor descriptor_parse_error_pointer;
 static Descriptor descriptor_parse_error_pointer_pointer;
-static Descriptor descriptor_token_group_tag;
-static Descriptor descriptor_token_group_tag_pointer;
-static Descriptor descriptor_token_group_tag_pointer_pointer;
+static Descriptor descriptor_group_tag;
+static Descriptor descriptor_group_tag_pointer;
+static Descriptor descriptor_group_tag_pointer_pointer;
 static Descriptor descriptor_token_view;
 static Descriptor descriptor_token_view_pointer;
 static Descriptor descriptor_token_view_pointer_pointer;
@@ -829,7 +829,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
   },
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
-MASS_DEFINE_OPAQUE_C_TYPE(token_group_tag, Token_Group_Tag)
+MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_view,
   {
     .name = slice_literal_fields("tokens"),

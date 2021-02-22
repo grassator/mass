@@ -738,7 +738,7 @@ tokenize(
     current_line.to = i + 1;\
     dyn_array_push(file->line_ranges, current_line);\
     current_line.from = current_line.to;\
-    if (!parent.token || parent.token->Group.tag == Token_Group_Tag_Curly) {\
+    if (!parent.token || parent.token->Group.tag == Group_Tag_Curly) {\
       /* Do not treating leading newlines as semicolons */ \
       if (dyn_array_length(parent.children)) {\
         start_token(Token_Tag_Value);\
@@ -792,9 +792,9 @@ tokenize(
         } else if (ch == '(' || ch == '{' || ch == '[') {
           start_token(Token_Tag_Group);
           current_token->Group.tag =
-            ch == '(' ? Token_Group_Tag_Paren :
-            ch == '{' ? Token_Group_Tag_Curly :
-            Token_Group_Tag_Square;
+            ch == '(' ? Group_Tag_Paren :
+            ch == '{' ? Group_Tag_Curly :
+            Group_Tag_Square;
           dyn_array_push(parent.children, current_token);
           dyn_array_push(parent_stack, parent);
           parent = (Tokenizer_Parent){current_token, dyn_array_make(Array_Const_Token_Ptr, 4)};
@@ -804,11 +804,11 @@ tokenize(
           }
           s8 expected_paren = 0;
           switch (parent.token->Group.tag) {
-            case Token_Group_Tag_Paren: {
+            case Group_Tag_Paren: {
               expected_paren = ')';
               break;
             }
-            case Token_Group_Tag_Curly: {
+            case Group_Tag_Curly: {
               // Newlines at the end of the block do not count as semicolons otherwise this:
               // { 42
               // }
@@ -827,7 +827,7 @@ tokenize(
               expected_paren = '}';
               break;
             }
-            case Token_Group_Tag_Square: {
+            case Group_Tag_Square: {
               expected_paren = ']';
               break;
             }
@@ -1180,7 +1180,7 @@ token_force_type(
   Descriptor *descriptor = 0;
   switch (token->tag) {
     case Token_Tag_Group: {
-      if (token->Group.tag != Token_Group_Tag_Square) {
+      if (token->Group.tag != Group_Tag_Square) {
         panic("TODO");
       }
       if (token->Group.children.length != 1) {
@@ -1309,7 +1309,7 @@ token_make_macro_capture_function(
     .tag = Token_Tag_Group,
     .source_range = capture_view.source_range,
     .Group = {
-      .tag = Token_Group_Tag_Curly,
+      .tag = Group_Tag_Curly,
       .children = capture_view,
     }
   };
@@ -1434,7 +1434,7 @@ token_apply_macro_syntax(
         .tag = Token_Tag_Group,
         .source_range = capture_view.source_range,
         .Group = {
-          .tag = Token_Group_Tag_Curly,
+          .tag = Group_Tag_Curly,
           .children = scope_token_view,
         }
       };
@@ -1808,17 +1808,17 @@ token_force_value(
     }
     case Token_Tag_Group: {
       switch(token->Group.tag) {
-        case Token_Group_Tag_Paren: {
+        case Group_Tag_Paren: {
           token_parse_expression(
             context, token->Group.children, result_value, Expression_Parse_Mode_Default
           );
           return *context->result;
         }
-        case Token_Group_Tag_Curly: {
+        case Group_Tag_Curly: {
           token_parse_block(context, token, result_value);
           return *context->result;
         }
-        case Token_Group_Tag_Square: {
+        case Group_Tag_Square: {
           panic("TODO");
           return *context->result;
         }
@@ -1955,7 +1955,7 @@ token_parse_exports(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   u64 peek_index = 0;
   Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("exports"));
-  Token_Maybe_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Curly);
+  Token_Maybe_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (!block) {
     context_error_snprintf(
@@ -2062,7 +2062,7 @@ token_parse_operator_definition(
   assert(precedence_value->storage.tag == Storage_Tag_Static);
   u64 precendence = storage_immediate_value_up_to_u64(&precedence_value->storage);
 
-  Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren);
+  Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   if (!pattern_token) {
     context_error_snprintf(
@@ -2072,7 +2072,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Token_Maybe_Match(body_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Curly);
+  Token_Maybe_Match(body_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (!body_token) {
     context_error_snprintf(
@@ -2242,7 +2242,7 @@ token_parse_syntax_definition(
   Token_Maybe_Match(statement, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("statement"));
   Token_Maybe_Match(rewrite, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("rewrite"));
 
-  Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren);
+  Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   if (!pattern_token) {
     context_error_snprintf(
@@ -2419,7 +2419,7 @@ token_process_c_struct_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if (!token_match(args, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren })) {
+  if (!token_match(args, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren })) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct must be followed by ()"
@@ -2435,7 +2435,7 @@ token_process_c_struct_definition(
     goto err;
   }
   const Token *layout_block = token_view_get(args->Group.children, 0);
-  if (!token_match(layout_block, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Curly })) {
+  if (!token_match(layout_block, &(Token_Pattern) { .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly })) {
     context_error_snprintf(
       context, args->source_range,
       "c_struct expects a {} block as the argument"
@@ -3019,7 +3019,7 @@ token_handle_function_call(
 
   Value *target = value_any(context);
   MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
-  assert(token_match(args_token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren}));
+  assert(token_match(args_token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren}));
 
   if (
     target->descriptor->tag == Descriptor_Tag_Function &&
@@ -3539,7 +3539,7 @@ token_eval_operator(
       Value *scope_value =
         value_make(context, &descriptor_execution_context, storage_immediate(context));
       MASS_ON_ERROR(assign(context, &body->source_range, result_value, scope_value)) return;
-    } else if (token_match(body, &(Token_Pattern){ .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren })) {
+    } else if (token_match(body, &(Token_Pattern){ .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren })) {
       compile_time_eval(context, body->Group.children, result_value);
     } else {
       context_error_snprintf(
@@ -3578,7 +3578,7 @@ token_eval_operator(
       }
     } else if (lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
       if (
-        token_match(rhs, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren}) ||
+        token_match(rhs, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren}) ||
         (rhs->tag == Token_Tag_Value && rhs->Value.value->descriptor == &descriptor_number_literal)
       ) {
         Value *index = value_any(context);
@@ -4050,7 +4050,7 @@ token_parse_expression(
       case Token_Tag_Group: {
         dyn_array_push(token_stack, token);
         switch (token->Group.tag) {
-          case Token_Group_Tag_Paren: {
+          case Group_Tag_Paren: {
             if (!is_previous_an_operator) {
               if (!token_handle_operator(
                 context, view, &token_stack, &operator_stack, slice_literal("()"),
@@ -4059,11 +4059,11 @@ token_parse_expression(
             }
             break;
           }
-          case Token_Group_Tag_Curly: {
+          case Group_Tag_Curly: {
             // Nothing special to do for now?
             break;
           }
-          case Token_Group_Tag_Square: {
+          case Group_Tag_Square: {
             context_error_snprintf(
               context, token->source_range,
               "Unexpected [] in an expression"
@@ -4179,7 +4179,7 @@ token_parse_block_no_scope(
   Value *block_result_value
 ) {
   assert(block->tag == Token_Tag_Group);
-  assert(block->Group.tag == Token_Group_Tag_Curly);
+  assert(block->Group.tag == Group_Tag_Curly);
 
   token_parse_block_view(context, block->Group.children, block_result_value);
 
@@ -4445,7 +4445,7 @@ token_match_fixed_array_type(
 
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
-  Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Square);
+  Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
   Descriptor *descriptor =
     scope_lookup_type(context, context->scope, type->source_range, token_as_symbol(type)->name);
 
@@ -4483,7 +4483,7 @@ token_parse_inline_machine_code_bytes(
   u64 peek_index = 0;
   Token_Match(id_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("inline_machine_code_bytes"));
   // TODO improve error reporting and / or transition to compile time functions when available
-  Token_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Token_Group_Tag_Paren);
+  Token_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
   Token_View rest = token_view_match_till_end_of_statement(view, &peek_index);
   if (rest.length) {
     context_error_snprintf(
@@ -4683,7 +4683,7 @@ token_parse(
     .tag = Token_Tag_Group,
     .source_range = view.source_range,
     .Group = {
-      .tag = Token_Group_Tag_Curly,
+      .tag = Group_Tag_Curly,
       .children = view,
     },
   };

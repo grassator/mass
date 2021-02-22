@@ -414,7 +414,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_enum("Token_Group_Tag", (Enum_Item[]){
+  push_type(type_enum("Group_Tag", (Enum_Item[]){
     { "Paren", 1 },
     { "Square", 2 },
     { "Curly", 3 },
@@ -442,7 +442,7 @@ main(void) {
       { "Value *", "value" },
     }),
     struct_fields("Group", (Struct_Item[]){
-      { "Token_Group_Tag", "tag" },
+      { "Group_Tag", "tag" },
       { "u32", "_tag_padding" },
       { "Token_View", "children" },
     }),
@@ -457,7 +457,7 @@ main(void) {
       { "Slice", "name" },
     }),
     struct_fields("Group", (Struct_Item[]){
-      { "Token_Group_Tag", "tag" },
+      { "Group_Tag", "tag" },
     }),
     struct_fields("String", (Struct_Item[]){
       { "Slice", "slice" },

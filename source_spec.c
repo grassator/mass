@@ -253,7 +253,7 @@ spec("source") {
 
       const Token *paren = token_view_get(tokens, 0);
       check(paren->tag == Token_Tag_Group);
-      check(paren->Group.tag == Token_Group_Tag_Paren);
+      check(paren->Group.tag == Group_Tag_Paren);
       check(paren->Group.children.length == 1);
       check(slice_equal(source_from_source_range(&paren->source_range), slice_literal("(x)")));
 
@@ -282,13 +282,13 @@ spec("source") {
 
       const Token *curly = token_view_get(tokens, 0);
       check(curly->tag == Token_Tag_Group);
-      check(curly->Group.tag == Token_Group_Tag_Curly);
+      check(curly->Group.tag == Group_Tag_Curly);
       check(curly->Group.children.length == 1);
       check(slice_equal(source_from_source_range(&curly->source_range), slice_literal("{[]}")));
 
       const Token *square = token_view_get(curly->Group.children, 0);
       check(square->tag == Token_Tag_Group);
-      check(square->Group.tag == Token_Group_Tag_Square);
+      check(square->Group.tag == Group_Tag_Square);
       check(square->Group.children.length == 0);
       check(slice_equal(source_from_source_range(&square->source_range), slice_literal("[]")));
     }
