@@ -696,7 +696,7 @@ tokenize(
   };
 
   Range_u64 current_line = {0};
-  Source_Range current_token_range = {0};
+  Source_Range current_token_range = {.file = file};
   enum Tokenizer_State state = Tokenizer_State_Default;
   Tokenizer_Parent parent = {
     .value = 0,
@@ -712,14 +712,6 @@ tokenize(
 
 #define current_token_source()\
    slice_sub(file->text, current_token_range.offsets.from, i)
-
-#define start_token()\
-  do {\
-    current_token_range = (Source_Range){\
-      .file = file,\
-      .offsets = {.from = i, .to = i}\
-    };\
-  } while(0)
 
 #define push(_VALUE_)\
   do {\
@@ -767,6 +759,7 @@ tokenize(
 
     retry: switch(state) {
       case Tokenizer_State_Default: {
+        current_token_range.offsets = (Range_u64){.from = i, .to = i};
         if (ch == '\n') {
           push_line();
         } else if (ch == '\r') {
@@ -775,30 +768,23 @@ tokenize(
         } else if (isspace(ch)) {
           continue;
         } else if (ch == '0' && peek == 'x') {
-          start_token();
           i++;
           state = Tokenizer_State_Hex_Integer;
         } else if (ch == '0' && peek == 'b') {
-          start_token();
           i++;
           state = Tokenizer_State_Binary_Integer;
         } else if (isdigit(ch)) {
-          start_token();
           state = Tokenizer_State_Decimal_Integer;
         } else if (isalpha(ch) || ch == '_') {
-          start_token();
           state = Tokenizer_State_Symbol;
         } else if(ch == '/' && peek == '/') {
           state = Tokenizer_State_Single_Line_Comment;
         } else if (code_point_is_operator(ch)) {
-          start_token();
           state = Tokenizer_State_Operator;
         } else if (ch == '"') {
           string_buffer->occupied = 0;
-          start_token();
           state = Tokenizer_State_String;
         } else if (ch == '(' || ch == '{' || ch == '[') {
-          start_token();
           Group *group = allocator_allocate(allocator, Group);
           group->tag =
             ch == '(' ? Group_Tag_Paren :
@@ -1017,9 +1003,7 @@ tokenize(
   }
 
   err:
-#undef tokenizer_error
-#undef start_token
-#undef push_and_retry
+#undef TOKENIZER_HANDLE_ERROR
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(parent_stack);
   if (result.tag == Mass_Result_Tag_Success) {
