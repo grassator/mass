@@ -547,56 +547,26 @@ token_make_symbol(
   return value;
 }
 
-static inline bool
-token_is_string(
-  const Token *token
-) {
-  assert(token->tag == Token_Tag_Value);
-  if (!token->Value.value) return false;
-  return token->Value.value->descriptor == &descriptor_string;
-}
+#define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
+  static inline bool\
+  token_is_##_SUFFIX_(\
+    const Token *token\
+  ) {\
+    assert(token->tag == Token_Tag_Value);\
+    if (!token->Value.value) return false;\
+    return token->Value.value->descriptor == &descriptor_##_SUFFIX_;\
+  }\
+  static inline _C_TYPE_ *\
+  token_as_##_SUFFIX_(\
+    const Token *token\
+  ) {\
+    assert(token_is_##_SUFFIX_(token));\
+    return storage_immediate_as_c_type(token->Value.value->storage, _C_TYPE_);\
+  }
 
-static inline bool
-token_is_symbol(
-  const Token *token
-) {
-  assert(token->tag == Token_Tag_Value);
-  if (!token->Value.value) return false;
-  return token->Value.value->descriptor == &descriptor_symbol;
-}
-
-static inline bool
-token_is_group(
-  const Token *token
-) {
-  assert(token->tag == Token_Tag_Value);
-  if (!token->Value.value) return false;
-  return token->Value.value->descriptor == &descriptor_group;
-}
-
-static inline Symbol *
-token_as_symbol(
-  const Token *token
-) {
-  assert(token_is_symbol(token));
-  return storage_immediate_as_c_type(token->Value.value->storage, Symbol);
-}
-
-static inline Group *
-token_as_group(
-  const Token *token
-) {
-  assert(token_is_group(token));
-  return storage_immediate_as_c_type(token->Value.value->storage, Group);
-}
-
-static inline Slice *
-token_as_string(
-  const Token *token
-) {
-  assert(token_is_string(token));
-  return storage_immediate_as_c_type(token->Value.value->storage, Slice);
-}
+DEFINE_VALUE_IS_AS_HELPERS(Slice, string)
+DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Group, group)
 
 const Token_Pattern token_pattern_comma_operator = {
   .tag = Token_Pattern_Tag_Symbol,
