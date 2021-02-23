@@ -1640,29 +1640,3 @@ make_or(
   return result;
 }
 
-Value *
-ensure_memory(
-  Allocator *allocator,
-  Value *value
-) {
-  Storage operand = value->storage;
-  if (operand.tag == Storage_Tag_Memory) return value;
-  Value *result = allocator_allocate(allocator, Value);
-  if (value->descriptor->tag != Descriptor_Tag_Pointer) assert(!"Not implemented");
-  if (value->storage.tag != Storage_Tag_Register) assert(!"Not implemented");
-  *result = (const Value) {
-    .descriptor = value->descriptor->Pointer.to,
-    .storage = {
-      .tag = Storage_Tag_Memory,
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = {
-          .base_register = value->storage.Register.index
-        }
-      }
-    },
-  };
-  return result;
-}
-
-
