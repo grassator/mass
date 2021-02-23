@@ -3244,27 +3244,44 @@ void
 struct_get_field(
   Execution_Context *context,
   const Source_Range *source_range,
-  Value *raw_value,
+  Value *struct_value,
   Slice name,
   Value *result_value
 ) {
-  Value *struct_value = ensure_memory(context->allocator, raw_value);
   Descriptor *descriptor = struct_value->descriptor;
   assert(descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
     if (slice_equal(name, field->name)) {
-      Value *field_value = allocator_allocate(context->allocator, Value);
-      Storage operand = struct_value->storage;
-      // FIXME support more operands
-      assert(operand.tag == Storage_Tag_Memory);
-      assert(operand.Memory.location.tag == Memory_Location_Tag_Indirect);
-      operand.byte_size = descriptor_byte_size(field->descriptor);
-      operand.Memory.location.Indirect.offset += field->offset;
-      *field_value = (const Value) {
-        .descriptor = field->descriptor,
-        .storage = operand,
-      };
+      Value *field_value;
+      Storage *storage = &struct_value->storage;
+      switch(storage->tag) {
+        default:
+        case Storage_Tag_Any:
+        case Storage_Tag_Eflags:
+        case Storage_Tag_Register:
+        case Storage_Tag_Xmm:
+        case Storage_Tag_None: {
+          panic("Internal Error: Unexpected storage type for structs");
+          field_value = 0;
+          break;
+        }
+        case Storage_Tag_Static: {
+          // TODO This might be incorrect with pointer fields. Need to think about it.
+          Storage field_storage = *storage;
+          field_storage.Static.memory = (s8 *)field_storage.Static.memory + field->offset;
+          field_value = value_make(context, field->descriptor, field_storage, *source_range);
+          break;
+        }
+        case Storage_Tag_Memory: {
+          Storage field_storage = *storage;
+          assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+          field_storage.byte_size = descriptor_byte_size(field->descriptor);
+          field_storage.Memory.location.Indirect.offset += field->offset;
+          field_value = value_make(context, field->descriptor, field_storage, *source_range);
+          break;
+        }
+      }
 
       MASS_ON_ERROR(assign(context, result_value, field_value));
       return;

@@ -1487,35 +1487,44 @@ same_value_type_or_can_implicitly_move_cast(
       value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
     return cast_result == Literal_Cast_Result_Success;
   }
+  if (target->descriptor == source->descriptor) return true;
   if (target->descriptor->tag != source->descriptor->tag) return false;
-  // TODO deal with signess
   if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
-    if (descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)) {
+    if (
+      descriptor_is_unsigned_integer(source->descriptor) &&
+      descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)
+    ) {
       return true;
-    }
-    if (source->storage.tag == Storage_Tag_Static) {
-
-      #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_TYPE_, _TARGET_TYPE_)\
-        if (source->descriptor == &descriptor_##_SOURCE_TYPE_) {\
-          assert(target->descriptor == &descriptor_##_TARGET_TYPE_);\
-          return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(\
-            *storage_immediate_as_c_type(source->storage, _SOURCE_TYPE_)\
-          );\
+    } else if (
+      descriptor_is_signed_integer(target->descriptor) &&
+      descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)
+    ) {
+      return true;
+    } else if (source->storage.tag == Storage_Tag_Static) {
+      #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_INTEGER_, _SOURCE_TYPE_, _TARGET_TYPE_)\
+        if (target->descriptor == &descriptor_##_TARGET_TYPE_) {\
+          return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(_SOURCE_INTEGER_);\
         }
-
-      if (descriptor_is_signed_integer(target->descriptor)) {
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u8, s8)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u16, s16)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u32, s32)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(u64, s64)
+      if (descriptor_is_signed_integer(source->descriptor)) {
+        s64 source_integer = storage_immediate_value_up_to_s64(&source->storage);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s8);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s16);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s32);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u8);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u16);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u32);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u64);
       } else {
-        assert(descriptor_is_unsigned_integer(target->descriptor));
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s8, u8)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s16, u16)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s32, u32)
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(s64, u64)
+        assert(descriptor_is_unsigned_integer(source->descriptor));
+        u64 source_integer = storage_immediate_value_up_to_u64(&source->storage);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s8);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s16);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s32);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s64);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u8);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u16);
+        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u32);
       }
-
       #undef ACCEPT_IF_INTEGER_IMMEDIATE_FITS
     }
   }
