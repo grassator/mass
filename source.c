@@ -2156,9 +2156,9 @@ token_parse_syntax_definition(
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
 
   for (u64 i = 0; i < definition.length; ++i) {
-    Value *token = value_view_get(definition, i);
-    Slice *slice = value_as_immediate_string(token);
-    if (slice) {
+    Value *value = value_view_get(definition, i);
+    if (value_is_string(value)) {
+      Slice *slice = value_as_string(value);
       // FIXME switch to a typed token setup
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
@@ -2169,11 +2169,11 @@ token_parse_syntax_definition(
           }
         },
       });
-    } else if (value_is_group(token)) {
-      Group *group = value_as_group(token);
+    } else if (value_is_group(value)) {
+      Group *group = value_as_group(value);
       if (group->children.length) {
         context_error_snprintf(
-          context, token->source_range,
+          context, value->source_range,
           "Nested group matches are not supported in syntax declarations (yet)"
         );
         goto err;
@@ -2188,20 +2188,20 @@ token_parse_syntax_definition(
         },
       });
     } else if (
-      value_match_symbol(token, slice_literal("..@")) ||
-      value_match_symbol(token, slice_literal(".@")) ||
-      value_match_symbol(token, slice_literal("@"))
+      value_match_symbol(value, slice_literal("..@")) ||
+      value_match_symbol(value, slice_literal(".@")) ||
+      value_match_symbol(value, slice_literal("@"))
     ) {
       Value *symbol_token = value_view_peek(definition, ++i);
       if (!symbol_token || !value_is_symbol(symbol_token)) {
         context_error_snprintf(
-          context, token->source_range,
+          context, value->source_range,
           "@ operator in a syntax definition requires an id after it"
         );
         goto err;
       }
       Macro_Pattern *last_pattern = 0;
-      Slice symbol_name = value_as_symbol(token)->name;
+      Slice symbol_name = value_as_symbol(value)->name;
       if (slice_equal(symbol_name, slice_literal("@"))) {
         last_pattern = dyn_array_last(pattern);
       } else if (slice_equal(symbol_name, slice_literal(".@"))) {
@@ -2218,7 +2218,7 @@ token_parse_syntax_definition(
       }
       if (!last_pattern) {
         context_error_snprintf(
-          context, token->source_range,
+          context, value->source_range,
           "@ requires a valid pattern before it"
         );
         goto err;
@@ -2235,7 +2235,7 @@ token_parse_syntax_definition(
       }
     } else {
       context_error_snprintf(
-        context, token->source_range,
+        context, value->source_range,
         "Only compile time strings are allowed as values in the pattern"
       );
       goto err;
@@ -2670,7 +2670,7 @@ token_handle_c_string(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   if (dyn_array_length(args) != 1) goto err;
   Value *arg_value = *dyn_array_get(args, 0);
-  Slice *c_string = value_as_immediate_string(arg_value);
+  Slice *c_string = value_as_string(arg_value);
   if (!c_string) goto err;
 
   const Value *c_string_bytes =

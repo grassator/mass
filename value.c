@@ -790,19 +790,6 @@ value_number_literal(
   );
 }
 
-static inline Slice *
-value_as_immediate_string(
-  const Value *value
-) {
-  if (value->descriptor != &descriptor_string) {
-    return 0;
-  }
-  if (value->storage.tag != Storage_Tag_Static) {
-    return 0;
-  }
-  return storage_immediate_as_c_type(value->storage, Slice);
-}
-
 Label_Index
 allocate_section_memory(
   Execution_Context *context,
