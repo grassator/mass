@@ -416,7 +416,7 @@ main(void) {
   }));
 
   push_type(type_struct("Value_View", (Struct_Item[]){
-    { "Value * *", "tokens" },
+    { "Value * *", "values" },
     { "u64", "length" },
     { "Source_Range", "source_range" },
   }));
@@ -625,6 +625,11 @@ main(void) {
     { "Postfix", 1 << 2 },
   }));
 
+  push_type(type_enum("Operator_Associativity", (Enum_Item[]){
+    { "Left", 0 },
+    { "Right", 1 },
+  }));
+
   push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
@@ -636,7 +641,7 @@ main(void) {
     }),
     struct_fields("Operator", (Struct_Item[]){
       { "Operator_Fixity", "fixity" },
-      { "u32", "_fixity_padding" },
+      { "Operator_Associativity", "associativity" },
       { "u64", "precedence" },
       { "u64", "argument_count" },
       { "Token_Handle_Operator_Proc", "handler" },

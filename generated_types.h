@@ -111,6 +111,8 @@ typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_So
 
 typedef enum Operator_Fixity Operator_Fixity;
 
+typedef enum Operator_Associativity Operator_Associativity;
+
 typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
 typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
@@ -192,7 +194,7 @@ typedef enum Group_Tag {
 } Group_Tag;
 
 typedef struct Value_View {
-  Value * * tokens;
+  Value * * values;
   u64 length;
   Source_Range source_range;
 } Value_View;
@@ -442,6 +444,11 @@ typedef enum Operator_Fixity {
   Operator_Fixity_Postfix = 4,
 } Operator_Fixity;
 
+typedef enum Operator_Associativity {
+  Operator_Associativity_Left = 0,
+  Operator_Associativity_Right = 1,
+} Operator_Associativity;
+
 typedef enum {
   Scope_Entry_Tag_Value = 0,
   Scope_Entry_Tag_Lazy_Expression = 1,
@@ -458,7 +465,7 @@ typedef struct {
 } Scope_Entry_Lazy_Expression;
 typedef struct {
   Operator_Fixity fixity;
-  u32 _fixity_padding;
+  Operator_Associativity associativity;
   u64 precedence;
   u64 argument_count;
   Token_Handle_Operator_Proc handler;
@@ -697,6 +704,9 @@ static Descriptor descriptor_compiler_source_location_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_operator_fixity_pointer;
 static Descriptor descriptor_operator_fixity_pointer_pointer;
+static Descriptor descriptor_operator_associativity;
+static Descriptor descriptor_operator_associativity_pointer;
+static Descriptor descriptor_operator_associativity_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
@@ -817,9 +827,9 @@ MASS_DEFINE_TYPE_VALUE(parse_error);
 MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
   {
-    .name = slice_literal_fields("tokens"),
+    .name = slice_literal_fields("values"),
     .descriptor = &descriptor_value_pointer_pointer,
-    .offset = offsetof(Value_View, tokens),
+    .offset = offsetof(Value_View, values),
   },
   {
     .name = slice_literal_fields("length"),
@@ -1040,6 +1050,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
 );
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
+MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value,
   {
     .name = slice_literal_fields("descriptor"),

@@ -8,6 +8,9 @@ WriteFile :: (
   overlapped : s64
 ) -> (s64) external("kernel32.dll", "WriteFile")
 
+// FIXME this must be a macro for now because we don't support
+//       relocations that would be required for copying to runtime
+//       a globally defined string as it contains a pointer.
 print :: macro (string : String) -> () {
   WriteFile(GetStdHandle(-11), string.bytes, cast(s32, string.length), 0, 0)
 }
@@ -24,7 +27,7 @@ fn print(integer : s64) {
   stack buffer u8[64]
   const output_size = {
     if integer < 0 then {
-      static minus_code = 0x2d
+      static minus_code = "-".bytes.0
       buffer.0 = minus_code
       integer = 0 - integer
       count + 1
@@ -37,7 +40,7 @@ fn print(integer : s64) {
     integer_index = integer_index + 1
     const digit = cast(u8, integer % 10)
     const digit_index = output_size - integer_index
-    static zero_code = 0x30
+    static zero_code = "0".bytes.0
     buffer.(digit_index) = zero_code + digit
     integer = integer / 10
   }

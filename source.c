@@ -7,7 +7,7 @@ value_view_peek(
   Value_View view,
   u64 index
 ) {
-  return index < view.length ? view.tokens[index] : 0;
+  return index < view.length ? view.values[index] : 0;
 }
 
 static inline Value *
@@ -40,13 +40,13 @@ value_view_slice(
   Source_Range source_range = view->source_range;
   source_range.offsets.to = end_index == view->length
     ? view->source_range.offsets.to
-    : view->tokens[end_index]->source_range.offsets.from;
+    : view->values[end_index]->source_range.offsets.from;
   source_range.offsets.from = start_index == end_index
     ? source_range.offsets.to
-    : view->tokens[start_index]->source_range.offsets.from;
+    : view->values[start_index]->source_range.offsets.from;
 
   return (Value_View) {
-    .tokens = view->tokens + start_index,
+    .values = view->values + start_index,
     .length = end_index - start_index,
     .source_range = source_range,
   };
@@ -66,7 +66,7 @@ value_view_from_value_array(
   const Source_Range *source_range
 ) {
   return (Value_View) {
-    .tokens = dyn_array_raw(value_array),
+    .values = dyn_array_raw(value_array),
     .length = dyn_array_length(value_array),
     .source_range = *source_range
   };
@@ -642,11 +642,11 @@ temp_token_array_into_value_view(
   u64 child_count,
   Source_Range children_range
 ) {
-  Value_View result = { .tokens = 0, .length = child_count, .source_range = children_range };
+  Value_View result = { .values = 0, .length = child_count, .source_range = children_range };
   if (child_count) {
     Value **tokens = allocator_allocate_array(allocator, Value *, child_count);
     memcpy(tokens, children, child_count * sizeof(tokens[0]));
-    result.tokens = tokens;
+    result.values = tokens;
   }
   return result;
 }
@@ -1385,7 +1385,7 @@ token_apply_macro_syntax(
       scope_body_tokens[3] = overload_function->body;
 
       Value_View scope_value_view = (Value_View) {
-        .tokens = scope_body_tokens,
+        .values = scope_body_tokens,
         .length = 4,
         .source_range = capture_view.source_range,
       };
@@ -2877,8 +2877,11 @@ token_handle_operator(
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
-    if (last_operator->scope_entry.precedence <= operator_entry->precedence) {
-      break;
+    if (last_operator->scope_entry.precedence < operator_entry->precedence) break;
+    if (last_operator->scope_entry.precedence == operator_entry->precedence) {
+      if (last_operator->scope_entry.associativity != Operator_Associativity_Left) {
+        break;
+      }
     }
 
     dyn_array_pop(*operator_stack);
@@ -2963,7 +2966,7 @@ token_handle_function_call(
     Value *fake_target_value =
       value_make(context, non_compile_time_descriptor, target->storage, source_range);
     Value_View fake_eval_view = {
-      .tokens = (Value *[]){fake_target_value, args_token},
+      .values = (Value *[]){fake_target_value, args_token},
       .length = 2,
       .source_range = source_range,
     };
@@ -3337,6 +3340,77 @@ struct_get_field(
   return;
 }
 
+Storage
+storage_load_index_address(
+  Execution_Context *context,
+  const Source_Range *source_range,
+  Value *target,
+  const Descriptor *item_descriptor,
+  Value *index_value
+) {
+  // @InstructionQuality
+  // This code is very general in terms of the operands where the base
+  // or the index are stored, but it is
+
+  u64 item_byte_size = descriptor_byte_size(item_descriptor);
+  Register reg = register_acquire_temp(context->builder);
+  // FIXME this acquires but never releases a register
+  Value *new_base_register =
+    value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
+
+  // Move the index into the register
+  move_value(
+    context->allocator,
+    context->builder,
+    source_range,
+    &new_base_register->storage,
+    &index_value->storage
+  );
+
+  Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
+  // Multiply index by the item byte size
+  multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
+
+  {
+    // @InstructionQuality
+    // TODO If the source does not have index, on X64 it should be possible to avoid
+    //      using an extra register and put the index into SIB
+
+    // Load previous address into a temp register
+    Register temp_register = register_acquire_temp(context->builder);
+    Value temp_value = {
+      .descriptor = &descriptor_s64,
+      .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
+    };
+
+    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+      move_value(
+        context->allocator,
+        context->builder,
+        source_range,
+        &temp_value.storage,
+        &target->storage
+      );
+    } else {
+      assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+      load_address(context, source_range, &temp_value, target);
+    }
+    plus(context, source_range, new_base_register, new_base_register, &temp_value);
+    register_release(context->builder, temp_register);
+  }
+
+  return (Storage) {
+    .tag = Storage_Tag_Memory,
+    .byte_size = item_byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base_register = new_base_register->storage.Register.index,
+      }
+    }
+  };
+}
+
 void
 token_handle_array_access(
   Execution_Context *context,
@@ -3345,70 +3419,73 @@ token_handle_array_access(
   Value *index_value,
   Value *result_value
 ) {
-  assert(array_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-  assert(array_value->storage.tag == Storage_Tag_Memory);
-  assert(array_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-  assert(!array_value->storage.Memory.location.Indirect.maybe_index_register.has_value);
-
-  Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
-  u64 item_byte_size = descriptor_byte_size(item_descriptor);
-
-  Value *array_element_value =
-    value_make(context, item_descriptor, array_value->storage, array_value->source_range);
   index_value = maybe_coerce_number_literal_to_integer(context, index_value, &descriptor_u64);
-  array_element_value->storage.byte_size = item_byte_size;
-  if (index_value->storage.tag == Storage_Tag_Static) {
-    s32 index = s64_to_s32(storage_static_value_up_to_s64(&index_value->storage));
-    array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
-  } else {
-    // @InstructionQuality
-    // This code is very general in terms of the operands where the base
-    // or the index are stored, but it is
-
-    Register reg = register_acquire_temp(context->builder);
-    Value *new_base_register =
-      value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
-
-    // Move the index into the register
-    move_value(
-      context->allocator,
-      context->builder,
-      source_range,
-      &new_base_register->storage,
-      &index_value->storage
+  Value *array_element_value;
+  if (array_value->descriptor->tag == Descriptor_Tag_Pointer) {
+    Descriptor *item_descriptor = array_value->descriptor->Pointer.to;
+    Storage storage = storage_load_index_address(
+      context, source_range, array_value, item_descriptor, index_value
     );
+    array_element_value = value_make(context, item_descriptor, storage, array_value->source_range);
+  } else {
+    assert(array_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+    assert(array_value->storage.tag == Storage_Tag_Memory);
+    assert(array_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+    assert(!array_value->storage.Memory.location.Indirect.maybe_index_register.has_value);
 
-    Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
-    // Multiply index by the item byte size
-    multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
+    Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
 
-    {
+    u64 item_byte_size = descriptor_byte_size(item_descriptor);
+
+    array_element_value =
+      value_make(context, item_descriptor, array_value->storage, array_value->source_range);
+    array_element_value->storage.byte_size = item_byte_size;
+    if (index_value->storage.tag == Storage_Tag_Static) {
+      s32 index = s64_to_s32(storage_static_value_up_to_s64(&index_value->storage));
+      array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
+    } else {
       // @InstructionQuality
-      // TODO If the source does not have index, on X64 it should be possible to avoid
-      //      using an extra register and put the index into SIB
+      // This code is very general in terms of the operands where the base
+      // or the index are stored, but it is
 
-      // Load previous address into a temp register
-      Register temp_register = register_acquire_temp(context->builder);
-      Value temp_value = {
-        .descriptor = &descriptor_s64,
-        .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
-      };
+      Register reg = register_acquire_temp(context->builder);
+      Value *new_base_register =
+        value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
 
-      load_address(context, source_range, &temp_value, array_value);
-      plus(context, source_range, new_base_register, new_base_register, &temp_value);
-      register_release(context->builder, temp_register);
-    }
+      // Move the index into the register
+      move_value(
+        context->allocator,
+        context->builder,
+        source_range,
+        &new_base_register->storage,
+        &index_value->storage
+      );
 
-    array_element_value->storage = (Storage) {
-      .tag = Storage_Tag_Memory,
-      .byte_size = item_byte_size,
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = {
-          .base_register = new_base_register->storage.Register.index,
-        }
+      Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
+      // Multiply index by the item byte size
+      multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
+
+      {
+        // @InstructionQuality
+        // TODO If the source does not have index, on X64 it should be possible to avoid
+        //      using an extra register and put the index into SIB
+
+        // Load previous address into a temp register
+        Register temp_register = register_acquire_temp(context->builder);
+        Value temp_value = {
+          .descriptor = &descriptor_s64,
+          .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
+        };
+
+        load_address(context, source_range, &temp_value, array_value);
+        plus(context, source_range, new_base_register, new_base_register, &temp_value);
+        register_release(context->builder, temp_register);
       }
-    };
+
+      array_element_value->storage = storage_load_index_address(
+        context, source_range, array_value, item_descriptor, index_value
+      );
+    }
   }
   // FIXME this might actually cause problems in assigning to an array element
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
@@ -3525,7 +3602,10 @@ token_eval_operator(
         );
         return;
       }
-    } else if (lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+    } else if (
+      lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
+      lhs_value->descriptor->tag == Descriptor_Tag_Pointer
+    ) {
       if (
         value_match_group(rhs, Group_Tag_Paren) ||
         value_is_number_literal(rhs)
@@ -3768,7 +3848,7 @@ token_dispatch_operator(
   Value *first_arg = *dyn_array_get(*stack, start_index);
   Value *last_arg = *dyn_array_last(*stack);
   Value_View args_view = {
-    .tokens = dyn_array_get(*stack, start_index),
+    .values = dyn_array_get(*stack, start_index),
     .length = argument_count,
     .source_range = {
       .file = last_arg->source_range.file,
@@ -4647,7 +4727,12 @@ scope_define_builtins(
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
+    .Operator = {
+      .precedence = 20,
+      .fixity = Operator_Fixity_Prefix,
+      .associativity = Operator_Associativity_Right,
+      .argument_count = 1
+     }
   });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
@@ -4655,11 +4740,21 @@ scope_define_builtins(
   });
   scope_define(scope, slice_literal("->"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 3 }
+    .Operator = {
+      .precedence = 19,
+      .fixity = Operator_Fixity_Infix,
+      .associativity = Operator_Associativity_Right,
+      .argument_count = 3
+    }
   });
   scope_define(scope, slice_literal("macro"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Prefix, .argument_count = 1 }
+    .Operator = {
+      .precedence = 19,
+      .associativity = Operator_Associativity_Right,
+      .fixity = Operator_Fixity_Prefix,
+      .argument_count = 1
+    }
   });
 
   scope_define(scope, slice_literal("-"), (Scope_Entry) {

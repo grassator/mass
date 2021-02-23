@@ -36,23 +36,13 @@
             </ArrayItems>
         </Expand>
     </Type>
-    <Type Name="Array_Const_Token_Ptr">
-        <DisplayString>[{data->length}]</DisplayString>
-        <Expand>
-            <Item Name="[length]">data->length</Item>
-            <ArrayItems>
-                <Size>data->length</Size>
-                <ValuePointer>data->items</ValuePointer>
-            </ArrayItems>
-        </Expand>
-    </Type>
-    <Type Name="Token_View">
+    <Type Name="Value_View">
         <DisplayString>[{length}]</DisplayString>
         <Expand>
             <Item Name="[length]">length</Item>
             <ArrayItems>
                 <Size>length</Size>
-                <ValuePointer>tokens</ValuePointer>
+                <ValuePointer>values</ValuePointer>
             </ArrayItems>
         </Expand>
     </Type>
