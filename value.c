@@ -6,6 +6,41 @@
 #include "win32_runtime.h"
 #endif
 
+static inline void *
+storage_immediate_as_c_type_internal(
+  Storage operand,
+  u64 byte_size
+) {
+  assert(operand.byte_size == byte_size);
+  assert(operand.tag == Storage_Tag_Static);
+  return operand.Static.memory;
+}
+
+#define storage_immediate_as_c_type(_OPERAND_, _TYPE_)\
+  ((_TYPE_ *)storage_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
+
+#define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
+  static inline bool\
+  value_is_##_SUFFIX_(\
+    const Value *value\
+  ) {\
+    if (!value) return false;\
+    return value->descriptor == &descriptor_##_SUFFIX_;\
+  }\
+  static inline _C_TYPE_ *\
+  value_as_##_SUFFIX_(\
+    const Value *value\
+  ) {\
+    assert(value_is_##_SUFFIX_(value));\
+    return storage_immediate_as_c_type(value->storage, _C_TYPE_);\
+  }
+
+DEFINE_VALUE_IS_AS_HELPERS(Slice, string)
+DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Group, group)
+DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
+DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
+
 static inline Label *
 program_get_label(
   Program *program,
@@ -206,19 +241,6 @@ source_range_print_start_position(
   slice_print(source_range->file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
-
-static inline void *
-storage_immediate_as_c_type_internal(
-  Storage operand,
-  u64 byte_size
-) {
-  assert(operand.byte_size == byte_size);
-  assert(operand.tag == Storage_Tag_Static);
-  return operand.Static.memory;
-}
-
-#define storage_immediate_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)storage_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 s64
 storage_immediate_value_up_to_s64(

@@ -1229,7 +1229,7 @@ ensure_compiled_function_body(
   if (function->flags & Descriptor_Function_Flags_Macro) return;
   assert(function->body);
 
-  if (function->flags & Descriptor_Function_Flags_External) {
+  if (value_is_external_symbol(function->body)) {
     assert(function->body->descriptor == &descriptor_external_symbol);
     assert(function->body->storage.tag == Storage_Tag_Static);
     External_Symbol *symbol = function->body->storage.Static.memory;

@@ -548,27 +548,6 @@ token_make_symbol(
   return value;
 }
 
-#define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
-  static inline bool\
-  value_is_##_SUFFIX_(\
-    const Value *value\
-  ) {\
-    if (!value) return false;\
-    return value->descriptor == &descriptor_##_SUFFIX_;\
-  }\
-  static inline _C_TYPE_ *\
-  value_as_##_SUFFIX_(\
-    const Value *value\
-  ) {\
-    assert(value_is_##_SUFFIX_(value));\
-    return storage_immediate_as_c_type(value->storage, _C_TYPE_);\
-  }
-
-DEFINE_VALUE_IS_AS_HELPERS(Slice, string)
-DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
-DEFINE_VALUE_IS_AS_HELPERS(Group, group)
-DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
-
 const Token_Pattern token_pattern_comma_operator = {
   .tag = Token_Pattern_Tag_Symbol,
   .Symbol.name = slice_literal_fields(","),
@@ -2411,6 +2390,8 @@ token_process_function_literal(
     .tag = Descriptor_Tag_Function,
     .Function = {
       .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .body = body,
+      .scope = function_scope,
       .returns = 0,
     },
   };
@@ -2476,23 +2457,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context, descriptor, (Storage){0}, args->source_range);
-  descriptor->Function.body = body;
-  descriptor->Function.scope = function_scope;
-  if (!value_is_group(body)) {
-    Value *body_value = body;
-    if (body_value->descriptor == &descriptor_external_symbol) {
-      result->descriptor->Function.flags |= Descriptor_Function_Flags_External;
-    } else {
-      context_error_snprintf(
-        context, body->source_range,
-        "Only External_Symbol values are allowed as non-literal function bodies"
-      );
-      return 0;
-    }
-  }
-
-  return result;
+  return value_make(context, descriptor, (Storage){0}, args->source_range);
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
@@ -3711,7 +3676,7 @@ token_eval_operator(
     if (function_value) {
       if (
         function_value->descriptor->tag == Descriptor_Tag_Function &&
-        !(function_value->descriptor->Function.flags & Descriptor_Function_Flags_External)
+        !value_is_external_symbol(function_value->descriptor->Function.body)
       ) {
         Descriptor_Function *descriptor = &function_value->descriptor->Function;
         descriptor->flags |= Descriptor_Function_Flags_Macro;

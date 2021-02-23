@@ -666,8 +666,7 @@ main(void) {
     { "Macro", 1 << 0 },
     { "No_Own_Scope", 1 << 1 },
     { "No_Own_Return", 1 << 2 },
-    { "External", 1 << 3 },
-    { "Compile_Time", 1 << 4 },
+    { "Compile_Time", 1 << 3 },
   }));
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
