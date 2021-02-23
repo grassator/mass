@@ -1,8 +1,8 @@
 ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
 GetStdHandle :: (handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
 WriteFile :: (
-  status : s64,
-  buffer : [s8],
+  handle : s64,
+  buffer : [u8],
   size : s32,
   bytes_written : [s32],
   overlapped : [s64]
@@ -10,6 +10,7 @@ WriteFile :: (
 
 main :: () -> () {
   STDOUT_HANDLE :: -11;
-  WriteFile(GetStdHandle(STDOUT_HANDLE), c_string("Hello, World!"), "Hello, World!".length, 0, 0);
+  message :: "Hello, World!"
+  WriteFile(GetStdHandle(STDOUT_HANDLE), c_string(message), message.length, 0, 0);
   ExitProcess(0)
 }

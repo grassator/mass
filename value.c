@@ -1005,7 +1005,7 @@ value_global_c_string_from_slice_internal(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Fixed_Size_Array,
     .Fixed_Size_Array = {
-      .item = &descriptor_s8,
+      .item = &descriptor_u8,
       .length = length,
     },
   };

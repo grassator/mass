@@ -1278,7 +1278,7 @@ spec("source") {
     it("should parse and return C-compatible strings") {
       fn_type_void_to_const_charp checker = (fn_type_void_to_const_charp)test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: () -> ([s8]) { c_string(\"test\") }"
+        "checker :: () -> ([u8]) { c_string(\"test\") }"
       );
       check(checker);
       const char *string = checker();

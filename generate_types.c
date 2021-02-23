@@ -252,9 +252,6 @@ print_mass_descriptor_and_type(
         fprintf(file, "  {\n");
         fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
         Slice lowercase_type = slice_from_c_string(strtolower(item->type));
-        if (slice_equal(lowercase_type, slice_literal("const char *"))) {
-          lowercase_type = slice_literal("c_string");
-        }
         // TODO support const
         Slice const_prefix = slice_literal("const ");
         if (slice_starts_with(lowercase_type, const_prefix)) {
@@ -617,8 +614,8 @@ main(void) {
   }));
 
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
-    { "const char *", "filename" },
-    { "const char *", "function_name" },
+    { "const u8 *", "filename" },
+    { "const u8 *", "function_name" },
     { "u64", "line_number" },
   }));
 
@@ -775,7 +772,6 @@ main(void) {
     fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
 
     // Also need to define built-in types
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
@@ -786,7 +782,7 @@ main(void) {
     fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
 
     push_type(type_struct("Slice", (Struct_Item[]){
-      { "c_string", "bytes" },
+      { "u8 *", "bytes" },
       { "u64", "length" },
     }));
 

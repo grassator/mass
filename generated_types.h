@@ -430,8 +430,8 @@ typedef struct Storage {
 } Storage;
 typedef dyn_array_type(Storage) Array_Storage;
 typedef struct Compiler_Source_Location {
-  const char * filename;
-  const char * function_name;
+  const u8 * filename;
+  const u8 * function_name;
   u64 line_number;
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
@@ -598,7 +598,6 @@ _Pragma("warning (pop)")
 
 static Descriptor descriptor_scope_pointer;
 MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
-MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
@@ -1025,12 +1024,12 @@ MASS_DEFINE_TYPE_VALUE(maybe_register);
 MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
   {
     .name = slice_literal_fields("filename"),
-    .descriptor = &descriptor_c_string,
+    .descriptor = &descriptor_u8_pointer,
     .offset = offsetof(Compiler_Source_Location, filename),
   },
   {
     .name = slice_literal_fields("function_name"),
-    .descriptor = &descriptor_c_string,
+    .descriptor = &descriptor_u8_pointer,
     .offset = offsetof(Compiler_Source_Location, function_name),
   },
   {
@@ -1109,7 +1108,7 @@ MASS_DEFINE_TYPE_VALUE(function_return);
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice,
   {
     .name = slice_literal_fields("bytes"),
-    .descriptor = &descriptor_c_string,
+    .descriptor = &descriptor_u8_pointer,
     .offset = offsetof(Slice, bytes),
   },
   {

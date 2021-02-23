@@ -3267,7 +3267,8 @@ struct_get_field(
           break;
         }
         case Storage_Tag_Static: {
-          // TODO This might be incorrect with pointer fields. Need to think about it.
+          // FIXME support pointers
+          assert(field->descriptor->tag != Descriptor_Tag_Pointer);
           Storage field_storage = *storage;
           field_storage.byte_size = descriptor_byte_size(field->descriptor);
           field_storage.Static.memory = (s8 *)field_storage.Static.memory + field->offset;
