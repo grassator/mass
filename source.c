@@ -576,9 +576,9 @@ value_match(
       return true;
     }
     case Token_Pattern_Tag_String: {
-      if (!value_is_string(value)) return false;
+      if (!value_is_slice(value)) return false;
       if (pattern->String.slice.length) {
-        Slice *slice = value_as_string(value);
+        Slice *slice = value_as_slice(value);
         if (!slice_equal(pattern->String.slice, *slice)) return false;
       }
       return true;
@@ -877,7 +877,7 @@ tokenize(
           *string = (Slice){bytes, string_buffer->occupied};
           Value *value = value_init(
             allocator_allocate(allocator, Value),
-            VALUE_STATIC_EPOCH, &descriptor_string, storage_immediate(string), current_token_range
+            VALUE_STATIC_EPOCH, &descriptor_slice, storage_immediate(string), current_token_range
           );
           push(value);
         } else {
@@ -2157,8 +2157,8 @@ token_parse_syntax_definition(
 
   for (u64 i = 0; i < definition.length; ++i) {
     Value *value = value_view_get(definition, i);
-    if (value_is_string(value)) {
-      Slice *slice = value_as_string(value);
+    if (value_is_slice(value)) {
+      Slice *slice = value_as_slice(value);
       // FIXME switch to a typed token setup
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
@@ -2670,7 +2670,7 @@ token_handle_c_string(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   if (dyn_array_length(args) != 1) goto err;
   Value *arg_value = *dyn_array_get(args, 0);
-  Slice *c_string = value_as_string(arg_value);
+  Slice *c_string = value_as_slice(arg_value);
   if (!c_string) goto err;
 
   const Value *c_string_bytes =
@@ -4699,7 +4699,7 @@ scope_define_builtins(
 
   scope_define(scope, slice_literal("String"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_string_value
+    .Value.value = type_slice_value
   });
 
   scope_define(scope, slice_literal("Scope"), (Scope_Entry) {
@@ -4781,14 +4781,14 @@ scope_define_builtins(
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_compiler_external, "external", &descriptor_external_symbol,
-    MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_string),
-    MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_string)
+    MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_slice),
+    MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_slice)
   );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
     MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context),
-    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_string)
+    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice)
   );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(

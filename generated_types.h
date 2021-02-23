@@ -598,7 +598,6 @@ _Pragma("warning (pop)")
 
 static Descriptor descriptor_scope_pointer;
 MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
-MASS_DEFINE_OPAQUE_C_TYPE(string, Slice);
 MASS_DEFINE_OPAQUE_C_TYPE(c_string, const char *);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
@@ -727,6 +726,9 @@ static Descriptor descriptor_mass_result;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(mass_result_tag, Mass_Result_Tag)
+static Descriptor descriptor_slice;
+static Descriptor descriptor_slice_pointer;
+static Descriptor descriptor_slice_pointer_pointer;
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position,
   {
     .name = slice_literal_fields("line"),
@@ -743,12 +745,12 @@ MASS_DEFINE_TYPE_VALUE(source_position);
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_file,
   {
     .name = slice_literal_fields("path"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Source_File, path),
   },
   {
     .name = slice_literal_fields("text"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Source_File, text),
   },
   {
@@ -803,7 +805,7 @@ MASS_DEFINE_TYPE_VALUE(module);
 MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
   {
     .name = slice_literal_fields("message"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Parse_Error, message),
   },
   {
@@ -846,7 +848,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
   },
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Symbol, name),
   },
 );
@@ -878,7 +880,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section,
   },
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Section, name),
   },
   {
@@ -915,7 +917,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label,
   },
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Label, name),
   },
   {
@@ -947,7 +949,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(number_base, Number_Base)
 MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
   {
     .name = slice_literal_fields("digits"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Number_Literal, digits),
   },
   {
@@ -970,12 +972,12 @@ MASS_DEFINE_TYPE_VALUE(number_literal);
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol,
   {
     .name = slice_literal_fields("library_name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(External_Symbol, library_name),
   },
   {
     .name = slice_literal_fields("symbol_name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(External_Symbol, symbol_name),
   },
 );
@@ -983,7 +985,7 @@ MASS_DEFINE_TYPE_VALUE(external_symbol);
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol,
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Import_Symbol, name),
   },
   {
@@ -996,7 +998,7 @@ MASS_DEFINE_TYPE_VALUE(import_symbol);
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_library,
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Import_Library, name),
   },
   {
@@ -1076,7 +1078,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Descriptor_Struct_Field, name),
   },
   {
@@ -1094,7 +1096,7 @@ MASS_DEFINE_TYPE_VALUE(descriptor_struct_field);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
   {
     .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_string,
+    .descriptor = &descriptor_slice,
     .offset = offsetof(Function_Return, name),
   },
   {
@@ -1104,5 +1106,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
+MASS_DEFINE_STRUCT_DESCRIPTOR(slice,
+  {
+    .name = slice_literal_fields("bytes"),
+    .descriptor = &descriptor_c_string,
+    .offset = offsetof(Slice, bytes),
+  },
+  {
+    .name = slice_literal_fields("length"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Slice, length),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(slice);
 
 #endif // GENERATED_TYPES_H

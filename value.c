@@ -35,7 +35,7 @@ storage_immediate_as_c_type_internal(
     return storage_immediate_as_c_type(value->storage, _C_TYPE_);\
   }
 
-DEFINE_VALUE_IS_AS_HELPERS(Slice, string)
+DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Group, group)
 DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
