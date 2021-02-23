@@ -12,9 +12,9 @@
 //    all the function calls within the body we do not know the max_call_parameters_stack_size
 //    so during initial encoding they are stored as negative numbers and then adjusted in
 //    fn_adjust_stack_displacement.
-// FIXME add COMPILER_SOURCE_LOCATION
 Value *
-reserve_stack(
+reserve_stack_internal(
+  Compiler_Source_Location compiler_source_location,
   Allocator *allocator,
   Function_Builder *fn,
   Descriptor *descriptor,
@@ -29,9 +29,13 @@ reserve_stack(
     .descriptor = descriptor,
     .storage = operand,
     .source_range = source_range,
+    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
+
+#define reserve_stack(...)\
+  reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 void
 register_acquire(
