@@ -347,6 +347,34 @@ assign(
       );
       return *context->result;
     }
+  } else if (
+    source->descriptor->tag == Descriptor_Tag_Pointer &&
+    source->storage.tag == Storage_Tag_Static
+  ) {
+    // If a static value contains a pointer, we expect an entry
+    // in a special map that allows us to track whether the target memory
+    // is also available in the compiled binary
+    // TODO this probably needs to be recursive for structs.
+    //      This might require support for relocations.
+    void *source_memory = *((void **)source->storage.Static.memory);
+    Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
+    assert(static_pointer);
+    if (static_pointer->storage.tag == Storage_Tag_None) {
+      // TODO should depend on constness of the static value I guess?
+      Section *section = &context->program->memory.sections.ro_data;
+      u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
+      u64 alignment = descriptor_alignment(static_pointer->descriptor);
+
+      // TODO this should also be deduped
+      Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+      static_pointer->storage = data_label32(label_index, byte_size);
+
+      void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+      memcpy(section_memory, source_memory, byte_size);
+    }
+    assert(storage_is_label(&static_pointer->storage));
+    load_address(context, &source_range, target, static_pointer);
+    return *context->result;
   }
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
@@ -646,10 +674,11 @@ tokenizer_maybe_push_fake_semicolon(
 
 PRELUDE_NO_DISCARD Mass_Result
 tokenize(
-  const Allocator *allocator,
+  Compilation *compilation,
   Source_File *file,
   Value_View *out_tokens
 ) {
+  const Allocator *allocator = compilation->allocator;
   assert(!dyn_array_is_initialized(file->line_ranges));
   file->line_ranges = dyn_array_make(Array_Range_u64);
 
@@ -871,15 +900,31 @@ tokenize(
           state = Tokenizer_State_String_Escape;
         } else if (ch == '"') {
           current_token_range.offsets.to = i + 1;
-          char *bytes = allocator_allocate_bytes(allocator, string_buffer->occupied, 1);
-          memcpy(bytes, string_buffer->memory, string_buffer->occupied);
+          u64 length = string_buffer->occupied;
+          char *bytes = allocator_allocate_bytes(allocator, length, 1);
+          memcpy(bytes, string_buffer->memory, length);
+          {
+            Descriptor *bytes_descriptor = allocator_allocate(allocator, Descriptor);
+            *bytes_descriptor = (Descriptor) {
+              .tag = Descriptor_Tag_Fixed_Size_Array,
+              .Fixed_Size_Array = { .item = &descriptor_u8, .length = length },
+            };
+            value_init(
+              hash_map_set(compilation->static_pointer_map, bytes, (Value){0}),
+              VALUE_STATIC_EPOCH,
+              bytes_descriptor,
+              (Storage){.tag = Storage_Tag_None},
+              current_token_range
+            );
+          }
+
           Slice *string = allocator_allocate(allocator, Slice);
           *string = (Slice){bytes, string_buffer->occupied};
-          Value *value = value_init(
+          Value *string_value = value_init(
             allocator_allocate(allocator, Value),
             VALUE_STATIC_EPOCH, &descriptor_slice, storage_static(string), current_token_range
           );
-          push(value);
+          push(string_value);
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
         }
@@ -3267,8 +3312,6 @@ struct_get_field(
           break;
         }
         case Storage_Tag_Static: {
-          // FIXME support pointers
-          assert(field->descriptor->tag != Descriptor_Tag_Pointer);
           Storage field_storage = *storage;
           field_storage.byte_size = descriptor_byte_size(field->descriptor);
           field_storage.Static.memory = (s8 *)field_storage.Static.memory + field->offset;
@@ -4843,7 +4886,7 @@ program_parse(
   assert(context->module);
   Value_View tokens;
 
-  MASS_TRY(tokenize(context->allocator, &context->module->source_file, &tokens));
+  MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
   Value_View program_value_view = tokens;
   MASS_TRY(token_parse(context, program_value_view));
   return *context->result;

@@ -447,12 +447,15 @@ code_label32(
   };
 }
 
-#define storage_static(_VALUE_)\
+#define storage_static_bytes(_VALUE_, _SIZE_)\
   ((Storage) {                    \
     .tag = Storage_Tag_Static, \
-    .byte_size = sizeof(*(_VALUE_)), \
+    .byte_size = (_SIZE_), \
     .Static.memory = (_VALUE_),\
   })
+
+#define storage_static(_VALUE_)\
+  storage_static_bytes((_VALUE_), sizeof(*(_VALUE_)))
 
 static inline Storage
 imm8(
@@ -1249,6 +1252,7 @@ compilation_init(
     .allocator = compilation_allocator,
     .runtime_program = runtime_program,
     .module_map = hash_map_make(Imported_Module_Map),
+    .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .jit = {0},
     .compiler_module = {
       .source_file = {
@@ -1271,6 +1275,7 @@ compilation_deinit(
   Compilation *compilation
 ) {
   hash_map_destroy(compilation->module_map);
+  hash_map_destroy(compilation->static_pointer_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   bucket_buffer_destroy(compilation->allocation_buffer);

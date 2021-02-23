@@ -273,11 +273,21 @@ typedef struct Jit {
   void *platform_specific_payload;
 } Jit;
 
+bool
+pointer_equal(
+  const void **a,
+  const void **b
+) {
+  return *a == *b;
+}
+hash_map_template(Static_Pointer_Map, void *, Value, hash_pointer, pointer_equal)
+
 typedef struct Compilation {
   Bucket_Buffer *allocation_buffer;
   Allocator *allocator;
   Jit jit;
   Module compiler_module;
+  Static_Pointer_Map *static_pointer_map;
   Imported_Module_Map *module_map;
   Scope *root_scope;
   Program *runtime_program;

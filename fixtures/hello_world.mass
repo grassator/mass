@@ -11,6 +11,6 @@ WriteFile :: (
 main :: () -> () {
   STDOUT_HANDLE :: -11;
   message :: "Hello, World!"
-  WriteFile(GetStdHandle(STDOUT_HANDLE), c_string(message), message.length, 0, 0);
+  WriteFile(GetStdHandle(STDOUT_HANDLE), message.bytes, message.length, 0, 0);
   ExitProcess(0)
 }

@@ -8,6 +8,10 @@ WriteFile :: (
   overlapped : s64
 ) -> (s64) external("kernel32.dll", "WriteFile")
 
+print :: macro (string : String) -> () {
+  WriteFile(GetStdHandle(-11), string.bytes, cast(s32, string.length), 0, 0)
+}
+
 fn print(integer : s64) {
   const count = {
     mut count = 0
@@ -41,21 +45,20 @@ fn print(integer : s64) {
 }
 
 fn fizz_buzz() {
-  const stdout_handle = GetStdHandle(-11)
   for i : s8 = 1; i <= 100; i = i + 1 {
     mut print_number = true
     if (i % 3 == 0) {
       print_number = false
-      WriteFile(stdout_handle, c_string("fizz"), 4, 0, 0)
+      print("fizz")
     }
     if (i % 5 == 0) {
       print_number = false
-      WriteFile(stdout_handle, c_string("buzz"), 4, 0, 0)
+      print("buzz")
     }
     if (print_number) {
       print(i)
     }
-    WriteFile(stdout_handle, c_string(" "), 1, 0, 0)
+    print(" ")
   }
 }
 

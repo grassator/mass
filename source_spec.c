@@ -170,7 +170,7 @@ spec("source") {
 
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
@@ -179,7 +179,7 @@ spec("source") {
       Slice source = slice_literal("// foo\n");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 0);
     }
@@ -188,7 +188,7 @@ spec("source") {
       Slice source = slice_literal("foo\n");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 2);
       Value *new_line = value_view_get(tokens, 1);
@@ -200,7 +200,7 @@ spec("source") {
       Slice source = slice_literal("0xCAFE");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -217,7 +217,7 @@ spec("source") {
       Slice source = slice_literal("0b100");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *token = value_view_get(tokens, 0);
@@ -234,7 +234,7 @@ spec("source") {
       Slice source = slice_literal("12 + foo123");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 3);
 
@@ -254,7 +254,7 @@ spec("source") {
       Slice source = slice_literal("(x)");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -272,7 +272,7 @@ spec("source") {
       Slice source = slice_literal("\"foo 123\"");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
       Value *string = value_view_get(tokens, 0);
@@ -283,7 +283,7 @@ spec("source") {
       Slice source = slice_literal("{[]}");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
       check(tokens.length == 1);
 
@@ -308,7 +308,7 @@ spec("source") {
       );
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Success);
     }
 
@@ -316,7 +316,7 @@ spec("source") {
       Slice source = slice_literal("(foo");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Parse_Error *error = &result.Error.details;
       spec_check_slice(error->source_range.file->path, test_file_name);
@@ -329,7 +329,7 @@ spec("source") {
       Slice source = slice_literal("(foo}");
       Value_View tokens;
       Mass_Result result =
-        tokenize(test_context.allocator, &(Source_File){test_file_name, source}, &tokens);
+        tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Parse_Error *error = &result.Error.details;
       spec_check_slice(error->source_range.file->path, test_file_name);

@@ -3276,10 +3276,10 @@ typedef struct {
   typedef struct {\
     _hash_map_type_ *(*make)();\
     _value_type_ *(*get)(_hash_map_type_ *, _key_type_);\
-    void (*set)(_hash_map_type_ *, _key_type_, _value_type_);\
+    _value_type_ *(*set)(_hash_map_type_ *, _key_type_, _value_type_);\
     void (*delete)(_hash_map_type_ *, _key_type_);\
     _value_type_ *(*get_by_hash)(_hash_map_type_ *, s32, _key_type_);\
-    void (*set_by_hash)(_hash_map_type_ *, s32, _key_type_, _value_type_);\
+    _value_type_ *(*set_by_hash)(_hash_map_type_ *, s32, _key_type_, _value_type_);\
     void (*delete_by_hash)(_hash_map_type_ *, s32, _key_type_);\
   } _hash_map_type_##__Methods;\
   \
@@ -3436,7 +3436,7 @@ hash_map_resize(
     _hash_map_type_##__delete_by_hash(map, _key_hash_fn_(key), key);\
   }\
   \
-  static inline void\
+  static inline _value_type_ *\
   _hash_map_type_##__set_by_hash(\
     _hash_map_type_ *map,\
     s32 hash,\
@@ -3456,14 +3456,15 @@ hash_map_resize(
       .key = key, \
       .value = value, \
     };\
+    return &map->entries[index].value;\
   }\
-  static inline void\
+  static inline _value_type_ *\
   _hash_map_type_##__set(\
     _hash_map_type_ *map,\
     _key_type_ key,\
     _value_type_ value\
   ) {\
-    _hash_map_type_##__set_by_hash(map, _key_hash_fn_(key), key, value);\
+    return _hash_map_type_##__set_by_hash(map, _key_hash_fn_(key), key, value);\
   }\
   \
   const _hash_map_type_##__Methods *_hash_map_type_##__methods = &(_hash_map_type_##__Methods){\
