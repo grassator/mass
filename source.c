@@ -325,7 +325,7 @@ assign(
 
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
-      Number_Literal *literal = storage_immediate_as_c_type(source->storage, Number_Literal);
+      Number_Literal *literal = storage_static_as_c_type(source->storage, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(
           context, &source_range, source, &descriptor_u64
@@ -539,7 +539,7 @@ token_make_symbol(
   };
   return value_init(
     allocator_allocate(allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_symbol, storage_immediate(symbol), source_range
+    VALUE_STATIC_EPOCH, &descriptor_symbol, storage_static(symbol), source_range
   );
 }
 
@@ -752,7 +752,7 @@ tokenize(
             Group_Tag_Square;
           Value *value = value_init(
             allocator_allocate(allocator, Value),
-            VALUE_STATIC_EPOCH, &descriptor_group, storage_immediate(group), current_token_range
+            VALUE_STATIC_EPOCH, &descriptor_group, storage_static(group), current_token_range
           );
           dyn_array_push(parent_index_stack, dyn_array_length(stack));
           push(value);
@@ -877,7 +877,7 @@ tokenize(
           *string = (Slice){bytes, string_buffer->occupied};
           Value *value = value_init(
             allocator_allocate(allocator, Value),
-            VALUE_STATIC_EPOCH, &descriptor_slice, storage_immediate(string), current_token_range
+            VALUE_STATIC_EPOCH, &descriptor_slice, storage_static(string), current_token_range
           );
           push(value);
         } else {
@@ -1038,7 +1038,7 @@ value_ensure_type(
     context_error_snprintf(context, source_range, "Expected a type");
     return 0;
   }
-  Descriptor *descriptor = storage_immediate_as_c_type(value->storage, Descriptor);
+  Descriptor *descriptor = storage_static_as_c_type(value->storage, Descriptor);
   return descriptor;
 }
 
@@ -1223,7 +1223,7 @@ token_make_fake_body(
     .children = children,
   };
 
-  return value_make(context, &descriptor_group, storage_immediate(group), children.source_range);
+  return value_make(context, &descriptor_group, storage_static(group), children.source_range);
 }
 
 Value *
@@ -1958,7 +1958,7 @@ token_parse_operator_definition(
   MASS_ON_ERROR(*context->result) goto err;
 
   assert(precedence_value->storage.tag == Storage_Tag_Static);
-  u64 precendence = storage_immediate_value_up_to_u64(&precedence_value->storage);
+  u64 precendence = storage_static_value_up_to_u64(&precedence_value->storage);
 
   Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
@@ -2769,12 +2769,12 @@ token_handle_negation(
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
-    Number_Literal *original = storage_immediate_as_c_type(value->storage, Number_Literal);
+    Number_Literal *original = storage_static_as_c_type(value->storage, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
     negated_value = value_make(
-      context, &descriptor_number_literal, storage_immediate(negated), source_range
+      context, &descriptor_number_literal, storage_static(negated), source_range
     );
   } else {
     panic("TODO support general negation");
@@ -3315,7 +3315,7 @@ token_handle_array_access(
   index_value = maybe_coerce_number_literal_to_integer(context, index_value, &descriptor_u64);
   array_element_value->storage.byte_size = item_byte_size;
   if (index_value->storage.tag == Storage_Tag_Static) {
-    s32 index = s64_to_s32(storage_immediate_value_up_to_s64(&index_value->storage));
+    s32 index = s64_to_s32(storage_static_value_up_to_s64(&index_value->storage));
     array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
   } else {
     // @InstructionQuality
@@ -3437,11 +3437,11 @@ token_eval_operator(
     Source_Range body_range = body->source_range;
     if (value_match_symbol(body, slice_literal("scope"))) {
       Value *scope_value =
-        value_make(context, &descriptor_scope, storage_immediate(context->scope), body_range);
+        value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
       MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
     } else if (value_match_symbol(body, slice_literal("context"))) {
       Value *scope_value =
-        value_make(context, &descriptor_execution_context, storage_immediate(context), body_range);
+        value_make(context, &descriptor_execution_context, storage_static(context), body_range);
       MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
     } else if (value_match_group(body, Group_Tag_Paren)) {
       compile_time_eval(context, value_as_group(body)->children, result_value);
@@ -3469,7 +3469,7 @@ token_eval_operator(
           struct_get_field(context, &rhs_range, lhs_value, value_as_symbol(rhs)->name, result_value);
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
-          Scope *module_scope = storage_immediate_as_c_type(lhs_value->storage, Scope);
+          Scope *module_scope = storage_static_as_c_type(lhs_value->storage, Scope);
           Execution_Context module_context = *context;
           module_context.scope = module_scope;
           module_context.builder = 0;
@@ -4135,7 +4135,7 @@ token_parse_statement_using(
 
   // This code injects a proxy scope that just uses the same data as the other
   Scope *current_scope = context->scope;
-  Scope *using_scope = storage_immediate_as_c_type(result->storage, Scope);
+  Scope *using_scope = storage_static_as_c_type(result->storage, Scope);
   Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
   assert(common_ancestor);
   // TODO @Speed This is quite inefficient but I can't really think of something faster
@@ -4365,7 +4365,7 @@ token_match_fixed_array_type(
     context, &size_view.source_range, size_value, &descriptor_u32
   );
   MASS_ON_ERROR(*context->result) return 0;
-  u32 length = u64_to_u32(storage_immediate_value_up_to_u64(&size_value->storage));
+  u32 length = u64_to_u32(storage_static_value_up_to_u64(&size_value->storage));
 
   // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -4436,7 +4436,7 @@ token_parse_inline_machine_code_bytes(
       value = token_value_force_immediate_integer(
         context, &value->source_range, value, &descriptor_u8
       );
-      u8 byte = u64_to_u8(storage_immediate_value_up_to_u64(&value->storage));
+      u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     }
   }

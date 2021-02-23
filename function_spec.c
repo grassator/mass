@@ -119,8 +119,8 @@ spec("function") {
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
           check(storage_equal(&instruction->assembly.operands[0], &reg_a->storage));
-          s64 actual_immediate = storage_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
-          s64 expected_immediate = storage_immediate_value_up_to_s64(&immediates[j]->storage);
+          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->assembly.operands[1]);
+          s64 expected_immediate = storage_static_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
       }
@@ -145,8 +145,8 @@ spec("function") {
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction->assembly.mnemonic == mov);
           check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
-          s64 actual_immediate = storage_immediate_value_up_to_s64(&instruction->assembly.operands[1]);
-          s64 expected_immediate = storage_immediate_value_up_to_s64(&immediates[j]->storage);
+          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->assembly.operands[1]);
+          s64 expected_immediate = storage_static_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
       }

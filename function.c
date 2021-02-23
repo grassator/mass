@@ -256,7 +256,7 @@ move_value(
       }
       return;
     }
-    s64 immediate = storage_immediate_value_up_to_s64(source);
+    s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_instruction(instructions, *source_range, (Instruction) {.assembly = {xor, {*target, *target}}});
@@ -696,7 +696,7 @@ make_if(
   bool is_always_true = false;
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("if"));
   if(value->storage.tag == Storage_Tag_Static) {
-    s64 imm = storage_immediate_value_up_to_s64(&value->storage);
+    s64 imm = storage_static_value_up_to_s64(&value->storage);
     if (imm == 0) return label;
     is_always_true = true;
   }
@@ -783,8 +783,8 @@ typedef enum {
     Storage *a_operand = &(_a_)->storage;\
     Storage *b_operand = &(_b_)->storage;\
     if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
-      s64 a_s64 = storage_immediate_value_up_to_s64(a_operand);\
-      s64 b_s64 = storage_immediate_value_up_to_s64(b_operand);\
+      s64 a_s64 = storage_static_value_up_to_s64(a_operand);\
+      s64 b_s64 = storage_static_value_up_to_s64(b_operand);\
       Value *imm_value = value_from_signed_immediate((_context_), a_s64 _operator_ b_s64, *(_loc_));\
       MASS_ON_ERROR(assign((_context_), (_result_), imm_value));\
       return;\

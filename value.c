@@ -7,7 +7,7 @@
 #endif
 
 static inline void *
-storage_immediate_as_c_type_internal(
+storage_static_as_c_type_internal(
   Storage operand,
   u64 byte_size
 ) {
@@ -16,8 +16,8 @@ storage_immediate_as_c_type_internal(
   return operand.Static.memory;
 }
 
-#define storage_immediate_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)storage_immediate_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
+#define storage_static_as_c_type(_OPERAND_, _TYPE_)\
+  ((_TYPE_ *)storage_static_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
 
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
@@ -32,7 +32,7 @@ storage_immediate_as_c_type_internal(
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\
-    return storage_immediate_as_c_type(value->storage, _C_TYPE_);\
+    return storage_static_as_c_type(value->storage, _C_TYPE_);\
   }
 
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
@@ -243,14 +243,14 @@ source_range_print_start_position(
 }
 
 s64
-storage_immediate_value_up_to_s64(
+storage_static_value_up_to_s64(
   const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *storage_immediate_as_c_type(*operand, s8);
-    case 2: return *storage_immediate_as_c_type(*operand, s16);
-    case 4: return *storage_immediate_as_c_type(*operand, s32);
-    case 8: return *storage_immediate_as_c_type(*operand, s64);
+    case 1: return *storage_static_as_c_type(*operand, s8);
+    case 2: return *storage_static_as_c_type(*operand, s16);
+    case 4: return *storage_static_as_c_type(*operand, s32);
+    case 8: return *storage_static_as_c_type(*operand, s64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -259,14 +259,14 @@ storage_immediate_value_up_to_s64(
 }
 
 u64
-storage_immediate_value_up_to_u64(
+storage_static_value_up_to_u64(
   const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *storage_immediate_as_c_type(*operand, u8);
-    case 2: return *storage_immediate_as_c_type(*operand, u16);
-    case 4: return *storage_immediate_as_c_type(*operand, u32);
-    case 8: return *storage_immediate_as_c_type(*operand, u64);
+    case 1: return *storage_static_as_c_type(*operand, u8);
+    case 2: return *storage_static_as_c_type(*operand, u16);
+    case 4: return *storage_static_as_c_type(*operand, u32);
+    case 8: return *storage_static_as_c_type(*operand, u64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -304,19 +304,19 @@ print_operand(
     case Storage_Tag_Static: {
       switch(operand->byte_size) {
         case 1: {
-          printf("imm8(0x%02x)", *storage_immediate_as_c_type(*operand, u8));
+          printf("imm8(0x%02x)", *storage_static_as_c_type(*operand, u8));
           break;
         }
         case 2: {
-          printf("imm16(0x%04x)", *storage_immediate_as_c_type(*operand, u16));
+          printf("imm16(0x%04x)", *storage_static_as_c_type(*operand, u16));
           break;
         }
         case 4: {
-          printf("imm32(0x%08x)", *storage_immediate_as_c_type(*operand, u32));
+          printf("imm32(0x%08x)", *storage_static_as_c_type(*operand, u32));
           break;
         }
         case 8: {
-          printf("imm64(0x%016" PRIx64 ")", *storage_immediate_as_c_type(*operand, u64));
+          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(*operand, u64));
           break;
         }
         default: {
@@ -447,7 +447,7 @@ code_label32(
   };
 }
 
-#define storage_immediate(_VALUE_)\
+#define storage_static(_VALUE_)\
   ((Storage) {                    \
     .tag = Storage_Tag_Static, \
     .byte_size = sizeof(*(_VALUE_)), \
@@ -786,7 +786,7 @@ value_number_literal(
   };
   return value_init(
     allocator_allocate(allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_immediate(literal), source_range
+    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(literal), source_range
   );
 }
 
@@ -1506,7 +1506,7 @@ same_value_type_or_can_implicitly_move_cast(
           return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(_SOURCE_INTEGER_);\
         }
       if (descriptor_is_signed_integer(source->descriptor)) {
-        s64 source_integer = storage_immediate_value_up_to_s64(&source->storage);
+        s64 source_integer = storage_static_value_up_to_s64(&source->storage);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s8);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s16);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s32);
@@ -1516,7 +1516,7 @@ same_value_type_or_can_implicitly_move_cast(
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u64);
       } else {
         assert(descriptor_is_unsigned_integer(source->descriptor));
-        u64 source_integer = storage_immediate_value_up_to_u64(&source->storage);
+        u64 source_integer = storage_static_value_up_to_u64(&source->storage);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s8);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s16);
         ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s32);
