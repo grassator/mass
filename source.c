@@ -3269,6 +3269,7 @@ struct_get_field(
         case Storage_Tag_Static: {
           // TODO This might be incorrect with pointer fields. Need to think about it.
           Storage field_storage = *storage;
+          field_storage.byte_size = descriptor_byte_size(field->descriptor);
           field_storage.Static.memory = (s8 *)field_storage.Static.memory + field->offset;
           field_value = value_make(context, field->descriptor, field_storage, *source_range);
           break;
