@@ -719,13 +719,13 @@ static inline Value *
 value_init_internal(
   Compiler_Source_Location compiler_source_location,
   Value *result,
-  Execution_Context *context,
+  u64 epoch,
   Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
   *result = (Value) {
-    .epoch = context->epoch,
+    .epoch = epoch,
     .descriptor = descriptor,
     .storage = storage,
     .source_range = source_range,
@@ -749,7 +749,7 @@ value_make_internal(
   return value_init_internal(
     compiler_source_location,
     allocator_allocate(context->allocator, Value),
-    context,
+    context->epoch,
     descriptor,
     storage,
     source_range
@@ -784,15 +784,10 @@ value_number_literal(
     .negative = false,
     .bits = bits,
   };
-  Value *value = allocator_allocate(allocator, Value);
-  *value = (Value) {
-    .epoch = 0,
-    .descriptor = &descriptor_number_literal,
-    .storage = storage_immediate(literal),
-    .source_range = source_range,
-    .compiler_source_location = COMPILER_SOURCE_LOCATION,
-  };
-  return value;
+  return value_init(
+    allocator_allocate(allocator, Value),
+    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_immediate(literal), source_range
+  );
 }
 
 static inline Slice *
@@ -827,11 +822,12 @@ allocate_section_memory(
   return label_index;
 }
 
-Value *
+static inline Value *
 value_global_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
-  Descriptor *descriptor
+  Descriptor *descriptor,
+  Source_Range source_range
 ) {
   Program *program = context->program;
   Section *section = &program->memory.sections.rw_data;
@@ -839,15 +835,9 @@ value_global_internal(
   u64 alignment = descriptor_alignment(descriptor);
 
   Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
-
-  Value *result = allocator_allocate(context->allocator, Value);
-  *result = (Value) {
-    .epoch = context->epoch,
-    .descriptor = descriptor,
-    .storage = data_label32(label_index, byte_size),
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
+  return value_make_internal(
+    compiler_source_location, context, descriptor, data_label32(label_index, byte_size), source_range
+  );
 }
 #define value_global(...)\
   value_global_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -1016,11 +1006,12 @@ rip_value_pointer(
   );
 }
 
-Value *
+static inline Value *
 value_global_c_string_from_slice_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
-  Slice slice
+  Slice slice,
+  Source_Range source_range
 ) {
   s32 length = (s32)slice.length + 1;
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -1032,7 +1023,8 @@ value_global_c_string_from_slice_internal(
     },
   };
 
-  Value *string_value = value_global_internal(compiler_source_location, context, descriptor);
+  Value *string_value =
+    value_global_internal(compiler_source_location, context, descriptor, source_range);
   s8 *memory = rip_value_pointer(context->program, string_value);
   memcpy(memory, slice.bytes, slice.length);
   memory[length - 1] = 0;
@@ -1155,10 +1147,10 @@ function_argument_value_at_index_internal(
     }
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
-    Storage operand = stack(offset, byte_size);
-    Value *value = allocator_allocate(allocator, Value);
-    *value = (Value) { .descriptor = arg_descriptor, .storage = operand };
-    return value;
+    Storage storage = stack(offset, byte_size);
+    return value_make_internal(
+      source_location, context, arg_descriptor, storage, argument->source_range
+    );
   }
 }
 #define function_argument_value_at_index(...)\

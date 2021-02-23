@@ -50,11 +50,11 @@ spec("function") {
 
   describe("stack") {
     it("should correctly align allocated values") {
-      Value *a = reserve_stack(temp_allocator, builder, &descriptor_s8, (Source_Range){0});
+      Value *a = reserve_stack(temp_context, builder, &descriptor_s8, (Source_Range){0});
       check(a->storage.tag == Storage_Tag_Memory);
       check(a->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
       check(a->storage.Memory.location.Indirect.offset == -1);
-      Value *b = reserve_stack(temp_allocator, builder, &descriptor_s32, (Source_Range){0});
+      Value *b = reserve_stack(temp_context, builder, &descriptor_s32, (Source_Range){0});
       check(b->storage.tag == Storage_Tag_Memory);
       check(b->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
       check(b->storage.Memory.location.Indirect.offset == -8);

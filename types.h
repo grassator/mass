@@ -49,8 +49,11 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
+#define VALUE_STATIC_EPOCH 0
+
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\
+    .epoch = VALUE_STATIC_EPOCH,\
     .descriptor = &descriptor_type,\
     .storage = {\
       .tag = Storage_Tag_Static,\

@@ -537,15 +537,10 @@ token_make_symbol(
     .type = type,
     .name = name,
   };
-  Value *value = allocator_allocate(allocator, Value);
-  *value = (Value) {
-    .epoch = 0,
-    .descriptor = &descriptor_symbol,
-    .storage = storage_immediate(symbol),
-    .source_range = source_range,
-    .compiler_source_location = COMPILER_SOURCE_LOCATION,
-  };
-  return value;
+  return value_init(
+    allocator_allocate(allocator, Value),
+    VALUE_STATIC_EPOCH, &descriptor_symbol, storage_immediate(symbol), source_range
+  );
 }
 
 const Token_Pattern token_pattern_comma_operator = {
@@ -755,14 +750,10 @@ tokenize(
             ch == '(' ? Group_Tag_Paren :
             ch == '{' ? Group_Tag_Curly :
             Group_Tag_Square;
-          Value *value = allocator_allocate(allocator, Value);
-          *value = (Value) {
-            .epoch = 0,
-            .descriptor = &descriptor_group,
-            .storage = storage_immediate(group),
-            .source_range = current_token_range,
-            .compiler_source_location = COMPILER_SOURCE_LOCATION,
-          };
+          Value *value = value_init(
+            allocator_allocate(allocator, Value),
+            VALUE_STATIC_EPOCH, &descriptor_group, storage_immediate(group), current_token_range
+          );
           dyn_array_push(parent_index_stack, dyn_array_length(stack));
           push(value);
         } else if (ch == ')' || ch == '}' || ch == ']') {
@@ -884,14 +875,10 @@ tokenize(
           memcpy(bytes, string_buffer->memory, string_buffer->occupied);
           Slice *string = allocator_allocate(allocator, Slice);
           *string = (Slice){bytes, string_buffer->occupied};
-          Value *value = allocator_allocate(allocator, Value);
-          *value = (Value) {
-            .epoch = 0,
-            .descriptor = &descriptor_string,
-            .storage = storage_immediate(string),
-            .source_range = current_token_range,
-            .compiler_source_location = COMPILER_SOURCE_LOCATION,
-          };
+          Value *value = value_init(
+            allocator_allocate(allocator, Value),
+            VALUE_STATIC_EPOCH, &descriptor_string, storage_immediate(string), current_token_range
+          );
           push(value);
         } else {
           fixed_buffer_resizing_append_u8(&string_buffer, ch);
@@ -2686,7 +2673,8 @@ token_handle_c_string(
   Slice *c_string = value_as_immediate_string(arg_value);
   if (!c_string) goto err;
 
-  const Value *c_string_bytes = value_global_c_string_from_slice(context, *c_string);
+  const Value *c_string_bytes =
+    value_global_c_string_from_slice(context, *c_string, arg_value->source_range);
   Value *c_string_pointer = value_any(context, arg_value->source_range);
   load_address(context, &arg_value->source_range, c_string_pointer, c_string_bytes);
   MASS_ON_ERROR(assign(context, result_value, c_string_pointer));
@@ -3049,7 +3037,7 @@ token_handle_function_call(
               Descriptor *arg_descriptor = arg->Any_Of_Type.descriptor;
               // FIXME avoid using a stack value
               arg_value = reserve_stack(
-                context->allocator, context->builder, arg_descriptor, default_expression.source_range
+                context, context->builder, arg_descriptor, default_expression.source_range
               );
               {
                 Execution_Context arg_context = *context;
@@ -3147,7 +3135,7 @@ extend_integer_value(
   assert(descriptor_is_integer(value->descriptor));
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
-  Value *result = reserve_stack(context->allocator, context->builder, target_descriptor, *source_range);
+  Value *result = reserve_stack(context, context->builder, target_descriptor, *source_range);
   move_value(context->allocator, context->builder, source_range, &result->storage, &value->storage);
   return result;
 }
@@ -3549,8 +3537,7 @@ token_eval_operator(
 
     Function_Builder *builder = context->builder;
 
-    Value *stack_result =
-      reserve_stack(context->allocator, builder, lhs_value->descriptor, lhs_range);
+    Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
     if (slice_equal(operator, slice_literal("+"))) {
       plus(context, &lhs_range, stack_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
@@ -3830,9 +3817,8 @@ token_parse_if_expression(
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
     }
-    Value *on_stack = reserve_stack(
-      context->allocator, context->builder, stack_descriptor, if_value->source_range
-    );
+    Value *on_stack =
+      reserve_stack(context, context->builder, stack_descriptor, if_value->source_range);
     MASS_ON_ERROR(assign(context, on_stack, if_value)) {
       goto err;
     }
@@ -4021,7 +4007,7 @@ token_parse_block_view(
     MASS_ON_ERROR(*context->result) return;
     Value_View rest = value_view_rest(&children_view, start_index);
     // TODO provide a better source range here
-    value_init(&last_result, context, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, rest.source_range);
+    value_init(&last_result, context->epoch, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, rest.source_range);
     // Skipping over empty statements
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
       match_length = 1;
@@ -4309,9 +4295,8 @@ token_parse_explicit_return(
     Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
       ? &descriptor_s64
       : fn_return->descriptor;
-    Value *stack_return = reserve_stack(
-      context->allocator, context->builder, stack_descriptor, fn_return->source_range
-    );
+    Value *stack_return =
+      reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
     MASS_ON_ERROR(assign(context, stack_return, fn_return)) return true;
     *fn_return = *stack_return;
   }
@@ -4466,7 +4451,7 @@ token_parse_definition(
   Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) goto err;
   Source_Range name_range = name->source_range;
-  Value *value = reserve_stack(context->allocator, context->builder, descriptor, name_range);
+  Value *value = reserve_stack(context, context->builder, descriptor, name_range);
   scope_define(context->scope, value_as_symbol(name)->name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = value,
@@ -4535,10 +4520,10 @@ token_parse_definition_and_assignment_statements(
   if (value->descriptor->tag == Descriptor_Tag_Function) {
     Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
     ensure_compiled_function_body(context, value);
-    on_stack = reserve_stack(context->allocator, context->builder, fn_pointer, view.source_range);
+    on_stack = reserve_stack(context, context->builder, fn_pointer, view.source_range);
     load_address(context, &view.source_range, on_stack, value);
   } else {
-    on_stack = reserve_stack(context->allocator, context->builder, value->descriptor, view.source_range);
+    on_stack = reserve_stack(context, context->builder, value->descriptor, view.source_range);
     MASS_ON_ERROR(assign(context, on_stack, value)) goto err;
   }
 
@@ -4757,13 +4742,10 @@ scope_define_builtins(
         }\
       },\
     };\
-    Value *value = allocator_allocate(allocator, Value);\
-    *value = (Value){\
-      .epoch = 0,\
-      .descriptor = descriptor,\
-      .storage = imm64(allocator, (u64)_FN_),\
-      .compiler_source_location = COMPILER_SOURCE_LOCATION,\
-    };\
+    Value *value = value_init(\
+      allocator_allocate(allocator, Value),\
+      VALUE_STATIC_EPOCH, descriptor, imm64(allocator, (u64)_FN_), (Source_Range){0}\
+    );\
     scope_define(scope, slice_literal(_NAME_), (Scope_Entry) {\
       .tag = Scope_Entry_Tag_Value,\
       .Value.value = value,\

@@ -15,7 +15,7 @@
 Value *
 reserve_stack_internal(
   Compiler_Source_Location compiler_source_location,
-  Allocator *allocator,
+  Execution_Context *context,
   Function_Builder *fn,
   Descriptor *descriptor,
   Source_Range source_range
@@ -23,15 +23,10 @@ reserve_stack_internal(
   s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
   fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
   fn->stack_reserve += byte_size;
-  Storage operand = stack(-fn->stack_reserve, byte_size);
-  Value *result = allocator_allocate(allocator, Value);
-  *result = (Value) {
-    .descriptor = descriptor,
-    .storage = operand,
-    .source_range = source_range,
-    .compiler_source_location = compiler_source_location,
-  };
-  return result;
+  Storage storage = stack(-fn->stack_reserve, byte_size);
+  return value_make_internal(
+    compiler_source_location, context, descriptor, storage, source_range
+  );
 }
 
 #define reserve_stack(...)\
@@ -650,27 +645,25 @@ fn_encode(
   encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
 }
 
-Value
+Value *
 function_return_value_for_descriptor(
+  Execution_Context *context,
   Descriptor *descriptor,
-  Function_Argument_Mode mode
+  Function_Argument_Mode mode,
+  Source_Range source_range
 ) {
   if (descriptor->tag == Descriptor_Tag_Void) {
-    return void_value;
+    return &void_value;
   }
   // TODO handle 16 byte non-float return values in XMM0
   if (descriptor_is_float(descriptor)) {
-    return (Value) {
-      .descriptor = descriptor,
-      .storage = storage_register_for_descriptor(Register_Xmm0, descriptor),
-    };
+    Storage storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
+    return value_make(context, descriptor, storage, source_range);
   }
   u64 byte_size = descriptor_byte_size(descriptor);
   if (byte_size <= 8) {
-    return (Value) {
-      .descriptor = descriptor,
-      .storage = storage_register_for_descriptor(Register_A, descriptor),
-    };
+    Storage storage = storage_register_for_descriptor(Register_A, descriptor);
+    return value_make(context, descriptor, storage, source_range);
   }
   // :ReturnTypeLargerThanRegister
   // Inside the function large returns are pointed to by RCX,
@@ -679,19 +672,17 @@ function_return_value_for_descriptor(
   if (mode == Function_Argument_Mode_Body) {
     base_register = Register_C;
   }
-  return (Value){
-    .descriptor = descriptor,
-    .storage = {
-      .tag = Storage_Tag_Memory,
-      .byte_size = byte_size,
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = {
-          .base_register = base_register,
-        }
+  Storage storage = {
+    .tag = Storage_Tag_Memory,
+    .byte_size = byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base_register = base_register,
       }
-    },
+    }
   };
+  return value_make(context, descriptor, storage, source_range);
 }
 
 Label_Index
@@ -958,7 +949,7 @@ multiply(
 
   // TODO deal with signed / unsigned
   // TODO support double the size of the result?
-  Value *y_temp = reserve_stack(allocator, builder, y->descriptor, *source_range);
+  Value *y_temp = reserve_stack(context, builder, y->descriptor, *source_range);
 
   Register temp_register_index = register_acquire_temp(builder);
   Value *temp_register =
@@ -1020,7 +1011,7 @@ divide_or_remainder(
     : b->descriptor;
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(allocator, builder, larger_descriptor, *source_range);
+  Value *divisor = reserve_stack(context, builder, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &divisor->storage, &b->storage);
 
   Value *reg_a = value_register_for_descriptor(context, Register_A, larger_descriptor, *source_range);
@@ -1162,7 +1153,7 @@ compare(
     ? a->descriptor
     : b->descriptor;
 
-  Value *temp_b = reserve_stack(allocator, builder, larger_descriptor, *source_range);
+  Value *temp_b = reserve_stack(context, builder, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &temp_b->storage, &b->storage);
 
   Value *reg_r11 = value_register_for_descriptor(context, Register_R11, larger_descriptor, *source_range);
@@ -1296,9 +1287,10 @@ ensure_compiled_function_body(
     }
   }
 
-  Value *return_value = allocator_allocate(context->allocator, Value);
-  *return_value = function_return_value_for_descriptor(
-    function->returns.descriptor, Function_Argument_Mode_Body
+  // TODO that is probably not what we want for the highlighted range
+  Source_Range return_range = fn_value->source_range;
+  Value *return_value = function_return_value_for_descriptor(
+    context, function->returns.descriptor, Function_Argument_Mode_Body, return_range
   );
 
   scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
@@ -1306,11 +1298,9 @@ ensure_compiled_function_body(
     .Value.value = return_value,
   });
 
-  Value *return_label_value = allocator_allocate(context->allocator, Value);
-  *return_label_value = (Value) {
-    .descriptor = &descriptor_void,
-    .storage = code_label32(builder.code_block.end_label),
-  };
+  Value *return_label_value = value_make(
+    context, &descriptor_void, code_label32(builder.code_block.end_label), return_range
+  );
   scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = return_label_value,
@@ -1378,7 +1368,7 @@ call_function_overload(
           }
         };
         Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
-        Value *stack_value = reserve_stack(context->allocator, builder, to_save.descriptor, *source_range);
+        Value *stack_value = reserve_stack(context, builder, to_save.descriptor, *source_range);
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
         dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
       }
@@ -1397,7 +1387,7 @@ call_function_overload(
       assert(default_expression.length);
       // FIXME do not force the result on the stack
       source_arg = reserve_stack(
-        context->allocator, context->builder, target_arg_definition->Any_Of_Type.descriptor, *source_range
+        context, context->builder, target_arg_definition->Any_Of_Type.descriptor, *source_range
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
@@ -1418,7 +1408,7 @@ call_function_overload(
       assign(context, target_arg, source_arg);
     } else {
       // Large values are copied to the stack and passed by a reference
-      Value *stack_value = reserve_stack(context->allocator, builder, source_arg->descriptor, *source_range);
+      Value *stack_value = reserve_stack(context, builder, source_arg->descriptor, *source_range);
       assign(context, stack_value, source_arg);
       load_address(context, source_range, target_arg, stack_value);
     }
@@ -1446,8 +1436,8 @@ call_function_overload(
   // area of at least 4 arguments?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
-  Value fn_return_value = function_return_value_for_descriptor(
-    descriptor->returns.descriptor, Function_Argument_Mode_Call
+  Value *fn_return_value = function_return_value_for_descriptor(
+    context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
 
   // :ReturnTypeLargerThanRegister
@@ -1459,7 +1449,7 @@ call_function_overload(
       result_operand = result_value->storage;
     } else {
       result_operand = reserve_stack(
-        context->allocator, builder, descriptor->returns.descriptor, *source_range
+        context, builder, descriptor->returns.descriptor, *source_range
       )->storage;
     }
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
@@ -1483,13 +1473,12 @@ call_function_overload(
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->storage, 0, 0}}});
   }
 
-  Value *saved_result = &fn_return_value;
+  Value *saved_result = fn_return_value;
   if (return_size <= 8) {
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
-      saved_result =
-        reserve_stack(context->allocator, builder, descriptor->returns.descriptor, *source_range);
-      move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value.storage);
+      saved_result = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
+      move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value->storage);
     }
   }
 
@@ -1525,8 +1514,10 @@ calculate_arguments_match_score(
       if (target_arg->tag != Function_Argument_Tag_Any_Of_Type) return -1;
       if (!target_arg->Any_Of_Type.maybe_default_expression.length) return -1;
       fake_source_value = (Value) {
+        .epoch = VALUE_STATIC_EPOCH,
         .descriptor = target_arg->Any_Of_Type.descriptor,
         .storage = {.tag = Storage_Tag_Any },
+        .source_range = target_arg->source_range,
       };
       source_arg = &fake_source_value;
     } else {
@@ -1585,7 +1576,7 @@ make_and(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8, *source_range);
+  Value *result = reserve_stack(context, builder, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("&&"));
 
   Value zero = {
@@ -1621,7 +1612,7 @@ make_or(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context->allocator, builder, &descriptor_s8, *source_range);
+  Value *result = reserve_stack(context, builder, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("||"));
 
   Value zero = {
