@@ -41,9 +41,9 @@ fn print(integer : s64) {
 }
 
 fn fizz_buzz() {
-  stdout_handle := GetStdHandle(-11)
+  const stdout_handle = GetStdHandle(-11)
   for i : s8 = 1; i <= 100; i = i + 1 {
-    print_number := true
+    mut print_number = true
     if (i % 3 == 0) {
       print_number = false
       WriteFile(stdout_handle, c_string("fizz"), 4, 0, 0)
@@ -59,7 +59,7 @@ fn fizz_buzz() {
   }
 }
 
-main :: () -> () {
+fn main () {
   fizz_buzz()
   ExitProcess(0)
 }
