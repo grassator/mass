@@ -7,7 +7,6 @@
 #include <stdio.h>  // printf
 #include <string.h> // malloc, realloc, free
 #include <assert.h>
-#include <stdarg.h> // va_arg
 #include <ctype.h> // isspace, isdigit etc
 #include <math.h> // ceilf, etc
 
@@ -1114,40 +1113,6 @@ dyn_array_delete_internal(
   do {\
     \
   } while(0)
-
-static inline void
-dyn_array_first_n_internal(
-  Dyn_Array_Internal *internal,
-  u64 item_byte_size,
-  u64 count,
-  ...
-) {
-  assert(count <= internal->length);
-  va_list list;
-  va_start(list, count);
-  for (u64 i = 0; i < count; ++i) {
-    memcpy(va_arg(list, void *), internal->items + item_byte_size * i, item_byte_size);
-  }
-  va_end(list);
-}
-
-#define dyn_array_first_2(_array_, _item_type_, _a1_, _a2_)\
-  _item_type_ _a1_, _a2_;\
-  dyn_array_first_n_internal(\
-    (_array_).internal, sizeof((_array_).data->items[0]), 2, &_a1_, &_a2_\
-  )
-
-#define dyn_array_first_3(_array_, _item_type_, _a1_, _a2_, _a3_)\
-  _item_type_ _a1_, _a2_, _a3_;\
-  dyn_array_first_n_internal(\
-    (_array_).internal, sizeof((_array_).data->items[0]), 3, &_a1_, &_a2_, &_a3_\
-  )
-
-#define dyn_array_first_4(_array_, _item_type_, _a1_, _a2_, _a3_, _a4_)\
-  _item_type_ _a1_, _a2_, _a3_, _a4_;\
-  dyn_array_first_n_internal(\
-    (_array_).internal, sizeof((_array_).data->items[0]), 4, &_a1_, &_a2_, &_a3_, &_a4_\
-  )
 
 typedef int (*Prelude_Comparator_Function)(const void*, const void*);
 
