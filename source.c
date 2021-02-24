@@ -1403,7 +1403,7 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  token_parse_expression(&body_context, macro->replacement, result_value, Expression_Parse_Mode_Default);
+  token_parse_expression(&body_context, macro->replacement, result_value, 0);
 }
 
 u64
@@ -1719,9 +1719,7 @@ token_force_value(
       Group *group = value_as_group(token);
       switch(group->tag) {
         case Group_Tag_Paren: {
-          token_parse_expression(
-            context, group->children, result_value, Expression_Parse_Mode_Default
-          );
+          token_parse_expression(context, group->children, result_value, 0);
           return *context->result;
         }
         case Group_Tag_Curly: {
@@ -1794,7 +1792,7 @@ token_match_call_arguments(
       // target value that can be anything that will behave like type inference and is
       // needed regardless for something like x := (...)
       Value *result_value = value_any(context, view.source_range);
-      token_parse_expression(context, view, result_value, Expression_Parse_Mode_Default);
+      token_parse_expression(context, view, result_value, 0);
       dyn_array_push(result, result_value);
     }
   }
@@ -2543,7 +2541,7 @@ compile_time_eval(
   //       what is the return value because we need to figure out the return type.
   //       Symboleally there would be a type-only eval available instead
   Value *expression_result_value = value_any(context, view.source_range);
-  token_parse_expression(&eval_context, view, expression_result_value, Expression_Parse_Mode_Default);
+  token_parse_expression(&eval_context, view, expression_result_value, 0);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
     return;
@@ -3090,9 +3088,7 @@ token_handle_function_call(
               {
                 Execution_Context arg_context = *context;
                 arg_context.scope = body_scope;
-                token_parse_expression(
-                  &arg_context, default_expression, arg_value, Expression_Parse_Mode_Default
-                );
+                token_parse_expression(&arg_context, default_expression, arg_value, 0);
               }
               scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
                 .tag = Scope_Entry_Tag_Value,
@@ -3942,7 +3938,7 @@ token_parse_if_expression(
   }
 
   Value *condition_value = value_any(context, condition.source_range);
-  token_parse_expression(context, condition, condition_value, Expression_Parse_Mode_Default);
+  token_parse_expression(context, condition, condition_value, 0);
   MASS_ON_ERROR(*context->result) goto err;
 
   Source_Range keyword_range = keyword->source_range;
@@ -3951,7 +3947,7 @@ token_parse_if_expression(
   );
 
   Value *if_value = value_any(context, then_branch.source_range);
-  token_parse_expression(context, then_branch, if_value, Expression_Parse_Mode_Default);
+  token_parse_expression(context, then_branch, if_value, 0);
   MASS_ON_ERROR(*context->result) goto err;
 
   if (if_value->storage.tag == Storage_Tag_Static) {
@@ -3979,8 +3975,7 @@ token_parse_if_expression(
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  u64 else_length =
-    token_parse_expression(context, else_branch, if_value, Expression_Parse_Mode_Default);
+  u64 else_length = token_parse_expression(context, else_branch, if_value, 0);
   *matched_length = peek_index + else_length;
 
   push_instruction(
@@ -3998,7 +3993,7 @@ token_parse_expression(
   Execution_Context *context,
   Value_View view,
   Value *result_value,
-  Expression_Parse_Mode mode
+  const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -4074,17 +4069,9 @@ token_parse_expression(
       is_previous_an_operator = false;
     } else if (value_is_symbol(value)) {
       Slice symbol_name = value_as_symbol(value)->name;
-      if (slice_equal(symbol_name, slice_literal(";"))) {
+      if (end_pattern && value_match(value, end_pattern)) {
         matched_length = i + 1;
-        if (mode == Expression_Parse_Mode_Statement) {
-          goto drain;
-        } else {
-          context_error_snprintf(
-            context, value->source_range,
-            "Unexpected semicolon in an expression"
-          );
-          goto err;
-        }
+        goto drain;
       }
 
       Scope_Entry *scope_entry = scope_lookup(context->scope, symbol_name);
@@ -4180,7 +4167,7 @@ token_parse_block_view(
         }
       }
     }
-    match_length = token_parse_expression(context, rest, &last_result, Expression_Parse_Mode_Statement);
+    match_length = token_parse_expression(context, rest, &last_result, &token_pattern_semicolon);
 
     check_match:
     if (!match_length) {
@@ -4244,7 +4231,7 @@ token_parse_statement_using(
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
   Value *result = value_any(context, rest.source_range);
-  token_parse_expression(context, rest, result, Expression_Parse_Mode_Default);
+  token_parse_expression(context, rest, result, 0);
 
   if (result->descriptor != &descriptor_scope) {
     context_error_snprintf(context, rest.source_range, "Expected a scope");
@@ -4429,7 +4416,7 @@ token_parse_explicit_return(
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
-  token_parse_expression(context, rest, fn_return, Expression_Parse_Mode_Default);
+  token_parse_expression(context, rest, fn_return, 0);
 
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
@@ -4649,7 +4636,7 @@ token_parse_definition_and_assignment_statements(
   Slice name = value_as_symbol(name_token)->name;
 
   Value *value = value_any(context, name_token->source_range);
-  token_parse_expression(context, rhs, value, Expression_Parse_Mode_Default);
+  token_parse_expression(context, rhs, value, 0);
   MASS_ON_ERROR(*context->result) goto err;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -4699,9 +4686,9 @@ token_parse_assignment(
 
   Value *target = value_any(context, lhs.source_range);
   if (!token_parse_definition(context, lhs, target)) {
-    token_parse_expression(context, lhs, target, Expression_Parse_Mode_Default);
+    token_parse_expression(context, lhs, target, 0);
   }
-  token_parse_expression(context, rhs, target, Expression_Parse_Mode_Default);
+  token_parse_expression(context, rhs, target, 0);
 
   return statement_length;
 }

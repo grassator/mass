@@ -113,17 +113,12 @@ token_handle_negation(
   void *unused_payload
 );
 
-typedef enum {
-  Expression_Parse_Mode_Default,
-  Expression_Parse_Mode_Statement,
-} Expression_Parse_Mode;
-
 u64
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
   Value *result_value,
-  Expression_Parse_Mode mode
+  const Token_Pattern *end_pattern
 );
 
 void

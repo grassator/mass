@@ -1391,9 +1391,7 @@ call_function_overload(
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
-      token_parse_expression(
-        &arg_context, default_expression, source_arg, Expression_Parse_Mode_Default
-      );
+      token_parse_expression(&arg_context, default_expression, source_arg, 0);
       MASS_ON_ERROR(*arg_context.result) return;
     } else {
       source_arg = *dyn_array_get(arguments, i);
