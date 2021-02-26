@@ -3552,7 +3552,7 @@ token_eval_operator(
         return;
       }
       ensure_compiled_function_body(context, startup_function);
-      dyn_array_push(context->compilation->startup_functions, startup_function);
+      dyn_array_push(context->program->startup_functions, startup_function);
       MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
     } else if (
       value_is_symbol(target) &&

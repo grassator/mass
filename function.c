@@ -1666,15 +1666,14 @@ program_init_startup_code(
     .label_index = fn_label,
     .frozen = true,
     .code_block = {
-      // FIXME use fn_value->descriptor->name
-      .end_label = make_label(program, &program->memory.sections.code, slice_literal("fn end")),
+      .end_label = make_label(program, &program->memory.sections.code, slice_literal("__startup end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
 
 
-  for (u64 i = 0; i < dyn_array_length(context->compilation->startup_functions); ++i) {
-    Value *fn = *dyn_array_get(context->compilation->startup_functions, i);
+  for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
+    Value *fn = *dyn_array_get(context->program->startup_functions, i);
     push_instruction(
       &builder.code_block.instructions, source_range,
       (Instruction) {.assembly = {call, {fn->storage, 0, 0}}}
@@ -1686,8 +1685,6 @@ program_init_startup_code(
   );
 
   program->entry_point = function;
-
-  // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, builder);
 }
 

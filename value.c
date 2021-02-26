@@ -1155,6 +1155,7 @@ program_init(
     .labels = dyn_array_make(Array_Label, .capacity = 128, .allocator = allocator),
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
+    .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
   };
 
@@ -1211,6 +1212,7 @@ program_deinit(
   dyn_array_destroy(program->patch_info_array);
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
+  dyn_array_destroy(program->startup_functions);
 }
 
 void
@@ -1253,7 +1255,6 @@ compilation_init(
     .runtime_program = runtime_program,
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
-    .startup_functions = dyn_array_make(Array_Value_Ptr),
     .jit = {0},
     .compiler_module = {
       .source_file = {
@@ -1275,7 +1276,6 @@ void
 compilation_deinit(
   Compilation *compilation
 ) {
-  dyn_array_destroy(compilation->startup_functions);
   hash_map_destroy(compilation->module_map);
   hash_map_destroy(compilation->static_pointer_map);
   program_deinit(compilation->runtime_program);

@@ -258,6 +258,7 @@ typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
+  Array_Value_Ptr startup_functions;
   Value *entry_point;
   Array_Function_Builder functions;
   Program_Memory memory;
@@ -289,7 +290,6 @@ typedef struct Compilation {
   Module compiler_module;
   Static_Pointer_Map *static_pointer_map;
   Imported_Module_Map *module_map;
-  Array_Value_Ptr startup_functions;
   Scope *root_scope;
   Program *runtime_program;
   Mass_Result *result;
