@@ -289,6 +289,7 @@ typedef struct Compilation {
   Module compiler_module;
   Static_Pointer_Map *static_pointer_map;
   Imported_Module_Map *module_map;
+  Array_Value_Ptr startup_functions;
   Scope *root_scope;
   Program *runtime_program;
   Mass_Result *result;

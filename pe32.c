@@ -311,6 +311,8 @@ write_executable(
   Execution_Context *context,
   Executable_Type executable_type
 ) {
+  program_init_startup_code(context);
+
   Program *program = context->program;
   assert(program->entry_point);
   // Sections

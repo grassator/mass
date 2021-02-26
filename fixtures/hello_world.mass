@@ -10,11 +10,12 @@ WriteFile :: (
 
 cached_stdout_handle := 0
 
+startup(() -> () {
+  STDOUT_HANDLE :: -11
+  cached_stdout_handle = GetStdHandle(STDOUT_HANDLE)
+})
+
 main :: () -> () {
-  STDOUT_HANDLE :: -11;
-  if cached_stdout_handle == 0 {
-    cached_stdout_handle = GetStdHandle(STDOUT_HANDLE)
-  }
   message :: "Hello, World!"
   WriteFile(cached_stdout_handle, message.bytes, message.length, 0, 0);
   ExitProcess(0)

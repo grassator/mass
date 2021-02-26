@@ -3534,6 +3534,28 @@ token_eval_operator(
       dyn_array_destroy(args);
     } else if (
       value_is_symbol(target) &&
+      slice_equal(value_as_symbol(target)->name, slice_literal("startup"))
+    ) {
+      Value *startup_function = value_any(context, args_token->source_range);
+      token_parse_expression(
+        context, value_as_group(args_token)->children, startup_function, 0
+      );
+      if (
+        !startup_function ||
+        startup_function->descriptor->tag != Descriptor_Tag_Function ||
+        dyn_array_length(startup_function->descriptor->Function.arguments) ||
+        startup_function->descriptor->Function.returns.descriptor != &descriptor_void
+      ) {
+        context_error_snprintf(
+          context, args_range, "`startup` expects a () -> () {...} function as an argument"
+        );
+        return;
+      }
+      ensure_compiled_function_body(context, startup_function);
+      dyn_array_push(context->compilation->startup_functions, startup_function);
+      MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
+    } else if (
+      value_is_symbol(target) &&
       slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
     ) {
       Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -4643,29 +4665,34 @@ token_parse_global_variable(
       context, &rhs.source_range, value, &descriptor_s64
     );
   }
-  assert(value->storage.tag == Storage_Tag_Static);
 
   Value *global_value;
-  if (value->descriptor->tag == Descriptor_Tag_Function) {
-    global_value = 0;
-    panic("TODO implement when relocations are available");
-    //Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
-    //ensure_compiled_function_body(context, value);
-    //global_value = value_global(context, fn_pointer, rhs.source_range);
-    //load_address(context, &view.source_range, on_stack, value);
+  if (storage_is_label(&value->storage)) {
+    global_value = value;
   } else {
-    Section *section = &context->program->memory.sections.rw_data;
-    u64 byte_size = descriptor_byte_size(value->descriptor);
-    u64 alignment = descriptor_alignment(value->descriptor);
+    assert(value->storage.tag == Storage_Tag_Static);
 
-    // TODO this should also be deduped
-    Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
-    global_value = value_make(
-      context, value->descriptor, data_label32(label_index, byte_size), value->source_range
-    );
+    if (value->descriptor->tag == Descriptor_Tag_Function) {
+      global_value = 0;
+      panic("TODO implement when relocations are available");
+      //Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+      //ensure_compiled_function_body(context, value);
+      //global_value = value_global(context, fn_pointer, rhs.source_range);
+      //load_address(context, &view.source_range, on_stack, value);
+    } else {
+      Section *section = &context->program->memory.sections.rw_data;
+      u64 byte_size = descriptor_byte_size(value->descriptor);
+      u64 alignment = descriptor_alignment(value->descriptor);
 
-    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-    memcpy(section_memory, value->storage.Static.memory, byte_size);
+      // TODO this should also be deduped
+      Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+      global_value = value_make(
+        context, value->descriptor, data_label32(label_index, byte_size), value->source_range
+      );
+
+      void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+      memcpy(section_memory, value->storage.Static.memory, byte_size);
+    }
   }
 
   scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {

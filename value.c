@@ -1253,6 +1253,7 @@ compilation_init(
     .runtime_program = runtime_program,
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
+    .startup_functions = dyn_array_make(Array_Value_Ptr),
     .jit = {0},
     .compiler_module = {
       .source_file = {
@@ -1274,6 +1275,7 @@ void
 compilation_deinit(
   Compilation *compilation
 ) {
+  dyn_array_destroy(compilation->startup_functions);
   hash_map_destroy(compilation->module_map);
   hash_map_destroy(compilation->static_pointer_map);
   program_deinit(compilation->runtime_program);

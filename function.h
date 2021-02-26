@@ -12,6 +12,11 @@ reserve_stack(
   Source_Range source_range
 );
 
+void
+program_init_startup_code(
+  Execution_Context *context
+);
+
 static inline Instruction  *
 instruction_add_compiler_location_internal(
   const Compiler_Source_Location compiler_source_location,

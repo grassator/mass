@@ -1638,3 +1638,56 @@ make_or(
   return result;
 }
 
+void
+program_init_startup_code(
+  Execution_Context *context
+) {
+  Program *program = context->program;
+  assert(program->entry_point->descriptor->tag == Descriptor_Tag_Function);
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Function,
+    .Function = {
+      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .body = 0,
+      .scope = 0,
+      .returns = {.descriptor = &descriptor_void},
+    },
+  };
+  Label_Index fn_label = make_label(program, &program->memory.sections.code, slice_literal("__startup"));
+  Storage storage = code_label32(fn_label);
+
+  // FIXME Create a special source range for internal values
+  Source_Range source_range = {0};
+  Value *function = value_make(context, descriptor, storage, source_range);
+
+  Function_Builder builder = (Function_Builder){
+    .function = &descriptor->Function,
+    .label_index = fn_label,
+    .frozen = true,
+    .code_block = {
+      // FIXME use fn_value->descriptor->name
+      .end_label = make_label(program, &program->memory.sections.code, slice_literal("fn end")),
+      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
+    },
+  };
+
+
+  for (u64 i = 0; i < dyn_array_length(context->compilation->startup_functions); ++i) {
+    Value *fn = *dyn_array_get(context->compilation->startup_functions, i);
+    push_instruction(
+      &builder.code_block.instructions, source_range,
+      (Instruction) {.assembly = {call, {fn->storage, 0, 0}}}
+    );
+  }
+  push_instruction(
+    &builder.code_block.instructions, source_range,
+    (Instruction) {.assembly = {jmp, {program->entry_point->storage, 0, 0}}}
+  );
+
+  program->entry_point = function;
+
+  // Only push the builder at the end to avoid problems in nested JIT compiles
+  dyn_array_push(program->functions, builder);
+}
+
