@@ -4626,43 +4626,22 @@ token_parse_definitions(
   return token_parse_definition(context, state, value_result);
 }
 
-u64
-token_parse_global_variable(
+void
+token_define_global_variable(
   Execution_Context *context,
-  Value_View view,
-  Value *unused_result,
-  void *unused_payload
+  Value *symbol,
+  Value_View expression
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value_View lhs;
-  Value_View rhs;
-  Value *operator;
-
-  u64 statement_length = 0;
-  view = value_view_match_till_end_of_statement(view, &statement_length);
-  if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
-    return 0;
-  }
-  // For now we support only single ID on the left
-  if (lhs.length > 1) {
-    panic("TODO user error");
-    goto err;
-  }
-  Value *symbol = value_view_get(lhs, 0);
-  if (!value_is_symbol(symbol)) {
-    panic("TODO user error");
-    goto err;
-  }
+  if (context->result->tag != Mass_Result_Tag_Success) return;
 
   Value *value = value_any(context, symbol->source_range);
-  compile_time_eval(context, rhs, value);
-  MASS_ON_ERROR(*context->result) goto err;
+  compile_time_eval(context, expression, value);
+  MASS_ON_ERROR(*context->result) return;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (value->descriptor == &descriptor_number_literal) {
     value = token_value_force_immediate_integer(
-      context, &rhs.source_range, value, &descriptor_s64
+      context, &expression.source_range, value, &descriptor_s64
     );
   }
 
@@ -4698,11 +4677,44 @@ token_parse_global_variable(
   scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = global_value,
-    .source_range = view.source_range,
+    .source_range = symbol->source_range,
   });
+}
 
-  err:
-  return statement_length;
+void
+token_define_local_variable(
+  Execution_Context *context,
+  Value *symbol,
+  Value_View expression
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
+  Value *value = value_any(context, symbol->source_range);
+  token_parse_expression(context, expression, value, 0);
+  MASS_ON_ERROR(*context->result) return;
+
+  // x := 42 should always be initialized to s64 to avoid weird suprises
+  if (value->descriptor == &descriptor_number_literal) {
+    value = token_value_force_immediate_integer(
+      context, &expression.source_range, value, &descriptor_s64
+    );
+  }
+  Value *on_stack;
+  if (value->descriptor->tag == Descriptor_Tag_Function) {
+    Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+    ensure_compiled_function_body(context, value);
+    on_stack = reserve_stack(context, context->builder, fn_pointer, symbol->source_range);
+    load_address(context, &symbol->source_range, on_stack, value);
+  } else {
+    on_stack = reserve_stack(context, context->builder, value->descriptor, symbol->source_range);
+    MASS_ON_ERROR(assign(context, on_stack, value)) return;
+  }
+
+  scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = on_stack,
+    .source_range = symbol->source_range,
+  });
 }
 
 u64
@@ -4713,10 +4725,6 @@ token_parse_definition_and_assignment_statements(
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  if (!context->builder) {
-    return token_parse_global_variable(context, view, unused_result, unused_payload);
-  }
 
   Value_View lhs;
   Value_View rhs;
@@ -4730,7 +4738,7 @@ token_parse_definition_and_assignment_statements(
   // For now we support only single ID on the left
   if (lhs.length > 1) {
     panic("TODO user error");
-    return false;
+    goto err;
   }
   Value *name_token = value_view_get(view, 0);
 
@@ -4738,34 +4746,12 @@ token_parse_definition_and_assignment_statements(
     panic("TODO user error");
     goto err;
   }
-  Slice name = value_as_symbol(name_token)->name;
 
-  Value *value = value_any(context, name_token->source_range);
-  token_parse_expression(context, rhs, value, 0);
-  MASS_ON_ERROR(*context->result) goto err;
-
-  // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (value->descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(
-      context, &rhs.source_range, value, &descriptor_s64
-    );
-  }
-  Value *on_stack;
-  if (value->descriptor->tag == Descriptor_Tag_Function) {
-    Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
-    ensure_compiled_function_body(context, value);
-    on_stack = reserve_stack(context, context->builder, fn_pointer, view.source_range);
-    load_address(context, &view.source_range, on_stack, value);
+  if (context->builder) {
+    token_define_local_variable(context, name_token, rhs);
   } else {
-    on_stack = reserve_stack(context, context->builder, value->descriptor, view.source_range);
-    MASS_ON_ERROR(assign(context, on_stack, value)) goto err;
+    token_define_global_variable(context, name_token, rhs);
   }
-
-  scope_define(context->scope, name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = on_stack,
-    .source_range = view.source_range,
-  });
 
   err:
   return statement_length;
