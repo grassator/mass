@@ -153,6 +153,7 @@ win32_program_test_exception_handler(
 typedef struct {
   u64 functions;
   u64 imports;
+  u64 startup;
 } Win32_Jit_Counters;
 
 typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
@@ -350,6 +351,7 @@ win32_program_jit(
     }
   }
 
+
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations
   program_patch_labels(program);
@@ -365,8 +367,17 @@ win32_program_jit(
     }
   }
 
+  // Call new startup functions
+  u64 startup_count = dyn_array_length(program->startup_functions);
+  for (u64 i = info->previous_counts.startup; i < startup_count; ++i) {
+    Value *value = *dyn_array_get(program->startup_functions, i);
+    fn_type_opaque fn = value_as_function(jit, value);
+    fn();
+  }
+
   info->previous_counts.functions = function_count;
-  info->previous_counts.imports = import_count;;
+  info->previous_counts.imports = import_count;
+  info->previous_counts.startup = startup_count;
 }
 
 

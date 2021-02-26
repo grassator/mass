@@ -312,6 +312,12 @@ rip_value_pointer(
   Value *value
 );
 
+fn_type_opaque
+value_as_function(
+  const Jit *jit,
+  Value *value
+);
+
 void
 program_jit(
   Jit *jit
