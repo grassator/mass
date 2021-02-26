@@ -8,9 +8,14 @@ WriteFile :: (
   overlapped : [s64]
 ) -> (s64) external("kernel32.dll", "WriteFile")
 
+cached_stdout_handle := 0
+
 main :: () -> () {
   STDOUT_HANDLE :: -11;
+  if cached_stdout_handle == 0 {
+    cached_stdout_handle = GetStdHandle(STDOUT_HANDLE)
+  }
   message :: "Hello, World!"
-  WriteFile(GetStdHandle(STDOUT_HANDLE), message.bytes, message.length, 0, 0);
+  WriteFile(cached_stdout_handle, message.bytes, message.length, 0, 0);
   ExitProcess(0)
 }

@@ -4605,6 +4605,80 @@ token_parse_definitions(
 }
 
 u64
+token_parse_global_variable(
+  Execution_Context *context,
+  Value_View view,
+  Value *unused_result,
+  void *unused_payload
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  Value_View lhs;
+  Value_View rhs;
+  Value *operator;
+
+  u64 statement_length = 0;
+  view = value_view_match_till_end_of_statement(view, &statement_length);
+  if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
+    return 0;
+  }
+  // For now we support only single ID on the left
+  if (lhs.length > 1) {
+    panic("TODO user error");
+    goto err;
+  }
+  Value *symbol = value_view_get(lhs, 0);
+  if (!value_is_symbol(symbol)) {
+    panic("TODO user error");
+    goto err;
+  }
+
+  Value *value = value_any(context, symbol->source_range);
+  compile_time_eval(context, rhs, value);
+  MASS_ON_ERROR(*context->result) goto err;
+
+  // x := 42 should always be initialized to s64 to avoid weird suprises
+  if (value->descriptor == &descriptor_number_literal) {
+    value = token_value_force_immediate_integer(
+      context, &rhs.source_range, value, &descriptor_s64
+    );
+  }
+  assert(value->storage.tag == Storage_Tag_Static);
+
+  Value *global_value;
+  if (value->descriptor->tag == Descriptor_Tag_Function) {
+    global_value = 0;
+    panic("TODO implement when relocations are available");
+    //Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+    //ensure_compiled_function_body(context, value);
+    //global_value = value_global(context, fn_pointer, rhs.source_range);
+    //load_address(context, &view.source_range, on_stack, value);
+  } else {
+    Section *section = &context->program->memory.sections.rw_data;
+    u64 byte_size = descriptor_byte_size(value->descriptor);
+    u64 alignment = descriptor_alignment(value->descriptor);
+
+    // TODO this should also be deduped
+    Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+    global_value = value_make(
+      context, value->descriptor, data_label32(label_index, byte_size), value->source_range
+    );
+
+    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+    memcpy(section_memory, value->storage.Static.memory, byte_size);
+  }
+
+  scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value.value = global_value,
+    .source_range = view.source_range,
+  });
+
+  err:
+  return statement_length;
+}
+
+u64
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
   Value_View view,
@@ -4612,6 +4686,10 @@ token_parse_definition_and_assignment_statements(
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  if (!context->builder) {
+    return token_parse_global_variable(context, view, unused_result, unused_payload);
+  }
 
   Value_View lhs;
   Value_View rhs;
