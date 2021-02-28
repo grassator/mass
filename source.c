@@ -4145,14 +4145,12 @@ token_parse_block_no_scope(
   Group *group = value_as_group(block);
   assert(group->tag == Group_Tag_Curly);
 
-  // FIXME this seems weird to be before empty check
-  token_parse_block_view(context, group->children, block_result_value);
-
-  Value_View children_view = group->children;
-  if (!children_view.length) {
+  if (!group->children.length) {
     MASS_ON_ERROR(assign(context, block_result_value, &void_value));
     return;
   }
+
+  token_parse_block_view(context, group->children, block_result_value);
 }
 
 void
