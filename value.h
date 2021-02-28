@@ -18,6 +18,8 @@ storage_equal(
   const Storage *b
 );
 
+#define storage_none ((Storage){.tag = Storage_Tag_None })
+
 static inline void
 register_bitset_set(
   u64 *bitset,

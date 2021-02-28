@@ -675,18 +675,10 @@ main(void) {
     { "u64", "offset" },
   }));
 
-  push_type(add_common_fields(type_union("Function_Argument", (Struct[]){
-    struct_fields("Any_Of_Type", (Struct_Item[]){
-      { "Slice", "name" },
-      { "Descriptor *", "descriptor" },
-      { "Value_View", "maybe_default_expression" },
-    }),
-    struct_fields("Exact", (Struct_Item[]){
-      { "Descriptor *", "descriptor" },
-      { "Storage", "storage" },
-    }),
-  }), (Struct_Item[]){
-    { "Source_Range", "source_range" },
+  push_type(type_struct("Function_Argument", (Struct_Item[]){
+    { "Slice", "name" },
+    { "Value *", "value"},
+    { "Value_View", "maybe_default_expression" },
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){

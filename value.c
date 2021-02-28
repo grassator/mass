@@ -98,24 +98,8 @@ same_type(
       for (u64 i = 0; i < dyn_array_length(a->Function.arguments); ++i) {
         Function_Argument *a_arg = dyn_array_get(a->Function.arguments, i);
         Function_Argument *b_arg = dyn_array_get(b->Function.arguments, i);
-        // Not sure that is correct with regards to exact arguments
-        if (a_arg->tag != b_arg->tag) return false;
-        switch(a_arg->tag) {
-          case Function_Argument_Tag_Any_Of_Type: {
-            if(!same_type(a_arg->Any_Of_Type.descriptor, b_arg->Any_Of_Type.descriptor)) {
-              return false;
-            }
-            break;
-          }
-          case Function_Argument_Tag_Exact: {
-            if(!(
-              same_type(a_arg->Exact.descriptor, b_arg->Exact.descriptor) &&
-              storage_equal(&a_arg->Exact.storage, &b_arg->Exact.storage)
-            )) return false;
-            break;
-          }
-        }
-        panic("Unknown argument tag");
+        if(!same_type(a_arg->value->descriptor, b_arg->value->descriptor)) return false;
+        if(storage_equal(&a_arg->value->storage, &b_arg->value->storage)) return false;
       }
       return true;
     }
@@ -641,6 +625,13 @@ storage_is_register_or_memory(
 }
 
 static inline bool
+function_argument_is_exact(
+  const Function_Argument *arg
+) {
+  return arg->value->storage.tag == Storage_Tag_Static;
+}
+
+static inline bool
 storage_equal(
   const Storage *a,
   const Storage *b
@@ -1076,18 +1067,9 @@ function_argument_value_at_index_internal(
   u64 argument_index,
   Function_Argument_Mode mode
 ) {
-  Descriptor *arg_descriptor = 0;
   Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
-  switch(argument->tag) {
-    case Function_Argument_Tag_Any_Of_Type: {
-      arg_descriptor = argument->Any_Of_Type.descriptor;
-      break;
-    }
-    case Function_Argument_Tag_Exact: {
-      arg_descriptor = argument->Exact.descriptor;
-      break;
-    }
-  }
+  Descriptor *arg_descriptor = argument->value->descriptor;
+  Source_Range source_range = argument->value->source_range;
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
   // :ReturnTypeLargerThanRegister
@@ -1109,7 +1091,7 @@ function_argument_value_at_index_internal(
     Register reg = registers[argument_index];
     if (byte_size <= 8) {
       return value_register_for_descriptor_internal(
-        source_location, context, reg, arg_descriptor, argument->source_range
+        source_location, context, reg, arg_descriptor, source_range
       );
     } else {
       switch(mode) {
@@ -1117,7 +1099,7 @@ function_argument_value_at_index_internal(
           // For the caller we pretend that the type is a pointer since we do not have references
           Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
           return value_register_for_descriptor_internal(
-            source_location, context, reg, pointer_descriptor, argument->source_range
+            source_location, context, reg, pointer_descriptor, source_range
           );
         }
         case Function_Argument_Mode_Body: {
@@ -1129,7 +1111,7 @@ function_argument_value_at_index_internal(
               .tag = Memory_Location_Tag_Indirect,
               .Indirect = { .base_register = reg },
             }
-          }, argument->source_range);
+          }, source_range);
         }
       }
       panic("Unexpected function argument mode");
@@ -1138,9 +1120,7 @@ function_argument_value_at_index_internal(
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
     Storage storage = stack(offset, byte_size);
-    return value_make_internal(
-      source_location, context, arg_descriptor, storage, argument->source_range
-    );
+    return value_make_internal(source_location, context, arg_descriptor, storage, source_range);
   }
 }
 #define function_argument_value_at_index(...)\

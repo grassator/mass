@@ -1262,28 +1262,21 @@ ensure_compiled_function_body(
   Scope *body_scope = scope_make(context->allocator, function->scope);
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
-    switch(argument->tag) {
-      case Function_Argument_Tag_Any_Of_Type: {
-        Value *arg_value = function_argument_value_at_index(
-          context, function, index, Function_Argument_Mode_Body
-        );
-        Slice name = argument->Any_Of_Type.name;
-        scope_define(body_scope, name, (Scope_Entry) {
-          .tag = Scope_Entry_Tag_Value,
-          .Value.value = arg_value,
-        });
-        if (arg_value->storage.tag == Storage_Tag_Register) {
-          register_bitset_set(
-            &builder.code_block.register_occupied_bitset,
-            arg_value->storage.Register.index
-          );
-        }
-        break;
-      }
-      case Function_Argument_Tag_Exact: {
-        // Nothing to do since there is no way to refer to this in the body
-        break;
-      }
+    // Nothing to do since there is no way to refer to an exact argument in the body
+    if (function_argument_is_exact(argument)) continue;
+    if (!argument->name.length) continue;
+    Value *arg_value = function_argument_value_at_index(
+      context, function, index, Function_Argument_Mode_Body
+    );
+    scope_define(body_scope, argument->name, (Scope_Entry) {
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = arg_value,
+    });
+    if (arg_value->storage.tag == Storage_Tag_Register) {
+      register_bitset_set(
+        &builder.code_block.register_occupied_bitset,
+        arg_value->storage.Register.index
+      );
     }
   }
 
@@ -1383,11 +1376,11 @@ call_function_overload(
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
-      Value_View default_expression = target_arg_definition->Any_Of_Type.maybe_default_expression;
+      Value_View default_expression = target_arg_definition->maybe_default_expression;
       assert(default_expression.length);
       // FIXME do not force the result on the stack
       source_arg = reserve_stack(
-        context, context->builder, target_arg_definition->Any_Of_Type.descriptor, *source_range
+        context, context->builder, target_arg_definition->value->descriptor, *source_range
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
@@ -1410,18 +1403,7 @@ call_function_overload(
       assign(context, stack_value, source_arg);
       load_address(context, source_range, target_arg, stack_value);
     }
-    Slice name;
-    switch(target_arg_definition->tag) {
-      case Function_Argument_Tag_Any_Of_Type: {
-        name = target_arg_definition->Any_Of_Type.name;
-        break;
-      }
-      default:
-      case Function_Argument_Tag_Exact: {
-        name = (Slice){0};
-        break;
-      }
-    }
+    Slice name = target_arg_definition->name;
     if (name.length) {
       scope_define(default_arguments_scope, name, (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
@@ -1507,59 +1489,45 @@ calculate_arguments_match_score(
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->arguments); ++arg_index) {
     Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
     Value *source_arg;
-    Value fake_source_value = {0};
     if (arg_index >= dyn_array_length(arguments)) {
-      if (target_arg->tag != Function_Argument_Tag_Any_Of_Type) return -1;
-      if (!target_arg->Any_Of_Type.maybe_default_expression.length) return -1;
-      fake_source_value = (Value) {
-        .epoch = VALUE_STATIC_EPOCH,
-        .descriptor = target_arg->Any_Of_Type.descriptor,
-        .storage = {.tag = Storage_Tag_Any },
-        .source_range = target_arg->source_range,
-      };
-      source_arg = &fake_source_value;
+      if (!target_arg->maybe_default_expression.length) return -1;
+      source_arg = target_arg->value;
     } else {
       source_arg = *dyn_array_get(arguments, arg_index);
     }
-    switch(target_arg->tag) {
-      case Function_Argument_Tag_Any_Of_Type: {
-        Value fake_target_value = {
-          .descriptor = target_arg->Any_Of_Type.descriptor,
-          .storage = {.tag = Storage_Tag_Any },
-        };
-        if (same_value_type(&fake_target_value, source_arg)) {
-          score += Score_Exact_Type;
-        } else if(same_value_type_or_can_implicitly_move_cast(&fake_target_value, source_arg)) {
-          score += Score_Cast;
+    if (function_argument_is_exact(target_arg)) {
+      if (same_value_type(target_arg->value, source_arg)) {
+        if(source_arg->descriptor == &descriptor_number_literal) {
+          assert(source_arg->storage.tag == Storage_Tag_Static);
+          assert(target_arg->value->storage.tag == Storage_Tag_Static);
+          Number_Literal *source_literal = source_arg->storage.Static.memory;
+          Number_Literal *target_literal = source_arg->storage.Static.memory;
+          if (
+            source_literal->bits == target_literal->bits &&
+            source_literal->negative == target_literal->negative
+          ) {
+            score += Score_Exact_Literal;
+          } else {
+            return -1;
+          }
+        } else if (
+          source_arg->storage.tag == Storage_Tag_Static &&
+          storage_equal(&target_arg->value->storage, &source_arg->storage)
+        ) {
+          score += Score_Exact_Literal;
         } else {
           return -1;
         }
-        break;
-      }
-      case Function_Argument_Tag_Exact: {
-        if (same_type(target_arg->Exact.descriptor, source_arg->descriptor)) {
-          if(source_arg->descriptor == &descriptor_number_literal) {
-            assert(source_arg->storage.tag == Storage_Tag_Static);
-            assert(target_arg->Exact.storage.tag == Storage_Tag_Static);
-            Number_Literal *source_literal = source_arg->storage.Static.memory;
-            Number_Literal *target_literal = source_arg->storage.Static.memory;
-            if (
-              source_literal->bits == target_literal->bits &&
-              source_literal->negative == target_literal->negative
-            ) {
-              return Score_Exact_Literal;
-            }
-          } else if (
-            source_arg->storage.tag == Storage_Tag_Static &&
-            storage_equal(&target_arg->Exact.storage, &source_arg->storage)
-          ) {
-            return Score_Exact_Literal;
-          }
-        }
+      } else {
         return -1;
       }
+    } else if (same_value_type(target_arg->value, source_arg)) {
+      score += Score_Exact_Type;
+    } else if(same_value_type_or_can_implicitly_move_cast(target_arg->value, source_arg)) {
+      score += Score_Cast;
+    } else {
+      return -1;
     }
-
   }
   return score;
 }

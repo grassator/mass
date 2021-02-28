@@ -1356,18 +1356,16 @@ token_apply_macro_syntax(
       Array_Function_Argument overload_arguments = dyn_array_make(
         Array_Function_Argument, .capacity = 1, .allocator = context->allocator
       );
+      Source_Range source_range = capture_view.source_range;
+      Value *argument_value = value_make(context, &descriptor_scope, storage_none, source_range);
       dyn_array_push(overload_arguments, (Function_Argument) {
-        .tag = Function_Argument_Tag_Any_Of_Type,
-        .Any_Of_Type = {
-          .name = slice_literal("@spliced_scope"),
-          .descriptor = &descriptor_scope,
-        },
+        .name = slice_literal("@spliced_scope"),
+        .value = argument_value,
       });
       Descriptor_Function *overload_function = &scope_overload->descriptor->Function;
       overload_function->arguments = overload_arguments;
       result->next_overload = scope_overload;
 
-      Source_Range source_range = capture_view.source_range;
       Value *using = token_make_symbol(
         context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range
       );
@@ -1643,27 +1641,19 @@ token_match_argument(
       goto err;
     }
 
+    Descriptor *descriptor = token_match_type(context, type_expression);
     arg = (Function_Argument) {
-      .tag = Function_Argument_Tag_Any_Of_Type,
-      .Any_Of_Type = {
-        .descriptor = token_match_type(context, type_expression),
-        .name = value_as_symbol(name_token)->name,
-        .maybe_default_expression = default_expression,
-      },
-      .source_range = definition.source_range,
+      .name = value_as_symbol(name_token)->name,
+      .value = value_make(context, descriptor, storage_none, definition.source_range),
+      .maybe_default_expression = default_expression,
     };
   } else {
     Value *value = value_any(context, definition.source_range);
     compile_time_eval(context, view, value);
-    arg = (Function_Argument) {
-      .tag = Function_Argument_Tag_Exact,
-      .Exact = {
-        .descriptor = value->descriptor,
-        .storage = value->storage,
-      },
-      .source_range = definition.source_range,
-    };
+    arg = (Function_Argument) { .value = value };
   }
+
+  //arg.value->epoch = VALUE_STATIC_EPOCH;
 
   err:
   return arg;
@@ -2434,10 +2424,7 @@ token_process_function_literal(
       dyn_array_push(descriptor->Function.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
       if (previous_argument_has_default_value) {
-        if (
-          arg.tag != Function_Argument_Tag_Any_Of_Type ||
-          !arg.Any_Of_Type.maybe_default_expression.length
-        ) {
+        if (function_argument_is_exact(&arg) || !arg.maybe_default_expression.length ) {
           context_error_snprintf(
             context, arg_view.source_range,
             "Non-default argument can not come after a default one"
@@ -2445,10 +2432,7 @@ token_process_function_literal(
           return 0;
         }
       } else {
-        previous_argument_has_default_value = (
-          arg.tag == Function_Argument_Tag_Any_Of_Type &&
-          !!arg.Any_Of_Type.maybe_default_expression.length
-        );
+        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
       }
     }
   }
@@ -3035,46 +3019,38 @@ token_handle_function_call(
 
       for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
         Function_Argument *arg = dyn_array_get(function->arguments, i);
-        switch(arg->tag) {
-          case Function_Argument_Tag_Exact: {
-            // There is no name so nothing to do
-            break;
-          }
-          case Function_Argument_Tag_Any_Of_Type: {
-            Value *arg_value;
-            if (i >= dyn_array_length(args)) {
-              // We should catch the missing default expression in the matcher
-              Value_View default_expression = arg->Any_Of_Type.maybe_default_expression;
-              assert(default_expression.length);
-              Descriptor *arg_descriptor = arg->Any_Of_Type.descriptor;
-              // FIXME avoid using a stack value
-              arg_value = reserve_stack(
-                context, context->builder, arg_descriptor, default_expression.source_range
-              );
-              {
-                Execution_Context arg_context = *context;
-                arg_context.scope = body_scope;
-                token_parse_expression(&arg_context, default_expression, arg_value, 0);
-              }
-              scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
-                .tag = Scope_Entry_Tag_Value,
-                .Value.value = arg_value,
-                .source_range = arg_value->source_range,
-              });
-            } else {
-              arg_value = *dyn_array_get(args, i);
-            }
-
-            arg_value = maybe_coerce_number_literal_to_integer(
-              context, arg_value, arg->Any_Of_Type.descriptor
+        if (arg->name.length) {
+          assert(!function_argument_is_exact(arg));
+          Value *arg_value;
+          Descriptor *arg_descriptor = arg->value->descriptor;
+          if (i >= dyn_array_length(args)) {
+            // We should catch the missing default expression in the matcher
+            Value_View default_expression = arg->maybe_default_expression;
+            assert(default_expression.length);
+            // FIXME avoid using a stack value
+            arg_value = reserve_stack(
+              context, context->builder, arg_descriptor, default_expression.source_range
             );
-            scope_define(body_scope, arg->Any_Of_Type.name, (Scope_Entry) {
+            {
+              Execution_Context arg_context = *context;
+              arg_context.scope = body_scope;
+              token_parse_expression(&arg_context, default_expression, arg_value, 0);
+            }
+            scope_define(body_scope, arg->name, (Scope_Entry) {
               .tag = Scope_Entry_Tag_Value,
               .Value.value = arg_value,
               .source_range = arg_value->source_range,
             });
-            break;
+          } else {
+            arg_value = *dyn_array_get(args, i);
           }
+
+          arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg_descriptor);
+          scope_define(body_scope, arg->name, (Scope_Entry) {
+            .tag = Scope_Entry_Tag_Value,
+            .Value.value = arg_value,
+            .source_range = arg_value->source_range,
+          });
         }
       }
 
@@ -4877,26 +4853,29 @@ scope_define_builtins(
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\
-      .tag = Function_Argument_Tag_Any_Of_Type,\
-      .Any_Of_Type = {\
-        .name = slice_literal_fields(_NAME_),\
-        .descriptor = (_DESCRIPTOR_)\
-      },\
+      .name = slice_literal_fields(_NAME_),\
+      .value = value_init(\
+        allocator_allocate(allocator, Value),\
+        VALUE_STATIC_EPOCH, (_DESCRIPTOR_), storage_none, (Source_Range){0}\
+      )\
     }
 
   #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
   {\
-    static dyn_array_struct(Function_Argument) args_internal = {\
-      .length = countof((const Function_Argument[]){__VA_ARGS__}),\
-      .items = {__VA_ARGS__},\
-    };\
+    Function_Argument raw_arguments[] = {__VA_ARGS__};\
+    u64 arg_length = countof(raw_arguments);\
+    Array_Function_Argument arguments =\
+      dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
+    for (u64 i = 0; i < arg_length; ++i) {\
+      dyn_array_push(arguments, raw_arguments[i]);\
+    }\
     Descriptor *descriptor = allocator_allocate(allocator, Descriptor);\
     *descriptor = (Descriptor) {\
       .tag = Descriptor_Tag_Function,\
       .name = slice_literal(_NAME_),\
       .Function = {\
         .flags = Descriptor_Function_Flags_Compile_Time,\
-        .arguments = {(Dyn_Array_Internal *)&args_internal},\
+        .arguments = arguments,\
         .returns = {\
           .descriptor = (_RETURN_DESCRIPTOR_),\
         }\

@@ -508,30 +508,13 @@ typedef struct Descriptor_Struct_Field {
 } Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
-typedef enum {
-  Function_Argument_Tag_Any_Of_Type = 0,
-  Function_Argument_Tag_Exact = 1,
-} Function_Argument_Tag;
-
-typedef struct {
-  Slice name;
-  Descriptor * descriptor;
-  Value_View maybe_default_expression;
-} Function_Argument_Any_Of_Type;
-typedef struct {
-  Descriptor * descriptor;
-  Storage storage;
-} Function_Argument_Exact;
 typedef struct Function_Argument {
-  Function_Argument_Tag tag;
-  char _tag_padding[4];
-  Source_Range source_range;
-  union {
-    Function_Argument_Any_Of_Type Any_Of_Type;
-    Function_Argument_Exact Exact;
-  };
+  Slice name;
+  Value * value;
+  Value_View maybe_default_expression;
 } Function_Argument;
 typedef dyn_array_type(Function_Argument) Array_Function_Argument;
+
 typedef struct Function_Return {
   Slice name;
   Descriptor * descriptor;
@@ -723,7 +706,6 @@ static Descriptor descriptor_descriptor_struct_field_pointer_pointer;
 static Descriptor descriptor_function_argument;
 static Descriptor descriptor_function_argument_pointer;
 static Descriptor descriptor_function_argument_pointer_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(function_argument_tag, Function_Argument_Tag)
 static Descriptor descriptor_function_return;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
@@ -1103,6 +1085,24 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_struct_field);
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument,
+  {
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .offset = offsetof(Function_Argument, name),
+  },
+  {
+    .name = slice_literal_fields("value"),
+    .descriptor = &descriptor_value_pointer,
+    .offset = offsetof(Function_Argument, value),
+  },
+  {
+    .name = slice_literal_fields("maybe_default_expression"),
+    .descriptor = &descriptor_value_view,
+    .offset = offsetof(Function_Argument, maybe_default_expression),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_argument);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
   {
     .name = slice_literal_fields("name"),
