@@ -4715,8 +4715,7 @@ token_parse(
   Execution_Context *context,
   Value_View view
 ) {
-  Value *fake_block = token_make_fake_body(context, view);
-  token_parse_block_no_scope(context, fake_block, &void_value);
+  token_parse_block_view(context, view, &void_value);
   return *context->result;
 }
 
