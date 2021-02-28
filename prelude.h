@@ -1,14 +1,31 @@
 #ifndef PRELUDE_H
 #define PRELUDE_H
 
+#ifndef PRELUDE_NO_WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
 #include <stdint.h> // int8_t, etc
 #include <stdbool.h>
+
 #include <stdlib.h>
 #include <stdio.h>  // printf
 #include <string.h> // malloc, realloc, free
 #include <assert.h>
 #include <ctype.h> // isspace, isdigit etc
 #include <math.h> // ceilf, etc
+
+// Force <windows.h> to not include definition for min() and max() macros
+#define NOMINMAX
+
+// If <windows.h> was already included explicitly remove those macros
+#ifdef max
+#undef max
+#endif
+
+#ifdef min
+#undef min
+#endif
 
 #ifdef _MSC_VER
 #define PRELUDE_NO_DISCARD _Must_inspect_result_
@@ -18,17 +35,19 @@
 
 #ifndef countof
 #define countof(...)\
-  (sizeof(__VA_ARGS__) / sizeof((__VA_ARGS__)[0]))
+  (sizeof((__VA_ARGS__)) / sizeof((__VA_ARGS__)[0]))
 #endif
-
-#undef static_assert
-#define static_assert(_condition_, _message_)\
-  struct _message_ { int _message_ : !!(_condition_); }
 
 #define static_assert_type_alignment(_type_, _alignment_)\
   static_assert(\
     sizeof(_type_) % (_alignment_) == 0,\
-    _type_##__expected_to_be_aligned_to__##_alignment_\
+    #_type_ " expected to be aligned to " #_alignment_\
+  );
+
+#define static_assert_type_size(_type_, _size_)\
+  static_assert(\
+    sizeof(_type_) == (_size_),\
+    #_type_ " expected to be " #_size_\
   );
 
 #ifndef __APPLE__
@@ -43,9 +62,48 @@
     *value_swap.b = value_swap.temp;\
   } while (0)
 
+#ifdef __STDC_NO_THREADS__
+  #ifdef _MSC_VER
+    #define thread_local __declspec(thread)
+  #else
+    static_assert(false, "Prelude requires a compiler with thread-local support");
+  #endif
+#else
+  #include <threads.h>
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // Numbers
 //////////////////////////////////////////////////////////////////////////////
+
+// Check whether `long` type is 32 bits (Windows) or 64 bits (Linux, Mac, BSD, etc)
+#if ((ULONG_MAX) == 4294967295l)
+  typedef signed long slong_t;
+  typedef unsigned long ulong_t;
+  #define slong_t_max_value INT32_MAX
+  #define slong_t_min_value INT32_MIN
+  #define ulong_t_max_value UINT32_MAX
+  #define ulong_t_min_value 0
+
+  #define PRIslong_t "li"
+  #define PRIulong_t "lu"
+
+  #define PRIs64 "lli"
+  #define PRIu64 "llu"
+#else
+  typedef signed long long slong_t;
+  typedef unsigned long long ulong_t;
+  #define slong_t_max_value INT64_MAX
+  #define slong_t_min_value INT64_MIN
+  #define ulong_t_max_value UINT64_MAX
+  #define ulong_t_min_value 0
+
+  #define PRIslong_t "lli"
+  #define PRIulong_t "llu"
+
+  #define PRIs64 "li"
+  #define PRIu64 "lu"
+#endif
 
 typedef int8_t  s8;
 typedef int16_t s16;
@@ -60,56 +118,56 @@ typedef uint64_t u64;
 #define u64_max_value UINT64_MAX
 #define u64_min_value 0
 
+#define PRIu32 "u"
 #define u32_max_value UINT32_MAX
 #define u32_min_value 0
 
+#define PRIu16 "hu"
 #define u16_max_value UINT16_MAX
 #define u16_min_value 0
 
+#define PRIu8 "hhu"
 #define u8_max_value UINT8_MAX
 #define u8_min_value 0
 
 #define s64_max_value INT64_MAX
 #define s64_min_value INT64_MIN
 
+#define PRIs32 "i"
 #define s32_max_value INT32_MAX
 #define s32_min_value INT32_MIN
 
+#define PRIs16 "hi"
 #define s16_max_value INT16_MAX
 #define s16_min_value INT16_MIN
 
+#define PRIs8 "hhi"
 #define s8_max_value INT8_MAX
 #define s8_min_value INT8_MIN
 
 typedef float f32;
+#define PRIf32 "f"
 typedef double f64;
+#define PRIf64 "f"
 
-static_assert(sizeof(void *) == sizeof(u64), prelude_only_supports_64_bit_architectures);
+static_assert(sizeof(void *) == sizeof(u64), "Prelude only supports 64bit architectures");
 
-#define PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES\
-  PRELUDE_PROCESS_TYPE(s8)\
-  PRELUDE_PROCESS_TYPE(s16)\
-  PRELUDE_PROCESS_TYPE(s32)\
-  PRELUDE_PROCESS_TYPE(s64)
+#define PRELUDE_MAP_SIGNED_INTEGER_TYPES(_FUNC_)\
+  _FUNC_(s8) _FUNC_(s16) _FUNC_(s32) _FUNC_(s64) _FUNC_(slong_t)
 
-#define PRELUDE_ENUMERATE_UNSIGNED_INTEGER_TYPES\
-  PRELUDE_PROCESS_TYPE(u8)\
-  PRELUDE_PROCESS_TYPE(u16)\
-  PRELUDE_PROCESS_TYPE(u32)\
-  PRELUDE_PROCESS_TYPE(u64)
+#define PRELUDE_MAP_UNSIGNED_INTEGER_TYPES(_FUNC_)\
+  _FUNC_(u8) _FUNC_(u16) _FUNC_(u32) _FUNC_(u64) _FUNC_(ulong_t)
 
-#define PRELUDE_ENUMERATE_FLOAT_TYPES\
-  PRELUDE_PROCESS_TYPE(f32)\
-  PRELUDE_PROCESS_TYPE(f64)
+#define PRELUDE_MAP_INTEGER_TYPES(_FUNC_)\
+  PRELUDE_MAP_SIGNED_INTEGER_TYPES(_FUNC_)\
+  PRELUDE_MAP_UNSIGNED_INTEGER_TYPES(_FUNC_)
 
-#define PRELUDE_ENUMERATE_INTEGER_TYPES\
-  PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES\
-  PRELUDE_ENUMERATE_UNSIGNED_INTEGER_TYPES
+#define PRELUDE_MAP_FLOAT_TYPES(_FUNC_)\
+  _FUNC_(f32) _FUNC_(f64)
 
-#define PRELUDE_ENUMERATE_NUMERIC_TYPES\
-  PRELUDE_ENUMERATE_FLOAT_TYPES\
-  PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES\
-  PRELUDE_ENUMERATE_UNSIGNED_INTEGER_TYPES
+#define PRELUDE_MAP_NUMERIC_TYPES(_FUNC_)\
+  PRELUDE_MAP_INTEGER_TYPES(_FUNC_)\
+  PRELUDE_MAP_FLOAT_TYPES(_FUNC_)
 
 //////////////////////////////////////////////////////////////////////////////
 // Integer Casts
@@ -129,7 +187,7 @@ static_assert(sizeof(void *) == sizeof(u64), prelude_only_supports_64_bit_archit
   DEFINE_UNSIGNED_CAST(u16, _type_)\
   DEFINE_UNSIGNED_CAST(u32, _type_)\
   DEFINE_UNSIGNED_CAST(u64, _type_)
-PRELUDE_ENUMERATE_INTEGER_TYPES
+PRELUDE_MAP_INTEGER_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 #undef DEFINE_UNSIGNED_CAST
 
@@ -148,7 +206,7 @@ PRELUDE_ENUMERATE_INTEGER_TYPES
   DEFINE_SIGNED_CAST(s16, _type_)\
   DEFINE_SIGNED_CAST(s32, _type_)\
   DEFINE_SIGNED_CAST(s64, _type_)
-PRELUDE_ENUMERATE_INTEGER_TYPES
+PRELUDE_MAP_INTEGER_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 #undef DEFINE_UNSIGNED_CAST
 
@@ -159,18 +217,35 @@ PRELUDE_ENUMERATE_INTEGER_TYPES
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline _type_ _type_##_min(_type_ x, _type_ y) { return x < y ? x : y; }\
   static inline _type_ _type_##_max(_type_ x, _type_ y) { return x > y ? x : y; }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
+
+#define min(x, y) _Generic((x) + (y),\
+  u8: u8_min, u16: u16_min, u32: u32_min, u64: u64_min,\
+  s8: s8_min, s16: s16_min, s32: s32_min, s64: s64_min,\
+  slong_t: slong_t_min, ulong_t: ulong_t_min,\
+  f32: f32_min, f64: f64_min)((x), (y))
+
+#define max(x, y) _Generic((x) + (y),\
+  u8: u8_max, u16: u16_max, u32: u32_max, u64: u64_max,\
+  s8: s8_max, s16: s16_max, s32: s32_max, s64: s64_max,\
+  slong_t: slong_t_max, ulong_t: ulong_t_max,\
+  f32: f32_max, f64: f64_max)((x), (y))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline _type_ _type_##_abs(_type_ x) { return x < 0 ? (-x) : x; }
-PRELUDE_ENUMERATE_SIGNED_INTEGER_TYPES
-PRELUDE_ENUMERATE_FLOAT_TYPES
+PRELUDE_MAP_SIGNED_INTEGER_TYPES(PRELUDE_PROCESS_TYPE)
+PRELUDE_MAP_FLOAT_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
+
+#define abs(x) _Generic((x),\
+  s8: s8_abs, s16: s16_abs, s32: s32_abs, s64: s64_abs,\
+  slong_t: slong_t_abs,\
+  f32: f32_abs, f64: f64_abs)((x))
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   static inline _type_ _type_##_align(_type_ x, _type_ align) { return ((x + align - 1) / align) * align; }
-PRELUDE_ENUMERATE_INTEGER_TYPES
+PRELUDE_MAP_INTEGER_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 static inline f32 f32_align(f32 x, f32 align) { return ceilf(x / align) * align; }
@@ -182,28 +257,8 @@ static inline f64 f64_align(f64 x, f64 align) { return ceil(x / align) * align; 
     if (*x > *y) return 1;\
     return 0;\
   }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
-
-////////////////////////////////////////////////////////////////////////////////
-// Color
-////////////////////////////////////////////////////////////////////////////////
-
-typedef union {
-  struct {
-    u8 r;
-    u8 g;
-    u8 b;
-    u8 a;
-  };
-  u32 raw;
-} Color_Rgba_8;
-
-#define color_rgba(_r_, _g_, _b_, _a_)\
-  (Color_Rgba_8){.r = (_r_), .g = (_g_), .b = (_b_), .a = (_a_)}
-
-#define color_rgb(_r_, _g_, _b_)\
-  color_rgba(_r_, _g_, _b_, 0xff)
 
 //////////////////////////////////////////////////////////////////////////////
 // Memory
@@ -351,7 +406,7 @@ system_performance_counter_end(
   return (u64)elapsed;
 }
 static_assert(
-  sizeof(struct timeval) <= sizeof(Performance_Counter), unix_timespec_must_fit_into_16bytes
+  sizeof(struct timeval) <= sizeof(Performance_Counter), "unix timespec must fit into 16bytes"
 );
 
 #endif
@@ -420,6 +475,12 @@ allocator_system_allocate(
   u64 alignment
 ) {
   // More than page of alignment is probably not required anyway so can ignore
+  u64 granularity = s32_to_u64(memory_allocation_granularity());
+  (void)granularity;
+  assert(
+    alignment <= granularity &&
+    memory_allocation_granularity() % alignment == 0
+  );
   return VirtualAlloc(0, size_in_bytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 }
 static inline void
@@ -577,7 +638,7 @@ allocator_reallocate(
     } \
     return result;\
   }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 //////////////////////////////////////////////////////////////////////////////
@@ -624,7 +685,7 @@ typedef bucket_array_struct_internal(Bucket_Array_Bucket_Internal) Bucket_Array_
 
 #define PRELUDE_PROCESS_TYPE(_type_)\
   typedef bucket_array_type_page_size(_type_)  Bucket_Array_##_type_;
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 struct Bucket_Array_Make_Options {
@@ -656,7 +717,7 @@ bucket_array_alloc_internal(
 
   result->bucket_tail[0] = (Bucket_Array_Bucket_Internal) {
     .length = 0,
-    .memory = allocator_allocate_bytes(allocator, single_bucket_byte_size, item_byte_size),
+    .memory = allocator_allocate_bytes(allocator, single_bucket_byte_size, 16),
   };
 
   return result;
@@ -690,7 +751,7 @@ bucket_array_ensure_capacity_for_push(
   internal->bucket_tail[internal->bucket_tail_length] = (Bucket_Array_Bucket_Internal) {
     .length = 0,
     .memory = allocator_allocate_bytes(
-      internal->allocator, single_bucket_byte_size, item_byte_size
+      internal->allocator, single_bucket_byte_size, 16
     ),
   };
   ++internal->bucket_tail_length;
@@ -797,7 +858,7 @@ typedef dyn_array_struct(s8) Dyn_Array_Internal;
 #define PRELUDE_PROCESS_TYPE(_type_)\
   typedef dyn_array_type(_type_)  Array_##_type_;\
   typedef dyn_array_type(Range_##_type_)  Array_Range_##_type_;
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 static inline Dyn_Array_Internal *
@@ -816,7 +877,7 @@ dyn_array_realloc_internal(
     internal,
     old_allocation_size,
     new_allocation_size,
-    item_byte_size
+    16
   );
   if (result) {
     result->capacity = capacity;
@@ -839,7 +900,7 @@ dyn_array_alloc_internal(
 ) {
   u64 new_allocation_size = sizeof(Dyn_Array_Internal) + item_byte_size * options->capacity;
   Dyn_Array_Internal *result = allocator_allocate_bytes(
-    options->allocator, new_allocation_size, item_byte_size
+    options->allocator, new_allocation_size, 16
   );
   *result = (Dyn_Array_Internal) {
     .allocator = options->allocator,
@@ -1265,38 +1326,6 @@ slice_parse_binary(
     integer += digit << index;
   }
   return integer;
-}
-
-Color_Rgba_8
-hex_parse_color_digits(
-  Slice color,
-  bool *ok
-) {
-  s8 digits[8] = {0, 0, 0, 0, 0, 0, 0xf, 0xf};
-  if (!ok) ok = &(bool){0};
-  *ok = true;
-
-  if (color.length == 3 || color.length == 4) {
-    digits[0] = digits[1] = hex_parse_digit(color.bytes[0], ok);
-    if (*ok) digits[2] = digits[3] = hex_parse_digit(color.bytes[1], ok);
-    if (*ok) digits[4] = digits[5] = hex_parse_digit(color.bytes[2], ok);
-    if (*ok && color.length == 4) {
-      digits[6] = digits[7] = hex_parse_digit(color.bytes[3], ok);
-    }
-  } else if (color.length == 6 || color.length == 8) {
-    for (u64 i = 0; *ok && i < color.length; ++i) {
-      digits[i] = hex_parse_digit(color.bytes[i], ok);
-    }
-  } else {
-    *ok = false;
-  }
-  if (!*ok) return (Color_Rgba_8){0};
-  return (Color_Rgba_8) {
-    .r = (digits[0] << 4) | digits[1],
-    .g = (digits[2] << 4) | digits[3],
-    .b = (digits[4] << 4) | digits[5],
-    .a = (digits[6] << 4) | digits[7],
-  };
 }
 
 static inline Slice
@@ -1734,7 +1763,7 @@ slice_normalize_path(
 ) {
   u64 after_last_slash = 0;
   u64 available_segments = 0;
-  char *buffer = allocator_allocate_bytes(allocator, path.length, sizeof(char));
+  char *buffer = allocator_allocate_bytes(allocator, path.length, _Alignof(char));
   s64 buffer_length = 0;
 
   static const Slice dot = slice_literal_fields(".");
@@ -2214,14 +2243,14 @@ utf8_to_utf16_null_terminated(
   u64 max_byte_length = utf8_to_utf16_estimate_max_byte_length(utf8);
   // + sizeof(u16) accounts for null termination
   u64 allocation_size = max_byte_length + sizeof(u16);
-  u16 *target = allocator_allocate_bytes(allocator, allocation_size, sizeof(u16));
+  u16 *target = allocator_allocate_bytes(allocator, allocation_size, _Alignof(u16));
   u64 bytes_written = utf8_to_utf16_raw(utf8, target, max_byte_length);
   u64 end_index = bytes_written / sizeof(u16);
   target[end_index] = 0;
   u64 actual_size = bytes_written + sizeof(u16);
 
   if (actual_size != allocation_size) {
-    target = allocator_reallocate(allocator, target, allocation_size, actual_size, sizeof(u16));
+    target = allocator_reallocate(allocator, target, allocation_size, actual_size, _Alignof(u16));
   }
 
   return target;
@@ -2352,7 +2381,7 @@ utf16_to_utf8(
   u64 source_byte_size
 ) {
   u64 max_byte_length = utf16_to_utf8_estimate_max_byte_length(source_byte_size);
-  char *target = allocator_allocate_bytes(allocator, max_byte_length, sizeof(char));
+  char *target = allocator_allocate_bytes(allocator, max_byte_length, _Alignof(char));
   u64 bytes_written = utf16_to_utf8_raw(source, source_byte_size, target, max_byte_length);
 
   target = allocator_reallocate(allocator, target, max_byte_length, bytes_written, sizeof(char));
@@ -2489,7 +2518,7 @@ virtual_memory_buffer_allocate_bytes(
     *result = value;\
     return (s8 *)result - buffer->memory;\
   }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 static inline Slice
@@ -2674,7 +2703,7 @@ fixed_buffer_resizing_ensure_capacity(
     *result = value;\
     return (s8 *)result - buffer->memory;\
   }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 static inline Slice
@@ -2837,8 +2866,9 @@ fixed_buffer_from_file_internal(
   struct Fixed_Buffer_From_File_Options *options
 ) {
   // Allows to not check for null when reporting
-  static File_Read_Error dummy_error = File_Read_Error_None;
+  static File_Read_Error dummy_error;
   if (!options->error) options->error = &dummy_error;
+  *options->error = File_Read_Error_None;
   Fixed_Buffer *buffer = 0;
 
 #ifdef _WIN32
@@ -2863,15 +2893,15 @@ fixed_buffer_from_file_internal(
   }
 
   // FIXME use 64bit version
-  DWORD buffer_size = GetFileSize(file_handle, 0);
-  if (options->null_terminate) buffer_size++;
+  DWORD file_size = GetFileSize(file_handle, 0);
+  DWORD buffer_size = options->null_terminate ? (file_size + 1) : file_size;
   buffer = fixed_buffer_make(
     .allocator = allocator_system,
     .capacity = s32_to_u64(buffer_size),
   );
   DWORD bytes_read = 0;
-  BOOL is_success = ReadFile(file_handle, buffer->memory, buffer_size, &bytes_read, 0);
-  if (!is_success || bytes_read != buffer_size)  {
+  BOOL is_success = ReadFile(file_handle, buffer->memory, file_size, &bytes_read, 0);
+  if (!is_success || bytes_read != file_size)  {
     *options->error = File_Read_Error_Failed_To_Read;
     goto handle_error;
   }
@@ -3046,7 +3076,7 @@ bucket_buffer_allocate_bytes(
     u64 offset = buffer->occupied - sizeof(_type_);\
     return offset;\
   }
-PRELUDE_ENUMERATE_NUMERIC_TYPES
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 static inline Slice
@@ -3300,7 +3330,7 @@ hash_map_resize(
   map->hash_mask = u64_to_s32(map->capacity - 1);
   s8 *entries = (s8 *)map->entries;
   u64 entries_byte_size = entry_byte_size * map->capacity;
-  map->entries = allocator_allocate_bytes(map->allocator, entries_byte_size, entry_byte_size);
+  map->entries = allocator_allocate_bytes(map->allocator, entries_byte_size, 16);
   memset(map->entries, 0, entries_byte_size);
 
   // Rehash occupied entries
@@ -3339,7 +3369,7 @@ hash_map_resize(
       .capacity = capacity,\
       .hash_mask = u64_to_s32(capacity - 1),\
       .occupied = 0,\
-      .entries = allocator_allocate_bytes(allocator, entry_array_byte_size, entry_byte_size),\
+      .entries = allocator_allocate_bytes(allocator, entry_array_byte_size, 16),\
     };\
     memset(map->entries, 0, entry_array_byte_size);\
     return map;\
@@ -3557,8 +3587,78 @@ static inline void
 thread_join(Thread thread) {
   pthread_join((pthread_t)thread.native_handle, 0);
 }
-static_assert(sizeof(pthread_t) <= sizeof(Thread), TODO_implement_thread_wrappers);
+static_assert(sizeof(pthread_t) <= sizeof(Thread), "TODO implement thread wrappers");
 #endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Printing
+//////////////////////////////////////////////////////////////////////////////
+
+#define PRELUDE_MACRO_CONCAT_HELPER(X, Y) X##Y
+#define PRELUDE_MACRO_CONCAT(X, Y) PRELUDE_MACRO_CONCAT_HELPER(X, Y)
+#define PRELUDE_NUM_ARGS_HELPER(_1, _2, _3, _4, _5, _6, _7, _8, TOTAL, ...) TOTAL
+#define PRELUDE_NUM_ARGS(...) PRELUDE_NUM_ARGS_HELPER(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+#define PRELUDE_VA_MACRO_GET(MACRO, ...) PRELUDE_MACRO_CONCAT(MACRO, PRELUDE_NUM_ARGS(__VA_ARGS__))
+#define PRELUDE_VA_MACRO(MACRO, ...) PRELUDE_VA_MACRO_GET(MACRO, ##__VA_ARGS__)(__VA_ARGS__)
+
+#define PRI(x) _Generic((x),\
+  u8: PRIu8, u16: PRIu16, u32: PRIu32, u64: PRIu64,\
+  s8: PRIs8, s16: PRIs16, s32: PRIs32, s64: PRIs64,\
+  slong_t: PRIslong_t, ulong_t: PRIulong_t,\
+  f32: PRIf32, f64: PRIf64,\
+  char *: "s", const char *: "s",\
+  Slice: PRIslice,\
+  void *: "p")
+
+#define PRELUDE_PROCESS_TYPE(_type_)\
+  static inline void _type_##_print(_type_ x) {\
+    printf("%" PRELUDE_MACRO_CONCAT(PRI, _type_), x);\
+  }
+PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
+#undef PRELUDE_PROCESS_TYPE
+
+static inline void
+c_string_print(
+  const char *string
+) {
+  printf("%s", string);
+}
+
+static inline void
+pointer_print(
+  void *pointer
+) {
+  printf("%p", pointer);
+}
+
+#define print_dispatch(x) _Generic((x),\
+  u8: u8_print, u16: u16_print, u32: u32_print, u64: u64_print,\
+  s8: s8_print, s16: s16_print, s32: s32_print, s64: s64_print,\
+  slong_t: slong_t_print, ulong_t: ulong_t_print,\
+  f32: f32_print, f64: f64_print,\
+  char *: c_string_print, const char *: c_string_print,\
+  Slice: slice_print,\
+  void *: pointer_print)(x)
+
+#define print_0()
+#define print_1(x1)\
+    (print_dispatch(x1))
+#define print_2(x1, x2)\
+    (print_1(x1), print_1(x2))
+#define print_3(x1, x2, x3)\
+    (print_1(x1), print_2((x2), (x3)))
+#define print_4(x1, x2, x3, x4)\
+    (print_2((x1), (x2)), print_2((x3), (x4)))
+#define print_5(x1, x2, x3, x4, x5)\
+    (print_2((x1), (x2)), print_3((x3), (x4), (x5)))
+#define print_6(x1, x2, x3, x4, x5, x6)\
+    (print_3((x1), (x2), (x3)), print_3((x4), (x5), (x6)))
+#define print_7(x1, x2, x3, x4, x5, x6, x7)\
+    (print_3((x1), (x2), (x3)), print_4((x4), (x5), (x6), (x7)))
+#define print_8(x1, x2, x3, x4, x5, x6, x7)\
+    (print_4((x1), (x2), (x3), (x4)), print_4((x5), (x6), (x7), (x8)))
+
+#define print(...) PRELUDE_VA_MACRO(print_, ##__VA_ARGS__)
 
 ////////////////////////////////////////////////////////////////////
 // Debug

@@ -161,7 +161,7 @@ scope_flatten_till_internal(
   return result;
 }
 
-Scope *
+static inline Scope *
 scope_flatten_till(
   const Allocator *allocator,
   Scope *scope,
@@ -1819,8 +1819,6 @@ token_handle_user_defined_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  // FIXME This is almost identical with the macro function call
-
   // We make a nested scope based on the original scope
   // instead of current scope for hygiene reasons.
   Scope *body_scope = scope_make(context->allocator, operator->scope);
@@ -1839,40 +1837,9 @@ token_handle_user_defined_operator(
     });
   }
 
-  // Define a new return target label and value so that explicit return statements
-  // jump to correct location and put value in the right place
-  Program *program = context->program;
-  Label_Index fake_return_label_index =
-    make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
-  {
-    Value *return_label_value = value_make(
-      context, &descriptor_void, code_label32(fake_return_label_index), result_value->source_range
-    );
-    scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = return_label_value,
-    });
-    scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = result_value,
-    });
-  }
-
-  Value *body = operator->body;
-  {
-    Execution_Context body_context = *context;
-    body_context.scope = body_scope;
-    token_parse_block(&body_context, body, result_value);
-  }
-
-  push_instruction(
-    &context->builder->code_block.instructions,
-    args.source_range,
-    (Instruction) {
-      .type = Instruction_Type_Label,
-      .label = fake_return_label_index
-    }
-  );
+  Execution_Context body_context = *context;
+  body_context.scope = body_scope;
+  token_parse_block(&body_context, operator->body, result_value);
 }
 
 void
