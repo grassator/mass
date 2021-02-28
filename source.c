@@ -1842,7 +1842,7 @@ token_handle_user_defined_operator(
   token_parse_block(&body_context, operator->body, result_value);
 }
 
-void
+static inline void
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
   Value_View args,
@@ -2169,7 +2169,6 @@ token_parse_syntax_definition(
     Value *value = value_view_get(definition, i);
     if (value_is_slice(value)) {
       Slice *slice = value_as_slice(value);
-      // FIXME switch to a typed token setup
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
         .Single_Token = {
@@ -3407,44 +3406,6 @@ token_handle_array_access(
       s32 index = s64_to_s32(storage_static_value_up_to_s64(&index_value->storage));
       array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
     } else {
-      // @InstructionQuality
-      // This code is very general in terms of the operands where the base
-      // or the index are stored, but it is
-
-      Register reg = register_acquire_temp(context->builder);
-      Value *new_base_register =
-        value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
-
-      // Move the index into the register
-      move_value(
-        context->allocator,
-        context->builder,
-        source_range,
-        &new_base_register->storage,
-        &index_value->storage
-      );
-
-      Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
-      // Multiply index by the item byte size
-      multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
-
-      {
-        // @InstructionQuality
-        // TODO If the source does not have index, on X64 it should be possible to avoid
-        //      using an extra register and put the index into SIB
-
-        // Load previous address into a temp register
-        Register temp_register = register_acquire_temp(context->builder);
-        Value temp_value = {
-          .descriptor = &descriptor_s64,
-          .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
-        };
-
-        load_address(context, source_range, &temp_value, array_value);
-        plus(context, source_range, new_base_register, new_base_register, &temp_value);
-        register_release(context->builder, temp_register);
-      }
-
       array_element_value->storage = storage_load_index_address(
         context, source_range, array_value, item_descriptor, index_value
       );
