@@ -1497,22 +1497,9 @@ calculate_arguments_match_score(
     }
     if (function_argument_is_exact(target_arg)) {
       if (same_value_type(target_arg->value, source_arg)) {
-        if(source_arg->descriptor == &descriptor_number_literal) {
-          assert(source_arg->storage.tag == Storage_Tag_Static);
-          assert(target_arg->value->storage.tag == Storage_Tag_Static);
-          Number_Literal *source_literal = source_arg->storage.Static.memory;
-          Number_Literal *target_literal = source_arg->storage.Static.memory;
-          if (
-            source_literal->bits == target_literal->bits &&
-            source_literal->negative == target_literal->negative
-          ) {
-            score += Score_Exact_Literal;
-          } else {
-            return -1;
-          }
-        } else if (
+        if (
           source_arg->storage.tag == Storage_Tag_Static &&
-          storage_equal(&target_arg->value->storage, &source_arg->storage)
+          storage_static_equal(target_arg->value, source_arg)
         ) {
           score += Score_Exact_Literal;
         } else {

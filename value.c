@@ -57,8 +57,8 @@ same_value_type(
 
 bool
 same_type(
-  Descriptor *a,
-  Descriptor *b
+  const Descriptor *a,
+  const Descriptor *b
 ) {
   if (a->tag != b->tag) return false;
   switch(a->tag) {
@@ -631,6 +631,88 @@ function_argument_is_exact(
   return arg->value->storage.tag == Storage_Tag_Static;
 }
 
+bool
+storage_static_equal_internal(
+  const Descriptor *a_descriptor,
+  void *a_memory,
+  const Descriptor *b_descriptor,
+  void *b_memory
+) {
+  if (!same_type(a_descriptor, b_descriptor)) return false;
+  if (a_descriptor == &descriptor_slice) {
+    return slice_equal(*(Slice *)a_memory, *(Slice *)b_memory);
+  }
+  u64 byte_size = descriptor_byte_size(a_descriptor);
+  switch(a_descriptor->tag) {
+    case Descriptor_Tag_Void: return true;
+    // Opaques and pointers can be compared with memcmp
+    case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Pointer: {
+      return memcmp(a_memory, b_memory, byte_size) == 0;
+    }
+    case Descriptor_Tag_Fixed_Size_Array: {
+      // compare field by field
+      if (a_descriptor->Fixed_Size_Array.length != b_descriptor->Fixed_Size_Array.length) {
+        return false;
+      }
+      for (u64 i = 0; i < a_descriptor->Fixed_Size_Array.length; ++i) {
+        Descriptor *a_item = a_descriptor->Fixed_Size_Array.item;
+        Descriptor *b_item = b_descriptor->Fixed_Size_Array.item;
+        u64 offset = descriptor_byte_size(a_item) * i;
+        if (!storage_static_equal_internal(
+          a_item, (s8 *)a_memory + offset, b_item, (s8 *)b_memory + offset
+        )) {
+          return false;
+        }
+      }
+      break;
+    }
+    case Descriptor_Tag_Struct: {
+      // compare field by field
+      u64 a_field_count = dyn_array_length(a_descriptor->Struct.fields);
+      u64 b_field_count = dyn_array_length(b_descriptor->Struct.fields);
+      if (a_field_count != b_field_count) {
+        return false;
+      }
+      for (u64 i = 0; i < a_field_count; ++i) {
+        Descriptor_Struct_Field *a_field = dyn_array_get(a_descriptor->Struct.fields, i);
+        Descriptor_Struct_Field *b_field = dyn_array_get(b_descriptor->Struct.fields, i);
+        if (!storage_static_equal_internal(
+          a_field->descriptor, (s8 *)a_memory + a_field->offset,
+          b_field->descriptor, (s8 *)b_memory + b_field->offset
+        )) {
+          return false;
+        }
+      }
+      break;
+    }
+    case Descriptor_Tag_Any: {
+      panic("Unexpected static storage any value");
+      break;
+    }
+    case Descriptor_Tag_Function: {
+      panic("Unexpected static storage function");
+      break;
+    }
+  }
+  return true;
+}
+
+bool
+storage_static_equal(
+  const Value *a,
+  const Value *b
+) {
+  assert(a->storage.tag == Storage_Tag_Static);
+  assert(b->storage.tag == Storage_Tag_Static);
+  assert(a->storage.byte_size == b->storage.byte_size);
+  assert(descriptor_byte_size(a->descriptor) == a->storage.byte_size);
+  return storage_static_equal_internal(
+    a->descriptor, a->storage.Static.memory,
+    b->descriptor, b->storage.Static.memory
+  );
+}
+
 static inline bool
 storage_equal(
   const Storage *a,
@@ -643,7 +725,11 @@ storage_equal(
       return a->Eflags.compare_type == b->Eflags.compare_type;
     }
     case Storage_Tag_Static: {
-      return !memcmp(a->Static.memory, b->Static.memory, a->byte_size);
+      // We need to know the memory layout (the descriptor) of the
+      // static values to properly compare them. `memcmp` does not
+      // work due to padding.
+      panic("Static values must be compared using storage_static_equal");
+      break;
     }
     case Storage_Tag_Memory: {
       const Memory_Location *a_location = &a->Memory.location;
@@ -692,9 +778,15 @@ instruction_equal(
     case Instruction_Type_Assembly: {
       if (a->assembly.mnemonic != b->assembly.mnemonic) return false;
       for (u64 i = 0; i < countof(a->assembly.operands); ++i) {
-        if (!storage_equal(&a->assembly.operands[i], &b->assembly.operands[i])) {
-          return false;
+        const Storage *a_storage = &a->assembly.operands[i];
+        const Storage *b_storage = &b->assembly.operands[i];
+        if (a_storage->tag != b_storage->tag) return false;
+        // FIXME Use immediates instead of static storage for instructions
+        if (a_storage->tag == Storage_Tag_Static) {
+          assert(a_storage->byte_size == b_storage->byte_size);
+          return memcmp(a_storage->Static.memory, b_storage->Static.memory, a_storage->byte_size) == 0;
         }
+        if (!storage_equal(a_storage, b_storage)) return false;
       }
       break;
     }
@@ -773,7 +865,6 @@ value_number_literal(
   if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
 
   *literal = (Number_Literal) {
-    .digits = digits,
     .base = base,
     .negative = false,
     .bits = bits,

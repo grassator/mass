@@ -208,9 +208,8 @@ spec("source") {
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = token->storage.Static.memory;
-      spec_check_slice(literal->digits, slice_literal("CAFE"));
       check(!literal->negative);
-      check(literal->base == Number_Base_16);
+      check(literal->bits == 0xCAFE);
     }
 
     it("should be able to parse binary integers") {
@@ -225,9 +224,8 @@ spec("source") {
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
       Number_Literal *literal = token->storage.Static.memory;
-      spec_check_slice(literal->digits, slice_literal("100"));
+      check(literal->bits == 0b100);
       check(!literal->negative);
-      check(literal->base == Number_Base_2);
     }
 
     it("should be able to tokenize a sum of integers") {

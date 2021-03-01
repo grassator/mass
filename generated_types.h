@@ -326,7 +326,6 @@ typedef enum Number_Base {
 } Number_Base;
 
 typedef struct Number_Literal {
-  Slice digits;
   Number_Base base;
   u32 negative;
   u64 bits;
@@ -938,11 +937,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info,
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
 MASS_DEFINE_OPAQUE_C_TYPE(number_base, Number_Base)
 MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
-  {
-    .name = slice_literal_fields("digits"),
-    .descriptor = &descriptor_slice,
-    .offset = offsetof(Number_Literal, digits),
-  },
   {
     .name = slice_literal_fields("base"),
     .descriptor = &descriptor_number_base,

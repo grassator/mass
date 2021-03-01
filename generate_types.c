@@ -535,7 +535,6 @@ main(void) {
   }));
 
   push_type(type_struct("Number_Literal", (Struct_Item[]){
-    { "Slice", "digits" },
     { "Number_Base", "base" },
     { "u32", "negative" },
     { "u64", "bits" },

@@ -156,8 +156,8 @@ descriptor_byte_size(
 
 bool
 same_type(
-  Descriptor *a,
-  Descriptor *b
+  const Descriptor *a,
+  const Descriptor *b
 );
 
 bool
