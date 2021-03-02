@@ -212,6 +212,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -219,6 +220,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -226,6 +228,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Tagged_Union: {
       char *lowercase_name = strtolower(type->union_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
@@ -246,6 +249,7 @@ print_mass_descriptor_and_type(
   switch(type->tag) {
     case Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->struct_.name);
       fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
@@ -781,6 +785,7 @@ main(void) {
       { "u8 *", "bytes" },
       { "u64", "length" },
     }));
+    fprintf(file, "typedef dyn_array_type(Slice *) Array_Slice_Ptr;\n");
 
     for (uint32_t i = 0; i < type_count; ++i) {
       print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
