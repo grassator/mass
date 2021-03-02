@@ -362,8 +362,15 @@ win32_program_jit(
   // Setup permissions for the code segment
   {
     win32_section_protect_from(&memory->sections.code, code_protected_size);
-    if (!FlushInstructionCache(GetCurrentProcess(), code_buffer->memory, code_buffer->occupied)) {
-      panic("Unable to flush instruction cache");
+    u64 size_to_flush = memory->sections.code.buffer.occupied - code_protected_size;
+    if (size_to_flush) {
+      if (!FlushInstructionCache(
+        GetCurrentProcess(),
+        code_buffer->memory + code_protected_size,
+        size_to_flush
+      )) {
+        panic("Unable to flush instruction cache");
+      }
     }
   }
 
