@@ -135,6 +135,14 @@ typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
 typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
 
+typedef struct Function_Info Function_Info;
+typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
+typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
+
+typedef struct Overload_Node Overload_Node;
+typedef dyn_array_type(Overload_Node *) Array_Overload_Node_Ptr;
+typedef dyn_array_type(const Overload_Node *) Array_Const_Overload_Node_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -520,6 +528,22 @@ typedef struct Function_Return {
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
+typedef struct Function_Info {
+  Descriptor_Function_Flags flags;
+  u32 _flags_padding;
+  Array_Function_Argument arguments;
+  Value * body;
+  Scope * scope;
+  Function_Return returns;
+} Function_Info;
+typedef dyn_array_type(Function_Info) Array_Function_Info;
+
+typedef struct Overload_Node {
+  Function_Argument argument;
+  Array_Overload_Node_Ptr children;
+} Overload_Node;
+typedef dyn_array_type(Overload_Node) Array_Overload_Node;
+
 typedef enum {
   Descriptor_Tag_Void = 0,
   Descriptor_Tag_Any = 1,
@@ -534,12 +558,7 @@ typedef struct {
   u64 bit_size;
 } Descriptor_Opaque;
 typedef struct {
-  Descriptor_Function_Flags flags;
-  u32 _flags_padding;
-  Array_Function_Argument arguments;
-  Value * body;
-  Scope * scope;
-  Function_Return returns;
+  Function_Info info;
 } Descriptor_Function;
 typedef struct {
   Descriptor * item;
@@ -590,7 +609,6 @@ MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
-MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol);
 #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)
 MASS_ENUMERATE_BUILT_IN_TYPES
@@ -745,6 +763,14 @@ static Descriptor descriptor_function_return;
 static Descriptor descriptor_array_function_return_ptr;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
+static Descriptor descriptor_function_info;
+static Descriptor descriptor_array_function_info_ptr;
+static Descriptor descriptor_function_info_pointer;
+static Descriptor descriptor_function_info_pointer_pointer;
+static Descriptor descriptor_overload_node;
+static Descriptor descriptor_array_overload_node_ptr;
+static Descriptor descriptor_overload_node_pointer;
+static Descriptor descriptor_overload_node_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
@@ -760,6 +786,7 @@ static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position,
   {
     .name = slice_literal_fields("line"),
@@ -774,6 +801,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_position,
 );
 MASS_DEFINE_TYPE_VALUE(source_position);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_file_ptr, Array_Source_File_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_source_file, Array_Source_File)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_file,
   {
     .name = slice_literal_fields("path"),
@@ -793,6 +821,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_file,
 );
 MASS_DEFINE_TYPE_VALUE(source_file);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_range_ptr, Array_Source_Range_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_source_range, Array_Source_Range)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_range,
   {
     .name = slice_literal_fields("file"),
@@ -808,6 +837,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range,
 MASS_DEFINE_TYPE_VALUE(source_range);
 MASS_DEFINE_OPAQUE_C_TYPE(module_flags, Module_Flags)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_ptr, Array_Module_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
 MASS_DEFINE_STRUCT_DESCRIPTOR(module,
   {
     .name = slice_literal_fields("flags"),
@@ -837,6 +867,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module,
 );
 MASS_DEFINE_TYPE_VALUE(module);
 MASS_DEFINE_OPAQUE_C_TYPE(array_parse_error_ptr, Array_Parse_Error_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_parse_error, Array_Parse_Error)
 MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
   {
     .name = slice_literal_fields("message"),
@@ -852,6 +883,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
 MASS_DEFINE_TYPE_VALUE(parse_error);
 MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view_ptr, Array_Value_View_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_value_view, Array_Value_View)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
   {
     .name = slice_literal_fields("values"),
@@ -872,6 +904,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
 MASS_DEFINE_TYPE_VALUE(value_view);
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_type, Symbol_Type)
 MASS_DEFINE_OPAQUE_C_TYPE(array_symbol_ptr, Array_Symbol_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_symbol, Array_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
   {
     .name = slice_literal_fields("type"),
@@ -891,6 +924,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
 );
 MASS_DEFINE_TYPE_VALUE(symbol);
 MASS_DEFINE_OPAQUE_C_TYPE(array_group_ptr, Array_Group_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_group, Array_Group)
 MASS_DEFINE_STRUCT_DESCRIPTOR(group,
   {
     .name = slice_literal_fields("tag"),
@@ -911,6 +945,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group,
 MASS_DEFINE_TYPE_VALUE(group);
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 MASS_DEFINE_OPAQUE_C_TYPE(array_section_ptr, Array_Section_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_section, Array_Section)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section,
   {
     .name = slice_literal_fields("buffer"),
@@ -936,6 +971,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section,
 MASS_DEFINE_TYPE_VALUE(section);
 MASS_DEFINE_OPAQUE_C_TYPE(register, Register)
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_index_ptr, Array_Label_Index_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_label_index, Array_Label_Index)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label_index,
   {
     .name = slice_literal_fields("value"),
@@ -945,6 +981,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_index,
 );
 MASS_DEFINE_TYPE_VALUE(label_index);
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_ptr, Array_Label_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_label, Array_Label)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label,
   {
     .name = slice_literal_fields("resolved"),
@@ -969,6 +1006,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label,
 );
 MASS_DEFINE_TYPE_VALUE(label);
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info_ptr, Array_Label_Location_Diff_Patch_Info_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_label_location_diff_patch_info, Array_Label_Location_Diff_Patch_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info,
   {
     .name = slice_literal_fields("target_label_index"),
@@ -989,6 +1027,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info,
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
 MASS_DEFINE_OPAQUE_C_TYPE(number_base, Number_Base)
 MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal_ptr, Array_Number_Literal_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal, Array_Number_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
   {
     .name = slice_literal_fields("base"),
@@ -1008,6 +1047,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
 );
 MASS_DEFINE_TYPE_VALUE(number_literal);
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol_ptr, Array_External_Symbol_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol, Array_External_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol,
   {
     .name = slice_literal_fields("library_name"),
@@ -1022,6 +1062,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol,
 );
 MASS_DEFINE_TYPE_VALUE(external_symbol);
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol_ptr, Array_Import_Symbol_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol,
   {
     .name = slice_literal_fields("name"),
@@ -1036,6 +1077,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol,
 );
 MASS_DEFINE_TYPE_VALUE(import_symbol);
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_library_ptr, Array_Import_Library_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_import_library, Array_Import_Library)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_library,
   {
     .name = slice_literal_fields("name"),
@@ -1051,6 +1093,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_library,
 MASS_DEFINE_TYPE_VALUE(import_library);
 MASS_DEFINE_OPAQUE_C_TYPE(compare_type, Compare_Type)
 MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register_ptr, Array_Maybe_Register_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register, Array_Maybe_Register)
 MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register,
   {
     .name = slice_literal_fields("index"),
@@ -1065,6 +1108,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register,
 );
 MASS_DEFINE_TYPE_VALUE(maybe_register);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location_ptr, Array_Compiler_Source_Location_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location, Array_Compiler_Source_Location)
 MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
   {
     .name = slice_literal_fields("filename"),
@@ -1086,6 +1130,7 @@ MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value,
   {
     .name = slice_literal_fields("descriptor"),
@@ -1121,6 +1166,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
 MASS_DEFINE_TYPE_VALUE(value);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field_ptr, Array_Descriptor_Struct_Field_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field, Array_Descriptor_Struct_Field)
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
   {
     .name = slice_literal_fields("name"),
@@ -1140,6 +1186,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_struct_field);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument,
   {
     .name = slice_literal_fields("name"),
@@ -1159,6 +1206,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument,
 );
 MASS_DEFINE_TYPE_VALUE(function_argument);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
   {
     .name = slice_literal_fields("name"),
@@ -1172,7 +1220,58 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_info,
+  {
+    .name = slice_literal_fields("flags"),
+    .descriptor = &descriptor_descriptor_function_flags,
+    .offset = offsetof(Function_Info, flags),
+  },
+  {
+    .name = slice_literal_fields("_flags_padding"),
+    .descriptor = &descriptor_u32,
+    .offset = offsetof(Function_Info, _flags_padding),
+  },
+  {
+    .name = slice_literal_fields("arguments"),
+    .descriptor = &descriptor_array_function_argument,
+    .offset = offsetof(Function_Info, arguments),
+  },
+  {
+    .name = slice_literal_fields("body"),
+    .descriptor = &descriptor_value_pointer,
+    .offset = offsetof(Function_Info, body),
+  },
+  {
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .offset = offsetof(Function_Info, scope),
+  },
+  {
+    .name = slice_literal_fields("returns"),
+    .descriptor = &descriptor_function_return,
+    .offset = offsetof(Function_Info, returns),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_info);
+MASS_DEFINE_OPAQUE_C_TYPE(array_overload_node_ptr, Array_Overload_Node_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_overload_node, Array_Overload_Node)
+MASS_DEFINE_STRUCT_DESCRIPTOR(overload_node,
+  {
+    .name = slice_literal_fields("argument"),
+    .descriptor = &descriptor_function_argument,
+    .offset = offsetof(Overload_Node, argument),
+  },
+  {
+    .name = slice_literal_fields("children"),
+    .descriptor = &descriptor_array_overload_node_ptr,
+    .offset = offsetof(Overload_Node, children),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(overload_node);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice,
   {
     .name = slice_literal_fields("bytes"),

@@ -1214,7 +1214,7 @@ ensure_compiled_function_body(
   if (fn_value->storage.tag != Storage_Tag_None) return;
 
   assert(fn_value->descriptor->tag == Descriptor_Tag_Function);
-  Descriptor_Function *function = &fn_value->descriptor->Function;
+  Function_Info *function = &fn_value->descriptor->Function.info;
 
   // No need to compile macro body as it will be compiled inline
   if (function->flags & Descriptor_Function_Flags_Macro) return;
@@ -1343,7 +1343,7 @@ call_function_overload(
   Array_Instruction *instructions = &builder->code_block.instructions;
   Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
   assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-  Descriptor_Function *descriptor = &to_call_descriptor->Function;
+  Function_Info *descriptor = &to_call_descriptor->Function.info;
 
   ensure_compiled_function_body(context, to_call);
 
@@ -1474,7 +1474,7 @@ call_function_overload(
 
 s64
 calculate_arguments_match_score(
-  Descriptor_Function *descriptor,
+  Function_Info *descriptor,
   Array_Value_Ptr arguments
 ) {
   enum {
@@ -1602,7 +1602,7 @@ program_init_startup_code(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
-    .Function = {
+    .Function.info = {
       .arguments = (Array_Function_Argument){&dyn_array_zero_items},
       .body = 0,
       .scope = 0,
@@ -1617,7 +1617,7 @@ program_init_startup_code(
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
-    .function = &descriptor->Function,
+    .function = &descriptor->Function.info,
     .label_index = fn_label,
     .frozen = true,
     .code_block = {

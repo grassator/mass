@@ -250,6 +250,7 @@ print_mass_descriptor_and_type(
     case Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->struct_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->struct_.name);
       fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
@@ -689,6 +690,15 @@ main(void) {
     { "Descriptor *", "descriptor" },
   }));
 
+  push_type(type_struct("Function_Info", (Struct_Item[]){
+    { "Descriptor_Function_Flags", "flags" },
+    { "u32", "_flags_padding" },
+    { "Array_Function_Argument", "arguments" },
+    { "Value *", "body" },
+    { "Scope *", "scope" },
+    { "Function_Return", "returns" },
+  }));
+
   push_type(add_common_fields(type_union("Descriptor", (Struct[]){
     struct_empty("Void"),
     struct_empty("Any"),
@@ -696,12 +706,7 @@ main(void) {
       { "u64", "bit_size" },
     }),
     struct_fields("Function", (Struct_Item[]){
-      { "Descriptor_Function_Flags", "flags" },
-      { "u32", "_flags_padding" },
-      { "Array_Function_Argument", "arguments" },
-      { "Value *", "body" },
-      { "Scope *", "scope" },
-      { "Function_Return", "returns" },
+      { "Function_Info", "info" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "Descriptor *", "item" },
@@ -775,7 +780,6 @@ main(void) {
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol);\n");
     fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\\\n");
     fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\n");
     fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");

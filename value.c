@@ -89,15 +89,15 @@ same_type(
       return a == b;
     }
     case Descriptor_Tag_Function: {
-      if (!same_type(a->Function.returns.descriptor, b->Function.returns.descriptor)) {
+      if (!same_type(a->Function.info.returns.descriptor, b->Function.info.returns.descriptor)) {
         return false;
       }
-      if (dyn_array_length(a->Function.arguments) != dyn_array_length(b->Function.arguments)) {
+      if (dyn_array_length(a->Function.info.arguments) != dyn_array_length(b->Function.info.arguments)) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->Function.arguments); ++i) {
-        Function_Argument *a_arg = dyn_array_get(a->Function.arguments, i);
-        Function_Argument *b_arg = dyn_array_get(b->Function.arguments, i);
+      for (u64 i = 0; i < dyn_array_length(a->Function.info.arguments); ++i) {
+        Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
+        Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
         if(!same_type(a_arg->value->descriptor, b_arg->value->descriptor)) return false;
         if(storage_equal(&a_arg->value->storage, &b_arg->value->storage)) return false;
       }
@@ -1154,7 +1154,7 @@ Value *
 function_argument_value_at_index_internal(
   Compiler_Source_Location source_location,
   Execution_Context *context,
-  Descriptor_Function *function,
+  Function_Info *function,
   u64 argument_index,
   Function_Argument_Mode mode
 ) {

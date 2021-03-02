@@ -1285,7 +1285,7 @@ token_make_macro_capture_function(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .name = capture_name,
-    .Function = {
+    .Function.info = {
       .arguments = (Array_Function_Argument){&dyn_array_zero_items},
       .scope = captured_scope,
       .body = fake_body,
@@ -1362,7 +1362,7 @@ token_apply_macro_syntax(
         .name = slice_literal("@spliced_scope"),
         .value = argument_value,
       });
-      Descriptor_Function *overload_function = &scope_overload->descriptor->Function;
+      Function_Info *overload_function = &scope_overload->descriptor->Function.info;
       overload_function->arguments = overload_arguments;
       result->next_overload = scope_overload;
 
@@ -1598,7 +1598,7 @@ Function_Argument
 token_match_argument(
   Execution_Context *context,
   Value_View view,
-  Descriptor_Function *function
+  Function_Info *function
 ) {
   Function_Argument arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
@@ -2374,7 +2374,7 @@ token_process_function_literal(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
-    .Function = {
+    .Function.info = {
       .arguments = (Array_Function_Argument){&dyn_array_zero_items},
       .body = body,
       .scope = function_scope,
@@ -2384,7 +2384,7 @@ token_process_function_literal(
 
   Value_View return_types_view = value_as_group(return_types)->children;
   if (return_types_view.length == 0) {
-    descriptor->Function.returns = (Function_Return) { .descriptor = &descriptor_void, };
+    descriptor->Function.info.returns = (Function_Return) { .descriptor = &descriptor_void, };
   } else {
     Value_View_Split_Iterator it = { .view = return_types_view };
 
@@ -2401,14 +2401,14 @@ token_process_function_literal(
       Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
       arg_context.builder = 0;
-      descriptor->Function.returns = token_match_return_type(&arg_context, arg_view);
+      descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
     }
   }
 
   bool previous_argument_has_default_value = false;
   Value_View args_view = value_as_group(args)->children;
   if (args_view.length != 0) {
-    descriptor->Function.arguments = dyn_array_make(
+    descriptor->Function.info.arguments = dyn_array_make(
       Array_Function_Argument,
       .allocator = context->allocator,
       .capacity = 4,
@@ -2420,8 +2420,8 @@ token_process_function_literal(
       Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
       arg_context.builder = 0;
-      Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function);
-      dyn_array_push(descriptor->Function.arguments, arg);
+      Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
+      dyn_array_push(descriptor->Function.info.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
       if (previous_argument_has_default_value) {
         if (function_argument_is_exact(&arg) || !arg.maybe_default_expression.length ) {
@@ -2468,7 +2468,7 @@ compile_time_eval(
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
     .name = slice_literal("$compile_time_eval$"),
-    .Function = {
+    .Function.info = {
       .returns = {
         .descriptor = &descriptor_void,
       },
@@ -2477,7 +2477,7 @@ compile_time_eval(
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval"));
   Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
   Function_Builder eval_builder = {
-    .function = &descriptor->Function,
+    .function = &descriptor->Function.info,
     .label_index = eval_label_index,
     .code_block = {
       .end_label = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval_end")),
@@ -2905,12 +2905,12 @@ token_handle_function_call(
 
   if (
     target->descriptor->tag == Descriptor_Tag_Function &&
-    (target->descriptor->Function.flags & Descriptor_Function_Flags_Compile_Time)
+    (target->descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
-    non_compile_time_descriptor->Function.flags &= ~Descriptor_Function_Flags_Compile_Time;
+    non_compile_time_descriptor->Function.info.flags &= ~Descriptor_Function_Flags_Compile_Time;
     Value *fake_target_value =
       value_make(context, non_compile_time_descriptor, target->storage, source_range);
     Value_View fake_eval_view = {
@@ -2969,7 +2969,7 @@ token_handle_function_call(
   for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
     Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-    Descriptor_Function *descriptor = &to_call_descriptor->Function;
+    Function_Info *descriptor = &to_call_descriptor->Function.info;
     //if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == -1) continue; // no match
@@ -3006,7 +3006,7 @@ token_handle_function_call(
 
   Value *overload = match.value;
   if (overload) {
-    Descriptor_Function *function = &overload->descriptor->Function;
+    Function_Info *function = &overload->descriptor->Function.info;
 
     if (function->flags & Descriptor_Function_Flags_Macro) {
       assert(function->scope->parent);
@@ -3447,8 +3447,8 @@ token_eval_operator(
       if (
         !startup_function ||
         startup_function->descriptor->tag != Descriptor_Tag_Function ||
-        dyn_array_length(startup_function->descriptor->Function.arguments) ||
-        startup_function->descriptor->Function.returns.descriptor != &descriptor_void
+        dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
+        startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
       ) {
         context_error_snprintf(
           context, args_range, "`startup` expects a () -> () {...} function as an argument"
@@ -3727,9 +3727,9 @@ token_eval_operator(
     if (function_value) {
       if (
         function_value->descriptor->tag == Descriptor_Tag_Function &&
-        !value_is_external_symbol(function_value->descriptor->Function.body)
+        !value_is_external_symbol(function_value->descriptor->Function.info.body)
       ) {
-        Descriptor_Function *descriptor = &function_value->descriptor->Function;
+        Function_Info *descriptor = &function_value->descriptor->Function.info;
         descriptor->flags |= Descriptor_Function_Flags_Macro;
       } else {
         context_error_snprintf(
@@ -4873,7 +4873,7 @@ scope_define_builtins(
     *descriptor = (Descriptor) {\
       .tag = Descriptor_Tag_Function,\
       .name = slice_literal(_NAME_),\
-      .Function = {\
+      .Function.info = {\
         .flags = Descriptor_Function_Flags_Compile_Time,\
         .arguments = arguments,\
         .returns = {\
