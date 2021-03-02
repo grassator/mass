@@ -139,10 +139,6 @@ typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
-typedef struct Overload_Node Overload_Node;
-typedef dyn_array_type(Overload_Node *) Array_Overload_Node_Ptr;
-typedef dyn_array_type(const Overload_Node *) Array_Const_Overload_Node_Ptr;
-
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -538,12 +534,6 @@ typedef struct Function_Info {
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
-typedef struct Overload_Node {
-  Function_Argument argument;
-  Array_Overload_Node_Ptr children;
-} Overload_Node;
-typedef dyn_array_type(Overload_Node) Array_Overload_Node;
-
 typedef enum {
   Descriptor_Tag_Void = 0,
   Descriptor_Tag_Any = 1,
@@ -767,10 +757,6 @@ static Descriptor descriptor_function_info;
 static Descriptor descriptor_array_function_info_ptr;
 static Descriptor descriptor_function_info_pointer;
 static Descriptor descriptor_function_info_pointer_pointer;
-static Descriptor descriptor_overload_node;
-static Descriptor descriptor_array_overload_node_ptr;
-static Descriptor descriptor_overload_node_pointer;
-static Descriptor descriptor_overload_node_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
@@ -1255,21 +1241,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload_node_ptr, Array_Overload_Node_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_overload_node, Array_Overload_Node)
-MASS_DEFINE_STRUCT_DESCRIPTOR(overload_node,
-  {
-    .name = slice_literal_fields("argument"),
-    .descriptor = &descriptor_function_argument,
-    .offset = offsetof(Overload_Node, argument),
-  },
-  {
-    .name = slice_literal_fields("children"),
-    .descriptor = &descriptor_array_overload_node_ptr,
-    .offset = offsetof(Overload_Node, children),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(overload_node);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice,

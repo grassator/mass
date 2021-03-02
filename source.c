@@ -1203,7 +1203,6 @@ token_match_pattern(
   u64 pattern_length = dyn_array_length(macro->pattern);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
 
-  dyn_array_clear(*out_match);
   u64 pattern_index = 0;
   u64 view_index = 0;
 
@@ -1215,7 +1214,9 @@ token_match_pattern(
         if (!token) {
           return 0;
         }
-        dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
+        if (out_match) {
+          dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
+        }
         view_index++;
         break;
       }
@@ -1237,7 +1238,9 @@ token_match_pattern(
             break;
           }
         }
-        dyn_array_push(*out_match, value_view_slice(&view, any_token_start_view_index, view_index));
+        if (out_match) {
+          dyn_array_push(*out_match, value_view_slice(&view, any_token_start_view_index, view_index));
+        }
         break;
       }
     }
@@ -1517,25 +1520,24 @@ token_parse_macros(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Array_Value_View match = dyn_array_make(Array_Value_View);
-  Value *replacement = 0;
   Scope *scope = context->scope;
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
-      *match_length = token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Expression);
+      *match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
+      Array_Value_View match = dyn_array_make(Array_Value_View);
+      *match_length = token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Expression);
 
-      replacement = value_any(context, value_view.source_range);
+      Value *replacement = value_any(context, value_view.source_range);
       token_apply_macro_syntax(context, match, macro, replacement);
-      goto defer;
+      dyn_array_destroy(match);
+      return replacement;
     }
   }
-  defer:
-  dyn_array_destroy(match);
-  return replacement;
+  return 0;
 }
 
 Descriptor *
