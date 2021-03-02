@@ -24,17 +24,12 @@ typedef enum {
 
 typedef struct {
   Token_Pattern token_pattern;
-  Slice capture_name;
 } Macro_Pattern_Single_Token;
 
 typedef struct {
-  Slice capture_name;
-} Macro_Pattern_Any_Token_Sequence;
-
-typedef struct {
   Macro_Pattern_Tag tag;
+  Slice capture_name;
   union {
-    Macro_Pattern_Any_Token_Sequence Any_Token_Sequence;
     Macro_Pattern_Single_Token Single_Token;
   };
 } Macro_Pattern;

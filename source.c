@@ -1326,18 +1326,7 @@ token_apply_macro_syntax(
 
   for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
     Macro_Pattern *item = dyn_array_get(macro->pattern, i);
-    Slice capture_name = {0};
-
-    switch(item->tag) {
-      case Macro_Pattern_Tag_Single_Token: {
-        capture_name = item->Single_Token.capture_name;
-        break;
-      }
-      case Macro_Pattern_Tag_Any_Token_Sequence: {
-        capture_name = item->Any_Token_Sequence.capture_name;
-        break;
-      }
-    }
+    Slice capture_name = item->capture_name;
 
     if (!capture_name.length) continue;
 
@@ -1466,25 +1455,6 @@ token_parse_macro_rewrite(
     }
   }
 
-  Raw_Macro_Map *macro_map = hash_map_make(Raw_Macro_Map);
-  for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
-    Macro_Pattern *item = dyn_array_get(macro->pattern, i);
-    Slice capture_name = {0};
-
-    switch(item->tag) {
-      case Macro_Pattern_Tag_Single_Token: {
-        capture_name = item->Single_Token.capture_name;
-        break;
-      }
-      case Macro_Pattern_Tag_Any_Token_Sequence: {
-        capture_name = item->Any_Token_Sequence.capture_name;
-        break;
-      }
-    }
-    Value_View capture_view = *dyn_array_get(match, i);
-    hash_map_set(macro_map, capture_name, capture_view);
-  }
-
   // TODO precalculate required capacity
   Array_Value_Ptr result_tokens = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
 
@@ -1492,7 +1462,14 @@ token_parse_macro_rewrite(
     Value *value = value_view_get(macro->replacement, i);
     if (value_is_symbol(value)) {
       Slice name = value_as_symbol(value)->name;
-      Value_View *maybe_replacement = hash_map_get(macro_map, name);
+      Value_View *maybe_replacement = 0;
+      for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
+        Macro_Pattern *item = dyn_array_get(macro->pattern, i);
+        if (slice_equal(item->capture_name, name)) {
+          maybe_replacement = dyn_array_get(match, i);
+          break;
+        }
+      }
       if (maybe_replacement) {
         for (u64 splice_index = 0; splice_index < maybe_replacement->length; ++splice_index) {
           dyn_array_push(result_tokens, value_view_get(*maybe_replacement, splice_index));
@@ -1508,7 +1485,6 @@ token_parse_macro_rewrite(
   token_parse_block_view(context, block_tokens, result_value);
 
   dyn_array_destroy(match);
-  hash_map_destroy(macro_map);
   return match_length;
 }
 
@@ -2224,16 +2200,7 @@ token_parse_syntax_definition(
         );
         goto err;
       }
-      switch(last_pattern->tag) {
-        case Macro_Pattern_Tag_Single_Token: {
-          last_pattern->Single_Token.capture_name = value_as_symbol(symbol_token)->name;
-          break;
-        }
-        case Macro_Pattern_Tag_Any_Token_Sequence: {
-          last_pattern->Any_Token_Sequence.capture_name = value_as_symbol(symbol_token)->name;
-          break;
-        }
-      }
+      last_pattern->capture_name = value_as_symbol(symbol_token)->name;
     } else {
       context_error_snprintf(
         context, value->source_range,
