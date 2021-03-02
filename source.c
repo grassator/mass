@@ -3571,21 +3571,31 @@ token_eval_operator(
 
     Function_Builder *builder = context->builder;
 
-    Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
+    Value *any_result = value_any(context, lhs_range);
     if (slice_equal(operator, slice_literal("+"))) {
-      plus(context, &lhs_range, stack_result, lhs_value, rhs_value);
+      plus(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {
-      minus(context, &lhs_range, stack_result, lhs_value, rhs_value);
+      minus(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("*"))) {
-      multiply(context, &lhs_range, stack_result, lhs_value, rhs_value);
+      multiply(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("/"))) {
-      divide(context, &lhs_range, stack_result, lhs_value, rhs_value);
+      divide(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("%"))) {
-      value_remainder(context, &lhs_range, stack_result, lhs_value, rhs_value);
+      value_remainder(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else {
       panic("Internal error: Unexpected operator");
     }
-    MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
+    if (any_result->storage.tag != Storage_Tag_Static) {
+      // FIXME do proper register allocation
+      Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
+      MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
+      if (any_result->storage.tag == Storage_Tag_Register) {
+        ensure_register_released(context->builder, any_result->storage.Register.index);
+      }
+      MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
+    } else {
+      MASS_ON_ERROR(assign(context, result_value, any_result)) return;
+    }
   } else if (
     slice_equal(operator, slice_literal(">")) ||
     slice_equal(operator, slice_literal("<")) ||

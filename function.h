@@ -79,7 +79,7 @@ fn_encode(
   Function_Layout *out_layout
 );
 
-void
+static inline void
 plus(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -88,7 +88,7 @@ plus(
   Value *b
 );
 
-void
+static inline void
 minus(
   Execution_Context *context,
   const Source_Range *source_range,

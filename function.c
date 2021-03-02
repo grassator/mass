@@ -64,13 +64,21 @@ register_acquire_temp(
   return -1;
 }
 
+static inline void
+ensure_register_released(
+  Function_Builder *builder,
+  Register reg_index
+) {
+  register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
+}
+
 void
 register_release(
   Function_Builder *builder,
   Register reg_index
 ) {
   assert(register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
-  register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
+  ensure_register_released(builder, reg_index);
 }
 
 
@@ -777,7 +785,27 @@ typedef enum {
   Arithmetic_Operation_Minus,
 } Arithmetic_Operation;
 
+void
+maybe_constant_fold_internal(
+  Execution_Context *context,
+  Value *a,
+  s64 constant_result,
+  Value *result_value,
+  const Source_Range *source_range
+) {
+  Storage imm_storage;
+  switch(a->storage.byte_size) {
+    case 1: imm_storage = imm8(context->allocator, s64_to_s8(constant_result)); break;
+    case 2: imm_storage = imm16(context->allocator, s64_to_s16(constant_result)); break;
+    case 4: imm_storage = imm32(context->allocator, s64_to_s32(constant_result)); break;
+    case 8: imm_storage = imm64(context->allocator, s64_to_s64(constant_result)); break;
+    default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
+  }
+  Value *imm_value = value_make(context, a->descriptor, imm_storage, *source_range);
+  MASS_ON_ERROR(assign(context, result_value, imm_value));
+}
 
+// TODO properly support unsigned numbers
 #define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     Storage *a_operand = &(_a_)->storage;\
@@ -785,8 +813,8 @@ typedef enum {
     if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
       s64 a_s64 = storage_static_value_up_to_s64(a_operand);\
       s64 b_s64 = storage_static_value_up_to_s64(b_operand);\
-      Value *imm_value = value_from_signed_immediate((_context_), a_s64 _operator_ b_s64, *(_loc_));\
-      MASS_ON_ERROR(assign((_context_), (_result_), imm_value));\
+      s64 constant_result = a_s64 _operator_ b_s64;\
+      maybe_constant_fold_internal((_context_), (_a_), constant_result, (_result_), (_loc_));\
       return;\
     }\
   } while(0)
@@ -909,7 +937,7 @@ plus_or_minus(
   }
 }
 
-void
+static inline void
 plus(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -920,7 +948,7 @@ plus(
   plus_or_minus(context, Arithmetic_Operation_Plus, source_range, result_value, a, b);
 }
 
-void
+static inline void
 minus(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -1046,16 +1074,16 @@ divide_or_remainder(
   // FIXME division uses specific registers so if the result_value operand is `any`
   //       we need to create a new temporary value and "return" that
   if (operation == Divide_Operation_Divide) {
-    move_value(allocator, builder, source_range, &result_value->storage, &reg_a->storage);
+    move_to_result_from_temp(allocator, builder, source_range, result_value, reg_a);
   } else {
     if (descriptor_byte_size(larger_descriptor) == 1) {
       Value *temp_result =
         value_register_for_descriptor(context, Register_AH, larger_descriptor, *source_range);
-      move_value(allocator, builder, source_range, &result_value->storage, &temp_result->storage);
+      move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     } else {
       Value *temp_result =
         value_register_for_descriptor(context, Register_D, larger_descriptor, *source_range);
-      move_value(allocator, builder, source_range, &result_value->storage, &temp_result->storage);
+      move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     }
   }
 
