@@ -1442,10 +1442,9 @@ token_parse_macro_rewrite(
   assert(payload);
   if (!value_view.length) return 0;
   Macro *macro = payload;
-  // TODO @Speed would be nice to not need this copy
-  Array_Value_View match = dyn_array_make(Array_Value_View);
-  u64 match_length = token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
+  u64 match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Statement);
   if (!match_length) return 0;
+
   Value_View rest = value_view_rest(&value_view, match_length);
   if (rest.length) {
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
@@ -1454,6 +1453,8 @@ token_parse_macro_rewrite(
       return 0;
     }
   }
+  Array_Value_View match = dyn_array_make(Array_Value_View);
+  token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
 
   // TODO precalculate required capacity
   Array_Value_Ptr result_tokens = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
@@ -1505,7 +1506,7 @@ token_parse_macros(
       *match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
       Array_Value_View match = dyn_array_make(Array_Value_View);
-      *match_length = token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Expression);
+      token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Expression);
 
       Value *replacement = value_any(context, value_view.source_range);
       token_apply_macro_syntax(context, match, macro, replacement);

@@ -122,6 +122,10 @@ spec("source") {
     test_context = execution_context_from_compilation(&test_compilation);
   }
 
+  after_each() {
+      compilation_deinit(&test_compilation);
+  }
+
   describe("Scope") {
     it("should be able to set and lookup values") {
       Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
