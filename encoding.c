@@ -274,7 +274,7 @@ encode_instruction_assembly(
         });
     } else if (storage->tag == Storage_Tag_Static) {
       Slice slice = {
-        .bytes = storage_static_as_c_type_internal(*storage, storage->byte_size),
+        .bytes = storage_static_as_c_type_internal(storage, storage->byte_size),
         .length = storage->byte_size,
       };
       virtual_memory_buffer_append_slice(buffer, slice);

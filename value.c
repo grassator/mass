@@ -6,34 +6,34 @@
 #include "win32_runtime.h"
 #endif
 
-static inline void *
+static inline const void *
 storage_static_as_c_type_internal(
-  Storage storage,
+  const Storage *storage,
   u64 byte_size
 ) {
-  assert(storage.byte_size == byte_size);
-  assert(storage.tag == Storage_Tag_Static);
+  assert(storage->byte_size == byte_size);
+  assert(storage->tag == Storage_Tag_Static);
 
   switch(byte_size) {
     case 1: {
-      assert(storage.Static.memory.tag == Static_Memory_Tag_U8);
-      return &storage.Static.memory.U8.value;
+      assert(storage->Static.memory.tag == Static_Memory_Tag_U8);
+      return &storage->Static.memory.U8.value;
     }
     case 2: {
-      assert(storage.Static.memory.tag == Static_Memory_Tag_U16);
-      return &storage.Static.memory.U16.value;
+      assert(storage->Static.memory.tag == Static_Memory_Tag_U16);
+      return &storage->Static.memory.U16.value;
     }
     case 4: {
-      assert(storage.Static.memory.tag == Static_Memory_Tag_U32);
-      return &storage.Static.memory.U32.value;
+      assert(storage->Static.memory.tag == Static_Memory_Tag_U32);
+      return &storage->Static.memory.U32.value;
     }
     case 8: {
-      assert(storage.Static.memory.tag == Static_Memory_Tag_U64);
-      return &storage.Static.memory.U64.value;
+      assert(storage->Static.memory.tag == Static_Memory_Tag_U64);
+      return &storage->Static.memory.U64.value;
     }
     default: {
-      assert(storage.Static.memory.tag == Static_Memory_Tag_Heap);
-      return storage.Static.memory.Heap.pointer;
+      assert(storage->Static.memory.tag == Static_Memory_Tag_Heap);
+      return storage->Static.memory.Heap.pointer;
     }
   }
 }
@@ -49,12 +49,12 @@ storage_static_as_c_type_internal(
     if (!value) return false;\
     return value->descriptor == &descriptor_##_SUFFIX_;\
   }\
-  static inline _C_TYPE_ *\
+  static inline const _C_TYPE_ *\
   value_as_##_SUFFIX_(\
     const Value *value\
   ) {\
     assert(value_is_##_SUFFIX_(value));\
-    return storage_static_as_c_type(value->storage, _C_TYPE_);\
+    return storage_static_as_c_type(&value->storage, _C_TYPE_);\
   }
 
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
@@ -135,7 +135,7 @@ same_type(
 
 u64
 descriptor_alignment(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
     return descriptor_alignment(descriptor->Fixed_Size_Array.item);
@@ -253,10 +253,10 @@ storage_static_value_up_to_s64(
   const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *storage_static_as_c_type(*operand, s8);
-    case 2: return *storage_static_as_c_type(*operand, s16);
-    case 4: return *storage_static_as_c_type(*operand, s32);
-    case 8: return *storage_static_as_c_type(*operand, s64);
+    case 1: return *storage_static_as_c_type(operand, s8);
+    case 2: return *storage_static_as_c_type(operand, s16);
+    case 4: return *storage_static_as_c_type(operand, s32);
+    case 8: return *storage_static_as_c_type(operand, s64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -269,10 +269,10 @@ storage_static_value_up_to_u64(
   const Storage *operand
 ) {
   switch(operand->byte_size) {
-    case 1: return *storage_static_as_c_type(*operand, u8);
-    case 2: return *storage_static_as_c_type(*operand, u16);
-    case 4: return *storage_static_as_c_type(*operand, u32);
-    case 8: return *storage_static_as_c_type(*operand, u64);
+    case 1: return *storage_static_as_c_type(operand, u8);
+    case 2: return *storage_static_as_c_type(operand, u16);
+    case 4: return *storage_static_as_c_type(operand, u32);
+    case 8: return *storage_static_as_c_type(operand, u64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -310,19 +310,19 @@ print_operand(
     case Storage_Tag_Static: {
       switch(operand->byte_size) {
         case 1: {
-          printf("imm8(0x%02x)", *storage_static_as_c_type(*operand, u8));
+          printf("imm8(0x%02x)", *storage_static_as_c_type(operand, u8));
           break;
         }
         case 2: {
-          printf("imm16(0x%04x)", *storage_static_as_c_type(*operand, u16));
+          printf("imm16(0x%04x)", *storage_static_as_c_type(operand, u16));
           break;
         }
         case 4: {
-          printf("imm32(0x%08x)", *storage_static_as_c_type(*operand, u32));
+          printf("imm32(0x%08x)", *storage_static_as_c_type(operand, u32));
           break;
         }
         case 8: {
-          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(*operand, u64));
+          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(operand, u64));
           break;
         }
         default: {
@@ -492,13 +492,6 @@ storage_static_internal(
   return result;
 }
 
-#define storage_static_bytes(_VALUE_, _SIZE_)\
-  ((Storage) {                    \
-    .tag = Storage_Tag_Static, \
-    .byte_size = (_SIZE_), \
-    .Static.memory = (_VALUE_),\
-  })
-
 #define storage_static(_VALUE_)\
   storage_static_internal((_VALUE_), sizeof(*(_VALUE_)))
 
@@ -507,14 +500,7 @@ storage_static_internal(
   imm##_BIT_SIZE_(\
     u##_BIT_SIZE_ value\
   ) {\
-    return (Storage) {\
-      .tag = Storage_Tag_Static,\
-      .byte_size = sizeof(value),\
-      .Static.memory = {\
-        .tag = Static_Memory_Tag_U##_BIT_SIZE_,\
-        .U##_BIT_SIZE_.value = value\
-      },\
-    };\
+    return storage_static_internal(&value, (_BIT_SIZE_) / 8);\
   }
 
 DEFINE_IMM_X(8)
@@ -588,7 +574,7 @@ descriptor_struct_make(
 void
 descriptor_struct_add_field(
   Descriptor *struct_descriptor,
-  Descriptor *field_descriptor,
+  const Descriptor *field_descriptor,
   Slice field_name
 ) {
   u64 offset = 0;
@@ -679,8 +665,8 @@ storage_static_equal_internal(
         return false;
       }
       for (u64 i = 0; i < a_descriptor->Fixed_Size_Array.length; ++i) {
-        Descriptor *a_item = a_descriptor->Fixed_Size_Array.item;
-        Descriptor *b_item = b_descriptor->Fixed_Size_Array.item;
+        const Descriptor *a_item = a_descriptor->Fixed_Size_Array.item;
+        const Descriptor *b_item = b_descriptor->Fixed_Size_Array.item;
         u64 offset = descriptor_byte_size(a_item) * i;
         if (!storage_static_equal_internal(
           a_item, (s8 *)a_memory + offset, b_item, (s8 *)b_memory + offset
@@ -876,7 +862,7 @@ value_init_internal(
   Compiler_Source_Location compiler_source_location,
   Value *result,
   u64 epoch,
-  Descriptor *descriptor,
+  const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
@@ -902,7 +888,7 @@ static inline Value *
 value_make_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
-  Descriptor *descriptor,
+  const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
@@ -1101,7 +1087,7 @@ value_from_unsigned_immediate_internal(
 static inline Storage
 storage_register_for_descriptor(
   Register reg,
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
@@ -1119,7 +1105,7 @@ value_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
   Register reg,
-  Descriptor *descriptor,
+  const Descriptor *descriptor,
   Source_Range source_range
 ) {
   return value_make_internal(
@@ -1182,7 +1168,7 @@ value_global_c_string_from_slice_internal(
 Descriptor *
 descriptor_pointer_to(
   Allocator *allocator,
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
@@ -1228,12 +1214,12 @@ Value *
 function_argument_value_at_index_internal(
   Compiler_Source_Location source_location,
   Execution_Context *context,
-  Function_Info *function,
+  const Function_Info *function,
   u64 argument_index,
   Function_Argument_Mode mode
 ) {
   Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
-  Descriptor *arg_descriptor = argument->value->descriptor;
+  const Descriptor *arg_descriptor = argument->value->descriptor;
   Source_Range source_range = argument->value->source_range;
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
@@ -1262,7 +1248,7 @@ function_argument_value_at_index_internal(
       switch(mode) {
         case Function_Argument_Mode_Call: {
           // For the caller we pretend that the type is a pointer since we do not have references
-          Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
+          const Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
           return value_register_for_descriptor_internal(
             source_location, context, reg, pointer_descriptor, source_range
           );
@@ -1577,7 +1563,7 @@ typedef enum {
 Literal_Cast_Result
 value_number_literal_cast_to(
   const Value *value,
-  Descriptor *target_descriptor,
+  const Descriptor *target_descriptor,
   u64 *out_bits,
   u64 *out_bit_size
 ) {

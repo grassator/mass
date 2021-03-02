@@ -75,7 +75,7 @@ value_view_from_value_array(
 Scope *
 scope_make(
   const Allocator *allocator,
-  Scope *parent
+  const Scope *parent
 ) {
   // TODO use _Atomic when supported
   static u64 id = 0;
@@ -90,10 +90,10 @@ scope_make(
   return scope;
 }
 
-Scope *
+const Scope *
 scope_maybe_find_common_ancestor(
-  Scope *a,
-  Scope *b
+  const Scope *a,
+  const Scope *b
 ) {
   while (a && b) {
     if (a->id > b->id) a = a->parent;
@@ -106,7 +106,7 @@ scope_maybe_find_common_ancestor(
 static inline Scope *
 scope_flatten_till_internal(
   const Allocator *allocator,
-  Scope *scope,
+  const Scope *scope,
   const Scope *till,
   u64 macro_count,
   u64 statement_matcher_count
@@ -164,7 +164,7 @@ scope_flatten_till_internal(
 static inline Scope *
 scope_flatten_till(
   const Allocator *allocator,
-  Scope *scope,
+  const Scope *scope,
   const Scope *till
 ) {
   return scope_flatten_till_internal(allocator, scope, till, 0, 0);
@@ -172,7 +172,7 @@ scope_flatten_till(
 
 void
 scope_print_names(
-  Scope *scope
+  const Scope *scope
 ) {
   for (; scope; scope = scope->parent) {
     if (!scope->map) continue;
@@ -189,7 +189,7 @@ scope_print_names(
 
 Scope_Entry *
 scope_lookup(
-  Scope *scope,
+  const Scope *scope,
   Slice name
 ) {
   for (; scope; scope = scope->parent) {
@@ -209,7 +209,7 @@ token_value_force_immediate_integer(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *value,
-  Descriptor *target_descriptor
+  const Descriptor *target_descriptor
 ) {
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -293,7 +293,7 @@ Value *
 maybe_coerce_number_literal_to_integer(
   Execution_Context *context,
   Value *value,
-  Descriptor *target_descriptor
+  const Descriptor *target_descriptor
 ) {
   if (!descriptor_is_integer(target_descriptor)) return value;
   if (value->descriptor != &descriptor_number_literal) return value;
@@ -325,7 +325,7 @@ assign(
 
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
-      Number_Literal *literal = storage_static_as_c_type(source->storage, Number_Literal);
+      const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(
           context, &source_range, source, &descriptor_u64
@@ -356,7 +356,8 @@ assign(
     // is also available in the compiled binary
     // TODO this probably needs to be recursive for structs.
     //      This might require support for relocations.
-    void *source_memory = storage_static_as_c_type_internal(source->storage, source->storage.byte_size);
+    const void *source_memory =
+      storage_static_as_c_type_internal(&source->storage, source->storage.byte_size);
     Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {
@@ -413,9 +414,6 @@ scope_entry_force(
       lazy_context.scope = expr->scope;
       Value *result = value_any(context, expr->tokens.source_range);
       compile_time_eval(&lazy_context, expr->tokens, result);
-      if (result && result->descriptor->name.length == 0) {
-        result->descriptor->name = expr->name;
-      }
       *entry = (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = result,
@@ -435,7 +433,7 @@ scope_entry_force(
 Value *
 scope_lookup_force(
   Execution_Context *context,
-  Scope *scope,
+  const Scope *scope,
   Slice name
 ) {
   Scope_Entry *entry = 0;
@@ -478,7 +476,7 @@ scope_lookup_force(
   // For functions we need to gather up overloads from all parent scopes
   if (result && result->descriptor->tag == Descriptor_Tag_Function) {
     Value *last = result;
-    Scope *parent = scope;
+    const Scope *parent = scope;
     for (;;) {
       parent = parent->parent;
       if (!parent) break;
@@ -606,7 +604,7 @@ value_match(
     case Token_Pattern_Tag_String: {
       if (!value_is_slice(value)) return false;
       if (pattern->String.slice.length) {
-        Slice *slice = value_as_slice(value);
+        const Slice *slice = value_as_slice(value);
         if (!slice_equal(pattern->String.slice, *slice)) return false;
       }
       return true;
@@ -795,7 +793,9 @@ tokenize(
           if (!parent_value || !value_is_group(parent_value)) {
             panic("Tokenizer: unexpected closing char for group");
           }
-          Group *group = value_as_group(parent_value);
+          // FIXME This const cast works at the moment, but could easily break
+          //       should put the group on the stack instead.
+          Group *group = (Group *)value_as_group(parent_value);
           s8 expected_paren = 0;
           switch (group->tag) {
             case Group_Tag_Paren: {
@@ -1071,7 +1071,7 @@ token_split_next(
   return value_view_rest(&it->view, start_index);
 }
 
-static inline Descriptor *
+static inline const Descriptor *
 value_ensure_type(
   Execution_Context *context,
   Value *value,
@@ -1083,11 +1083,11 @@ value_ensure_type(
     context_error_snprintf(context, source_range, "Expected a type");
     return 0;
   }
-  Descriptor *descriptor = storage_static_as_c_type(value->storage, Descriptor);
+  const Descriptor *descriptor = storage_static_as_c_type(&value->storage, Descriptor);
   return descriptor;
 }
 
-Descriptor *
+const Descriptor *
 scope_lookup_type(
   Execution_Context *context,
   Scope *scope,
@@ -1139,7 +1139,7 @@ typedef struct {
   Value *value;
 } Token_Match_Arg;
 
-Descriptor *
+const Descriptor *
 token_force_type(
   Execution_Context *context,
   Scope *scope,
@@ -1148,10 +1148,10 @@ token_force_type(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
 
-  Descriptor *descriptor = 0;
+  const Descriptor *descriptor = 0;
   Source_Range source_range = value->source_range;
   if (value_is_group(value)) {
-    Group *group = value_as_group(value);
+    const Group *group = value_as_group(value);
     if (group->tag != Group_Tag_Square) {
       panic("TODO");
     }
@@ -1166,14 +1166,15 @@ token_force_type(
       panic("TODO: should be recursive");
     }
     Slice name = value_as_symbol(child)->name;
-    descriptor = allocator_allocate(context->allocator, Descriptor);
-    *descriptor = (Descriptor) {
+    Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
+    *temp = (Descriptor) {
       .tag = Descriptor_Tag_Pointer,
       .name = name,
       .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
     };
+    descriptor = temp;
   } else if (value_is_symbol(value)) {
-    Symbol *symbol = value_as_symbol(value);
+    const Symbol *symbol = value_as_symbol(value);
     descriptor = scope_lookup_type(context, scope, source_range, symbol->name);
     if (!descriptor) {
       MASS_ON_ERROR(*context->result) return 0;
@@ -1277,21 +1278,20 @@ token_make_fake_body(
 Value *
 token_make_macro_capture_function(
   Execution_Context *context,
-  Value_View capture_view,
+  Value *body,
   Scope *captured_scope,
+  Array_Function_Argument arguments,
   Descriptor *return_descriptor,
   Slice capture_name
 ) {
-  Value *fake_body = token_make_fake_body(context, capture_view);
-
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .name = capture_name,
     .Function.info = {
-      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .arguments = arguments,
       .scope = captured_scope,
-      .body = fake_body,
+      .body = body,
       .flags
         = Descriptor_Function_Flags_Macro
         | Descriptor_Function_Flags_No_Own_Scope
@@ -1303,7 +1303,7 @@ token_make_macro_capture_function(
     },
   };
 
-  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None}, capture_view.source_range);
+  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None}, body->source_range);
 }
 
 void
@@ -1331,10 +1331,12 @@ token_apply_macro_syntax(
     if (!capture_name.length) continue;
 
     Value_View capture_view = *dyn_array_get(match, i);
+    Value *fake_body = token_make_fake_body(context, capture_view);
     Descriptor *return_descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void;
 
+    Array_Function_Argument empty_arguments = {&dyn_array_zero_items};
     Value *result = token_make_macro_capture_function(
-      context, capture_view, captured_scope, return_descriptor, capture_name
+      context, fake_body, captured_scope, empty_arguments, return_descriptor, capture_name
     );
     // This overload allows the macro implementation to pass in a scope into a captured that
     // will be expanded with `using` to bring in values from into a local scope. It is used
@@ -1342,9 +1344,6 @@ token_apply_macro_syntax(
     // definition in the captured scope of an expansion
     // TODO @Speed figure out a better way to do this
     {
-      Value *scope_overload = token_make_macro_capture_function(
-        context, capture_view, captured_scope, return_descriptor, capture_name
-      );
       Array_Function_Argument overload_arguments = dyn_array_make(
         Array_Function_Argument, .capacity = 1, .allocator = context->allocator
       );
@@ -1354,9 +1353,6 @@ token_apply_macro_syntax(
         .name = slice_literal("@spliced_scope"),
         .value = argument_value,
       });
-      Function_Info *overload_function = &scope_overload->descriptor->Function.info;
-      overload_function->arguments = overload_arguments;
-      result->next_overload = scope_overload;
 
       Value *using = token_make_symbol(
         context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range
@@ -1372,15 +1368,18 @@ token_apply_macro_syntax(
       scope_body_tokens[0] = using;
       scope_body_tokens[1] = scope_symbol;
       scope_body_tokens[2] = semicolon;
-      scope_body_tokens[3] = overload_function->body;
+      scope_body_tokens[3] = fake_body;
 
       Value_View scope_value_view = (Value_View) {
         .values = scope_body_tokens,
         .length = 4,
         .source_range = capture_view.source_range,
       };
-      Value *fake_body = token_make_fake_body(context, scope_value_view);
-      overload_function->body = fake_body;
+      Value *overload_body = token_make_fake_body(context, scope_value_view);
+      Value *scope_overload = token_make_macro_capture_function(
+        context, overload_body, captured_scope, overload_arguments, return_descriptor, capture_name
+      );
+      result->next_overload = scope_overload;
     }
 
     scope_define(expansion_scope, capture_name, (Scope_Entry) {
@@ -1500,7 +1499,7 @@ token_parse_macros(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Scope *scope = context->scope;
+  const Scope *scope = context->scope;
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
@@ -1526,7 +1525,7 @@ token_match_fixed_array_type(
   Value_View view
 );
 
-Descriptor *
+const Descriptor *
 token_match_type(
   Execution_Context *context,
   Value_View view
@@ -1623,7 +1622,7 @@ token_match_argument(
       goto err;
     }
 
-    Descriptor *descriptor = token_match_type(context, type_expression);
+    const Descriptor *descriptor = token_match_type(context, type_expression);
     arg = (Function_Argument) {
       .name = value_as_symbol(name_token)->name,
       .value = value_make(context, descriptor, storage_none, definition.source_range),
@@ -1688,7 +1687,7 @@ token_force_value(
   if (token) {
     Value *value = token;
     if (value_is_group(token)) {
-      Group *group = value_as_group(token);
+      const Group *group = value_as_group(token);
       switch(group->tag) {
         case Group_Tag_Paren: {
           token_parse_expression(context, group->children, result_value, 0);
@@ -1748,7 +1747,7 @@ token_match_call_arguments(
 ) {
   Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   if (context->result->tag != Mass_Result_Tag_Success) return result;
-  Group *group = value_as_group(token);
+  const Group *group = value_as_group(token);
 
   if (group->children.length != 0) {
     Value_View_Split_Iterator it = { .view = group->children };
@@ -2093,7 +2092,7 @@ mass_import(
   if (module_pointer) {
     module = *module_pointer;
   } else {
-    Scope *root_scope = context.scope;
+    const Scope *root_scope = context.scope;
     while (root_scope->parent) root_scope = root_scope->parent;
     Scope *module_scope = scope_make(context.allocator, root_scope);
     module = program_module_from_file(&context, file_path, module_scope);
@@ -2140,7 +2139,7 @@ token_parse_syntax_definition(
   for (u64 i = 0; i < definition.length; ++i) {
     Value *value = value_view_get(definition, i);
     if (value_is_slice(value)) {
-      Slice *slice = value_as_slice(value);
+      const Slice *slice = value_as_slice(value);
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
         .Single_Token = {
@@ -2151,7 +2150,7 @@ token_parse_syntax_definition(
         },
       });
     } else if (value_is_group(value)) {
-      Group *group = value_as_group(value);
+      const Group *group = value_as_group(value);
       if (group->children.length) {
         context_error_snprintf(
           context, value->source_range,
@@ -2259,7 +2258,7 @@ token_match_struct_field(
   Token_Match_Operator(define, ":");
 
   Value_View rest = value_view_rest(&view, peek_index);
-  Descriptor *descriptor = token_match_type(context, rest);
+  const Descriptor *descriptor = token_match_type(context, rest);
   if (!descriptor) return false;
   descriptor_struct_add_field(struct_descriptor, descriptor, value_as_symbol(symbol)->name);
   return true;
@@ -2289,7 +2288,7 @@ token_process_c_struct_definition(
     );
     goto err;
   }
-  Group *args_group = value_as_group(args);
+  const Group *args_group = value_as_group(args);
   if (args_group->children.length != 1) {
     context_error_snprintf(
       context, args->source_range,
@@ -2317,7 +2316,7 @@ token_process_c_struct_definition(
     },
   };
 
-  Group *layout_group = value_as_group(layout_block);
+  const Group *layout_group = value_as_group(layout_block);
   if (layout_group->children.length != 0) {
     Value_View_Split_Iterator it = { .view = layout_group->children };
     while (!it.done) {
@@ -2630,7 +2629,7 @@ token_handle_c_string(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   if (dyn_array_length(args) != 1) goto err;
   Value *arg_value = *dyn_array_get(args, 0);
-  Slice *c_string = value_as_slice(arg_value);
+  const Slice *c_string = value_as_slice(arg_value);
   if (!c_string) goto err;
 
   const Value *c_string_bytes =
@@ -2695,7 +2694,7 @@ token_handle_cast(
 
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
-  Descriptor *cast_to_descriptor = value_ensure_type(context, type, *source_range);
+  const Descriptor *cast_to_descriptor = value_ensure_type(context, type, *source_range);
 
   assert(descriptor_is_integer(cast_to_descriptor));
   Value *after_cast_value = value;
@@ -2729,7 +2728,7 @@ token_handle_negation(
   MASS_ON_ERROR(token_force_value(context, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
-    Number_Literal *original = storage_static_as_c_type(value->storage, Number_Literal);
+    const Number_Literal *original = storage_static_as_c_type(&value->storage, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
@@ -2920,7 +2919,7 @@ token_handle_function_call(
     }
   }
 
-  Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
+  const Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
 
   if (target_descriptor->tag != Descriptor_Tag_Function) {
     Slice source = source_from_source_range(&source_range);
@@ -2934,10 +2933,9 @@ token_handle_function_call(
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
-    Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+    const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-    Function_Info *descriptor = &to_call_descriptor->Function.info;
-    //if (dyn_array_length(args) != dyn_array_length(descriptor->arguments)) continue;
+    const Function_Info *descriptor = &to_call_descriptor->Function.info;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == -1) continue; // no match
     if (score == match.score) {
@@ -2973,7 +2971,7 @@ token_handle_function_call(
 
   Value *overload = match.value;
   if (overload) {
-    Function_Info *function = &overload->descriptor->Function.info;
+    const Function_Info *function = &overload->descriptor->Function.info;
 
     if (function->flags & Descriptor_Function_Flags_Macro) {
       assert(function->scope->parent);
@@ -2989,7 +2987,7 @@ token_handle_function_call(
         if (arg->name.length) {
           assert(!function_argument_is_exact(arg));
           Value *arg_value;
-          Descriptor *arg_descriptor = arg->value->descriptor;
+          const Descriptor *arg_descriptor = arg->value->descriptor;
           if (i >= dyn_array_length(args)) {
             // We should catch the missing default expression in the matcher
             Value_View default_expression = arg->maybe_default_expression;
@@ -3083,7 +3081,7 @@ extend_integer_value(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *value,
-  Descriptor *target_descriptor
+  const Descriptor *target_descriptor
 ) {
   assert(descriptor_is_integer(value->descriptor));
   assert(descriptor_is_integer(target_descriptor));
@@ -3140,8 +3138,8 @@ maybe_resize_values_for_integer_math_operation(
     context, *rhs_pointer, (*lhs_pointer)->descriptor
   );
 
-  Descriptor *ld = (*lhs_pointer)->descriptor;
-  Descriptor *rd = (*rhs_pointer)->descriptor;
+  const Descriptor *ld = (*lhs_pointer)->descriptor;
+  const Descriptor *rd = (*rhs_pointer)->descriptor;
 
   bool ld_signed = descriptor_is_signed_integer(ld);
   bool rd_signed = descriptor_is_signed_integer(rd);
@@ -3151,7 +3149,7 @@ maybe_resize_values_for_integer_math_operation(
 
   if (ld_signed == rd_signed) {
     if (ld_size == rd_size) return;
-    Descriptor *larger_descriptor = ld_size > rd_size ? ld : rd;
+    const Descriptor *larger_descriptor = ld_size > rd_size ? ld : rd;
     if (ld == larger_descriptor) {
       *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, larger_descriptor);
     } else {
@@ -3201,7 +3199,7 @@ struct_get_field(
   Slice name,
   Value *result_value
 ) {
-  Descriptor *descriptor = struct_value->descriptor;
+  const Descriptor *descriptor = struct_value->descriptor;
   assert(descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
     Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
@@ -3221,7 +3219,7 @@ struct_get_field(
         }
         case Storage_Tag_Static: {
           Storage field_storage = storage_static_internal(
-            (s8 *)storage_static_as_c_type_internal(*storage, storage->byte_size) + field->offset,
+            (s8 *)storage_static_as_c_type_internal(storage, storage->byte_size) + field->offset,
             descriptor_byte_size(field->descriptor)
           );
           field_value = value_make(context, field->descriptor, field_storage, *source_range);
@@ -3328,7 +3326,7 @@ token_handle_array_access(
   index_value = maybe_coerce_number_literal_to_integer(context, index_value, &descriptor_u64);
   Value *array_element_value;
   if (array_value->descriptor->tag == Descriptor_Tag_Pointer) {
-    Descriptor *item_descriptor = array_value->descriptor->Pointer.to;
+    const Descriptor *item_descriptor = array_value->descriptor->Pointer.to;
     Storage storage = storage_load_index_address(
       context, source_range, array_value, item_descriptor, index_value
     );
@@ -3339,7 +3337,7 @@ token_handle_array_access(
     assert(array_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
     assert(!array_value->storage.Memory.location.Indirect.maybe_index_register.has_value);
 
-    Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
+    const Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
 
     u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
@@ -3479,9 +3477,14 @@ token_eval_operator(
           struct_get_field(context, &rhs_range, lhs_value, value_as_symbol(rhs)->name, result_value);
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
-          Scope *module_scope = storage_static_as_c_type(lhs_value->storage, Scope);
+          const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
+          // TODO this is quite wasteful and also might not be correct
+          //      to to create a nested scope when we try to force a value.
+          //      A better option is probably to have a special case here instead
+          //      of using `token_force_value`
+          Scope *force_scope = scope_make(context->allocator, module_scope);
           Execution_Context module_context = *context;
-          module_context.scope = module_scope;
+          module_context.scope = force_scope;
           module_context.builder = 0;
           MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
         }
@@ -3707,8 +3710,12 @@ token_eval_operator(
         function_value->descriptor->tag == Descriptor_Tag_Function &&
         !value_is_external_symbol(function_value->descriptor->Function.info.body)
       ) {
-        Function_Info *descriptor = &function_value->descriptor->Function.info;
-        descriptor->flags |= Descriptor_Function_Flags_Macro;
+        Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
+        *macro_descriptor = *function_value->descriptor;
+        macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+        function_value = value_make(
+          context, macro_descriptor, function_value->storage, function_value->source_range
+        );
       } else {
         context_error_snprintf(
           context, source_range,
@@ -3855,7 +3862,7 @@ token_parse_if_expression(
   MASS_ON_ERROR(*context->result) goto err;
 
   if (if_value->storage.tag == Storage_Tag_Static) {
-    Descriptor *stack_descriptor = if_value->descriptor;
+    const Descriptor *stack_descriptor = if_value->descriptor;
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
     }
@@ -3947,7 +3954,7 @@ token_parse_expression(
     Value *value = value_view_get(view, i);
     if (value_is_group(value)) {
       dyn_array_push(value_stack, value);
-      Group *group = value_as_group(value);
+      const Group *group = value_as_group(value);
       switch (group->tag) {
         case Group_Tag_Paren: {
           if (!is_previous_an_operator) {
@@ -4047,14 +4054,14 @@ token_parse_block_view(
       continue;
     }
     for (
-      Scope *statement_matcher_scope = context->scope;
+      const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
       statement_matcher_scope = statement_matcher_scope->parent
     ) {
       if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
         continue;
       }
-      Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
+      const Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
       // Do a reverse iteration because we want statements that are defined later
       // to have higher precedence when parsing
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
@@ -4096,7 +4103,7 @@ token_parse_block_no_scope(
   Value *block,
   Value *block_result_value
 ) {
-  Group *group = value_as_group(block);
+  const Group *group = value_as_group(block);
   assert(group->tag == Group_Tag_Curly);
 
   if (!group->children.length) {
@@ -4147,8 +4154,8 @@ token_parse_statement_using(
 
   // This code injects a proxy scope that just uses the same data as the other
   Scope *current_scope = context->scope;
-  Scope *using_scope = storage_static_as_c_type(result->storage, Scope);
-  Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
+  const Scope *using_scope = storage_static_as_c_type(&result->storage, Scope);
+  const Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
   assert(common_ancestor);
   // TODO @Speed This is quite inefficient but I can't really think of something faster
   Scope *proxy = scope_flatten_till(context->allocator, using_scope, common_ancestor);
@@ -4366,7 +4373,7 @@ token_match_fixed_array_type(
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  Descriptor *descriptor = scope_lookup_type(
+  const Descriptor *descriptor = scope_lookup_type(
     context, context->scope, type->source_range, value_as_symbol(type)->name
   );
 
@@ -4479,7 +4486,7 @@ token_parse_definition(
   Token_Match_Operator(define, ":");
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
-  Descriptor *descriptor = token_match_type(context, rest);
+  const Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) goto err;
   Source_Range name_range = name->source_range;
   Value *value = reserve_stack(context, context->builder, descriptor, name_range);
@@ -4550,7 +4557,7 @@ token_define_global_variable(
       );
 
       void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-      memcpy(section_memory, storage_static_as_c_type_internal(value->storage, byte_size), byte_size);
+      memcpy(section_memory, storage_static_as_c_type_internal(&value->storage, byte_size), byte_size);
     }
   }
 

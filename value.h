@@ -103,7 +103,7 @@ Value *type_any_value = &(Value) {
 
 static inline bool
 descriptor_is_unsigned_integer(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   return (
     descriptor == &descriptor_u8  ||
@@ -115,7 +115,7 @@ descriptor_is_unsigned_integer(
 
 static inline bool
 descriptor_is_signed_integer(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   return (
     descriptor == &descriptor_s8  ||
@@ -127,21 +127,21 @@ descriptor_is_signed_integer(
 
 static inline bool
 descriptor_is_integer(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   return descriptor_is_signed_integer(descriptor) || descriptor_is_unsigned_integer(descriptor);
 }
 
 bool
 descriptor_is_float(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   return descriptor == &descriptor_f32 || descriptor == &descriptor_f64;
 }
 
-static inline Descriptor *
+static inline const Descriptor *
 maybe_unwrap_pointer_descriptor(
-  Descriptor *descriptor
+  const Descriptor *descriptor
 ) {
   if (descriptor->tag == Descriptor_Tag_Pointer) {
     return descriptor->Pointer.to;
@@ -239,7 +239,7 @@ typedef struct Function_Builder {
   u64 used_register_bitset;
   Slice source;
 
-  Function_Info *function;
+  const Function_Info *function;
   Label_Index label_index;
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
@@ -283,7 +283,7 @@ pointer_equal(
 ) {
   return *a == *b;
 }
-hash_map_template(Static_Pointer_Map, void *, Value, hash_pointer, pointer_equal)
+hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, pointer_equal)
 
 typedef struct Compilation {
   Virtual_Memory_Buffer allocation_buffer;

@@ -3266,7 +3266,7 @@ hash_u64(
 
 static inline s32
 hash_pointer(
-  void *address
+  const void *address
 ) {
   return hash_u64((u64)address);
 }

@@ -17,7 +17,7 @@ reserve_stack_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
   Function_Builder *fn,
-  Descriptor *descriptor,
+  const Descriptor *descriptor,
   Source_Range source_range
 ) {
   s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
@@ -653,7 +653,7 @@ fn_encode(
 Value *
 function_return_value_for_descriptor(
   Execution_Context *context,
-  Descriptor *descriptor,
+  const Descriptor *descriptor,
   Function_Argument_Mode mode,
   Source_Range source_range
 ) {
@@ -1030,7 +1030,7 @@ divide_or_remainder(
     allocator, builder, source_range, Register_D
   );
 
-  Descriptor *larger_descriptor =
+  const Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
     ? a->descriptor
     : b->descriptor;
@@ -1173,7 +1173,7 @@ compare(
     }
   }
 
-  Descriptor *larger_descriptor =
+  const Descriptor *larger_descriptor =
     descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
     ? a->descriptor
     : b->descriptor;
@@ -1239,7 +1239,7 @@ ensure_compiled_function_body(
   if (fn_value->storage.tag != Storage_Tag_None) return;
 
   assert(fn_value->descriptor->tag == Descriptor_Tag_Function);
-  Function_Info *function = &fn_value->descriptor->Function.info;
+  const Function_Info *function = &fn_value->descriptor->Function.info;
 
   // No need to compile macro body as it will be compiled inline
   if (function->flags & Descriptor_Function_Flags_Macro) return;
@@ -1248,7 +1248,7 @@ ensure_compiled_function_body(
   if (value_is_external_symbol(function->body)) {
     assert(function->body->descriptor == &descriptor_external_symbol);
     assert(function->body->storage.tag == Storage_Tag_Static);
-    External_Symbol *symbol = storage_static_as_c_type(function->body->storage, External_Symbol);
+    const External_Symbol *symbol = storage_static_as_c_type(&function->body->storage, External_Symbol);
     fn_value->storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     return;
   }
@@ -1366,9 +1366,9 @@ call_function_overload(
 ) {
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+  const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
   assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-  Function_Info *descriptor = &to_call_descriptor->Function.info;
+  const Function_Info *descriptor = &to_call_descriptor->Function.info;
 
   ensure_compiled_function_body(context, to_call);
 
@@ -1499,7 +1499,7 @@ call_function_overload(
 
 s64
 calculate_arguments_match_score(
-  Function_Info *descriptor,
+  const Function_Info *descriptor,
   Array_Value_Ptr arguments
 ) {
   enum {

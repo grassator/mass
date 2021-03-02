@@ -671,7 +671,7 @@ main(void) {
   }));
 
   push_type(type_struct("Value", (Struct_Item[]){
-    { "Descriptor *", "descriptor" },
+    { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Value *", "next_overload" },
     { "u64", "epoch" },
@@ -689,7 +689,7 @@ main(void) {
 
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
     { "Slice", "name" },
-    { "Descriptor *", "descriptor" },
+    { "const Descriptor *", "descriptor" },
     { "u64", "offset" },
   }));
 
@@ -701,7 +701,7 @@ main(void) {
 
   push_type(type_struct("Function_Return", (Struct_Item[]){
     { "Slice", "name" },
-    { "Descriptor *", "descriptor" },
+    { "const Descriptor *", "descriptor" },
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){
@@ -723,7 +723,7 @@ main(void) {
       { "Function_Info", "info" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
-      { "Descriptor *", "item" },
+      { "const Descriptor *", "item" },
       { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
@@ -731,7 +731,7 @@ main(void) {
       { "Array_Descriptor_Struct_Field", "fields" },
     }),
     struct_fields("Pointer", (Struct_Item[]){
-      { "Descriptor *", "to" },
+      { "const Descriptor *", "to" },
     }),
   }), (Struct_Item[]){
     { "Slice", "name" },

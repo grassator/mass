@@ -84,16 +84,16 @@ spec("function") {
         value_from_s64(temp_context, 0, (Source_Range){0}),
       };
       for (u64 i = 0; i < countof(descriptors); ++i) {
-        Value *reg_a = value_register_for_descriptor(temp_context, Register_A, descriptors[i], (Source_Range){0});
+        Storage reg_a = storage_register_for_descriptor(Register_A, descriptors[i]);
         // We end at the current descriptor index to make sure we do not
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates)); ++j) {
           dyn_array_clear(builder->code_block.instructions);
-          move_value(temp_allocator, builder, &test_range, &reg_a->storage, &immediates[j]->storage);
+          move_value(temp_allocator, builder, &test_range, &reg_a, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction_equal(
-            instruction, &(Instruction){.assembly = {xor, reg_a->storage, reg_a->storage}}
+            instruction, &(Instruction){.assembly = {xor, reg_a, reg_a}}
           ));
         }
       }

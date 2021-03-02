@@ -211,7 +211,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0xCAFE"));
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(token->storage, Number_Literal);
+      Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
       check(!literal->negative);
       check(literal->bits == 0xCAFE);
     }
@@ -227,7 +227,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0b100"));
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = storage_static_as_c_type(token->storage, Number_Literal);
+      Number_Literal *literal = storage_static_as_c_type(&token->storage, Number_Literal);
       check(literal->bits == 0b100);
       check(!literal->negative);
     }
@@ -1007,7 +1007,7 @@ spec("source") {
       check(descriptor_is_integer(status->descriptor));
       check(status->storage.tag == Storage_Tag_Static);
       check(status->storage.byte_size == 1);
-      check(*storage_static_as_c_type(status->storage, s8) == 42);
+      check(*storage_static_as_c_type(&status->storage, s8) == 42);
     }
 
     it("should be able to to do nested compile time calls") {
@@ -1023,7 +1023,7 @@ spec("source") {
       check(descriptor_is_integer(result->descriptor));
       check(result->storage.tag == Storage_Tag_Static);
       check(result->storage.byte_size == 1);
-      check(*storage_static_as_c_type(result->storage, s8) == 42);
+      check(*storage_static_as_c_type(&result->storage, s8) == 42);
     }
 
     it("should not be able to use runtime values in a static context") {

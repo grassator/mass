@@ -526,7 +526,7 @@ typedef struct Scope_Entry {
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 typedef struct Value {
-  Descriptor * descriptor;
+  const Descriptor * descriptor;
   Storage storage;
   Value * next_overload;
   u64 epoch;
@@ -545,7 +545,7 @@ typedef enum Descriptor_Function_Flags {
 
 typedef struct Descriptor_Struct_Field {
   Slice name;
-  Descriptor * descriptor;
+  const Descriptor * descriptor;
   u64 offset;
 } Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
@@ -559,7 +559,7 @@ typedef dyn_array_type(Function_Argument) Array_Function_Argument;
 
 typedef struct Function_Return {
   Slice name;
-  Descriptor * descriptor;
+  const Descriptor * descriptor;
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
@@ -590,7 +590,7 @@ typedef struct {
   Function_Info info;
 } Descriptor_Function;
 typedef struct {
-  Descriptor * item;
+  const Descriptor * item;
   u64 length;
 } Descriptor_Fixed_Size_Array;
 typedef struct {
@@ -598,7 +598,7 @@ typedef struct {
   Array_Descriptor_Struct_Field fields;
 } Descriptor_Struct;
 typedef struct {
-  Descriptor * to;
+  const Descriptor * to;
 } Descriptor_Pointer;
 typedef struct Descriptor {
   Descriptor_Tag tag;

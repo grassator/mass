@@ -59,7 +59,7 @@ typedef struct Scope {
   const Allocator *allocator;
   u64 id;
   Scope_Flags flags;
-  struct Scope *parent;
+  const struct Scope *parent;
   Scope_Map *map;
   Array_Macro_Ptr macros;
   Array_Token_Statement_Matcher statement_matchers;
@@ -77,7 +77,7 @@ assign(
 Scope *
 scope_make(
   const Allocator *allocator,
-  Scope *parent
+  const Scope *parent
 );
 
 static inline void
