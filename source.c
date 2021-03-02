@@ -222,13 +222,13 @@ token_value_force_immediate_integer(
     switch(cast_result) {
       case Literal_Cast_Result_Success: {
         // Always copy full value. Truncation is handled by the byte_size of the immediate
-        u64 *memory = allocator_allocate(context->allocator, u64);
-        *memory = bits;
-        return value_make(context, target_descriptor, (Storage) {
-          .tag = Storage_Tag_Static,
-          .byte_size = u64_to_u32(bit_size / 8),
-          .Static.memory = memory,
-        }, value->source_range);
+        u64 byte_size = u64_to_u32(bit_size / 8);
+        return value_make(
+          context,
+          target_descriptor,
+          storage_static_internal(&bits, byte_size),
+          value->source_range
+        );
       }
       case Literal_Cast_Result_Target_Not_An_Integer: {
         panic("We already checked that target is an integer");
@@ -356,7 +356,7 @@ assign(
     // is also available in the compiled binary
     // TODO this probably needs to be recursive for structs.
     //      This might require support for relocations.
-    void *source_memory = *((void **)source->storage.Static.memory);
+    void *source_memory = storage_static_as_c_type_internal(source->storage, source->storage.byte_size);
     Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {
@@ -2499,7 +2499,7 @@ compile_time_eval(
   };
   Value result_address = {
     .descriptor = &descriptor_s64,
-    .storage = imm64(context->allocator, (u64)result),
+    .storage = imm64((u64)result),
   };
 
   MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
@@ -2548,13 +2548,7 @@ compile_time_eval(
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
-      temp_result->storage = (Storage){
-        .tag = Storage_Tag_Static,
-        .byte_size = result_byte_size,
-        .Static = {
-          .memory = result,
-        },
-      };
+      temp_result->storage = storage_static_internal(result, result_byte_size);
       break;
     }
     case Descriptor_Tag_Function: {
@@ -2619,7 +2613,7 @@ token_handle_storage_variant_of(
       storage_value = value_make(
         context,
         result_descriptor,
-        imm8(context->allocator, value->storage.Register.index),
+        imm8(value->storage.Register.index),
         *source_range
       );
     }
@@ -3226,9 +3220,10 @@ struct_get_field(
           break;
         }
         case Storage_Tag_Static: {
-          Storage field_storage = *storage;
-          field_storage.byte_size = descriptor_byte_size(field->descriptor);
-          field_storage.Static.memory = (s8 *)field_storage.Static.memory + field->offset;
+          Storage field_storage = storage_static_internal(
+            (s8 *)storage_static_as_c_type_internal(*storage, storage->byte_size) + field->offset,
+            descriptor_byte_size(field->descriptor)
+          );
           field_value = value_make(context, field->descriptor, field_storage, *source_range);
           break;
         }
@@ -4555,7 +4550,7 @@ token_define_global_variable(
       );
 
       void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-      memcpy(section_memory, value->storage.Static.memory, byte_size);
+      memcpy(section_memory, storage_static_as_c_type_internal(value->storage, byte_size), byte_size);
     }
   }
 
@@ -4866,7 +4861,7 @@ scope_define_builtins(
     };\
     Value *value = value_init(\
       allocator_allocate(allocator, Value),\
-      VALUE_STATIC_EPOCH, descriptor, imm64(allocator, (u64)_FN_), (Source_Range){0}\
+      VALUE_STATIC_EPOCH, descriptor, imm64((u64)_FN_), (Source_Range){0}\
     );\
     scope_define(scope, slice_literal(_NAME_), (Scope_Entry) {\
       .tag = Scope_Entry_Tag_Value,\

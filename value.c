@@ -8,12 +8,34 @@
 
 static inline void *
 storage_static_as_c_type_internal(
-  Storage operand,
+  Storage storage,
   u64 byte_size
 ) {
-  assert(operand.byte_size == byte_size);
-  assert(operand.tag == Storage_Tag_Static);
-  return operand.Static.memory;
+  assert(storage.byte_size == byte_size);
+  assert(storage.tag == Storage_Tag_Static);
+
+  switch(byte_size) {
+    case 1: {
+      assert(storage.Static.memory.tag == Static_Memory_Tag_U8);
+      return &storage.Static.memory.U8.value;
+    }
+    case 2: {
+      assert(storage.Static.memory.tag == Static_Memory_Tag_U16);
+      return &storage.Static.memory.U16.value;
+    }
+    case 4: {
+      assert(storage.Static.memory.tag == Static_Memory_Tag_U32);
+      return &storage.Static.memory.U32.value;
+    }
+    case 8: {
+      assert(storage.Static.memory.tag == Static_Memory_Tag_U64);
+      return &storage.Static.memory.U64.value;
+    }
+    default: {
+      assert(storage.Static.memory.tag == Static_Memory_Tag_Heap);
+      return storage.Static.memory.Heap.pointer;
+    }
+  }
 }
 
 #define storage_static_as_c_type(_OPERAND_, _TYPE_)\
@@ -431,6 +453,45 @@ code_label32(
   };
 }
 
+static inline Storage
+storage_static_internal(
+  void *value,
+  u64 byte_size
+) {
+  Storage result = {
+    .tag = Storage_Tag_Static,
+    .byte_size = byte_size,
+  };
+  switch(byte_size) {
+    case 1: {
+      result.Static.memory.tag = Static_Memory_Tag_U8;
+      result.Static.memory.U8.value = *(u8 *)value;
+      break;
+    }
+    case 2: {
+      result.Static.memory.tag = Static_Memory_Tag_U16;
+      result.Static.memory.U16.value = *(u16 *)value;
+      break;
+    }
+    case 4: {
+      result.Static.memory.tag = Static_Memory_Tag_U32;
+      result.Static.memory.U32.value = *(u32 *)value;
+      break;
+    }
+    case 8: {
+      result.Static.memory.tag = Static_Memory_Tag_U64;
+      result.Static.memory.U64.value = *(u64 *)value;
+      break;
+    }
+    default: {
+      result.Static.memory.tag = Static_Memory_Tag_Heap;
+      result.Static.memory.Heap.pointer = value;
+      break;
+    }
+  }
+  return result;
+}
+
 #define storage_static_bytes(_VALUE_, _SIZE_)\
   ((Storage) {                    \
     .tag = Storage_Tag_Static, \
@@ -439,74 +500,37 @@ code_label32(
   })
 
 #define storage_static(_VALUE_)\
-  storage_static_bytes((_VALUE_), sizeof(*(_VALUE_)))
+  storage_static_internal((_VALUE_), sizeof(*(_VALUE_)))
 
-static inline Storage
-imm8(
-  const Allocator *allocator,
-  u8 value
-) {
-  return (Storage) {
-    .tag = Storage_Tag_Static,
-    .byte_size = sizeof(value),
-    .Static.memory = memcpy(
-      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
-    ),
-  };
-}
+#define DEFINE_IMM_X(_BIT_SIZE_)\
+  static inline Storage\
+  imm##_BIT_SIZE_(\
+    u##_BIT_SIZE_ value\
+  ) {\
+    return (Storage) {\
+      .tag = Storage_Tag_Static,\
+      .byte_size = sizeof(value),\
+      .Static.memory = {\
+        .tag = Static_Memory_Tag_U##_BIT_SIZE_,\
+        .U##_BIT_SIZE_.value = value\
+      },\
+    };\
+  }
 
-static inline Storage
-imm16(
-  const Allocator *allocator,
-  u16 value
-) {
-  return (Storage) {
-    .tag = Storage_Tag_Static,
-    .byte_size = sizeof(value),
-    .Static.memory = memcpy(
-      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
-    ),
-  };
-}
-
-static inline Storage
-imm32(
-  const Allocator *allocator,
-  u32 value
-) {
-  return (Storage) {
-    .tag = Storage_Tag_Static,
-    .byte_size = sizeof(value),
-    .Static.memory = memcpy(
-      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
-    ),
-  };
-}
-
-static inline Storage
-imm64(
-  const Allocator *allocator,
-  u64 value
-) {
-  return (Storage) {
-    .tag = Storage_Tag_Static,
-    .byte_size = sizeof(value),
-    .Static.memory = memcpy(
-      allocator_allocate_bytes(allocator, sizeof(value), sizeof(value)), &value, sizeof(value)
-    ),
-  };
-}
+DEFINE_IMM_X(8)
+DEFINE_IMM_X(16)
+DEFINE_IMM_X(32)
+DEFINE_IMM_X(64)
 
 static inline Storage
 imm_auto_8_or_32(
-  const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return imm8(allocator, (s8) value);
+    return imm8((s8) value);
   }
   if (s64_fits_into_s32(value)) {
-    return imm32(allocator, (s32) value);
+    return imm32((s32) value);
   }
   panic("Storage is does not fit into either s8 or s32");
   return (Storage){0};
@@ -514,19 +538,18 @@ imm_auto_8_or_32(
 
 static inline Storage
 imm_auto(
-  const Allocator *allocator,
   s64 value
 ) {
   if (s64_fits_into_s8(value)) {
-    return imm8(allocator, (s8) value);
+    return imm8((s8) value);
   }
   if (s64_fits_into_s16(value)) {
-    return imm16(allocator, (s16) value);
+    return imm16((s16) value);
   }
   if (s64_fits_into_s32(value)) {
-    return imm32(allocator, (s32) value);
+    return imm32((s32) value);
   }
-  return imm64(allocator, value);
+  return imm64(value);
 }
 
 static inline Storage
@@ -707,10 +730,31 @@ storage_static_equal(
   assert(b->storage.tag == Storage_Tag_Static);
   assert(a->storage.byte_size == b->storage.byte_size);
   assert(descriptor_byte_size(a->descriptor) == a->storage.byte_size);
-  return storage_static_equal_internal(
-    a->descriptor, a->storage.Static.memory,
-    b->descriptor, b->storage.Static.memory
-  );
+  assert(a->storage.Static.memory.tag == b->storage.Static.memory.tag);
+  switch(a->storage.Static.memory.tag) {
+    case Static_Memory_Tag_U8: {
+      return a->storage.Static.memory.U8.value == b->storage.Static.memory.U8.value;
+    }
+    case Static_Memory_Tag_U16: {
+      return a->storage.Static.memory.U16.value == b->storage.Static.memory.U16.value;
+    }
+    case Static_Memory_Tag_U32: {
+      return a->storage.Static.memory.U32.value == b->storage.Static.memory.U32.value;
+    }
+    case Static_Memory_Tag_U64: {
+      return a->storage.Static.memory.U64.value == b->storage.Static.memory.U64.value;
+    }
+    case Static_Memory_Tag_Heap: {
+      return storage_static_equal_internal(
+        a->descriptor, a->storage.Static.memory.Heap.pointer,
+        b->descriptor, b->storage.Static.memory.Heap.pointer
+      );
+    }
+    default: {
+      panic("Unexpected Static_Memory_Tag");
+      return false;
+    }
+  }
 }
 
 static inline bool
@@ -784,7 +828,33 @@ instruction_equal(
         // FIXME Use immediates instead of static storage for instructions
         if (a_storage->tag == Storage_Tag_Static) {
           assert(a_storage->byte_size == b_storage->byte_size);
-          return memcmp(a_storage->Static.memory, b_storage->Static.memory, a_storage->byte_size) == 0;
+          assert(a_storage->Static.memory.tag == b_storage->Static.memory.tag);
+
+          switch(a_storage->Static.memory.tag) {
+            case Static_Memory_Tag_U8: {
+              return a_storage->Static.memory.U8.value == b_storage->Static.memory.U8.value;
+            }
+            case Static_Memory_Tag_U16: {
+              return a_storage->Static.memory.U16.value == b_storage->Static.memory.U16.value;
+            }
+            case Static_Memory_Tag_U32: {
+              return a_storage->Static.memory.U32.value == b_storage->Static.memory.U32.value;
+            }
+            case Static_Memory_Tag_U64: {
+              return a_storage->Static.memory.U64.value == b_storage->Static.memory.U64.value;
+            }
+            case Static_Memory_Tag_Heap: {
+              return memcmp(
+                a_storage->Static.memory.Heap.pointer,
+                b_storage->Static.memory.Heap.pointer,
+                a_storage->byte_size
+              ) == 0;
+            }
+            default: {
+              panic("Unexpected Static_Memory_Tag");
+              return false;
+            }
+          }
         }
         if (!storage_equal(a_storage, b_storage)) return false;
       }
@@ -939,35 +1009,35 @@ storage_eflags(
 )
 
 #define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_s32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_s16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_s8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_u64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_u32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_CONTEXT_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_u16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_allocator_)->allocator, (_integer_)), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_integer_)), (_SOURCE_RANGE_)\
 )
 
 #define value_from_u8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_CONTEXT_)->allocator, (_integer_), (_SOURCE_RANGE_)\
+  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_integer_), (_SOURCE_RANGE_)\
 )
 
 static inline Value *
@@ -979,21 +1049,21 @@ value_from_signed_immediate_internal(
 ) {
   if (s64_fits_into_s8(value)) {
     return value_make_internal(
-      location, context, &descriptor_s8, imm8(context->allocator, (s8)value), source_range
+      location, context, &descriptor_s8, imm8((s8)value), source_range
     );
   }
   if (s64_fits_into_s16(value)) {
     return value_make_internal(
-      location, context, &descriptor_s16, imm16(context->allocator, (s16)value), source_range
+      location, context, &descriptor_s16, imm16((s16)value), source_range
     );
   }
   if (s64_fits_into_s32(value)) {
     return value_make_internal(
-      location, context, &descriptor_s32, imm32(context->allocator, (s32)value), source_range
+      location, context, &descriptor_s32, imm32((s32)value), source_range
     );
   }
   return value_make_internal(
-    location, context, &descriptor_s64, imm64(context->allocator, value), source_range
+    location, context, &descriptor_s64, imm64(value), source_range
   );
 }
 #define value_from_signed_immediate(...)\
@@ -1008,21 +1078,21 @@ value_from_unsigned_immediate_internal(
 ) {
   if (u64_fits_into_u8(value)) {
     return value_make_internal(
-      location, context, &descriptor_u8, imm8(context->allocator, (u8)value), source_range
+      location, context, &descriptor_u8, imm8((u8)value), source_range
     );
   }
   if (u64_fits_into_u16(value)) {
     return value_make_internal(
-      location, context, &descriptor_u16, imm16(context->allocator, (u16)value), source_range
+      location, context, &descriptor_u16, imm16((u16)value), source_range
     );
   }
   if (u64_fits_into_u32(value)) {
     return value_make_internal(
-      location, context, &descriptor_u32, imm32(context->allocator, (u32)value), source_range
+      location, context, &descriptor_u32, imm32((u32)value), source_range
     );
   }
   return value_make_internal(
-    location, context, &descriptor_u64, imm64(context->allocator, value), source_range
+    location, context, &descriptor_u64, imm64(value), source_range
   );
 }
 #define value_from_unsigned_immediate(...)\
@@ -1518,7 +1588,8 @@ value_number_literal_cast_to(
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  Number_Literal *literal = value->storage.Static.memory;
+  assert(value->storage.Static.memory.tag == Static_Memory_Tag_Heap);
+  Number_Literal *literal = value->storage.Static.memory.Heap.pointer;
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1559,7 +1630,8 @@ same_value_type_or_can_implicitly_move_cast(
     source->descriptor == &descriptor_number_literal
   ) {
     assert(source->storage.tag == Storage_Tag_Static);
-    Number_Literal *literal = source->storage.Static.memory;
+    assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
+    Number_Literal *literal = source->storage.Static.memory.Heap.pointer;
     return literal->bits == 0;
   }
   if (source->descriptor == &descriptor_number_literal) {

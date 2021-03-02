@@ -153,7 +153,7 @@ spec("function") {
     }
     it("should use a 32bit immediate when the value fits for a move to a 64bit value") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
-      Storage immediate = imm64(temp_allocator, 42000);
+      Storage immediate = imm64(42000);
       move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
@@ -237,7 +237,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, reg_a->storage, imm8(temp_allocator, 42)}}
+        instruction, &(Instruction){.assembly = {mov, reg_a->storage, imm8(42)}}
       ));
     }
     it("should move `a` to result and add `b` to it when result is neither `a` or `b`") {
@@ -334,7 +334,7 @@ spec("function") {
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
       check(instruction_equal(
-        instruction, &(Instruction){.assembly = {mov, temp_reg->storage, imm8(temp_allocator, 42)}}
+        instruction, &(Instruction){.assembly = {mov, temp_reg->storage, imm8(42)}}
       ));
     }
     it("should move `a` to result and sub `b` from it when result is neither `a` or `b`") {

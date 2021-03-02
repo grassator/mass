@@ -594,6 +594,20 @@ main(void) {
     }),
   }));
 
+  push_type(type_union("Static_Memory", (Struct[]){
+    //struct_fields("S8", (Struct_Item[]){{ "s8", "value" }}),
+    //struct_fields("S16", (Struct_Item[]){{ "s16", "value" }}),
+    //struct_fields("S32", (Struct_Item[]){{ "s32", "value" }}),
+    //struct_fields("S64", (Struct_Item[]){{ "s64", "value" }}),
+    struct_fields("U8", (Struct_Item[]){{ "u8", "value" }}),
+    struct_fields("U16", (Struct_Item[]){{ "u16", "value" }}),
+    struct_fields("U32", (Struct_Item[]){{ "u32", "value" }}),
+    struct_fields("U64", (Struct_Item[]){{ "u64", "value" }}),
+    struct_fields("Heap", (Struct_Item[]){
+      { "void *", "pointer" },
+    }),
+  }));
+
   push_type(add_common_fields(type_union("Storage", (Struct[]){
     struct_empty("None"),
     struct_empty("Any"),
@@ -607,7 +621,7 @@ main(void) {
       { "Register", "index" },
     }),
     struct_fields("Static", (Struct_Item[]){
-      { "void *", "memory" },
+      { "Static_Memory", "memory" },
     }),
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },

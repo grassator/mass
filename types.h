@@ -58,7 +58,7 @@
     .storage = {\
       .tag = Storage_Tag_Static,\
       .byte_size = sizeof(Descriptor),\
-      .Static.memory = (_DESCRIPTOR_),\
+      .Static.memory = {.tag = Static_Memory_Tag_Heap, .Heap.pointer = (_DESCRIPTOR_)},\
     },\
     .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,\
   }

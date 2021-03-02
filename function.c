@@ -252,11 +252,9 @@ move_value(
         Storage adjusted_target = *target;
         adjusted_target.byte_size = chunk_size;
         adjusted_target.Memory.location.Indirect.offset += offset;
-        Storage adjusted_source = (Storage) {
-          .tag = Storage_Tag_Static,
-          .byte_size = chunk_size,
-          .Static.memory = (s8 *)source->Static.memory + offset,
-        };
+        assert(source->Static.memory.tag == Static_Memory_Tag_Heap);
+        void *memory = (s8 *)source->Static.memory.Heap.pointer + offset;
+        Storage adjusted_source = storage_static_internal(memory, chunk_size);
         push_instruction(
           instructions, *source_range,
           (Instruction) {.assembly = {mov, {adjusted_target, adjusted_source}}}
@@ -273,23 +271,23 @@ move_value(
     Storage adjusted_source;
     switch(target_size) {
       case 1: {
-        adjusted_source = imm8(allocator, s64_to_s8(immediate));
+        adjusted_source = imm8(s64_to_s8(immediate));
         break;
       }
       case 2: {
-        adjusted_source = imm16(allocator, s64_to_s16(immediate));
+        adjusted_source = imm16(s64_to_s16(immediate));
         break;
       }
       case 4: {
-        adjusted_source = imm32(allocator, s64_to_s32(immediate));
+        adjusted_source = imm32(s64_to_s32(immediate));
         break;
       }
       case 8: {
         // FIXME This does sign extension so will be broken for unsigned
         if (s64_fits_into_s32(immediate)) {
-          adjusted_source = imm32(allocator, s64_to_s32(immediate));
+          adjusted_source = imm32(s64_to_s32(immediate));
         } else {
-          adjusted_source = imm64(allocator, immediate);
+          adjusted_source = imm64(immediate);
         }
         break;
       }
@@ -371,7 +369,7 @@ move_value(
 
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rsi, *source}}});
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rdi, *target}}});
-        Storage size_operand = imm64(allocator, target_size);
+        Storage size_operand = imm64(target_size);
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg_rcx, size_operand}}});
         push_instruction(instructions, *source_range, (Instruction) {.assembly = {rep_movsb}});
 
@@ -532,8 +530,7 @@ make_trampoline(
   u32 result = u64_to_u32(buffer->occupied);
   encode_instruction_with_compiler_location(
     program, buffer,
-    // @Leak
-    &(Instruction) {.assembly = {mov, {rax, imm64(allocator_default, address)}}}
+    &(Instruction) {.assembly = {mov, {rax, imm64(address)}}}
   );
   encode_instruction_with_compiler_location(
     program, buffer,
@@ -577,7 +574,7 @@ fn_encode(
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
   // @Leak
-  Storage stack_size_operand = imm_auto_8_or_32(allocator_default, out_layout->stack_reserve);
+  Storage stack_size_operand = imm_auto_8_or_32(out_layout->stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
       .type = Instruction_Type_Label,
@@ -763,12 +760,12 @@ make_if(
       if (byte_size == 4 || byte_size == 8) {
         push_instruction(
           instructions, *source_range,
-          (Instruction) {.assembly = {cmp, {value->storage, imm32(context->allocator, 0), 0}}}
+          (Instruction) {.assembly = {cmp, {value->storage, imm32(0), 0}}}
         );
       } else if (byte_size == 1) {
         push_instruction(
           instructions, *source_range,
-          (Instruction) {.assembly = {cmp, {value->storage, imm8(context->allocator, 0), 0}}}
+          (Instruction) {.assembly = {cmp, {value->storage, imm8(0), 0}}}
         );
       } else {
         assert(!"Unsupported value inside `if`");
@@ -795,10 +792,10 @@ maybe_constant_fold_internal(
 ) {
   Storage imm_storage;
   switch(a->storage.byte_size) {
-    case 1: imm_storage = imm8(context->allocator, s64_to_s8(constant_result)); break;
-    case 2: imm_storage = imm16(context->allocator, s64_to_s16(constant_result)); break;
-    case 4: imm_storage = imm32(context->allocator, s64_to_s32(constant_result)); break;
-    case 8: imm_storage = imm64(context->allocator, s64_to_s64(constant_result)); break;
+    case 1: imm_storage = imm8(s64_to_s8(constant_result)); break;
+    case 2: imm_storage = imm16(s64_to_s16(constant_result)); break;
+    case 4: imm_storage = imm32(s64_to_s32(constant_result)); break;
+    case 8: imm_storage = imm64(s64_to_s64(constant_result)); break;
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
   Value *imm_value = value_make(context, a->descriptor, imm_storage, *source_range);
@@ -1251,7 +1248,7 @@ ensure_compiled_function_body(
   if (value_is_external_symbol(function->body)) {
     assert(function->body->descriptor == &descriptor_external_symbol);
     assert(function->body->storage.tag == Storage_Tag_Static);
-    External_Symbol *symbol = function->body->storage.Static.memory;
+    External_Symbol *symbol = storage_static_as_c_type(function->body->storage, External_Symbol);
     fn_value->storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     return;
   }
@@ -1562,7 +1559,7 @@ make_and(
 
   Value zero = {
     .descriptor = &descriptor_s8,
-    .storage = imm8(context->allocator, 0),
+    .storage = imm8(0),
   };
 
   Label_Index else_label = make_if(context, instructions, source_range, a);
@@ -1598,7 +1595,7 @@ make_or(
 
   Value zero = {
     .descriptor = &descriptor_s8,
-    .storage = imm8(context->allocator, 0),
+    .storage = imm8(0),
   };
 
   compare(context, Compare_Type_Equal, source_range, result, a, &zero);
@@ -1612,7 +1609,7 @@ make_or(
     .label = else_label,
   });
 
-  Storage one = imm8(context->allocator, 1);
+  Storage one = imm8(1);
   move_value(context->allocator, builder, source_range, &result->storage, &one);
   push_instruction(instructions, *source_range, (Instruction) {
     .type = Instruction_Type_Label,

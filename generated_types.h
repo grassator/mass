@@ -101,6 +101,10 @@ typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
 typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
 
+typedef struct Static_Memory Static_Memory;
+typedef dyn_array_type(Static_Memory *) Array_Static_Memory_Ptr;
+typedef dyn_array_type(const Static_Memory *) Array_Const_Static_Memory_Ptr;
+
 typedef struct Storage Storage;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
 typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
@@ -397,6 +401,41 @@ typedef struct Memory_Location {
 } Memory_Location;
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
 typedef enum {
+  Static_Memory_Tag_U8 = 0,
+  Static_Memory_Tag_U16 = 1,
+  Static_Memory_Tag_U32 = 2,
+  Static_Memory_Tag_U64 = 3,
+  Static_Memory_Tag_Heap = 4,
+} Static_Memory_Tag;
+
+typedef struct {
+  u8 value;
+} Static_Memory_U8;
+typedef struct {
+  u16 value;
+} Static_Memory_U16;
+typedef struct {
+  u32 value;
+} Static_Memory_U32;
+typedef struct {
+  u64 value;
+} Static_Memory_U64;
+typedef struct {
+  void * pointer;
+} Static_Memory_Heap;
+typedef struct Static_Memory {
+  Static_Memory_Tag tag;
+  char _tag_padding[4];
+  union {
+    Static_Memory_U8 U8;
+    Static_Memory_U16 U16;
+    Static_Memory_U32 U32;
+    Static_Memory_U64 U64;
+    Static_Memory_Heap Heap;
+  };
+} Static_Memory;
+typedef dyn_array_type(Static_Memory) Array_Static_Memory;
+typedef enum {
   Storage_Tag_None = 0,
   Storage_Tag_Any = 1,
   Storage_Tag_Eflags = 2,
@@ -416,7 +455,7 @@ typedef struct {
   Register index;
 } Storage_Xmm;
 typedef struct {
-  void * memory;
+  Static_Memory memory;
 } Storage_Static;
 typedef struct {
   Memory_Location location;
@@ -711,6 +750,11 @@ static Descriptor descriptor_array_memory_location_ptr;
 static Descriptor descriptor_memory_location_pointer;
 static Descriptor descriptor_memory_location_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
+static Descriptor descriptor_static_memory;
+static Descriptor descriptor_array_static_memory_ptr;
+static Descriptor descriptor_static_memory_pointer;
+static Descriptor descriptor_static_memory_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(static_memory_tag, Static_Memory_Tag)
 static Descriptor descriptor_storage;
 static Descriptor descriptor_array_storage_ptr;
 static Descriptor descriptor_storage_pointer;

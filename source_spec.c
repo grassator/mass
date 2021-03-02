@@ -211,7 +211,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0xCAFE"));
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = token->storage.Static.memory;
+      Number_Literal *literal = storage_static_as_c_type(token->storage, Number_Literal);
       check(!literal->negative);
       check(literal->bits == 0xCAFE);
     }
@@ -227,7 +227,7 @@ spec("source") {
       spec_check_slice(source_from_source_range(&token->source_range), slice_literal("0b100"));
       check(token->descriptor == &descriptor_number_literal);
       check(token->storage.tag == Storage_Tag_Static);
-      Number_Literal *literal = token->storage.Static.memory;
+      Number_Literal *literal = storage_static_as_c_type(token->storage, Number_Literal);
       check(literal->bits == 0b100);
       check(!literal->negative);
     }
@@ -1472,7 +1472,7 @@ spec("source") {
       write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
     }
 
-    xit("should parse and write an executable that prints Hello, world!") {
+    xit("should parse and write an executable with a lot of constant folding") {
         Scope* module_scope = scope_make(test_context.allocator, test_context.scope);
         Module* prelude_module = program_module_from_file(
             &test_context, slice_literal("lib\\prelude"), module_scope
