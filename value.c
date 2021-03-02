@@ -824,6 +824,10 @@ value_init_internal(
   COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
 )
 
+#define value_any_init(_VALUE_, _CONTEXT_, _SOURCE_RANGE_) value_init_internal(\
+  COMPILER_SOURCE_LOCATION, (_VALUE_), (_CONTEXT_)->epoch, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, (_SOURCE_RANGE_)\
+)
+
 static inline Value *
 value_make_internal(
   Compiler_Source_Location compiler_source_location,

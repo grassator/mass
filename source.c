@@ -3534,9 +3534,9 @@ token_eval_operator(
     Source_Range rhs_range = rhs->source_range;
     Source_Range lhs_range = lhs->source_range;
 
-    Value *lhs_value = value_any(context, lhs_range);
+    Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
     MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context, rhs_range);
+    Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
     MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
@@ -3574,7 +3574,7 @@ token_eval_operator(
 
     Function_Builder *builder = context->builder;
 
-    Value *any_result = value_any(context, lhs_range);
+    Value *any_result = value_any_init(&(Value){0}, context, lhs_range);
     if (slice_equal(operator, slice_literal("+"))) {
       plus(context, &lhs_range, any_result, lhs_value, rhs_value);
     } else if (slice_equal(operator, slice_literal("-"))) {

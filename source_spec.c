@@ -1471,6 +1471,29 @@ spec("source") {
 
       write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
     }
+
+    xit("should parse and write an executable that prints Hello, world!") {
+        Scope* module_scope = scope_make(test_context.allocator, test_context.scope);
+        Module* prelude_module = program_module_from_file(
+            &test_context, slice_literal("lib\\prelude"), module_scope
+        );
+        Mass_Result result = program_import_module(&test_context, prelude_module);
+        check(result.tag == Mass_Result_Tag_Success);
+        Module* module = program_module_from_file(
+            &test_context, slice_literal("..\\compile-time-benchmark\\folding"), module_scope
+        );
+        program_import_module(&test_context, module);
+        Program* test_program = test_context.program;
+        test_program->entry_point =
+            scope_lookup_force(&test_context, module_scope, slice_literal("main"));
+        check(spec_check_mass_result(test_context.result));
+        check(test_program->entry_point);
+        ensure_compiled_function_body(&test_context, test_program->entry_point);
+        check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
+        check(spec_check_mass_result(test_context.result));
+
+        write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
+    }
   }
 
   describe("Complex Examples") {
