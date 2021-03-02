@@ -62,11 +62,11 @@
     *value_swap.b = value_swap.temp;\
   } while (0)
 
-#ifdef __STDC_NO_THREADS__
+#if defined(__STDC_NO_THREADS__)
   #ifdef _MSC_VER
     #define thread_local __declspec(thread)
   #else
-    static_assert(false, "Prelude requires a compiler with thread-local support");
+    #define thread_local __thread
   #endif
 #else
   #include <threads.h>
