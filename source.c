@@ -1406,10 +1406,9 @@ token_parse_macro_statement(
   assert(payload);
   if (!value_view.length) return 0;
   Macro *macro = payload;
-  // TODO @Speed would be nice to not need this copy
-  Array_Value_View match = dyn_array_make(Array_Value_View);
-  u64 match_length = token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
+  u64 match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Statement);
   if (!match_length) return 0;
+
   Value_View rest = value_view_rest(&value_view, match_length);
   if (rest.length) {
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
@@ -1418,6 +1417,10 @@ token_parse_macro_statement(
       return 0;
     }
   }
+
+  Array_Value_View match = dyn_array_make(Array_Value_View);
+  token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
+
   token_apply_macro_syntax(context, match, macro, result_value);
   dyn_array_destroy(match);
   return match_length;
