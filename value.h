@@ -286,7 +286,7 @@ pointer_equal(
 hash_map_template(Static_Pointer_Map, void *, Value, hash_pointer, pointer_equal)
 
 typedef struct Compilation {
-  Bucket_Buffer *allocation_buffer;
+  Virtual_Memory_Buffer allocation_buffer;
   Allocator *allocator;
   Jit jit;
   Module compiler_module;

@@ -1309,37 +1309,35 @@ void
 compilation_init(
   Compilation *compilation
 ) {
-  Bucket_Buffer *compilation_buffer = bucket_buffer_make(.allocator = allocator_system);
-  Allocator *compilation_allocator = bucket_buffer_allocator_make(compilation_buffer);
-
-  Program *runtime_program = allocator_allocate(compilation_allocator, Program);
-  program_init(compilation_allocator, runtime_program);
-
-  Scope *root_scope = scope_make(compilation_allocator, 0);
-  scope_define_builtins(compilation_allocator, root_scope);
-
-  Scope *compiler_scope = scope_make(compilation_allocator, root_scope);
-
   *compilation = (Compilation) {
-    .allocation_buffer = compilation_buffer,
-    .allocator = compilation_allocator,
-    .runtime_program = runtime_program,
     .module_map = hash_map_make(Imported_Module_Map),
     .static_pointer_map = hash_map_make(Static_Pointer_Map),
     .jit = {0},
-    .compiler_module = {
-      .source_file = {
-        .path = slice_literal("__mass_internal__"),
-      },
-      .own_scope = compiler_scope,
-      .export_scope = compiler_scope,
-    },
-    .root_scope = root_scope,
-    .result = allocator_allocate(compilation_allocator, Mass_Result)
   };
 
-  Program *jit_program = allocator_allocate(compilation_allocator, Program);
-  program_init(compilation_allocator, jit_program);
+  // Get 16 gigabytes of virtual space
+  virtual_memory_buffer_init(&compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024);
+  compilation->allocator = virtual_memory_buffer_allocator_make(&compilation->allocation_buffer);
+
+  compilation->result = allocator_allocate(compilation->allocator, Mass_Result);
+
+  compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
+  program_init(compilation->allocator, compilation->runtime_program);
+
+  compilation->root_scope = scope_make(compilation->allocator, 0);
+  scope_define_builtins(compilation->allocator, compilation->root_scope);
+
+  Scope *compiler_scope = scope_make(compilation->allocator, compilation->root_scope);
+  compilation->compiler_module = (Module) {
+    .source_file = {
+      .path = slice_literal("__mass_internal__"),
+    },
+    .own_scope = compiler_scope,
+    .export_scope = compiler_scope,
+  };
+
+  Program *jit_program = allocator_allocate(compilation->allocator, Program);
+  program_init(compilation->allocator, jit_program);
   jit_init(&compilation->jit, jit_program);
 }
 
@@ -1351,7 +1349,7 @@ compilation_deinit(
   hash_map_destroy(compilation->static_pointer_map);
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
-  bucket_buffer_destroy(compilation->allocation_buffer);
+  virtual_memory_buffer_deinit(&compilation->allocation_buffer);
 }
 
 Execution_Context

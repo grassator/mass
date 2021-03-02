@@ -2472,7 +2472,7 @@ virtual_memory_buffer_ensure_committed(
 ) {
   assert(buffer->capacity >= size);
   #ifdef _WIN32
-  u64 page_size = s32_to_u64(memory_page_size());
+  u64 page_size = s32_to_u64(memory_page_size()) * 256;
   u64 required_to_commit = u64_align(size, page_size);
   if (required_to_commit > buffer->committed) {
     void *commit_pointer = buffer->memory + buffer->committed;
@@ -2547,6 +2547,59 @@ virtual_memory_buffer_append_slice(
   void *target = virtual_memory_buffer_allocate_bytes(buffer, slice.length, _Alignof(s8));
   memcpy(target, slice.bytes, slice.length);
   return (Slice) { .bytes = target, .length = slice.length, };
+}
+
+static inline void *
+virtual_memory_buffer_allocator_allocate(
+  Allocator_Handle handle,
+  u64 size_in_bytes,
+  u64 alignment
+) {
+  return virtual_memory_buffer_allocate_bytes(handle.raw, size_in_bytes, alignment);
+}
+
+static inline void
+virtual_memory_buffer_allocator_deallocate(
+  Allocator_Handle handle,
+  void *address,
+  u64 size_in_bytes
+) {
+  // noop
+}
+
+static inline void *
+virtual_memory_buffer_allocator_reallocate(
+  Allocator_Handle handle,
+  void *address,
+  u64 old_size_in_bytes,
+  u64 new_size_in_bytes,
+  u64 alignment
+) {
+  void *result = virtual_memory_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
+  memcpy(result, address, old_size_in_bytes);
+  virtual_memory_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
+  return result;
+}
+
+static inline Allocator *
+virtual_memory_buffer_allocator_init(
+  Virtual_Memory_Buffer *buffer,
+  Allocator *allocator
+) {
+  *allocator = (Allocator){
+    .allocate = virtual_memory_buffer_allocator_allocate,
+    .reallocate = virtual_memory_buffer_allocator_reallocate,
+    .deallocate = virtual_memory_buffer_allocator_deallocate,
+    .handle = {buffer},
+  };
+  return allocator;
+}
+
+static inline Allocator *
+virtual_memory_buffer_allocator_make(
+  Virtual_Memory_Buffer *buffer
+) {
+  return virtual_memory_buffer_allocator_init(buffer, virtual_memory_buffer_allocate(buffer, Allocator));
 }
 
 //////////////////////////////////////////////////////////////////////////////
