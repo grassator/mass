@@ -287,6 +287,8 @@ print_mass_descriptor_and_type(
       break;
     }
     case Type_Tag_Tagged_Union: {
+      char *lowercase_name = strtolower(type->union_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->union_.name);
       break;
     }
     case Type_Tag_Function: {
@@ -648,13 +650,24 @@ main(void) {
     { "Right", 1 },
   }));
 
+  push_type(type_struct("Execution_Context", (Struct_Item[]){
+    { "Allocator *", "allocator" },
+    { "Compilation *", "compilation" },
+    { "u64", "epoch" },
+    { "Program *", "program" },
+    { "Scope *", "scope" },
+    { "Function_Builder *", "builder" },
+    { "Module *", "module" },
+    { "Mass_Result *", "result" },
+  }));
+
   push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
     struct_fields("Lazy_Expression", (Struct_Item[]){
       { "Slice", "name" },
-      { "Scope *", "scope" },
+      { "Execution_Context", "context" },
       { "Value_View", "tokens" },
     }),
     struct_fields("Operator", (Struct_Item[]){
@@ -768,7 +781,8 @@ main(void) {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
-      fprintf(file, "typedef struct Execution_Context Execution_Context;\n\n");
+      fprintf(file, "typedef struct Program Program;\n\n");
+      fprintf(file, "typedef struct Compilation Compilation;\n\n");
     }
 
     fprintf(file, "// Forward declarations\n\n");
@@ -785,12 +799,16 @@ main(void) {
 
     fprintf(file, "\n// Mass Type Reflection\n\n");
 
+    fprintf(file, "static Descriptor descriptor_function_builder_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_program_pointer;\n");
     fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_compilation_pointer;\n");
 
     // The type of type needs to be defined manually
     fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
 
     // Also need to define built-in types
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");

@@ -89,7 +89,7 @@ test_program_inline_source_base(
   test_init_module(slice_from_c_string(source));
   program_parse(context);
   // FIXME lookup main in exported scope
-  Value *value = scope_lookup_force(context, test_context.module->own_scope, slice_from_c_string(id));
+  Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
     ensure_compiled_function_body(context, value);
   }
@@ -403,7 +403,7 @@ spec("source") {
       Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
       // FIXME lookup main in exported scope
-      Value *main = scope_lookup_force(&test_context, module->own_scope, slice_literal("main"));
+      Value *main = scope_lookup_force(module->own_scope, slice_literal("main"));
       check(main);
       ensure_compiled_function_body(&test_context, main);
 
@@ -618,11 +618,9 @@ spec("source") {
         check(false, "Failed parsing");
       }
 
-      Value *checker_s64 =
-        scope_lookup_force(&test_context, test_context.scope, slice_literal("checker_s64"));
+      Value *checker_s64 = scope_lookup_force(test_context.scope, slice_literal("checker_s64"));
       ensure_compiled_function_body(&test_context, checker_s64);
-      Value *checker_s32 =
-        scope_lookup_force(&test_context, test_context.scope, slice_literal("checker_s32"));
+      Value *checker_s32 = scope_lookup_force(test_context.scope, slice_literal("checker_s32"));
       ensure_compiled_function_body(&test_context, checker_s32);
 
       Jit jit;
@@ -836,7 +834,7 @@ spec("source") {
       );
       Mass_Result result = program_import_module(&test_context, module);
       check(result.tag == Mass_Result_Tag_Success);
-      scope_lookup_force(&test_context, test_context.scope, slice_literal("main"));
+      scope_lookup_force(test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(error->message, slice_literal("Could not find type s33"));
@@ -1461,8 +1459,7 @@ spec("source") {
       );
       program_import_module(&test_context, module);
       Program *test_program = test_context.program;
-      test_program->entry_point =
-        scope_lookup_force(&test_context, module_scope, slice_literal("main"));
+      test_program->entry_point = scope_lookup_force(module_scope, slice_literal("main"));
       check(spec_check_mass_result(test_context.result));
       check(test_program->entry_point);
       ensure_compiled_function_body(&test_context, test_program->entry_point);
@@ -1484,8 +1481,7 @@ spec("source") {
         );
         program_import_module(&test_context, module);
         Program* test_program = test_context.program;
-        test_program->entry_point =
-            scope_lookup_force(&test_context, module_scope, slice_literal("main"));
+        test_program->entry_point = scope_lookup_force(module_scope, slice_literal("main"));
         check(spec_check_mass_result(test_context.result));
         check(test_program->entry_point);
         ensure_compiled_function_body(&test_context, test_program->entry_point);
@@ -1511,9 +1507,7 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       Program *test_program = test_context.program;
 
-      Value *fizz_buzz = scope_lookup_force(
-        &test_context, module_scope, slice_literal("fizz_buzz")
-      );
+      Value *fizz_buzz = scope_lookup_force(module_scope, slice_literal("fizz_buzz"));
       check(fizz_buzz);
       ensure_compiled_function_body(&test_context, fizz_buzz);
       check(spec_check_mass_result(test_context.result));

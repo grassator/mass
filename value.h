@@ -244,6 +244,8 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
+MASS_DEFINE_OPAQUE_C_TYPE(function_builder, Function_Builder);
+
 typedef struct {
   Virtual_Memory_Buffer buffer;
   union {
@@ -265,6 +267,7 @@ typedef struct Program {
   Array_Function_Builder functions;
   Program_Memory memory;
 } Program;
+MASS_DEFINE_OPAQUE_C_TYPE(program, Program);
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
@@ -297,16 +300,7 @@ typedef struct Compilation {
   Mass_Result *result;
 } Compilation;
 
-typedef struct Execution_Context {
-  Allocator *allocator;
-  Compilation *compilation;
-  u64 epoch;
-  Program *program;
-  Scope *scope;
-  Function_Builder *builder;
-  Module *module;
-  Mass_Result *result;
-} Execution_Context;
+MASS_DEFINE_OPAQUE_C_TYPE(compilation, Compilation);
 
 void *
 rip_value_pointer(
@@ -342,7 +336,5 @@ program_set_label_offset(
   Label_Index label_index,
   u32 offset_in_section
 );
-
-MASS_DEFINE_OPAQUE_C_TYPE(execution_context, Execution_Context);
 
 #endif

@@ -7,7 +7,9 @@ typedef struct Scope Scope;
 
 typedef struct Function_Builder Function_Builder;
 
-typedef struct Execution_Context Execution_Context;
+typedef struct Program Program;
+
+typedef struct Compilation Compilation;
 
 // Forward declarations
 
@@ -116,6 +118,10 @@ typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_So
 typedef enum Operator_Fixity Operator_Fixity;
 
 typedef enum Operator_Associativity Operator_Associativity;
+
+typedef struct Execution_Context Execution_Context;
+typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
+typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
 
 typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
@@ -491,6 +497,18 @@ typedef enum Operator_Associativity {
   Operator_Associativity_Right = 1,
 } Operator_Associativity;
 
+typedef struct Execution_Context {
+  Allocator * allocator;
+  Compilation * compilation;
+  u64 epoch;
+  Program * program;
+  Scope * scope;
+  Function_Builder * builder;
+  Module * module;
+  Mass_Result * result;
+} Execution_Context;
+typedef dyn_array_type(Execution_Context) Array_Execution_Context;
+
 typedef enum {
   Scope_Entry_Tag_Value = 0,
   Scope_Entry_Tag_Lazy_Expression = 1,
@@ -502,7 +520,7 @@ typedef struct {
 } Scope_Entry_Value;
 typedef struct {
   Slice name;
-  Scope * scope;
+  Execution_Context context;
   Value_View tokens;
 } Scope_Entry_Lazy_Expression;
 typedef struct {
@@ -633,8 +651,12 @@ _Pragma("warning (pop)")
 
 // Mass Type Reflection
 
+static Descriptor descriptor_function_builder_pointer;
+static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_scope_pointer;
+static Descriptor descriptor_compilation_pointer;
 MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
+MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
@@ -772,6 +794,10 @@ static Descriptor descriptor_operator_associativity;
 static Descriptor descriptor_array_operator_associativity_ptr;
 static Descriptor descriptor_operator_associativity_pointer;
 static Descriptor descriptor_operator_associativity_pointer_pointer;
+static Descriptor descriptor_execution_context;
+static Descriptor descriptor_array_execution_context_ptr;
+static Descriptor descriptor_execution_context_pointer;
+static Descriptor descriptor_execution_context_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
@@ -973,6 +999,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group,
   },
 );
 MASS_DEFINE_TYPE_VALUE(group);
+MASS_DEFINE_OPAQUE_C_TYPE(token_pattern, Token_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
 MASS_DEFINE_OPAQUE_C_TYPE(array_section_ptr, Array_Section_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_section, Array_Section)
@@ -1137,6 +1164,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register,
   },
 );
 MASS_DEFINE_TYPE_VALUE(maybe_register);
+MASS_DEFINE_OPAQUE_C_TYPE(memory_location, Memory_Location)
+MASS_DEFINE_OPAQUE_C_TYPE(static_memory, Static_Memory)
+MASS_DEFINE_OPAQUE_C_TYPE(storage, Storage)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location_ptr, Array_Compiler_Source_Location_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location, Array_Compiler_Source_Location)
 MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
@@ -1159,6 +1189,52 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
+MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context_ptr, Array_Execution_Context_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context, Array_Execution_Context)
+MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context,
+  {
+    .name = slice_literal_fields("allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .offset = offsetof(Execution_Context, allocator),
+  },
+  {
+    .name = slice_literal_fields("compilation"),
+    .descriptor = &descriptor_compilation_pointer,
+    .offset = offsetof(Execution_Context, compilation),
+  },
+  {
+    .name = slice_literal_fields("epoch"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Execution_Context, epoch),
+  },
+  {
+    .name = slice_literal_fields("program"),
+    .descriptor = &descriptor_program_pointer,
+    .offset = offsetof(Execution_Context, program),
+  },
+  {
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .offset = offsetof(Execution_Context, scope),
+  },
+  {
+    .name = slice_literal_fields("builder"),
+    .descriptor = &descriptor_function_builder_pointer,
+    .offset = offsetof(Execution_Context, builder),
+  },
+  {
+    .name = slice_literal_fields("module"),
+    .descriptor = &descriptor_module_pointer,
+    .offset = offsetof(Execution_Context, module),
+  },
+  {
+    .name = slice_literal_fields("result"),
+    .descriptor = &descriptor_mass_result_pointer,
+    .offset = offsetof(Execution_Context, result),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(execution_context);
+MASS_DEFINE_OPAQUE_C_TYPE(scope_entry, Scope_Entry)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value,
@@ -1285,6 +1361,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
+MASS_DEFINE_OPAQUE_C_TYPE(descriptor, Descriptor)
+MASS_DEFINE_OPAQUE_C_TYPE(mass_result, Mass_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice,

@@ -157,6 +157,7 @@ struct_byte_size(
     alignment = u64_max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
     u64 field_size_with_alignment = u64_max(field_alignment, descriptor_byte_size(field->descriptor));
+    assert(field_size_with_alignment);
     if (is_last_field) {
       raw_size = field->offset + field_size_with_alignment;
     }

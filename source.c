@@ -400,7 +400,6 @@ token_force_value(
 
 Value *
 scope_entry_force(
-  Execution_Context *context,
   Scope_Entry *entry
 ) {
   switch(entry->tag) {
@@ -410,10 +409,8 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Lazy_Expression: {
       Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
-      Execution_Context lazy_context = *context;
-      lazy_context.scope = expr->scope;
-      Value *result = value_any(context, expr->tokens.source_range);
-      compile_time_eval(&lazy_context, expr->tokens, result);
+      Value *result = value_any(&expr->context, expr->tokens.source_range);
+      compile_time_eval(&expr->context, expr->tokens, result);
       *entry = (Scope_Entry) {
         .tag = Scope_Entry_Tag_Value,
         .Value.value = result,
@@ -432,7 +429,6 @@ scope_entry_force(
 
 Value *
 scope_lookup_force(
-  Execution_Context *context,
   const Scope *scope,
   Slice name
 ) {
@@ -453,7 +449,7 @@ scope_lookup_force(
   // Force lazy entries
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
     if (it->tag == Scope_Entry_Tag_Lazy_Expression) {
-      scope_entry_force(context, it);
+      scope_entry_force(it);
     }
   }
 
@@ -482,7 +478,7 @@ scope_lookup_force(
       if (!parent) break;
       if (!parent->map) continue;
       if (!hash_map_has(parent->map, name)) continue;
-      Value *overload = scope_lookup_force(context, parent, name);
+      Value *overload = scope_lookup_force(parent, name);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
       if (overload->descriptor->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
@@ -1109,7 +1105,7 @@ scope_lookup_type(
     );
     return 0;
   }
-  Value *value = scope_entry_force(context, scope_entry);
+  Value *value = scope_entry_force(scope_entry);
   return value_ensure_type(context, value, source_range);
 }
 
@@ -1710,7 +1706,7 @@ token_force_value(
       }
     } else if(value_is_symbol(token)) {
       Slice name = value_as_symbol(token)->name;
-      value = scope_lookup_force(context, context->scope, name);
+      value = scope_lookup_force(context->scope, name);
       MASS_TRY(*context->result);
       if (!value) {
         scope_print_names(context->scope);
@@ -1883,12 +1879,13 @@ token_parse_exports(
       }
       Value *symbol_token = value_view_get(item, 0);
       Slice name = value_as_symbol(symbol_token)->name;
+      Execution_Context lazy_context = *context;
       scope_define(context->module->export_scope, name, (Scope_Entry) {
         .tag = Scope_Entry_Tag_Lazy_Expression,
         .Lazy_Expression = {
           .name = name,
           .tokens = item,
-          .scope = context->module->own_scope,
+          .context = lazy_context,
         },
         .source_range = symbol_token->source_range,
       });
@@ -2098,11 +2095,16 @@ mass_import(
   if (module_pointer) {
     module = *module_pointer;
   } else {
-    const Scope *root_scope = context.scope;
-    while (root_scope->parent) root_scope = root_scope->parent;
+    const Scope *root_scope = context.compilation->root_scope;
     Scope *module_scope = scope_make(context.allocator, root_scope);
     module = program_module_from_file(&context, file_path, module_scope);
-    program_import_module(&context, module);
+    MASS_ON_ERROR(program_import_module(&context, module)) {
+      context_error_snprintf(
+        &context, (Source_Range){0},
+        "Failed to import module %"PRIslice, SLICE_EXPAND_PRINTF(file_path)
+      );
+      return (Scope){0};
+    }
     hash_map_set(context.compilation->module_map, file_path, module);
   }
 
@@ -2852,7 +2854,7 @@ token_parse_constant_definitions(
     .Lazy_Expression = {
       .name = name,
       .tokens = rhs,
-      .scope = context->scope,
+      .context = *context,
     },
     .source_range = lhs.source_range,
   });
@@ -3479,20 +3481,24 @@ token_eval_operator(
       lhs_value->descriptor == &descriptor_scope
     ) {
       if (value_is_symbol(rhs)) {
+        Slice field_name = value_as_symbol(rhs)->name;
         if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
-          struct_get_field(context, &rhs_range, lhs_value, value_as_symbol(rhs)->name, result_value);
+          struct_get_field(context, &rhs_range, lhs_value, field_name, result_value);
         } else {
           assert(lhs_value->descriptor == &descriptor_scope);
           const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
-          // TODO this is quite wasteful and also might not be correct
-          //      to to create a nested scope when we try to force a value.
-          //      A better option is probably to have a special case here instead
-          //      of using `token_force_value`
-          Scope *force_scope = scope_make(context->allocator, module_scope);
-          Execution_Context module_context = *context;
-          module_context.scope = force_scope;
-          module_context.builder = 0;
-          MASS_ON_ERROR(token_force_value(&module_context, rhs, result_value)) return;
+          Value *lookup = scope_lookup_force(module_scope, field_name);
+          if (!lookup) {
+            scope_print_names(module_scope);
+            context_error_snprintf(
+              context, rhs_range,
+              // TODO provide module name
+              "Could not find name %"PRIslice" in the module",
+              SLICE_EXPAND_PRINTF(field_name)
+            );
+            return;
+          }
+          MASS_ON_ERROR(assign(context, result_value, lookup)) return;
         }
       } else {
         context_error_snprintf(
@@ -4203,7 +4209,7 @@ token_parse_statement_label(
   Scope_Entry *scope_entry = scope_lookup(context->scope, name);
   Value *value;
   if (scope_entry) {
-    value = scope_entry_force(context, scope_entry);
+    value = scope_entry_force(scope_entry);
   } else {
     Scope *label_scope = context->scope;
 
@@ -4286,7 +4292,7 @@ token_parse_goto(
 
   Slice name = value_as_symbol(symbol)->name;
   Scope_Entry *scope_entry = scope_lookup(context->scope, name);
-  Value *value = scope_entry_force(context, scope_entry);
+  Value *value = scope_entry_force(scope_entry);
 
   if (
     !value ||
@@ -4327,7 +4333,7 @@ token_parse_explicit_return(
 
   Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
   assert(scope_value_entry);
-  Value *fn_return = scope_entry_force(context, scope_value_entry);
+  Value *fn_return = scope_entry_force(scope_value_entry);
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
@@ -4355,7 +4361,7 @@ token_parse_explicit_return(
 
   Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
   assert(scope_label_entry);
-  Value *return_label = scope_entry_force(context, scope_label_entry);
+  Value *return_label = scope_entry_force(scope_label_entry);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
   assert(storage_is_label(&return_label->storage));

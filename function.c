@@ -248,6 +248,7 @@ move_value(
       Memory_Location location = target->Memory.location;
       // TODO support other ones
       assert(location.tag == Memory_Location_Tag_Indirect);
+      assert(source->byte_size == target->byte_size);
       for (u64 offset = 0; offset < source->byte_size; offset += chunk_size) {
         Storage adjusted_target = *target;
         adjusted_target.byte_size = chunk_size;
