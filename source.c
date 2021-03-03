@@ -649,19 +649,25 @@ temp_token_array_into_value_view(
   return result;
 }
 
+typedef struct {
+  Group *group;
+  u64 index;
+} Tokenizer_Parent;
+typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
+
 void
 tokenizer_maybe_push_fake_semicolon(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
-  Array_u64 *parent_index_stack,
+  Array_Tokenizer_Parent *parent_stack,
   Source_Range source_range
 ) {
   bool has_children = dyn_array_length(*stack) != 0;
-  if (dyn_array_length(*parent_index_stack)) {
-    u64 parent_index = *dyn_array_last(*parent_index_stack);
-    Value *parent_value = *dyn_array_get(*stack, parent_index);
+  if (dyn_array_length(*parent_stack)) {
+    Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
+    Value *parent_value = *dyn_array_get(*stack, parent->index);
     if(value_as_group(parent_value)->tag != Group_Tag_Curly) return;
-    has_children = parent_index + 1 != dyn_array_length(*stack);
+    has_children = parent->index + 1 != dyn_array_length(*stack);
   }
   // Do not treat leading newlines as semicolons
   if (!has_children) return;
@@ -696,7 +702,7 @@ tokenize(
   Source_Range current_token_range = {.file = file};
   enum Tokenizer_State state = Tokenizer_State_Default;
   Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
-  Array_u64 parent_index_stack = dyn_array_make(Array_u64);
+  Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(
     .allocator = allocator_system,
@@ -735,7 +741,7 @@ tokenize(
     current_line.from = current_line.to;\
     current_token_range.offsets = (Range_u64){i + 1, i + 1};\
     tokenizer_maybe_push_fake_semicolon(\
-      allocator, &stack, &parent_index_stack, current_token_range\
+      allocator, &stack, &parent_stack, current_token_range\
     );\
   } while(0)
 
@@ -781,23 +787,23 @@ tokenize(
             allocator_allocate(allocator, Value),
             VALUE_STATIC_EPOCH, &descriptor_group, storage_static(group), current_token_range
           );
-          dyn_array_push(parent_index_stack, dyn_array_length(stack));
+          dyn_array_push(parent_stack, (Tokenizer_Parent){
+            .group = group,
+            .index = dyn_array_length(stack)
+          });
           push(value);
         } else if (ch == ')' || ch == '}' || ch == ']') {
           Value *parent_value = 0;
-          u64 parent_index = 0;
-          if (dyn_array_length(parent_index_stack)) {
-            parent_index = *dyn_array_last(parent_index_stack);
-            parent_value = *dyn_array_get(stack, parent_index);
+          Tokenizer_Parent *parent = 0;
+          if (dyn_array_length(parent_stack)) {
+            parent = dyn_array_last(parent_stack);
+            parent_value = *dyn_array_get(stack, parent->index);
           }
           if (!parent_value || !value_is_group(parent_value)) {
             panic("Tokenizer: unexpected closing char for group");
           }
-          // FIXME This const cast works at the moment, but could easily break
-          //       should put the group on the stack instead.
-          Group *group = (Group *)value_as_group(parent_value);
           s8 expected_paren = 0;
-          switch (group->tag) {
+          switch (parent->group->tag) {
             case Group_Tag_Paren: {
               expected_paren = ')';
               break;
@@ -808,7 +814,7 @@ tokenize(
               // }
               // is being interpreted as:
               // { 42 ; }
-              while (parent_index + 1 < dyn_array_length(stack)) {
+              while (parent->index + 1 < dyn_array_length(stack)) {
                 Value *last = *dyn_array_last(stack);
                 bool is_last_token_a_fake_semicolon = (
                   range_length(last->source_range.offsets) == 0 &&
@@ -834,13 +840,13 @@ tokenize(
           Source_Range children_range = parent_value->source_range;
           children_range.offsets.to -= 1;
           children_range.offsets.from += 1;
-          Value **children_values = dyn_array_raw(stack) + parent_index + 1;
-          u64 child_count = dyn_array_length(stack) - parent_index - 1;
-          group->children = temp_token_array_into_value_view(
+          Value **children_values = dyn_array_raw(stack) + parent->index + 1;
+          u64 child_count = dyn_array_length(stack) - parent->index - 1;
+          parent->group->children = temp_token_array_into_value_view(
             allocator, children_values, child_count, children_range
           );
-          stack.data->length = parent_index + 1; // pop the children
-          dyn_array_pop(parent_index_stack);
+          stack.data->length = parent->index + 1; // pop the children
+          dyn_array_pop(parent_stack);
         } else {
           TOKENIZER_HANDLE_ERROR("Unpexpected input");
         }
@@ -999,7 +1005,7 @@ tokenize(
   current_line.to = file->text.length;
   dyn_array_push(file->line_ranges, current_line);
 
-  if (dyn_array_length(parent_index_stack)) {
+  if (dyn_array_length(parent_stack)) {
     TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
   }
 
@@ -1013,7 +1019,7 @@ tokenize(
   }
   fixed_buffer_destroy(string_buffer);
   dyn_array_destroy(stack);
-  dyn_array_destroy(parent_index_stack);
+  dyn_array_destroy(parent_stack);
   return result;
 }
 
