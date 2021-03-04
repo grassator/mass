@@ -938,14 +938,13 @@ value_number_literal(
 
 Label_Index
 allocate_section_memory(
-  Execution_Context *context,
+  Program *program,
   Section *section,
   u64 byte_size,
   u64 alignment
 ) {
-  Program *program = context->program;
-  u64 offset_in_data_section = section->buffer.occupied;
   virtual_memory_buffer_allocate_bytes(&section->buffer, byte_size, alignment);
+  u64 offset_in_data_section = section->buffer.occupied - byte_size;
 
   Label_Index label_index = make_label(program, section, slice_literal("global"));
   Label *label = program_get_label(program, label_index);
@@ -967,7 +966,7 @@ value_global_internal(
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_alignment(descriptor);
 
-  Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+  Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
   return value_make_internal(
     compiler_source_location, context, descriptor, data_label32(label_index, byte_size), source_range
   );
@@ -1118,12 +1117,13 @@ value_register_for_descriptor_internal(
 #define value_register_for_descriptor(...)\
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-void *
+static inline void *
 rip_value_pointer_from_label_index(
   Program *program,
   Label_Index label_index
 ) {
   Label *label = program_get_label(program, label_index);
+  assert(label->resolved);
   return (s8 *)label->section->buffer.memory + label->offset_in_section;
 }
 
@@ -1288,6 +1288,7 @@ program_init(
     .patch_info_array = dyn_array_make(Array_Label_Location_Diff_Patch_Info, .capacity = 128, .allocator = allocator),
     .import_libraries = dyn_array_make(Array_Import_Library, .capacity = 16, .allocator = allocator),
     .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
+    .relocations = dyn_array_make(Array_Relocation, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
   };
 
@@ -1345,6 +1346,7 @@ program_deinit(
   dyn_array_destroy(program->import_libraries);
   dyn_array_destroy(program->functions);
   dyn_array_destroy(program->startup_functions);
+  dyn_array_destroy(program->relocations);
 }
 
 void

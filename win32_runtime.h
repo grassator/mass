@@ -154,6 +154,7 @@ typedef struct {
   u64 functions;
   u64 imports;
   u64 startup;
+  u64 relocations;
 } Win32_Jit_Counters;
 
 typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
@@ -374,6 +375,21 @@ win32_program_jit(
     }
   }
 
+  // Resolve relocations
+  u64 relocation_count = dyn_array_length(program->relocations);
+  for (u64 i = info->previous_counts.relocations; i < relocation_count; ++i) {
+    Relocation *relocation = dyn_array_get(program->relocations, i);
+    assert(storage_is_label(&relocation->patch_at));
+    assert(storage_is_label(&relocation->address_of));
+    Label_Index patch_at_index =
+      relocation->patch_at.Memory.location.Instruction_Pointer_Relative.label_index;
+    Label_Index address_of_index =
+      relocation->address_of.Memory.location.Instruction_Pointer_Relative.label_index;
+    void *address_of = rip_value_pointer_from_label_index(program, address_of_index);
+    void **patch_at = rip_value_pointer_from_label_index(program, patch_at_index);
+    *patch_at = address_of;
+  }
+
   // Call new startup functions
   u64 startup_count = dyn_array_length(program->startup_functions);
   for (u64 i = info->previous_counts.startup; i < startup_count; ++i) {
@@ -382,6 +398,7 @@ win32_program_jit(
     fn();
   }
 
+  info->previous_counts.relocations = relocation_count;
   info->previous_counts.functions = function_count;
   info->previous_counts.imports = import_count;
   info->previous_counts.startup = startup_count;

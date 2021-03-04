@@ -756,9 +756,9 @@ spec("source") {
     it("should be able to run fibonnacii") {
       fn_type_s64_to_s64 fibonnacci = (fn_type_s64_to_s64)test_program_inline_source_function(
         "fibonnacci", &test_context,
-        "fibonnacci :: (n : s64) -> (s64) {"
-          "if (n < 2) { return n };"
-          "fibonnacci(n - 1) + fibonnacci(n - 2)"
+        "fibonnacci :: (n : s64) -> (s64) {\n"
+          "if (n < 2) { return n }\n"
+          "fibonnacci(n - 1) + fibonnacci(n - 2)\n"
         "}"
       );
       check(fibonnacci);
@@ -1489,6 +1489,36 @@ spec("source") {
         check(spec_check_mass_result(test_context.result));
 
         write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
+    }
+  }
+
+  describe("Relocations") {
+    it("should work in JIT code") {
+      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
+      Module *prelude_module = program_module_from_file(
+        &test_context, slice_literal("lib\\prelude"), module_scope
+      );
+      Mass_Result result = program_import_module(&test_context, prelude_module);
+      check(result.tag == Mass_Result_Tag_Success);
+      Module *module = program_module_from_file(
+        &test_context, slice_literal("fixtures\\relocations"), module_scope
+      );
+      result = program_import_module(&test_context, module);
+      check(spec_check_mass_result(test_context.result));
+      Program *test_program = test_context.program;
+
+      Value *test = scope_lookup_force(module_scope, slice_literal("test"));
+      check(test);
+      ensure_compiled_function_body(&test_context, test);
+      check(spec_check_mass_result(test_context.result));
+
+      Jit jit;
+      jit_init(&jit, test_program);
+      program_jit(&jit);
+      check(spec_check_mass_result(test_context.result));
+
+      fn_type_void_to_void checker = (fn_type_void_to_void)value_as_function(&jit, test);
+      checker();
     }
   }
 

@@ -316,6 +316,7 @@ assign(
   }
   if (target->descriptor->tag == Descriptor_Tag_Any) {
     assert(target->storage.tag == Storage_Tag_Any);
+    target->epoch = source->epoch;
     target->descriptor = source->descriptor;
     target->storage = source->storage;
     target->next_overload = source->next_overload;
@@ -367,7 +368,7 @@ assign(
       u64 alignment = descriptor_alignment(static_pointer->descriptor);
 
       // TODO this should also be deduped
-      Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
       static_pointer->storage = data_label32(label_index, byte_size);
 
       void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
@@ -1721,13 +1722,16 @@ token_force_value(
         value->storage.tag != Storage_Tag_Static &&
         value->storage.tag != Storage_Tag_None
       ) {
-        if (value->epoch != context->epoch) {
+        if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
           context_error_snprintf(
             context, value->source_range,
-            "Trying to access a runtime variable %"PRIslice" from a different epoch. "
+            "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
+            " from a different epoch %"PRIu64 ". "
             "This happens when you access value from runtime in compile-time execution "
-            "or a runtime value of one compile time execution in a diffrent one.",
-            SLICE_EXPAND_PRINTF(name)
+            "or a runtime value of one compile time execution in a different one.",
+            SLICE_EXPAND_PRINTF(name),
+            value->epoch,
+            context->epoch
           );
           return *context->result;
         }
@@ -2417,12 +2421,16 @@ token_process_function_literal(
     }
   }
 
-  return value_make(context, descriptor, (Storage){0}, args->source_range);
+  Value *result = value_make(context, descriptor, (Storage){0}, args->source_range);
+  // TODO this is not going to be true for lambdas with capture
+  result->epoch = VALUE_STATIC_EPOCH;
+  return result;
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
-static u64 get_new_epoch() {
+static inline u64
+get_new_epoch() {
   // FIXME make atomic
   static u64 epoch = 1;
   return epoch++;
@@ -2548,10 +2556,7 @@ compile_time_eval(
       panic("Internal Error: We should never get Any type from comp time eval");
       break;
     }
-    case Descriptor_Tag_Pointer: {
-      panic("TODO move to data section or maybe we should allocate from there right away above?");
-      break;
-    };
+    case Descriptor_Tag_Pointer:
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
@@ -3443,7 +3448,33 @@ token_eval_operator(
         );
         return;
       }
-      load_address(context, &args_range, result_value, *dyn_array_get(args, 0));
+      Value *pointee = *dyn_array_get(args, 0);
+      if (context->compilation->jit.program == context->program) { // compile time
+        assert(pointee->epoch == VALUE_STATIC_EPOCH);
+        assert(pointee->storage.tag == Storage_Tag_Memory);
+        Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
+
+        // TODO put this into a separate section and make readonly after relocations are done
+        //      this section can probably be zero-initialized
+        Program *runtime_program = context->compilation->runtime_program;
+        Section *section = &runtime_program->memory.sections.rw_data;
+        u64 byte_size = descriptor_byte_size(descriptor);
+        u64 alignment = descriptor_alignment(descriptor);
+
+        Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
+        Storage pointer_storage = data_label32(label_index, byte_size);
+        Value *pointer = value_make(
+          context, descriptor, pointer_storage, pointee->source_range
+        );
+        dyn_array_push(runtime_program->relocations, (Relocation) {
+          .patch_at = pointer_storage,
+          .address_of = pointee->storage,
+        });
+        pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
+        MASS_ON_ERROR(assign(context, result_value, pointer)) return;
+      } else { // run time
+        load_address(context, &args_range, result_value, pointee);
+      }
       dyn_array_destroy(args);
     } else {
       token_handle_function_call(context, target, args_token, result_value);
@@ -4563,7 +4594,7 @@ token_define_global_variable(
       u64 alignment = descriptor_alignment(value->descriptor);
 
       // TODO this should also be deduped
-      Label_Index label_index = allocate_section_memory(context, section, byte_size, alignment);
+      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
       global_value = value_make(
         context, value->descriptor, data_label32(label_index, byte_size), value->source_range
       );

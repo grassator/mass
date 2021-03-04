@@ -258,11 +258,18 @@ typedef struct {
   } sections;
 } Program_Memory;
 
+typedef struct {
+  Storage patch_at;
+  Storage address_of;
+} Relocation;
+typedef dyn_array_type(Relocation) Array_Relocation;
+
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;
   Array_Label_Location_Diff_Patch_Info patch_info_array;
   Array_Value_Ptr startup_functions;
+  Array_Relocation relocations;
   Value *entry_point;
   Array_Function_Builder functions;
   Program_Memory memory;
@@ -308,10 +315,21 @@ rip_value_pointer(
   Value *value
 );
 
+static inline bool
+storage_is_label(
+  const Storage *operand
+);
+
 fn_type_opaque
 value_as_function(
   const Jit *jit,
   Value *value
+);
+
+static inline void *
+rip_value_pointer_from_label_index(
+  Program *program,
+  Label_Index label_index
 );
 
 void

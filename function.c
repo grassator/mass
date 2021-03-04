@@ -1286,13 +1286,18 @@ ensure_compiled_function_body(
 
   Execution_Context body_context = *context;
   Scope *body_scope = scope_make(context->allocator, function->scope);
+  body_context.scope = body_scope;
+  body_context.builder = &builder;
+  body_context.epoch = get_new_epoch();
+
+
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     // Nothing to do since there is no way to refer to an exact argument in the body
     if (function_argument_is_exact(argument)) continue;
     if (!argument->name.length) continue;
     Value *arg_value = function_argument_value_at_index(
-      context, function, index, Function_Argument_Mode_Body
+      &body_context, function, index, Function_Argument_Mode_Body
     );
     scope_define(body_scope, argument->name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
@@ -1309,7 +1314,7 @@ ensure_compiled_function_body(
   // TODO that is probably not what we want for the highlighted range
   Source_Range return_range = fn_value->source_range;
   Value *return_value = function_return_value_for_descriptor(
-    context, function->returns.descriptor, Function_Argument_Mode_Body, return_range
+    &body_context, function->returns.descriptor, Function_Argument_Mode_Body, return_range
   );
 
   scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
@@ -1345,10 +1350,6 @@ ensure_compiled_function_body(
       .Value.value = return_value,
     });
   }
-
-  // TODO Should this set compilation_mode?
-  body_context.scope = body_scope;
-  body_context.builder = &builder;
   token_parse_block_no_scope(&body_context, function->body, return_value);
 
   fn_end(program, &builder);

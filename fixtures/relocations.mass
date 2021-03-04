@@ -1,0 +1,23 @@
+ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
+GetStdHandle :: (handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
+WriteFile :: (
+  handle : s64,
+  buffer : [u8],
+  size : s32,
+  bytes_written : [s32],
+  overlapped : [s64]
+) -> (s64) external("kernel32.dll", "WriteFile")
+STDOUT_HANDLE :: -11
+
+global_char := cast(u8, "a".bytes.0)
+global_string := &global_char
+
+test :: () -> () {
+  stdout_handle := GetStdHandle(STDOUT_HANDLE)
+  WriteFile(stdout_handle, global_string, 1, 0, 0)
+}
+
+main :: () -> () {
+  test()
+  ExitProcess(0)
+}

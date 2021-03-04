@@ -74,6 +74,9 @@ assign(
   Value *source
 );
 
+static inline u64
+get_new_epoch();
+
 Scope *
 scope_make(
   const Allocator *allocator,
