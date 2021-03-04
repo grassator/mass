@@ -1653,6 +1653,22 @@ program_init_startup_code(
     },
   };
 
+  // Resolve relocations
+  Descriptor *void_pointer = descriptor_pointer_to(context->allocator, &descriptor_void);
+  Storage register_a = storage_register_for_descriptor(Register_A, void_pointer);
+  u64 relocation_count = dyn_array_length(program->relocations);
+  for (u64 i = 0; i < relocation_count; ++i) {
+    Relocation *relocation = dyn_array_get(program->relocations, i);
+    push_instruction(
+      &builder.code_block.instructions, source_range,
+      (Instruction) {.assembly = {lea, {register_a, relocation->address_of, 0}}}
+    );
+    push_instruction(
+      &builder.code_block.instructions, source_range,
+      (Instruction) {.assembly = {mov, {relocation->patch_at, register_a, 0}}}
+    );
+  }
+
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
