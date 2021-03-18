@@ -45,6 +45,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_end;
 }
 
+syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
+
 bool :: s8
 true :: 1
 false :: 0

@@ -110,97 +110,99 @@ win32_program_test_exception_handler(
   Win32_Exception_Data *exception_data = DispatcherContext->HandlerData;
 
   if (!exception_data->jit->is_stack_unwinding_in_progress) {
-    exception_data->jit->is_stack_unwinding_in_progress = true;
     printf("Unhandled Exception: ");
 
     switch(ExceptionRecord->ExceptionCode) {
       case EXCEPTION_ACCESS_VIOLATION: {
-        printf("Access Violation");
+        printf("Access Violation.\n");
         break;
       }
       case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: {
-        printf("Hardware Array Bounds Check Failed");
+        printf("Hardware Array Bounds Check Failed.\n");
         break;
       }
       case EXCEPTION_BREAKPOINT: {
-        printf("User Breakpoint");
-        break;
+        printf("User Breakpoint.\n");
+        win32_print_register_state(ContextRecord);
+        // Move instruction pointer over the CC in
+        ContextRecord->Rip += 1;
+        return ExceptionContinueExecution;
       }
       case EXCEPTION_DATATYPE_MISALIGNMENT: {
-        printf("Misaligned Read / Write");
+        printf("Misaligned Read / Write.\n");
         break;
       }
       case EXCEPTION_FLT_DENORMAL_OPERAND: {
-        printf("Denormal Float Value Result");
+        printf("Denormal Float Value Result.\n");
         break;
       }
       case EXCEPTION_FLT_DIVIDE_BY_ZERO: {
-        printf("Float Divide By Zero");
+        printf("Float Divide By Zero.\n");
         break;
       }
       case EXCEPTION_FLT_INEXACT_RESULT: {
-        printf("Float Inexact Decimal Fraction");
+        printf("Float Inexact Decimal Fraction.\n");
         break;
       }
       case EXCEPTION_FLT_INVALID_OPERATION: {
-        printf("Float Invalid Operation");
+        printf("Float Invalid Operation.\n");
         break;
       }
       case EXCEPTION_FLT_OVERFLOW: {
-        printf("Float Overflow");
+        printf("Float Overflow.\n");
         break;
       }
       case EXCEPTION_FLT_STACK_CHECK: {
-        printf("Stack Overflow After Float Operation");
+        printf("Stack Overflow After Float Operation.\n");
         break;
       }
       case EXCEPTION_FLT_UNDERFLOW: {
-        printf("Float Underflow");
+        printf("Float Underflow.\n");
         break;
       }
       case EXCEPTION_ILLEGAL_INSTRUCTION: {
-        printf("Illegal Machine Code Instruction");
+        printf("Illegal Machine Code Instruction.\n");
         break;
       }
       case EXCEPTION_IN_PAGE_ERROR: {
-        printf("Read Missing Memory Page");
+        printf("Read Missing Memory Page.\n");
         break;
       }
       case EXCEPTION_INT_DIVIDE_BY_ZERO: {
-        printf("Integer Divide By Zero");
+        printf("Integer Divide By Zero.\n");
         break;
       }
       case EXCEPTION_INT_OVERFLOW: {
-        printf("Integer Overflow");
+        printf("Integer Overflow.\n");
         break;
       }
       case EXCEPTION_INVALID_DISPOSITION: {
-        printf("Invalid Disposition From An Exception Handler");
+        printf("Invalid Disposition From An Exception Handler.\n");
         break;
       }
       case EXCEPTION_NONCONTINUABLE_EXCEPTION: {
-        printf("Continue Execution After Noncontinuable Exception");
+        printf("Continue Execution After Noncontinuable Exception.\n");
         break;
       }
       case EXCEPTION_PRIV_INSTRUCTION: {
-        printf("Instruction Not Allowed In Current CPU Mode");
+        printf("Instruction Not Allowed In Current CPU Mode.\n");
         break;
       }
       case EXCEPTION_SINGLE_STEP: {
-        printf("Single Step Instruction");
+        printf("Single Step Instruction.\n");
         break;
       }
       case EXCEPTION_STACK_OVERFLOW: {
-        printf("Stack Overflow");
+        printf("Stack Overflow.\n");
         break;
       }
       default: {
-        printf("Unknown");
+        printf("Unknown.\n");
         break;
       }
     }
-    printf(".\n");
     win32_print_register_state(ContextRecord);
+    exception_data->jit->is_stack_unwinding_in_progress = true;
   }
 
   u64 current_offset = 0;
@@ -215,7 +217,6 @@ win32_program_test_exception_handler(
     }
   }
 
-  // Another valid value is ExceptionContinueExecution
   return ExceptionContinueSearch;
 }
 
