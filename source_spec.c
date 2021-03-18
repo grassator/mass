@@ -394,7 +394,7 @@ spec("source") {
 
   #ifdef _WIN32
   describe("Win32: Structured Exceptions") {
-    it("should be unwind stack on hardware exception on Windows") {
+    fit("should be unwind stack on hardware exception on Windows") {
       Module *module = program_module_from_file(
         &test_context,
         slice_literal("fixtures\\error_runtime_divide_by_zero"),
