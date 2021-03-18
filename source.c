@@ -3923,6 +3923,12 @@ token_parse_if_expression(
   return 0;
 }
 
+typedef Value *(*Expression_Matcher_Proc)(
+  Execution_Context *context,
+  Value_View view,
+  u64 *out_match_length
+);
+
 PRELUDE_NO_DISCARD u64
 token_parse_expression(
   Execution_Context *context,
@@ -3942,32 +3948,28 @@ token_parse_expression(
 
   bool is_previous_an_operator = true;
   u64 matched_length = view.length;
-  for (u64 i = 0; i < view.length; ++i) {
-    Value_View rest = value_view_rest(&view, i);
-    {
-      // Try to match macros at the current position
-      u64 macro_match_length = 0;
-      Value *macro_result = token_parse_macros(context, rest, &macro_match_length);
-      MASS_ON_ERROR(*context->result) goto err;
-      if (macro_match_length) {
-        assert(macro_result);
-        dyn_array_push(value_stack, macro_result);
-        // Skip over the matched slice
-        i += macro_match_length - 1;
-        continue;
-      }
-    }
 
-    {
-      u64 if_match_length = 0;
-      Value *if_expression = token_parse_if_expression(context, rest, &if_match_length);
+  static Expression_Matcher_Proc expression_matchers[] = {
+    token_parse_macros,
+    token_parse_if_expression
+  };
+
+  for (u64 i = 0; ; ++i) {
+    repeat:
+    if (i >= view.length) break;
+
+    Value_View rest = value_view_rest(&view, i);
+    for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
+      Expression_Matcher_Proc matcher = expression_matchers[matcher_index];
+      u64 match_length = 0;
+      Value *match_result = matcher(context, rest, &match_length);
       MASS_ON_ERROR(*context->result) goto err;
-      if (if_match_length) {
-        assert(if_expression);
-        dyn_array_push(value_stack, if_expression);
+      if (match_length) {
+        assert(match_result);
+        dyn_array_push(value_stack, match_result);
         // Skip over the matched slice
-        i += if_match_length - 1;
-        continue;
+        i += match_length;
+        goto repeat;
       }
     }
 
