@@ -395,6 +395,7 @@ assign(
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Execution_Context *context,
+  const Source_Range *source_range,
   Value *token,
   Value *result_value
 );
@@ -577,7 +578,7 @@ const Token_Pattern token_pattern_semicolon = {
 };
 
 bool
-value_match(
+value_match_single(
   const Value *value,
   const Token_Pattern *pattern
 ) {
@@ -612,6 +613,17 @@ value_match(
     }
   }
   return true;
+}
+
+bool
+value_match(
+  const Value *value,
+  const Token_Pattern *pattern
+) {
+  for (; pattern; pattern = pattern->or) {
+    if (value_match_single(value, pattern)) return true;
+  }
+  return false;
 }
 
 static inline bool
@@ -1682,6 +1694,7 @@ token_match_return_type(
 PRELUDE_NO_DISCARD Mass_Result
 token_force_value(
   Execution_Context *context,
+  const Source_Range *source_range,
   Value *token,
   Value *result_value
 ) {
@@ -1710,9 +1723,9 @@ token_force_value(
       value = scope_lookup_force(context->scope, name);
       MASS_TRY(*context->result);
       if (!value) {
-        scope_print_names(context->scope);
+        //scope_print_names(context->scope);
         context_error_snprintf(
-          context, value->source_range,
+          context, *source_range,
           "Undefined variable %"PRIslice,
           SLICE_EXPAND_PRINTF(name)
         );
@@ -1806,7 +1819,7 @@ token_handle_user_defined_operator(
     Value *arg = value_view_get(args, i);
     Source_Range source_range = arg->source_range;
     Value *arg_value = value_any(context, source_range);
-    MASS_ON_ERROR(token_force_value(context, arg, arg_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &source_range, arg, arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
@@ -1939,7 +1952,9 @@ token_parse_operator_definition(
 
   Source_Range precedence_source_range = precedence_token->source_range;
   Value *precedence_value = value_any(context, precedence_source_range);
-  MASS_ON_ERROR(token_force_value(context, precedence_token, precedence_value)) goto err;
+  MASS_ON_ERROR(token_force_value(
+    context, &precedence_source_range, precedence_token, precedence_value
+  )) goto err;
   precedence_value = token_value_force_immediate_integer(
     context, &precedence_source_range, precedence_value, &descriptor_u64
   );
@@ -2738,7 +2753,7 @@ token_handle_negation(
   // FIXME use result_value here
   Source_Range source_range = token->source_range;
   Value *value = value_any(context, source_range);
-  MASS_ON_ERROR(token_force_value(context, token, value)) return;
+  MASS_ON_ERROR(token_force_value(context, &source_range, token, value)) return;
   Value *negated_value;
   if (value->descriptor == &descriptor_number_literal) {
     const Number_Literal *original = storage_static_as_c_type(&value->storage, Number_Literal);
@@ -2879,7 +2894,7 @@ token_handle_function_call(
 
   Source_Range source_range = target_token->source_range; // TODO add args as well
   Value *target = value_any(context, source_range);
-  MASS_ON_ERROR(token_force_value(context, target_token, target)) return;
+  MASS_ON_ERROR(token_force_value(context, &source_range, target_token, target)) return;
   assert(value_match_group(args_token, Group_Tag_Paren));
 
   if (
@@ -3407,7 +3422,9 @@ token_eval_operator(
       slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
     ) {
       Value *result_token = token_process_c_struct_definition(context, args_token);
-      MASS_ON_ERROR(token_force_value(context, result_token, result_value)) return;
+      MASS_ON_ERROR(token_force_value(
+        context, &args_token->source_range, result_token, result_value
+      )) return;
     } else if (
       value_is_symbol(target) &&
       slice_equal(value_as_symbol(target)->name, slice_literal("storage_variant_of"))
@@ -3506,7 +3523,7 @@ token_eval_operator(
     Source_Range rhs_range = rhs->source_range;
     Source_Range lhs_range = lhs->source_range;
     Value *lhs_value = value_any(context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
     if (
       lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
       lhs_value->descriptor == &descriptor_scope
@@ -3547,7 +3564,7 @@ token_eval_operator(
         value_is_number_literal(rhs)
       ) {
         Value *index = value_any(context, rhs_range);
-        token_force_value(context, rhs, index);
+        token_force_value(context, &rhs_range, rhs, index);
         token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
       } else {
         context_error_snprintf(
@@ -3576,9 +3593,9 @@ token_eval_operator(
     Source_Range lhs_range = lhs->source_range;
 
     Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
     Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
-    MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
     bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
@@ -3654,9 +3671,9 @@ token_eval_operator(
     Source_Range lhs_range = lhs->source_range;
 
     Value *lhs_value = value_any(context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, lhs, lhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
     Value *rhs_value = value_any(context, rhs_range);
-    MASS_ON_ERROR(token_force_value(context, rhs, rhs_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
 
     bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
     bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
@@ -3747,7 +3764,7 @@ token_eval_operator(
     Value *function = value_view_get(args_view, 0);
     Source_Range source_range = function->source_range;
     Value *function_value = value_any(context, source_range);
-    MASS_ON_ERROR(token_force_value(context, function, function_value)) return;
+    MASS_ON_ERROR(token_force_value(context, &source_range, function, function_value)) return;
     if (function_value) {
       if (
         function_value->descriptor->tag == Descriptor_Tag_Function &&
@@ -3827,116 +3844,80 @@ token_parse_if_expression(
   u64 peek_index = 0;
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("if"));
 
-  Value_View condition = {0};
-  Value_View then_branch = {0};
-  Value_View else_branch = {0};
+  Source_Range dummy_range = keyword->source_range;
 
-  enum {
-    Parse_State_Condition,
-    Parse_State_Then,
-    Parse_State_Else
-  } parse_state = Parse_State_Condition;
-
-  for (u64 i = peek_index; i < view.length; ++i) {
-    Value *token = value_view_get(view, i);
-    if (value_match_symbol(token, slice_literal("then"))) {
-      Value_View till_here = value_view_slice(&view, peek_index, i);
-      if (parse_state != Parse_State_Condition) {
-        context_error_snprintf(
-          context, till_here.source_range,
-          "Expected `else`, encountered `then` inside an `if` expression"
-        );
-        goto err;
-      }
-      parse_state = Parse_State_Then;
-      condition = till_here;
-      peek_index = i + 1;
-    } else if (value_match_symbol(token, slice_literal("else"))) {
-      Value_View till_here = value_view_slice(&view, peek_index, i);
-      if (parse_state != Parse_State_Then) {
-        context_error_snprintf(
-          context, till_here.source_range,
-          "Expected `then`, encountered `else` inside an `if` expression"
-        );
-        goto err;
-      }
-      then_branch = till_here;
-      peek_index = i + 1;
-      else_branch = value_view_rest(&view, peek_index);
-      parse_state = Parse_State_Else;
-      break;
-    } else if (value_match(token, &token_pattern_semicolon)) {
-      break;
+  Value *condition_value = value_any(context, dummy_range);
+  {
+    static const Token_Pattern then_pattern = {
+      .tag = Token_Pattern_Tag_Symbol,
+      .Symbol.name = slice_literal_fields("then")
+    };
+    Value_View condition_view = value_view_slice(&view, peek_index, view.length);
+    //if (!condition_view.length) {
+      //context_error_snprintf(
+        //context, keyword->source_range,
+        //"`if` keyword must be followed by an expression"
+      //);
+      //goto err;
+    //}
+    peek_index += token_parse_expression(context, condition_view, condition_value, &then_pattern);
+    if (condition_value->descriptor == &descriptor_number_literal) {
+      condition_value = token_value_force_immediate_integer(
+        context, &condition_value->source_range, condition_value, &descriptor_s64
+      );
     }
-  }
-  if (!condition.length) {
-    context_error_snprintf(
-      context, view.source_range,
-      "`if` keyword must be followed by an expression"
-    );
-    goto err;
-  }
-  if (!then_branch.length) {
-    context_error_snprintf(
-      context, view.source_range,
-      "`then` branch of an if expression must not be empty"
-    );
-    goto err;
-  }
-  if (!else_branch.length) {
-    context_error_snprintf(
-      context, view.source_range,
-      "`else` branch of an if expression must not be empty"
-    );
-    goto err;
+    MASS_ON_ERROR(*context->result) goto err;
   }
 
-  Value *condition_value = value_any(context, condition.source_range);
-  token_parse_expression(context, condition, condition_value, 0);
-  MASS_ON_ERROR(*context->result) goto err;
-
-  Source_Range keyword_range = keyword->source_range;
   Label_Index else_label = make_if(
-    context, &context->builder->code_block.instructions, &keyword_range, condition_value
+    context, &context->builder->code_block.instructions, &condition_value->source_range, condition_value
   );
 
-  Value *if_value = value_any(context, then_branch.source_range);
-  token_parse_expression(context, then_branch, if_value, 0);
-  MASS_ON_ERROR(*context->result) goto err;
+  Value *then_value = value_any(context, dummy_range);
+  {
+    static const Token_Pattern else_pattern = {
+      .tag = Token_Pattern_Tag_Symbol,
+      .Symbol.name = slice_literal_fields("else"),
+    };
+    Value_View then_view = value_view_slice(&view, peek_index, view.length);
+    peek_index += token_parse_expression(context, then_view, then_value, &else_pattern);
+    MASS_ON_ERROR(*context->result) goto err;
+  }
 
-  if (if_value->storage.tag == Storage_Tag_Static) {
-    const Descriptor *stack_descriptor = if_value->descriptor;
+  if (then_value->storage.tag == Storage_Tag_Static) {
+    const Descriptor *stack_descriptor = then_value->descriptor;
     if (stack_descriptor == &descriptor_number_literal) {
       stack_descriptor = &descriptor_s64;
     }
     Value *on_stack =
-      reserve_stack(context, context->builder, stack_descriptor, if_value->source_range);
-    MASS_ON_ERROR(assign(context, on_stack, if_value)) {
+      reserve_stack(context, context->builder, stack_descriptor, then_value->source_range);
+    MASS_ON_ERROR(assign(context, on_stack, then_value)) {
       goto err;
     }
-    if_value = on_stack;
+    then_value = on_stack;
   }
 
   Label_Index after_label =
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
   push_instruction(
-    &context->builder->code_block.instructions, keyword_range,
+    &context->builder->code_block.instructions, dummy_range,
     (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
   );
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword_range,
+    &context->builder->code_block.instructions, dummy_range,
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  u64 else_length = token_parse_expression(context, else_branch, if_value, 0);
+  Value_View else_view = value_view_slice(&view, peek_index, view.length);
+  u64 else_length = token_parse_expression(context, else_view, then_value, 0);
   *matched_length = peek_index + else_length;
 
   push_instruction(
-    &context->builder->code_block.instructions, keyword_range,
+    &context->builder->code_block.instructions, dummy_range,
     (Instruction) {.type = Instruction_Type_Label, .label = after_label}
   );
-  return if_value;
+  return then_value;
 
   err:
   return 0;
@@ -4053,7 +4034,7 @@ token_parse_expression(
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(value_stack) == 1) {
       Value *value = *dyn_array_last(value_stack);
-      MASS_ON_ERROR(token_force_value(context, value, result_value)) goto err;
+      MASS_ON_ERROR(token_force_value(context, &view.source_range, value, result_value)) goto err;
     } else {
       context_error_snprintf(
         context, view.source_range,

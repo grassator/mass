@@ -447,7 +447,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(
         error->message,
-        slice_literal("Expected `then`, encountered `else` inside an `if` expression")
+        slice_literal("Could not parse the expression")
       );
     }
     it("should report an error on double `then` inside of an if expression") {
@@ -459,7 +459,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(
         error->message,
-        slice_literal("Expected `else`, encountered `then` inside an `if` expression")
+        slice_literal("Could not parse the expression")
       );
     }
     it("should be able to parse and run if statement") {
@@ -497,7 +497,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(
         error->message,
-        slice_literal("`if` keyword must be followed by an expression")
+        slice_literal("Undefined variable ;")
       );
     }
 
@@ -511,7 +511,7 @@ spec("source") {
       slice_print(error->message);
       spec_check_slice(
         error->message,
-        slice_literal("`if` keyword must be followed by an expression")
+        slice_literal("Could not parse the expression")
       );
     }
   }

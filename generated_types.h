@@ -253,6 +253,7 @@ typedef struct {
 typedef struct Token_Pattern {
   Token_Pattern_Tag tag;
   char _tag_padding[4];
+  Token_Pattern * or;
   union {
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
