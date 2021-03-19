@@ -3853,13 +3853,6 @@ token_parse_if_expression(
       .Symbol.name = slice_literal_fields("then")
     };
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
-    //if (!condition_view.length) {
-      //context_error_snprintf(
-        //context, keyword->source_range,
-        //"`if` keyword must be followed by an expression"
-      //);
-      //goto err;
-    //}
     peek_index += token_parse_expression(context, condition_view, condition_value, &then_pattern);
     if (condition_value->descriptor == &descriptor_number_literal) {
       condition_value = token_value_force_immediate_integer(
