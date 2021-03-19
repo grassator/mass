@@ -235,7 +235,8 @@ print_mass_descriptor_and_type_forward_declaration(
       break;
     }
     case Type_Tag_Function: {
-
+      char *lowercase_name = strtolower(type->function.name);
+      fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       break;
     }
   }
@@ -805,6 +806,8 @@ main(void) {
     fprintf(file, "static Descriptor descriptor_program_pointer;\n");
     fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
     fprintf(file, "static Descriptor descriptor_compilation_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_void;\n");
+    fprintf(file, "static Descriptor descriptor_void_pointer;\n");
 
     // The type of type needs to be defined manually
     fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");

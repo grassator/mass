@@ -76,11 +76,6 @@ MASS_DEFINE_OPAQUE_TYPE(register_64, 8);
 MASS_DEFINE_OPAQUE_TYPE(immediate, sizeof(Slice));
 MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Storage_Eflags));
 
-Descriptor descriptor_void = {
-  .tag = Descriptor_Tag_Void,
-  .name = slice_literal_fields("void"),
-};
-
 Value void_value = {
   .descriptor = &descriptor_void,
   .storage = { .tag = Storage_Tag_None },

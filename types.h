@@ -90,4 +90,10 @@
 
 #include "generated_types.h"
 
+static Descriptor descriptor_void = {
+  .tag = Descriptor_Tag_Void,
+  .name = slice_literal_fields("void"),
+};
+MASS_DEFINE_POINTER_DESCRIPTOR(void);
+
 #endif // C_MACRO_H
