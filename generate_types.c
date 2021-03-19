@@ -677,7 +677,7 @@ main(void) {
       { "Operator_Associativity", "associativity" },
       { "u64", "precedence" },
       { "u64", "argument_count" },
-      { "Token_Handle_Operator_Proc", "handler" },
+      { "Mass_Handle_Operator_Proc", "handler" },
       { "void *", "handler_payload" },
     }),
   }), (Struct_Item[]){
@@ -759,7 +759,7 @@ main(void) {
     })
   }));
 
-  push_type(type_function("Token_Handle_Operator_Proc", "void", (Argument[]){
+  push_type(type_function("Mass_Handle_Operator_Proc", "void", (Argument[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "Value *", "result_value" },

@@ -157,7 +157,7 @@ typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
-typedef void (*Token_Handle_Operator_Proc)
+typedef void (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, Value * result_value, void * payload);
 
 
@@ -529,7 +529,7 @@ typedef struct {
   Operator_Associativity associativity;
   u64 precedence;
   u64 argument_count;
-  Token_Handle_Operator_Proc handler;
+  Mass_Handle_Operator_Proc handler;
   void * handler_payload;
 } Scope_Entry_Operator;
 typedef struct Scope_Entry {
