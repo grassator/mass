@@ -3413,7 +3413,6 @@ mass_arithmetic_operator_symbol(
   return (Slice){0};
 }
 
-
 void
 mass_handle_arithmetic_operation(
   Execution_Context *context,
@@ -3506,6 +3505,95 @@ mass_handle_arithmetic_operation(
   } else {
     MASS_ON_ERROR(assign(context, result_value, any_result)) return;
   }
+}
+
+void
+mass_handle_comparison_operation(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *payload
+) {
+  Compare_Type compare_type = (Compare_Type)(u64)payload;
+
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+  Source_Range rhs_range = rhs->source_range;
+  Source_Range lhs_range = lhs->source_range;
+
+  Value *lhs_value = value_any(context, lhs_range);
+  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
+  Value *rhs_value = value_any(context, rhs_range);
+  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
+
+  bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
+  bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
+  if (lhs_is_literal && rhs_is_literal) {
+    // FIXME support large unsigned numbers
+    lhs_value = token_value_force_immediate_integer(
+      context, &lhs_range, lhs_value, &descriptor_s64
+    );
+    rhs_value = token_value_force_immediate_integer(
+      context, &rhs_range, rhs_value, &descriptor_s64
+    );
+    MASS_ON_ERROR(*context->result) return;
+  }
+
+  if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
+    context_error_snprintf(
+      context, lhs_range,
+      "Left hand side of the comparison is not an integer"
+    );
+    return;
+  }
+  if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
+    context_error_snprintf(
+      context, rhs_range,
+      "Right hand side of the comparison is not an integer"
+    );
+    return;
+  }
+  maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
+  MASS_ON_ERROR(*context->result) return;
+
+  if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
+    switch(compare_type) {
+      case Compare_Type_Equal:
+      case Compare_Type_Not_Equal: {
+        break;
+      }
+
+      case Compare_Type_Unsigned_Below:
+      case Compare_Type_Unsigned_Below_Equal:
+      case Compare_Type_Unsigned_Above:
+      case Compare_Type_Unsigned_Above_Equal: {
+        panic("Internal error. Expected to parse operators as signed compares");
+        break;
+      }
+
+      case Compare_Type_Signed_Less: {
+        compare_type = Compare_Type_Unsigned_Below;
+        break;
+      }
+      case Compare_Type_Signed_Less_Equal: {
+        compare_type = Compare_Type_Unsigned_Below_Equal;
+        break;
+      }
+      case Compare_Type_Signed_Greater: {
+        compare_type = Compare_Type_Unsigned_Above;
+        break;
+      }
+      case Compare_Type_Signed_Greater_Equal: {
+        compare_type = Compare_Type_Unsigned_Above_Equal;
+        break;
+      }
+      default: {
+        assert(!"Unsupported comparison");
+      }
+    }
+  }
+
+  compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
 }
 
 void
@@ -3703,103 +3791,6 @@ token_eval_operator(
       );
       return;
     }
-  } else if (
-    slice_equal(operator, slice_literal(">")) ||
-    slice_equal(operator, slice_literal("<")) ||
-    slice_equal(operator, slice_literal(">=")) ||
-    slice_equal(operator, slice_literal("<=")) ||
-    slice_equal(operator, slice_literal("==")) ||
-    slice_equal(operator, slice_literal("!="))
-  ) {
-    Value *lhs = value_view_get(args_view, 0);
-    Value *rhs = value_view_get(args_view, 1);
-    Source_Range rhs_range = rhs->source_range;
-    Source_Range lhs_range = lhs->source_range;
-
-    Value *lhs_value = value_any(context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
-    Value *rhs_value = value_any(context, rhs_range);
-    MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
-
-    bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
-    bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
-    if (lhs_is_literal && rhs_is_literal) {
-      // FIXME support large unsigned numbers
-      lhs_value = token_value_force_immediate_integer(
-        context, &lhs_range, lhs_value, &descriptor_s64
-      );
-      rhs_value = token_value_force_immediate_integer(
-        context, &rhs_range, rhs_value, &descriptor_s64
-      );
-      MASS_ON_ERROR(*context->result) return;
-    }
-
-    if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
-      context_error_snprintf(
-        context, lhs_range,
-        "Left hand side of the %"PRIslice" is not an integer",
-        SLICE_EXPAND_PRINTF(operator)
-      );
-      return;
-    }
-    if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
-      context_error_snprintf(
-        context, rhs_range,
-        "Right hand side of the %"PRIslice" is not an integer",
-        SLICE_EXPAND_PRINTF(operator)
-      );
-      return;
-    }
-    maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
-    MASS_ON_ERROR(*context->result) return;
-
-    Compare_Type compare_type = 0;
-
-    if (slice_equal(operator, slice_literal(">"))) compare_type = Compare_Type_Signed_Greater;
-    else if (slice_equal(operator, slice_literal("<"))) compare_type = Compare_Type_Signed_Less;
-    else if (slice_equal(operator, slice_literal(">="))) compare_type = Compare_Type_Signed_Greater_Equal;
-    else if (slice_equal(operator, slice_literal("<="))) compare_type = Compare_Type_Signed_Less_Equal;
-    else if (slice_equal(operator, slice_literal("=="))) compare_type = Compare_Type_Equal;
-    else if (slice_equal(operator, slice_literal("!="))) compare_type = Compare_Type_Not_Equal;
-
-    if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
-      switch(compare_type) {
-        case Compare_Type_Equal:
-        case Compare_Type_Not_Equal: {
-          break;
-        }
-
-        case Compare_Type_Unsigned_Below:
-        case Compare_Type_Unsigned_Below_Equal:
-        case Compare_Type_Unsigned_Above:
-        case Compare_Type_Unsigned_Above_Equal: {
-          panic("Internal error. Expected to parse operators as signed compares");
-          break;
-        }
-
-        case Compare_Type_Signed_Less: {
-          compare_type = Compare_Type_Unsigned_Below;
-          break;
-        }
-        case Compare_Type_Signed_Less_Equal: {
-          compare_type = Compare_Type_Unsigned_Below_Equal;
-          break;
-        }
-        case Compare_Type_Signed_Greater: {
-          compare_type = Compare_Type_Unsigned_Above;
-          break;
-        }
-        case Compare_Type_Signed_Greater_Equal: {
-          compare_type = Compare_Type_Unsigned_Above_Equal;
-          break;
-        }
-        default: {
-          assert(!"Unsupported comparison");
-        }
-      }
-    }
-
-    compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
   } else if (slice_equal(operator, slice_literal("->"))) {
     Value *arguments = value_view_get(args_view, 0);
     Value *return_types = value_view_get(args_view, 1);
@@ -4810,32 +4801,27 @@ scope_define_builtins(
   MASS_ARITHMETIC_OPERATOR(MASS_DEFINE_ARITHMETIC)
   #undef MASS_DEFINE_ARITHMETIC
 
-  scope_define(scope, slice_literal("<"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal(">"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("<="), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal(">="), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 8, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
+  struct { Slice symbol; u32 precedence; Compare_Type type; } comparisons[] = {
+    { .symbol = slice_literal("<"),  .precedence = 8, .type = Compare_Type_Signed_Less },
+    { .symbol = slice_literal(">"),  .precedence = 8, .type = Compare_Type_Signed_Greater },
+    { .symbol = slice_literal("<="), .precedence = 8, .type = Compare_Type_Signed_Less_Equal },
+    { .symbol = slice_literal(">="), .precedence = 8, .type = Compare_Type_Signed_Greater_Equal },
+    { .symbol = slice_literal("=="), .precedence = 7, .type = Compare_Type_Equal },
+    { .symbol = slice_literal("!="), .precedence = 7, .type = Compare_Type_Not_Equal },
+  };
 
-  scope_define(scope, slice_literal("=="), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("!="), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 7, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
+  for (u64 i = 0; i < countof(comparisons); ++i) {
+    scope_define(scope, comparisons[i].symbol, (Scope_Entry) {
+      .tag = Scope_Entry_Tag_Operator,
+      .Operator = {
+        .precedence = comparisons[i].precedence,
+        .fixity = Operator_Fixity_Infix,
+        .argument_count = 2,
+        .handler = mass_handle_comparison_operation,
+        .handler_payload = (void*)(s64)comparisons[i].type,
+      }
+    });
+  }
 
   scope_define(scope, slice_literal("&&"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
