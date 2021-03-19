@@ -3715,6 +3715,33 @@ mass_handle_paren_operator(
 }
 
 void
+mass_handle_at_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *unused_payload
+) {
+  Value *body = value_view_get(args_view, 0);
+  Source_Range body_range = body->source_range;
+  if (value_match_symbol(body, slice_literal("scope"))) {
+    Value *scope_value =
+      value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
+    MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
+  } else if (value_match_symbol(body, slice_literal("context"))) {
+    Value *context_value =
+      value_make(context, &descriptor_execution_context, storage_static(context), body_range);
+    MASS_ON_ERROR(assign(context, result_value, context_value)) return;
+  } else if (value_match_group(body, Group_Tag_Paren)) {
+    compile_time_eval(context, value_as_group(body)->children, result_value);
+  } else {
+    context_error_snprintf(
+      context, body_range,
+      "@ operator must be followed by a parenthesized expression"
+    );
+  }
+}
+
+void
 token_eval_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3729,26 +3756,6 @@ token_eval_operator(
     operator_entry->scope_entry.handler(
       context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
-  } else if (slice_equal(operator, slice_literal("@"))) {
-    Value *body = value_view_get(args_view, 0);
-    Source_Range body_range = body->source_range;
-    if (value_match_symbol(body, slice_literal("scope"))) {
-      Value *scope_value =
-        value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
-      MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
-    } else if (value_match_symbol(body, slice_literal("context"))) {
-      Value *scope_value =
-        value_make(context, &descriptor_execution_context, storage_static(context), body_range);
-      MASS_ON_ERROR(assign(context, result_value, scope_value)) return;
-    } else if (value_match_group(body, Group_Tag_Paren)) {
-      compile_time_eval(context, value_as_group(body)->children, result_value);
-    } else {
-      context_error_snprintf(
-        context, body_range,
-        "@ operator must be followed by a parenthesized expression"
-      );
-      return;
-    }
   } else if (slice_equal(operator, slice_literal("."))) {
     Value *lhs = value_view_get(args_view, 0);
     Value *rhs = value_view_get(args_view, 1);
@@ -4772,7 +4779,8 @@ scope_define_builtins(
       .precedence = 20,
       .fixity = Operator_Fixity_Prefix,
       .associativity = Operator_Associativity_Right,
-      .argument_count = 1
+      .argument_count = 1,
+      .handler = mass_handle_at_operator,
      }
   });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
