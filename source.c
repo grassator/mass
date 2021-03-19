@@ -3814,6 +3814,38 @@ mass_handle_dot_operator(
 }
 
 void
+mass_handle_macro_keyword(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *unused_payload
+) {
+  Value *function = value_view_get(args_view, 0);
+  Source_Range source_range = function->source_range;
+  Value *function_value = value_any(context, source_range);
+  MASS_ON_ERROR(token_force_value(context, &source_range, function, function_value)) return;
+  if (function_value) {
+    if (
+      function_value->descriptor->tag == Descriptor_Tag_Function &&
+      !value_is_external_symbol(function_value->descriptor->Function.info.body)
+    ) {
+      Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
+      *macro_descriptor = *function_value->descriptor;
+      macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+      function_value = value_make(
+        context, macro_descriptor, function_value->storage, function_value->source_range
+      );
+    } else {
+      context_error_snprintf(
+        context, source_range,
+        "Only literal functions (with a body) can be marked as macro"
+      );
+    }
+  }
+  MASS_ON_ERROR(assign(context, result_value, function_value)) return;
+}
+
+void
 token_eval_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3822,38 +3854,10 @@ token_eval_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Slice operator = operator_entry->source;
-
   if (operator_entry->scope_entry.handler) {
     operator_entry->scope_entry.handler(
       context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
-  } else if (slice_equal(operator, slice_literal("."))) {
-
-  } else if (slice_equal(operator, slice_literal("macro"))) {
-    Value *function = value_view_get(args_view, 0);
-    Source_Range source_range = function->source_range;
-    Value *function_value = value_any(context, source_range);
-    MASS_ON_ERROR(token_force_value(context, &source_range, function, function_value)) return;
-    if (function_value) {
-      if (
-        function_value->descriptor->tag == Descriptor_Tag_Function &&
-        !value_is_external_symbol(function_value->descriptor->Function.info.body)
-      ) {
-        Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
-        *macro_descriptor = *function_value->descriptor;
-        macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
-        function_value = value_make(
-          context, macro_descriptor, function_value->storage, function_value->source_range
-        );
-      } else {
-        context_error_snprintf(
-          context, source_range,
-          "Only literal functions (with a body) can be marked as macro"
-        );
-      }
-    }
-    MASS_ON_ERROR(assign(context, result_value, function_value)) return;
   } else {
     panic("TODO: Unknown operator");
   }
@@ -4818,7 +4822,8 @@ scope_define_builtins(
       .precedence = 19,
       .associativity = Operator_Associativity_Right,
       .fixity = Operator_Fixity_Prefix,
-      .argument_count = 1
+      .argument_count = 1,
+      .handler = mass_handle_macro_keyword,
     }
   });
 
