@@ -3742,6 +3742,78 @@ mass_handle_at_operator(
 }
 
 void
+mass_handle_dot_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *unused_payload
+) {
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+
+  Source_Range rhs_range = rhs->source_range;
+  Source_Range lhs_range = lhs->source_range;
+  Value *lhs_value = value_any(context, lhs_range);
+  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
+  if (
+    lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
+    lhs_value->descriptor == &descriptor_scope
+  ) {
+    if (value_is_symbol(rhs)) {
+      Slice field_name = value_as_symbol(rhs)->name;
+      if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
+        struct_get_field(context, &rhs_range, lhs_value, field_name, result_value);
+      } else {
+        assert(lhs_value->descriptor == &descriptor_scope);
+        const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
+        Value *lookup = scope_lookup_force(module_scope, field_name);
+        if (!lookup) {
+          scope_print_names(module_scope);
+          context_error_snprintf(
+            context, rhs_range,
+            // TODO provide module name
+            "Could not find name %"PRIslice" in the module",
+            SLICE_EXPAND_PRINTF(field_name)
+          );
+          return;
+        }
+        MASS_ON_ERROR(assign(context, result_value, lookup)) return;
+      }
+    } else {
+      context_error_snprintf(
+        context, rhs_range,
+        "Right hand side of the . operator on structs must be an identifier"
+      );
+      return;
+    }
+  } else if (
+    lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
+    lhs_value->descriptor->tag == Descriptor_Tag_Pointer
+  ) {
+    if (
+      value_match_group(rhs, Group_Tag_Paren) ||
+      value_is_number_literal(rhs)
+    ) {
+      Value *index = value_any(context, rhs_range);
+      token_force_value(context, &rhs_range, rhs, index);
+      token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
+    } else {
+      context_error_snprintf(
+        context, rhs_range,
+        "Right hand side of the . operator for an array must be a (expr) or a literal number"
+      );
+      return;
+    }
+  } else {
+    context_error_snprintf(
+      context, rhs_range,
+      "Left hand side of the . operator must be a struct"
+    );
+    return;
+  }
+}
+
+void
 token_eval_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3757,69 +3829,7 @@ token_eval_operator(
       context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
   } else if (slice_equal(operator, slice_literal("."))) {
-    Value *lhs = value_view_get(args_view, 0);
-    Value *rhs = value_view_get(args_view, 1);
 
-    Source_Range rhs_range = rhs->source_range;
-    Source_Range lhs_range = lhs->source_range;
-    Value *lhs_value = value_any(context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
-    if (
-      lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
-      lhs_value->descriptor == &descriptor_scope
-    ) {
-      if (value_is_symbol(rhs)) {
-        Slice field_name = value_as_symbol(rhs)->name;
-        if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
-          struct_get_field(context, &rhs_range, lhs_value, field_name, result_value);
-        } else {
-          assert(lhs_value->descriptor == &descriptor_scope);
-          const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
-          Value *lookup = scope_lookup_force(module_scope, field_name);
-          if (!lookup) {
-            scope_print_names(module_scope);
-            context_error_snprintf(
-              context, rhs_range,
-              // TODO provide module name
-              "Could not find name %"PRIslice" in the module",
-              SLICE_EXPAND_PRINTF(field_name)
-            );
-            return;
-          }
-          MASS_ON_ERROR(assign(context, result_value, lookup)) return;
-        }
-      } else {
-        context_error_snprintf(
-          context, rhs_range,
-          "Right hand side of the . operator on structs must be an identifier"
-        );
-        return;
-      }
-    } else if (
-      lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-      lhs_value->descriptor->tag == Descriptor_Tag_Pointer
-    ) {
-      if (
-        value_match_group(rhs, Group_Tag_Paren) ||
-        value_is_number_literal(rhs)
-      ) {
-        Value *index = value_any(context, rhs_range);
-        token_force_value(context, &rhs_range, rhs, index);
-        token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
-      } else {
-        context_error_snprintf(
-          context, rhs_range,
-          "Right hand side of the . operator for an array must be a (expr) or a literal number"
-        );
-        return;
-      }
-    } else {
-      context_error_snprintf(
-        context, rhs_range,
-        "Left hand side of the . operator must be a struct"
-      );
-      return;
-    }
   } else if (slice_equal(operator, slice_literal("macro"))) {
     Value *function = value_view_get(args_view, 0);
     Source_Range source_range = function->source_range;
@@ -4785,7 +4795,12 @@ scope_define_builtins(
   });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 19, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
+    .Operator = {
+      .precedence = 19,
+      .fixity = Operator_Fixity_Infix,
+      .argument_count = 2,
+      .handler = mass_handle_dot_operator,
+    }
   });
   scope_define(scope, slice_literal("->"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
