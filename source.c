@@ -3597,6 +3597,20 @@ mass_handle_comparison_operation(
 }
 
 void
+mass_handle_arrow_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *unused_payload
+) {
+  Value *arguments = value_view_get(args_view, 0);
+  Value *return_types = value_view_get(args_view, 1);
+  Value *body = value_view_get(args_view, 2);
+  Value *function_value = token_process_function_literal(context, arguments, return_types, body);
+  MASS_ON_ERROR(assign(context, result_value, function_value)) return;
+}
+
+void
 token_eval_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3791,12 +3805,6 @@ token_eval_operator(
       );
       return;
     }
-  } else if (slice_equal(operator, slice_literal("->"))) {
-    Value *arguments = value_view_get(args_view, 0);
-    Value *return_types = value_view_get(args_view, 1);
-    Value *body = value_view_get(args_view, 2);
-    Value *function_value = token_process_function_literal(context, arguments, return_types, body);
-    MASS_ON_ERROR(assign(context, result_value, function_value)) return;
   } else if (slice_equal(operator, slice_literal("macro"))) {
     Value *function = value_view_get(args_view, 0);
     Source_Range source_range = function->source_range;
@@ -4764,7 +4772,8 @@ scope_define_builtins(
       .precedence = 19,
       .fixity = Operator_Fixity_Infix,
       .associativity = Operator_Associativity_Right,
-      .argument_count = 3
+      .argument_count = 3,
+      .handler = mass_handle_arrow_operator,
     }
   });
   scope_define(scope, slice_literal("macro"), (Scope_Entry) {
