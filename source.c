@@ -3846,24 +3846,6 @@ mass_handle_macro_keyword(
 }
 
 void
-token_eval_operator(
-  Execution_Context *context,
-  Value_View args_view,
-  Operator_Stack_Entry *operator_entry,
-  Value *result_value
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  if (operator_entry->scope_entry.handler) {
-    operator_entry->scope_entry.handler(
-      context, args_view, result_value, operator_entry->scope_entry.handler_payload
-    );
-  } else {
-    panic("TODO: Unknown operator");
-  }
-}
-
-void
 token_dispatch_operator(
   Execution_Context *context,
   Array_Value_Ptr *stack,
@@ -3900,7 +3882,10 @@ token_dispatch_operator(
     },
   };
   Value *result_value = value_any(context, args_view.source_range);
-  token_eval_operator(context, args_view, operator_entry, result_value);
+  assert(operator_entry->scope_entry.handler);
+  operator_entry->scope_entry.handler(
+    context, args_view, result_value, operator_entry->scope_entry.handler_payload
+  );
   MASS_ON_ERROR(*context->result) return;
 
   // Pop off current arguments and push a new one
