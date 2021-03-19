@@ -3611,6 +3611,110 @@ mass_handle_arrow_operator(
 }
 
 void
+mass_handle_paren_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *unused_payload
+) {
+  Value *target = value_view_get(args_view, 0);
+  Value *args_token = value_view_get(args_view, 1);
+  Source_Range args_range = args_token->source_range;
+  // TODO turn `cast` into a compile-time function call / macro
+  if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("cast"))
+  ) {
+    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+    token_handle_cast(context, &args_range, args, result_value);
+    dyn_array_destroy(args);
+  } else if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("c_string"))
+  ) {
+    token_handle_c_string(context, args_token, result_value);
+  } else if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
+  ) {
+    Value *result_token = token_process_c_struct_definition(context, args_token);
+    MASS_ON_ERROR(token_force_value(
+      context, &args_token->source_range, result_token, result_value
+    )) return;
+  } else if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("storage_variant_of"))
+  ) {
+    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+    token_handle_storage_variant_of(context, &args_range, args, result_value);
+    dyn_array_destroy(args);
+  } else if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("startup"))
+  ) {
+    Value *startup_function = value_any(context, args_token->source_range);
+    token_parse_expression(
+      context, value_as_group(args_token)->children, startup_function, 0
+    );
+    if (
+      !startup_function ||
+      startup_function->descriptor->tag != Descriptor_Tag_Function ||
+      dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
+      startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
+    ) {
+      context_error_snprintf(
+        context, args_range, "`startup` expects a () -> () {...} function as an argument"
+      );
+      return;
+    }
+    ensure_compiled_function_body(context, startup_function);
+    dyn_array_push(context->program->startup_functions, startup_function);
+    MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
+  } else if (
+    value_is_symbol(target) &&
+    slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
+  ) {
+    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+    if (dyn_array_length(args) != 1) {
+      context_error_snprintf(
+        context, args_range, "address_of expects a single argument"
+      );
+      return;
+    }
+    Value *pointee = *dyn_array_get(args, 0);
+    if (context->compilation->jit.program == context->program) { // compile time
+      assert(pointee->epoch == VALUE_STATIC_EPOCH);
+      assert(pointee->storage.tag == Storage_Tag_Memory);
+      Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
+
+      // TODO put this into a separate section and make readonly after relocations are done
+      //      this section can probably be zero-initialized
+      Program *runtime_program = context->compilation->runtime_program;
+      Section *section = &runtime_program->memory.sections.rw_data;
+      u64 byte_size = descriptor_byte_size(descriptor);
+      u64 alignment = descriptor_alignment(descriptor);
+
+      Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
+      Storage pointer_storage = data_label32(label_index, byte_size);
+      Value *pointer = value_make(
+        context, descriptor, pointer_storage, pointee->source_range
+      );
+      dyn_array_push(runtime_program->relocations, (Relocation) {
+        .patch_at = pointer_storage,
+        .address_of = pointee->storage,
+      });
+      pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
+      MASS_ON_ERROR(assign(context, result_value, pointer)) return;
+    } else { // run time
+      load_address(context, &args_range, result_value, pointee);
+    }
+    dyn_array_destroy(args);
+  } else {
+    token_handle_function_call(context, target, args_token, result_value);
+  }
+}
+
+void
 token_eval_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3625,102 +3729,6 @@ token_eval_operator(
     operator_entry->scope_entry.handler(
       context, args_view, result_value, operator_entry->scope_entry.handler_payload
     );
-  } else if (slice_equal(operator, slice_literal("()"))) {
-    Value *target = value_view_get(args_view, 0);
-    Value *args_token = value_view_get(args_view, 1);
-    Source_Range args_range = args_token->source_range;
-    // TODO turn `cast` into a compile-time function call / macro
-    if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("cast"))
-    ) {
-      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      token_handle_cast(context, &args_range, args, result_value);
-      dyn_array_destroy(args);
-    } else if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("c_string"))
-    ) {
-      token_handle_c_string(context, args_token, result_value);
-    } else if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
-    ) {
-      Value *result_token = token_process_c_struct_definition(context, args_token);
-      MASS_ON_ERROR(token_force_value(
-        context, &args_token->source_range, result_token, result_value
-      )) return;
-    } else if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("storage_variant_of"))
-    ) {
-      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      token_handle_storage_variant_of(context, &args_range, args, result_value);
-      dyn_array_destroy(args);
-    } else if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("startup"))
-    ) {
-      Value *startup_function = value_any(context, args_token->source_range);
-      token_parse_expression(
-        context, value_as_group(args_token)->children, startup_function, 0
-      );
-      if (
-        !startup_function ||
-        startup_function->descriptor->tag != Descriptor_Tag_Function ||
-        dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
-        startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
-      ) {
-        context_error_snprintf(
-          context, args_range, "`startup` expects a () -> () {...} function as an argument"
-        );
-        return;
-      }
-      ensure_compiled_function_body(context, startup_function);
-      dyn_array_push(context->program->startup_functions, startup_function);
-      MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
-    } else if (
-      value_is_symbol(target) &&
-      slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
-    ) {
-      Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-      if (dyn_array_length(args) != 1) {
-        context_error_snprintf(
-          context, args_range, "address_of expects a single argument"
-        );
-        return;
-      }
-      Value *pointee = *dyn_array_get(args, 0);
-      if (context->compilation->jit.program == context->program) { // compile time
-        assert(pointee->epoch == VALUE_STATIC_EPOCH);
-        assert(pointee->storage.tag == Storage_Tag_Memory);
-        Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
-
-        // TODO put this into a separate section and make readonly after relocations are done
-        //      this section can probably be zero-initialized
-        Program *runtime_program = context->compilation->runtime_program;
-        Section *section = &runtime_program->memory.sections.rw_data;
-        u64 byte_size = descriptor_byte_size(descriptor);
-        u64 alignment = descriptor_alignment(descriptor);
-
-        Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
-        Storage pointer_storage = data_label32(label_index, byte_size);
-        Value *pointer = value_make(
-          context, descriptor, pointer_storage, pointee->source_range
-        );
-        dyn_array_push(runtime_program->relocations, (Relocation) {
-          .patch_at = pointer_storage,
-          .address_of = pointee->storage,
-        });
-        pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
-        MASS_ON_ERROR(assign(context, result_value, pointer)) return;
-      } else { // run time
-        load_address(context, &args_range, result_value, pointee);
-      }
-      dyn_array_destroy(args);
-    } else {
-      token_handle_function_call(context, target, args_token, result_value);
-    }
   } else if (slice_equal(operator, slice_literal("@"))) {
     Value *body = value_view_get(args_view, 0);
     Source_Range body_range = body->source_range;
@@ -4751,7 +4759,12 @@ scope_define_builtins(
 ) {
   scope_define(scope, slice_literal("()"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 20, .fixity = Operator_Fixity_Postfix, .argument_count = 2 }
+    .Operator = {
+      .precedence = 20,
+      .fixity = Operator_Fixity_Postfix,
+      .argument_count = 2,
+      .handler = mass_handle_paren_operator,
+    }
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
