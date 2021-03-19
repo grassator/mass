@@ -131,6 +131,16 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
+typedef void (*Lazy_Value_Proc)
+  (Execution_Context * context, Value * result_value, void * payload);
+
+typedef struct Lazy_Value Lazy_Value;
+typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
+typedef dyn_array_type(const Lazy_Value *) Array_Const_Lazy_Value_Ptr;
+
+typedef Lazy_Value (*Mass_Handle_Operator_Proc)
+  (Execution_Context * context, Value_View view, void * payload);
+
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
 typedef struct Descriptor_Struct_Field Descriptor_Struct_Field;
@@ -156,9 +166,6 @@ typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
-
-typedef void (*Mass_Handle_Operator_Proc)
-  (Execution_Context * context, Value_View view, Value * result_value, void * payload);
 
 
 // Type Definitions
@@ -554,6 +561,28 @@ typedef struct Value {
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
+typedef enum {
+  Lazy_Value_Tag_Pending = 0,
+  Lazy_Value_Tag_Resolved = 1,
+} Lazy_Value_Tag;
+
+typedef struct {
+  const Descriptor * descriptor;
+  Lazy_Value_Proc proc;
+  void * payload;
+} Lazy_Value_Pending;
+typedef struct {
+  Value * value;
+} Lazy_Value_Resolved;
+typedef struct Lazy_Value {
+  Lazy_Value_Tag tag;
+  char _tag_padding[4];
+  union {
+    Lazy_Value_Pending Pending;
+    Lazy_Value_Resolved Resolved;
+  };
+} Lazy_Value;
+typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
@@ -656,6 +685,8 @@ static Descriptor descriptor_function_builder_pointer;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_scope_pointer;
 static Descriptor descriptor_compilation_pointer;
+static Descriptor descriptor_void;
+static Descriptor descriptor_void_pointer;
 MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
@@ -808,6 +839,13 @@ static Descriptor descriptor_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
+static Descriptor descriptor_lazy_value_proc;
+static Descriptor descriptor_lazy_value;
+static Descriptor descriptor_array_lazy_value_ptr;
+static Descriptor descriptor_lazy_value_pointer;
+static Descriptor descriptor_lazy_value_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(lazy_value_tag, Lazy_Value_Tag)
+static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
 static Descriptor descriptor_descriptor_function_flags_pointer;
@@ -1271,6 +1309,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(value);
+MASS_DEFINE_OPAQUE_C_TYPE(lazy_value, Lazy_Value)
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field_ptr, Array_Descriptor_Struct_Field_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field, Array_Descriptor_Struct_Field)

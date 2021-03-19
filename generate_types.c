@@ -695,6 +695,29 @@ main(void) {
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
+  push_type(type_function("Lazy_Value_Proc", "void", (Argument[]){
+    { "Execution_Context *", "context" },
+    { "Value *", "result_value" },
+    { "void *", "payload" },
+  }));
+
+  push_type(type_union("Lazy_Value", (Struct[]){
+    struct_fields("Pending", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
+      { "Lazy_Value_Proc", "proc" },
+      { "void *", "payload" },
+    }),
+    struct_fields("Resolved", (Struct_Item[]){
+      { "Value *", "value" },
+    }),
+  }));
+
+  push_type(type_function("Mass_Handle_Operator_Proc", "Lazy_Value", (Argument[]){
+    { "Execution_Context *", "context" },
+    { "Value_View", "view" },
+    { "void *", "payload" },
+  }));
+
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
     { "None", 0 },
     { "Macro", 1 << 0 },
@@ -758,13 +781,6 @@ main(void) {
     struct_fields("Error", (Struct_Item[]){
       { "Parse_Error", "details" },
     })
-  }));
-
-  push_type(type_function("Mass_Handle_Operator_Proc", "void", (Argument[]){
-    { "Execution_Context *", "context" },
-    { "Value_View", "view" },
-    { "Value *", "result_value" },
-    { "void *", "payload" },
   }));
 
   {

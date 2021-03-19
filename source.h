@@ -103,14 +103,6 @@ compile_time_eval(
   Value *result_value
 );
 
-void
-token_handle_negation(
-  Execution_Context *context,
-  Value_View args,
-  Value *result_value,
-  void *unused_payload
-);
-
 u64
 token_parse_expression(
   Execution_Context *context,
