@@ -3385,6 +3385,129 @@ token_handle_array_access(
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
+#define MASS_ARITHMETIC_OPERATOR(APPLY)\
+  APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
+  APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
+  APPLY(Multiply,  3 /*value*/, *, 15 /*precendence */)\
+  APPLY(Divide,    4 /*value*/, /, 10 /*precendence */)\
+  APPLY(Remainder, 5 /*value*/, %, 10 /*precendence */)
+
+#define MASS_ARITHMETIC_ENUM(NAME, VALUE, ...)\
+  Mass_Arithmetic_Operator_##NAME = (VALUE),
+typedef enum {
+  MASS_ARITHMETIC_OPERATOR(MASS_ARITHMETIC_ENUM)
+} Mass_Arithmetic_Operator;
+#undef MASS_ARITHMETIC_ENUM
+
+static inline Slice
+mass_arithmetic_operator_symbol(
+  Mass_Arithmetic_Operator operator
+) {
+  switch(operator) {
+    #define MASS_ARITHMETIC_ENUM(NAME, VALUE, SYMBOL, ...)\
+      case Mass_Arithmetic_Operator_##NAME: return slice_literal(#SYMBOL);
+    MASS_ARITHMETIC_OPERATOR(MASS_ARITHMETIC_ENUM)
+    #undef MASS_ARITHMETIC_ENUM
+  }
+  panic("Unreachable");
+  return (Slice){0};
+}
+
+
+void
+mass_handle_arithmetic_operation(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *result_value,
+  void *payload
+) {
+  Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)payload;
+  Value *lhs = value_view_get(args_view, 0);
+  Value *rhs = value_view_get(args_view, 1);
+  Source_Range rhs_range = rhs->source_range;
+  Source_Range lhs_range = lhs->source_range;
+
+  Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
+  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
+  Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
+  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
+
+  bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
+  bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
+  if (lhs_is_literal && rhs_is_literal) {
+    // FIXME support large unsigned numbers
+    lhs_value = token_value_force_immediate_integer(
+      context, &lhs_range, lhs_value, &descriptor_s64
+    );
+    rhs_value = token_value_force_immediate_integer(
+      context, &rhs_range, rhs_value, &descriptor_s64
+    );
+    MASS_ON_ERROR(*context->result) return;
+  }
+
+  Slice operator_symbol = mass_arithmetic_operator_symbol(operator);
+  if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
+    context_error_snprintf(
+      context, lhs_range,
+      "Left hand side of the %"PRIslice" is not an integer",
+      SLICE_EXPAND_PRINTF(operator_symbol)
+    );
+    return;
+  }
+  if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
+    context_error_snprintf(
+      context, rhs_range,
+      "Right hand side of the %"PRIslice" is not an integer",
+      SLICE_EXPAND_PRINTF(operator_symbol)
+    );
+    return;
+  }
+
+  maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
+  MASS_ON_ERROR(*context->result) return;
+
+  Function_Builder *builder = context->builder;
+
+  Value *any_result = value_any_init(&(Value){0}, context, lhs_range);
+  switch(operator) {
+    case Mass_Arithmetic_Operator_Add: {
+      plus(context, &lhs_range, any_result, lhs_value, rhs_value);
+      break;
+    }
+    case Mass_Arithmetic_Operator_Subtract: {
+      minus(context, &lhs_range, any_result, lhs_value, rhs_value);
+      break;
+    }
+    case Mass_Arithmetic_Operator_Multiply: {
+      multiply(context, &lhs_range, any_result, lhs_value, rhs_value);
+      break;
+    }
+    case Mass_Arithmetic_Operator_Divide: {
+      divide(context, &lhs_range, any_result, lhs_value, rhs_value);
+      break;
+    }
+    case Mass_Arithmetic_Operator_Remainder: {
+      value_remainder(context, &lhs_range, any_result, lhs_value, rhs_value);
+      break;
+    }
+    default: {
+      panic("Internal error: Unexpected operator");
+      break;
+    }
+  }
+  if (any_result->storage.tag != Storage_Tag_Static) {
+    // FIXME do proper register allocation
+    Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
+    MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
+    if (any_result->storage.tag == Storage_Tag_Register) {
+      ensure_register_released(context->builder, any_result->storage.Register.index);
+    }
+    MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
+  } else {
+    MASS_ON_ERROR(assign(context, result_value, any_result)) return;
+  }
+}
+
 void
 token_eval_operator(
   Execution_Context *context,
@@ -3579,83 +3702,6 @@ token_eval_operator(
         "Left hand side of the . operator must be a struct"
       );
       return;
-    }
-  } else if (
-    slice_equal(operator, slice_literal("+")) ||
-    slice_equal(operator, slice_literal("-")) ||
-    slice_equal(operator, slice_literal("*")) ||
-    slice_equal(operator, slice_literal("/")) ||
-    slice_equal(operator, slice_literal("%"))
-  ) {
-    Value *lhs = value_view_get(args_view, 0);
-    Value *rhs = value_view_get(args_view, 1);
-    Source_Range rhs_range = rhs->source_range;
-    Source_Range lhs_range = lhs->source_range;
-
-    Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
-    MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
-    Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
-    MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
-
-    bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
-    bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
-    if (lhs_is_literal && rhs_is_literal) {
-      // FIXME support large unsigned numbers
-      lhs_value = token_value_force_immediate_integer(
-        context, &lhs_range, lhs_value, &descriptor_s64
-      );
-      rhs_value = token_value_force_immediate_integer(
-        context, &rhs_range, rhs_value, &descriptor_s64
-      );
-      MASS_ON_ERROR(*context->result) return;
-    }
-
-    if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
-      context_error_snprintf(
-        context, lhs_range,
-        "Left hand side of the %"PRIslice" is not an integer",
-        SLICE_EXPAND_PRINTF(operator)
-      );
-      return;
-    }
-    if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
-      context_error_snprintf(
-        context, rhs_range,
-        "Right hand side of the %"PRIslice" is not an integer",
-        SLICE_EXPAND_PRINTF(operator)
-      );
-      return;
-    }
-
-    maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
-    MASS_ON_ERROR(*context->result) return;
-
-    Function_Builder *builder = context->builder;
-
-    Value *any_result = value_any_init(&(Value){0}, context, lhs_range);
-    if (slice_equal(operator, slice_literal("+"))) {
-      plus(context, &lhs_range, any_result, lhs_value, rhs_value);
-    } else if (slice_equal(operator, slice_literal("-"))) {
-      minus(context, &lhs_range, any_result, lhs_value, rhs_value);
-    } else if (slice_equal(operator, slice_literal("*"))) {
-      multiply(context, &lhs_range, any_result, lhs_value, rhs_value);
-    } else if (slice_equal(operator, slice_literal("/"))) {
-      divide(context, &lhs_range, any_result, lhs_value, rhs_value);
-    } else if (slice_equal(operator, slice_literal("%"))) {
-      value_remainder(context, &lhs_range, any_result, lhs_value, rhs_value);
-    } else {
-      panic("Internal error: Unexpected operator");
-    }
-    if (any_result->storage.tag != Storage_Tag_Static) {
-      // FIXME do proper register allocation
-      Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
-      MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
-      if (any_result->storage.tag == Storage_Tag_Register) {
-        ensure_register_released(context->builder, any_result->storage.Register.index);
-      }
-      MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
-    } else {
-      MASS_ON_ERROR(assign(context, result_value, any_result)) return;
     }
   } else if (
     slice_equal(operator, slice_literal(">")) ||
@@ -4750,28 +4796,19 @@ scope_define_builtins(
     }
   });
 
-  scope_define(scope, slice_literal("*"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("/"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("%"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 15, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
-  scope_define(scope, slice_literal("+"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("-"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 10, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
+  #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
+    scope_define(scope, slice_literal(#SYMBOL), (Scope_Entry) { \
+      .tag = Scope_Entry_Tag_Operator,\
+      .Operator = {\
+        .precedence = (PRECEDENCE),\
+        .fixity = Operator_Fixity_Infix,\
+        .argument_count = 2,\
+        .handler = mass_handle_arithmetic_operation,\
+        .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
+      }\
+    });
+  MASS_ARITHMETIC_OPERATOR(MASS_DEFINE_ARITHMETIC)
+  #undef MASS_DEFINE_ARITHMETIC
 
   scope_define(scope, slice_literal("<"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
