@@ -3918,10 +3918,12 @@ token_dispatch_operator(
       },
     },
   };
+
   assert(operator_entry->scope_entry.handler);
   Value *result_value = operator_entry->scope_entry.handler(
     context, args_view, operator_entry->scope_entry.handler_payload
   );
+
   MASS_ON_ERROR(*context->result) return;
   if (result_value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&result_value->storage, Lazy_Value);
