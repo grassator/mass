@@ -697,22 +697,19 @@ main(void) {
 
   push_type(type_function("Lazy_Value_Proc", "void", (Argument[]){
     { "Execution_Context *", "context" },
+    { "Value_View", "arguments" },
     { "Value *", "result_value" },
     { "void *", "payload" },
   }));
 
-  push_type(type_union("Lazy_Value", (Struct[]){
-    struct_fields("Pending", (Struct_Item[]){
-      { "const Descriptor *", "descriptor" },
-      { "Lazy_Value_Proc", "proc" },
-      { "void *", "payload" },
-    }),
-    struct_fields("Resolved", (Struct_Item[]){
-      { "Value *", "value" },
-    }),
+  push_type(type_struct("Lazy_Value", (Struct_Item[]){
+    { "const Descriptor *", "descriptor" },
+    { "Value_View", "arguments" },
+    { "Lazy_Value_Proc", "proc" },
+    { "void *", "payload" },
   }));
 
-  push_type(type_function("Mass_Handle_Operator_Proc", "Lazy_Value", (Argument[]){
+  push_type(type_function("Mass_Handle_Operator_Proc", "Value *", (Argument[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "void *", "payload" },

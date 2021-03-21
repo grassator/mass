@@ -1832,7 +1832,7 @@ token_handle_user_defined_operator(
   token_parse_block(&body_context, operator->body, result_value);
 }
 
-static inline Lazy_Value
+static inline Value *
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
   Value_View args,
@@ -1840,10 +1840,7 @@ token_handle_user_defined_operator_proc(
 ) {
   Value *result_value = value_any(context, args.source_range);
   token_handle_user_defined_operator(context, args, result_value, payload);
-  return (Lazy_Value) {
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value },
-  };
+  return result_value;
 }
 
 u64
@@ -2743,7 +2740,7 @@ token_handle_cast(
   MASS_ON_ERROR(assign(context, result_value, after_cast_value));
 }
 
-Lazy_Value
+Value *
 token_handle_negation(
   Execution_Context *context,
   Value_View args,
@@ -2770,10 +2767,7 @@ token_handle_negation(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = negated_value, },
-  };
+  return negated_value;
 }
 
 void
@@ -3391,6 +3385,17 @@ token_handle_array_access(
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
+const Descriptor *
+value_or_lazy_value_descriptor(
+  const Value *value
+) {
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    return lazy->descriptor;
+  }
+  return value->descriptor;
+}
+
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
   APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
   APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
@@ -3419,8 +3424,7 @@ mass_arithmetic_operator_symbol(
   return (Slice){0};
 }
 
-Lazy_Value
-mass_handle_arithmetic_operation(
+Value*mass_handle_arithmetic_operation(
   Execution_Context *context,
   Value_View args_view,
   void *payload
@@ -3513,19 +3517,16 @@ mass_handle_arithmetic_operation(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value, },
-  };
+  return result_value;
 }
 
-Lazy_Value
-mass_handle_comparison_operation(
+void
+mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
   Value_View args_view,
+  Value *result_value,
   void *payload
 ) {
-  Value *result_value = value_any(context, args_view.source_range);
   Compare_Type compare_type = (Compare_Type)(u64)payload;
 
   Value *lhs = value_view_get(args_view, 0);
@@ -3534,9 +3535,9 @@ mass_handle_comparison_operation(
   Source_Range lhs_range = lhs->source_range;
 
   Value *lhs_value = value_any(context, lhs_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) goto err;
+  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
   Value *rhs_value = value_any(context, rhs_range);
-  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) goto err;
+  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
 
   bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
   bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
@@ -3548,7 +3549,7 @@ mass_handle_comparison_operation(
     rhs_value = token_value_force_immediate_integer(
       context, &rhs_range, rhs_value, &descriptor_s64
     );
-    MASS_ON_ERROR(*context->result) goto err;
+    MASS_ON_ERROR(*context->result) return;
   }
 
   if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
@@ -3556,17 +3557,17 @@ mass_handle_comparison_operation(
       context, lhs_range,
       "Left hand side of the comparison is not an integer"
     );
-    goto err;
+    return;
   }
   if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
     context_error_snprintf(
       context, rhs_range,
       "Right hand side of the comparison is not an integer"
     );
-    goto err;
+    return;
   }
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
-  MASS_ON_ERROR(*context->result) goto err;
+  MASS_ON_ERROR(*context->result) return;
 
   if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
     switch(compare_type) {
@@ -3606,15 +3607,25 @@ mass_handle_comparison_operation(
   }
 
   compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
-
-  err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value, },
-  };
 }
 
-Lazy_Value
+Value *
+mass_handle_comparison_operation(
+  Execution_Context *context,
+  Value_View arguments,
+  void *payload
+) {
+  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
+  *lazy = (Lazy_Value) {
+    .arguments = arguments,
+    .descriptor = &descriptor_s8,
+    .proc = mass_handle_comparison_operation_lazy_proc,
+    .payload = payload,
+  };
+  return value_make(context, &descriptor_lazy_value, storage_static(lazy), arguments.source_range);
+}
+
+Value *
 mass_handle_arrow_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3624,14 +3635,10 @@ mass_handle_arrow_operator(
   Value *return_types = value_view_get(args_view, 1);
   Value *body = value_view_get(args_view, 2);
   Value *function_value = token_process_function_literal(context, arguments, return_types, body);
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = function_value, },
-  };
-  //MASS_ON_ERROR(assign(context, result_value, function_value)) goto err;
+  return function_value;
 }
 
-Lazy_Value
+Value *
 mass_handle_paren_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3733,13 +3740,10 @@ mass_handle_paren_operator(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value, },
-  };
+  return result_value;
 }
 
-Lazy_Value
+Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3767,13 +3771,10 @@ mass_handle_at_operator(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value, },
-  };
+  return result_value;
 }
 
-Lazy_Value
+Value *
 mass_handle_dot_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3845,13 +3846,10 @@ mass_handle_dot_operator(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = result_value, },
-  };
+  return result_value;
 }
 
-Lazy_Value
+Value *
 mass_handle_macro_keyword(
   Execution_Context *context,
   Value_View args_view,
@@ -3881,10 +3879,7 @@ mass_handle_macro_keyword(
   }
 
   err:
-  return (Lazy_Value){
-    .tag = Lazy_Value_Tag_Resolved,
-    .Resolved = { .value = function_value, },
-  };
+  return function_value;
 }
 
 void
@@ -3924,21 +3919,15 @@ token_dispatch_operator(
     },
   };
   assert(operator_entry->scope_entry.handler);
-  Lazy_Value lazy_result = operator_entry->scope_entry.handler(
+  Value *result_value = operator_entry->scope_entry.handler(
     context, args_view, operator_entry->scope_entry.handler_payload
   );
-  Value *result_value = 0;
-  switch(lazy_result.tag) {
-    case Lazy_Value_Tag_Pending: {
-      panic("TODO not implemented");
-      break;
-    }
-    case Lazy_Value_Tag_Resolved: {
-      result_value = lazy_result.Resolved.value;
-      break;
-    }
-  }
   MASS_ON_ERROR(*context->result) return;
+  if (result_value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&result_value->storage, Lazy_Value);
+    result_value = value_any(context, result_value->source_range);
+    lazy->proc(context, lazy->arguments, result_value, lazy->payload);
+  }
 
   // Pop off current arguments and push a new one
   dyn_array_splice_raw(*stack, start_index, argument_count, &result_value, 1);

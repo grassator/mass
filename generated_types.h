@@ -132,13 +132,13 @@ typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
 typedef void (*Lazy_Value_Proc)
-  (Execution_Context * context, Value * result_value, void * payload);
+  (Execution_Context * context, Value_View arguments, Value * result_value, void * payload);
 
 typedef struct Lazy_Value Lazy_Value;
 typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
 typedef dyn_array_type(const Lazy_Value *) Array_Const_Lazy_Value_Ptr;
 
-typedef Lazy_Value (*Mass_Handle_Operator_Proc)
+typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, void * payload);
 
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
@@ -561,28 +561,14 @@ typedef struct Value {
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
-typedef enum {
-  Lazy_Value_Tag_Pending = 0,
-  Lazy_Value_Tag_Resolved = 1,
-} Lazy_Value_Tag;
-
-typedef struct {
+typedef struct Lazy_Value {
   const Descriptor * descriptor;
+  Value_View arguments;
   Lazy_Value_Proc proc;
   void * payload;
-} Lazy_Value_Pending;
-typedef struct {
-  Value * value;
-} Lazy_Value_Resolved;
-typedef struct Lazy_Value {
-  Lazy_Value_Tag tag;
-  char _tag_padding[4];
-  union {
-    Lazy_Value_Pending Pending;
-    Lazy_Value_Resolved Resolved;
-  };
 } Lazy_Value;
 typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
+
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
@@ -844,7 +830,6 @@ static Descriptor descriptor_lazy_value;
 static Descriptor descriptor_array_lazy_value_ptr;
 static Descriptor descriptor_lazy_value_pointer;
 static Descriptor descriptor_lazy_value_pointer_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(lazy_value_tag, Lazy_Value_Tag)
 static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
@@ -1309,7 +1294,31 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(value);
-MASS_DEFINE_OPAQUE_C_TYPE(lazy_value, Lazy_Value)
+MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
+MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,
+  {
+    .name = slice_literal_fields("descriptor"),
+    .descriptor = &descriptor_descriptor_pointer,
+    .offset = offsetof(Lazy_Value, descriptor),
+  },
+  {
+    .name = slice_literal_fields("arguments"),
+    .descriptor = &descriptor_value_view,
+    .offset = offsetof(Lazy_Value, arguments),
+  },
+  {
+    .name = slice_literal_fields("proc"),
+    .descriptor = &descriptor_lazy_value_proc,
+    .offset = offsetof(Lazy_Value, proc),
+  },
+  {
+    .name = slice_literal_fields("payload"),
+    .descriptor = &descriptor_void_pointer,
+    .offset = offsetof(Lazy_Value, payload),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(lazy_value);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field_ptr, Array_Descriptor_Struct_Field_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field, Array_Descriptor_Struct_Field)
