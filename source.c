@@ -3229,23 +3229,24 @@ maybe_resize_values_for_integer_math_operation(
 ) {
   const Descriptor *result_descriptor =
     large_enough_common_integer_descriptor_for_values(context, *lhs_pointer, *rhs_pointer);
-
-  *lhs_pointer = maybe_coerce_number_literal_to_integer(
-    context, *lhs_pointer, (*rhs_pointer)->descriptor
-  );
-  *rhs_pointer = maybe_coerce_number_literal_to_integer(
-    context, *rhs_pointer, (*lhs_pointer)->descriptor
-  );
   MASS_ON_ERROR(*context->result) return;
 
   const Descriptor *ld = (*lhs_pointer)->descriptor;
   const Descriptor *rd = (*rhs_pointer)->descriptor;
 
   if (ld != result_descriptor) {
-    *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, result_descriptor);
+    if (ld == &descriptor_number_literal) {
+      *lhs_pointer = maybe_coerce_number_literal_to_integer(context, *lhs_pointer, result_descriptor);
+    } else {
+      *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, result_descriptor);
+    }
   }
   if (rd != result_descriptor) {
-    *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, result_descriptor);
+    if (rd == &descriptor_number_literal) {
+      *rhs_pointer = maybe_coerce_number_literal_to_integer(context, *rhs_pointer, result_descriptor);
+    } else {
+      *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, result_descriptor);
+    }
   }
 }
 
@@ -3443,7 +3444,8 @@ mass_arithmetic_operator_symbol(
   return (Slice){0};
 }
 
-Value*mass_handle_arithmetic_operation(
+Value*
+mass_handle_arithmetic_operation(
   Execution_Context *context,
   Value_View args_view,
   void *payload
@@ -3459,37 +3461,6 @@ Value*mass_handle_arithmetic_operation(
   MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) goto err;
   Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
   MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) goto err;
-
-  bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
-  bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
-  if (lhs_is_literal && rhs_is_literal) {
-    // FIXME support large unsigned numbers
-    lhs_value = token_value_force_immediate_integer(
-      context, &lhs_range, lhs_value, &descriptor_s64
-    );
-    rhs_value = token_value_force_immediate_integer(
-      context, &rhs_range, rhs_value, &descriptor_s64
-    );
-    MASS_ON_ERROR(*context->result) goto err;
-  }
-
-  Slice operator_symbol = mass_arithmetic_operator_symbol(operator);
-  if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
-    context_error_snprintf(
-      context, lhs_range,
-      "Left hand side of the %"PRIslice" is not an integer",
-      SLICE_EXPAND_PRINTF(operator_symbol)
-    );
-    goto err;
-  }
-  if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
-    context_error_snprintf(
-      context, rhs_range,
-      "Right hand side of the %"PRIslice" is not an integer",
-      SLICE_EXPAND_PRINTF(operator_symbol)
-    );
-    goto err;
-  }
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
   MASS_ON_ERROR(*context->result) goto err;
