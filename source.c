@@ -3529,33 +3529,6 @@ mass_handle_comparison_operation_lazy_proc(
   Value *rhs_value = value_any(context, rhs_range);
   MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
 
-  bool lhs_is_literal = lhs_value->descriptor == &descriptor_number_literal;
-  bool rhs_is_literal = rhs_value->descriptor == &descriptor_number_literal;
-  if (lhs_is_literal && rhs_is_literal) {
-    // FIXME support large unsigned numbers
-    lhs_value = token_value_force_immediate_integer(
-      context, &lhs_range, lhs_value, &descriptor_s64
-    );
-    rhs_value = token_value_force_immediate_integer(
-      context, &rhs_range, rhs_value, &descriptor_s64
-    );
-    MASS_ON_ERROR(*context->result) return;
-  }
-
-  if (!descriptor_is_integer(lhs_value->descriptor) && !lhs_is_literal) {
-    context_error_snprintf(
-      context, lhs_range,
-      "Left hand side of the comparison is not an integer"
-    );
-    return;
-  }
-  if (!descriptor_is_integer(rhs_value->descriptor) && !rhs_is_literal) {
-    context_error_snprintf(
-      context, rhs_range,
-      "Right hand side of the comparison is not an integer"
-    );
-    return;
-  }
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
   MASS_ON_ERROR(*context->result) return;
 
@@ -3592,6 +3565,7 @@ mass_handle_comparison_operation_lazy_proc(
       }
       default: {
         assert(!"Unsupported comparison");
+        break;
       }
     }
   }
