@@ -3462,13 +3462,13 @@ mass_arithmetic_operator_symbol(
   return (Slice){0};
 }
 
-Value*
-mass_handle_arithmetic_operation(
+void
+mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
   Value_View args_view,
+  Value *result_value,
   void *payload
 ) {
-  Value *result_value = value_any(context, args_view.source_range);
   Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)payload;
   Value *lhs = value_view_get(args_view, 0);
   Value *rhs = value_view_get(args_view, 1);
@@ -3476,12 +3476,12 @@ mass_handle_arithmetic_operation(
   Source_Range lhs_range = lhs->source_range;
 
   Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) goto err;
+  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
   Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
-  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) goto err;
+  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
-  MASS_ON_ERROR(*context->result) goto err;
+  MASS_ON_ERROR(*context->result) return;
 
   Function_Builder *builder = context->builder;
 
@@ -3515,17 +3515,33 @@ mass_handle_arithmetic_operation(
   if (any_result->storage.tag != Storage_Tag_Static) {
     // FIXME do proper register allocation
     Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
-    MASS_ON_ERROR(assign(context, stack_result, any_result)) goto err;
+    MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
     if (any_result->storage.tag == Storage_Tag_Register) {
       ensure_register_released(context->builder, any_result->storage.Register.index);
     }
-    MASS_ON_ERROR(assign(context, result_value, stack_result)) goto err;
+    MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
   } else {
-    MASS_ON_ERROR(assign(context, result_value, any_result)) goto err;
+    MASS_ON_ERROR(assign(context, result_value, any_result)) return;
   }
+}
 
-  err:
+static inline Value *
+mass_handle_arithmetic_operation(
+  Execution_Context *context,
+  Value_View arguments,
+  void *payload
+) {
+  Value *result_value = value_any(context, arguments.source_range);
+  mass_handle_arithmetic_operation_lazy_proc(context, arguments, result_value, payload);
   return result_value;
+  // FIXME reenable this code once we can resolve expression to a lazy value to know the descriptor
+  //Value *lhs = value_view_get(arguments, 0);
+  //Value *rhs = value_view_get(arguments, 1);
+  //const Descriptor *descriptor =
+    //large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
+  //return mass_make_lazy_value(
+    //context, arguments, payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+  //);
 }
 
 void
