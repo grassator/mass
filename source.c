@@ -3119,37 +3119,115 @@ extend_integer_value(
   return result;
 }
 
+static inline const Descriptor *
+signed_integer_next_size_descriptor(
+  const Descriptor *descriptor
+) {
+  assert(descriptor_is_signed_integer(descriptor));
+  assert(descriptor->tag == Descriptor_Tag_Opaque);
+  if (descriptor == &descriptor_s8) {
+    return &descriptor_s16;
+  } else if (descriptor == &descriptor_s16) {
+    return &descriptor_s32;
+  } else if (descriptor == &descriptor_s32) {
+    return &descriptor_s64;
+  } else {
+    panic("Unexpected iteger size");
+    return 0;
+  }
+}
+
 static inline Value *
 extend_signed_integer_value_to_next_size(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *value
 ) {
-  assert(descriptor_is_signed_integer(value->descriptor));
-  assert(value->descriptor->tag == Descriptor_Tag_Opaque);
-  Descriptor *one_size_larger;
-  switch(value->descriptor->Opaque.bit_size) {
-    case 8: {
-      one_size_larger = &descriptor_s16;
-      break;
+  const Descriptor *one_size_larger = signed_integer_next_size_descriptor(value->descriptor);
+  return extend_integer_value(context, source_range, value, one_size_larger);
+}
+
+const Descriptor *
+value_or_lazy_value_descriptor(
+  const Value *value
+) {
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    return lazy->descriptor;
+  }
+  return value->descriptor;
+}
+
+const Descriptor *
+large_enough_common_integer_descriptor_for_values(
+  Execution_Context *context,
+  const Value *left_value,
+  const Value *right_value
+) {
+  const Descriptor *left = value_or_lazy_value_descriptor(left_value);
+  const Descriptor *right = value_or_lazy_value_descriptor(right_value);
+
+  bool left_is_integer = descriptor_is_integer(left);
+  bool right_is_integer = descriptor_is_integer(right);
+
+  bool left_is_literal = left == &descriptor_number_literal;
+  bool right_is_literal = right == &descriptor_number_literal;
+
+  if (!left_is_integer && !left_is_literal) {
+    context_error_snprintf(
+      context, left_value->source_range,
+      "Value is not an integer"
+    );
+    return 0;
+  }
+  if (!right_is_integer && !right_is_literal) {
+    context_error_snprintf(
+      context, right_value->source_range,
+      "Value is not an integer"
+    );
+    return 0;
+  }
+
+  if (left_is_literal) {
+    if (right_is_literal) {
+      // TODO consider if this should support large unsigned numbers
+      return &descriptor_s64;
+    } else {
+      return right;
     }
-    case 16: {
-      one_size_larger = &descriptor_s32;
-      break;
-    }
-    case 32: {
-      one_size_larger = &descriptor_s64;
-      break;
-    }
-    default: {
-      context_error_snprintf(
-        context, *source_range,
-        "Could not find large enough signed integer type to fit both operands"
-      );
-      return 0;
+  } else {
+    if (right_is_literal) {
+      return left;
     }
   }
-  return extend_integer_value(context, source_range, value, one_size_larger);
+
+  bool left_signed = descriptor_is_signed_integer(left);
+  bool right_signed = descriptor_is_signed_integer(right);
+
+  u64 left_size = descriptor_byte_size(left);
+  u64 right_size = descriptor_byte_size(right);
+
+  if (left_signed == right_signed) {
+    if (left_size == right_size) return left;
+    return left_size > right_size ? left : right;
+  } else {
+    const Descriptor *signed_side = left_signed ? left : right;
+    // If the signed and unsigned have the same size need to
+    // increase the size of the signed one so it fits the unsigned
+    if (left_size == right_size) {
+      if (left_size == 8) {
+        context_error_snprintf(
+          context, left_value->source_range,
+          "Could not find large enough signed integer type to fit both operands"
+        );
+        return 0;
+      }
+      return signed_integer_next_size_descriptor(signed_side);
+    }
+
+    // Now we know that the signed operand is large enough to fit the unsigned one
+    return signed_side;
+  }
 }
 
 void
@@ -3159,64 +3237,75 @@ maybe_resize_values_for_integer_math_operation(
   Value **lhs_pointer,
   Value **rhs_pointer
 ) {
+  const Descriptor *result_descriptor =
+    large_enough_common_integer_descriptor_for_values(context, *lhs_pointer, *rhs_pointer);
+
   *lhs_pointer = maybe_coerce_number_literal_to_integer(
     context, *lhs_pointer, (*rhs_pointer)->descriptor
   );
   *rhs_pointer = maybe_coerce_number_literal_to_integer(
     context, *rhs_pointer, (*lhs_pointer)->descriptor
   );
+  MASS_ON_ERROR(*context->result) return;
 
   const Descriptor *ld = (*lhs_pointer)->descriptor;
   const Descriptor *rd = (*rhs_pointer)->descriptor;
 
-  bool ld_signed = descriptor_is_signed_integer(ld);
-  bool rd_signed = descriptor_is_signed_integer(rd);
-
-  u64 ld_size = descriptor_byte_size(ld);
-  u64 rd_size = descriptor_byte_size(rd);
-
-  if (ld_signed == rd_signed) {
-    if (ld_size == rd_size) return;
-    const Descriptor *larger_descriptor = ld_size > rd_size ? ld : rd;
-    if (ld == larger_descriptor) {
-      *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, larger_descriptor);
-    } else {
-      *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, larger_descriptor);
-    }
-    return;
-  } else {
-    // If the signed and unsigned have the same size need to
-    // increase the size of the signed one so it fits the unsigned
-    if (ld_size == rd_size) {
-      if (ld_size == 8) {
-        context_error_snprintf(
-          context, *source_range,
-          "Could not find large enough signed integer type to fit both operands"
-        );
-        return;
-      }
-      if (ld_signed) {
-        *lhs_pointer =
-          extend_signed_integer_value_to_next_size(context, source_range, *lhs_pointer);
-        MASS_ON_ERROR(*context->result) return;
-      } else {
-        assert(rd_signed);
-        *rhs_pointer =
-          extend_signed_integer_value_to_next_size(context, source_range, *rhs_pointer);
-        MASS_ON_ERROR(*context->result) return;
-      }
-    }
-
-    // Now we know that the signed operand is larger so we move
-    if (ld_signed) {
-      *rhs_pointer =
-        extend_integer_value(context, source_range, *rhs_pointer, (*lhs_pointer)->descriptor);
-    } else {
-      assert(rd_signed);
-      *lhs_pointer =
-        extend_integer_value(context, source_range, *lhs_pointer, (*rhs_pointer)->descriptor);
-    }
+  if (ld != result_descriptor) {
+    *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, result_descriptor);
   }
+  if (rd != result_descriptor) {
+    *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, result_descriptor);
+  }
+
+  //bool ld_signed = descriptor_is_signed_integer(ld);
+  //bool rd_signed = descriptor_is_signed_integer(rd);
+//
+  //u64 ld_size = descriptor_byte_size(ld);
+  //u64 rd_size = descriptor_byte_size(rd);
+//
+  //if (ld_signed == rd_signed) {
+    //if (ld_size == rd_size) return;
+    //const Descriptor *larger_descriptor = ld_size > rd_size ? ld : rd;
+    //if (ld == larger_descriptor) {
+      //*rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, larger_descriptor);
+    //} else {
+      //*lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, larger_descriptor);
+    //}
+    //return;
+  //} else {
+    //// If the signed and unsigned have the same size need to
+    //// increase the size of the signed one so it fits the unsigned
+    //if (ld_size == rd_size) {
+      //if (ld_size == 8) {
+        //context_error_snprintf(
+          //context, *source_range,
+          //"Could not find large enough signed integer type to fit both operands"
+        //);
+        //return;
+      //}
+      //if (ld_signed) {
+        //*lhs_pointer =
+          //extend_signed_integer_value_to_next_size(context, source_range, *lhs_pointer);
+        //MASS_ON_ERROR(*context->result) return;
+      //} else {
+        //assert(rd_signed);
+        //*rhs_pointer =
+          //extend_signed_integer_value_to_next_size(context, source_range, *rhs_pointer);
+        //MASS_ON_ERROR(*context->result) return;
+      //}
+    //}
+//
+    //// Now we know that the signed operand is larger so we move
+    //if (ld_signed) {
+      //*rhs_pointer =
+        //extend_integer_value(context, source_range, *rhs_pointer, (*lhs_pointer)->descriptor);
+    //} else {
+      //assert(rd_signed);
+      //*lhs_pointer =
+        //extend_integer_value(context, source_range, *lhs_pointer, (*rhs_pointer)->descriptor);
+    //}
+  //}
 }
 
 void
@@ -3383,17 +3472,6 @@ token_handle_array_access(
   }
   // FIXME this might actually cause problems in assigning to an array element
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
-}
-
-const Descriptor *
-value_or_lazy_value_descriptor(
-  const Value *value
-) {
-  if (value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    return lazy->descriptor;
-  }
-  return value->descriptor;
 }
 
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
