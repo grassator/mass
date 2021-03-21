@@ -3416,6 +3416,24 @@ token_handle_array_access(
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
+static Value *
+mass_make_lazy_value(
+  Execution_Context *context,
+  Value_View arguments,
+  void *payload,
+  const Descriptor *descriptor,
+  Lazy_Value_Proc proc
+) {
+  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
+  *lazy = (Lazy_Value) {
+    .arguments = arguments,
+    .descriptor = descriptor,
+    .proc = proc,
+    .payload = payload,
+  };
+  return value_make(context, &descriptor_lazy_value, storage_static(lazy), arguments.source_range);
+}
+
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
   APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
   APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
@@ -3573,20 +3591,15 @@ mass_handle_comparison_operation_lazy_proc(
   compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
 }
 
-Value *
+static inline Value *
 mass_handle_comparison_operation(
   Execution_Context *context,
   Value_View arguments,
   void *payload
 ) {
-  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
-  *lazy = (Lazy_Value) {
-    .arguments = arguments,
-    .descriptor = &descriptor_s8,
-    .proc = mass_handle_comparison_operation_lazy_proc,
-    .payload = payload,
-  };
-  return value_make(context, &descriptor_lazy_value, storage_static(lazy), arguments.source_range);
+  return mass_make_lazy_value(
+    context, arguments, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
+  );
 }
 
 Value *
