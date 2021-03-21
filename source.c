@@ -3463,23 +3463,24 @@ mass_arithmetic_operator_symbol(
   return (Slice){0};
 }
 
+typedef struct {
+  Mass_Arithmetic_Operator operator;
+  Value *lhs;
+  Value *rhs;
+} Mass_Arithmetic_Operator_Lazy_Payload;
+
 void
 mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
   Value_View args_view,
   Value *result_value,
-  void *payload
+  void *raw_payload
 ) {
-  Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)payload;
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = value_view_get(args_view, 1);
-  Source_Range rhs_range = rhs->source_range;
-  Source_Range lhs_range = lhs->source_range;
+  Mass_Arithmetic_Operator_Lazy_Payload *payload = raw_payload;
 
-  Value *lhs_value = value_any_init(&(Value){0}, context, lhs_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
-  Value *rhs_value = value_any_init(&(Value){0}, context, rhs_range);
-  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
+  Value *lhs_value = payload->lhs;
+  Value *rhs_value = payload->rhs;
+  Source_Range lhs_range = lhs_value->source_range;
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
   MASS_ON_ERROR(*context->result) return;
@@ -3487,7 +3488,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   Function_Builder *builder = context->builder;
 
   Value *any_result = value_any_init(&(Value){0}, context, lhs_range);
-  switch(operator) {
+  switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add: {
       plus(context, &lhs_range, any_result, lhs_value, rhs_value);
       break;
@@ -3530,19 +3531,31 @@ static inline Value *
 mass_handle_arithmetic_operation(
   Execution_Context *context,
   Value_View arguments,
-  void *payload
+  void *operator_payload
 ) {
-  Value *result_value = value_any(context, arguments.source_range);
-  mass_handle_arithmetic_operation_lazy_proc(context, arguments, result_value, payload);
-  return result_value;
-  // FIXME reenable this code once we can resolve expression to a lazy value to know the descriptor
-  //Value *lhs = value_view_get(arguments, 0);
-  //Value *rhs = value_view_get(arguments, 1);
-  //const Descriptor *descriptor =
-    //large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
-  //return mass_make_lazy_value(
-    //context, arguments, payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
-  //);
+  // TODO @Speed this seems very inefficient
+  Value *lhs = value_view_get(arguments, 0);
+  Value *rhs = value_view_get(arguments, 1);
+
+  // FIXME :LazyForce we should somehow request a lazy value here instead of fully forcing
+  Value *lhs_value = value_any(context, lhs->source_range);
+  MASS_ON_ERROR(token_force_value(context, &lhs->source_range, lhs, lhs_value)) return 0;
+  Value *rhs_value = value_any(context, rhs->source_range);
+  MASS_ON_ERROR(token_force_value(context, &rhs->source_range, rhs, rhs_value)) return 0;
+
+  Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
+    allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
+  *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
+    .lhs = lhs_value,
+    .rhs = rhs_value,
+    .operator = (Mass_Arithmetic_Operator)(u64)operator_payload,
+  };
+
+  const Descriptor *descriptor =
+    large_enough_common_integer_descriptor_for_values(context, lhs_value, rhs_value);
+  return mass_make_lazy_value(
+    context, arguments, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+  );
 }
 
 void
