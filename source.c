@@ -3426,6 +3426,7 @@ mass_make_lazy_value(
 ) {
   Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
   *lazy = (Lazy_Value) {
+    .context = *context,
     .arguments = arguments,
     .descriptor = descriptor,
     .proc = proc,
@@ -3921,7 +3922,7 @@ token_dispatch_operator(
   if (result_value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&result_value->storage, Lazy_Value);
     result_value = value_any(context, result_value->source_range);
-    lazy->proc(context, lazy->arguments, result_value, lazy->payload);
+    lazy->proc(&lazy->context, lazy->arguments, result_value, lazy->payload);
   }
 
   // Pop off current arguments and push a new one

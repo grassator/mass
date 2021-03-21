@@ -703,6 +703,7 @@ main(void) {
   }));
 
   push_type(type_struct("Lazy_Value", (Struct_Item[]){
+    { "Execution_Context", "context" },
     { "const Descriptor *", "descriptor" },
     { "Value_View", "arguments" },
     { "Lazy_Value_Proc", "proc" },

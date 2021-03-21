@@ -562,6 +562,7 @@ typedef struct Value {
 typedef dyn_array_type(Value) Array_Value;
 
 typedef struct Lazy_Value {
+  Execution_Context context;
   const Descriptor * descriptor;
   Value_View arguments;
   Lazy_Value_Proc proc;
@@ -1297,6 +1298,11 @@ MASS_DEFINE_TYPE_VALUE(value);
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,
+  {
+    .name = slice_literal_fields("context"),
+    .descriptor = &descriptor_execution_context,
+    .offset = offsetof(Lazy_Value, context),
+  },
   {
     .name = slice_literal_fields("descriptor"),
     .descriptor = &descriptor_descriptor_pointer,
