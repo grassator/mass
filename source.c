@@ -3925,31 +3925,25 @@ mass_handle_macro_keyword(
   Value_View args_view,
   void *unused_payload
 ) {
-  Value *function = value_view_get(args_view, 0);
-  Source_Range source_range = function->source_range;
-  Value *function_value = value_any(context, source_range);
-  MASS_ON_ERROR(value_force(context, &source_range, function, function_value)) goto err;
-  if (function_value) {
-    if (
-      function_value->descriptor->tag == Descriptor_Tag_Function &&
-      !value_is_external_symbol(function_value->descriptor->Function.info.body)
-    ) {
-      Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
-      *macro_descriptor = *function_value->descriptor;
-      macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
-      function_value = value_make(
-        context, macro_descriptor, function_value->storage, function_value->source_range
-      );
-    } else {
-      context_error_snprintf(
-        context, source_range,
-        "Only literal functions (with a body) can be marked as macro"
-      );
-    }
-  }
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  err:
-  return function_value;
+  Value *function_value = value_view_get(args_view, 0);
+  Source_Range source_range = function_value->source_range;
+  if (
+    function_value->descriptor->tag == Descriptor_Tag_Function &&
+    !value_is_external_symbol(function_value->descriptor->Function.info.body)
+  ) {
+    Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
+    *macro_descriptor = *function_value->descriptor;
+    macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+    return value_make(context, macro_descriptor, function_value->storage, source_range);
+  } else {
+    context_error_snprintf(
+      context, source_range,
+      "Only literal functions (with a body) can be marked as macro"
+    );
+    return 0;
+  }
 }
 
 void
