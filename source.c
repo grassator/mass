@@ -393,7 +393,7 @@ assign(
 }
 
 PRELUDE_NO_DISCARD Mass_Result
-token_force_value(
+value_force(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *token,
@@ -1692,69 +1692,64 @@ token_match_return_type(
 }
 
 PRELUDE_NO_DISCARD Mass_Result
-token_force_value(
+value_force(
   Execution_Context *context,
   const Source_Range *source_range,
-  Value *token,
+  Value *value,
   Value *result_value
 ) {
   MASS_TRY(*context->result);
+  if (!value) return *context->result;
 
-  if (token) {
-    Value *value = token;
-    if (value_is_group(token)) {
-      const Group *group = value_as_group(token);
-      switch(group->tag) {
-        case Group_Tag_Paren: {
-          token_parse_expression(context, group->children, result_value, 0);
-          return *context->result;
-        }
-        case Group_Tag_Curly: {
-          token_parse_block(context, token, result_value);
-          return *context->result;
-        }
-        case Group_Tag_Square: {
-          panic("TODO");
-          return *context->result;
-        }
-      }
-    } else if(value_is_symbol(token)) {
-      Slice name = value_as_symbol(token)->name;
-      value = scope_lookup_force(context->scope, name);
-      MASS_TRY(*context->result);
-      if (!value) {
-        //scope_print_names(context->scope);
-        context_error_snprintf(
-          context, *source_range,
-          "Undefined variable %"PRIslice,
-          SLICE_EXPAND_PRINTF(name)
-        );
-
+  if (value_is_group(value)) {
+    const Group *group = value_as_group(value);
+    switch(group->tag) {
+      case Group_Tag_Paren: {
+        token_parse_expression(context, group->children, result_value, 0);
         return *context->result;
-      } else if (
-        value->storage.tag != Storage_Tag_Static &&
-        value->storage.tag != Storage_Tag_None
-      ) {
-        if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
-          context_error_snprintf(
-            context, value->source_range,
-            "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
-            " from a different epoch %"PRIu64 ". "
-            "This happens when you access value from runtime in compile-time execution "
-            "or a runtime value of one compile time execution in a different one.",
-            SLICE_EXPAND_PRINTF(name),
-            value->epoch,
-            context->epoch
-          );
-          return *context->result;
-        }
+      }
+      case Group_Tag_Curly: {
+        token_parse_block(context, value, result_value);
+        return *context->result;
+      }
+      case Group_Tag_Square: {
+        panic("TODO");
+        return *context->result;
       }
     }
-    return assign(context, result_value, value);
-  } else {
-    // TODO consider what should happen here
+  } else if(value_is_symbol(value)) {
+    Slice name = value_as_symbol(value)->name;
+    value = scope_lookup_force(context->scope, name);
+    MASS_TRY(*context->result);
+    if (!value) {
+      //scope_print_names(context->scope);
+      context_error_snprintf(
+        context, *source_range,
+        "Undefined variable %"PRIslice,
+        SLICE_EXPAND_PRINTF(name)
+      );
+
+      return *context->result;
+    } else if (
+      value->storage.tag != Storage_Tag_Static &&
+      value->storage.tag != Storage_Tag_None
+    ) {
+      if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
+        context_error_snprintf(
+          context, value->source_range,
+          "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
+          " from a different epoch %"PRIu64 ". "
+          "This happens when you access value from runtime in compile-time execution "
+          "or a runtime value of one compile time execution in a different one.",
+          SLICE_EXPAND_PRINTF(name),
+          value->epoch,
+          context->epoch
+        );
+        return *context->result;
+      }
+    }
   }
-  return *context->result;
+  return assign(context, result_value, value);
 }
 
 
@@ -1819,7 +1814,7 @@ token_handle_user_defined_operator(
     Value *arg = value_view_get(args, i);
     Source_Range source_range = arg->source_range;
     Value *arg_value = value_any(context, source_range);
-    MASS_ON_ERROR(token_force_value(context, &source_range, arg, arg_value)) return;
+    MASS_ON_ERROR(value_force(context, &source_range, arg, arg_value)) return;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
@@ -1953,7 +1948,7 @@ token_parse_operator_definition(
 
   Source_Range precedence_source_range = precedence_token->source_range;
   Value *precedence_value = value_any(context, precedence_source_range);
-  MASS_ON_ERROR(token_force_value(
+  MASS_ON_ERROR(value_force(
     context, &precedence_source_range, precedence_token, precedence_value
   )) goto err;
   precedence_value = token_value_force_immediate_integer(
@@ -2753,7 +2748,7 @@ token_handle_negation(
   Source_Range source_range = token->source_range;
   Value *value = value_any(context, source_range);
   Value *negated_value = 0;
-  MASS_ON_ERROR(token_force_value(context, &source_range, token, value)) goto err;
+  MASS_ON_ERROR(value_force(context, &source_range, token, value)) goto err;
   if (value->descriptor == &descriptor_number_literal) {
     const Number_Literal *original = storage_static_as_c_type(&value->storage, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
@@ -2894,7 +2889,7 @@ token_handle_function_call(
 
   Source_Range source_range = target_token->source_range; // TODO add args as well
   Value *target = value_any(context, source_range);
-  MASS_ON_ERROR(token_force_value(context, &source_range, target_token, target)) return;
+  MASS_ON_ERROR(value_force(context, &source_range, target_token, target)) return;
   assert(value_match_group(args_token, Group_Tag_Paren));
 
   if (
@@ -3539,9 +3534,9 @@ mass_handle_arithmetic_operation(
 
   // FIXME :LazyForce we should somehow request a lazy value here instead of fully forcing
   Value *lhs_value = value_any(context, lhs->source_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs->source_range, lhs, lhs_value)) return 0;
+  MASS_ON_ERROR(value_force(context, &lhs->source_range, lhs, lhs_value)) return 0;
   Value *rhs_value = value_any(context, rhs->source_range);
-  MASS_ON_ERROR(token_force_value(context, &rhs->source_range, rhs, rhs_value)) return 0;
+  MASS_ON_ERROR(value_force(context, &rhs->source_range, rhs, rhs_value)) return 0;
 
   Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
     allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
@@ -3573,9 +3568,9 @@ mass_handle_comparison_operation_lazy_proc(
   Source_Range lhs_range = lhs->source_range;
 
   Value *lhs_value = value_any(context, lhs_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) return;
+  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) return;
   Value *rhs_value = value_any(context, rhs_range);
-  MASS_ON_ERROR(token_force_value(context, &rhs_range, rhs, rhs_value)) return;
+  MASS_ON_ERROR(value_force(context, &rhs_range, rhs, rhs_value)) return;
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
   MASS_ON_ERROR(*context->result) return;
@@ -3673,7 +3668,7 @@ mass_handle_paren_operator(
     slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
   ) {
     Value *result_token = token_process_c_struct_definition(context, args_token);
-    MASS_ON_ERROR(token_force_value(
+    MASS_ON_ERROR(value_force(
       context, &args_token->source_range, result_token, result_value
     )) goto err;
   } else if (
@@ -3794,7 +3789,7 @@ mass_handle_dot_operator(
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
   Value *lhs_value = value_any(context, lhs_range);
-  MASS_ON_ERROR(token_force_value(context, &lhs_range, lhs, lhs_value)) goto err;
+  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) goto err;
   if (
     lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
     lhs_value->descriptor == &descriptor_scope
@@ -3835,7 +3830,7 @@ mass_handle_dot_operator(
       value_is_number_literal(rhs)
     ) {
       Value *index = value_any(context, rhs_range);
-      token_force_value(context, &rhs_range, rhs, index);
+      value_force(context, &rhs_range, rhs, index);
       token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
     } else {
       context_error_snprintf(
@@ -3865,7 +3860,7 @@ mass_handle_macro_keyword(
   Value *function = value_view_get(args_view, 0);
   Source_Range source_range = function->source_range;
   Value *function_value = value_any(context, source_range);
-  MASS_ON_ERROR(token_force_value(context, &source_range, function, function_value)) goto err;
+  MASS_ON_ERROR(value_force(context, &source_range, function, function_value)) goto err;
   if (function_value) {
     if (
       function_value->descriptor->tag == Descriptor_Tag_Function &&
@@ -4138,7 +4133,7 @@ token_parse_expression(
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(value_stack) == 1) {
       Value *value = *dyn_array_last(value_stack);
-      MASS_ON_ERROR(token_force_value(context, &view.source_range, value, result_value)) goto err;
+      MASS_ON_ERROR(value_force(context, &view.source_range, value, result_value)) goto err;
     } else {
       context_error_snprintf(
         context, view.source_range,
