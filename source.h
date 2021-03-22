@@ -103,11 +103,11 @@ compile_time_eval(
   Value *result_value
 );
 
-u64
+PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
-  Value *result_value,
+  u64 *out_match_length,
   const Token_Pattern *end_pattern
 );
 

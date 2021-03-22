@@ -1411,22 +1411,24 @@ call_function_overload(
       );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
-      token_parse_expression(&arg_context, default_expression, source_arg, 0);
+      Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
       MASS_ON_ERROR(*arg_context.result) return;
+      MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, source_arg));
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
+    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
     if (
-      descriptor_byte_size(source_arg->descriptor) <= 8 ||
+      descriptor_byte_size(source_descriptor) <= 8 ||
       // TODO Number literals are larger than a register, but only converted into
       //      a proper value in the assign below so need this explicit check.
       //      Maybe we should do the conversion at some step before?
-      source_arg->descriptor == &descriptor_number_literal
+      source_descriptor == &descriptor_number_literal
     ) {
       assign(context, target_arg, source_arg);
     } else {
       // Large values are copied to the stack and passed by a reference
-      Value *stack_value = reserve_stack(context, builder, source_arg->descriptor, *source_range);
+      Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
       assign(context, stack_value, source_arg);
       load_address(context, source_range, target_arg, stack_value);
     }
@@ -1522,7 +1524,9 @@ calculate_arguments_match_score(
     } else {
       source_arg = *dyn_array_get(arguments, arg_index);
     }
+    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
     if (function_argument_is_exact(target_arg)) {
+      if (source_arg->descriptor == &descriptor_lazy_value) return -1;
       if (same_value_type(target_arg->value, source_arg)) {
         if (
           source_arg->storage.tag == Storage_Tag_Static &&
@@ -1535,7 +1539,7 @@ calculate_arguments_match_score(
       } else {
         return -1;
       }
-    } else if (same_value_type(target_arg->value, source_arg)) {
+    } else if (same_type(target_arg->value->descriptor, source_descriptor)) {
       score += Score_Exact_Type;
     } else if(same_value_type_or_can_implicitly_move_cast(target_arg->value, source_arg)) {
       score += Score_Cast;

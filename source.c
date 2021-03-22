@@ -322,6 +322,11 @@ assign(
     target->next_overload = source->next_overload;
     return *context->result;
   }
+
+  if (source->descriptor == &descriptor_lazy_value) {
+    return value_force(context, &target->source_range, source, target);
+  }
+
   Source_Range source_range = target->source_range;
 
   if (source->descriptor == &descriptor_number_literal) {
@@ -1399,7 +1404,8 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  token_parse_expression(&body_context, macro->replacement, result_value, 0);
+  Value *parse_result = token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
+  value_force(context, &macro->replacement.source_range, parse_result, result_value);
 }
 
 u64
@@ -1683,43 +1689,33 @@ token_match_return_type(
   return returns;
 }
 
-PRELUDE_NO_DISCARD Mass_Result
-value_force(
+Value *
+token_parse_single(
   Execution_Context *context,
-  const Source_Range *source_range,
-  Value *value,
-  Value *result_value
+  Value *value
 ) {
-  MASS_TRY(*context->result);
-  if (!value) return *context->result;
-
-  if (value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    lazy->proc(&lazy->context, result_value, lazy->payload);
-    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
-    // TODO is there a better way to cache the result?
-    *value = *result_value;
-    return *context->result;
-  } else if (value_is_group(value)) {
+  const Source_Range *source_range = &value->source_range;
+  if (value_is_group(value)) {
     const Group *group = value_as_group(value);
     switch(group->tag) {
       case Group_Tag_Paren: {
-        token_parse_expression(context, group->children, result_value, 0);
-        return *context->result;
+        return token_parse_expression(context, group->children, &(u64){0}, 0);
       }
       case Group_Tag_Curly: {
+        // FIXME :LazyProc
+        Value *result_value = value_any(context, *source_range);
         token_parse_block(context, value, result_value);
-        return *context->result;
+        return result_value;
       }
       case Group_Tag_Square: {
         panic("TODO");
-        return *context->result;
+        return 0;
       }
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
     value = scope_lookup_force(context->scope, name);
-    MASS_TRY(*context->result);
+    MASS_ON_ERROR(*context->result) return 0;
     if (!value) {
       //scope_print_names(context->scope);
       context_error_snprintf(
@@ -1728,7 +1724,7 @@ value_force(
         SLICE_EXPAND_PRINTF(name)
       );
 
-      return *context->result;
+      return 0;
     } else if (
       value->storage.tag != Storage_Tag_Static &&
       value->storage.tag != Storage_Tag_None
@@ -1744,15 +1740,37 @@ value_force(
           value->epoch,
           context->epoch
         );
-        return *context->result;
+        return 0;
       }
     }
+  }
+  return value;
+}
+
+PRELUDE_NO_DISCARD Mass_Result
+value_force(
+  Execution_Context *context,
+  const Source_Range *source_range,
+  Value *value,
+  Value *result_value
+) {
+  MASS_TRY(*context->result);
+
+  if (!value) return *context->result;
+  value = token_parse_single(context, value);
+  MASS_TRY(*context->result);
+
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    lazy->proc(&lazy->context, result_value, lazy->payload);
+    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
+    // TODO is there a better way to cache the result?
+    *value = *result_value;
+    return *context->result;
   }
   return assign(context, result_value, value);
 }
 
-
-// FIXME pass in the function definition
 Array_Value_Ptr
 token_match_call_arguments(
   Execution_Context *context,
@@ -1768,16 +1786,8 @@ token_match_call_arguments(
     while (!it.done) {
       if (context->result->tag != Mass_Result_Tag_Success) return result;
       Value_View view = token_split_next(&it, &token_pattern_comma_operator);
-      // TODO :TargetValue
-      // There is an interesting conundrum here that we need to know the types of the
-      // arguments for overload resolution, but then we need the exact function definition
-      // to know the result_value definition to do the evaluation. Proper solution would
-      // be to introduce :TypeOnlyEvalulation, but for now we will just create a special
-      // target value that can be anything that will behave like type inference and is
-      // needed regardless for something like x := (...)
-      Value *result_value = value_any(context, view.source_range);
-      token_parse_expression(context, view, result_value, 0);
-      dyn_array_push(result, result_value);
+      Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
+      dyn_array_push(result, parse_result);
     }
   }
   return result;
@@ -2496,24 +2506,21 @@ compile_time_eval(
   eval_context.builder = &eval_builder;
   eval_context.builder->source = source_from_source_range(source_range);
 
-  // FIXME We have to call token_parse_expression here before we figure out
-  //       what is the return value because we need to figure out the return type.
-  //       Symboleally there would be a type-only eval available instead
-  Value *expression_result_value = value_any(context, view.source_range);
-  token_parse_expression(&eval_context, view, expression_result_value, 0);
+  Value *expression_result_value = token_parse_expression(&eval_context, view, &(u64){0}, 0);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
     return;
   }
+  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
-    if (expression_result_value->descriptor->tag == Descriptor_Tag_Function) {
+    if (result_descriptor->tag == Descriptor_Tag_Function) {
       // It is only allowed to to pass through funciton definitions not compiled ones
       assert(expression_result_value->storage.tag == Storage_Tag_None);
     }
-    MASS_ON_ERROR(assign(context, result_value, expression_result_value));
+    MASS_ON_ERROR(value_force(context, &view.source_range, expression_result_value, result_value));
     return;
   }
 
@@ -2660,24 +2667,26 @@ token_handle_c_string(
   Value *args_token
 ) {
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-  if (dyn_array_length(args) != 1) goto err;
+  if (dyn_array_length(args) != 1) {
+    context_error_snprintf(
+      context, args_token->source_range,
+      "c_string expects a single compile-time known string"
+    );
+    goto defer;
+  }
   Value *arg_value = *dyn_array_get(args, 0);
   const Slice *c_string = value_as_slice(arg_value);
-  if (!c_string) goto err;
+  if (!c_string) {
+    context_error_snprintf(
+      context, args_token->source_range,
+      "c_string expects a single compile-time known string"
+    );
+    goto defer;
+  }
 
   const Value *c_string_bytes =
     value_global_c_string_from_slice(context, *c_string, arg_value->source_range);
-  Value *c_string_pointer = value_any(context, arg_value->source_range);
-  load_address(context, &arg_value->source_range, c_string_pointer, c_string_bytes);
-  MASS_ON_ERROR(assign(context, result_value, c_string_pointer));
-
-  goto defer;
-
-  err:
-  context_error_snprintf(
-    context, args_token->source_range,
-    "c_string expects a single compile-time known string"
-  );
+  load_address(context, &arg_value->source_range, result_value, c_string_bytes);
 
   defer:
   dyn_array_destroy(args);
@@ -2743,7 +2752,6 @@ token_handle_cast(
   } else if (cast_to_byte_size < original_byte_size) {
     after_cast_value = value_make(context, cast_to_descriptor, value->storage, *source_range);
     if (value->storage.tag == Storage_Tag_Static) {
-      after_cast_value->epoch = value->epoch;
       // TODO this is quite awkward and unsafe. There is probably is a better way
       void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
       after_cast_value->storage = storage_static_internal(memory, cast_to_byte_size);
@@ -3045,14 +3053,14 @@ token_handle_function_call(
         // We should catch the missing default expression in the matcher
         Value_View default_expression = arg->maybe_default_expression;
         assert(default_expression.length);
+        const Source_Range *source_range = &default_expression.source_range;
         // FIXME avoid using a stack value
-        arg_value = reserve_stack(
-          context, context->builder, arg_descriptor, default_expression.source_range
-        );
+        arg_value = reserve_stack(context, context->builder, arg_descriptor, *source_range);
         {
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
-          token_parse_expression(&arg_context, default_expression, arg_value, 0);
+          Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+          MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) goto err;
         }
         scope_define(body_scope, arg->name, (Scope_Entry) {
           .tag = Scope_Entry_Tag_Value,
@@ -3617,13 +3625,14 @@ mass_handle_startup_call_lazy_proc(
   Value *result_value,
   Value *args_token
 ) {
-  Value *startup_function = value_any(context, args_token->source_range);
-  token_parse_expression(context, value_as_group(args_token)->children, startup_function, 0);
+  Value_View expression = value_as_group(args_token)->children;
+  Value *startup_function = token_parse_expression(context, expression, &(u64){0}, 0);
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(startup_function);
   if (
     !startup_function ||
-    startup_function->descriptor->tag != Descriptor_Tag_Function ||
-    dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
-    startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
+    descriptor->tag != Descriptor_Tag_Function ||
+    dyn_array_length(descriptor->Function.info.arguments) ||
+    descriptor->Function.info.returns.descriptor != &descriptor_void
   ) {
     context_error_snprintf(
       context, args_token->source_range,
@@ -4014,14 +4023,20 @@ token_parse_if_expression(
 
   Source_Range dummy_range = keyword->source_range;
 
-  Value *condition_value = value_any(context, dummy_range);
+  Value *condition_value;
   {
     static const Token_Pattern then_pattern = {
       .tag = Token_Pattern_Tag_Symbol,
       .Symbol.name = slice_literal_fields("then")
     };
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
-    peek_index += token_parse_expression(context, condition_view, condition_value, &then_pattern);
+    condition_value = value_any(context, condition_view.source_range);
+    u64 condition_length;
+    // FIXME :LazyProc
+    Value *parse_result =
+      token_parse_expression(context, condition_view, &condition_length, &then_pattern);
+    value_force(context, &condition_view.source_range, parse_result, condition_value);
+    peek_index += condition_length;
     if (condition_value->descriptor == &descriptor_number_literal) {
       condition_value = token_value_force_immediate_integer(
         context, &condition_value->source_range, condition_value, &descriptor_s64
@@ -4034,14 +4049,19 @@ token_parse_if_expression(
     context, &context->builder->code_block.instructions, &condition_value->source_range, condition_value
   );
 
-  Value *then_value = value_any(context, dummy_range);
+  Value *then_value = 0;
   {
     static const Token_Pattern else_pattern = {
       .tag = Token_Pattern_Tag_Symbol,
       .Symbol.name = slice_literal_fields("else"),
     };
     Value_View then_view = value_view_slice(&view, peek_index, view.length);
-    peek_index += token_parse_expression(context, then_view, then_value, &else_pattern);
+    then_value = value_any(context, then_view.source_range);
+    u64 then_length;
+    // FIXME :LazyProc
+    Value *parse_result = token_parse_expression(context, then_view, &then_length, &else_pattern);
+    value_force(context, &then_view.source_range, parse_result, then_value);
+    peek_index += then_length;
     MASS_ON_ERROR(*context->result) goto err;
   }
 
@@ -4052,9 +4072,7 @@ token_parse_if_expression(
     }
     Value *on_stack =
       reserve_stack(context, context->builder, stack_descriptor, then_value->source_range);
-    MASS_ON_ERROR(assign(context, on_stack, then_value)) {
-      goto err;
-    }
+    MASS_ON_ERROR(assign(context, on_stack, then_value)) goto err;
     then_value = on_stack;
   }
 
@@ -4071,8 +4089,12 @@ token_parse_if_expression(
   );
 
   Value_View else_view = value_view_slice(&view, peek_index, view.length);
-  u64 else_length = token_parse_expression(context, else_view, then_value, 0);
-  *matched_length = peek_index + else_length;
+  u64 else_length;
+  Value *else_value = token_parse_expression(context, else_view, &else_length, 0);
+  MASS_ON_ERROR(value_force(context, &else_view.source_range, else_value, then_value)) goto err;
+
+  peek_index += else_length;
+  *matched_length = peek_index;
 
   push_instruction(
     &context->builder->code_block.instructions, dummy_range,
@@ -4090,19 +4112,17 @@ typedef Value *(*Expression_Matcher_Proc)(
   u64 *out_match_length
 );
 
-PRELUDE_NO_DISCARD u64
+PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
-  Value *result_value,
+  u64 *out_match_length,
   const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if(!view.length) {
-    MASS_ON_ERROR(assign(context, result_value, &void_value)) return true;
-    return true;
-  }
+  if(!view.length) return &void_value;
+  Value *result = 0;
 
   Array_Value_Ptr value_stack = dyn_array_make(Array_Value_Ptr);
   Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
@@ -4194,24 +4214,22 @@ token_parse_expression(
     Operator_Stack_Entry *entry = dyn_array_pop(operator_stack);
     token_dispatch_operator(context, &value_stack, entry);
   }
+
   if (context->result->tag == Mass_Result_Tag_Success) {
     if (dyn_array_length(value_stack) == 1) {
-      Value *value = *dyn_array_last(value_stack);
-      MASS_ON_ERROR(value_force(context, &view.source_range, value, result_value)) goto err;
+      result = *dyn_array_last(value_stack);
+      result = token_parse_single(context, result);
     } else {
-      context_error_snprintf(
-        context, view.source_range,
-        "Could not parse the expression"
-      );
+      context_error_snprintf(context, view.source_range, "Could not parse the expression");
     }
   }
 
   err:
-
   dyn_array_destroy(value_stack);
   dyn_array_destroy(operator_stack);
 
-  return matched_length;
+  *out_match_length = matched_length;
+  return result;
 }
 
 void
@@ -4228,13 +4246,14 @@ token_parse_block_view(
   }
 
   u64 match_length = 0;
-  Value last_result;
+  Value *last_result = 0;
   // FIXME deal with terminated vs unterminated statements
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) return;
     Value_View rest = value_view_rest(&children_view, start_index);
+
     // TODO provide a better source range here
-    value_init(&last_result, context->epoch, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, rest.source_range);
+    last_result = value_any(context, rest.source_range);
     // Skipping over empty statements
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
       match_length = 1;
@@ -4253,19 +4272,22 @@ token_parse_block_view(
       // to have higher precedence when parsing
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
-        match_length = matcher->proc(context, rest, &last_result, matcher->payload);
+        match_length = matcher->proc(context, rest, last_result, matcher->payload);
         MASS_ON_ERROR(*context->result) {
             return;
         }
         if (match_length) {
-          if (last_result.descriptor->tag == Descriptor_Tag_Any) {
-            MASS_ON_ERROR(assign(context, &last_result, &void_value));
+          if (last_result->descriptor->tag == Descriptor_Tag_Any) {
+            MASS_ON_ERROR(assign(context, last_result, &void_value));
           }
           goto check_match;
         }
       }
     }
-    match_length = token_parse_expression(context, rest, &last_result, &token_pattern_semicolon);
+
+    // FIXME :LazyProc
+    Value *parse_result = token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
+    value_force(context, &rest.source_range, parse_result, last_result);
 
     check_match:
     if (!match_length) {
@@ -4281,7 +4303,7 @@ token_parse_block_view(
   }
 
   // TODO This is not optimal as we might generate extra temp values
-  MASS_ON_ERROR(assign(context, block_result_value, &last_result));
+  MASS_ON_ERROR(assign(context, block_result_value, last_result));
 }
 
 void
@@ -4326,8 +4348,7 @@ token_parse_statement_using(
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("using"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
-  Value *result = value_any(context, rest.source_range);
-  token_parse_expression(context, rest, result, 0);
+  Value *result = token_parse_expression(context, rest, &(u64){0}, 0);
 
   if (result->descriptor != &descriptor_scope) {
     context_error_snprintf(context, rest.source_range, "Expected a scope");
@@ -4512,7 +4533,8 @@ token_parse_explicit_return(
   assert(fn_return);
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
-  token_parse_expression(context, rest, fn_return, 0);
+  Value *parse_result = token_parse_expression(context, rest, &(u64){0}, 0);
+  value_force(context, &rest.source_range, parse_result, fn_return);
 
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
@@ -4763,25 +4785,25 @@ token_define_local_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = value_any(context, symbol->source_range);
-  token_parse_expression(context, expression, value, 0);
+  const Source_Range *source_range = &expression.source_range;
+  Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return;
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (value->descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(
-      context, &expression.source_range, value, &descriptor_s64
-    );
+  if (descriptor == &descriptor_number_literal) {
+    value = token_value_force_immediate_integer(context, source_range, value, &descriptor_s64);
+    descriptor = value->descriptor;
   }
   Value *on_stack;
-  if (value->descriptor->tag == Descriptor_Tag_Function) {
+  if (descriptor->tag == Descriptor_Tag_Function) {
     Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
     ensure_compiled_function_body(context, value);
     on_stack = reserve_stack(context, context->builder, fn_pointer, symbol->source_range);
     load_address(context, &symbol->source_range, on_stack, value);
   } else {
-    on_stack = reserve_stack(context, context->builder, value->descriptor, symbol->source_range);
-    MASS_ON_ERROR(assign(context, on_stack, value)) return;
+    on_stack = reserve_stack(context, context->builder, descriptor, symbol->source_range);
+    MASS_ON_ERROR(value_force(context, source_range, value, on_stack)) return;
   }
 
   scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
@@ -4851,9 +4873,11 @@ token_parse_assignment(
 
   Value *target = value_any(context, lhs.source_range);
   if (!token_parse_definition(context, lhs, target)) {
-    token_parse_expression(context, lhs, target, 0);
+    Value *target_parse = token_parse_expression(context, lhs, &(u64){0}, 0);
+    value_force(context, &lhs.source_range, target_parse, target);
   }
-  token_parse_expression(context, rhs, target, 0);
+  Value *parse_result = token_parse_expression(context, rhs, &(u64){0}, 0);
+  value_force(context, &lhs.source_range, parse_result, target);
 
   return statement_length;
 }
