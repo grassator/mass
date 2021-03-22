@@ -3626,6 +3626,15 @@ mass_handle_startup_call_lazy_proc(
   }
 }
 
+void
+mass_handle_address_of_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Value *pointee
+) {
+  load_address(context, &result_value->source_range, result_value, pointee);
+}
+
 Value *
 mass_handle_paren_operator(
   Execution_Context *context,
@@ -3665,6 +3674,8 @@ mass_handle_paren_operator(
       goto err;
     }
     Value *pointee = *dyn_array_get(args, 0);
+    dyn_array_destroy(args);
+
     if (context->compilation->jit.program == context->program) { // compile time
       assert(pointee->epoch == VALUE_STATIC_EPOCH);
       assert(pointee->storage.tag == Storage_Tag_Memory);
@@ -3687,9 +3698,12 @@ mass_handle_paren_operator(
       pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
       return pointer;
     } else { // run time
-      load_address(context, &args_range, result_value, pointee);
+      const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
+      const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
+      return mass_make_lazy_value(
+        context, args_range, pointee, descriptor, mass_handle_address_of_lazy_proc
+      );
     }
-    dyn_array_destroy(args);
   } else {
     token_handle_function_call(context, target, args_token, result_value);
   }
