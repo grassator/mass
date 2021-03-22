@@ -2713,14 +2713,13 @@ mass_compiler_external(
 MASS_ENUMERATE_INTEGER_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
-void
+Value *
 token_handle_cast(
   Execution_Context *context,
   const Source_Range *source_range,
-  Array_Value_Ptr args,
-  Value *result_value
+  Array_Value_Ptr args
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Value *type = *dyn_array_get(args, 0);
   Value *value = *dyn_array_get(args, 1);
@@ -2738,7 +2737,7 @@ token_handle_cast(
     after_cast_value = value_make(context, cast_to_descriptor, value->storage, value->source_range);
     after_cast_value->storage.byte_size = cast_to_byte_size;
   }
-  MASS_ON_ERROR(assign(context, result_value, after_cast_value));
+  return after_cast_value;
 }
 
 Value *
@@ -3653,8 +3652,9 @@ mass_handle_paren_operator(
   }
   if (slice_equal(target_name, slice_literal("cast"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-    token_handle_cast(context, &args_range, args, result_value);
+    Value *result = token_handle_cast(context, &args_range, args);
     dyn_array_destroy(args);
+    return result;
   } else if (slice_equal(target_name, slice_literal("c_string"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
