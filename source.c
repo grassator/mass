@@ -3249,58 +3249,6 @@ maybe_resize_values_for_integer_math_operation(
   }
 }
 
-void
-struct_get_field(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *struct_value,
-  Slice name,
-  Value *result_value
-) {
-  const Descriptor *descriptor = struct_value->descriptor;
-  assert(descriptor->tag == Descriptor_Tag_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
-    if (slice_equal(name, field->name)) {
-      Value *field_value;
-      Storage *storage = &struct_value->storage;
-      switch(storage->tag) {
-        default:
-        case Storage_Tag_Any:
-        case Storage_Tag_Eflags:
-        case Storage_Tag_Register:
-        case Storage_Tag_Xmm:
-        case Storage_Tag_None: {
-          panic("Internal Error: Unexpected storage type for structs");
-          field_value = 0;
-          break;
-        }
-        case Storage_Tag_Static: {
-          Storage field_storage = storage_static_internal(
-            (s8 *)storage_static_as_c_type_internal(storage, storage->byte_size) + field->offset,
-            descriptor_byte_size(field->descriptor)
-          );
-          field_value = value_make(context, field->descriptor, field_storage, *source_range);
-          break;
-        }
-        case Storage_Tag_Memory: {
-          Storage field_storage = *storage;
-          assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-          field_storage.byte_size = descriptor_byte_size(field->descriptor);
-          field_storage.Memory.location.Indirect.offset += field->offset;
-          field_value = value_make(context, field->descriptor, field_storage, *source_range);
-          break;
-        }
-      }
-
-      MASS_ON_ERROR(assign(context, result_value, field_value));
-      return;
-    }
-  }
-
-  assert(!"Could not find a field with specified name");
-  return;
-}
 
 Storage
 storage_load_index_address(
@@ -3790,6 +3738,70 @@ mass_handle_at_operator(
   return result_value;
 }
 
+Descriptor_Struct_Field *
+struct_find_field_by_name(
+  const Descriptor *descriptor,
+  Slice field_name
+) {
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
+    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+    if (slice_equal(field->name, field_name)) {
+      return field;
+    }
+  }
+  return 0;
+}
+
+typedef struct {
+  Value *struct_;
+  Descriptor_Struct_Field *field;
+} Mass_Field_Access_Lazy_Payload;
+
+void
+mass_handle_field_access_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  void *raw_payload
+) {
+  Mass_Field_Access_Lazy_Payload *payload = raw_payload;
+  Descriptor_Struct_Field *field = payload->field;
+
+  Value *field_value;
+  Storage *storage = &payload->struct_->storage;
+  const Source_Range *source_range = &payload->struct_->source_range;
+  switch(storage->tag) {
+    default:
+    case Storage_Tag_Any:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm:
+    case Storage_Tag_None: {
+      panic("Internal Error: Unexpected storage type for structs");
+      field_value = 0;
+      break;
+    }
+    case Storage_Tag_Static: {
+      Storage field_storage = storage_static_internal(
+        (s8 *)storage_static_as_c_type_internal(storage, storage->byte_size) + field->offset,
+        descriptor_byte_size(field->descriptor)
+      );
+      field_value = value_make(context, field->descriptor, field_storage, *source_range);
+      break;
+    }
+    case Storage_Tag_Memory: {
+      Storage field_storage = *storage;
+      assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      field_storage.byte_size = descriptor_byte_size(field->descriptor);
+      field_storage.Memory.location.Indirect.offset += field->offset;
+      field_value = value_make(context, field->descriptor, field_storage, *source_range);
+      break;
+    }
+  }
+
+  MASS_ON_ERROR(assign(context, result_value, field_value));
+}
+
 Value *
 mass_handle_dot_operator(
   Execution_Context *context,
@@ -3803,37 +3815,56 @@ mass_handle_dot_operator(
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
   Value *lhs_value = value_any(context, lhs_range);
+  // FIXME :LazyForce
   MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) goto err;
   if (
     lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
     lhs_value->descriptor == &descriptor_scope
   ) {
-    if (value_is_symbol(rhs)) {
-      Slice field_name = value_as_symbol(rhs)->name;
-      if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
-        struct_get_field(context, &rhs_range, lhs_value, field_name, result_value);
-      } else {
-        assert(lhs_value->descriptor == &descriptor_scope);
-        const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
-        Value *lookup = scope_lookup_force(module_scope, field_name);
-        if (!lookup) {
-          scope_print_names(module_scope);
-          context_error_snprintf(
-            context, rhs_range,
-            // TODO provide module name
-            "Could not find name %"PRIslice" in the module",
-            SLICE_EXPAND_PRINTF(field_name)
-          );
-          goto err;
-        }
-        MASS_ON_ERROR(assign(context, result_value, lookup)) goto err;
-      }
-    } else {
+    if (!value_is_symbol(rhs)) {
       context_error_snprintf(
         context, rhs_range,
         "Right hand side of the . operator on structs must be an identifier"
       );
       goto err;
+    }
+    Slice field_name = value_as_symbol(rhs)->name;
+    if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
+      Descriptor_Struct_Field *field = struct_find_field_by_name(lhs_value->descriptor, field_name);
+      if (!field) {
+        context_error_snprintf(
+          context, rhs_range,
+          "Struct does not have a field `%"PRIslice"`",
+          SLICE_EXPAND_PRINTF(field_name)
+        );
+        return 0;
+      }
+
+      Mass_Field_Access_Lazy_Payload *lazy_payload =
+        allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
+      *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
+        .struct_ = lhs_value,
+        .field = field,
+      };
+
+      return mass_make_lazy_value(
+        context, lhs_range, lazy_payload, field->descriptor, mass_handle_field_access_lazy_proc
+      );
+    } else {
+      assert(lhs_value->descriptor == &descriptor_scope);
+      const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
+      Value *lookup = scope_lookup_force(module_scope, field_name);
+      if (!lookup) {
+        scope_print_names(module_scope);
+        context_error_snprintf(
+          context, rhs_range,
+          // TODO provide module name
+          "Could not find name %"PRIslice" in the module",
+          SLICE_EXPAND_PRINTF(field_name)
+        );
+        goto err;
+      }
+      MASS_ON_ERROR(assign(context, result_value, lookup)) goto err;
     }
   } else if (
     lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||

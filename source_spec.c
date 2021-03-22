@@ -1359,6 +1359,20 @@ spec("source") {
       );
     }
 
+    it("should report an error when a struct does not have a request field") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "main :: () -> () { p : Point; p.foo }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      spec_check_slice(
+        error->message,
+        slice_literal("Struct does not have a field `foo`")
+      );
+    }
+
     it("should be able to return structs while accepting other arguments") {
       fn_type_s64_to_test_128bit_struct checker = (fn_type_s64_to_test_128bit_struct)test_program_inline_source_function(
         "return_struct", &test_context,
