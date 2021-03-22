@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <inttypes.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
@@ -637,8 +636,8 @@ main(void) {
   }));
 
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
-    { "const u8 *", "filename" },
-    { "const u8 *", "function_name" },
+    { "const char *", "filename" },
+    { "const char *", "function_name" },
     { "u64", "line_number" },
   }));
 
@@ -820,6 +819,8 @@ main(void) {
     fprintf(file, "static Descriptor descriptor_compilation_pointer;\n");
     fprintf(file, "static Descriptor descriptor_void;\n");
     fprintf(file, "static Descriptor descriptor_void_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_char;\n");
+    fprintf(file, "static Descriptor descriptor_char_pointer;\n");
 
     // The type of type needs to be defined manually
     fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");

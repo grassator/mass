@@ -283,8 +283,8 @@ typedef struct Jit {
 
 bool
 pointer_equal(
-  const void **a,
-  const void **b
+  const void * const *a,
+  const void * const *b
 ) {
   return *a == *b;
 }

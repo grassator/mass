@@ -1405,7 +1405,9 @@ token_apply_macro_syntax(
   body_context.scope = expansion_scope;
 
   Value *parse_result = token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
-  value_force(context, &macro->replacement.source_range, parse_result, result_value);
+  MASS_ON_ERROR(
+    value_force(context, &macro->replacement.source_range, parse_result, result_value)
+  ) return;
 }
 
 u64
@@ -1497,7 +1499,7 @@ token_parse_macro_rewrite(
   Value_View block_tokens = value_view_from_value_array(result_tokens, &match_view.source_range);
   // FIXME :LazyProc
   Value *block_result = token_parse_block_view(context, block_tokens);
-  value_force(context, &match_view.source_range, block_result, &void_value);
+  MASS_ON_ERROR(value_force(context, &match_view.source_range, block_result, &void_value)) return 0;
 
   dyn_array_destroy(match);
   return match_length;
@@ -2074,7 +2076,7 @@ mass_normalize_import_path(
   Slice raw
 ) {
   // @Speed
-  u8 *bytes = allocator_allocate_bytes(allocator, raw.length, _Alignof(u8));
+  char *bytes = allocator_allocate_bytes(allocator, raw.length, _Alignof(char));
   Slice normalized_slashes = {
     .bytes = bytes,
     .length = raw.length
@@ -2577,7 +2579,7 @@ compile_time_eval(
       break;
     }
   }
-  MASS_ON_ERROR(assign(context, result_value, temp_result));
+  MASS_ON_ERROR(assign(context, result_value, temp_result)) return;
 }
 
 typedef struct {
@@ -2721,7 +2723,7 @@ token_handle_cast(
   assert(descriptor_is_integer(cast_to_descriptor));
   // FIXME :LazyProc
   Value *value = value_any(context, *source_range);
-  value_force(context, source_range, raw_value, value);
+  MASS_ON_ERROR(value_force(context, source_range, raw_value, value)) return 0;
 
   Value *after_cast_value = value;
   u64 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
@@ -3087,7 +3089,9 @@ token_handle_function_call(
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
     Value *parse_result = token_parse_block_no_scope(&body_context, body);
-    value_force(&body_context, &body->source_range, parse_result, result_value);
+    MASS_ON_ERROR(
+      value_force(&body_context, &body->source_range, parse_result, result_value)
+    ) goto err;
   }
 
   if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
@@ -3797,7 +3801,7 @@ mass_handle_field_access_lazy_proc(
     }
   }
 
-  MASS_ON_ERROR(assign(context, result_value, field_value));
+  MASS_ON_ERROR(assign(context, result_value, field_value)) return;
 }
 
 typedef struct {
@@ -3815,7 +3819,7 @@ mass_handle_array_access_lazy_proc(
   Value *raw_index = payload->index;
   Value *array = payload->array;
   Value *index = value_any(context, raw_index->source_range);
-  value_force(context, &raw_index->source_range, raw_index, index);
+  MASS_ON_ERROR(value_force(context, &raw_index->source_range, raw_index, index)) return;
   token_handle_array_access(context, &array->source_range, array, index, result_value);
 }
 
@@ -4016,7 +4020,9 @@ token_parse_if_expression(
     // FIXME :LazyProc
     Value *parse_result =
       token_parse_expression(context, condition_view, &condition_length, &then_pattern);
-    value_force(context, &condition_view.source_range, parse_result, condition_value);
+    MASS_ON_ERROR(
+      value_force(context, &condition_view.source_range, parse_result, condition_value)
+    ) goto err;
     peek_index += condition_length;
     if (condition_value->descriptor == &descriptor_number_literal) {
       condition_value = token_value_force_immediate_integer(
@@ -4041,7 +4047,7 @@ token_parse_if_expression(
     u64 then_length;
     // FIXME :LazyProc
     Value *parse_result = token_parse_expression(context, then_view, &then_length, &else_pattern);
-    value_force(context, &then_view.source_range, parse_result, then_value);
+    MASS_ON_ERROR(value_force(context, &then_view.source_range, parse_result, then_value)) goto err;
     peek_index += then_length;
     MASS_ON_ERROR(*context->result) goto err;
   }
@@ -4224,7 +4230,9 @@ mass_handle_block_lazy_proc(
   for (u64 i = 0; i < statement_count; ++i) {
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     Value *target = i == statement_count - 1 ? result_value : &void_value;
-    value_force(context, &lazy_statement->source_range, lazy_statement, target);
+    MASS_ON_ERROR(
+      value_force(context, &lazy_statement->source_range, lazy_statement, target)
+    ) return;
   }
 }
 
@@ -4453,17 +4461,17 @@ token_parse_explicit_return(
 
   bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
   Value *parse_result = token_parse_expression(context, rest, &(u64){0}, 0);
-  value_force(context, &rest.source_range, parse_result, fn_return);
+  MASS_ON_ERROR(value_force(context, &rest.source_range, parse_result, fn_return)) return 0;
 
   // FIXME with inline functions and explicit returns we can end up with multiple immediate
   //       values that are trying to be moved in the same return value
   if (is_any_return) {
-    Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
+    const Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
       ? &descriptor_s64
       : fn_return->descriptor;
     Value *stack_return =
       reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
-    MASS_ON_ERROR(assign(context, stack_return, fn_return)) return true;
+    MASS_ON_ERROR(assign(context, stack_return, fn_return)) return 0;
     *fn_return = *stack_return;
   }
 
@@ -4623,7 +4631,7 @@ token_parse_definition(
     .Value.value = value,
     .source_range = name_range,
   });
-  MASS_ON_ERROR(assign(context, result_value, value));
+  MASS_ON_ERROR(assign(context, result_value, value)) goto err;
 
   err:
   return peek_index;
@@ -4790,10 +4798,10 @@ token_parse_assignment(
   Value *target = value_any(context, lhs.source_range);
   if (!token_parse_definition(context, lhs, target)) {
     Value *target_parse = token_parse_expression(context, lhs, &(u64){0}, 0);
-    value_force(context, &lhs.source_range, target_parse, target);
+    MASS_ON_ERROR(value_force(context, &lhs.source_range, target_parse, target)) return 0;
   }
   Value *parse_result = token_parse_expression(context, rhs, &(u64){0}, 0);
-  value_force(context, &lhs.source_range, parse_result, target);
+  MASS_ON_ERROR(value_force(context, &lhs.source_range, parse_result, target)) return 0;
 
   return statement_length;
 }
@@ -4804,7 +4812,7 @@ token_parse(
   Value_View view
 ) {
   Value *block_result = token_parse_block_view(context, view);
-  value_force(context, &view.source_range, block_result, &void_value);
+  MASS_TRY(value_force(context, &view.source_range, block_result, &void_value));
   return *context->result;
 }
 

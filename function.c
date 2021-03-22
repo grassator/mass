@@ -800,7 +800,7 @@ maybe_constant_fold_internal(
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
   Value *imm_value = value_make(context, a->descriptor, imm_storage, *source_range);
-  MASS_ON_ERROR(assign(context, result_value, imm_value));
+  MASS_ON_ERROR(assign(context, result_value, imm_value)) return;
 }
 
 // TODO properly support unsigned numbers
@@ -1189,7 +1189,7 @@ compare(
 
   // FIXME if the result_value operand is any we should create a temp value
   Value *comparison_value = value_from_compare(context, operation, *source_range);
-  MASS_ON_ERROR(assign(context, result_value, comparison_value));
+  MASS_ON_ERROR(assign(context, result_value, comparison_value)) return;
 }
 
 void
@@ -1351,7 +1351,9 @@ ensure_compiled_function_body(
     });
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
-  value_force(&body_context, &function->body->source_range, parse_result, return_value);
+  MASS_ON_ERROR(
+    value_force(&body_context, &function->body->source_range, parse_result, return_value)
+  ) return;
 
   fn_end(program, &builder);
 
@@ -1421,11 +1423,11 @@ call_function_overload(
       //      Maybe we should do the conversion at some step before?
       source_descriptor == &descriptor_number_literal
     ) {
-      assign(context, target_arg, source_arg);
+      MASS_ON_ERROR(assign(context, target_arg, source_arg)) return;
     } else {
       // Large values are copied to the stack and passed by a reference
       Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
-      assign(context, stack_value, source_arg);
+      MASS_ON_ERROR(assign(context, stack_value, source_arg)) return;
       load_address(context, source_range, target_arg, stack_value);
     }
     Slice name = target_arg_definition->name;
@@ -1487,7 +1489,7 @@ call_function_overload(
     }
   }
 
-  MASS_ON_ERROR(assign(context, result_value, saved_result));
+  MASS_ON_ERROR(assign(context, result_value, saved_result)) return;
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
