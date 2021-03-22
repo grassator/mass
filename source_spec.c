@@ -1101,21 +1101,11 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to define and use a syntax macro matching start and end of statement") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
-        "checker", &test_context,
-        "syntax statement(\"foo\") 42;"
-        "checker :: () -> (s64) { foo := 20; foo }"
-      );
-      check(checker);
-      check(checker() == 42);
-    }
-
     it("should be able to define and use a syntax macro matching a curly brace block") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "checker", &test_context,
         "syntax statement (\"block\" {}@body) body();"
-        "checker :: () -> (s64) { block { 42 } }"
+        "checker :: () -> (s64) { result := 20; block { result = 42 }; result }"
       );
       check(checker);
       check(checker() == 42);

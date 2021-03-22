@@ -1,7 +1,9 @@
+// TODO ..@condition should be parsed as an expression instead of a wildcard
 syntax statement("if" ..@condition {}@then_branch) {
   () = if condition() then { then_branch(); () } else {}
 }
 
+// TODO ..@condition should be parsed as an expression instead of a wildcard
 syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
   () = if condition() then { then_branch(); () } else { else_branch(); () }
 }
@@ -10,9 +12,9 @@ syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
 // It is a bit unfortunate that we have to define this wrapper,
 // otherwise we match the block version of this which will fail
 // parsing (@condition() then) as an expression
-syntax statement("if" ..@condition "then" {}@then_branch "else" {}@else_branch) (
-  if condition() then then_branch() else else_branch()
-)
+//syntax statement("if" ..@condition "then" {}@then_branch "else" {}@else_branch) (
+  //if condition() then then_branch() else else_branch()
+//)
 
 syntax statement("while" ..@condition {}@body) {
   label _loop_start;

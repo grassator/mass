@@ -1412,7 +1412,7 @@ u64
 token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
-  Value *result_value,
+  Value *unused_value,
   void *payload
 ) {
   assert(payload);
@@ -1433,7 +1433,7 @@ token_parse_macro_statement(
   Array_Value_View match = dyn_array_make(Array_Value_View);
   token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
 
-  token_apply_macro_syntax(context, match, macro, result_value);
+  token_apply_macro_syntax(context, match, macro, &void_value);
   dyn_array_destroy(match);
   return match_length;
 }
@@ -1495,10 +1495,10 @@ token_parse_macro_rewrite(
     dyn_array_push(result_tokens, value);
   }
 
-  Value_View block_tokens =
-    value_view_from_value_array(result_tokens, &macro->replacement.source_range);
+  Value_View match_view = value_view_slice(&value_view, 0, match_length);
+  Value_View block_tokens = value_view_from_value_array(result_tokens, &match_view.source_range);
   Value *block_result = token_parse_block_view(context, block_tokens);
-  value_force(context, &block_tokens.source_range, block_result, result_value);
+  value_force(context, &match_view.source_range, block_result, result_value);
 
   dyn_array_destroy(match);
   return match_length;
@@ -4275,6 +4275,8 @@ token_parse_block_view(
         if (match_length) {
           if (last_result->descriptor->tag == Descriptor_Tag_Any) {
             last_result = &void_value;
+          } else if (last_result->descriptor->tag != Descriptor_Tag_Void) {
+            panic("Statement that returns a value");
           }
           dyn_array_push(lazy_statements, last_result);
           goto next_loop;
@@ -4707,15 +4709,15 @@ token_parse_definition(
 }
 
 u64
-token_parse_definitions(
+token_parse_definition_statement(
   Execution_Context *context,
   Value_View state,
-  Value *value_result,
+  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  return token_parse_definition(context, state, value_result);
+  return token_parse_definition(context, state, &void_value);
 }
 
 void
@@ -5134,7 +5136,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_goto});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definitions});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});

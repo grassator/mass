@@ -32,16 +32,14 @@ fn print(integer : s64) {
   }
 
   stack buffer u8[64]
-  const output_size = {
-    if integer < 0 then {
-      // FIXME this should work
-      //static minus_code = "-".bytes.0
-      buffer.0 = "-".bytes.0
-      integer = 0 - integer
-      count + 1
-    } else {
-      count
-    }
+  const output_size = if integer < 0 then {
+    // FIXME this should work
+    //static minus_code = "-".bytes.0
+    buffer.0 = "-".bytes.0
+    integer = 0 - integer
+    count + 1
+  } else {
+    count
   }
 
   for mut integer_index = 0 ; integer_index < count ; {
