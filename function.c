@@ -1405,15 +1405,10 @@ call_function_overload(
     if (i >= dyn_array_length(arguments)) {
       Value_View default_expression = target_arg_definition->maybe_default_expression;
       assert(default_expression.length);
-      // FIXME do not force the result on the stack
-      source_arg = reserve_stack(
-        context, context->builder, target_arg_definition->value->descriptor, *source_range
-      );
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
-      Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+      source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
       MASS_ON_ERROR(*arg_context.result) return;
-      MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, source_arg));
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
