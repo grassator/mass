@@ -1412,7 +1412,6 @@ u64
 token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
-  Value *unused_value,
   void *payload
 ) {
   assert(payload);
@@ -1450,7 +1449,6 @@ u64
 token_parse_macro_rewrite(
   Execution_Context *context,
   Value_View value_view,
-  Value *result_value,
   void *payload
 ) {
   assert(payload);
@@ -1497,8 +1495,9 @@ token_parse_macro_rewrite(
 
   Value_View match_view = value_view_slice(&value_view, 0, match_length);
   Value_View block_tokens = value_view_from_value_array(result_tokens, &match_view.source_range);
+  // FIXME :LazyProc
   Value *block_result = token_parse_block_view(context, block_tokens);
-  value_force(context, &match_view.source_range, block_result, result_value);
+  value_force(context, &match_view.source_range, block_result, &void_value);
 
   dyn_array_destroy(match);
   return match_length;
@@ -1836,7 +1835,6 @@ u64
 token_parse_exports(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -1920,7 +1918,6 @@ u64
 token_parse_operator_definition(
   Execution_Context *context,
   Value_View view,
-  Value *unused_value,
   void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2128,7 +2125,6 @@ u64
 token_parse_syntax_definition(
   Execution_Context *context,
   Value_View view,
-  Value *result_value,
   void *payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2254,7 +2250,6 @@ token_parse_syntax_definition(
   } else {
     scope_add_macro(context->scope, macro);
   }
-  MASS_ON_ERROR(assign(context, result_value, &void_value));
   return peek_index;
 
   err:
@@ -2851,7 +2846,6 @@ u64
 token_parse_constant_definitions(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4255,8 +4249,6 @@ token_parse_block_view(
       match_length = 1;
       continue;
     }
-    // TODO provide a better source range here
-    Value *last_result = value_any(context, rest.source_range);
     for (
       const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
@@ -4270,15 +4262,11 @@ token_parse_block_view(
       // to have higher precedence when parsing
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
-        match_length = matcher->proc(context, rest, last_result, matcher->payload);
+        // FIXME for the lazy evaluation we need to get a lazy value here
+        match_length = matcher->proc(context, rest, matcher->payload);
         MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
-          if (last_result->descriptor->tag == Descriptor_Tag_Any) {
-            last_result = &void_value;
-          } else if (last_result->descriptor->tag != Descriptor_Tag_Void) {
-            panic("Statement that returns a value");
-          }
-          dyn_array_push(lazy_statements, last_result);
+          dyn_array_push(lazy_statements, &void_value);
           goto next_loop;
         }
       }
@@ -4337,7 +4325,6 @@ u64
 token_parse_statement_using(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4379,7 +4366,6 @@ u64
 token_parse_statement_label(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4451,7 +4437,6 @@ u64
 token_parse_goto(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4515,7 +4500,6 @@ u64
 token_parse_explicit_return(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4610,7 +4594,6 @@ u64
 token_parse_inline_machine_code_bytes(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4712,7 +4695,6 @@ u64
 token_parse_definition_statement(
   Execution_Context *context,
   Value_View state,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4815,7 +4797,6 @@ u64
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4855,7 +4836,6 @@ u64
 token_parse_assignment(
   Execution_Context *context,
   Value_View view,
-  Value *unused_result,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;

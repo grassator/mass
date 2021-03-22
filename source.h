@@ -43,7 +43,7 @@ typedef struct {
 typedef dyn_array_type(Macro *) Array_Macro_Ptr;
 
 typedef u64 (*Token_Statement_Matcher_Proc)
-(Execution_Context *context, Value_View, Value *result_value, void *payload);
+(Execution_Context *context, Value_View, void *payload);
 typedef struct {
   Token_Statement_Matcher_Proc proc;
   void *payload;
