@@ -1209,18 +1209,18 @@ typedef enum {
 u64
 token_match_pattern(
   Value_View view,
-  Macro *macro,
+  Array_Macro_Pattern macro_pattern,
   Array_Value_View *out_match,
   Macro_Match_Mode mode
 ) {
-  u64 pattern_length = dyn_array_length(macro->pattern);
+  u64 pattern_length = dyn_array_length(macro_pattern);
   if (!pattern_length) panic("Zero-length pattern does not make sense");
 
   u64 pattern_index = 0;
   u64 view_index = 0;
 
   for (; pattern_index < pattern_length && view_index < view.length; pattern_index++) {
-    Macro_Pattern *pattern = dyn_array_get(macro->pattern, pattern_index);
+    Macro_Pattern *pattern = dyn_array_get(macro_pattern, pattern_index);
     switch(pattern->tag) {
       case Macro_Pattern_Tag_Single_Token: {
         Value *token = token_peek_match(view, view_index, &pattern->Single_Token.token_pattern);
@@ -1236,7 +1236,7 @@ token_match_pattern(
       case Macro_Pattern_Tag_Any_Token_Sequence: {
         u64 any_token_start_view_index = view_index;
         Macro_Pattern *peek = pattern_index + 1 < pattern_length
-          ? dyn_array_get(macro->pattern, pattern_index + 1)
+          ? dyn_array_get(macro_pattern, pattern_index + 1)
           : 0;
         assert(!peek || peek->tag == Macro_Pattern_Tag_Single_Token);
         for (; view_index < view.length; ++view_index) {
@@ -1264,7 +1264,7 @@ token_match_pattern(
     pattern_index != pattern_length &&
     !(
       pattern_index == pattern_length - 1 &&
-      dyn_array_last(macro->pattern)->tag == Macro_Pattern_Tag_Any_Token_Sequence
+      dyn_array_last(macro_pattern)->tag == Macro_Pattern_Tag_Any_Token_Sequence
     )
   ) {
     return 0;
@@ -1417,7 +1417,7 @@ token_parse_macro_statement(
   assert(payload);
   if (!value_view.length) return 0;
   Macro *macro = payload;
-  u64 match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Statement);
+  u64 match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Statement);
   if (!match_length) return 0;
 
   Value_View rest = value_view_rest(&value_view, match_length);
@@ -1430,7 +1430,7 @@ token_parse_macro_statement(
   }
 
   Array_Value_View match = dyn_array_make(Array_Value_View);
-  token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
+  token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
 
   token_apply_macro_syntax(context, match, macro, &void_value);
   dyn_array_destroy(match);
@@ -1454,7 +1454,7 @@ token_parse_macro_rewrite(
   assert(payload);
   if (!value_view.length) return 0;
   Macro *macro = payload;
-  u64 match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Statement);
+  u64 match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Statement);
   if (!match_length) return 0;
 
   Value_View rest = value_view_rest(&value_view, match_length);
@@ -1466,7 +1466,7 @@ token_parse_macro_rewrite(
     }
   }
   Array_Value_View match = dyn_array_make(Array_Value_View);
-  token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Statement);
+  token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
 
   // TODO precalculate required capacity
   Array_Value_Ptr result_tokens = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
@@ -1517,10 +1517,10 @@ token_parse_macros(
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
-      *match_length = token_match_pattern(value_view, macro, 0, Macro_Match_Mode_Expression);
+      *match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
       Array_Value_View match = dyn_array_make(Array_Value_View);
-      token_match_pattern(value_view, macro, &match, Macro_Match_Mode_Expression);
+      token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
 
       Value *replacement = value_any(context, value_view.source_range);
       token_apply_macro_syntax(context, match, macro, replacement);
