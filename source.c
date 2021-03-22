@@ -3816,7 +3816,7 @@ mass_handle_dot_operator(
   Source_Range lhs_range = lhs->source_range;
   Value *lhs_value = value_any(context, lhs_range);
   // FIXME :LazyForce
-  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) goto err;
+  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) return 0;
   if (
     lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
     lhs_value->descriptor == &descriptor_scope
@@ -3826,7 +3826,7 @@ mass_handle_dot_operator(
         context, rhs_range,
         "Right hand side of the . operator on structs must be an identifier"
       );
-      goto err;
+      return 0;
     }
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
@@ -3862,9 +3862,9 @@ mass_handle_dot_operator(
           "Could not find name %"PRIslice" in the module",
           SLICE_EXPAND_PRINTF(field_name)
         );
-        goto err;
+        return 0;
       }
-      MASS_ON_ERROR(assign(context, result_value, lookup)) goto err;
+      return lookup;
     }
   } else if (
     lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
@@ -3877,23 +3877,21 @@ mass_handle_dot_operator(
       Value *index = value_any(context, rhs_range);
       value_force(context, &rhs_range, rhs, index);
       token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
+      return result_value;
     } else {
       context_error_snprintf(
         context, rhs_range,
         "Right hand side of the . operator for an array must be a (expr) or a literal number"
       );
-      goto err;
+      return 0;
     }
   } else {
     context_error_snprintf(
       context, rhs_range,
       "Left hand side of the . operator must be a struct"
     );
-    goto err;
+    return 0;
   }
-
-  err:
-  return result_value;
 }
 
 Value *
