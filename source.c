@@ -2596,21 +2596,20 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-void
+Value *
 token_handle_storage_variant_of(
   Execution_Context *context,
   const Source_Range *source_range,
-  Array_Value_Ptr args,
-  Value *result_value
+  Array_Value_Ptr args
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if (dyn_array_length(args) != 1) {
     context_error_snprintf(
       context, *source_range,
       "storage_variant_of expects a single argument"
     );
-    return;
+    return 0;
   }
 
   Value *value = *dyn_array_get(args, 0);
@@ -2648,7 +2647,7 @@ token_handle_storage_variant_of(
       );
     }
   }
-  MASS_ON_ERROR(assign(context, result_value, storage_value));
+  return storage_value;
 }
 
 void
@@ -3664,8 +3663,9 @@ mass_handle_paren_operator(
     return token_process_c_struct_definition(context, args_token);
   } else if (slice_equal(target_name, slice_literal("storage_variant_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-    token_handle_storage_variant_of(context, &args_range, args, result_value);
+    Value *result = token_handle_storage_variant_of(context, &args_range, args);
     dyn_array_destroy(args);
+    return result;
   } else if (slice_equal(target_name, slice_literal("startup"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
