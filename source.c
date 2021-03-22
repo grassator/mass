@@ -3636,43 +3636,29 @@ mass_handle_paren_operator(
   Value *target = value_view_get(args_view, 0);
   Value *args_token = value_view_get(args_view, 1);
   Source_Range args_range = args_token->source_range;
-  if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("cast"))
-  ) {
+  Slice target_name = {0};
+  if (value_is_symbol(target)) {
+    target_name = value_as_symbol(target)->name;
+  }
+  if (slice_equal(target_name, slice_literal("cast"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     token_handle_cast(context, &args_range, args, result_value);
     dyn_array_destroy(args);
-  } else if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("c_string"))
-  ) {
+  } else if (slice_equal(target_name, slice_literal("c_string"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
     );
-  } else if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
-  ) {
+  } else if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
-  } else if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("storage_variant_of"))
-  ) {
+  } else if (slice_equal(target_name, slice_literal("storage_variant_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     token_handle_storage_variant_of(context, &args_range, args, result_value);
     dyn_array_destroy(args);
-  } else if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("startup"))
-  ) {
+  } else if (slice_equal(target_name, slice_literal("startup"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
-  } else if (
-    value_is_symbol(target) &&
-    slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
-  ) {
+  } else if (slice_equal(target_name, slice_literal("address_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     if (dyn_array_length(args) != 1) {
       context_error_snprintf(context, args_range, "address_of expects a single argument");
