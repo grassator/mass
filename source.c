@@ -3602,6 +3602,30 @@ mass_handle_arrow_operator(
   return function_value;
 }
 
+void
+mass_handle_startup_call_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Value *args_token
+) {
+  Value *startup_function = value_any(context, args_token->source_range);
+  token_parse_expression(context, value_as_group(args_token)->children, startup_function, 0);
+  if (
+    !startup_function ||
+    startup_function->descriptor->tag != Descriptor_Tag_Function ||
+    dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
+    startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
+  ) {
+    context_error_snprintf(
+      context, args_token->source_range,
+      "`startup` expects a () -> () {...} function as an argument"
+    );
+  } else {
+    ensure_compiled_function_body(context, startup_function);
+    dyn_array_push(context->program->startup_functions, startup_function);
+  }
+}
+
 Value *
 mass_handle_paren_operator(
   Execution_Context *context,
@@ -3642,24 +3666,9 @@ mass_handle_paren_operator(
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("startup"))
   ) {
-    Value *startup_function = value_any(context, args_token->source_range);
-    token_parse_expression(
-      context, value_as_group(args_token)->children, startup_function, 0
+    return mass_make_lazy_value(
+      context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
-    if (
-      !startup_function ||
-      startup_function->descriptor->tag != Descriptor_Tag_Function ||
-      dyn_array_length(startup_function->descriptor->Function.info.arguments) ||
-      startup_function->descriptor->Function.info.returns.descriptor != &descriptor_void
-    ) {
-      context_error_snprintf(
-        context, args_range, "`startup` expects a () -> () {...} function as an argument"
-      );
-      goto err;
-    }
-    ensure_compiled_function_body(context, startup_function);
-    dyn_array_push(context->program->startup_functions, startup_function);
-    return &void_value;
   } else if (
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
