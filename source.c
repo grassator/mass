@@ -3612,7 +3612,6 @@ mass_handle_paren_operator(
   Value *target = value_view_get(args_view, 0);
   Value *args_token = value_view_get(args_view, 1);
   Source_Range args_range = args_token->source_range;
-  // TODO turn `cast` into a compile-time function call / macro
   if (
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("cast"))
@@ -3629,10 +3628,7 @@ mass_handle_paren_operator(
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
   ) {
-    Value *result_token = token_process_c_struct_definition(context, args_token);
-    MASS_ON_ERROR(value_force(
-      context, &args_token->source_range, result_token, result_value
-    )) goto err;
+    return token_process_c_struct_definition(context, args_token);
   } else if (
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("storage_variant_of"))
@@ -3661,7 +3657,7 @@ mass_handle_paren_operator(
     }
     ensure_compiled_function_body(context, startup_function);
     dyn_array_push(context->program->startup_functions, startup_function);
-    MASS_ON_ERROR(assign(context, result_value, &void_value)) goto err;
+    return &void_value;
   } else if (
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("address_of"))
@@ -3686,15 +3682,13 @@ mass_handle_paren_operator(
 
       Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
       Storage pointer_storage = data_label32(label_index, byte_size);
-      Value *pointer = value_make(
-        context, descriptor, pointer_storage, pointee->source_range
-      );
+      Value *pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
       dyn_array_push(runtime_program->relocations, (Relocation) {
         .patch_at = pointer_storage,
         .address_of = pointee->storage,
       });
       pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
-      MASS_ON_ERROR(assign(context, result_value, pointer)) goto err;
+      return pointer;
     } else { // run time
       load_address(context, &args_range, result_value, pointee);
     }
