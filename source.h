@@ -124,18 +124,16 @@ value_or_lazy_value_descriptor(
   const Value *value
 );
 
-void
+PRELUDE_NO_DISCARD Value *
 token_parse_block_no_scope(
   Execution_Context *context,
-  Value *block,
-  Value *block_result_value
+  Value *block
 );
 
-void
+PRELUDE_NO_DISCARD Value *
 token_parse_block(
   Execution_Context *program,
-  Value *block,
-  Value *result_value
+  Value *block
 );
 
 u64

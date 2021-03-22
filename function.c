@@ -1350,7 +1350,8 @@ ensure_compiled_function_body(
       .Value.value = return_value,
     });
   }
-  token_parse_block_no_scope(&body_context, function->body, return_value);
+  Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
+  value_force(&body_context, &function->body->source_range, parse_result, return_value);
 
   fn_end(program, &builder);
 

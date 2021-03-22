@@ -1440,11 +1440,10 @@ token_parse_macro_statement(
 
 hash_map_slice_template(Raw_Macro_Map, Value_View)
 
-void
+Value *
 token_parse_block_view(
   Execution_Context *context,
-  Value_View children_view,
-  Value *block_result_value
+  Value_View children_view
 );
 
 u64
@@ -1498,7 +1497,8 @@ token_parse_macro_rewrite(
 
   Value_View block_tokens =
     value_view_from_value_array(result_tokens, &macro->replacement.source_range);
-  token_parse_block_view(context, block_tokens, result_value);
+  Value *block_result = token_parse_block_view(context, block_tokens);
+  value_force(context, &block_tokens.source_range, block_result, result_value);
 
   dyn_array_destroy(match);
   return match_length;
@@ -1702,10 +1702,7 @@ token_parse_single(
         return token_parse_expression(context, group->children, &(u64){0}, 0);
       }
       case Group_Tag_Curly: {
-        // FIXME :LazyProc
-        Value *result_value = value_any(context, *source_range);
-        token_parse_block(context, value, result_value);
-        return result_value;
+        return token_parse_block(context, value);
       }
       case Group_Tag_Square: {
         panic("TODO");
@@ -1804,14 +1801,13 @@ scope_add_macro(
   dyn_array_push(scope->macros, macro);
 }
 
-void
-token_handle_user_defined_operator(
+Value *
+token_handle_user_defined_operator_proc(
   Execution_Context *context,
   Value_View args,
-  Value *result_value,
   User_Defined_Operator *operator
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   // We make a nested scope based on the original scope
   // instead of current scope for hygiene reasons.
@@ -1823,7 +1819,7 @@ token_handle_user_defined_operator(
     Value *arg = value_view_get(args, i);
     Source_Range source_range = arg->source_range;
     Value *arg_value = value_any(context, source_range);
-    MASS_ON_ERROR(value_force(context, &source_range, arg, arg_value)) return;
+    MASS_ON_ERROR(value_force(context, &source_range, arg, arg_value)) return 0;
     scope_define(body_scope, arg_name, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = arg_value,
@@ -1833,18 +1829,7 @@ token_handle_user_defined_operator(
 
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
-  token_parse_block(&body_context, operator->body, result_value);
-}
-
-static inline Value *
-token_handle_user_defined_operator_proc(
-  Execution_Context *context,
-  Value_View args,
-  void *payload
-) {
-  Value *result_value = value_any(context, args.source_range);
-  token_handle_user_defined_operator(context, args, result_value, payload);
-  return result_value;
+  return token_parse_block(&body_context, operator->body);
 }
 
 u64
@@ -2511,16 +2496,17 @@ compile_time_eval(
     context->result = eval_context.result;
     return;
   }
-  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
-    if (result_descriptor->tag == Descriptor_Tag_Function) {
-      // It is only allowed to to pass through funciton definitions not compiled ones
-      assert(expression_result_value->storage.tag == Storage_Tag_None);
+    MASS_ON_ERROR(value_force(context, &view.source_range, expression_result_value, result_value)) {
+      return;
     }
-    MASS_ON_ERROR(value_force(context, &view.source_range, expression_result_value, result_value));
+    if (result_value->descriptor->tag == Descriptor_Tag_Function) {
+      // It is only allowed to to pass through funciton definitions not compiled ones
+      assert(result_value->storage.tag == Storage_Tag_None);
+    }
     return;
   }
 
@@ -3106,7 +3092,8 @@ token_handle_function_call(
   {
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
-    token_parse_block_no_scope(&body_context, body, result_value);
+    Value *parse_result = token_parse_block_no_scope(&body_context, body);
+    value_force(&body_context, &body->source_range, parse_result, result_value);
   }
 
   if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
@@ -4233,32 +4220,43 @@ token_parse_expression(
 }
 
 void
+mass_handle_block_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  void *raw_payload
+) {
+  Array_Value_Ptr lazy_statements = *(Array_Value_Ptr *)&raw_payload;
+  u64 statement_count = dyn_array_length(lazy_statements);
+  for (u64 i = 0; i < statement_count; ++i) {
+    Value *lazy_statement = *dyn_array_get(lazy_statements, i);
+    Value *target = i == statement_count - 1 ? result_value : &void_value;
+    value_force(context, &lazy_statement->source_range, lazy_statement, target);
+  }
+}
+
+Value *
 token_parse_block_view(
   Execution_Context *context,
-  Value_View children_view,
-  Value *block_result_value
+  Value_View children_view
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if (!children_view.length) {
-    MASS_ON_ERROR(assign(context, block_result_value, &void_value));
-    return;
-  }
+  if (!children_view.length) return &void_value;
+
+  Array_Value_Ptr lazy_statements = dyn_array_make(Array_Value_Ptr);
 
   u64 match_length = 0;
-  Value *last_result = 0;
   // FIXME deal with terminated vs unterminated statements
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
-    MASS_ON_ERROR(*context->result) return;
+    MASS_ON_ERROR(*context->result) return 0;
     Value_View rest = value_view_rest(&children_view, start_index);
-
-    // TODO provide a better source range here
-    last_result = value_any(context, rest.source_range);
     // Skipping over empty statements
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
       match_length = 1;
       continue;
     }
+    // TODO provide a better source range here
+    Value *last_result = value_any(context, rest.source_range);
     for (
       const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
@@ -4273,23 +4271,22 @@ token_parse_block_view(
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
         match_length = matcher->proc(context, rest, last_result, matcher->payload);
-        MASS_ON_ERROR(*context->result) {
-            return;
-        }
+        MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
           if (last_result->descriptor->tag == Descriptor_Tag_Any) {
-            MASS_ON_ERROR(assign(context, last_result, &void_value));
+            last_result = &void_value;
           }
-          goto check_match;
+          dyn_array_push(lazy_statements, last_result);
+          goto next_loop;
         }
       }
     }
 
-    // FIXME :LazyProc
-    Value *parse_result = token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
-    value_force(context, &rest.source_range, parse_result, last_result);
+    Value *parse_result =
+      token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
+    MASS_ON_ERROR(*context->result) return 0;
+    dyn_array_push(lazy_statements, parse_result);
 
-    check_match:
     if (!match_length) {
       Value *token = value_view_get(rest, 0);
       Slice source = source_from_source_range(&token->source_range);
@@ -4298,41 +4295,40 @@ token_parse_block_view(
         "Can not parse statement. Unexpected token %"PRIslice".",
         SLICE_EXPAND_PRINTF(source)
       );
-      return;
+      return 0;
     }
+    next_loop:;
   }
 
-  // TODO This is not optimal as we might generate extra temp values
-  MASS_ON_ERROR(assign(context, block_result_value, last_result));
+  Value *last_result = *dyn_array_last(lazy_statements);
+  const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
+  void *payload = *(void **)&lazy_statements;
+
+  return mass_make_lazy_value(
+    context, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
+  );
 }
 
-void
+Value *
 token_parse_block_no_scope(
   Execution_Context *context,
-  Value *block,
-  Value *block_result_value
+  Value *block
 ) {
   const Group *group = value_as_group(block);
   assert(group->tag == Group_Tag_Curly);
 
-  if (!group->children.length) {
-    MASS_ON_ERROR(assign(context, block_result_value, &void_value));
-    return;
-  }
-
-  token_parse_block_view(context, group->children, block_result_value);
+  return token_parse_block_view(context, group->children);
 }
 
-void
+Value *
 token_parse_block(
   Execution_Context *context,
-  Value *block,
-  Value *block_result_value
+  Value *block
 ) {
   Execution_Context body_context = *context;
   Scope *block_scope = scope_make(context->allocator, context->scope);
   body_context.scope = block_scope;
-  token_parse_block_no_scope(&body_context, block, block_result_value);
+  return token_parse_block_no_scope(&body_context, block);
 }
 
 u64
@@ -4887,7 +4883,8 @@ token_parse(
   Execution_Context *context,
   Value_View view
 ) {
-  token_parse_block_view(context, view, &void_value);
+  Value *block_result = token_parse_block_view(context, view);
+  value_force(context, &view.source_range, block_result, &void_value);
   return *context->result;
 }
 
