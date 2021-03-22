@@ -1259,8 +1259,6 @@ spec("source") {
         "main :: (status: s32) -> () { x : s32; goto x; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("x is not a label"));
     }
   }
 

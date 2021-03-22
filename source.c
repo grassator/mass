@@ -4434,69 +4434,6 @@ token_parse_statement_label(
 }
 
 u64
-token_parse_goto(
-  Execution_Context *context,
-  Value_View view,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("goto"));
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
-
-  if (rest.length == 0) {
-    context_error_snprintf(
-      context, keyword->source_range,
-      "`goto` keyword must be followed by an identifier"
-    );
-    goto err;
-  }
-
-  if (rest.length > 1) {
-    context_error_snprintf(
-      context, value_view_get(rest, 1)->source_range,
-      "Unexpected token"
-    );
-    goto err;
-  }
-  Value *symbol = value_view_get(rest, 0);
-  if (!value_is_symbol(symbol)) {
-    context_error_snprintf(
-      context, symbol->source_range,
-      "`goto` keyword must be followed by an identifier"
-    );
-    goto err;
-  }
-
-  Slice name = value_as_symbol(symbol)->name;
-  Scope_Entry *scope_entry = scope_lookup(context->scope, name);
-  Value *value = scope_entry_force(scope_entry);
-
-  if (
-    !value ||
-    value->descriptor != &descriptor_void ||
-    value->storage.tag != Storage_Tag_Memory ||
-    value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
-  ) {
-    context_error_snprintf(
-      context, keyword->source_range,
-      "%"PRIslice" is not a label",
-      SLICE_EXPAND_PRINTF(name)
-    );
-    goto err;
-  }
-
-  push_instruction(
-    &context->builder->code_block.instructions, keyword->source_range,
-    (Instruction) {.assembly = {jmp, {value->storage, 0, 0}}}
-  );
-
-  err:
-  return peek_index;
-}
-
-u64
 token_parse_explicit_return(
   Execution_Context *context,
   Value_View view,
@@ -4645,6 +4582,7 @@ token_parse_inline_machine_code_bytes(
       value = token_value_force_immediate_integer(
         context, &value->source_range, value, &descriptor_u8
       );
+      MASS_ON_ERROR(*context->result) goto err;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     }
@@ -5114,7 +5052,6 @@ scope_define_builtins(
       dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
 
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_goto});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
