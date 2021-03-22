@@ -2651,8 +2651,8 @@ token_handle_storage_variant_of(
 void
 token_handle_c_string(
   Execution_Context *context,
-  Value *args_token,
-  Value *result_value
+  Value *result_value,
+  Value *args_token
 ) {
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   if (dyn_array_length(args) != 1) goto err;
@@ -3623,7 +3623,9 @@ mass_handle_paren_operator(
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("c_string"))
   ) {
-    token_handle_c_string(context, args_token, result_value);
+    return mass_make_lazy_value(
+      context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
+    );
   } else if (
     value_is_symbol(target) &&
     slice_equal(value_as_symbol(target)->name, slice_literal("c_struct"))
