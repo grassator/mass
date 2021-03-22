@@ -1704,6 +1704,9 @@ value_force(
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
     lazy->proc(&lazy->context, result_value, lazy->payload);
+    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
+    // TODO is there a better way to cache the result?
+    *value = *result_value;
     return *context->result;
   } else if (value_is_group(value)) {
     const Group *group = value_as_group(value);
