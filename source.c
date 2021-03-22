@@ -3713,29 +3713,23 @@ mass_handle_at_operator(
   Value_View args_view,
   void *unused_payload
 ) {
-  Value *result_value = value_any(context, args_view.source_range);
   Value *body = value_view_get(args_view, 0);
   Source_Range body_range = body->source_range;
   if (value_match_symbol(body, slice_literal("scope"))) {
-    Value *scope_value =
-      value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
-    MASS_ON_ERROR(assign(context, result_value, scope_value)) goto err;
+    return value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
   } else if (value_match_symbol(body, slice_literal("context"))) {
-    Value *context_value =
-      value_make(context, &descriptor_execution_context, storage_static(context), body_range);
-    MASS_ON_ERROR(assign(context, result_value, context_value)) goto err;
+    return value_make(context, &descriptor_execution_context, storage_static(context), body_range);
   } else if (value_match_group(body, Group_Tag_Paren)) {
+    Value *result_value = value_any(context, args_view.source_range);
     compile_time_eval(context, value_as_group(body)->children, result_value);
+    return result_value;
   } else {
     context_error_snprintf(
       context, body_range,
       "@ operator must be followed by a parenthesized expression"
     );
-    goto err;
+    return 0;
   }
-
-  err:
-  return result_value;
 }
 
 Descriptor_Struct_Field *
