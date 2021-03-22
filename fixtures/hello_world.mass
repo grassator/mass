@@ -17,6 +17,6 @@ startup(() -> () {
 
 main :: () -> () {
   message :: "Hello, World!"
-  WriteFile(cached_stdout_handle, c_string("Hello, World!"), message.length, 0, 0);
+  WriteFile(cached_stdout_handle, c_string("Hello, World!"), cast(s32, message.length), 0, 0);
   ExitProcess(0)
 }

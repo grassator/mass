@@ -392,14 +392,6 @@ assign(
   return *context->result;
 }
 
-PRELUDE_NO_DISCARD Mass_Result
-value_force(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *token,
-  Value *result_value
-);
-
 Value *
 scope_entry_force(
   Scope_Entry *entry
@@ -2454,6 +2446,17 @@ get_new_epoch() {
   return epoch++;
 }
 
+const Descriptor *
+value_or_lazy_value_descriptor(
+  const Value *value
+) {
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    return lazy->descriptor;
+  }
+  return value->descriptor;
+}
+
 void
 compile_time_eval(
   Execution_Context *context,
@@ -2722,10 +2725,14 @@ token_handle_cast(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   Value *type = *dyn_array_get(args, 0);
-  Value *value = *dyn_array_get(args, 1);
+  Value *raw_value = *dyn_array_get(args, 1);
   const Descriptor *cast_to_descriptor = value_ensure_type(context, type, *source_range);
 
   assert(descriptor_is_integer(cast_to_descriptor));
+  // FIXME :LazyProc
+  Value *value = value_any(context, *source_range);
+  value_force(context, source_range, raw_value, value);
+
   Value *after_cast_value = value;
   u64 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
   u64 original_byte_size = descriptor_byte_size(value->descriptor);
@@ -2734,8 +2741,15 @@ token_handle_cast(
       context, source_range, value, cast_to_descriptor
     );
   } else if (cast_to_byte_size < original_byte_size) {
-    after_cast_value = value_make(context, cast_to_descriptor, value->storage, value->source_range);
-    after_cast_value->storage.byte_size = cast_to_byte_size;
+    after_cast_value = value_make(context, cast_to_descriptor, value->storage, *source_range);
+    if (value->storage.tag == Storage_Tag_Static) {
+      after_cast_value->epoch = value->epoch;
+      // TODO this is quite awkward and unsafe. There is probably is a better way
+      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
+      after_cast_value->storage = storage_static_internal(memory, cast_to_byte_size);
+    } else {
+      after_cast_value->storage.byte_size = cast_to_byte_size;
+    }
   }
   return after_cast_value;
 }
@@ -3140,17 +3154,6 @@ signed_integer_next_size_descriptor(
     panic("Unexpected iteger size");
     return 0;
   }
-}
-
-const Descriptor *
-value_or_lazy_value_descriptor(
-  const Value *value
-) {
-  if (value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    return lazy->descriptor;
-  }
-  return value->descriptor;
 }
 
 const Descriptor *

@@ -1608,68 +1608,52 @@ value_number_literal_cast_to(
 }
 
 bool
+same_type_or_can_implicitly_move_cast(
+  const Descriptor *target,
+  const Descriptor *source
+) {
+  if (same_type(target, source)) return true;
+  if (target == source) return true;
+  if (target->tag != source->tag) return false;
+  if (descriptor_is_integer(source) && descriptor_is_integer(target)) {
+    if (
+      descriptor_is_unsigned_integer(source) &&
+      descriptor_byte_size(target) > descriptor_byte_size(source)
+    ) {
+      return true;
+    } else if (
+      descriptor_is_signed_integer(target) &&
+      descriptor_byte_size(target) > descriptor_byte_size(source)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool
 same_value_type_or_can_implicitly_move_cast(
   Value *target,
   Value *source
 ) {
-  if (same_value_type(target, source)) return true;
-  // Allow literal `0` to be cast to a pointer
-  if (
-    target->descriptor->tag == Descriptor_Tag_Pointer &&
-    source->descriptor == &descriptor_number_literal
-  ) {
-    assert(source->storage.tag == Storage_Tag_Static);
-    assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
-    Number_Literal *literal = source->storage.Static.memory.Heap.pointer;
-    return literal->bits == 0;
-  }
   if (source->descriptor == &descriptor_number_literal) {
-    Literal_Cast_Result cast_result =
-      value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
-    return cast_result == Literal_Cast_Result_Success;
-  }
-  if (target->descriptor == source->descriptor) return true;
-  if (target->descriptor->tag != source->descriptor->tag) return false;
-  if (descriptor_is_integer(source->descriptor) && descriptor_is_integer(target->descriptor)) {
-    if (
-      descriptor_is_unsigned_integer(source->descriptor) &&
-      descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)
-    ) {
-      return true;
-    } else if (
-      descriptor_is_signed_integer(target->descriptor) &&
-      descriptor_byte_size(target->descriptor) > descriptor_byte_size(source->descriptor)
-    ) {
-      return true;
-    } else if (source->storage.tag == Storage_Tag_Static) {
-      #define ACCEPT_IF_INTEGER_IMMEDIATE_FITS(_SOURCE_INTEGER_, _SOURCE_TYPE_, _TARGET_TYPE_)\
-        if (target->descriptor == &descriptor_##_TARGET_TYPE_) {\
-          return _SOURCE_TYPE_##_fits_into_##_TARGET_TYPE_(_SOURCE_INTEGER_);\
-        }
-      if (descriptor_is_signed_integer(source->descriptor)) {
-        s64 source_integer = storage_static_value_up_to_s64(&source->storage);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s8);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s16);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, s32);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u8);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u16);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u32);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, s64, u64);
-      } else {
-        assert(descriptor_is_unsigned_integer(source->descriptor));
-        u64 source_integer = storage_static_value_up_to_u64(&source->storage);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s8);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s16);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s32);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, s64);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u8);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u16);
-        ACCEPT_IF_INTEGER_IMMEDIATE_FITS(source_integer, u64, u32);
-      }
-      #undef ACCEPT_IF_INTEGER_IMMEDIATE_FITS
+    // Allow literal `0` to be cast to a pointer
+    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+      assert(source->storage.tag == Storage_Tag_Static);
+      assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
+      Number_Literal *literal = source->storage.Static.memory.Heap.pointer;
+      return literal->bits == 0;
+    } else {
+      Literal_Cast_Result cast_result =
+        value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
+      return cast_result == Literal_Cast_Result_Success;
     }
   }
-  return false;
+
+  return same_type_or_can_implicitly_move_cast(
+    value_or_lazy_value_descriptor(target),
+    value_or_lazy_value_descriptor(source)
+  );
 }
 
 

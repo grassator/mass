@@ -111,6 +111,19 @@ token_parse_expression(
   const Token_Pattern *end_pattern
 );
 
+PRELUDE_NO_DISCARD Mass_Result
+value_force(
+  Execution_Context *context,
+  const Source_Range *source_range,
+  Value *token,
+  Value *result_value
+);
+
+const Descriptor *
+value_or_lazy_value_descriptor(
+  const Value *value
+);
+
 void
 token_parse_block_no_scope(
   Execution_Context *context,
