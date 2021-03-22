@@ -697,7 +697,6 @@ main(void) {
 
   push_type(type_function("Lazy_Value_Proc", "void", (Argument[]){
     { "Execution_Context *", "context" },
-    { "Value_View", "arguments" },
     { "Value *", "result_value" },
     { "void *", "payload" },
   }));
@@ -705,7 +704,6 @@ main(void) {
   push_type(type_struct("Lazy_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
     { "const Descriptor *", "descriptor" },
-    { "Value_View", "arguments" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },
   }));

@@ -1701,7 +1701,11 @@ value_force(
   MASS_TRY(*context->result);
   if (!value) return *context->result;
 
-  if (value_is_group(value)) {
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    lazy->proc(&lazy->context, result_value, lazy->payload);
+    return *context->result;
+  } else if (value_is_group(value)) {
     const Group *group = value_as_group(value);
     switch(group->tag) {
       case Group_Tag_Paren: {
@@ -3411,10 +3415,10 @@ token_handle_array_access(
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
-static Value *
+static inline Value *
 mass_make_lazy_value(
   Execution_Context *context,
-  Value_View arguments,
+  Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
   Lazy_Value_Proc proc
@@ -3422,12 +3426,11 @@ mass_make_lazy_value(
   Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
   *lazy = (Lazy_Value) {
     .context = *context,
-    .arguments = arguments,
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
   };
-  return value_make(context, &descriptor_lazy_value, storage_static(lazy), arguments.source_range);
+  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
 }
 
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
@@ -3467,7 +3470,6 @@ typedef struct {
 void
 mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
-  Value_View args_view,
   Value *result_value,
   void *raw_payload
 ) {
@@ -3549,21 +3551,26 @@ mass_handle_arithmetic_operation(
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, lhs_value, rhs_value);
   return mass_make_lazy_value(
-    context, arguments, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+    context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
   );
 }
+
+typedef struct {
+  Compare_Type compare_type;
+  Value *lhs;
+  Value *rhs;
+} Mass_Comparison_Operator_Lazy_Payload;
 
 void
 mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
-  Value_View args_view,
   Value *result_value,
-  void *payload
+  void *raw_payload
 ) {
-  Compare_Type compare_type = (Compare_Type)(u64)payload;
-
-  Value *lhs = value_view_get(args_view, 0);
-  Value *rhs = value_view_get(args_view, 1);
+  Mass_Comparison_Operator_Lazy_Payload *payload = raw_payload;
+  Compare_Type compare_type = payload->compare_type;
+  Value *lhs = payload->lhs;
+  Value *rhs = payload->rhs;
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
 
@@ -3620,10 +3627,17 @@ static inline Value *
 mass_handle_comparison_operation(
   Execution_Context *context,
   Value_View arguments,
-  void *payload
+  void *raw_payload
 ) {
+  Mass_Comparison_Operator_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
+  *payload = (Mass_Comparison_Operator_Lazy_Payload) {
+    .lhs = value_view_get(arguments, 0),
+    .rhs = value_view_get(arguments, 1),
+    .compare_type = (Compare_Type)(u64)raw_payload,
+  };
   return mass_make_lazy_value(
-    context, arguments, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
+    context, arguments.source_range, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
   );
 }
 
@@ -3925,13 +3939,7 @@ token_dispatch_operator(
   Value *result_value = operator_entry->scope_entry.handler(
     context, args_view, operator_entry->scope_entry.handler_payload
   );
-
   MASS_ON_ERROR(*context->result) return;
-  if (result_value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&result_value->storage, Lazy_Value);
-    result_value = value_any(context, result_value->source_range);
-    lazy->proc(&lazy->context, lazy->arguments, result_value, lazy->payload);
-  }
 
   // Pop off current arguments and push a new one
   dyn_array_splice_raw(*stack, start_index, argument_count, &result_value, 1);

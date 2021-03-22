@@ -132,7 +132,7 @@ typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
 typedef void (*Lazy_Value_Proc)
-  (Execution_Context * context, Value_View arguments, Value * result_value, void * payload);
+  (Execution_Context * context, Value * result_value, void * payload);
 
 typedef struct Lazy_Value Lazy_Value;
 typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
@@ -564,7 +564,6 @@ typedef dyn_array_type(Value) Array_Value;
 typedef struct Lazy_Value {
   Execution_Context context;
   const Descriptor * descriptor;
-  Value_View arguments;
   Lazy_Value_Proc proc;
   void * payload;
 } Lazy_Value;
@@ -1307,11 +1306,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,
     .name = slice_literal_fields("descriptor"),
     .descriptor = &descriptor_descriptor_pointer,
     .offset = offsetof(Lazy_Value, descriptor),
-  },
-  {
-    .name = slice_literal_fields("arguments"),
-    .descriptor = &descriptor_value_view,
-    .offset = offsetof(Lazy_Value, arguments),
   },
   {
     .name = slice_literal_fields("proc"),
