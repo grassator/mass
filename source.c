@@ -3802,13 +3802,31 @@ mass_handle_field_access_lazy_proc(
   MASS_ON_ERROR(assign(context, result_value, field_value));
 }
 
+typedef struct {
+  Value *array;
+  Value *index;
+} Mass_Array_Access_Lazy_Payload;
+
+void
+mass_handle_array_access_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  void *raw_payload
+) {
+  Mass_Array_Access_Lazy_Payload *payload = raw_payload;
+  Value *raw_index = payload->index;
+  Value *array = payload->array;
+  Value *index = value_any(context, raw_index->source_range);
+  value_force(context, &raw_index->source_range, raw_index, index);
+  token_handle_array_access(context, &array->source_range, array, index, result_value);
+}
+
 Value *
 mass_handle_dot_operator(
   Execution_Context *context,
   Value_View args_view,
   void *unused_payload
 ) {
-  Value *result_value = value_any(context, args_view.source_range);
   Value *lhs = value_view_get(args_view, 0);
   Value *rhs = value_view_get(args_view, 1);
 
@@ -3874,10 +3892,17 @@ mass_handle_dot_operator(
       value_match_group(rhs, Group_Tag_Paren) ||
       value_is_number_literal(rhs)
     ) {
-      Value *index = value_any(context, rhs_range);
-      value_force(context, &rhs_range, rhs, index);
-      token_handle_array_access(context, &lhs_range, lhs_value, index, result_value);
-      return result_value;
+      const Descriptor *descriptor = lhs_value->descriptor;
+      if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
+        descriptor = descriptor->Fixed_Size_Array.item;
+      }
+      Mass_Array_Access_Lazy_Payload *lazy_payload =
+        allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
+      *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs_value, .index = rhs };
+
+      return mass_make_lazy_value(
+        context, lhs_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
+      );
     } else {
       context_error_snprintf(
         context, rhs_range,
