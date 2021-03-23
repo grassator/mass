@@ -2979,13 +2979,14 @@ token_parse_constant_definitions(
 typedef struct {
   Array_Value_Ptr args;
   Value *overload;
-} Mass_Macro_Call_Lazy_Payload;
+  Source_Range source_range;
+} Mass_Function_Call_Lazy_Payload;
 
 void
 call_function_macro(
   Execution_Context *context,
   Value *result_value,
-  Mass_Macro_Call_Lazy_Payload *payload
+  Mass_Function_Call_Lazy_Payload *payload
 ) {
   Value *overload = payload->overload;
   Array_Value_Ptr args = payload->args;
@@ -3071,11 +3072,13 @@ call_function_macro(
 void
 call_function_overload(
   Execution_Context *context,
-  const Source_Range *source_range,
-  Value *to_call,
-  Array_Value_Ptr arguments,
-  Value *result_value
+  Value *result_value,
+  Mass_Function_Call_Lazy_Payload *payload
 ) {
+  const Source_Range *source_range = &payload->source_range;
+  Value *to_call = payload->overload;
+  Array_Value_Ptr arguments = payload->args;
+
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
@@ -3312,18 +3315,19 @@ token_handle_function_call(
   Value *overload = value_any(context, source_range);
   MASS_ON_ERROR(value_force(context, &source_range, match.value, overload)) return;
 
-  Mass_Macro_Call_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Macro_Call_Lazy_Payload);
-  *payload = (Mass_Macro_Call_Lazy_Payload) {
+  Mass_Function_Call_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
+  *payload = (Mass_Function_Call_Lazy_Payload) {
     .overload = overload,
     .args = args,
+    .source_range = source_range,
   };
 
   const Function_Info *function = &overload->descriptor->Function.info;
-  if (!(function->flags & Descriptor_Function_Flags_Macro)) {
-    call_function_overload(context, &source_range, overload, args, result_value);
-  } else {
+  if (function->flags & Descriptor_Function_Flags_Macro) {
     call_function_macro(context, result_value, payload);
+  } else {
+    call_function_overload(context, result_value, payload);
   }
 
   err:
