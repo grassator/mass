@@ -190,18 +190,24 @@ scope_print_names(
 }
 
 Scope_Entry *
+scope_lookup_shallow(
+  const Scope *scope,
+  Slice name
+) {
+  if (!scope->map) return 0;
+  Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
+  if (!entry_pointer) return 0;
+  return *entry_pointer;
+}
+
+Scope_Entry *
 scope_lookup(
   const Scope *scope,
   Slice name
 ) {
   for (; scope; scope = scope->parent) {
-    if (!scope->map) continue;
-    Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
-    if (!entry_pointer) continue;
-    Scope_Entry *entry = *entry_pointer;
-    if (entry) {
-      return entry;
-    }
+    Scope_Entry *entry = scope_lookup_shallow(scope, name);
+    if (entry) return entry;
   }
   return 0;
 }
@@ -1919,19 +1925,6 @@ token_parse_exports(
   return peek_index;
 }
 
-static inline Slice
-operator_fixity_to_lowercase_slice(
-  Operator_Fixity fixity
-) {
-  switch(fixity) {
-    case Operator_Fixity_Infix: return slice_literal("an infix");
-    case Operator_Fixity_Prefix: return slice_literal("a prefix");
-    case Operator_Fixity_Postfix: return slice_literal("a postfix");
-  }
-  panic("Unexpected fixity");
-  return slice_literal("");
-}
-
 u64
 token_parse_operator_definition(
   Execution_Context *context,
@@ -1941,7 +1934,7 @@ token_parse_operator_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  User_Defined_Operator *operator = 0;
+  User_Defined_Operator *user_defined_operator = 0;
 
   u64 peek_index = 0;
   Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("operator"));
@@ -1991,8 +1984,8 @@ token_parse_operator_definition(
 
   Value_View definition = value_as_group(pattern_token)->children;
 
-  operator = allocator_allocate(context->allocator, User_Defined_Operator);
-  *operator = (User_Defined_Operator) {
+  user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
+  *user_defined_operator = (User_Defined_Operator) {
     .body = body_token,
     .scope = context->scope,
   };
@@ -2005,9 +1998,9 @@ token_parse_operator_definition(
     Value *first =  value_view_get(definition, 0);
     bool is_first_operator_like =
       value_is_symbol(first) && value_as_symbol(first)->type == Symbol_Type_Operator_Like;
-    operator->fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
-    operator->argument_count = 1;
-    if (operator->fixity == Operator_Fixity_Prefix) {
+    user_defined_operator->fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
+    user_defined_operator->argument_count = 1;
+    if (user_defined_operator->fixity == Operator_Fixity_Prefix) {
       operator_token = value_view_get(definition, 0);
       arguments[0] = value_view_get(definition, 1);
     } else {
@@ -2015,8 +2008,8 @@ token_parse_operator_definition(
       arguments[0] = value_view_get(definition, 0);
     }
   } else if (definition.length == 3) { // infix
-    operator->argument_count = 2;
-    operator->fixity = Operator_Fixity_Infix;
+    user_defined_operator->argument_count = 2;
+    user_defined_operator->fixity = Operator_Fixity_Infix;
     operator_token = value_view_get(definition, 1);
     arguments[0] = value_view_get(definition, 0);
     arguments[1] = value_view_get(definition, 2);
@@ -2029,7 +2022,7 @@ token_parse_operator_definition(
     goto err;
   }
 
-  for (u8 i = 0; i < operator->argument_count; ++i) {
+  for (u8 i = 0; i < user_defined_operator->argument_count; ++i) {
     if (!value_is_symbol(arguments[i])) {
       context_error_snprintf(
         context, arguments[i]->source_range,
@@ -2037,53 +2030,73 @@ token_parse_operator_definition(
       );
       goto err;
     }
-    operator->argument_names[i] = value_as_symbol(arguments[i])->name;
+    user_defined_operator->argument_names[i] = value_as_symbol(arguments[i])->name;
   }
 
+  Operator *operator = allocator_allocate(context->allocator, Operator);
+  *operator = (Operator){
+    .fixity = user_defined_operator->fixity,
+    .precedence = precendence,
+    .argument_count = user_defined_operator->argument_count,
+    .handler = token_handle_user_defined_operator_proc,
+    .handler_payload = user_defined_operator,
+  };
+
+  // FIXME move this logic into something like scope_define_operator
   Slice operator_name = value_as_symbol(operator_token)->name;
-  Scope_Entry *existing_scope_entry = scope_lookup(context->scope, operator_name);
-  while (existing_scope_entry) {
-    if (existing_scope_entry->tag != Scope_Entry_Tag_Operator) {
+  Scope_Entry *current_scope_entry = scope_lookup_shallow(context->scope, operator_name);
+  Scope_Entry *ancestor_scope_entry = scope_lookup(context->scope, operator_name);
+  if (current_scope_entry) {
+    if (current_scope_entry->tag != Scope_Entry_Tag_Operator) {
       panic("Internal Error: Found an operator-like scope entry that is not an operator");
     }
-    Scope_Entry_Operator *operator_entry = &existing_scope_entry->Operator;
-    if ((
-      operator->fixity == operator_entry->fixity
-    ) || (
-      operator->fixity == Operator_Fixity_Infix &&
-      operator_entry->fixity == Operator_Fixity_Postfix
-    ) || (
-      operator->fixity == Operator_Fixity_Postfix &&
-      operator_entry->fixity == Operator_Fixity_Infix
-    )) {
-      Slice existing = operator_fixity_to_lowercase_slice(operator_entry->fixity);
-      context_error_snprintf(
-        context, keyword_token->source_range,
-        "There is already %"PRIslice" operator %"PRIslice
-        ". You can only have one definition for prefix and one for infix or suffix.",
-        SLICE_EXPAND_PRINTF(existing), SLICE_EXPAND_PRINTF(operator_name)
-      );
-      goto err;
+    Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
+    if (operator->fixity == Operator_Fixity_Prefix) {
+      if (operator_entry->maybe_prefix) {
+        context_error_snprintf(
+          context, keyword_token->source_range,
+          "There is already a prefix operator %"PRIslice" defined in this scope",
+          SLICE_EXPAND_PRINTF(operator_name)
+        );
+        goto err;
+      } else {
+        operator_entry->maybe_prefix = operator;
+      }
+    } else {
+      if (operator_entry->maybe_infix_or_postfix) {
+        context_error_snprintf(
+          context, keyword_token->source_range,
+          "There is already a infix or postfix operator %"PRIslice" defined in this scope",
+          SLICE_EXPAND_PRINTF(operator_name)
+        );
+        goto err;
+      } else {
+        operator_entry->maybe_infix_or_postfix = operator;
+      }
     }
-    existing_scope_entry = existing_scope_entry->next_overload;
+  } else {
+    Scope_Entry new_entry = {
+      .tag = Scope_Entry_Tag_Operator,
+      .source_range = operator_token->source_range,
+    };
+    // Flatten parent operator entry into current one to avoid the need for overload iteration
+    if (ancestor_scope_entry) {
+      new_entry.Operator = ancestor_scope_entry->Operator;
+    }
+    if (operator->fixity == Operator_Fixity_Prefix) {
+      new_entry.Operator.maybe_prefix = operator;
+    } else {
+      new_entry.Operator.maybe_infix_or_postfix = operator;
+    }
+    scope_define(context->scope, operator_name, new_entry);
   }
-
-  scope_define(context->scope, operator_name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .source_range = operator_token->source_range,
-    .Operator = {
-      .precedence = precendence,
-      .argument_count = operator->argument_count,
-      .fixity = operator->fixity,
-      .handler = token_handle_user_defined_operator_proc,
-      .handler_payload = operator,
-    }
-  });
 
   return peek_index;
 
   err:
-  if (operator) allocator_deallocate(context->allocator, operator, sizeof(*operator));
+  if (user_defined_operator) {
+    allocator_deallocate(context->allocator, user_defined_operator, sizeof(*user_defined_operator));
+  }
   return peek_index;
 }
 
@@ -2607,7 +2620,7 @@ compile_time_eval(
 typedef struct {
   Slice source;
   Source_Range source_range;
-  Scope_Entry_Operator scope_entry;
+  Operator *operator;
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
@@ -2866,8 +2879,9 @@ token_handle_operator(
 
   Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
 
-  Scope_Entry_Operator *operator_entry = 0;
-  for (; scope_entry; scope_entry = scope_entry->next_overload) {
+  Operator *operator_entry = 0;
+
+  if (scope_entry) {
     if (scope_entry->tag != Scope_Entry_Tag_Operator) {
       context_error_snprintf(
         context, source_range,
@@ -2876,8 +2890,10 @@ token_handle_operator(
       );
       return false;
     }
-    if (scope_entry->Operator.fixity & fixity_mask) {
-      operator_entry = &scope_entry->Operator;
+    if (fixity_mask == Operator_Fixity_Prefix) {
+      operator_entry = scope_entry->Operator.maybe_prefix;
+    } else {
+      operator_entry = scope_entry->Operator.maybe_infix_or_postfix;
     }
   }
 
@@ -2890,13 +2906,12 @@ token_handle_operator(
     return false;
   }
 
-
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
-    if (last_operator->scope_entry.precedence < operator_entry->precedence) break;
-    if (last_operator->scope_entry.precedence == operator_entry->precedence) {
-      if (last_operator->scope_entry.associativity != Operator_Associativity_Left) {
+    if (last_operator->operator->precedence < operator_entry->precedence) break;
+    if (last_operator->operator->precedence == operator_entry->precedence) {
+      if (last_operator->operator->associativity != Operator_Associativity_Left) {
         break;
       }
     }
@@ -2909,7 +2924,7 @@ token_handle_operator(
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
     .source = new_operator,
     .source_range = source_range,
-    .scope_entry = *operator_entry,
+    .operator = operator_entry,
   });
   return true;
 }
@@ -3428,8 +3443,8 @@ token_handle_array_access(
   APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
   APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
   APPLY(Multiply,  3 /*value*/, *, 15 /*precendence */)\
-  APPLY(Divide,    4 /*value*/, /, 10 /*precendence */)\
-  APPLY(Remainder, 5 /*value*/, %, 10 /*precendence */)
+  APPLY(Divide,    4 /*value*/, /, 15 /*precendence */)\
+  APPLY(Remainder, 5 /*value*/, %, 15 /*precendence */)
 
 #define MASS_ARITHMETIC_ENUM(NAME, VALUE, ...)\
   Mass_Arithmetic_Operator_##NAME = (VALUE),
@@ -3986,20 +4001,21 @@ void
 token_dispatch_operator(
   Execution_Context *context,
   Array_Value_Ptr *stack,
-  Operator_Stack_Entry *operator_entry
+  Operator_Stack_Entry *stack_entry
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Slice operator = operator_entry->source;
+  Slice symbol = stack_entry->source;
+  Operator *operator = stack_entry->operator;
 
-  u64 argument_count = operator_entry->scope_entry.argument_count;
+  u64 argument_count = operator->argument_count;
 
   if (dyn_array_length(*stack) < argument_count) {
     // FIXME provide source range
     context_error_snprintf(
-      context, operator_entry->source_range,
+      context, stack_entry->source_range,
       "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
-      SLICE_EXPAND_PRINTF(operator), argument_count, dyn_array_length(*stack)
+      SLICE_EXPAND_PRINTF(symbol), argument_count, dyn_array_length(*stack)
     );
     return;
   }
@@ -4019,10 +4035,8 @@ token_dispatch_operator(
     },
   };
 
-  assert(operator_entry->scope_entry.handler);
-  Value *result_value = operator_entry->scope_entry.handler(
-    context, args_view, operator_entry->scope_entry.handler_payload
-  );
+  assert(operator->handler);
+  Value *result_value = operator->handler(context, args_view, operator->handler_payload);
   MASS_ON_ERROR(*context->result) return;
 
   // Pop off current arguments and push a new one
@@ -4976,71 +4990,93 @@ scope_define_builtins(
   scope_define(scope, slice_literal("()"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 20,
-      .fixity = Operator_Fixity_Postfix,
-      .argument_count = 2,
-      .handler = mass_handle_paren_operator,
-    }
+      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
+        .precedence = 20,
+        .fixity = Operator_Fixity_Postfix,
+        .argument_count = 2,
+        .handler = mass_handle_paren_operator,
+      ),
+    },
   });
   scope_define(scope, slice_literal("@"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 20,
-      .fixity = Operator_Fixity_Prefix,
-      .associativity = Operator_Associativity_Right,
-      .argument_count = 1,
-      .handler = mass_handle_at_operator,
-     }
+      .maybe_prefix = allocator_make(allocator, Operator,
+        .precedence = 20,
+        .fixity = Operator_Fixity_Prefix,
+        .associativity = Operator_Associativity_Right,
+        .argument_count = 1,
+        .handler = mass_handle_at_operator,
+      ),
+    },
   });
   scope_define(scope, slice_literal("."), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 19,
-      .fixity = Operator_Fixity_Infix,
-      .argument_count = 2,
-      .handler = mass_handle_dot_operator,
-    }
+      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
+        .precedence = 19,
+        .fixity = Operator_Fixity_Infix,
+        .argument_count = 2,
+        .handler = mass_handle_dot_operator,
+      ),
+    },
   });
   scope_define(scope, slice_literal("->"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 19,
-      .fixity = Operator_Fixity_Infix,
-      .associativity = Operator_Associativity_Right,
-      .argument_count = 3,
-      .handler = mass_handle_arrow_operator,
-    }
+      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
+        .precedence = 19,
+        .fixity = Operator_Fixity_Infix,
+        .associativity = Operator_Associativity_Right,
+        .argument_count = 3,
+        .handler = mass_handle_arrow_operator,
+      ),
+    },
   });
   scope_define(scope, slice_literal("macro"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 19,
-      .associativity = Operator_Associativity_Right,
-      .fixity = Operator_Fixity_Prefix,
-      .argument_count = 1,
-      .handler = mass_handle_macro_keyword,
-    }
+      .maybe_prefix = allocator_make(allocator, Operator,
+        .precedence = 19,
+        .associativity = Operator_Associativity_Right,
+        .fixity = Operator_Fixity_Prefix,
+        .argument_count = 1,
+        .handler = mass_handle_macro_keyword,
+      ),
+    },
   });
 
   scope_define(scope, slice_literal("-"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Operator,
     .Operator = {
-      .precedence = 17,
-      .handler = token_handle_negation,
-      .argument_count = 1,
-      .fixity = Operator_Fixity_Prefix
-    }
+      .maybe_prefix = allocator_make(allocator, Operator,
+        .precedence = 17,
+        .handler = token_handle_negation,
+        .argument_count = 1,
+        .fixity = Operator_Fixity_Prefix
+      ),
+      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
+        .precedence = 10,
+        .fixity = Operator_Fixity_Infix,
+        .argument_count = 2,
+        .handler = mass_handle_arithmetic_operation,
+        .handler_payload = (void*)Mass_Arithmetic_Operator_Subtract
+      )
+    },
   });
 
+  // FIXME Change this to not require the minus hack
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
-    scope_define(scope, slice_literal(#SYMBOL), (Scope_Entry) { \
+    if (#SYMBOL[0] != '-') scope_define(scope, slice_literal(#SYMBOL), (Scope_Entry) { \
       .tag = Scope_Entry_Tag_Operator,\
       .Operator = {\
-        .precedence = (PRECEDENCE),\
-        .fixity = Operator_Fixity_Infix,\
-        .argument_count = 2,\
-        .handler = mass_handle_arithmetic_operation,\
-        .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
+        .maybe_infix_or_postfix = allocator_make(allocator, Operator, \
+          .precedence = (PRECEDENCE),\
+          .fixity = Operator_Fixity_Infix,\
+          .argument_count = 2,\
+          .handler = mass_handle_arithmetic_operation,\
+          .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
+        ),\
       }\
     });
   MASS_ARITHMETIC_OPERATOR(MASS_DEFINE_ARITHMETIC)
@@ -5059,24 +5095,16 @@ scope_define_builtins(
     scope_define(scope, comparisons[i].symbol, (Scope_Entry) {
       .tag = Scope_Entry_Tag_Operator,
       .Operator = {
-        .precedence = comparisons[i].precedence,
-        .fixity = Operator_Fixity_Infix,
-        .argument_count = 2,
-        .handler = mass_handle_comparison_operation,
-        .handler_payload = (void*)(s64)comparisons[i].type,
+        .maybe_infix_or_postfix = allocator_make(allocator, Operator,
+          .precedence = comparisons[i].precedence,
+          .fixity = Operator_Fixity_Infix,
+          .argument_count = 2,
+          .handler = mass_handle_comparison_operation,
+          .handler_payload = (void*)(s64)comparisons[i].type,
+        ),
       }
     });
   }
-
-  scope_define(scope, slice_literal("&&"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 5, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-  scope_define(scope, slice_literal("||"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = { .precedence = 4, .fixity = Operator_Fixity_Infix, .argument_count = 2 }
-  });
-
 
   scope_define(scope, slice_literal("any"), (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,

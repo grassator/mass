@@ -123,6 +123,10 @@ typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
 typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
 
+typedef struct Operator Operator;
+typedef dyn_array_type(Operator *) Array_Operator_Ptr;
+typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
+
 typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
 typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
@@ -517,6 +521,16 @@ typedef struct Execution_Context {
 } Execution_Context;
 typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 
+typedef struct Operator {
+  Operator_Fixity fixity;
+  Operator_Associativity associativity;
+  u64 precedence;
+  u64 argument_count;
+  Mass_Handle_Operator_Proc handler;
+  void * handler_payload;
+} Operator;
+typedef dyn_array_type(Operator) Array_Operator;
+
 typedef enum {
   Scope_Entry_Tag_Value = 0,
   Scope_Entry_Tag_Lazy_Expression = 1,
@@ -532,12 +546,8 @@ typedef struct {
   Value_View tokens;
 } Scope_Entry_Lazy_Expression;
 typedef struct {
-  Operator_Fixity fixity;
-  Operator_Associativity associativity;
-  u64 precedence;
-  u64 argument_count;
-  Mass_Handle_Operator_Proc handler;
-  void * handler_payload;
+  Operator * maybe_prefix;
+  Operator * maybe_infix_or_postfix;
 } Scope_Entry_Operator;
 typedef struct Scope_Entry {
   Scope_Entry_Tag tag;
@@ -818,6 +828,10 @@ static Descriptor descriptor_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
 static Descriptor descriptor_execution_context_pointer;
 static Descriptor descriptor_execution_context_pointer_pointer;
+static Descriptor descriptor_operator;
+static Descriptor descriptor_array_operator_ptr;
+static Descriptor descriptor_operator_pointer;
+static Descriptor descriptor_operator_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
@@ -1260,6 +1274,41 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context,
   },
 );
 MASS_DEFINE_TYPE_VALUE(execution_context);
+MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
+MASS_DEFINE_STRUCT_DESCRIPTOR(operator,
+  {
+    .name = slice_literal_fields("fixity"),
+    .descriptor = &descriptor_operator_fixity,
+    .offset = offsetof(Operator, fixity),
+  },
+  {
+    .name = slice_literal_fields("associativity"),
+    .descriptor = &descriptor_operator_associativity,
+    .offset = offsetof(Operator, associativity),
+  },
+  {
+    .name = slice_literal_fields("precedence"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Operator, precedence),
+  },
+  {
+    .name = slice_literal_fields("argument_count"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Operator, argument_count),
+  },
+  {
+    .name = slice_literal_fields("handler"),
+    .descriptor = &descriptor_mass_handle_operator_proc,
+    .offset = offsetof(Operator, handler),
+  },
+  {
+    .name = slice_literal_fields("handler_payload"),
+    .descriptor = &descriptor_void_pointer,
+    .offset = offsetof(Operator, handler_payload),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(operator);
 MASS_DEFINE_OPAQUE_C_TYPE(scope_entry, Scope_Entry)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)

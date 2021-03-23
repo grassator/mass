@@ -933,7 +933,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(
         error->message,
-        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix.")
+        slice_literal("There is already a infix or postfix operator ** defined in this scope")
       );
     }
 
@@ -948,7 +948,7 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(
         error->message,
-        slice_literal("There is already an infix operator **. You can only have one definition for prefix and one for infix or suffix.")
+        slice_literal("There is already a infix or postfix operator ** defined in this scope")
       );
     }
 

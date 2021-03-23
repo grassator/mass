@@ -663,6 +663,15 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  push_type(type_struct("Operator", (Struct_Item[]){
+    { "Operator_Fixity", "fixity" },
+    { "Operator_Associativity", "associativity" },
+    { "u64", "precedence" },
+    { "u64", "argument_count" },
+    { "Mass_Handle_Operator_Proc", "handler" },
+    { "void *", "handler_payload" },
+  }));
+
   push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
@@ -673,12 +682,8 @@ main(void) {
       { "Value_View", "tokens" },
     }),
     struct_fields("Operator", (Struct_Item[]){
-      { "Operator_Fixity", "fixity" },
-      { "Operator_Associativity", "associativity" },
-      { "u64", "precedence" },
-      { "u64", "argument_count" },
-      { "Mass_Handle_Operator_Proc", "handler" },
-      { "void *", "handler_payload" },
+      { "Operator *", "maybe_prefix" },
+      { "Operator *", "maybe_infix_or_postfix" },
     }),
   }), (Struct_Item[]){
     { "Source_Range", "source_range" },
