@@ -1406,6 +1406,16 @@ token_apply_macro_syntax(
   return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
 }
 
+bool
+value_is_lazy_or_static(
+  Value *value
+) {
+  if (value->descriptor == &descriptor_lazy_value) return true;
+  if (value->storage.tag == Storage_Tag_Static) return true;
+  if (value->storage.tag == Storage_Tag_None) return true;
+  return false;
+}
+
 u64
 token_parse_macro_statement(
   Execution_Context *context,
@@ -1431,11 +1441,11 @@ token_parse_macro_statement(
   Array_Value_View match = dyn_array_make(Array_Value_View);
   token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
 
-  // :LazyProc
-  Value *parse_result = token_apply_macro_syntax(context, match, macro);
-  MASS_ON_ERROR(
-    value_force(context, &macro->replacement.source_range, parse_result, &void_value)
-  ) return 0;
+  Value *expansion_value = token_apply_macro_syntax(context, match, macro);
+  if (expansion_value) {
+    assert(value_is_lazy_or_static(expansion_value));
+    out_lazy_value->payload = expansion_value;
+  }
   dyn_array_destroy(match);
   return match_length;
 }
