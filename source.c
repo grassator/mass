@@ -4776,23 +4776,24 @@ token_define_global_variable(
 
 typedef struct {
   Source_Range source_range;
-  Value *stack_value;
+  Value *target;
   Value *expression;
-} Mass_Local_Variable_Lazy_Payload;
+} Mass_Assignment_Lazy_Payload;
 
 void
-mass_handle_local_variable_lazy_proc(
+mass_handle_assignment_lazy_proc(
   Execution_Context *context,
   Value *unused_result,
-  Mass_Local_Variable_Lazy_Payload *payload
+  Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
+  Value target;
+  value_any_init(&target, context, payload->source_range);
+  MASS_ON_ERROR(value_force(context, &payload->source_range, payload->target, &target)) return;
   if (descriptor->tag == Descriptor_Tag_Function) {
-    load_address(context, &payload->source_range, payload->stack_value, payload->expression);
+    load_address(context, &payload->source_range, &target, payload->expression);
   } else {
-    MASS_ON_ERROR(
-      value_force(context, &payload->source_range, payload->expression, payload->stack_value)
-    ) return;
+    MASS_ON_ERROR(value_force(context, &payload->source_range, payload->expression, &target)) return;
   }
 }
 
@@ -4828,17 +4829,17 @@ token_define_local_variable(
     .source_range = *source_range,
   });
 
-  Mass_Local_Variable_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Local_Variable_Lazy_Payload);
-  *payload = (Mass_Local_Variable_Lazy_Payload) {
+  Mass_Assignment_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
+  *payload = (Mass_Assignment_Lazy_Payload) {
     .source_range = *source_range,
-    .stack_value = on_stack,
+    .target = on_stack,
     .expression = value,
   };
 
   // :LazyProc
-  mass_handle_local_variable_lazy_proc(context, 0, payload);
-  //out_lazy_value->proc = mass_handle_local_variable_lazy_proc;
+  mass_handle_assignment_lazy_proc(context, 0, payload);
+  //out_lazy_value->proc = mass_handle_assignment_lazy_proc;
   //out_lazy_value->payload = payload;
 }
 
@@ -4900,13 +4901,32 @@ token_parse_assignment(
     return 0;
   }
 
+  Mass_Assignment_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
+
   Value *target = value_any(context, lhs.source_range);
-  if (!token_parse_definition(context, lhs, target)) {
+  if (token_parse_definition(context, lhs, target)) {
+    Value *expression_parse = token_parse_expression(context, rhs, &(u64){0}, 0);
+    *payload = (Mass_Assignment_Lazy_Payload) {
+      .source_range = operator->source_range,
+      .target = target,
+      .expression = expression_parse,
+    };
+  } else {
     Value *target_parse = token_parse_expression(context, lhs, &(u64){0}, 0);
-    MASS_ON_ERROR(value_force(context, &lhs.source_range, target_parse, target)) return 0;
+    Value *expression_parse = token_parse_expression(context, rhs, &(u64){0}, 0);
+
+    *payload = (Mass_Assignment_Lazy_Payload) {
+      .source_range = operator->source_range,
+      .target = target_parse,
+      .expression = expression_parse,
+    };
   }
-  Value *parse_result = token_parse_expression(context, rhs, &(u64){0}, 0);
-  MASS_ON_ERROR(value_force(context, &lhs.source_range, parse_result, target)) return 0;
+
+  // :LazyProc
+  mass_handle_assignment_lazy_proc(context, 0, payload);
+  //out_lazy_value->proc = mass_handle_assignment_lazy_proc;
+  //out_lazy_value->payload = payload;
 
   return statement_length;
 }
@@ -5168,7 +5188,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement}); // ?
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements}); // ready
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using}); // ~
