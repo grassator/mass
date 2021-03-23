@@ -4285,6 +4285,11 @@ token_parse_block_view(
       match_length = 1;
       continue;
     }
+    Lazy_Value lazy_value = {
+      .context = *context,
+      .proc = mass_handle_statement_lazy_proc,
+      .payload = &void_value,
+    };
     for (
       const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
@@ -4298,21 +4303,16 @@ token_parse_block_view(
       // to have higher precedence when parsing
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
-        // FIXME for the lazy evaluation we need to get a lazy value here
-        Lazy_Value *value = allocator_allocate(context->allocator, Lazy_Value);
-        *value = (Lazy_Value) {
-          .context = *context,
-          .proc = mass_handle_statement_lazy_proc,
-          .payload = &void_value,
-        };
-        match_length = matcher->proc(context, rest, value, matcher->payload);
+        match_length = matcher->proc(context, rest, &lazy_value, matcher->payload);
         MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
           Value_View matched_view = value_view_slice(&rest, 0, match_length);
-          Value *lazy_value = value_make(
-            context, &descriptor_void, storage_static(value), matched_view.source_range
+          Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
+          *lazy_value_storage = lazy_value;
+          Value *lazy_statement = value_make(
+            context, &descriptor_void, storage_static(lazy_value_storage), matched_view.source_range
           );
-          dyn_array_push(lazy_statements, lazy_value);
+          dyn_array_push(lazy_statements, lazy_statement);
           goto next_loop;
         }
       }
