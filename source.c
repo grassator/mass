@@ -3036,13 +3036,10 @@ token_handle_function_call(
     goto err;
   }
 
-  // :LazyForce
-  Value *target = value_any(context, source_range);
-  MASS_ON_ERROR(value_force(context, &source_range, target_expression, target)) return;
-
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
-  for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
-    const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+  for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
+    const Descriptor *to_call_descriptor =
+      maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
     const Function_Info *descriptor = &to_call_descriptor->Function.info;
     s64 score = calculate_arguments_match_score(descriptor, args);
@@ -3078,8 +3075,7 @@ token_handle_function_call(
   }
 
 
-  Value *overload = match.value;
-  if (!overload) {
+  if (!match.value) {
     // TODO add better error message
     context_error_snprintf(
       context, source_range,
@@ -3087,6 +3083,8 @@ token_handle_function_call(
     );
     goto err;
   }
+  Value *overload = value_any(context, source_range);
+  MASS_ON_ERROR(value_force(context, &source_range, match.value, overload)) return;
 
   const Function_Info *function = &overload->descriptor->Function.info;
 
