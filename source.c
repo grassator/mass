@@ -3478,35 +3478,37 @@ mass_handle_arithmetic_operation_lazy_proc(
 ) {
   Mass_Arithmetic_Operator_Lazy_Payload *payload = raw_payload;
 
-  Value *lhs_value = payload->lhs;
-  Value *rhs_value = payload->rhs;
-  Source_Range lhs_range = lhs_value->source_range;
+  Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
+  MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
+  Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
+  MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
 
-  maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
+  maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
   MASS_ON_ERROR(*context->result) return;
 
   Function_Builder *builder = context->builder;
 
-  Value *any_result = value_any_init(&(Value){0}, context, lhs_range);
+  // FIXME use result_value here instead
+  Value *any_result = value_any_init(&(Value){0}, context, lhs->source_range);
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add: {
-      plus(context, &lhs_range, any_result, lhs_value, rhs_value);
+      plus(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Subtract: {
-      minus(context, &lhs_range, any_result, lhs_value, rhs_value);
+      minus(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      multiply(context, &lhs_range, any_result, lhs_value, rhs_value);
+      multiply(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Divide: {
-      divide(context, &lhs_range, any_result, lhs_value, rhs_value);
+      divide(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Remainder: {
-      value_remainder(context, &lhs_range, any_result, lhs_value, rhs_value);
+      value_remainder(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     default: {
@@ -3516,7 +3518,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   }
   if (any_result->storage.tag != Storage_Tag_Static) {
     // FIXME do proper register allocation
-    Value *stack_result = reserve_stack(context, builder, lhs_value->descriptor, lhs_range);
+    Value *stack_result = reserve_stack(context, builder, lhs->descriptor, lhs->source_range);
     MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
     if (any_result->storage.tag == Storage_Tag_Register) {
       ensure_register_released(context->builder, any_result->storage.Register.index);
@@ -3533,26 +3535,18 @@ mass_handle_arithmetic_operation(
   Value_View arguments,
   void *operator_payload
 ) {
-  // TODO @Speed this seems very inefficient
-  Value *lhs = value_view_get(arguments, 0);
-  Value *rhs = value_view_get(arguments, 1);
-
-  // FIXME :LazyForce we should somehow request a lazy value here instead of fully forcing
-  Value *lhs_value = value_any(context, lhs->source_range);
-  MASS_ON_ERROR(value_force(context, &lhs->source_range, lhs, lhs_value)) return 0;
-  Value *rhs_value = value_any(context, rhs->source_range);
-  MASS_ON_ERROR(value_force(context, &rhs->source_range, rhs, rhs_value)) return 0;
+  Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
+  Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
 
   Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
     allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
   *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
-    .lhs = lhs_value,
-    .rhs = rhs_value,
+    .lhs = lhs,
+    .rhs = rhs,
     .operator = (Mass_Arithmetic_Operator)(u64)operator_payload,
   };
 
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(context, lhs_value, rhs_value);
+  const Descriptor *descriptor = large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
   return mass_make_lazy_value(
     context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
   );
@@ -3866,10 +3860,15 @@ mass_handle_array_access_lazy_proc(
   void *raw_payload
 ) {
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
-  Value *raw_index = payload->index;
-  Value *array = payload->array;
-  Value *index = value_any(context, raw_index->source_range);
-  MASS_ON_ERROR(value_force(context, &raw_index->source_range, raw_index, index)) return;
+  Value *array = value_any(context, payload->array->source_range);
+  MASS_ON_ERROR(
+    value_force(context, &payload->array->source_range, payload->array, array)
+  ) return;
+  Value *index = value_any(context, payload->index->source_range);
+  MASS_ON_ERROR(
+    value_force(context, &payload->index->source_range, payload->index, index)
+  ) return;
+
   token_handle_array_access(context, &array->source_range, array, index, result_value);
 }
 
@@ -3879,17 +3878,15 @@ mass_handle_dot_operator(
   Value_View args_view,
   void *unused_payload
 ) {
-  Value *lhs = value_view_get(args_view, 0);
+  Value *lhs = token_parse_single(context, value_view_get(args_view, 0));
   Value *rhs = value_view_get(args_view, 1);
 
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
-  Value *lhs_value = value_any(context, lhs_range);
-  // FIXME :LazyForce
-  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) return 0;
+  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
   if (
-    lhs_value->descriptor->tag == Descriptor_Tag_Struct ||
-    lhs_value->descriptor == &descriptor_scope
+    lhs_descriptor->tag == Descriptor_Tag_Struct ||
+    lhs_descriptor == &descriptor_scope
   ) {
     if (!value_is_symbol(rhs)) {
       context_error_snprintf(
@@ -3899,8 +3896,8 @@ mass_handle_dot_operator(
       return 0;
     }
     Slice field_name = value_as_symbol(rhs)->name;
-    if (lhs_value->descriptor->tag == Descriptor_Tag_Struct) {
-      Descriptor_Struct_Field *field = struct_find_field_by_name(lhs_value->descriptor, field_name);
+    if (lhs_descriptor->tag == Descriptor_Tag_Struct) {
+      Descriptor_Struct_Field *field = struct_find_field_by_name(lhs_descriptor, field_name);
       if (!field) {
         context_error_snprintf(
           context, rhs_range,
@@ -3913,7 +3910,7 @@ mass_handle_dot_operator(
       Mass_Field_Access_Lazy_Payload *lazy_payload =
         allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
       *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
-        .struct_ = lhs_value,
+        .struct_ = lhs,
         .field = field,
       };
 
@@ -3921,8 +3918,8 @@ mass_handle_dot_operator(
         context, lhs_range, lazy_payload, field->descriptor, mass_handle_field_access_lazy_proc
       );
     } else {
-      assert(lhs_value->descriptor == &descriptor_scope);
-      const Scope *module_scope = storage_static_as_c_type(&lhs_value->storage, Scope);
+      assert(lhs->descriptor == &descriptor_scope);
+      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
       Value *lookup = scope_lookup_force(module_scope, field_name);
       if (!lookup) {
         scope_print_names(module_scope);
@@ -3937,20 +3934,19 @@ mass_handle_dot_operator(
       return lookup;
     }
   } else if (
-    lhs_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-    lhs_value->descriptor->tag == Descriptor_Tag_Pointer
+    lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
+    lhs_descriptor->tag == Descriptor_Tag_Pointer
   ) {
-    if (
-      value_match_group(rhs, Group_Tag_Paren) ||
-      value_is_number_literal(rhs)
-    ) {
-      const Descriptor *descriptor = lhs_value->descriptor;
+    if (value_match_group(rhs, Group_Tag_Paren) || value_is_number_literal(rhs)) {
+      const Descriptor *descriptor = lhs_descriptor;
       if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
         descriptor = descriptor->Fixed_Size_Array.item;
+      } else {
+        descriptor = descriptor->Pointer.to;
       }
       Mass_Array_Access_Lazy_Payload *lazy_payload =
         allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
-      *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs_value, .index = rhs };
+      *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs, .index = rhs };
 
       return mass_make_lazy_value(
         context, lhs_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
@@ -4964,6 +4960,7 @@ token_parse_assignment(
       .expression = expression_parse,
     };
   }
+  MASS_ON_ERROR(*context->result) return 0;
 
   // :LazyProc
   mass_handle_assignment_lazy_proc(context, 0, payload);
