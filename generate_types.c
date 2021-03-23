@@ -682,7 +682,6 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Source_Range", "source_range" },
-    { "Scope_Entry *", "next_overload" },
   }));
 
   push_type(type_struct("Value", (Struct_Item[]){

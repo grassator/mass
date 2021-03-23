@@ -955,7 +955,7 @@ spec("source") {
     it("should have a built-in compile-time shift operator") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
-        "test :: () -> (u64) { 2 << 1 }"
+        "test :: () -> (s64) { 2 << 1 }"
       );
       check(checker);
       s64 actual = checker();
@@ -965,7 +965,7 @@ spec("source") {
     it("should have a built-in compile-time bitwise and operator") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
-        "test :: () -> (u64) { 0b110 & 0b011 }"
+        "test :: () -> (s64) { 0b110 & 0b011 }"
       );
       check(checker);
       s64 actual = checker();
@@ -975,7 +975,7 @@ spec("source") {
     it("should have correctly handle the difference between addressof and bitwise and operators") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
-        "test :: () -> ([u64]) { x := 0 & 1; &x }"
+        "test :: () -> ([s64]) { x := 0 & 1; &x }"
       );
       check(checker);
       s64 actual = checker();
@@ -985,7 +985,7 @@ spec("source") {
     it("should have a built-in compile-time bitwise or operator") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
-        "test :: () -> (u64) { 0b110 | 0b011 }"
+        "test :: () -> (s64) { 0b110 | 0b011 }"
       );
       check(checker);
       s64 actual = checker();

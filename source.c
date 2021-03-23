@@ -415,16 +415,17 @@ scope_entry_force(
       return 0;
     }
     case Scope_Entry_Tag_Value: {
-      Value *value = entry->Value.value;
-      Value *next_overload = value->next_overload;
-      // TODO Should this be limited to just compile time execution explicitly?
-      if (value->descriptor == &descriptor_lazy_value) {
-        Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-        Execution_Context *context = &lazy->context;
-        Value *result = value_any(context, entry->source_range);
-        lazy->proc(context, result, lazy->payload);
-        *value = *result;
-        value->next_overload = next_overload;
+      for (Value *value = entry->Value.value; value; value = value->next_overload) {
+        // TODO Should this be limited to just compile time execution explicitly?
+        if (value->descriptor == &descriptor_lazy_value) {
+          Value *next_overload = value->next_overload;
+          Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+          Execution_Context *context = &lazy->context;
+          Value *result = value_any(context, entry->source_range);
+          lazy->proc(context, result, lazy->payload);
+          *value = *result;
+          value->next_overload = next_overload;
+        }
       }
       return entry->Value.value;
     }
@@ -453,27 +454,10 @@ scope_lookup_force(
   }
 
   // Force lazy entries
-  for (Scope_Entry *it = entry; it; it = it->next_overload) {
-    if (it->tag == Scope_Entry_Tag_Value) {
-      scope_entry_force(it);
-    }
-  }
+  scope_entry_force(entry);
 
-  Value *result = 0;
-  for (Scope_Entry *it = entry; it; it = it->next_overload) {
-    assert(it->tag == Scope_Entry_Tag_Value);
-
-    if (!result) {
-      result = it->Value.value;
-    } else {
-      if (it->Value.value->descriptor->tag != Descriptor_Tag_Function) {
-        panic("Only functions support overloading");
-      }
-      Value *overload = it->Value.value;
-      overload->next_overload = result;
-      result = overload;
-    }
-  }
+  assert(entry->tag == Scope_Entry_Tag_Value);
+  Value *result = entry->Value.value;
 
   // For functions we need to gather up overloads from all parent scopes
   if (result && result->descriptor->tag == Descriptor_Tag_Function) {
@@ -507,17 +491,17 @@ scope_define(
   if (!scope->map) {
     scope->map = Scope_Map__make(scope->allocator);
   }
-  Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
-  *allocated = entry;
   if (hash_map_has(scope->map, name)) {
     // We just checked that the map has the entry so it safe to deref right away
     Scope_Entry *it = *hash_map_get(scope->map, name);
-    // TODO Consider using a hash map that allows multiple values instead
-    while (it->next_overload) {
-      it = it->next_overload;
-    }
-    it->next_overload = allocated;
+    assert(it->tag == Scope_Entry_Tag_Value);
+    Value *existing = it->Value.value;
+    while (existing->next_overload) existing = existing->next_overload;
+    assert(entry.tag == Scope_Entry_Tag_Value);
+    existing->next_overload = entry.Value.value;
   } else {
+    Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
+    *allocated = entry;
     hash_map_set(scope->map, name, allocated);
   }
 }

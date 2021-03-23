@@ -547,7 +547,6 @@ typedef struct Scope_Entry {
   Scope_Entry_Tag tag;
   char _tag_padding[4];
   Source_Range source_range;
-  Scope_Entry * next_overload;
   union {
     Scope_Entry_Value Value;
     Scope_Entry_Operator Operator;
