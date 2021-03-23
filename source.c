@@ -2966,16 +2966,19 @@ token_handle_function_call(
   Value *result_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
-
-  Source_Range source_range = target_token->source_range; // TODO add args as well
-  Value *target = value_any(context, source_range);
-  MASS_ON_ERROR(value_force(context, &source_range, target_token, target)) return;
   assert(value_match_group(args_token, Group_Tag_Paren));
 
+  Source_Range source_range = target_token->source_range; // TODO add args as well
+  Value *target_expression = token_parse_single(context, target_token);
+  MASS_ON_ERROR(*context->result) return;
+  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target_expression);
+
   if (
-    target->descriptor->tag == Descriptor_Tag_Function &&
-    (target->descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
+    target_descriptor->tag == Descriptor_Tag_Function &&
+    (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
+    Value *target = value_any(context, source_range);
+    MASS_ON_ERROR(value_force(context, &source_range, target_expression, target)) return;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
@@ -3022,7 +3025,7 @@ token_handle_function_call(
     }
   }
 
-  const Descriptor *target_descriptor = maybe_unwrap_pointer_descriptor(target->descriptor);
+  target_descriptor = maybe_unwrap_pointer_descriptor(target_descriptor);
 
   if (target_descriptor->tag != Descriptor_Tag_Function) {
     Slice source = source_from_source_range(&source_range);
@@ -3033,6 +3036,10 @@ token_handle_function_call(
     );
     goto err;
   }
+
+  // :LazyForce
+  Value *target = value_any(context, source_range);
+  MASS_ON_ERROR(value_force(context, &source_range, target_expression, target)) return;
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target; to_call; to_call = to_call->next_overload) {
