@@ -2,6 +2,8 @@
 #include "source.h"
 #include "function.h"
 
+#define LAZY_EVAL 0
+
 static inline Value *
 value_view_peek(
   Value_View view,
@@ -2509,11 +2511,15 @@ compile_time_eval(
     context->result = eval_context.result;
     return;
   }
+  Value *forced_value = value_any(&eval_context, view.source_range);
+  MASS_ON_ERROR(value_force(&eval_context, &view.source_range, expression_result_value, forced_value)) {
+    return;
+  }
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
-    MASS_ON_ERROR(value_force(context, &view.source_range, expression_result_value, result_value)) {
+    MASS_ON_ERROR(value_force(&eval_context, &view.source_range, forced_value, result_value)) {
       return;
     }
     if (result_value->descriptor->tag == Descriptor_Tag_Function) {
@@ -2724,41 +2730,89 @@ mass_compiler_external(
 MASS_ENUMERATE_INTEGER_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
+static inline Value *
+mass_make_lazy_value(
+  Execution_Context *context,
+  Source_Range source_range,
+  void *payload,
+  const Descriptor *descriptor,
+  Lazy_Value_Proc proc
+) {
+  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
+  *lazy = (Lazy_Value) {
+    .context = *context,
+    .descriptor = descriptor,
+    .proc = proc,
+    .payload = payload,
+  };
+  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
+}
+
+typedef struct {
+  const Descriptor *target;
+  Value *expression;
+} Mass_Cast_Lazy_Payload;
+
+void
+mass_handle_cast_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Mass_Cast_Lazy_Payload *payload
+) {
+  const Descriptor *target_descriptor = payload->target;
+  Value *expression = payload->expression;
+  const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
+  const Source_Range *source_range = &expression->source_range;
+
+  Value *value = value_any(context, *source_range);
+  MASS_ON_ERROR(value_force(context, source_range, expression, value)) return;
+
+  u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
+  u64 original_byte_size = descriptor_byte_size(source_descriptor);
+  if (source_descriptor == &descriptor_number_literal) {
+    value = token_value_force_immediate_integer(context, source_range, value, target_descriptor);
+  } else if (cast_to_byte_size < original_byte_size) {
+    value = value_make(context, target_descriptor, value->storage, *source_range);
+    if (value->storage.tag == Storage_Tag_Static) {
+      // TODO this is quite awkward and unsafe. There is probably a better way
+      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
+      value->storage = storage_static_internal(memory, cast_to_byte_size);
+    } else {
+      value->storage.byte_size = cast_to_byte_size;
+    }
+  }
+  MASS_ON_ERROR(assign(context, result_value, value)) return;
+}
+
 Value *
 token_handle_cast(
   Execution_Context *context,
-  const Source_Range *source_range,
-  Array_Value_Ptr args
+  Value *args_token
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  const Source_Range *source_range = &args_token->source_range;
+
   Value *type = *dyn_array_get(args, 0);
-  Value *raw_value = *dyn_array_get(args, 1);
-  const Descriptor *cast_to_descriptor = value_ensure_type(context, type, *source_range);
+  Value *expression = *dyn_array_get(args, 1);
+  dyn_array_destroy(args);
+  const Descriptor *target_descriptor = value_ensure_type(context, type, *source_range);
 
-  assert(descriptor_is_integer(cast_to_descriptor));
-  // FIXME :LazyProc
-  Value *value = value_any(context, *source_range);
-  MASS_ON_ERROR(value_force(context, source_range, raw_value, value)) return 0;
-
-  Value *after_cast_value = value;
-  u64 cast_to_byte_size = descriptor_byte_size(cast_to_descriptor);
-  u64 original_byte_size = descriptor_byte_size(value->descriptor);
-  if (value->descriptor == &descriptor_number_literal) {
-    after_cast_value = token_value_force_immediate_integer(
-      context, source_range, value, cast_to_descriptor
-    );
-  } else if (cast_to_byte_size < original_byte_size) {
-    after_cast_value = value_make(context, cast_to_descriptor, value->storage, *source_range);
-    if (value->storage.tag == Storage_Tag_Static) {
-      // TODO this is quite awkward and unsafe. There is probably is a better way
-      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
-      after_cast_value->storage = storage_static_internal(memory, cast_to_byte_size);
-    } else {
-      after_cast_value->storage.byte_size = cast_to_byte_size;
-    }
+  if (!descriptor_is_integer(target_descriptor)) {
+    context_error_snprintf(context, *source_range, "Only integer types are supported for casts");
+    return 0;
   }
-  return after_cast_value;
+
+  Mass_Cast_Lazy_Payload *payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+  *payload = (Mass_Cast_Lazy_Payload) {
+    .target = target_descriptor,
+    .expression = expression,
+  };
+
+  return mass_make_lazy_value(
+    context, *source_range, payload, target_descriptor, mass_handle_cast_lazy_proc
+  );
 }
 
 Value *
@@ -3382,24 +3436,6 @@ token_handle_array_access(
   MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
-static inline Value *
-mass_make_lazy_value(
-  Execution_Context *context,
-  Source_Range source_range,
-  void *payload,
-  const Descriptor *descriptor,
-  Lazy_Value_Proc proc
-) {
-  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
-  *lazy = (Lazy_Value) {
-    .context = *context,
-    .descriptor = descriptor,
-    .proc = proc,
-    .payload = payload,
-  };
-  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
-}
-
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
   APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
   APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
@@ -3669,10 +3705,7 @@ mass_handle_paren_operator(
     target_name = value_as_symbol(target)->name;
   }
   if (slice_equal(target_name, slice_literal("cast"))) {
-    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-    Value *result = token_handle_cast(context, &args_range, args);
-    dyn_array_destroy(args);
-    return result;
+    return token_handle_cast(context, args_token);
   } else if (slice_equal(target_name, slice_literal("c_string"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
