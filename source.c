@@ -3069,6 +3069,140 @@ call_function_macro(
 }
 
 void
+call_function_overload(
+  Execution_Context *context,
+  const Source_Range *source_range,
+  Value *to_call,
+  Array_Value_Ptr arguments,
+  Value *result_value
+) {
+  Function_Builder *builder = context->builder;
+  Array_Instruction *instructions = &builder->code_block.instructions;
+  const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
+  assert(to_call_descriptor->tag == Descriptor_Tag_Function);
+  const Function_Info *descriptor = &to_call_descriptor->Function.info;
+
+  ensure_compiled_function_body(context, to_call);
+
+  Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
+
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    if (register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+      if (register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+        Value to_save = {
+          .descriptor = &descriptor_s64,
+          .storage = {
+            .tag = Storage_Tag_Register,
+            .byte_size = 8,
+            .Register.index = reg_index,
+          }
+        };
+        Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
+        Value *stack_value = reserve_stack(context, builder, to_save.descriptor, *source_range);
+        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
+        dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
+      }
+    }
+  }
+
+  Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
+  for (u64 i = 0; i < dyn_array_length(descriptor->arguments); ++i) {
+    Function_Argument *target_arg_definition = dyn_array_get(descriptor->arguments, i);
+    Value *target_arg = function_argument_value_at_index(
+      context, descriptor, i, Function_Argument_Mode_Call
+    );
+    Value *source_arg;
+    if (i >= dyn_array_length(arguments)) {
+      Value_View default_expression = target_arg_definition->maybe_default_expression;
+      assert(default_expression.length);
+      Execution_Context arg_context = *context;
+      arg_context.scope = default_arguments_scope;
+      source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+      MASS_ON_ERROR(*arg_context.result) return;
+    } else {
+      source_arg = *dyn_array_get(arguments, i);
+    }
+    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
+    if (
+      descriptor_byte_size(source_descriptor) <= 8 ||
+      // TODO Number literals are larger than a register, but only converted into
+      //      a proper value in the assign below so need this explicit check.
+      //      Maybe we should do the conversion at some step before?
+      source_descriptor == &descriptor_number_literal
+    ) {
+      MASS_ON_ERROR(assign(context, target_arg, source_arg)) return;
+    } else {
+      // Large values are copied to the stack and passed by a reference
+      Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
+      MASS_ON_ERROR(assign(context, stack_value, source_arg)) return;
+      load_address(context, source_range, target_arg, stack_value);
+    }
+    Slice name = target_arg_definition->name;
+    if (name.length) {
+      scope_define_value(default_arguments_scope, target_arg->source_range, name, target_arg);
+    }
+  }
+
+  // If we call a function, then we need to reserve space for the home
+  // area of at least 4 arguments?
+  u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
+
+  Value *fn_return_value = function_return_value_for_descriptor(
+    context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
+  );
+
+  // :ReturnTypeLargerThanRegister
+  u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
+  if (return_size > 8) {
+    Storage result_operand;
+    // If we want the result at a memory location can just pass that address to the callee
+    if (result_value->storage.tag == Storage_Tag_Memory) {
+      result_operand = result_value->storage;
+    } else {
+      result_operand = reserve_stack(
+        context, builder, descriptor->returns.descriptor, *source_range
+      )->storage;
+    }
+    Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
+    push_instruction(
+      instructions, *source_range,
+      (Instruction) {.assembly = {lea, {reg_c, result_operand}}}
+    );
+  }
+
+  builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
+    builder->max_call_parameters_stack_size,
+    parameters_stack_size
+  ));
+
+  if (to_call->storage.tag == Storage_Tag_Static) {
+    // TODO it will not be safe to use this register with other calling conventions
+    Storage reg = storage_register_for_descriptor(Register_A, to_call_descriptor);
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg, to_call->storage}}});
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {reg}}});
+  } else {
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->storage, 0, 0}}});
+  }
+
+  Value *saved_result = fn_return_value;
+  if (return_size <= 8) {
+    if (return_size != 0) {
+      // FIXME Should not be necessary with correct register allocation
+      saved_result = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
+      move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value->storage);
+    }
+  }
+
+  MASS_ON_ERROR(assign(context, result_value, saved_result)) return;
+
+  for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
+    Saved_Register *reg = dyn_array_get(saved_array, i);
+    move_value(context->allocator, builder, source_range, &reg->saved.storage, &reg->stack_value->storage);
+    // TODO :FreeStackAllocation
+  }
+}
+
+void
 token_handle_function_call(
   Execution_Context *context,
   Value *target_token,
