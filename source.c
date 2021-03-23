@@ -4226,6 +4226,16 @@ token_parse_expression(
 }
 
 void
+mass_handle_statement_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Value *lazy_value
+) {
+  MASS_ON_ERROR(value_force(context, &lazy_value->source_range, lazy_value, &void_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
+}
+
+void
 mass_handle_block_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -4278,11 +4288,20 @@ token_parse_block_view(
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
         // FIXME for the lazy evaluation we need to get a lazy value here
-        Lazy_Value value;
-        match_length = matcher->proc(context, rest, &value, matcher->payload);
+        Lazy_Value *value = allocator_allocate(context->allocator, Lazy_Value);
+        *value = (Lazy_Value) {
+          .context = *context,
+          .proc = mass_handle_statement_lazy_proc,
+          .payload = &void_value,
+        };
+        match_length = matcher->proc(context, rest, value, matcher->payload);
         MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
-          dyn_array_push(lazy_statements, &void_value);
+          Value_View matched_view = value_view_slice(&rest, 0, match_length);
+          Value *lazy_value = value_make(
+            context, &descriptor_void, storage_static(value), matched_view.source_range
+          );
+          dyn_array_push(lazy_statements, lazy_value);
           goto next_loop;
         }
       }
@@ -4290,7 +4309,6 @@ token_parse_block_view(
 
     Value *parse_result =
       token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
-    MASS_ON_ERROR(*context->result) return 0;
     dyn_array_push(lazy_statements, parse_result);
 
     if (!match_length) {
@@ -4305,6 +4323,8 @@ token_parse_block_view(
     }
     next_loop:;
   }
+
+  MASS_ON_ERROR(*context->result) return 0;
 
   Value *last_result = *dyn_array_last(lazy_statements);
   const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
