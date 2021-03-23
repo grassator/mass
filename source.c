@@ -3303,8 +3303,8 @@ token_handle_function_call(
     goto err;
   }
 
-
-  if (!match.value) {
+  Value *overload = match.value;
+  if (!overload) {
     // TODO add better error message
     context_error_snprintf(
       context, source_range,
@@ -3312,8 +3312,6 @@ token_handle_function_call(
     );
     goto err;
   }
-  Value *overload = value_any(context, source_range);
-  MASS_ON_ERROR(value_force(context, &source_range, match.value, overload)) return;
 
   Mass_Function_Call_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
