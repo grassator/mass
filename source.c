@@ -1509,9 +1509,11 @@ token_parse_macro_rewrite(
 
   Value_View match_view = value_view_slice(&value_view, 0, match_length);
   Value_View block_tokens = value_view_from_value_array(result_tokens, &match_view.source_range);
-  // FIXME :LazyProc
   Value *block_result = token_parse_block_view(context, block_tokens);
-  MASS_ON_ERROR(value_force(context, &match_view.source_range, block_result, &void_value)) return 0;
+  if (block_result) {
+    assert(value_is_lazy_or_static(block_result));
+    out_lazy_value->payload = block_result;
+  }
 
   dyn_array_destroy(match);
   return match_length;
