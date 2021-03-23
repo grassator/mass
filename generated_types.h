@@ -541,7 +541,6 @@ typedef struct {
   Value * value;
 } Scope_Entry_Value;
 typedef struct {
-  Slice name;
   Execution_Context context;
   Value_View tokens;
 } Scope_Entry_Lazy_Expression;

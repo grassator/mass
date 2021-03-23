@@ -1912,7 +1912,6 @@ token_parse_exports(
       scope_define(context->module->export_scope, name, (Scope_Entry) {
         .tag = Scope_Entry_Tag_Lazy_Expression,
         .Lazy_Expression = {
-          .name = name,
           .tokens = item,
           .context = lazy_context,
         },
@@ -2962,7 +2961,6 @@ token_parse_constant_definitions(
   scope_define(context->scope, name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Lazy_Expression,
     .Lazy_Expression = {
-      .name = name,
       .tokens = rhs,
       .context = *context,
     },

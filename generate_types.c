@@ -677,7 +677,6 @@ main(void) {
       { "Value *", "value" },
     }),
     struct_fields("Lazy_Expression", (Struct_Item[]){
-      { "Slice", "name" },
       { "Execution_Context", "context" },
       { "Value_View", "tokens" },
     }),
