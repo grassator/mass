@@ -6,6 +6,18 @@
 #define MASS_RETURN_LABEL_NAME slice_literal("@return_label")
 #define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
 
+#define PACK_AS_VOID_POINTER(_TARGET_, _SOURCE_)\
+  do {\
+    static_assert(sizeof(_SOURCE_) <= sizeof(_TARGET_), "Value too large to pack into a pointer");\
+    memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_SOURCE_));\
+  } while(0)
+
+#define UNPACK_FROM_VOID_POINTER(_TARGET_, _SOURCE_)\
+  do {\
+    static_assert(sizeof(_SOURCE_) >= sizeof(_TARGET_), "Value too large to unpack from a pointer");\
+    memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_TARGET_));\
+  } while(0)
+
 typedef struct {
   Operator_Fixity fixity;
   u8 argument_count;

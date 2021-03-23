@@ -4231,7 +4231,8 @@ mass_handle_block_lazy_proc(
   Value *result_value,
   void *raw_payload
 ) {
-  Array_Value_Ptr lazy_statements = *(Array_Value_Ptr *)&raw_payload;
+  Array_Value_Ptr lazy_statements;
+  UNPACK_FROM_VOID_POINTER(lazy_statements, raw_payload);
   u64 statement_count = dyn_array_length(lazy_statements);
   for (u64 i = 0; i < statement_count; ++i) {
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
@@ -4307,7 +4308,8 @@ token_parse_block_view(
 
   Value *last_result = *dyn_array_last(lazy_statements);
   const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
-  void *payload = *(void **)&lazy_statements;
+  void *payload;
+  PACK_AS_VOID_POINTER(payload, lazy_statements);
 
   return mass_make_lazy_value(
     context, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
