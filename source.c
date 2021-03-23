@@ -4411,6 +4411,36 @@ token_parse_statement_using(
   return peek_index;
 }
 
+void
+mass_handle_label_lazy_proc(
+  Execution_Context *context,
+  Value *unused_result,
+  Value *label_value
+) {
+  Source_Range source_range = label_value->source_range;
+  if (
+    label_value->descriptor != &descriptor_void ||
+    label_value->storage.tag != Storage_Tag_Memory ||
+    label_value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
+  ) {
+    Slice source = source_from_source_range(&source_range);
+    context_error_snprintf(
+      context, source_range,
+      "Trying to redefine variable %"PRIslice" as a label",
+      SLICE_EXPAND_PRINTF(source)
+    );
+    return;
+  }
+
+  push_instruction(
+    &context->builder->code_block.instructions, source_range,
+    (Instruction) {
+      .type = Instruction_Type_Label,
+      .label = label_value->storage.Memory.location.Instruction_Pointer_Relative.label_index
+    }
+  );
+}
+
 u64
 token_parse_statement_label(
   Execution_Context *context,
@@ -4456,28 +4486,10 @@ token_parse_statement_label(
     }
   }
 
-  Source_Range keyword_range = keyword->source_range;
-  if (
-    value->descriptor != &descriptor_void ||
-    value->storage.tag != Storage_Tag_Memory ||
-    value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
-  ) {
-    Slice source = source_from_source_range(&keyword_range);
-    context_error_snprintf(
-      context, keyword_range,
-      "Trying to redefine variable %"PRIslice" as a label",
-      SLICE_EXPAND_PRINTF(source)
-    );
-    goto err;
-  }
-
-  push_instruction(
-    &context->builder->code_block.instructions, keyword_range,
-    (Instruction) {
-      .type = Instruction_Type_Label,
-      .label = value->storage.Memory.location.Instruction_Pointer_Relative.label_index
-    }
-  );
+  // :LazyProc
+  mass_handle_label_lazy_proc(context, 0, value);
+  //out_lazy_value->proc = mass_handle_label_lazy_proc;
+  //out_lazy_value->payload = value;
 
   err:
   return peek_index;
@@ -5122,11 +5134,11 @@ scope_define_builtins(
 
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions}); // ~
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return}); // ready
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement}); // ?
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using}); // ~
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition}); // ~
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_operator_definition}); // ~
