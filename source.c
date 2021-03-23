@@ -414,19 +414,18 @@ scope_entry_force(
       panic("Internal Error: Operators are not allowed in this context");
       return 0;
     }
-    case Scope_Entry_Tag_Lazy_Expression: {
-      Scope_Entry_Lazy_Expression *expr = &entry->Lazy_Expression;
-      Value *result = value_any(&expr->context, expr->tokens.source_range);
-      compile_time_eval(&expr->context, expr->tokens, result);
-      *entry = (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = result,
-        .next_overload = entry->next_overload,
-        .source_range = entry->source_range,
-      };
-      return result;
-    }
     case Scope_Entry_Tag_Value: {
+      Value *value = entry->Value.value;
+      Value *next_overload = value->next_overload;
+      // TODO Should this be limited to just compile time execution explicitly?
+      if (value->descriptor == &descriptor_lazy_value) {
+        Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+        Execution_Context *context = &lazy->context;
+        Value *result = value_any(context, entry->source_range);
+        lazy->proc(context, result, lazy->payload);
+        *value = *result;
+        value->next_overload = next_overload;
+      }
       return entry->Value.value;
     }
   }
@@ -455,7 +454,7 @@ scope_lookup_force(
 
   // Force lazy entries
   for (Scope_Entry *it = entry; it; it = it->next_overload) {
-    if (it->tag == Scope_Entry_Tag_Lazy_Expression) {
+    if (it->tag == Scope_Entry_Tag_Value) {
       scope_entry_force(it);
     }
   }
@@ -1854,6 +1853,53 @@ token_handle_user_defined_operator_proc(
   return token_parse_block(&body_context, operator->body);
 }
 
+void
+mass_handle_compile_time_eval_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Value_View *view
+) {
+  compile_time_eval(context, *view, result_value);
+}
+
+static inline Value *
+mass_make_lazy_value(
+  Execution_Context *context,
+  Source_Range source_range,
+  void *payload,
+  const Descriptor *descriptor,
+  Lazy_Value_Proc proc
+) {
+  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
+  *lazy = (Lazy_Value) {
+    .context = *context,
+    .descriptor = descriptor,
+    .proc = proc,
+    .payload = payload,
+  };
+  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
+}
+
+void
+scope_define_lazy_compile_time_expression(
+  Execution_Context *context,
+  Scope *scope,
+  Slice name,
+  Value_View view
+) {
+  Value_View *payload = allocator_allocate(context->allocator, Value_View);
+  *payload = view;
+  Value *lazy_value = mass_make_lazy_value(
+    context, view.source_range, payload, 0 /*descriptor*/, mass_handle_compile_time_eval_lazy_proc
+  );
+
+  scope_define(scope, name, (Scope_Entry) {
+    .tag = Scope_Entry_Tag_Value,
+    .Value = lazy_value,
+    .source_range = view.source_range,
+  });
+}
+
 u64
 token_parse_exports(
   Execution_Context *context,
@@ -1908,15 +1954,7 @@ token_parse_exports(
       }
       Value *symbol_token = value_view_get(item, 0);
       Slice name = value_as_symbol(symbol_token)->name;
-      Execution_Context lazy_context = *context;
-      scope_define(context->module->export_scope, name, (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Lazy_Expression,
-        .Lazy_Expression = {
-          .tokens = item,
-          .context = lazy_context,
-        },
-        .source_range = symbol_token->source_range,
-      });
+      scope_define_lazy_compile_time_expression(context, context->module->export_scope, name, item);
     }
   }
 
@@ -2742,24 +2780,6 @@ mass_compiler_external(
 MASS_ENUMERATE_INTEGER_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
-static inline Value *
-mass_make_lazy_value(
-  Execution_Context *context,
-  Source_Range source_range,
-  void *payload,
-  const Descriptor *descriptor,
-  Lazy_Value_Proc proc
-) {
-  Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
-  *lazy = (Lazy_Value) {
-    .context = *context,
-    .descriptor = descriptor,
-    .proc = proc,
-    .payload = payload,
-  };
-  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
-}
-
 typedef struct {
   const Descriptor *target;
   Value *expression;
@@ -2958,14 +2978,7 @@ token_parse_constant_definitions(
   }
 
   Slice name = value_as_symbol(symbol)->name;
-  scope_define(context->scope, name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Lazy_Expression,
-    .Lazy_Expression = {
-      .tokens = rhs,
-      .context = *context,
-    },
-    .source_range = lhs.source_range,
-  });
+  scope_define_lazy_compile_time_expression(context, context->scope, name, rhs);
 
   err:
   return statement_length;

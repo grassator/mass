@@ -676,10 +676,6 @@ main(void) {
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
-    struct_fields("Lazy_Expression", (Struct_Item[]){
-      { "Execution_Context", "context" },
-      { "Value_View", "tokens" },
-    }),
     struct_fields("Operator", (Struct_Item[]){
       { "Operator *", "maybe_prefix" },
       { "Operator *", "maybe_infix_or_postfix" },

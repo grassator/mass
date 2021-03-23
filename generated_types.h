@@ -533,17 +533,12 @@ typedef dyn_array_type(Operator) Array_Operator;
 
 typedef enum {
   Scope_Entry_Tag_Value = 0,
-  Scope_Entry_Tag_Lazy_Expression = 1,
-  Scope_Entry_Tag_Operator = 2,
+  Scope_Entry_Tag_Operator = 1,
 } Scope_Entry_Tag;
 
 typedef struct {
   Value * value;
 } Scope_Entry_Value;
-typedef struct {
-  Execution_Context context;
-  Value_View tokens;
-} Scope_Entry_Lazy_Expression;
 typedef struct {
   Operator * maybe_prefix;
   Operator * maybe_infix_or_postfix;
@@ -555,7 +550,6 @@ typedef struct Scope_Entry {
   Scope_Entry * next_overload;
   union {
     Scope_Entry_Value Value;
-    Scope_Entry_Lazy_Expression Lazy_Expression;
     Scope_Entry_Operator Operator;
   };
 } Scope_Entry;
