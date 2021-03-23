@@ -3090,10 +3090,10 @@ token_handle_function_call(
 
   if (!(function->flags & Descriptor_Function_Flags_Macro)) {
     call_function_overload(context, &source_range, overload, args, result_value);
-    goto err;
+    goto done;
   }
-  assert(function->scope->parent);
-  // We make a nested scope based on function's original parent scope
+
+  // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
   Scope *body_scope = (function->flags & Descriptor_Function_Flags_No_Own_Scope)
@@ -3170,6 +3170,7 @@ token_handle_function_call(
     }
   }
 
+  done:
   err:
   if (dyn_array_is_initialized(args)) {
     dyn_array_destroy(args);
