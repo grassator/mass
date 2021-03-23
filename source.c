@@ -4774,6 +4774,28 @@ token_define_global_variable(
   });
 }
 
+typedef struct {
+  Source_Range source_range;
+  Value *stack_value;
+  Value *expression;
+} Mass_Local_Variable_Lazy_Payload;
+
+void
+mass_handle_local_variable_lazy_proc(
+  Execution_Context *context,
+  Value *unused_result,
+  Mass_Local_Variable_Lazy_Payload *payload
+) {
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
+  if (descriptor->tag == Descriptor_Tag_Function) {
+    load_address(context, &payload->source_range, payload->stack_value, payload->expression);
+  } else {
+    MASS_ON_ERROR(
+      value_force(context, &payload->source_range, payload->expression, payload->stack_value)
+    ) return;
+  }
+}
+
 void
 token_define_local_variable(
   Execution_Context *context,
@@ -4782,32 +4804,42 @@ token_define_local_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  const Source_Range *source_range = &expression.source_range;
   Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
 
-  // x := 42 should always be initialized to s64 to avoid weird suprises
+  const Descriptor *stack_descriptor;
   if (descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(context, source_range, value, &descriptor_s64);
-    descriptor = value->descriptor;
-  }
-  Value *on_stack;
-  if (descriptor->tag == Descriptor_Tag_Function) {
-    Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
+    // x := 42 should always be initialized to s64 to avoid weird suprises
+    stack_descriptor = &descriptor_s64;
+  } else if (descriptor->tag == Descriptor_Tag_Function) {
+    stack_descriptor = descriptor_pointer_to(context->allocator, descriptor);
     ensure_compiled_function_body(context, value);
-    on_stack = reserve_stack(context, context->builder, fn_pointer, symbol->source_range);
-    load_address(context, &symbol->source_range, on_stack, value);
   } else {
-    on_stack = reserve_stack(context, context->builder, descriptor, symbol->source_range);
-    MASS_ON_ERROR(value_force(context, source_range, value, on_stack)) return;
+    stack_descriptor = descriptor;
   }
+
+  const Source_Range *source_range = &symbol->source_range;
+  Value *on_stack = reserve_stack(context, context->builder, stack_descriptor, *source_range);
 
   scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
     .tag = Scope_Entry_Tag_Value,
     .Value.value = on_stack,
-    .source_range = symbol->source_range,
+    .source_range = *source_range,
   });
+
+  Mass_Local_Variable_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Local_Variable_Lazy_Payload);
+  *payload = (Mass_Local_Variable_Lazy_Payload) {
+    .source_range = *source_range,
+    .stack_value = on_stack,
+    .expression = value,
+  };
+
+  // :LazyProc
+  mass_handle_local_variable_lazy_proc(context, 0, payload);
+  //out_lazy_value->proc = mass_handle_local_variable_lazy_proc;
+  //out_lazy_value->payload = payload;
 }
 
 u64
@@ -5135,7 +5167,7 @@ scope_define_builtins(
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions}); // ~
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement}); // ?
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label}); // ready
