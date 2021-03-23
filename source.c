@@ -2976,13 +2976,19 @@ token_parse_constant_definitions(
   return statement_length;
 }
 
+typedef struct {
+  Array_Value_Ptr args;
+  Value *overload;
+} Mass_Macro_Call_Lazy_Payload;
+
 void
 call_function_macro(
   Execution_Context *context,
-  Value *overload,
-  Array_Value_Ptr args,
-  Value *result_value
+  Value *result_value,
+  Mass_Macro_Call_Lazy_Payload *payload
 ) {
+  Value *overload = payload->overload;
+  Array_Value_Ptr args = payload->args;
   const Function_Info *function = &overload->descriptor->Function.info;
 
   // We make a nested scope based on function's original scope
@@ -3172,11 +3178,18 @@ token_handle_function_call(
   Value *overload = value_any(context, source_range);
   MASS_ON_ERROR(value_force(context, &source_range, match.value, overload)) return;
 
+  Mass_Macro_Call_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Macro_Call_Lazy_Payload);
+  *payload = (Mass_Macro_Call_Lazy_Payload) {
+    .overload = overload,
+    .args = args,
+  };
+
   const Function_Info *function = &overload->descriptor->Function.info;
   if (!(function->flags & Descriptor_Function_Flags_Macro)) {
     call_function_overload(context, &source_range, overload, args, result_value);
   } else {
-    call_function_macro(context, overload, args, result_value);
+    call_function_macro(context, result_value, payload);
   }
 
   err:
