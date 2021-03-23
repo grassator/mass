@@ -130,10 +130,7 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define(root_scope, slice_literal("test"), (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = test,
-      });
+      scope_define_value(root_scope, (Source_Range){0}, slice_literal("test"), test);
       Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
       check(entry->tag == Scope_Entry_Tag_Value);
       check(entry->Value.value == test);
@@ -142,24 +139,15 @@ spec("source") {
     it("should be able to lookup things from parent scopes") {
       Value *global = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define(root_scope, slice_literal("global"), (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = global,
-      });
+      scope_define_value(root_scope, (Source_Range){0}, slice_literal("global"), global);
 
       Value *level_1_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
-      scope_define(scope_level_1, slice_literal("test"), (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = level_1_test,
-      });
+      scope_define_value(scope_level_1, (Source_Range){0}, slice_literal("test"), level_1_test);
 
       Value *level_2_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
-      scope_define(scope_level_2, slice_literal("test"),  (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = level_2_test,
-      });
+      scope_define_value(scope_level_2, (Source_Range){0}, slice_literal("test"),  level_2_test);
 
       Scope_Entry *entry =
         scope_lookup(scope_level_2, slice_literal("global"));

@@ -96,10 +96,20 @@ scope_make(
 );
 
 static inline void
-scope_define(
+scope_define_value(
   Scope *scope,
+  Source_Range source_range,
   Slice name,
-  Scope_Entry entry
+  Value *value
+);
+
+static inline void
+scope_define_operator(
+  Execution_Context *context,
+  Scope *scope,
+  Source_Range source_range,
+  Slice name,
+  Operator *operator
 );
 
 void

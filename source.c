@@ -483,10 +483,11 @@ scope_lookup_force(
 }
 
 static inline void
-scope_define(
+scope_define_value(
   Scope *scope,
+  Source_Range source_range,
   Slice name,
-  Scope_Entry entry
+  Value *value
 ) {
   if (!scope->map) {
     scope->map = Scope_Map__make(scope->allocator);
@@ -497,12 +498,76 @@ scope_define(
     assert(it->tag == Scope_Entry_Tag_Value);
     Value *existing = it->Value.value;
     while (existing->next_overload) existing = existing->next_overload;
-    assert(entry.tag == Scope_Entry_Tag_Value);
-    existing->next_overload = entry.Value.value;
+    existing->next_overload = value;
   } else {
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
-    *allocated = entry;
+    *allocated = (Scope_Entry) {
+      .tag = Scope_Entry_Tag_Value,
+      .Value.value = value,
+      .source_range = source_range,
+    };
     hash_map_set(scope->map, name, allocated);
+  }
+}
+
+static inline void
+scope_define_operator(
+  Execution_Context *context,
+  Scope *scope,
+  Source_Range source_range,
+  Slice name,
+  Operator *operator
+) {
+  Scope_Entry *current_scope_entry = scope_lookup_shallow(scope, name);
+  Scope_Entry *ancestor_scope_entry = scope_lookup(scope, name);
+  if (current_scope_entry) {
+    if (current_scope_entry->tag != Scope_Entry_Tag_Operator) {
+      panic("Internal Error: Found an operator-like scope entry that is not an operator");
+    }
+    Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
+    if (operator->fixity == Operator_Fixity_Prefix) {
+      if (operator_entry->maybe_prefix) {
+        context_error_snprintf(
+          context, source_range,
+          "There is already a prefix operator %"PRIslice" defined in this scope",
+          SLICE_EXPAND_PRINTF(name)
+        );
+        return;
+      } else {
+        operator_entry->maybe_prefix = operator;
+      }
+    } else {
+      if (operator_entry->maybe_infix_or_postfix) {
+        context_error_snprintf(
+          context, source_range,
+          "There is already a infix or postfix operator %"PRIslice" defined in this scope",
+          SLICE_EXPAND_PRINTF(name)
+        );
+        return;
+      } else {
+        operator_entry->maybe_infix_or_postfix = operator;
+      }
+    }
+  } else {
+    Scope_Entry *new_entry = allocator_allocate(scope->allocator, Scope_Entry);
+    *new_entry = (Scope_Entry){
+      .tag = Scope_Entry_Tag_Operator,
+      .source_range = source_range,
+    };
+    // Flatten parent operator entry into current one to avoid the need for overload iteration
+    if (ancestor_scope_entry) {
+      new_entry->Operator = ancestor_scope_entry->Operator;
+    }
+    if (operator->fixity == Operator_Fixity_Prefix) {
+      new_entry->Operator.maybe_prefix = operator;
+    } else {
+      new_entry->Operator.maybe_infix_or_postfix = operator;
+    }
+
+    if (!scope->map) {
+      scope->map = Scope_Map__make(scope->allocator);
+    }
+    hash_map_set(scope->map, name, new_entry);
   }
 }
 
@@ -1384,11 +1449,7 @@ token_apply_macro_syntax(
       result->next_overload = scope_overload;
     }
 
-    scope_define(expansion_scope, capture_name, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = result,
-      .source_range = capture_view.source_range,
-    });
+    scope_define_value(expansion_scope, capture_view.source_range, capture_name, result);
   }
 
   Execution_Context body_context = *context;
@@ -1825,11 +1886,7 @@ token_handle_user_defined_operator_proc(
     Source_Range source_range = arg->source_range;
     Value *arg_value = value_any(context, source_range);
     MASS_ON_ERROR(value_force(context, &source_range, arg, arg_value)) return 0;
-    scope_define(body_scope, arg_name, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = arg_value,
-      .source_range = source_range,
-    });
+    scope_define_value(body_scope, source_range, arg_name, arg_value);
   }
 
   Execution_Context body_context = *context;
@@ -1877,11 +1934,7 @@ scope_define_lazy_compile_time_expression(
     context, view.source_range, payload, 0 /*descriptor*/, mass_handle_compile_time_eval_lazy_proc
   );
 
-  scope_define(scope, name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value = lazy_value,
-    .source_range = view.source_range,
-  });
+  scope_define_value(scope, view.source_range, name, lazy_value);
 }
 
 u64
@@ -2065,52 +2118,7 @@ token_parse_operator_definition(
 
   // FIXME move this logic into something like scope_define_operator
   Slice operator_name = value_as_symbol(operator_token)->name;
-  Scope_Entry *current_scope_entry = scope_lookup_shallow(context->scope, operator_name);
-  Scope_Entry *ancestor_scope_entry = scope_lookup(context->scope, operator_name);
-  if (current_scope_entry) {
-    if (current_scope_entry->tag != Scope_Entry_Tag_Operator) {
-      panic("Internal Error: Found an operator-like scope entry that is not an operator");
-    }
-    Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
-    if (operator->fixity == Operator_Fixity_Prefix) {
-      if (operator_entry->maybe_prefix) {
-        context_error_snprintf(
-          context, keyword_token->source_range,
-          "There is already a prefix operator %"PRIslice" defined in this scope",
-          SLICE_EXPAND_PRINTF(operator_name)
-        );
-        goto err;
-      } else {
-        operator_entry->maybe_prefix = operator;
-      }
-    } else {
-      if (operator_entry->maybe_infix_or_postfix) {
-        context_error_snprintf(
-          context, keyword_token->source_range,
-          "There is already a infix or postfix operator %"PRIslice" defined in this scope",
-          SLICE_EXPAND_PRINTF(operator_name)
-        );
-        goto err;
-      } else {
-        operator_entry->maybe_infix_or_postfix = operator;
-      }
-    }
-  } else {
-    Scope_Entry new_entry = {
-      .tag = Scope_Entry_Tag_Operator,
-      .source_range = operator_token->source_range,
-    };
-    // Flatten parent operator entry into current one to avoid the need for overload iteration
-    if (ancestor_scope_entry) {
-      new_entry.Operator = ancestor_scope_entry->Operator;
-    }
-    if (operator->fixity == Operator_Fixity_Prefix) {
-      new_entry.Operator.maybe_prefix = operator;
-    } else {
-      new_entry.Operator.maybe_infix_or_postfix = operator;
-    }
-    scope_define(context->scope, operator_name, new_entry);
-  }
+  scope_define_operator(context, context->scope, keyword_token->source_range, operator_name, operator);
 
   return peek_index;
 
@@ -3113,21 +3121,13 @@ token_handle_function_call(
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
           MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) goto err;
         }
-        scope_define(body_scope, arg->name, (Scope_Entry) {
-          .tag = Scope_Entry_Tag_Value,
-          .Value.value = arg_value,
-          .source_range = arg_value->source_range,
-        });
+        scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
       } else {
         arg_value = *dyn_array_get(args, i);
       }
 
       arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg_descriptor);
-      scope_define(body_scope, arg->name, (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = arg_value,
-        .source_range = arg_value->source_range,
-      });
+      scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
     }
   }
 
@@ -3143,14 +3143,8 @@ token_handle_function_call(
       .storage = code_label32(fake_return_label_index),
       .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
     };
-    scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = &return_label,
-    });
-    scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = result_value,
-    });
+    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
+    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
   }
 
   Value *body = function->body;
@@ -4502,11 +4496,7 @@ token_parse_statement_label(
     Source_Range source_range = symbol->source_range;
     Label_Index label = make_label(context->program, &context->program->memory.sections.code, name);
     value = value_make(context, &descriptor_void, code_label32(label), source_range);
-    scope_define(label_scope, name, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = value,
-      .source_range = source_range,
-    });
+    scope_define_value(label_scope, source_range, name, value);
     if (placeholder) {
       return peek_index;
     }
@@ -4723,19 +4713,16 @@ token_parse_definition(
 
   // TODO consider merging with argument matching
   u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Pattern_Tag_Symbol);
+  Token_Match(name_token, .tag = Token_Pattern_Tag_Symbol);
   Token_Match_Operator(define, ":");
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   const Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) goto err;
-  Source_Range name_range = name->source_range;
+  Source_Range name_range = name_token->source_range;
   Value *value = reserve_stack(context, context->builder, descriptor, name_range);
-  scope_define(context->scope, value_as_symbol(name)->name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = value,
-    .source_range = name_range,
-  });
+  Slice name = value_as_symbol(name_token)->name;
+  scope_define_value(context->scope, name_range, name, value);
   MASS_ON_ERROR(assign(context, result_value, value)) goto err;
 
   err:
@@ -4802,11 +4789,8 @@ token_define_global_variable(
     }
   }
 
-  scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = global_value,
-    .source_range = symbol->source_range,
-  });
+  Slice scope_name = value_as_symbol(symbol)->name;
+  scope_define_value(context->scope, symbol->source_range, scope_name, global_value);
 }
 
 typedef struct {
@@ -4858,11 +4842,8 @@ token_define_local_variable(
   const Source_Range *source_range = &symbol->source_range;
   Value *on_stack = reserve_stack(context, context->builder, stack_descriptor, *source_range);
 
-  scope_define(context->scope, value_as_symbol(symbol)->name, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = on_stack,
-    .source_range = *source_range,
-  });
+  Slice scope_name = value_as_symbol(symbol)->name;
+  scope_define_value(context->scope, *source_range, scope_name, on_stack);
 
   Mass_Assignment_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
@@ -4982,98 +4963,56 @@ scope_define_builtins(
   const Allocator *allocator,
   Scope *scope
 ) {
-  scope_define(scope, slice_literal("()"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
-        .precedence = 20,
-        .fixity = Operator_Fixity_Postfix,
-        .argument_count = 2,
-        .handler = mass_handle_paren_operator,
-      ),
-    },
-  });
-  scope_define(scope, slice_literal("@"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_prefix = allocator_make(allocator, Operator,
-        .precedence = 20,
-        .fixity = Operator_Fixity_Prefix,
-        .associativity = Operator_Associativity_Right,
-        .argument_count = 1,
-        .handler = mass_handle_at_operator,
-      ),
-    },
-  });
-  scope_define(scope, slice_literal("."), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
-        .precedence = 19,
-        .fixity = Operator_Fixity_Infix,
-        .argument_count = 2,
-        .handler = mass_handle_dot_operator,
-      ),
-    },
-  });
-  scope_define(scope, slice_literal("->"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
-        .precedence = 19,
-        .fixity = Operator_Fixity_Infix,
-        .associativity = Operator_Associativity_Right,
-        .argument_count = 3,
-        .handler = mass_handle_arrow_operator,
-      ),
-    },
-  });
-  scope_define(scope, slice_literal("macro"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_prefix = allocator_make(allocator, Operator,
-        .precedence = 19,
-        .associativity = Operator_Associativity_Right,
-        .fixity = Operator_Fixity_Prefix,
-        .argument_count = 1,
-        .handler = mass_handle_macro_keyword,
-      ),
-    },
-  });
+  Source_Range range = {0};
+  scope_define_operator(0, scope, range, slice_literal("()"), allocator_make(allocator, Operator,
+    .precedence = 20,
+    .fixity = Operator_Fixity_Postfix,
+    .argument_count = 2,
+    .handler = mass_handle_paren_operator,
+  ));
+  scope_define_operator(0, scope, range, slice_literal("@"), allocator_make(allocator, Operator,
+    .precedence = 20,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 1,
+    .handler = mass_handle_at_operator,
+  ));
+  scope_define_operator(0, scope, range, slice_literal("."), allocator_make(allocator, Operator,
+    .precedence = 19,
+    .fixity = Operator_Fixity_Infix,
+    .argument_count = 2,
+    .handler = mass_handle_dot_operator,
+  ));
+  scope_define_operator(0, scope, range, slice_literal("->"), allocator_make(allocator, Operator,
+    .precedence = 19,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 3,
+    .handler = mass_handle_arrow_operator,
+  ));
+  scope_define_operator(0, scope, range, slice_literal("macro"), allocator_make(allocator, Operator,
+    .precedence = 19,
+    .associativity = Operator_Associativity_Right,
+    .fixity = Operator_Fixity_Prefix,
+    .argument_count = 1,
+    .handler = mass_handle_macro_keyword,
+  ));
 
-  scope_define(scope, slice_literal("-"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Operator,
-    .Operator = {
-      .maybe_prefix = allocator_make(allocator, Operator,
-        .precedence = 17,
-        .handler = token_handle_negation,
-        .argument_count = 1,
-        .fixity = Operator_Fixity_Prefix
-      ),
-      .maybe_infix_or_postfix = allocator_make(allocator, Operator,
-        .precedence = 10,
-        .fixity = Operator_Fixity_Infix,
-        .argument_count = 2,
-        .handler = mass_handle_arithmetic_operation,
-        .handler_payload = (void*)Mass_Arithmetic_Operator_Subtract
-      )
-    },
-  });
+  scope_define_operator(0, scope, range, slice_literal("-"), allocator_make(allocator, Operator,
+    .precedence = 17,
+    .handler = token_handle_negation,
+    .argument_count = 1,
+    .fixity = Operator_Fixity_Prefix
+  ));
 
-  // FIXME Change this to not require the minus hack
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
-    if (#SYMBOL[0] != '-') scope_define(scope, slice_literal(#SYMBOL), (Scope_Entry) { \
-      .tag = Scope_Entry_Tag_Operator,\
-      .Operator = {\
-        .maybe_infix_or_postfix = allocator_make(allocator, Operator, \
-          .precedence = (PRECEDENCE),\
-          .fixity = Operator_Fixity_Infix,\
-          .argument_count = 2,\
-          .handler = mass_handle_arithmetic_operation,\
-          .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
-        ),\
-      }\
-    });
+    scope_define_operator(0, scope, range, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
+      .precedence = (PRECEDENCE),\
+      .fixity = Operator_Fixity_Infix,\
+      .argument_count = 2,\
+      .handler = mass_handle_arithmetic_operation,\
+      .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
+    ));
   MASS_ARITHMETIC_OPERATOR(MASS_DEFINE_ARITHMETIC)
   #undef MASS_DEFINE_ARITHMETIC
 
@@ -5087,62 +5026,26 @@ scope_define_builtins(
   };
 
   for (u64 i = 0; i < countof(comparisons); ++i) {
-    scope_define(scope, comparisons[i].symbol, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Operator,
-      .Operator = {
-        .maybe_infix_or_postfix = allocator_make(allocator, Operator,
-          .precedence = comparisons[i].precedence,
-          .fixity = Operator_Fixity_Infix,
-          .argument_count = 2,
-          .handler = mass_handle_comparison_operation,
-          .handler_payload = (void*)(s64)comparisons[i].type,
-        ),
-      }
-    });
+    scope_define_operator(0, scope, range, comparisons[i].symbol, allocator_make(allocator, Operator,
+      .precedence = comparisons[i].precedence,
+      .fixity = Operator_Fixity_Infix,
+      .argument_count = 2,
+      .handler = mass_handle_comparison_operation,
+      .handler_payload = (void*)(s64)comparisons[i].type,
+    ));
   }
 
-  scope_define(scope, slice_literal("any"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_any_value
-  });
-
-  scope_define(scope, slice_literal("Register_8"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_register_8_value
-  });
-  scope_define(scope, slice_literal("Register_16"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_register_16_value
-  });
-  scope_define(scope, slice_literal("Register_32"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_register_32_value
-  });
-  scope_define(scope, slice_literal("Register_64"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_register_64_value
-  });
-
-  scope_define(scope, slice_literal("External_Symbol"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_external_symbol_value
-  });
-
-  scope_define(scope, slice_literal("String"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_slice_value
-  });
-
-  scope_define(scope, slice_literal("Scope"), (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = type_scope_value
-  });
+  scope_define_value(scope, range, slice_literal("any"), type_any_value);
+  scope_define_value(scope, range, slice_literal("Register_8"), type_register_8_value);
+  scope_define_value(scope, range, slice_literal("Register_16"), type_register_16_value);
+  scope_define_value(scope, range, slice_literal("Register_32"), type_register_32_value);
+  scope_define_value(scope, range, slice_literal("Register_64"), type_register_64_value);
+  scope_define_value(scope, range, slice_literal("External_Symbol"), type_external_symbol_value);
+  scope_define_value(scope, range, slice_literal("String"), type_slice_value);
+  scope_define_value(scope, range, slice_literal("Scope"), type_scope_value);
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
-    scope_define(scope, slice_literal(#_NAME_), (Scope_Entry) {\
-      .tag = Scope_Entry_Tag_Value,\
-      .Value.value = type_##_NAME_##_value\
-    });
+    scope_define_value(scope, range, slice_literal(#_NAME_), type_##_NAME_##_value);
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
@@ -5180,10 +5083,7 @@ scope_define_builtins(
       allocator_allocate(allocator, Value),\
       VALUE_STATIC_EPOCH, descriptor, imm64((u64)_FN_), (Source_Range){0}\
     );\
-    scope_define(scope, slice_literal(_NAME_), (Scope_Entry) {\
-      .tag = Scope_Entry_Tag_Value,\
-      .Value.value = value,\
-    });\
+    scope_define_value(scope, range, slice_literal(_NAME_), value);\
   }
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\

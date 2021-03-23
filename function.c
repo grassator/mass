@@ -1299,10 +1299,7 @@ ensure_compiled_function_body(
     Value *arg_value = function_argument_value_at_index(
       &body_context, function, index, Function_Argument_Mode_Body
     );
-    scope_define(body_scope, argument->name, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = arg_value,
-    });
+    scope_define_value(body_scope, arg_value->source_range, argument->name, arg_value);
     if (arg_value->storage.tag == Storage_Tag_Register) {
       register_bitset_set(
         &builder.code_block.register_occupied_bitset,
@@ -1317,18 +1314,11 @@ ensure_compiled_function_body(
     &body_context, function->returns.descriptor, Function_Argument_Mode_Body, return_range
   );
 
-  scope_define(body_scope, MASS_RETURN_VALUE_NAME, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = return_value,
-  });
+  scope_define_value(body_scope, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
-  Value *return_label_value = value_make(
-    context, &descriptor_void, code_label32(builder.code_block.end_label), return_range
-  );
-  scope_define(body_scope, MASS_RETURN_LABEL_NAME, (Scope_Entry) {
-    .tag = Scope_Entry_Tag_Value,
-    .Value.value = return_label_value,
-  });
+  Value *return_label_value =
+    value_make(context, &descriptor_void, code_label32(builder.code_block.end_label), return_range);
+  scope_define_value(body_scope, return_value->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
 
   // :ReturnTypeLargerThanRegister
   // Make sure we don't stomp the address of a larger-than-register
@@ -1345,10 +1335,7 @@ ensure_compiled_function_body(
 
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
-    scope_define(body_scope, function->returns.name, (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = return_value,
-    });
+    scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
   MASS_ON_ERROR(
@@ -1432,10 +1419,7 @@ call_function_overload(
     }
     Slice name = target_arg_definition->name;
     if (name.length) {
-      scope_define(default_arguments_scope, name, (Scope_Entry) {
-        .tag = Scope_Entry_Tag_Value,
-        .Value.value = target_arg,
-      });
+      scope_define_value(default_arguments_scope, target_arg->source_range, name, target_arg);
     }
   }
 
