@@ -2977,6 +2977,92 @@ token_parse_constant_definitions(
 }
 
 void
+call_function_macro(
+  Execution_Context *context,
+  Value *overload,
+  Array_Value_Ptr args,
+  Value *result_value
+) {
+  const Function_Info *function = &overload->descriptor->Function.info;
+
+  // We make a nested scope based on function's original scope
+  // instead of current scope for hygiene reasons. I.e. function body
+  // should not have access to locals inside the call scope.
+  Scope *body_scope = (function->flags & Descriptor_Function_Flags_No_Own_Scope)
+    ? function->scope
+    : scope_make(context->allocator, function->scope);
+
+  for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+    Function_Argument *arg = dyn_array_get(function->arguments, i);
+    if (arg->name.length) {
+      assert(!function_argument_is_exact(arg));
+      Value *arg_value;
+      const Descriptor *arg_descriptor = arg->value->descriptor;
+      if (i >= dyn_array_length(args)) {
+        // We should catch the missing default expression in the matcher
+        Value_View default_expression = arg->maybe_default_expression;
+        assert(default_expression.length);
+        const Source_Range *source_range = &default_expression.source_range;
+        // FIXME avoid using a stack value
+        arg_value = reserve_stack(context, context->builder, arg_descriptor, *source_range);
+        {
+          Execution_Context arg_context = *context;
+          arg_context.scope = body_scope;
+          Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+          MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) return;
+        }
+      } else {
+        arg_value = *dyn_array_get(args, i);
+      }
+
+      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg_descriptor);
+      scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
+    }
+  }
+
+  // Define a new return target label and value so that explicit return statements
+  // jump to correct location and put value in the right place
+  Program *program = context->program;
+  Label_Index fake_return_label_index =
+    make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
+
+  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
+    Value return_label = {
+      .descriptor = &descriptor_void,
+      .storage = code_label32(fake_return_label_index),
+      .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+    };
+    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
+    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
+  }
+
+  Value *body = function->body;
+  {
+    Execution_Context body_context = *context;
+    body_context.scope = body_scope;
+    Value *parse_result = token_parse_block_no_scope(&body_context, body);
+    MASS_ON_ERROR(
+      value_force(&body_context, &body->source_range, parse_result, result_value)
+    ) return;
+  }
+
+  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
+    // @Hack if there are no instructions generated so far there definitely was no jumps
+    //       to return so we can avoid generating this instructions which also can enable
+    //       optimizations in the compile_time_eval that check for the instruction count.
+    if (dyn_array_length(context->builder->code_block.instructions)) {
+      push_instruction(
+        &context->builder->code_block.instructions, overload->source_range,
+        (Instruction) {
+          .type = Instruction_Type_Label,
+          .label = fake_return_label_index
+        }
+      );
+    }
+  }
+}
+
+void
 token_handle_function_call(
   Execution_Context *context,
   Value *target_token,
@@ -3087,90 +3173,12 @@ token_handle_function_call(
   MASS_ON_ERROR(value_force(context, &source_range, match.value, overload)) return;
 
   const Function_Info *function = &overload->descriptor->Function.info;
-
   if (!(function->flags & Descriptor_Function_Flags_Macro)) {
     call_function_overload(context, &source_range, overload, args, result_value);
-    goto done;
+  } else {
+    call_function_macro(context, overload, args, result_value);
   }
 
-  // We make a nested scope based on function's original scope
-  // instead of current scope for hygiene reasons. I.e. function body
-  // should not have access to locals inside the call scope.
-  Scope *body_scope = (function->flags & Descriptor_Function_Flags_No_Own_Scope)
-    ? function->scope
-    : scope_make(context->allocator, function->scope);
-
-  for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
-    Function_Argument *arg = dyn_array_get(function->arguments, i);
-    if (arg->name.length) {
-      assert(!function_argument_is_exact(arg));
-      Value *arg_value;
-      const Descriptor *arg_descriptor = arg->value->descriptor;
-      if (i >= dyn_array_length(args)) {
-        // We should catch the missing default expression in the matcher
-        Value_View default_expression = arg->maybe_default_expression;
-        assert(default_expression.length);
-        const Source_Range *source_range = &default_expression.source_range;
-        // FIXME avoid using a stack value
-        arg_value = reserve_stack(context, context->builder, arg_descriptor, *source_range);
-        {
-          Execution_Context arg_context = *context;
-          arg_context.scope = body_scope;
-          Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) goto err;
-        }
-      } else {
-        arg_value = *dyn_array_get(args, i);
-      }
-
-      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg_descriptor);
-      scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
-    }
-  }
-
-  // Define a new return target label and value so that explicit return statements
-  // jump to correct location and put value in the right place
-  Program *program = context->program;
-  Label_Index fake_return_label_index =
-    make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
-
-  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
-    Value return_label = {
-      .descriptor = &descriptor_void,
-      .storage = code_label32(fake_return_label_index),
-      .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-    };
-    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
-    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
-  }
-
-  Value *body = function->body;
-  {
-    Execution_Context body_context = *context;
-    body_context.scope = body_scope;
-    Value *parse_result = token_parse_block_no_scope(&body_context, body);
-    MASS_ON_ERROR(
-      value_force(&body_context, &body->source_range, parse_result, result_value)
-    ) goto err;
-  }
-
-  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
-    // @Hack if there are no instructions generated so far there definitely was no jumps
-    //       to return so we can avoid generating this instructions which also can enable
-    //       optimizations in the compile_time_eval that check for the instruction count.
-    if (dyn_array_length(context->builder->code_block.instructions)) {
-      push_instruction(
-        &context->builder->code_block.instructions,
-        source_range,
-        (Instruction) {
-          .type = Instruction_Type_Label,
-          .label = fake_return_label_index
-        }
-      );
-    }
-  }
-
-  done:
   err:
   if (dyn_array_is_initialized(args)) {
     dyn_array_destroy(args);
