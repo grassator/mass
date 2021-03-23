@@ -3119,7 +3119,6 @@ token_handle_function_call(
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
           MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) goto err;
         }
-        scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
       } else {
         arg_value = *dyn_array_get(args, i);
       }
