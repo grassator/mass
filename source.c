@@ -2994,35 +2994,16 @@ token_handle_function_call(
     return;
   }
 
-  Array_Value_Ptr args;
-
-  // FIXME this is a bit of hack to make sure we don't use argument registers for
-  //       computing arguments as it might end up in the wrong one and overwrite.
-  //       The right fix for that is to add type-only evaluation to figure out the
-  //       correct target register for each argument and use it during mathcing.
-  //       We will need type-only eval anyway for things like `typeof(some expression)`.
-  {
-    Register arg_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
-    bool acquired_registers[countof(arg_registers)] = {0};
-    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
-      Register reg_index = arg_registers[i];
-      if (!register_bitset_get(context->builder->code_block.register_occupied_bitset, reg_index)) {
-        register_acquire(context->builder, reg_index);
-        acquired_registers[i] = true;
-      }
-    }
-
-    args = token_match_call_arguments(context, args_token);
-    MASS_ON_ERROR(*context->result) goto err;
-
-    // Release any registers that we fake acquired to make sure that the actual call
-    // does not unnecessarily store them to stack
-    for (uint64_t i = 0; i < countof(arg_registers); ++i) {
-      if (acquired_registers[i]) {
-        Register reg_index = arg_registers[i];
-        register_release(context->builder, reg_index);
-      }
-    }
+  u64 instruction_count = dyn_array_length(context->builder->code_block.instructions);
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  MASS_ON_ERROR(*context->result) goto err;
+  if(instruction_count != dyn_array_length(context->builder->code_block.instructions)) {
+    // token_match_call_arguments is expected to use lazy evaluation, i.e. not produce
+    // any actual instructions in the current block. Such eager evaluations would be
+    // wasteful as before the function prototype is known we don't know the storage for
+    // each of the arguments. It also might end up stomping a registers for one of the
+    // previous arguments when calculating the next one.
+    panic("unepexpected eager evaluation of function arguments");
   }
 
   target_descriptor = maybe_unwrap_pointer_descriptor(target_descriptor);
