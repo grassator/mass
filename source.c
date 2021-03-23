@@ -1414,6 +1414,7 @@ u64
 token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
+  Lazy_Value *out_lazy_value,
   void *payload
 ) {
   assert(payload);
@@ -1451,6 +1452,7 @@ u64
 token_parse_macro_rewrite(
   Execution_Context *context,
   Value_View value_view,
+  Lazy_Value *out_lazy_value,
   void *payload
 ) {
   assert(payload);
@@ -1837,6 +1839,7 @@ u64
 token_parse_exports(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -1920,6 +1923,7 @@ u64
 token_parse_operator_definition(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_data
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2127,6 +2131,7 @@ u64
 token_parse_syntax_definition(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2848,6 +2853,7 @@ u64
 token_parse_constant_definitions(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4271,7 +4277,8 @@ token_parse_block_view(
       for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
         Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
         // FIXME for the lazy evaluation we need to get a lazy value here
-        match_length = matcher->proc(context, rest, matcher->payload);
+        Lazy_Value value;
+        match_length = matcher->proc(context, rest, &value, matcher->payload);
         MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
           dyn_array_push(lazy_statements, &void_value);
@@ -4333,6 +4340,7 @@ u64
 token_parse_statement_using(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4374,6 +4382,7 @@ u64
 token_parse_statement_label(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4445,6 +4454,7 @@ u64
 token_parse_explicit_return(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4539,6 +4549,7 @@ u64
 token_parse_inline_machine_code_bytes(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4641,6 +4652,7 @@ u64
 token_parse_definition_statement(
   Execution_Context *context,
   Value_View state,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4743,6 +4755,7 @@ u64
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -4782,6 +4795,7 @@ u64
 token_parse_assignment(
   Execution_Context *context,
   Value_View view,
+  Lazy_Value *out_lazy_value,
   void *unused_payload
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
