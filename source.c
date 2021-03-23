@@ -1318,14 +1318,13 @@ token_make_macro_capture_function(
   return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None}, body->source_range);
 }
 
-void
+Value *
 token_apply_macro_syntax(
   Execution_Context *context,
   Array_Value_View match,
-  Macro *macro,
-  Value *result_value
+  Macro *macro
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   assert(macro->scope);
 
@@ -1404,10 +1403,7 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  Value *parse_result = token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
-  MASS_ON_ERROR(
-    value_force(context, &macro->replacement.source_range, parse_result, result_value)
-  ) return;
+  return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
 }
 
 u64
@@ -1435,7 +1431,11 @@ token_parse_macro_statement(
   Array_Value_View match = dyn_array_make(Array_Value_View);
   token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
 
-  token_apply_macro_syntax(context, match, macro, &void_value);
+  // :LazyProc
+  Value *parse_result = token_apply_macro_syntax(context, match, macro);
+  MASS_ON_ERROR(
+    value_force(context, &macro->replacement.source_range, parse_result, &void_value)
+  ) return 0;
   dyn_array_destroy(match);
   return match_length;
 }
@@ -1526,8 +1526,7 @@ token_parse_macros(
       Array_Value_View match = dyn_array_make(Array_Value_View);
       token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
 
-      Value *replacement = value_any(context, value_view.source_range);
-      token_apply_macro_syntax(context, match, macro, replacement);
+      Value *replacement = token_apply_macro_syntax(context, match, macro);
       dyn_array_destroy(match);
       return replacement;
     }
