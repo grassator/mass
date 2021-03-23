@@ -4604,6 +4604,58 @@ token_match_fixed_array_type(
   return array_descriptor;
 }
 
+void
+mass_handle_inline_machine_code_bytes_lazy_proc(
+  Execution_Context *context,
+  Value *unused_result,
+  Value *args_token
+) {
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+
+  Instruction_Bytes bytes = {
+    .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
+  };
+
+  for (u64 i = 0; i < dyn_array_length(args); ++i) {
+    if (bytes.length >= 15) {
+      context_error_snprintf(
+        context, args_token->source_range,
+        "Expected a maximum of 15 bytes"
+      );
+      return;
+    }
+    Value *value = *dyn_array_get(args, i);
+    if (!value) continue;
+    if (storage_is_label(&value->storage)) {
+      if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
+        context_error_snprintf(
+          context, value->source_range,
+          "inline_machine_code_bytes only supports one label"
+        );
+        return;
+      }
+      bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+      bytes.label_offset_in_instruction = u64_to_u8(i);
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+      bytes.memory[bytes.length++] = 0;
+    } else {
+      value = token_value_force_immediate_integer(
+        context, &value->source_range, value, &descriptor_u8
+      );
+      MASS_ON_ERROR(*context->result) return;
+      u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
+      bytes.memory[bytes.length++] = s64_to_u8(byte);
+    }
+  }
+
+  push_instruction(
+    &context->builder->code_block.instructions, args_token->source_range,
+    (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes }
+  );
+}
+
 u64
 token_parse_inline_machine_code_bytes(
   Execution_Context *context,
@@ -4626,53 +4678,10 @@ token_parse_inline_machine_code_bytes(
     goto err;
   }
 
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-
-  Instruction_Bytes bytes = {
-    .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
-  };
-
-  for (u64 i = 0; i < dyn_array_length(args); ++i) {
-    if (bytes.length >= 15) {
-      context_error_snprintf(
-        context, args_token->source_range,
-        "Expected a maximum of 15 bytes"
-      );
-      goto err;
-    }
-    Value *value = *dyn_array_get(args, i);
-    if (!value) continue;
-    if (storage_is_label(&value->storage)) {
-      if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
-        context_error_snprintf(
-          context, value->source_range,
-          "inline_machine_code_bytes only supports one label"
-        );
-        goto err;
-      }
-      bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-      bytes.label_offset_in_instruction = u64_to_u8(i);
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-      bytes.memory[bytes.length++] = 0;
-    } else {
-      value = token_value_force_immediate_integer(
-        context, &value->source_range, value, &descriptor_u8
-      );
-      MASS_ON_ERROR(*context->result) goto err;
-      u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
-      bytes.memory[bytes.length++] = s64_to_u8(byte);
-    }
-  }
-
-  push_instruction(
-    &context->builder->code_block.instructions, id_token->source_range,
-    (Instruction) {
-      .type = Instruction_Type_Bytes,
-      .Bytes = bytes,
-     }
-  );
+  // :LazyProc
+  mass_handle_inline_machine_code_bytes_lazy_proc(context, 0, args_token);
+  //out_lazy_value->proc = mass_handle_inline_machine_code_bytes_lazy_proc;
+  //out_lazy_value->payload = args_token;
 
   err:
   return peek_index;
