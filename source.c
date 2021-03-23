@@ -4483,6 +4483,45 @@ token_parse_statement_label(
   return peek_index;
 }
 
+void
+mass_handle_explicit_return_lazy_proc(
+  Execution_Context *context,
+  Value *unused_result,
+  Value *parse_result
+) {
+  const Descriptor *parse_result_descriptor = value_or_lazy_value_descriptor(parse_result);
+  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
+  assert(scope_value_entry);
+  Value *fn_return = scope_entry_force(scope_value_entry);
+  assert(fn_return);
+  bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
+
+  // FIXME with inline functions and explicit returns we can end up with multiple immediate
+  //       values that are trying to be moved in the same return value
+  if (is_any_return) {
+    const Descriptor *stack_descriptor = parse_result_descriptor == &descriptor_number_literal
+      ? &descriptor_s64
+      : parse_result_descriptor;
+    Value *stack_return =
+      reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
+    *fn_return = *stack_return;
+  }
+  MASS_ON_ERROR(assign(context, fn_return, parse_result)) return;
+
+  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
+  assert(scope_label_entry);
+  Value *return_label = scope_entry_force(scope_label_entry);
+  assert(return_label);
+  assert(return_label->descriptor == &descriptor_void);
+  assert(storage_is_label(&return_label->storage));
+
+  push_instruction(
+    &context->builder->code_block.instructions,
+    fn_return->source_range,
+    (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
+  );
+}
+
 u64
 token_parse_explicit_return(
   Execution_Context *context,
@@ -4497,47 +4536,22 @@ token_parse_explicit_return(
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   bool has_return_expression = rest.length > 0;
 
-  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
-  assert(scope_value_entry);
-  Value *fn_return = scope_entry_force(scope_value_entry);
-  assert(fn_return);
-
-  bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
   Value *parse_result = token_parse_expression(context, rest, &(u64){0}, 0);
-  MASS_ON_ERROR(value_force(context, &rest.source_range, parse_result, fn_return)) return 0;
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(parse_result);
 
-  // FIXME with inline functions and explicit returns we can end up with multiple immediate
-  //       values that are trying to be moved in the same return value
-  if (is_any_return) {
-    const Descriptor *stack_descriptor = fn_return->descriptor == &descriptor_number_literal
-      ? &descriptor_s64
-      : fn_return->descriptor;
-    Value *stack_return =
-      reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
-    MASS_ON_ERROR(assign(context, stack_return, fn_return)) return 0;
-    *fn_return = *stack_return;
-  }
-
-  bool is_void = fn_return->descriptor->tag == Descriptor_Tag_Void;
+  bool is_void = descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
     context_error_snprintf(
-      context, fn_return->source_range,
+      context, parse_result->source_range,
       "Explicit return from a non-void function requires a value"
     );
+    return 0;
   }
 
-  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
-  assert(scope_label_entry);
-  Value *return_label = scope_entry_force(scope_label_entry);
-  assert(return_label);
-  assert(return_label->descriptor == &descriptor_void);
-  assert(storage_is_label(&return_label->storage));
-
-  push_instruction(
-    &context->builder->code_block.instructions,
-    fn_return->source_range,
-    (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
-  );
+  // FIXME :LazyProc
+  mass_handle_explicit_return_lazy_proc(context, 0, parse_result);
+  //out_lazy_value->proc = mass_handle_explicit_return_lazy_proc;
+  //out_lazy_value->payload = parse_result;
 
   return peek_index;
 }
@@ -5106,17 +5120,17 @@ scope_define_builtins(
     Array_Token_Statement_Matcher matchers =
       dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
 
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions}); // ~
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return}); // ready
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_operator_definition});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_exports});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using}); // ~
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition}); // ~
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_operator_definition}); // ~
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_exports}); // ~
 
     scope->statement_matchers = matchers;
   }
