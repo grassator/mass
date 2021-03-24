@@ -4773,7 +4773,6 @@ token_match_fixed_array_type(
   MASS_ON_ERROR(*context->result) return 0;
   u32 length = u64_to_u32(storage_static_value_up_to_u64(&size_value->storage));
 
-  // TODO extract into a helper
   Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
   *array_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Fixed_Size_Array,
