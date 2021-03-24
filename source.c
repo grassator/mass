@@ -416,8 +416,10 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Value: {
       for (Value *value = entry->Value.value; value; value = value->next_overload) {
-        // TODO Should this be limited to just compile time execution explicitly?
-        if (value->descriptor == &descriptor_lazy_value) {
+        if (
+          value->descriptor == &descriptor_lazy_value &&
+          !value_or_lazy_value_descriptor(value) // defined with ::
+        ) {
           Value *next_overload = value->next_overload;
           Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
           Execution_Context *context = &lazy->context;
@@ -459,8 +461,10 @@ scope_lookup_force(
   assert(entry->tag == Scope_Entry_Tag_Value);
   Value *result = entry->Value.value;
 
+  if (!result) return 0;
+
   // For functions we need to gather up overloads from all parent scopes
-  if (result && result->descriptor->tag == Descriptor_Tag_Function) {
+  if (value_or_lazy_value_descriptor(result)->tag == Descriptor_Tag_Function) {
     Value *last = result;
     const Scope *parent = scope;
     for (;;) {
@@ -470,7 +474,7 @@ scope_lookup_force(
       if (!hash_map_has(parent->map, name)) continue;
       Value *overload = scope_lookup_force(parent, name);
       if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
-      if (overload->descriptor->tag != Descriptor_Tag_Function) {
+      if (value_or_lazy_value_descriptor(overload)->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
       while (last->next_overload) {
