@@ -4878,7 +4878,6 @@ token_maybe_parse_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   *match_length = 0;
 
-  // TODO consider merging with argument matching
   u64 peek_index = 0;
   Token_Match(name_token, .tag = Token_Pattern_Tag_Symbol);
   Token_Match_Operator(define, ":");
