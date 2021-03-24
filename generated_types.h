@@ -201,6 +201,7 @@ typedef struct Module {
   Module_Flags flags;
   u32 _flags_padding;
   Source_File source_file;
+  Source_Range exports_source_range;
   Scope * own_scope;
   Scope * export_scope;
 } Module;
@@ -941,6 +942,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module,
     .name = slice_literal_fields("source_file"),
     .descriptor = &descriptor_source_file,
     .offset = offsetof(Module, source_file),
+  },
+  {
+    .name = slice_literal_fields("exports_source_range"),
+    .descriptor = &descriptor_source_range,
+    .offset = offsetof(Module, exports_source_range),
   },
   {
     .name = slice_literal_fields("own_scope"),

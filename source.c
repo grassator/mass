@@ -1991,13 +1991,15 @@ token_parse_exports(
   }
 
   if (context->module->flags & Module_Flags_Has_Exports) {
-    // TODO track original exports
+    // TODO support priting second range context->module->exports_source_range
     context_error_snprintf(
       context, keyword_token->source_range,
-      "A module can not have multiple exports statements"
+      "A module can not have multiple exports statements. This is the original exports"
     );
     goto err;
   }
+
+  context->module->exports_source_range = keyword_token->source_range;
 
   Value_View children = value_as_group(block)->children;
   if (children.length == 1) {

@@ -407,6 +407,7 @@ main(void) {
     { "Module_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Source_File", "source_file" },
+    { "Source_Range", "exports_source_range" },
     { "Scope *", "own_scope" },
     { "Scope *", "export_scope" },
   }));
