@@ -2546,8 +2546,7 @@ compile_time_eval(
   Execution_Context eval_context = *context;
   eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
-  // TODO consider if compile-time eval should create a nested scope
-  //eval_context.scope = scope_make(context->allocator, context->scope);
+  eval_context.scope = scope_make(context->allocator, context->scope);
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
