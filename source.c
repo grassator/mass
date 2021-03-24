@@ -2978,14 +2978,20 @@ token_parse_constant_definitions(
   if (!token_maybe_split_on_operator(view, slice_literal("::"), &lhs, &rhs, &operator)) {
     return 0;
   }
-  // For now we support only single ID on the left
   if (lhs.length > 1) {
-    panic("TODO user error");
+    context_error_snprintf(
+      context, lhs.source_range,
+      "Multiple assignment are not supported at the moment"
+    );
     goto err;
   }
-  Value *symbol = value_view_get(lhs, 0);
+  Value *symbol = value_view_get(view, 0);
+
   if (!value_is_symbol(symbol)) {
-    panic("TODO user error");
+    context_error_snprintf(
+      context, symbol->source_range,
+      "Left hand side of the :: is not a symbol"
+    );
     goto err;
   }
 
