@@ -4199,17 +4199,6 @@ mass_handle_if_expression_lazy_proc(
 
   MASS_ON_ERROR(value_force(context, &then->source_range, then, result_value)) return;
 
-  //if (then_value->storage.tag == Storage_Tag_Static) {
-    //const Descriptor *stack_descriptor = then_value->descriptor;
-    //if (stack_descriptor == &descriptor_number_literal) {
-      //stack_descriptor = &descriptor_s64;
-    //}
-    //Value *on_stack =
-      //reserve_stack(context, context->builder, stack_descriptor, then_value->source_range);
-    //MASS_ON_ERROR(assign(context, on_stack, then_value)) goto err;
-    //then_value = on_stack;
-  //}
-
   Label_Index after_label =
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
   push_instruction(
