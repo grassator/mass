@@ -4850,14 +4850,15 @@ token_parse_inline_machine_code_bytes(
 
   u64 peek_index = 0;
   Token_Match(id_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("inline_machine_code_bytes"));
-  // TODO improve error reporting and / or transition to compile time functions when available
-  Token_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  Token_Maybe_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  if (!args_token) {
+    context_error_snprintf(context, id_token->source_range, "Expected ()");
+    goto err;
+  }
+
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   if (rest.length) {
-    context_error_snprintf(
-      context, rest.source_range,
-      "Expected the end of the statement"
-    );
+    context_error_snprintf(context, rest.source_range, "Expected the end of the statement");
     goto err;
   }
 
