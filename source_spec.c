@@ -413,6 +413,32 @@ spec("source") {
     }
   }
   #endif
+  describe("Type Inference") {
+    it("should report an error when LHS of the := is not a symbol") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { 2 := 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      spec_check_slice(
+        error->message,
+        slice_literal("Left hand side of the := is not a symbol")
+      );
+    }
+    it("should report an error when LHS of the := is not a symbol") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () { foo, bar := 42, 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      spec_check_slice(
+        error->message,
+        slice_literal("Multiple assignment are not supported at the moment")
+      );
+    }
+  }
 
   describe("if / else") {
     it("should be able to parse and run if expression") {

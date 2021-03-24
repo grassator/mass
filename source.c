@@ -5041,15 +5041,20 @@ token_parse_definition_and_assignment_statements(
   if (!token_maybe_split_on_operator(view, slice_literal(":="), &lhs, &rhs, &operator)) {
     return 0;
   }
-  // For now we support only single ID on the left
   if (lhs.length > 1) {
-    panic("TODO user error");
+    context_error_snprintf(
+      context, lhs.source_range,
+      "Multiple assignment are not supported at the moment"
+    );
     goto err;
   }
   Value *name_token = value_view_get(view, 0);
 
   if (!value_is_symbol(name_token)) {
-    panic("TODO user error");
+    context_error_snprintf(
+      context, name_token->source_range,
+      "Left hand side of the := is not a symbol"
+    );
     goto err;
   }
 
