@@ -574,7 +574,6 @@ fn_encode(
 
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
-  // @Leak
   Storage stack_size_operand = imm_auto_8_or_32(out_layout->stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {

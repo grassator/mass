@@ -95,6 +95,118 @@ win32_print_register_state(
   printf("\n");
 }
 
+typedef struct {
+  u64 functions;
+  u64 imports;
+  u64 startup;
+  u64 relocations;
+} Win32_Jit_Counters;
+
+typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
+
+typedef struct {
+  Array_RUNTIME_FUNCTION function_table;
+  Fixed_Buffer *temp_buffer;
+  Allocator temp_allocator;
+  u32 trampoline_rva;
+
+  Win32_Jit_Counters previous_counts;
+} Win32_Jit_Info;
+
+s64
+win32_get_function_index_from_address(
+  DWORD64 instruction_address,
+  Jit *jit
+) {
+  Win32_Jit_Info *info = jit->platform_specific_payload;
+  Section *code_section = &jit->program->memory.sections.code;
+  Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
+  if(instruction_address < (DWORD64)code_buffer->memory) return -1;
+  if(instruction_address >= (DWORD64)code_buffer->memory + code_buffer->occupied) return -1;
+
+  u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
+
+  // Do binary search
+  s64 left_bound = 0;
+  s64 right_bound = u64_to_s64(dyn_array_length(info->function_table)) - 1;
+  while (left_bound <= right_bound) {
+    s64 middle = left_bound + (right_bound - left_bound) / 2;
+    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, middle);
+
+    if (rva < function->BeginAddress) {
+      right_bound = middle - 1;
+    } else if (rva > function->EndAddress) {
+      left_bound = middle + 1;
+    } else {
+      return middle;
+    }
+  }
+  panic("Could not find matching RUNTIME_FUNCTION");
+
+  return -1;
+}
+
+RUNTIME_FUNCTION *
+win32_get_runtime_function_callback(
+  DWORD64 instruction_address,
+  Jit *jit
+) {
+  s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
+  if (runtime_function_index < 0) return 0;
+  Win32_Jit_Info *info = jit->platform_specific_payload;
+  return dyn_array_get(info->function_table, runtime_function_index);
+}
+
+void
+win32_print_stack(
+  DWORD64 stack_pointer,
+  DWORD64 instruction_address,
+  Jit *jit
+) {
+  s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
+  if (runtime_function_index < 0) {
+    // TODO adjust instruction address to point to the start of the function
+    printf("  stopped at external code at %016llX\n", instruction_address);
+    return;
+  }
+
+  Win32_Jit_Info *info = jit->platform_specific_payload;
+  Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
+  RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
+
+  Program_Memory *memory = &jit->program->memory;
+  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+
+  u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
+  u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
+
+  u64 current_offset = 0;
+  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
+    // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
+    // so we add instruction byte size before comparing
+    current_offset += instruction->encoded_byte_size;
+    if (current_offset == relative_instruction_byte_offset) {
+      printf("  at ");
+      source_range_print_start_position(&instruction->source_range);
+    }
+  }
+
+  stack_pointer += builder->stack_reserve;
+
+  u64 low_limit;
+  u64 high_limit;
+  GetCurrentThreadStackLimits(&low_limit, &high_limit);
+
+  if (stack_pointer < low_limit || stack_pointer >= high_limit) {
+    printf("Outside of allocated stack\n");
+    return;
+  }
+
+  u64 return_address = *(u64 *)stack_pointer;
+  win32_print_stack(stack_pointer, return_address, jit);
+}
+
 EXCEPTION_DISPOSITION
 win32_program_test_exception_handler(
   EXCEPTION_RECORD *ExceptionRecord,
@@ -102,11 +214,6 @@ win32_program_test_exception_handler(
   CONTEXT *ContextRecord,
   DISPATCHER_CONTEXT *DispatcherContext
 ) {
-  RUNTIME_FUNCTION *function = DispatcherContext->FunctionEntry;
-  u64 absolute_function_begin_address = DispatcherContext->ImageBase + function->BeginAddress;
-  u64 relative_instruction_byte_offset =
-    DispatcherContext->ControlPc - absolute_function_begin_address;
-
   Win32_Exception_Data *exception_data = DispatcherContext->HandlerData;
 
   if (!exception_data->jit->is_stack_unwinding_in_progress) {
@@ -123,8 +230,9 @@ win32_program_test_exception_handler(
       }
       case EXCEPTION_BREAKPOINT: {
         printf("User Breakpoint.\n");
+        win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
         win32_print_register_state(ContextRecord);
-        // Move instruction pointer over the CC in
+        // Move instruction pointer over the int3 (0xCC) instruction
         ContextRecord->Rip += 1;
         return ExceptionContinueExecution;
       }
@@ -201,73 +309,12 @@ win32_program_test_exception_handler(
         break;
       }
     }
+    win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
     win32_print_register_state(ContextRecord);
     exception_data->jit->is_stack_unwinding_in_progress = true;
   }
 
-  u64 current_offset = 0;
-  for (u64 i = 0; i < dyn_array_length(exception_data->builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(exception_data->builder->code_block.instructions, i);
-    // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
-    // so we add instruction byte size before comparing
-    current_offset += instruction->encoded_byte_size;
-    if (current_offset == relative_instruction_byte_offset) {
-      printf("  at ");
-      source_range_print_start_position(&instruction->source_range);
-    }
-  }
-
   return ExceptionContinueSearch;
-}
-
-typedef struct {
-  u64 functions;
-  u64 imports;
-  u64 startup;
-  u64 relocations;
-} Win32_Jit_Counters;
-
-typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
-
-typedef struct {
-  Array_RUNTIME_FUNCTION function_table;
-  Fixed_Buffer *temp_buffer;
-  Allocator temp_allocator;
-  u32 trampoline_rva;
-
-  Win32_Jit_Counters previous_counts;
-} Win32_Jit_Info;
-
-RUNTIME_FUNCTION *
-win32_get_runtime_function_callback(
-  DWORD64 instruction_address,
-  void *context
-) {
-  Jit *jit = context;
-  Win32_Jit_Info *info = jit->platform_specific_payload;
-  Section *code_section = &jit->program->memory.sections.code;
-  Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
-  assert(instruction_address >= (DWORD64)code_buffer->memory);
-  u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
-
-  // Do binary search
-  s64 left_bound = 0;
-  s64 right_bound = u64_to_s64(dyn_array_length(info->function_table)) - 1;
-  while (left_bound <= right_bound) {
-    s64 middle = left_bound + (right_bound - left_bound) / 2;
-    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, middle);
-
-    if (rva < function->BeginAddress) {
-      right_bound = middle - 1;
-    } else if (rva > function->EndAddress) {
-      left_bound = middle + 1;
-    } else {
-      return function;
-    }
-  }
-  panic("Could not find matching RUNTIME_FUNCTION");
-
-  return 0;
 }
 
 static u64
