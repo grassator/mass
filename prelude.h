@@ -2472,7 +2472,7 @@ virtual_memory_buffer_ensure_committed(
 ) {
   assert(buffer->capacity >= size);
   #ifdef _WIN32
-  u64 page_size = s32_to_u64(memory_page_size()) * 256;
+  u64 page_size = s32_to_u64(memory_page_size());
   u64 required_to_commit = u64_align(size, page_size);
   if (required_to_commit > buffer->committed) {
     void *commit_pointer = buffer->memory + buffer->committed;
@@ -3401,6 +3401,12 @@ hash_map_resize(
   allocator_deallocate(map->allocator, entries, previous_byte_size);
 }
 
+struct Hash_Map_Make_Options {
+  void *_count_reset;
+  const Allocator *allocator;
+  u64 initial_capacity;
+};
+
 #define hash_map_template(_hash_map_type_, _key_type_, _value_type_, _key_hash_fn_, _key_equality_fn_)\
   hash_map_type_internal(_hash_map_type_, _key_type_, _value_type_)\
   \
@@ -3408,21 +3414,21 @@ hash_map_resize(
   \
   static inline _hash_map_type_ *\
   _hash_map_type_##__make(\
-    const Allocator *allocator\
+    struct Hash_Map_Make_Options *options\
   ) {\
-    _hash_map_type_ *map = allocator_allocate(allocator, _hash_map_type_);\
-    u32 capacity_power_of_2 = 5;\
+    _hash_map_type_ *map = allocator_allocate(options->allocator, _hash_map_type_);\
+    u32 capacity_power_of_2 = (u32)(ceil(log2((f64)options->initial_capacity)));\
     u64 capacity = 1llu << capacity_power_of_2;\
     u64 entry_byte_size = sizeof(map->entries[0]);\
     u64 entry_array_byte_size = entry_byte_size * capacity;\
     *map = (_hash_map_type_) {\
       .methods = _hash_map_type_##__methods,\
-      .allocator = allocator,\
+      .allocator = options->allocator,\
       .capacity_power_of_2 = capacity_power_of_2,\
       .capacity = capacity,\
       .hash_mask = u64_to_s32(capacity - 1),\
       .occupied = 0,\
-      .entries = allocator_allocate_bytes(allocator, entry_array_byte_size, 16),\
+      .entries = allocator_allocate_bytes(options->allocator, entry_array_byte_size, 16),\
     };\
     memset(map->entries, 0, entry_array_byte_size);\
     return map;\
@@ -3531,8 +3537,15 @@ hash_map_resize(
 #define hash_map_slice_template(_hash_map_type_, _value_type_)\
   hash_map_template(_hash_map_type_, Slice, _value_type_, hash_slice, slice_equal)
 
-#define hash_map_make(_hash_map_type_)\
-  _hash_map_type_##__make(allocator_default)
+#define hash_map_make(_hash_map_type_, ...)\
+  _hash_map_type_##__make(\
+    &(struct Hash_Map_Make_Options) {\
+      .allocator = allocator_default,\
+      .initial_capacity = 32,\
+      ._count_reset = 0,\
+      __VA_ARGS__\
+    }\
+  )
 
 static inline void
 hash_map_destroy_internal(

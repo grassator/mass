@@ -108,11 +108,11 @@ scope_flatten_till_internal(
   const Allocator *allocator,
   const Scope *scope,
   const Scope *till,
+  u64 scope_entry_count,
   u64 macro_count,
   u64 statement_matcher_count
 ) {
   // On the way up we calculate how many things all levels combined contain to avoid resizes
-  // TODO allow to pre-size a hashmap
   if (scope != till) {
     if (dyn_array_is_initialized(scope->macros)) {
       macro_count += dyn_array_length(scope->macros);
@@ -120,9 +120,15 @@ scope_flatten_till_internal(
     if (dyn_array_is_initialized(scope->statement_matchers)) {
       statement_matcher_count += dyn_array_length(scope->statement_matchers);
     }
+    if (scope->map) {
+      scope_entry_count += scope->map->occupied;
+    }
   } else {
     Scope *result = scope_make(allocator, 0);
-    result->map = Scope_Map__make(result->allocator);
+    result->map = hash_map_make(Scope_Map,
+      .allocator = result->allocator,
+      .initial_capacity = scope_entry_count,
+    );
     if (macro_count) {
       result->macros = dyn_array_make(
         Array_Macro_Ptr, .capacity = macro_count, .allocator = allocator
@@ -137,7 +143,7 @@ scope_flatten_till_internal(
   }
 
   Scope *result = scope_flatten_till_internal(
-    allocator, scope->parent, till, macro_count, statement_matcher_count
+    allocator, scope->parent, till, scope_entry_count, macro_count, statement_matcher_count
   );
   if (dyn_array_is_initialized(scope->macros)) {
     for (u64 i = 0; i < dyn_array_length(scope->macros); ++i) {
@@ -167,7 +173,7 @@ scope_flatten_till(
   const Scope *scope,
   const Scope *till
 ) {
-  return scope_flatten_till_internal(allocator, scope, till, 0, 0);
+  return scope_flatten_till_internal(allocator, scope, till, 0, 0, 0);
 }
 
 void
@@ -492,7 +498,7 @@ scope_define_value(
   Value *value
 ) {
   if (!scope->map) {
-    scope->map = Scope_Map__make(scope->allocator);
+    scope->map = hash_map_make(Scope_Map, scope->allocator);
   }
   if (hash_map_has(scope->map, name)) {
     // We just checked that the map has the entry so it safe to deref right away
@@ -567,7 +573,7 @@ scope_define_operator(
     }
 
     if (!scope->map) {
-      scope->map = Scope_Map__make(scope->allocator);
+      scope->map = hash_map_make(Scope_Map, scope->allocator);
     }
     hash_map_set(scope->map, name, new_entry);
   }
