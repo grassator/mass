@@ -2847,26 +2847,21 @@ token_handle_negation(
   void *unused_payload
 ) {
   assert(args.length == 1);
-  Value *token = value_view_get(args, 0);
+  Value *value = token_parse_single(context, value_view_get(args, 0));
 
-  // FIXME use result_value here
-  Source_Range source_range = token->source_range;
-  Value *value = value_any(context, source_range);
   Value *negated_value = 0;
-  MASS_ON_ERROR(value_force(context, &source_range, token, value)) goto err;
   if (value->descriptor == &descriptor_number_literal) {
     const Number_Literal *original = storage_static_as_c_type(&value->storage, Number_Literal);
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
     negated_value = value_make(
-      context, &descriptor_number_literal, storage_static(negated), source_range
+      context, &descriptor_number_literal, storage_static(negated), value->source_range
     );
   } else {
     panic("TODO support general negation");
   }
 
-  err:
   return negated_value;
 }
 
