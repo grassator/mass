@@ -3250,22 +3250,19 @@ token_handle_function_call(
     panic("unepexpected eager evaluation of function arguments");
   }
 
-  target_descriptor = maybe_unwrap_pointer_descriptor(target_descriptor);
-
-  if (target_descriptor->tag != Descriptor_Tag_Function) {
-    Slice source = source_from_source_range(&source_range);
-    context_error_snprintf(
-      context, source_range,
-      "%"PRIslice" is not a function",
-      SLICE_EXPAND_PRINTF(source)
-    );
-    goto err;
-  }
-
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
     const Descriptor *to_call_descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
+    if (to_call_descriptor->tag != Descriptor_Tag_Function) {
+      Slice source = source_from_source_range(&to_call->source_range);
+      context_error_snprintf(
+        context, to_call->source_range,
+        "%"PRIslice" is not a function",
+        SLICE_EXPAND_PRINTF(source)
+      );
+      goto err;
+    }
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
     const Function_Info *descriptor = &to_call_descriptor->Function.info;
     s64 score = calculate_arguments_match_score(descriptor, args);
