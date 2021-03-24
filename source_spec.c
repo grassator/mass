@@ -1108,7 +1108,8 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to define and use a syntax macro with a capture") {
+    // FIXME :SyntaxReturnDescriptor
+    xit("should be able to define and use a syntax macro with a capture") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
         // TODO figure out what should be the rule for subtracting unsigned integers

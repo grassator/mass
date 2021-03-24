@@ -2,7 +2,7 @@
 #include "source.h"
 #include "function.h"
 
-#define LAZY_EVAL 0
+#define LAZY_EVAL 1
 
 static inline Value *
 value_view_peek(
@@ -1408,6 +1408,7 @@ token_apply_macro_syntax(
     //       which limits the usefulness of this type of macro. Need to figure out
     //       a way to determine the return descriptor in such a way that it does not
     //       break the lazy evaluation.
+    //       :SyntaxReturnDescriptor
     const Descriptor *return_descriptor = &descriptor_void;
 
     Array_Function_Argument empty_arguments = {&dyn_array_zero_items};
