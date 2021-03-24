@@ -4227,6 +4227,10 @@ mass_handle_if_expression_lazy_proc(
     condition = token_value_force_immediate_integer(
       context, &condition->source_range, condition, &descriptor_s64
     );
+  } else {
+    Value *temp_condition = value_any(context, condition->source_range);
+    MASS_ON_ERROR(value_force(context, &condition->source_range, condition, temp_condition)) return;
+    condition = temp_condition;
   }
 
   Label_Index else_label = make_if(
