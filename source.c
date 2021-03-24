@@ -4462,11 +4462,7 @@ token_parse_block_view(
       match_length = 1;
       continue;
     }
-    Lazy_Value lazy_value = {
-      .context = *context,
-      .proc = mass_handle_statement_lazy_proc,
-      .payload = &void_value,
-    };
+    Lazy_Value lazy_value = { .context = *context };
     for (
       const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
@@ -4483,16 +4479,20 @@ token_parse_block_view(
         match_length = matcher->proc(context, rest, &lazy_value, matcher->payload);
         MASS_ON_ERROR(*context->result) return 0;
         if (match_length) {
-          Value_View matched_view = value_view_slice(&rest, 0, match_length);
-          Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
-          *lazy_value_storage = lazy_value;
-          Value *lazy_statement = value_make(
-            context,
-            &descriptor_lazy_value,
-            storage_static(lazy_value_storage),
-            matched_view.source_range
-          );
-          dyn_array_push(lazy_statements, lazy_statement);
+          // If the statement did not assign a proc that means that it does not need
+          // to output any instructions and there is nothing to force.
+          if (lazy_value.proc) {
+            Value_View matched_view = value_view_slice(&rest, 0, match_length);
+            Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
+            *lazy_value_storage = lazy_value;
+            Value *lazy_statement = value_make(
+              context,
+              &descriptor_lazy_value,
+              storage_static(lazy_value_storage),
+              matched_view.source_range
+            );
+            dyn_array_push(lazy_statements, lazy_statement);
+          }
           goto next_loop;
         }
       }
@@ -4517,14 +4517,25 @@ token_parse_block_view(
 
   MASS_ON_ERROR(*context->result) return 0;
 
-  Value *last_result = *dyn_array_last(lazy_statements);
-  const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
-  void *payload;
-  PACK_AS_VOID_POINTER(payload, lazy_statements);
+  u64 statement_count = dyn_array_length(lazy_statements);
+  if (statement_count) {
+    Value *last_result = *dyn_array_last(lazy_statements);
+    const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
+    if (statement_count == 1) {
+      dyn_array_destroy(lazy_statements);
+      return last_result;
+    } else {
+      void *payload;
+      PACK_AS_VOID_POINTER(payload, lazy_statements);
 
-  return mass_make_lazy_value(
-    context, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
-  );
+      return mass_make_lazy_value(
+        context, last_result->source_range, payload, last_descriptor, mass_handle_block_lazy_proc
+      );
+    }
+  } else {
+    dyn_array_destroy(lazy_statements);
+    return &void_value;
+  }
 }
 
 Value *
