@@ -2,8 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-#define LAZY_EVAL 1
-
 static inline Value *
 value_view_peek(
   Value_View view,
@@ -3341,12 +3339,8 @@ token_handle_function_call(
     ? call_function_macro
     : call_function_overload;
 
-  #if LAZY_EVAL
   result_value =
     mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
-  #else
-  proc(context, result_value, payload);
-  #endif
   return result_value;
 
   err:
@@ -4272,7 +4266,6 @@ mass_handle_if_expression_lazy_proc(
   );
 }
 
-#if LAZY_EVAL
 Value *
 token_parse_if_expression(
   Execution_Context *context,
@@ -4331,104 +4324,6 @@ token_parse_if_expression(
     context, dummy_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
   );
 }
-
-#else
-Value *
-token_parse_if_expression(
-  Execution_Context *context,
-  Value_View view,
-  u64 *matched_length
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("if"));
-
-  Source_Range dummy_range = keyword->source_range;
-
-  Value *condition_value;
-  {
-    static const Token_Pattern then_pattern = {
-      .tag = Token_Pattern_Tag_Symbol,
-      .Symbol.name = slice_literal_fields("then")
-    };
-    Value_View condition_view = value_view_slice(&view, peek_index, view.length);
-    condition_value = value_any(context, condition_view.source_range);
-    u64 condition_length;
-    Value *parse_result =
-      token_parse_expression(context, condition_view, &condition_length, &then_pattern);
-    MASS_ON_ERROR(
-      value_force(context, &condition_view.source_range, parse_result, condition_value)
-    ) goto err;
-    peek_index += condition_length;
-    if (condition_value->descriptor == &descriptor_number_literal) {
-      condition_value = token_value_force_immediate_integer(
-        context, &condition_value->source_range, condition_value, &descriptor_s64
-      );
-    }
-    MASS_ON_ERROR(*context->result) goto err;
-  }
-
-  Label_Index else_label = make_if(
-    context, &context->builder->code_block.instructions, &condition_value->source_range, condition_value
-  );
-
-  Value *then_value = 0;
-  {
-    static const Token_Pattern else_pattern = {
-      .tag = Token_Pattern_Tag_Symbol,
-      .Symbol.name = slice_literal_fields("else"),
-    };
-    Value_View then_view = value_view_slice(&view, peek_index, view.length);
-    then_value = value_any(context, then_view.source_range);
-    u64 then_length;
-    Value *parse_result = token_parse_expression(context, then_view, &then_length, &else_pattern);
-    MASS_ON_ERROR(value_force(context, &then_view.source_range, parse_result, then_value)) goto err;
-    peek_index += then_length;
-    MASS_ON_ERROR(*context->result) goto err;
-  }
-
-  if (then_value->storage.tag == Storage_Tag_Static) {
-    const Descriptor *stack_descriptor = then_value->descriptor;
-    if (stack_descriptor == &descriptor_number_literal) {
-      stack_descriptor = &descriptor_s64;
-    }
-    Value *on_stack =
-      reserve_stack(context, context->builder, stack_descriptor, then_value->source_range);
-    MASS_ON_ERROR(assign(context, on_stack, then_value)) goto err;
-    then_value = on_stack;
-  }
-
-  Label_Index after_label =
-    make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
-  push_instruction(
-    &context->builder->code_block.instructions, dummy_range,
-    (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
-  );
-
-  push_instruction(
-    &context->builder->code_block.instructions, dummy_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = else_label}
-  );
-
-  Value_View else_view = value_view_slice(&view, peek_index, view.length);
-  u64 else_length;
-  Value *else_value = token_parse_expression(context, else_view, &else_length, 0);
-  MASS_ON_ERROR(value_force(context, &else_view.source_range, else_value, then_value)) goto err;
-
-  peek_index += else_length;
-  *matched_length = peek_index;
-
-  push_instruction(
-    &context->builder->code_block.instructions, dummy_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = after_label}
-  );
-  return then_value;
-
-  err:
-  return 0;
-}
-#endif
 
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
@@ -4805,12 +4700,8 @@ token_parse_statement_label(
     }
   }
 
-  #if LAZY_EVAL
   out_lazy_value->proc = mass_handle_label_lazy_proc;
   out_lazy_value->payload = value;
-  #else
-  mass_handle_label_lazy_proc(context, 0, value);
-  #endif
 
   err:
   return peek_index;
@@ -4881,12 +4772,8 @@ token_parse_explicit_return(
     return 0;
   }
 
-  #if LAZY_EVAL
   out_lazy_value->proc = mass_handle_explicit_return_lazy_proc;
   out_lazy_value->payload = parse_result;
-  #else
-  mass_handle_explicit_return_lazy_proc(context, 0, parse_result);
-  #endif
 
   return peek_index;
 }
@@ -5003,12 +4890,8 @@ token_parse_inline_machine_code_bytes(
     goto err;
   }
 
-  #if LAZY_EVAL
   out_lazy_value->proc = mass_handle_inline_machine_code_bytes_lazy_proc;
   out_lazy_value->payload = args_token;
-  #else
-  mass_handle_inline_machine_code_bytes_lazy_proc(context, 0, args_token);
-  #endif
 
   err:
   return peek_index;
@@ -5165,12 +5048,8 @@ token_define_local_variable(
     .expression = value,
   };
 
-  #if LAZY_EVAL
   out_lazy_value->proc = mass_handle_assignment_lazy_proc;
   out_lazy_value->payload = payload;
-  #else
-  mass_handle_assignment_lazy_proc(context, 0, payload);
-  #endif
 }
 
 u64
@@ -5254,12 +5133,8 @@ token_parse_assignment(
   }
   MASS_ON_ERROR(*context->result) return 0;
 
-  #if LAZY_EVAL
   out_lazy_value->proc = mass_handle_assignment_lazy_proc;
   out_lazy_value->payload = payload;
-  #else
-  mass_handle_assignment_lazy_proc(context, 0, payload);
-  #endif
 
   return statement_length;
 }
