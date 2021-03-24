@@ -4940,13 +4940,13 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
   for (u64 i = 0; i < dyn_array_length(args); ++i) {
     if (bytes.length >= 15) {
-      context_error_snprintf(
-        context, args_token->source_range,
-        "Expected a maximum of 15 bytes"
-      );
+      context_error_snprintf(context, args_token->source_range, "Expected a maximum of 15 bytes");
       return;
     }
-    Value *value = *dyn_array_get(args, i);
+    Value *raw_value = *dyn_array_get(args, i);
+    Value *value = value_any(context, raw_value->source_range);
+    MASS_ON_ERROR(value_force(context, &raw_value->source_range, raw_value, value)) return;
+
     if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error_snprintf(
@@ -4961,13 +4961,16 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
-    } else {
+    } else if (value->storage.tag == Storage_Tag_Static) {
       value = token_value_force_immediate_integer(
         context, &value->source_range, value, &descriptor_u8
       );
       MASS_ON_ERROR(*context->result) return;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
+    } else {
+      context_error_snprintf(context, value->source_range, "Expected a compile-time known value");
+      return;
     }
   }
 
