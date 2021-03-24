@@ -2,6 +2,10 @@
 #include "source.h"
 #include "function.h"
 
+#ifndef __STDC_NO_ATOMICS__
+#include <stdatomic.h>
+#endif
+
 static inline Value *
 value_view_peek(
   Value_View view,
@@ -72,8 +76,14 @@ value_view_from_value_array(
   };
 }
 
-#ifndef __STDC_NO_ATOMICS__
-#include <stdatomic.h>
+#ifdef _MSC_VER
+#define ATOMIC_COUNTER(ID)\
+  volatile static u64 _atomic_next_##ID = 0;\
+  u64 ID = InterlockedIncrement64(&_atomic_next_##ID);
+#else
+#define ATOMIC_COUNTER(ID)\
+  _Atomic static u64 _atomic_next_##ID = 0;\
+  u64 ID = _atomic_next_##ID++;
 #endif
 
 Scope *
@@ -81,13 +91,7 @@ scope_make(
   const Allocator *allocator,
   const Scope *parent
 ) {
-  #ifdef _MSC_VER
-  volatile static u64 next_id = 0;
-  u64 id = InterlockedIncrement64(&next_id);
-  #else
-  _Atomic static u64 next_id = 0;
-  u64 id = next_id++;
-  #endif
+  ATOMIC_COUNTER(id);
 
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
@@ -2527,9 +2531,8 @@ typedef void (*Compile_Time_Eval_Proc)(void *);
 
 static inline u64
 get_new_epoch() {
-  // FIXME make atomic
-  static u64 epoch = 1;
-  return epoch++;
+  ATOMIC_COUNTER(epoch);
+  return epoch;
 }
 
 const Descriptor *
