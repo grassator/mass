@@ -3210,27 +3210,29 @@ call_function_overload(
   }
 }
 
-void
+Value *
 token_handle_function_call(
   Execution_Context *context,
   Value *target_token,
-  Value *args_token,
-  Value *result_value
+  Value *args_token
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
   assert(value_match_group(args_token, Group_Tag_Paren));
 
   Source_Range source_range = target_token->source_range; // TODO add args as well
   Value *target_expression = token_parse_single(context, target_token);
-  MASS_ON_ERROR(*context->result) return;
+  MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target_expression);
+
+  Value *result_value = value_any(context, source_range);
 
   if (
     target_descriptor->tag == Descriptor_Tag_Function &&
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
     Value *target = value_any(context, source_range);
-    MASS_ON_ERROR(value_force(context, &source_range, target_expression, target)) return;
+    MASS_ON_ERROR(value_force(context, &source_range, target_expression, target)) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
     // Need to remove Compile_Time flag otherwise we will go into an infinite loop
@@ -3243,7 +3245,7 @@ token_handle_function_call(
       .source_range = source_range,
     };
     compile_time_eval(context, fake_eval_view, result_value);
-    return;
+    return result_value;
   }
 
   u64 instruction_count = dyn_array_length(context->builder->code_block.instructions);
@@ -3330,6 +3332,7 @@ token_handle_function_call(
 
   const Function_Info *function = &overload_descriptor->Function.info;
   assert(function->returns.descriptor->tag != Descriptor_Tag_Any);
+
   if (function->flags & Descriptor_Function_Flags_Macro) {
     call_function_macro(context, result_value, payload);
   } else {
@@ -3340,6 +3343,7 @@ token_handle_function_call(
   if (dyn_array_is_initialized(args)) {
     dyn_array_destroy(args);
   }
+  return result_value;
 }
 
 static inline Value *
@@ -3908,9 +3912,7 @@ mass_handle_paren_operator(
       );
     }
   } else {
-    Value *result_value = value_any(context, args_view.source_range);
-    token_handle_function_call(context, target, args_token, result_value);
-    return result_value;
+    return token_handle_function_call(context, target, args_token);
   }
 }
 
