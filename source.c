@@ -2151,7 +2151,6 @@ token_parse_operator_definition(
     .handler_payload = user_defined_operator,
   };
 
-  // FIXME move this logic into something like scope_define_operator
   Slice operator_name = value_as_symbol(operator_token)->name;
   scope_define_operator(context, context->scope, keyword_token->source_range, operator_name, operator);
 
