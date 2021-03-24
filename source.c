@@ -2557,6 +2557,10 @@ compile_time_eval(
     context->result = eval_context.result;
     return 0;
   }
+  const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
+  // Lazy evaluation should not generate any instructions
+  assert(!dyn_array_length(eval_builder.code_block.instructions));
+
   Value *forced_value = value_any(&eval_context, view.source_range);
   MASS_ON_ERROR(value_force(&eval_context, &view.source_range, expression_result_value, forced_value)) {
     return 0;
@@ -2572,7 +2576,7 @@ compile_time_eval(
     return forced_value;
   }
 
-  u64 result_byte_size = expression_result_value->storage.byte_size;
+  u64 result_byte_size = descriptor_byte_size(result_descriptor);
   // Need to ensure 16-byte alignment here because result value might be __m128
   // TODO When we support AVX-2 or AVX-512, this might need to increase further
   u64 alignment = 16;
@@ -2582,26 +2586,17 @@ compile_time_eval(
   Register out_register = register_acquire_temp(&eval_builder);
   Value out_value_register = {
     .descriptor = &descriptor_s64,
-    .storage = {
-      .tag = Storage_Tag_Register,
-      .byte_size = 8,
-      .Register.index = out_register
-    }
+    .storage = storage_register_for_descriptor(out_register, &descriptor_void_pointer),
   };
   Value result_address = {
     .descriptor = &descriptor_s64,
     .storage = imm64((u64)result),
   };
 
-  MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
-    context->result = eval_context.result;
-    return 0;
-  }
-
   // Use memory-indirect addressing to copy
-  Value *out_value = value_make(&eval_context, expression_result_value->descriptor, (Storage){
+  Value *out_value = value_make(&eval_context, result_descriptor, (Storage){
     .tag = Storage_Tag_Memory,
-    .byte_size = expression_result_value->storage.byte_size,
+    .byte_size = result_byte_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Indirect,
       .Indirect = {
@@ -2609,6 +2604,11 @@ compile_time_eval(
       },
     },
   }, view.source_range);
+
+  MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
+    context->result = eval_context.result;
+    return 0;
+  }
 
   MASS_ON_ERROR(assign(&eval_context, out_value, expression_result_value)) {
     context->result = eval_context.result;
