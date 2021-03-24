@@ -1349,7 +1349,7 @@ token_make_macro_capture_function(
   Value *body,
   Scope *captured_scope,
   Array_Function_Argument arguments,
-  Descriptor *return_descriptor,
+  const Descriptor *return_descriptor,
   Slice capture_name
 ) {
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -1399,7 +1399,12 @@ token_apply_macro_syntax(
 
     Value_View capture_view = *dyn_array_get(match, i);
     Value *fake_body = token_make_fake_body(context, capture_view);
-    Descriptor *return_descriptor = macro->replacement.length ? &descriptor_any : &descriptor_void;
+
+    // FIXME because of hardcoded &descriptor_void we can only capture statements
+    //       which limits the usefulness of this type of macro. Need to figure out
+    //       a way to determine the return descriptor in such a way that it does not
+    //       break the lazy evaluation.
+    const Descriptor *return_descriptor = &descriptor_void;
 
     Array_Function_Argument empty_arguments = {&dyn_array_zero_items};
     Value *result = token_make_macro_capture_function(
@@ -3320,8 +3325,11 @@ token_handle_function_call(
     .args = args,
     .source_range = source_range,
   };
+  const Descriptor *overload_descriptor =
+    maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(overload));
 
-  const Function_Info *function = &overload->descriptor->Function.info;
+  const Function_Info *function = &overload_descriptor->Function.info;
+  assert(function->returns.descriptor->tag != Descriptor_Tag_Any);
   if (function->flags & Descriptor_Function_Flags_Macro) {
     call_function_macro(context, result_value, payload);
   } else {
