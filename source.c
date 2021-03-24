@@ -4947,7 +4947,6 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       return;
     }
     Value *value = *dyn_array_get(args, i);
-    if (!value) continue;
     if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error_snprintf(
