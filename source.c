@@ -3540,48 +3540,6 @@ storage_load_index_address(
   };
 }
 
-void
-token_handle_array_access(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *array_value,
-  Value *index_value,
-  Value *result_value
-) {
-  index_value = maybe_coerce_number_literal_to_integer(context, index_value, &descriptor_u64);
-  Value *array_element_value;
-  if (array_value->descriptor->tag == Descriptor_Tag_Pointer) {
-    const Descriptor *item_descriptor = array_value->descriptor->Pointer.to;
-    Storage storage = storage_load_index_address(
-      context, source_range, array_value, item_descriptor, index_value
-    );
-    array_element_value = value_make(context, item_descriptor, storage, array_value->source_range);
-  } else {
-    assert(array_value->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-    assert(array_value->storage.tag == Storage_Tag_Memory);
-    assert(array_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-    assert(!array_value->storage.Memory.location.Indirect.maybe_index_register.has_value);
-
-    const Descriptor *item_descriptor = array_value->descriptor->Fixed_Size_Array.item;
-
-    u64 item_byte_size = descriptor_byte_size(item_descriptor);
-
-    array_element_value =
-      value_make(context, item_descriptor, array_value->storage, array_value->source_range);
-    array_element_value->storage.byte_size = item_byte_size;
-    if (index_value->storage.tag == Storage_Tag_Static) {
-      s32 index = s64_to_s32(storage_static_value_up_to_s64(&index_value->storage));
-      array_element_value->storage.Memory.location.Indirect.offset = index * item_byte_size;
-    } else {
-      array_element_value->storage = storage_load_index_address(
-        context, source_range, array_value, item_descriptor, index_value
-      );
-    }
-  }
-  // FIXME this might actually cause problems in assigning to an array element
-  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
-}
-
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
   APPLY(Add,       1 /*value*/, +, 10 /*precendence */)\
   APPLY(Subtract,  2 /*value*/, -, 10 /*precendence */)\
@@ -4002,16 +3960,41 @@ mass_handle_array_access_lazy_proc(
   void *raw_payload
 ) {
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
-  Value *array = value_any(context, payload->array->source_range);
-  MASS_ON_ERROR(
-    value_force(context, &payload->array->source_range, payload->array, array)
-  ) return;
+  const Source_Range *array_range = &payload->array->source_range;
+  Value *array = value_any(context, *array_range);
+  MASS_ON_ERROR(value_force(context, array_range, payload->array, array)) return;
   Value *index = value_any(context, payload->index->source_range);
-  MASS_ON_ERROR(
-    value_force(context, &payload->index->source_range, payload->index, index)
-  ) return;
+  MASS_ON_ERROR(value_force(context, &payload->index->source_range, payload->index, index)) return;
 
-  token_handle_array_access(context, &array->source_range, array, index, result_value);
+  index = maybe_coerce_number_literal_to_integer(context, index, &descriptor_u64);
+  Value *array_element_value;
+  if (array->descriptor->tag == Descriptor_Tag_Pointer) {
+    const Descriptor *item_descriptor = array->descriptor->Pointer.to;
+    Storage storage = storage_load_index_address(context, array_range, array, item_descriptor, index);
+    array_element_value = value_make(context, item_descriptor, storage, *array_range);
+  } else {
+    assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+    assert(array->storage.tag == Storage_Tag_Memory);
+    assert(array->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+    assert(!array->storage.Memory.location.Indirect.maybe_index_register.has_value);
+
+    const Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
+
+    u64 item_byte_size = descriptor_byte_size(item_descriptor);
+
+    array_element_value =
+      value_make(context, item_descriptor, array->storage, array->source_range);
+    array_element_value->storage.byte_size = item_byte_size;
+    if (index->storage.tag == Storage_Tag_Static) {
+      s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
+      array_element_value->storage.Memory.location.Indirect.offset = index_number * item_byte_size;
+    } else {
+      array_element_value->storage =
+        storage_load_index_address(context, array_range, array, item_descriptor, index);
+    }
+  }
+  // FIXME this might actually cause problems in assigning to an array element
+  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
 }
 
 Value *
