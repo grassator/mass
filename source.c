@@ -1476,6 +1476,16 @@ value_is_lazy_or_static(
   return false;
 }
 
+void
+mass_handle_statement_lazy_proc(
+  Execution_Context *context,
+  Value *result_value,
+  Value *lazy_value
+) {
+  MASS_ON_ERROR(value_force(context, &lazy_value->source_range, lazy_value, &void_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
+}
+
 u64
 token_parse_macro_statement(
   Execution_Context *context,
@@ -1504,7 +1514,9 @@ token_parse_macro_statement(
   Value *expansion_value = token_apply_macro_syntax(context, match, macro);
   if (expansion_value) {
     assert(value_is_lazy_or_static(expansion_value));
+
     out_lazy_value->payload = expansion_value;
+    out_lazy_value->proc = mass_handle_statement_lazy_proc;
   }
   dyn_array_destroy(match);
   return match_length;
@@ -1573,6 +1585,7 @@ token_parse_macro_rewrite(
   if (block_result) {
     assert(value_is_lazy_or_static(block_result));
     out_lazy_value->payload = block_result;
+    out_lazy_value->proc = mass_handle_statement_lazy_proc;
   }
 
   dyn_array_destroy(match);
@@ -4408,16 +4421,6 @@ token_parse_expression(
 
   *out_match_length = matched_length;
   return result;
-}
-
-void
-mass_handle_statement_lazy_proc(
-  Execution_Context *context,
-  Value *result_value,
-  Value *lazy_value
-) {
-  MASS_ON_ERROR(value_force(context, &lazy_value->source_range, lazy_value, &void_value)) return;
-  MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
 }
 
 void
