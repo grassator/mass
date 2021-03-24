@@ -72,17 +72,26 @@ value_view_from_value_array(
   };
 }
 
+#ifndef __STDC_NO_ATOMICS__
+#include <stdatomic.h>
+#endif
+
 Scope *
 scope_make(
   const Allocator *allocator,
   const Scope *parent
 ) {
-  // TODO use _Atomic when supported
-  static u64 id = 0;
+  #ifdef _MSC_VER
+  volatile static u64 next_id = 0;
+  u64 id = InterlockedIncrement64(&next_id);
+  #else
+  _Atomic static u64 next_id = 0;
+  u64 id = next_id++;
+  #endif
 
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
-    .id = ++id,
+    .id = id,
     .allocator = allocator,
     .parent = parent,
     .map = 0,
