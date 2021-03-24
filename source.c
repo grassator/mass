@@ -4624,7 +4624,10 @@ token_parse_block_view(
           Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
           *lazy_value_storage = lazy_value;
           Value *lazy_statement = value_make(
-            context, &descriptor_void, storage_static(lazy_value_storage), matched_view.source_range
+            context,
+            &descriptor_lazy_value,
+            storage_static(lazy_value_storage),
+            matched_view.source_range
           );
           dyn_array_push(lazy_statements, lazy_statement);
           goto next_loop;
