@@ -4885,13 +4885,14 @@ token_parse_inline_machine_code_bytes(
   return peek_index;
 }
 
-u64
-token_parse_definition(
+Value *
+token_maybe_parse_definition(
   Execution_Context *context,
   Value_View view,
-  Value *result_value
+  u64 *match_length
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  *match_length = 0;
 
   // TODO consider merging with argument matching
   u64 peek_index = 0;
@@ -4900,15 +4901,13 @@ token_parse_definition(
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   const Descriptor *descriptor = token_match_type(context, rest);
-  MASS_ON_ERROR(*context->result) goto err;
+  MASS_ON_ERROR(*context->result) return 0;
   Source_Range name_range = name_token->source_range;
-  Value *value = reserve_stack(context, context->builder, descriptor, name_range);
+  Value *stack_value = reserve_stack(context, context->builder, descriptor, name_range);
   Slice name = value_as_symbol(name_token)->name;
-  scope_define_value(context->scope, name_range, name, value);
-  MASS_ON_ERROR(assign(context, result_value, value)) goto err;
-
-  err:
-  return peek_index;
+  scope_define_value(context->scope, name_range, name, stack_value);
+  *match_length = peek_index;
+  return stack_value;
 }
 
 u64
@@ -4920,7 +4919,9 @@ token_parse_definition_statement(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  return token_parse_definition(context, state, &void_value);
+  u64 match_length = 0;
+  token_maybe_parse_definition(context, state, &match_length);
+  return match_length;
 }
 
 void
@@ -5100,8 +5101,8 @@ token_parse_assignment(
   Mass_Assignment_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
 
-  Value *target = value_any(context, lhs.source_range);
-  if (token_parse_definition(context, lhs, target)) {
+  Value *target = token_maybe_parse_definition(context, lhs, &(u64){0});
+  if (target) {
     Value *expression_parse = token_parse_expression(context, rhs, &(u64){0}, 0);
     *payload = (Mass_Assignment_Lazy_Payload) {
       .source_range = operator->source_range,
@@ -5109,12 +5110,12 @@ token_parse_assignment(
       .expression = expression_parse,
     };
   } else {
-    Value *target_parse = token_parse_expression(context, lhs, &(u64){0}, 0);
+    Value *target = token_parse_expression(context, lhs, &(u64){0}, 0);
     Value *expression_parse = token_parse_expression(context, rhs, &(u64){0}, 0);
 
     *payload = (Mass_Assignment_Lazy_Payload) {
       .source_range = operator->source_range,
-      .target = target_parse,
+      .target = target,
       .expression = expression_parse,
     };
   }
