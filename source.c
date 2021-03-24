@@ -1891,11 +1891,8 @@ token_handle_user_defined_operator_proc(
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
-    Value *arg = value_view_get(args, i);
-    Source_Range source_range = arg->source_range;
-    Value *arg_value = value_any(context, source_range);
-    MASS_ON_ERROR(value_force(context, &source_range, arg, arg_value)) return 0;
-    scope_define_value(body_scope, source_range, arg_name, arg_value);
+    Value *arg = token_parse_single(context, value_view_get(args, i));
+    scope_define_value(body_scope, arg->source_range, arg_name, arg);
   }
 
   Execution_Context body_context = *context;

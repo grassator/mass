@@ -881,7 +881,7 @@ spec("source") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
-        "operator 18 (x ++) { result := x; x = x + 1; result };"
+        "operator 19 (x ++) { result := x; x = x + 1; result };"
         "test :: () -> (s64) { y := 41; ++y++ }"
       );
       check(checker);
