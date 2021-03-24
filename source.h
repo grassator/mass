@@ -118,11 +118,10 @@ scope_define_builtins(
   Scope *scope
 );
 
-void
+Value *
 compile_time_eval(
   Execution_Context *context,
-  Value_View view,
-  Value *result_value
+  Value_View view
 );
 
 PRELUDE_NO_DISCARD Value *

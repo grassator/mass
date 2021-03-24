@@ -1716,8 +1716,7 @@ token_match_argument(
       .maybe_default_expression = default_expression,
     };
   } else {
-    Value *value = value_any(context, definition.source_range);
-    compile_time_eval(context, view, value);
+    Value *value = compile_time_eval(context, view);
     arg = (Function_Argument) { .value = value };
   }
 
@@ -1905,7 +1904,8 @@ mass_handle_compile_time_eval_lazy_proc(
   Value *result_value,
   Value_View *view
 ) {
-  compile_time_eval(context, *view, result_value);
+  Value *compile_time_result = compile_time_eval(context, *view);
+  MASS_ON_ERROR(assign(context, result_value, compile_time_result));
 }
 
 static inline Value *
@@ -2514,13 +2514,12 @@ value_or_lazy_value_descriptor(
   return value->descriptor;
 }
 
-void
+Value *
 compile_time_eval(
   Execution_Context *context,
-  Value_View view,
-  Value *result_value
+  Value_View view
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return;
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   const Source_Range *source_range = &view.source_range;
 
@@ -2556,24 +2555,21 @@ compile_time_eval(
   Value *expression_result_value = token_parse_expression(&eval_context, view, &(u64){0}, 0);
   MASS_ON_ERROR(*eval_context.result) {
     context->result = eval_context.result;
-    return;
+    return 0;
   }
   Value *forced_value = value_any(&eval_context, view.source_range);
   MASS_ON_ERROR(value_force(&eval_context, &view.source_range, expression_result_value, forced_value)) {
-    return;
+    return 0;
   }
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
-    MASS_ON_ERROR(value_force(&eval_context, &view.source_range, forced_value, result_value)) {
-      return;
-    }
-    if (result_value->descriptor->tag == Descriptor_Tag_Function) {
+    if (forced_value->descriptor->tag == Descriptor_Tag_Function) {
       // It is only allowed to to pass through funciton definitions not compiled ones
-      assert(result_value->storage.tag == Storage_Tag_None);
+      assert(forced_value->storage.tag == Storage_Tag_None);
     }
-    return;
+    return forced_value;
   }
 
   u64 result_byte_size = expression_result_value->storage.byte_size;
@@ -2599,7 +2595,7 @@ compile_time_eval(
 
   MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
     context->result = eval_context.result;
-    return;
+    return 0;
   }
 
   // Use memory-indirect addressing to copy
@@ -2616,7 +2612,7 @@ compile_time_eval(
 
   MASS_ON_ERROR(assign(&eval_context, out_value, expression_result_value)) {
     context->result = eval_context.result;
-    return;
+    return 0;
   }
   fn_end(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
@@ -2648,7 +2644,7 @@ compile_time_eval(
       break;
     }
   }
-  MASS_ON_ERROR(assign(context, result_value, temp_result)) return;
+  return temp_result;
 }
 
 typedef struct {
@@ -3227,8 +3223,6 @@ token_handle_function_call(
   MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target_expression);
 
-  Value *result_value = value_any(context, source_range);
-
   if (
     target_descriptor->tag == Descriptor_Tag_Function &&
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
@@ -3246,8 +3240,7 @@ token_handle_function_call(
       .length = 2,
       .source_range = source_range,
     };
-    compile_time_eval(context, fake_eval_view, result_value);
-    return result_value;
+    return compile_time_eval(context, fake_eval_view);
   }
 
   u64 instruction_count = dyn_array_length(context->builder->code_block.instructions);
@@ -3339,9 +3332,7 @@ token_handle_function_call(
     ? call_function_macro
     : call_function_overload;
 
-  result_value =
-    mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
-  return result_value;
+  return mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
 
   err:
   if (dyn_array_is_initialized(args)) {
@@ -3933,9 +3924,7 @@ mass_handle_at_operator(
   } else if (value_match_symbol(body, slice_literal("context"))) {
     return value_make(context, &descriptor_execution_context, storage_static(context), body_range);
   } else if (value_match_group(body, Group_Tag_Paren)) {
-    Value *result_value = value_any(context, args_view.source_range);
-    compile_time_eval(context, value_as_group(body)->children, result_value);
-    return result_value;
+    return compile_time_eval(context, value_as_group(body)->children);
   } else {
     context_error_snprintf(
       context, body_range,
@@ -4793,8 +4782,7 @@ token_match_fixed_array_type(
   );
 
   Value_View size_view = value_as_group(square_brace)->children;
-  Value *size_value = value_any(context, size_view.source_range);
-  compile_time_eval(context, size_view, size_value);
+  Value *size_value = compile_time_eval(context, size_view);
   size_value = token_value_force_immediate_integer(
     context, &size_view.source_range, size_value, &descriptor_u32
   );
@@ -4943,8 +4931,7 @@ token_define_global_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = value_any(context, symbol->source_range);
-  compile_time_eval(context, expression, value);
+  Value *value = compile_time_eval(context, expression);
   MASS_ON_ERROR(*context->result) return;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
