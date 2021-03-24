@@ -3072,6 +3072,7 @@ call_function_macro(
       );
     }
   }
+  dyn_array_destroy(args);
 }
 
 void
@@ -3208,6 +3209,7 @@ call_function_overload(
     move_value(context->allocator, builder, source_range, &reg->saved.storage, &reg->stack_value->storage);
     // TODO :FreeStackAllocation
   }
+  dyn_array_destroy(arguments);
 }
 
 Value *
@@ -3333,17 +3335,23 @@ token_handle_function_call(
   const Function_Info *function = &overload_descriptor->Function.info;
   assert(function->returns.descriptor->tag != Descriptor_Tag_Any);
 
-  if (function->flags & Descriptor_Function_Flags_Macro) {
-    call_function_macro(context, result_value, payload);
-  } else {
-    call_function_overload(context, result_value, payload);
-  }
+  Lazy_Value_Proc proc = (function->flags & Descriptor_Function_Flags_Macro)
+    ? call_function_macro
+    : call_function_overload;
+
+  #if LAZY_EVAL
+  result_value =
+    mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
+  #else
+  proc(context, result_value, payload);
+  #endif
+  return result_value;
 
   err:
   if (dyn_array_is_initialized(args)) {
     dyn_array_destroy(args);
   }
-  return result_value;
+  return 0;
 }
 
 static inline Value *
@@ -4667,10 +4675,12 @@ token_parse_statement_label(
     }
   }
 
-  // :LazyProc
+  #if LAZY_EVAL
+  out_lazy_value->proc = mass_handle_label_lazy_proc;
+  out_lazy_value->payload = value;
+  #else
   mass_handle_label_lazy_proc(context, 0, value);
-  //out_lazy_value->proc = mass_handle_label_lazy_proc;
-  //out_lazy_value->payload = value;
+  #endif
 
   err:
   return peek_index;
@@ -4741,10 +4751,12 @@ token_parse_explicit_return(
     return 0;
   }
 
-  // FIXME :LazyProc
+  #if LAZY_EVAL
+  out_lazy_value->proc = mass_handle_explicit_return_lazy_proc;
+  out_lazy_value->payload = parse_result;
+  #else
   mass_handle_explicit_return_lazy_proc(context, 0, parse_result);
-  //out_lazy_value->proc = mass_handle_explicit_return_lazy_proc;
-  //out_lazy_value->payload = parse_result;
+  #endif
 
   return peek_index;
 }
@@ -4859,10 +4871,12 @@ token_parse_inline_machine_code_bytes(
     goto err;
   }
 
-  // :LazyProc
+  #if LAZY_EVAL
+  out_lazy_value->proc = mass_handle_inline_machine_code_bytes_lazy_proc;
+  out_lazy_value->payload = args_token;
+  #else
   mass_handle_inline_machine_code_bytes_lazy_proc(context, 0, args_token);
-  //out_lazy_value->proc = mass_handle_inline_machine_code_bytes_lazy_proc;
-  //out_lazy_value->payload = args_token;
+  #endif
 
   err:
   return peek_index;
@@ -5018,10 +5032,12 @@ token_define_local_variable(
     .expression = value,
   };
 
-  // :LazyProc
+  #if LAZY_EVAL
+  out_lazy_value->proc = mass_handle_assignment_lazy_proc;
+  out_lazy_value->payload = payload;
+  #else
   mass_handle_assignment_lazy_proc(context, 0, payload);
-  //out_lazy_value->proc = mass_handle_assignment_lazy_proc;
-  //out_lazy_value->payload = payload;
+  #endif
 }
 
 u64
@@ -5105,10 +5121,12 @@ token_parse_assignment(
   }
   MASS_ON_ERROR(*context->result) return 0;
 
-  // :LazyProc
+  #if LAZY_EVAL
+  out_lazy_value->proc = mass_handle_assignment_lazy_proc;
+  out_lazy_value->payload = payload;
+  #else
   mass_handle_assignment_lazy_proc(context, 0, payload);
-  //out_lazy_value->proc = mass_handle_assignment_lazy_proc;
-  //out_lazy_value->payload = payload;
+  #endif
 
   return statement_length;
 }
