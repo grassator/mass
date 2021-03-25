@@ -106,7 +106,6 @@ register_acquire_maybe_save_if_already_acquired(
     return result;
   }
 
-  // Save RDX as it will be used for the remainder
   result.saved_index = register_acquire_temp(builder);
   result.saved = true;
 
@@ -1077,8 +1076,12 @@ divide_or_remainder(
         value_register_for_descriptor(context, Register_AH, dividend->descriptor, *source_range);
       move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     } else {
+      // TODO saving to AX should not be necessary, but because we do not have global
+      //      register allocation and arguments might be in RDX we use RAX instead 
+      Storage remainder = storage_register_for_descriptor(Register_D, dividend->descriptor);
       Value *temp_result =
-        value_register_for_descriptor(context, Register_D, dividend->descriptor, *source_range);
+        value_register_for_descriptor(context, Register_A, dividend->descriptor, *source_range);
+      move_value(allocator, builder, source_range, &temp_result->storage, &remainder);
       move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     }
   }

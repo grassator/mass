@@ -421,18 +421,26 @@ spec("source") {
           "test", &test_context,\
           "test :: (x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
-    #define MATCH_CHECK_UNSIGNED_DIVIDE(BITS)\
+    #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
       it("should correctly handle u"#BITS" divide") {\
         MATH_CHECKER_FN(u##BITS, u##BITS, /);\
         check(checker);\
         check(checker(10, 3) == 10 / 3);\
         check(checker(UINT##BITS##_MAX, 3) == UINT##BITS##_MAX / 3);\
+      }\
+      it("should correctly handle u"#BITS" remainder") {\
+        MATH_CHECKER_FN(u##BITS, u##BITS, %);\
+        check(checker);\
+        check(checker(10, 3) == 10 % 3);\
+        check(checker(13, 10) == 13 % 10);\
+        check(checker(UINT##BITS##_MAX, 3) == UINT##BITS##_MAX % 3);\
+        check(checker(3, UINT##BITS##_MAX) == 3 % UINT##BITS##_MAX);\
       }
 
-    MATCH_CHECK_UNSIGNED_DIVIDE(8)
-    MATCH_CHECK_UNSIGNED_DIVIDE(16)
-    MATCH_CHECK_UNSIGNED_DIVIDE(32)
-    MATCH_CHECK_UNSIGNED_DIVIDE(64)
+    MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(8)
+    MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(16)
+    MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(32)
+    MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(64)
 
     #define MATCH_CHECK_SIGNED_DIVIDE(BITS)\
       it("should correctly handle s"#BITS" divide") {\
