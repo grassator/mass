@@ -101,24 +101,6 @@ fn_encode(
   Function_Layout *out_layout
 );
 
-static inline void
-plus(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *a,
-  Value *b
-);
-
-static inline void
-minus(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *a,
-  Value *b
-);
-
 void
 multiply(
   Execution_Context *context,
