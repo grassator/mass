@@ -421,34 +421,33 @@ spec("source") {
           "test", &test_context,\
           "test :: (x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
+    #define MATCH_CHECK_UNSIGNED_DIVIDE(BITS)\
+      it("should correctly handle u"#BITS" divide") {\
+        MATH_CHECKER_FN(u##BITS, u##BITS, /);\
+        check(checker);\
+        check(checker(10, 3) == 10 / 3);\
+        check(checker(UINT##BITS##_MAX, 3) == UINT##BITS##_MAX / 3);\
+      }
 
-    it("should correctly handle u8 divide") {
-      MATH_CHECKER_FN(u8, u8, /);
-      check(checker);
-      check(checker(10, 3) == 10 / 3);
-      check(checker(UINT8_MAX, 3) == UINT8_MAX / 3);
-    }
+    MATCH_CHECK_UNSIGNED_DIVIDE(8)
+    MATCH_CHECK_UNSIGNED_DIVIDE(16)
+    MATCH_CHECK_UNSIGNED_DIVIDE(32)
+    MATCH_CHECK_UNSIGNED_DIVIDE(64)
 
-    it("should correctly handle u16 divide") {
-      MATH_CHECKER_FN(u16, u16, /);
-      check(checker);
-      check(checker(10, 3) == 10 / 3);
-      check(checker(UINT16_MAX, 3) == UINT16_MAX / 3);
-    }
+    #define MATCH_CHECK_SIGNED_DIVIDE(BITS)\
+      it("should correctly handle s"#BITS" divide") {\
+        MATH_CHECKER_FN(s##BITS, s##BITS, /);\
+        check(checker);\
+        check(checker(10, 3) == 10 / 3);\
+        check(checker(10, -3) == 10 / -3);\
+        check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX / 3);\
+        check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN / -3);\
+      }
 
-    it("should correctly handle u32 divide") {
-      MATH_CHECKER_FN(u32, u32, /);
-      check(checker);
-      check(checker(10, 3) == 10 / 3);
-      check(checker(UINT32_MAX, 3) == UINT32_MAX / 3);
-    }
-
-    it("should correctly handle u64 divide") {
-      MATH_CHECKER_FN(u64, u64, /);
-      check(checker);
-      check(checker(10, 3) == 10 / 3);
-      check(checker(UINT64_MAX, 3) == UINT64_MAX / 3);
-    }
+    MATCH_CHECK_SIGNED_DIVIDE(8)
+    MATCH_CHECK_SIGNED_DIVIDE(16)
+    MATCH_CHECK_SIGNED_DIVIDE(32)
+    MATCH_CHECK_SIGNED_DIVIDE(64)
   }
 
   describe("Type Inference") {
