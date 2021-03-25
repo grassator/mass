@@ -315,6 +315,12 @@ storage_is_label(
   const Storage *operand
 );
 
+static inline bool
+storage_is_register_index(
+  const Storage *storage,
+  Register reg_index
+);
+
 fn_type_opaque
 value_as_function(
   const Jit *jit,

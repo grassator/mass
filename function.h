@@ -57,13 +57,21 @@ instruction_add_source_location_internal(
 // TODO properly support unsigned numbers
 #define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
-    Storage *a_operand = &(_a_)->storage;\
-    Storage *b_operand = &(_b_)->storage;\
-    if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
-      s64 a_s64 = storage_static_value_up_to_s64(a_operand);\
-      s64 b_s64 = storage_static_value_up_to_s64(b_operand);\
+    Execution_Context *fold_context = (_context_);\
+    Value *fold_a = (_a_);\
+    Value *fold_b = (_b_);\
+    if (\
+      fold_a->descriptor != &descriptor_lazy_value &&\
+      fold_b->descriptor != &descriptor_lazy_value &&\
+      fold_a->storage.tag == Storage_Tag_Static &&\
+      fold_b->storage.tag == Storage_Tag_Static\
+    ) {\
+      fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_s64);\
+      fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_s64);\
+      s64 a_s64 = storage_static_value_up_to_s64(&fold_a->storage);\
+      s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
       s64 constant_result = a_s64 _operator_ b_s64;\
-      maybe_constant_fold_internal((_context_), (_a_), constant_result, (_result_), (_loc_));\
+      maybe_constant_fold_internal(fold_context, fold_a, constant_result, (_result_), (_loc_));\
       return;\
     }\
   } while(0)

@@ -89,6 +89,13 @@ assign(
 static inline u64
 get_new_epoch();
 
+Value *
+maybe_coerce_number_literal_to_integer(
+  Execution_Context *context,
+  Value *value,
+  const Descriptor *target_descriptor
+);
+
 Scope *
 scope_make(
   const Allocator *allocator,

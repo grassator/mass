@@ -3132,18 +3132,22 @@ call_function_overload(
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
       if (register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-        Value to_save = {
-          .descriptor = &descriptor_s64,
-          .storage = {
-            .tag = Storage_Tag_Register,
-            .byte_size = 8,
-            .Register.index = reg_index,
-          }
-        };
-        Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
-        Value *stack_value = reserve_stack(context, builder, to_save.descriptor, *source_range);
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
-        dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
+        // We must not save the register that we will overwrite with the result
+        // otherwise we will overwrite it with the restored value
+        if (!storage_is_register_index(&result_value->storage, reg_index)) {
+          Value to_save = {
+            .descriptor = &descriptor_s64,
+            .storage = {
+              .tag = Storage_Tag_Register,
+              .byte_size = 8,
+              .Register.index = reg_index,
+            }
+          };
+          Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
+          Value *stack_value = reserve_stack(context, builder, to_save.descriptor, *source_range);
+          push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
+          dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
+        }
       }
     }
   }
@@ -3567,7 +3571,10 @@ storage_load_index_address(
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
       load_address(context, source_range, &temp_value, target);
     }
-    plus(context, source_range, new_base_register, new_base_register, &temp_value);
+    push_instruction(
+      &context->builder->code_block.instructions, *source_range,
+      (Instruction) {.assembly = {add, {new_base_register->storage, temp_value.storage}}}
+    );
     register_release(context->builder, temp_register);
   }
 
@@ -3624,40 +3631,96 @@ mass_handle_arithmetic_operation_lazy_proc(
   void *raw_payload
 ) {
   Mass_Arithmetic_Operator_Lazy_Payload *payload = raw_payload;
+
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
+  assert(descriptor_is_integer(descriptor));
   assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
-  Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
-  MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
-  Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
-  MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
-
-  maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
-  MASS_ON_ERROR(*context->result) return;
-
-  Function_Builder *builder = context->builder;
+  const Source_Range result_range = payload->lhs->source_range;
 
   // FIXME use result_value here instead
-  Value *any_result = value_any_init(&(Value){0}, context, lhs->source_range);
+  Value *any_result = value_any_init(&(Value){0}, context, result_range);
   switch(payload->operator) {
-    case Mass_Arithmetic_Operator_Add: {
-      plus(context, &lhs->source_range, any_result, lhs, rhs);
-      break;
-    }
+    case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
-      minus(context, &lhs->source_range, any_result, lhs, rhs);
-      break;
+      Value *a = payload->lhs;
+      Value *b = payload->rhs;
+
+      if (payload->operator == Mass_Arithmetic_Operator_Add) {
+        maybe_constant_fold(context, &result_range, result_value, a, b, +);
+      } else {
+        maybe_constant_fold(context, &result_range, result_value, a, b, -);
+      }
+
+      // Try to reuse result_value if we can
+      // TODO should also be able to reuse memory
+      Value *temp_a;
+      if (
+        result_value->storage.tag == Storage_Tag_Register &&
+        result_value->storage.Register.index != Register_A // FIXME :ExplicitAcquireRegisterA
+      ) {
+        temp_a = value_register_for_descriptor(
+          context, result_value->storage.Register.index, descriptor, result_range
+        );
+      } else {
+        temp_a = value_register_for_descriptor(
+          context, register_acquire_temp(context->builder), descriptor, result_range
+        );
+      }
+
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
+
+      // TODO This can be optimized in cases where one of the operands is
+      Value *temp_b = value_register_for_descriptor(
+        context, register_acquire_temp(context->builder), descriptor, result_range
+      );
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
+
+      const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
+
+      push_instruction(
+        &context->builder->code_block.instructions, result_range,
+        (Instruction) {.assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
+      );
+      if (!storage_equal(&temp_a->storage, &result_value->storage)) {
+        move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
+        assert(temp_a->storage.tag == Storage_Tag_Register);
+        register_release(context->builder, temp_a->storage.Register.index);
+      }
+      register_release(context->builder, temp_b->storage.Register.index);
+      return;
     }
     case Mass_Arithmetic_Operator_Multiply: {
+      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
+      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
+
+      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
+      MASS_ON_ERROR(*context->result) return;
       multiply(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Divide: {
+      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
+      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
+
+      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
+      MASS_ON_ERROR(*context->result) return;
       divide(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
     case Mass_Arithmetic_Operator_Remainder: {
+      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
+      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
+
+      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
+      MASS_ON_ERROR(*context->result) return;
       value_remainder(context, &lhs->source_range, any_result, lhs, rhs);
       break;
     }
@@ -3666,9 +3729,11 @@ mass_handle_arithmetic_operation_lazy_proc(
       break;
     }
   }
+
+  Function_Builder *builder = context->builder;
   if (any_result->storage.tag != Storage_Tag_Static) {
     // FIXME do proper register allocation
-    Value *stack_result = reserve_stack(context, builder, lhs->descriptor, lhs->source_range);
+    Value *stack_result = reserve_stack(context, builder, descriptor, result_range);
     MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
     if (any_result->storage.tag == Storage_Tag_Register) {
       ensure_register_released(context->builder, any_result->storage.Register.index);

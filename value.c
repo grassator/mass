@@ -635,6 +635,14 @@ storage_is_register_or_memory(
 }
 
 static inline bool
+storage_is_register_index(
+  const Storage *storage,
+  Register reg_index
+) {
+  return storage->tag == Storage_Tag_Register && storage->Register.index == reg_index;
+}
+
+static inline bool
 function_argument_is_exact(
   const Function_Argument *arg
 ) {
