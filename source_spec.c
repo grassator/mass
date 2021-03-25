@@ -428,6 +428,27 @@ spec("source") {
       check(checker(10, 3) == 10 / 3);
       check(checker(UINT8_MAX, 3) == UINT8_MAX / 3);
     }
+
+    it("should correctly handle u16 divide") {
+      MATH_CHECKER_FN(u16, u16, /);
+      check(checker);
+      check(checker(10, 3) == 10 / 3);
+      check(checker(UINT16_MAX, 3) == UINT16_MAX / 3);
+    }
+
+    it("should correctly handle u32 divide") {
+      MATH_CHECKER_FN(u32, u32, /);
+      check(checker);
+      check(checker(10, 3) == 10 / 3);
+      check(checker(UINT32_MAX, 3) == UINT32_MAX / 3);
+    }
+
+    it("should correctly handle u64 divide") {
+      MATH_CHECKER_FN(u64, u64, /);
+      check(checker);
+      check(checker(10, 3) == 10 / 3);
+      check(checker(UINT64_MAX, 3) == UINT64_MAX / 3);
+    }
   }
 
   describe("Type Inference") {
