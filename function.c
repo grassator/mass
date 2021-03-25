@@ -801,20 +801,6 @@ maybe_constant_fold_internal(
   MASS_ON_ERROR(assign(context, result_value, imm_value)) return;
 }
 
-// TODO properly support unsigned numbers
-#define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
-  do {\
-    Storage *a_operand = &(_a_)->storage;\
-    Storage *b_operand = &(_b_)->storage;\
-    if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
-      s64 a_s64 = storage_static_value_up_to_s64(a_operand);\
-      s64 b_s64 = storage_static_value_up_to_s64(b_operand);\
-      s64 constant_result = a_s64 _operator_ b_s64;\
-      maybe_constant_fold_internal((_context_), (_a_), constant_result, (_result_), (_loc_));\
-      return;\
-    }\
-  } while(0)
-
 void
 plus_or_minus(
   Execution_Context *context,
@@ -1077,7 +1063,7 @@ divide_or_remainder(
       move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     } else {
       // TODO saving to AX should not be necessary, but because we do not have global
-      //      register allocation and arguments might be in RDX we use RAX instead 
+      //      register allocation and arguments might be in RDX we use RAX instead
       Storage remainder = storage_register_for_descriptor(Register_D, dividend->descriptor);
       Value *temp_result =
         value_register_for_descriptor(context, Register_A, dividend->descriptor, *source_range);

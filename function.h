@@ -54,6 +54,20 @@ instruction_add_source_location_internal(
     instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, (__VA_ARGS__))\
   )
 
+// TODO properly support unsigned numbers
+#define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
+  do {\
+    Storage *a_operand = &(_a_)->storage;\
+    Storage *b_operand = &(_b_)->storage;\
+    if (a_operand->tag == Storage_Tag_Static && b_operand->tag == Storage_Tag_Static) {\
+      s64 a_s64 = storage_static_value_up_to_s64(a_operand);\
+      s64 b_s64 = storage_static_value_up_to_s64(b_operand);\
+      s64 constant_result = a_s64 _operator_ b_s64;\
+      maybe_constant_fold_internal((_context_), (_a_), constant_result, (_result_), (_loc_));\
+      return;\
+    }\
+  } while(0)
+
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
 u32
 make_trampoline(
