@@ -1036,8 +1036,9 @@ divide_or_remainder(
     : b->descriptor;
 
   // TODO deal with signed / unsigned
-  Value *divisor = reserve_stack(context, builder, larger_descriptor, *source_range);
-  move_value(allocator, builder, source_range, &divisor->storage, &b->storage);
+  Register divisor_register = register_acquire_temp(builder);
+  Storage divisor = storage_register_for_descriptor(divisor_register, larger_descriptor);
+  move_value(allocator, builder, source_range, &divisor, &b->storage);
 
   Value *reg_a = value_register_for_descriptor(context, Register_A, larger_descriptor, *source_range);
   {
@@ -1065,7 +1066,7 @@ divide_or_remainder(
       }
     }
   }
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {divisor->storage, 0, 0}}});
+  push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {divisor, 0, 0}}});
 
 
   // FIXME division uses specific registers so if the result_value operand is `any`
@@ -1084,6 +1085,7 @@ divide_or_remainder(
     }
   }
 
+  register_release(builder, divisor_register);
   register_release_maybe_restore(builder, &maybe_saved_rdx);
 }
 
