@@ -413,6 +413,23 @@ spec("source") {
     }
   }
   #endif
+
+  describe("Math") {
+    #define MATH_CHECKER_FN(LEFT_TYPE, RIGHT_TYPE, OPERATOR)\
+      LEFT_TYPE(*checker)(LEFT_TYPE, RIGHT_TYPE) = \
+        (LEFT_TYPE(*)(LEFT_TYPE, RIGHT_TYPE))test_program_inline_source_function(\
+          "test", &test_context,\
+          "test :: (x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
+        )
+
+    it("should correctly handle u8 divide") {
+      MATH_CHECKER_FN(u8, u8, /);
+      check(checker);
+      check(checker(10, 3) == 10 / 3);
+      check(checker(UINT8_MAX, 3) == UINT8_MAX / 3);
+    }
+  }
+
   describe("Type Inference") {
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(

@@ -92,6 +92,14 @@ mnemonic(movsx,
   encoding(0x0FBF, _r, r64, r_m16),
 );
 
+mnemonic(movzx,
+  encoding(0x0FB6, _r, r16, r_m8),
+  encoding(0x0FB6, _r, r32, r_m8),
+  encoding(0x0FB6, _r, r64, r_m8),
+  encoding(0x0FB7, _r, r32, r_m16),
+  encoding(0x0FB7, _r, r64, r_m16),
+);
+
 mnemonic(movss,
   encoding(0xF30F10, _r, xmm32, xmm_m32),
   encoding(0xF30F11, _r, xmm_m32, xmm32),
@@ -228,6 +236,13 @@ mnemonic(idiv,
   encoding(0xF7, _op_code(7), r_m16),
   encoding(0xF7, _op_code(7), r_m32),
   encoding(0xF7, _op_code(7), r_m64),
+);
+
+mnemonic(x64_div,
+  encoding(0xF6, _op_code(6), r_m8),
+  encoding(0xF7, _op_code(6), r_m16),
+  encoding(0xF7, _op_code(6), r_m32),
+  encoding(0xF7, _op_code(6), r_m64),
 );
 
 mnemonic(cbw,

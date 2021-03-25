@@ -1013,7 +1013,11 @@ divide_or_remainder(
   Array_Instruction *instructions = &builder->code_block.instructions;
   assert(same_value_type(dividend, divisor));
   assert(descriptor_is_integer(dividend->descriptor));
-  assert(descriptor_byte_size(dividend->descriptor) == descriptor_byte_size(divisor->descriptor));
+
+  u64 dividend_size = descriptor_byte_size(dividend->descriptor);
+  u64 divisor_size = descriptor_byte_size(divisor->descriptor);
+
+  assert(dividend_size == divisor_size);
 
   switch(operation) {
     case Divide_Operation_Divide: {
@@ -1031,17 +1035,16 @@ divide_or_remainder(
     allocator, builder, source_range, Register_D
   );
 
-  // TODO deal with signed / unsigned
   Register divisor_register = register_acquire_temp(builder);
   Storage temp_divisor = storage_register_for_descriptor(divisor_register, divisor->descriptor);
   move_value(allocator, builder, source_range, &temp_divisor, &divisor->storage);
 
   Value *reg_a = value_register_for_descriptor(context, Register_A, dividend->descriptor, *source_range);
-  {
+  if (descriptor_is_signed_integer(dividend->descriptor)){
     move_value(allocator, builder, source_range, &reg_a->storage, &dividend->storage);
 
     const X64_Mnemonic *widen = 0;
-    switch (descriptor_byte_size(dividend->descriptor)) {
+    switch (dividend_size) {
       case 8: widen = cqo; break;
       case 4: widen = cdq; break;
       case 2: widen = cwd; break;
@@ -1049,8 +1052,19 @@ divide_or_remainder(
     }
     assert(widen);
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {widen}});
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {temp_divisor}}});
+  } else {
+    if (dividend_size == 1) {
+      Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movzx, {reg_ax, dividend->storage}}});
+    } else {
+      move_value(allocator, builder, source_range, &reg_a->storage, &dividend->storage);
+      // We need to zero-extend A to D which means just clearing D register
+      Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {xor, {reg_d, reg_d}}});
+    }
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {x64_div, {temp_divisor}}});
   }
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {temp_divisor}}});
 
 
   // FIXME division uses specific registers so if the result_value operand is `any`
