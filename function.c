@@ -1005,22 +1005,23 @@ divide_or_remainder(
   Divide_Operation operation,
   const Source_Range *source_range,
   Value *result_value,
-  Value *a,
-  Value *b
+  Value *dividend,
+  Value *divisor
 ) {
   Allocator *allocator = context->allocator;
   Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  assert(same_value_type_or_can_implicitly_move_cast(a, b));
-  assert(descriptor_is_integer(a->descriptor));
+  assert(same_value_type(dividend, divisor));
+  assert(descriptor_is_integer(dividend->descriptor));
+  assert(descriptor_byte_size(dividend->descriptor) == descriptor_byte_size(divisor->descriptor));
 
   switch(operation) {
     case Divide_Operation_Divide: {
-      maybe_constant_fold(context, source_range, result_value, a, b, /);
+      maybe_constant_fold(context, source_range, result_value, dividend, divisor, /);
       break;
     }
     case Divide_Operation_Remainder: {
-      maybe_constant_fold(context, source_range, result_value, a, b, %);
+      maybe_constant_fold(context, source_range, result_value, dividend, divisor, %);
       break;
     }
   }
@@ -1030,43 +1031,26 @@ divide_or_remainder(
     allocator, builder, source_range, Register_D
   );
 
-  const Descriptor *larger_descriptor =
-    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
-    ? a->descriptor
-    : b->descriptor;
-
   // TODO deal with signed / unsigned
   Register divisor_register = register_acquire_temp(builder);
-  Storage divisor = storage_register_for_descriptor(divisor_register, larger_descriptor);
-  move_value(allocator, builder, source_range, &divisor, &b->storage);
+  Storage temp_divisor = storage_register_for_descriptor(divisor_register, divisor->descriptor);
+  move_value(allocator, builder, source_range, &temp_divisor, &divisor->storage);
 
-  Value *reg_a = value_register_for_descriptor(context, Register_A, larger_descriptor, *source_range);
+  Value *reg_a = value_register_for_descriptor(context, Register_A, dividend->descriptor, *source_range);
   {
-    move_value(allocator, builder, source_range, &reg_a->storage, &a->storage);
+    move_value(allocator, builder, source_range, &reg_a->storage, &dividend->storage);
 
-    switch (descriptor_byte_size(larger_descriptor)) {
-      case 8: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cqo, {0}}});
-        break;
-      }
-      case 4: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cdq, {0}}});
-        break;
-      }
-      case 2: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cwd, {0}}});
-        break;
-      }
-      case 1: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {cbw, {0}}});
-        break;
-      }
-      default: {
-        assert(!"Unsupported byte size when dividing");
-      }
+    const X64_Mnemonic *widen = 0;
+    switch (descriptor_byte_size(dividend->descriptor)) {
+      case 8: widen = cqo; break;
+      case 4: widen = cdq; break;
+      case 2: widen = cwd; break;
+      case 1: widen = cbw; break;
     }
+    assert(widen);
+    push_instruction(instructions, *source_range, (Instruction) {.assembly = {widen}});
   }
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {divisor, 0, 0}}});
+  push_instruction(instructions, *source_range, (Instruction) {.assembly = {idiv, {temp_divisor}}});
 
 
   // FIXME division uses specific registers so if the result_value operand is `any`
@@ -1074,13 +1058,13 @@ divide_or_remainder(
   if (operation == Divide_Operation_Divide) {
     move_to_result_from_temp(allocator, builder, source_range, result_value, reg_a);
   } else {
-    if (descriptor_byte_size(larger_descriptor) == 1) {
+    if (descriptor_byte_size(dividend->descriptor) == 1) {
       Value *temp_result =
-        value_register_for_descriptor(context, Register_AH, larger_descriptor, *source_range);
+        value_register_for_descriptor(context, Register_AH, dividend->descriptor, *source_range);
       move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     } else {
       Value *temp_result =
-        value_register_for_descriptor(context, Register_D, larger_descriptor, *source_range);
+        value_register_for_descriptor(context, Register_D, dividend->descriptor, *source_range);
       move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
     }
   }
