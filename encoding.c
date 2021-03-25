@@ -180,12 +180,12 @@ encode_instruction_assembly(
     rex_byte |= REX_B;
   }
 
-  if (rex_byte) {
-    virtual_memory_buffer_append_u8(buffer, rex_byte);
-  }
-
   if (needs_16_bit_prefix) {
     virtual_memory_buffer_append_u8(buffer, 0x66);
+  }
+
+  if (rex_byte) {
+    virtual_memory_buffer_append_u8(buffer, rex_byte);
   }
 
   if (op_code[0]) {
