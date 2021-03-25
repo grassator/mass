@@ -3528,11 +3528,11 @@ storage_load_index_address(
   // This code is very general in terms of the operands where the base
   // or the index are stored, but it is
 
-  u64 item_byte_size = descriptor_byte_size(item_descriptor);
-  Register reg = register_acquire_temp(context->builder);
+  s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
   // FIXME this acquires but never releases a register
-  Value *new_base_register =
-    value_register_for_descriptor(context, reg, &descriptor_s64, index_value->source_range);
+  Value *new_base_register = value_register_for_descriptor(
+    context, register_acquire_temp(context->builder), &descriptor_s64, index_value->source_range
+  );
 
   // Move the index into the register
   move_value(
@@ -3543,9 +3543,22 @@ storage_load_index_address(
     &index_value->storage
   );
 
-  Value *byte_size_value = value_from_s64(context, item_byte_size, index_value->source_range);
+  Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
+
   // Multiply index by the item byte size
-  multiply(context, source_range, new_base_register, new_base_register, byte_size_value);
+  Register reg_byte_size = register_acquire_temp(context->builder);
+  Value *reg_byte_size_value = value_register_for_descriptor(
+    context, reg_byte_size, &descriptor_s64, index_value->source_range
+  );
+  move_value(
+    context->allocator, context->builder, source_range,
+    &reg_byte_size_value->storage, &byte_size_value->storage
+  );
+
+  push_instruction(
+    &context->builder->code_block.instructions, *source_range,
+    (Instruction) {.assembly = {imul, {new_base_register->storage, reg_byte_size_value->storage}}}
+  );
 
   {
     // @InstructionQuality
