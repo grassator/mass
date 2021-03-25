@@ -1612,6 +1612,7 @@ same_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   const Descriptor *source
 ) {
+  if (target->tag == Descriptor_Tag_Any) return true;
   if (same_type(target, source)) return true;
   if (target == source) return true;
   if (target->tag != source->tag) return false;

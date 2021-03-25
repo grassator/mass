@@ -3624,6 +3624,9 @@ mass_handle_arithmetic_operation_lazy_proc(
   void *raw_payload
 ) {
   Mass_Arithmetic_Operator_Lazy_Payload *payload = raw_payload;
+  const Descriptor *descriptor =
+    large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
+  assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
   Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
   MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
