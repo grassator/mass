@@ -425,16 +425,16 @@ spec("source") {
       it("should correctly handle u"#BITS" divide") {\
         MATH_CHECKER_FN(u##BITS, u##BITS, /);\
         check(checker);\
-        check(checker(10, 3) == 10 / 3);\
-        check(checker(UINT##BITS##_MAX, 3) == UINT##BITS##_MAX / 3);\
+        check(checker(10u, 3u) == 10u / 3u);\
+        check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX / 3u);\
       }\
       it("should correctly handle u"#BITS" remainder") {\
         MATH_CHECKER_FN(u##BITS, u##BITS, %);\
         check(checker);\
-        check(checker(10, 3) == 10 % 3);\
-        check(checker(13, 10) == 13 % 10);\
-        check(checker(UINT##BITS##_MAX, 3) == UINT##BITS##_MAX % 3);\
-        check(checker(3, UINT##BITS##_MAX) == 3 % UINT##BITS##_MAX);\
+        check(checker(10u, 3u) == 10u % 3u);\
+        check(checker(13u, 10u) == 13u % 10u);\
+        check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX % 3u);\
+        check(checker(3u, UINT##BITS##_MAX) == 3u % UINT##BITS##_MAX);\
       }
 
     MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(8)
@@ -442,7 +442,7 @@ spec("source") {
     MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(32)
     MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(64)
 
-    #define MATCH_CHECK_SIGNED_DIVIDE(BITS)\
+    #define MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(BITS)\
       it("should correctly handle s"#BITS" divide") {\
         MATH_CHECKER_FN(s##BITS, s##BITS, /);\
         check(checker);\
@@ -450,12 +450,22 @@ spec("source") {
         check(checker(10, -3) == 10 / -3);\
         check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX / 3);\
         check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN / -3);\
+      }\
+      it("should correctly handle s"#BITS" remainder") {\
+        MATH_CHECKER_FN(s##BITS, s##BITS, %);\
+        check(checker);\
+        check(checker(10, 3) == 10 % 3);\
+        check(checker(10, -3) == 10 % -3);\
+        check(checker(13, 10) == 13 % 10);\
+        check(checker(-13, 10) == -13 % 10);\
+        check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX % 3);\
+        check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN % -3);\
       }
 
-    MATCH_CHECK_SIGNED_DIVIDE(8)
-    MATCH_CHECK_SIGNED_DIVIDE(16)
-    MATCH_CHECK_SIGNED_DIVIDE(32)
-    MATCH_CHECK_SIGNED_DIVIDE(64)
+    MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(8)
+    MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(16)
+    MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(32)
+    MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(64)
   }
 
   describe("Type Inference") {
