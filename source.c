@@ -4567,7 +4567,10 @@ token_parse_block_view(
       match_length = 1;
       continue;
     }
-    Lazy_Value lazy_value = { .context = *context };
+    Lazy_Value lazy_value = {
+      .context = *context,
+      .descriptor = &descriptor_void,
+    };
     for (
       const Scope *statement_matcher_scope = context->scope;
       statement_matcher_scope;
@@ -4587,6 +4590,7 @@ token_parse_block_view(
           // If the statement did not assign a proc that means that it does not need
           // to output any instructions and there is nothing to force.
           if (lazy_value.proc) {
+            assert(lazy_value.descriptor);
             Value_View matched_view = value_view_slice(&rest, 0, match_length);
             Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
             *lazy_value_storage = lazy_value;
