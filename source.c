@@ -5115,16 +5115,21 @@ token_define_local_variable(
   }
 
   const Source_Range *source_range = &symbol->source_range;
-  Value *on_stack = reserve_stack(context, context->builder, stack_descriptor, *source_range);
+  Value *variable;
+  if (descriptor == &descriptor_void) {
+    variable = value_make(context, stack_descriptor, (Storage){0}, *source_range);
+  } else {
+    variable = reserve_stack(context, context->builder, stack_descriptor, *source_range);
+  }
 
   Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, *source_range, scope_name, on_stack);
+  scope_define_value(context->scope, *source_range, scope_name, variable);
 
   Mass_Assignment_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
   *payload = (Mass_Assignment_Lazy_Payload) {
     .source_range = *source_range,
-    .target = on_stack,
+    .target = variable,
     .expression = value,
   };
 
