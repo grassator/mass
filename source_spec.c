@@ -1548,7 +1548,7 @@ spec("source") {
         Mass_Result result = program_import_module(&test_context, prelude_module);
         check(result.tag == Mass_Result_Tag_Success);
         Module* module = program_module_from_file(
-            &test_context, slice_literal("..\\compile-time-benchmark\\folding"), module_scope
+            &test_context, slice_literal("..\\compile-time-benchmark\\print"), module_scope
         );
         program_import_module(&test_context, module);
         Program* test_program = test_context.program;
@@ -1559,7 +1559,7 @@ spec("source") {
         check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
         check(spec_check_mass_result(test_context.result));
 
-        write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
+        write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
     }
   }
 
