@@ -3763,9 +3763,13 @@ mass_handle_arithmetic_operation_lazy_proc(
         move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_dividend->storage);
       } else {
         if (byte_size == 1) {
-          // TODO I think it might be impossible to move into extended registers from AH
-          Storage reg_ah = storage_register_for_descriptor(Register_AH, descriptor);
-          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_ah);
+          // It is not possible to access AH and an extended register like R15
+          // in the same operation. To avoid this problem we just mov AH to AL
+          // This is not optimal but will do for now.
+          Storage reg_ah = storage_register_for_descriptor(Register_AH, &descriptor_s8);
+          Storage reg_al = storage_register_for_descriptor(Register_A, &descriptor_s8);
+          push_instruction(instructions, result_range, (Instruction) {.assembly = {mov, {reg_al, reg_ah}}});
+          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_al);
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
           move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_d);
