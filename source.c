@@ -471,14 +471,10 @@ scope_lookup_force(
   Slice name
 ) {
   Scope_Entry *entry = 0;
+  s32 hash = Scope_Map__hash(name);
   for (; scope; scope = scope->parent) {
-    if (!scope->map) continue;
-    Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
-    if (!entry_pointer) continue;
-    if (*entry_pointer) {
-      entry = *entry_pointer;
-      break;
-    }
+    entry = scope_lookup_shallow_hashed(scope, hash, name);
+    if (entry) break;
   }
   if (!entry) {
     return 0;
@@ -499,10 +495,9 @@ scope_lookup_force(
     for (;;) {
       parent = parent->parent;
       if (!parent) break;
-      if (!parent->map) continue;
-      if (!hash_map_has(parent->map, name)) continue;
-      Value *overload = scope_lookup_force(parent, name);
-      if (!overload) panic("Just checked that hash map has the name so lookup must succeed");
+      Scope_Entry *overload_entry = scope_lookup_shallow_hashed(parent, hash, name);
+      if (!overload_entry) continue;
+      Value *overload = scope_entry_force(overload_entry);
       if (value_or_lazy_value_descriptor(overload)->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
