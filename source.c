@@ -392,7 +392,7 @@ assign(
   if (source->descriptor == &descriptor_lazy_value) {
     Expected_Result expected_result = expected_result_from_value(target);
     value_force(context, &expected_result, source);
-    MASS_TRY(*context->result);
+    return *context->result;
   }
 
   Source_Range source_range = target->source_range;
