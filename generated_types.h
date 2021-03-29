@@ -135,7 +135,7 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
-typedef void (*Lazy_Value_Proc)
+typedef Value * (*Lazy_Value_Proc)
   (Execution_Context * context, Value * result_value, void * payload);
 
 typedef struct Lazy_Value Lazy_Value;

@@ -694,7 +694,7 @@ main(void) {
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
-  push_type(type_function("Lazy_Value_Proc", "void", (Argument[]){
+  push_type(type_function("Lazy_Value_Proc", "Value *", (Argument[]){
     { "Execution_Context *", "context" },
     { "Value *", "result_value" },
     { "void *", "payload" },

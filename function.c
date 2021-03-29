@@ -796,7 +796,7 @@ maybe_constant_fold_internal(
   MASS_ON_ERROR(assign(context, result_value, imm_value)) return;
 }
 
-void
+Value *
 compare(
   Execution_Context *context,
   Compare_Type operation,
@@ -874,7 +874,8 @@ compare(
 
   // FIXME if the result_value operand is any we should create a temp value
   Value *comparison_value = value_from_compare(context, operation, *source_range);
-  MASS_ON_ERROR(assign(context, result_value, comparison_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, comparison_value)) return 0;
+  return result_value;
 }
 
 void

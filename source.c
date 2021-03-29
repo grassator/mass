@@ -1510,14 +1510,15 @@ value_is_lazy_or_static(
   return false;
 }
 
-void
+Value *
 mass_handle_statement_lazy_proc(
   Execution_Context *context,
   Value *result_value,
   Value *lazy_value
 ) {
-  MASS_ON_ERROR(value_force(context, &lazy_value->source_range, lazy_value, &void_value)) return;
-  MASS_ON_ERROR(assign(context, result_value, &void_value)) return;
+  MASS_ON_ERROR(value_force(context, &lazy_value->source_range, lazy_value, &void_value)) return 0;
+  MASS_ON_ERROR(assign(context, result_value, &void_value)) return 0;
+  return result_value;
 }
 
 u64
@@ -1883,14 +1884,15 @@ token_handle_user_defined_operator_proc(
   return token_parse_block(&body_context, operator->body);
 }
 
-void
+Value *
 mass_handle_compile_time_eval_lazy_proc(
   Execution_Context *context,
   Value *result_value,
   Value_View *view
 ) {
   Value *compile_time_result = compile_time_eval(context, *view);
-  MASS_ON_ERROR(assign(context, result_value, compile_time_result));
+  MASS_ON_ERROR(assign(context, result_value, compile_time_result)) return 0;
+  return result_value;
 }
 
 static inline Value *
@@ -2698,7 +2700,7 @@ token_handle_storage_variant_of(
   return storage_value;
 }
 
-void
+Value *
 token_handle_c_string(
   Execution_Context *context,
   Value *result_value,
@@ -2728,6 +2730,8 @@ token_handle_c_string(
 
   defer:
   dyn_array_destroy(args);
+
+  return result_value;
 }
 
 External_Symbol
@@ -2768,7 +2772,7 @@ typedef struct {
   Value *expression;
 } Mass_Cast_Lazy_Payload;
 
-void
+Value *
 mass_handle_cast_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -2780,7 +2784,7 @@ mass_handle_cast_lazy_proc(
   const Source_Range *source_range = &expression->source_range;
 
   Value *value = value_any(context, *source_range);
-  MASS_ON_ERROR(value_force(context, source_range, expression, value)) return;
+  MASS_ON_ERROR(value_force(context, source_range, expression, value)) return 0;
 
   u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
   u64 original_byte_size = descriptor_byte_size(source_descriptor);
@@ -2796,7 +2800,8 @@ mass_handle_cast_lazy_proc(
       value->storage.byte_size = cast_to_byte_size;
     }
   }
-  MASS_ON_ERROR(assign(context, result_value, value)) return;
+  MASS_ON_ERROR(assign(context, result_value, value)) return 0;
+  return result_value;
 }
 
 Value *
@@ -2984,7 +2989,7 @@ typedef struct {
   Source_Range source_range;
 } Mass_Function_Call_Lazy_Payload;
 
-void
+Value *
 call_function_macro(
   Execution_Context *context,
   Value *result_value,
@@ -3018,7 +3023,7 @@ call_function_macro(
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) return;
+          MASS_ON_ERROR(value_force(&arg_context, source_range, parse_result, arg_value)) return 0;
         }
       } else {
         arg_value = *dyn_array_get(args, i);
@@ -3052,7 +3057,7 @@ call_function_macro(
     Value *parse_result = token_parse_block_no_scope(&body_context, body);
     MASS_ON_ERROR(
       value_force(&body_context, &body->source_range, parse_result, result_value)
-    ) return;
+    ) return 0;
   }
 
   if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
@@ -3070,9 +3075,10 @@ call_function_macro(
     }
   }
   dyn_array_destroy(args);
+  return result_value;
 }
 
-void
+Value *
 call_function_overload(
   Execution_Context *context,
   Value *result_value,
@@ -3128,7 +3134,7 @@ call_function_overload(
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
       source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-      MASS_ON_ERROR(*arg_context.result) return;
+      MASS_ON_ERROR(*arg_context.result) return 0;
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
@@ -3140,11 +3146,11 @@ call_function_overload(
       //      Maybe we should do the conversion at some step before?
       source_descriptor == &descriptor_number_literal
     ) {
-      MASS_ON_ERROR(assign(context, target_arg, source_arg)) return;
+      MASS_ON_ERROR(assign(context, target_arg, source_arg)) return 0;
     } else {
       // Large values are copied to the stack and passed by a reference
       Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
-      MASS_ON_ERROR(assign(context, stack_value, source_arg)) return;
+      MASS_ON_ERROR(assign(context, stack_value, source_arg)) return 0;
       load_address(context, source_range, target_arg, stack_value);
     }
     Slice name = target_arg_definition->name;
@@ -3203,7 +3209,7 @@ call_function_overload(
     }
   }
 
-  MASS_ON_ERROR(assign(context, result_value, saved_result)) return;
+  MASS_ON_ERROR(assign(context, result_value, saved_result)) return 0;
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
@@ -3211,6 +3217,8 @@ call_function_overload(
     // TODO :FreeStackAllocation
   }
   dyn_array_destroy(arguments);
+
+  return result_value;
 }
 
 Value *
@@ -3600,14 +3608,12 @@ typedef struct {
   Value *rhs;
 } Mass_Arithmetic_Operator_Lazy_Payload;
 
-void
+Value *
 mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
   Value *result_value,
-  void *raw_payload
+  Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
-  Mass_Arithmetic_Operator_Lazy_Payload *payload = raw_payload;
-
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
   assert(descriptor_is_integer(descriptor));
@@ -3621,7 +3627,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   if(result_value->descriptor->tag == Descriptor_Tag_Any) {
     Value *temp_result =
       reserve_stack(context, context->builder, descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, result_value, temp_result)) return;
+    MASS_ON_ERROR(assign(context, result_value, temp_result)) return 0;
   }
 
   switch(payload->operator) {
@@ -3649,13 +3655,13 @@ mass_handle_arithmetic_operation_lazy_proc(
         );
       }
 
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return 0;
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_b = value_register_for_descriptor(
         context, register_acquire_temp(context->builder), descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return 0;
 
       const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
 
@@ -3669,7 +3675,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         register_release(context->builder, temp_a->storage.Register.index);
       }
       register_release(context->builder, temp_b->storage.Register.index);
-      return;
+      return result_value;
     }
     case Mass_Arithmetic_Operator_Multiply: {
       maybe_constant_fold(context, &result_range, result_value, a, b, *);
@@ -3689,12 +3695,12 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_a = value_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return 0;
 
       Value *temp_b = value_register_for_descriptor(
         context, Register_D, descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return 0;
 
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_instruction(
@@ -3704,7 +3710,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
 
       register_release_maybe_restore(builder, &maybe_saved_rdx);
-      return;
+      return result_value;
     }
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
@@ -3722,13 +3728,13 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_dividend = value_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_dividend)) return;
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_dividend)) return 0;
 
       Register temp_divisor_register = register_acquire_temp(builder);
       Value *temp_divisor = value_register_for_descriptor(
         context, temp_divisor_register, descriptor, payload->rhs->source_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_divisor)) return;
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_divisor)) return 0;
 
       // Save RDX as it will be used for the remainder
       // but we should not save or restore it if it is the result
@@ -3784,11 +3790,11 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       register_release(builder, temp_divisor_register);
       register_release_maybe_restore(builder, &maybe_saved_rdx);
-      return;
+      return result_value;
     }
     default: {
       panic("Internal error: Unexpected operator");
-      break;
+      return 0;
     }
   }
 }
@@ -3822,7 +3828,7 @@ typedef struct {
   Value *rhs;
 } Mass_Comparison_Operator_Lazy_Payload;
 
-void
+Value *
 mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -3836,12 +3842,12 @@ mass_handle_comparison_operation_lazy_proc(
   Source_Range lhs_range = lhs->source_range;
 
   Value *lhs_value = value_any(context, lhs_range);
-  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) return;
+  MASS_ON_ERROR(value_force(context, &lhs_range, lhs, lhs_value)) return 0;
   Value *rhs_value = value_any(context, rhs_range);
-  MASS_ON_ERROR(value_force(context, &rhs_range, rhs, rhs_value)) return;
+  MASS_ON_ERROR(value_force(context, &rhs_range, rhs, rhs_value)) return 0;
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
-  MASS_ON_ERROR(*context->result) return;
+  MASS_ON_ERROR(*context->result) return 0;
 
   if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
     switch(compare_type) {
@@ -3881,7 +3887,7 @@ mass_handle_comparison_operation_lazy_proc(
     }
   }
 
-  compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
+  return compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
 }
 
 static inline Value *
@@ -3915,7 +3921,7 @@ mass_handle_arrow_operator(
   return function_value;
 }
 
-void
+Value *
 mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -3938,15 +3944,17 @@ mass_handle_startup_call_lazy_proc(
     ensure_compiled_function_body(context, startup_function);
     dyn_array_push(context->program->startup_functions, startup_function);
   }
+  return result_value;
 }
 
-void
+Value *
 mass_handle_address_of_lazy_proc(
   Execution_Context *context,
   Value *result_value,
   Value *pointee
 ) {
   load_address(context, &result_value->source_range, result_value, pointee);
+  return result_value;
 }
 
 Value *
@@ -4131,7 +4139,7 @@ typedef struct {
   Descriptor_Struct_Field *field;
 } Mass_Field_Access_Lazy_Payload;
 
-void
+Value *
 mass_handle_field_access_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -4172,7 +4180,8 @@ mass_handle_field_access_lazy_proc(
     }
   }
 
-  MASS_ON_ERROR(assign(context, result_value, field_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, field_value)) return 0;
+  return result_value;
 }
 
 typedef struct {
@@ -4180,7 +4189,7 @@ typedef struct {
   Value *index;
 } Mass_Array_Access_Lazy_Payload;
 
-void
+Value *
 mass_handle_array_access_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -4189,9 +4198,9 @@ mass_handle_array_access_lazy_proc(
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
   const Source_Range *array_range = &payload->array->source_range;
   Value *array = value_any(context, *array_range);
-  MASS_ON_ERROR(value_force(context, array_range, payload->array, array)) return;
+  MASS_ON_ERROR(value_force(context, array_range, payload->array, array)) return 0;
   Value *index = value_any(context, payload->index->source_range);
-  MASS_ON_ERROR(value_force(context, &payload->index->source_range, payload->index, index)) return;
+  MASS_ON_ERROR(value_force(context, &payload->index->source_range, payload->index, index)) return 0;
 
   index = maybe_coerce_number_literal_to_integer(context, index, &descriptor_u64);
   Value *array_element_value;
@@ -4221,7 +4230,9 @@ mass_handle_array_access_lazy_proc(
     }
   }
   // FIXME this might actually cause problems in assigning to an array element
-  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return;
+  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return 0;
+
+  return result_value;
 }
 
 Value *
@@ -4398,7 +4409,7 @@ typedef struct {
   Value *else_;
 } Mass_If_Expression_Lazy_Payload;
 
-void
+Value *
 mass_handle_if_expression_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -4416,7 +4427,7 @@ mass_handle_if_expression_lazy_proc(
     );
   } else {
     Value *temp_condition = value_any(context, condition->source_range);
-    MASS_ON_ERROR(value_force(context, &condition->source_range, condition, temp_condition)) return;
+    MASS_ON_ERROR(value_force(context, &condition->source_range, condition, temp_condition)) return 0;
     condition = temp_condition;
   }
 
@@ -4424,7 +4435,7 @@ mass_handle_if_expression_lazy_proc(
     context, &context->builder->code_block.instructions, &condition->source_range, condition
   );
 
-  MASS_ON_ERROR(value_force(context, &then->source_range, then, result_value)) return;
+  MASS_ON_ERROR(value_force(context, &then->source_range, then, result_value)) return 0;
 
   Label_Index after_label =
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
@@ -4438,12 +4449,14 @@ mass_handle_if_expression_lazy_proc(
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  MASS_ON_ERROR(value_force(context, &else_->source_range, else_, result_value)) return;
+  MASS_ON_ERROR(value_force(context, &else_->source_range, else_, result_value)) return 0;
 
   push_instruction(
     &context->builder->code_block.instructions, *dummy_range,
     (Instruction) {.type = Instruction_Type_Label, .label = after_label}
   );
+
+  return result_value;
 }
 
 Value *
@@ -4625,7 +4638,7 @@ token_parse_expression(
   return result;
 }
 
-void
+Value *
 mass_handle_block_lazy_proc(
   Execution_Context *context,
   Value *result_value,
@@ -4634,13 +4647,15 @@ mass_handle_block_lazy_proc(
   Array_Value_Ptr lazy_statements;
   UNPACK_FROM_VOID_POINTER(lazy_statements, raw_payload);
   u64 statement_count = dyn_array_length(lazy_statements);
+  assert(statement_count);
   for (u64 i = 0; i < statement_count; ++i) {
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     Value *target = i == statement_count - 1 ? result_value : &void_value;
     MASS_ON_ERROR(
       value_force(context, &lazy_statement->source_range, lazy_statement, target)
-    ) return;
+    ) return 0;
   }
+  return result_value;
 }
 
 Value *
@@ -4808,10 +4823,10 @@ token_parse_statement_using(
   return peek_index;
 }
 
-void
+Value *
 mass_handle_label_lazy_proc(
   Execution_Context *context,
-  Value *unused_result,
+  Value *result_value,
   Value *label_value
 ) {
   Source_Range source_range = label_value->source_range;
@@ -4826,7 +4841,7 @@ mass_handle_label_lazy_proc(
       "Trying to redefine variable %"PRIslice" as a label",
       SLICE_EXPAND_PRINTF(source)
     );
-    return;
+    return 0;
   }
 
   push_instruction(
@@ -4836,6 +4851,8 @@ mass_handle_label_lazy_proc(
       .label = label_value->storage.Memory.location.Instruction_Pointer_Relative.label_index
     }
   );
+
+  return result_value;
 }
 
 u64
@@ -4886,10 +4903,10 @@ token_parse_statement_label(
   return peek_index;
 }
 
-void
+Value *
 mass_handle_explicit_return_lazy_proc(
   Execution_Context *context,
-  Value *unused_result,
+  Value *result_value,
   Value *parse_result
 ) {
   const Descriptor *parse_result_descriptor = value_or_lazy_value_descriptor(parse_result);
@@ -4909,7 +4926,7 @@ mass_handle_explicit_return_lazy_proc(
       reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
     *fn_return = *stack_return;
   }
-  MASS_ON_ERROR(assign(context, fn_return, parse_result)) return;
+  MASS_ON_ERROR(assign(context, fn_return, parse_result)) return 0;
 
   Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
   assert(scope_label_entry);
@@ -4923,6 +4940,7 @@ mass_handle_explicit_return_lazy_proc(
     fn_return->source_range,
     (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
   );
+  return result_value;
 }
 
 u64
@@ -4990,10 +5008,10 @@ token_match_fixed_array_type(
   return array_descriptor;
 }
 
-void
+Value *
 mass_handle_inline_machine_code_bytes_lazy_proc(
   Execution_Context *context,
-  Value *unused_result,
+  Value *result_value,
   Value *args_token
 ) {
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -5005,11 +5023,11 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   for (u64 i = 0; i < dyn_array_length(args); ++i) {
     if (bytes.length >= 15) {
       context_error_snprintf(context, args_token->source_range, "Expected a maximum of 15 bytes");
-      return;
+      return 0;
     }
     Value *raw_value = *dyn_array_get(args, i);
     Value *value = value_any(context, raw_value->source_range);
-    MASS_ON_ERROR(value_force(context, &raw_value->source_range, raw_value, value)) return;
+    MASS_ON_ERROR(value_force(context, &raw_value->source_range, raw_value, value)) return 0;
 
     if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
@@ -5017,7 +5035,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
           context, value->source_range,
           "inline_machine_code_bytes only supports one label"
         );
-        return;
+        return 0;
       }
       bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
       bytes.label_offset_in_instruction = u64_to_u8(i);
@@ -5029,12 +5047,12 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       value = token_value_force_immediate_integer(
         context, &value->source_range, value, &descriptor_u8
       );
-      MASS_ON_ERROR(*context->result) return;
+      MASS_ON_ERROR(*context->result) return 0;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     } else {
       context_error_snprintf(context, value->source_range, "Expected a compile-time known value");
-      return;
+      return 0;
     }
   }
 
@@ -5042,6 +5060,8 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     &context->builder->code_block.instructions, args_token->source_range,
     (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes }
   );
+
+  return result_value;
 }
 
 u64
@@ -5169,21 +5189,22 @@ typedef struct {
   Value *expression;
 } Mass_Assignment_Lazy_Payload;
 
-void
+Value *
 mass_handle_assignment_lazy_proc(
   Execution_Context *context,
-  Value *unused_result,
+  Value *result_value,
   Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
   Value target;
   value_any_init(&target, context, payload->source_range);
-  MASS_ON_ERROR(value_force(context, &payload->source_range, payload->target, &target)) return;
+  MASS_ON_ERROR(value_force(context, &payload->source_range, payload->target, &target)) return 0;
   if (descriptor->tag == Descriptor_Tag_Function) {
     load_address(context, &payload->source_range, &target, payload->expression);
   } else {
-    MASS_ON_ERROR(value_force(context, &payload->source_range, payload->expression, &target)) return;
+    MASS_ON_ERROR(value_force(context, &payload->source_range, payload->expression, &target)) return 0;
   }
+  return result_value;
 }
 
 void
