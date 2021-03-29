@@ -206,7 +206,7 @@ scope_print_names(
   printf("\n");
 }
 
-Scope_Entry *
+static inline Scope_Entry *
 scope_lookup_shallow(
   const Scope *scope,
   Slice name
@@ -217,7 +217,7 @@ scope_lookup_shallow(
   return *entry_pointer;
 }
 
-Scope_Entry *
+static inline Scope_Entry *
 scope_lookup(
   const Scope *scope,
   Slice name
