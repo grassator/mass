@@ -139,11 +139,11 @@ token_parse_expression(
   const Token_Pattern *end_pattern
 );
 
-PRELUDE_NO_DISCARD Mass_Result
+PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
   const Source_Range *source_range,
-  Value *token,
+  Value *value,
   Value *result_value
 );
 
