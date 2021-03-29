@@ -207,14 +207,25 @@ scope_print_names(
 }
 
 static inline Scope_Entry *
+scope_lookup_shallow_hashed(
+  const Scope *scope,
+  s32 hash,
+  Slice name
+) {
+  if (!scope->map) return 0;
+  Scope_Entry **entry_pointer = Scope_Map__get_by_hash(scope->map, hash, name);
+  if (!entry_pointer) return 0;
+  return *entry_pointer;
+}
+
+
+static inline Scope_Entry *
 scope_lookup_shallow(
   const Scope *scope,
   Slice name
 ) {
-  if (!scope->map) return 0;
-  Scope_Entry **entry_pointer = hash_map_get(scope->map, name);
-  if (!entry_pointer) return 0;
-  return *entry_pointer;
+  s32 hash = Scope_Map__hash(name);
+  return scope_lookup_shallow_hashed(scope, hash, name);
 }
 
 static inline Scope_Entry *
@@ -222,8 +233,9 @@ scope_lookup(
   const Scope *scope,
   Slice name
 ) {
+  s32 hash = Scope_Map__hash(name);
   for (; scope; scope = scope->parent) {
-    Scope_Entry *entry = scope_lookup_shallow(scope, name);
+    Scope_Entry *entry = scope_lookup_shallow_hashed(scope, hash, name);
     if (entry) return entry;
   }
   return 0;

@@ -3452,6 +3452,7 @@ struct Hash_Map_Make_Options {
     }\
     return 0;\
   }\
+  static s32 (*_hash_map_type_##__hash)(_key_type_ key) = _key_hash_fn_;\
   \
   static inline _value_type_ *\
   _hash_map_type_##__get_by_hash(\
