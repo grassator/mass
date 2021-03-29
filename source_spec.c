@@ -675,10 +675,10 @@ spec("source") {
 
     it("should be able to parse and run functions with overloads") {
       Slice source = slice_literal(
-        "size_of :: (x : s32) -> (s64) { 4 }\n"
-        "size_of :: (x : s64) -> (s64) { 8 }\n"
-        "checker_s64 :: (x : s64) -> (s64) { size_of(x) }\n"
-        "checker_s32 :: (x : s32) -> (s64) { size_of(x) }\n"
+        "my_size_of :: (x : s32) -> (s64) { 4 }\n"
+        "my_size_of :: (x : s64) -> (s64) { 8 }\n"
+        "checker_s64 :: (x : s64) -> (s64) { my_size_of(x) }\n"
+        "checker_s32 :: (x : s32) -> (s64) { my_size_of(x) }\n"
       );
 
       test_init_module(source);
