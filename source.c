@@ -4071,7 +4071,7 @@ mass_handle_at_operator(
     return value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
   } else if (value_match_symbol(body, slice_literal("context"))) {
     return value_make(context, &descriptor_execution_context, storage_static(context), body_range);
-  } else if (value_match_group(body, Group_Tag_Paren)) {
+  } else if (value_match_group(body, Group_Tag_Paren) || value_match_group(body, Group_Tag_Curly)) {
     return compile_time_eval(context, value_as_group(body)->children);
   } else {
     context_error_snprintf(

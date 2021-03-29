@@ -1155,6 +1155,15 @@ spec("source") {
       check(*storage_static_as_c_type(&result->storage, s8) == 42);
     }
 
+    it("should support compile time blocks") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: () -> (s64) { @{ 20 + 22 } }"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
+
     it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test", &test_context,
