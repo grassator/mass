@@ -1024,7 +1024,7 @@ ensure_compiled_function_body(
     scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
-  return_value = value_force(&body_context, &function->body->source_range, parse_result, return_value);
+  return_value = value_force(&body_context, parse_result, return_value);
 
   fn_end(program, &builder);
 

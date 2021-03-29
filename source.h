@@ -142,7 +142,6 @@ token_parse_expression(
 PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
-  const Source_Range *source_range,
   Value *value,
   Value *result_value
 );
