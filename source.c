@@ -255,11 +255,11 @@ scope_lookup(
 Value *
 token_value_force_immediate_integer(
   Execution_Context *context,
-  const Source_Range *source_range,
   Value *value,
   const Descriptor *target_descriptor
 ) {
   MASS_ON_ERROR(*context->result) return 0;
+  const Source_Range *source_range = &value->source_range;
 
   assert(descriptor_is_integer(target_descriptor));
   if (value->descriptor == &descriptor_number_literal) {
@@ -345,7 +345,7 @@ maybe_coerce_number_literal_to_integer(
 ) {
   if (!descriptor_is_integer(target_descriptor)) return value;
   if (value->descriptor != &descriptor_number_literal) return value;
-  return token_value_force_immediate_integer(context, &value->source_range, value, target_descriptor);
+  return token_value_force_immediate_integer(context, value, target_descriptor);
 }
 
 PRELUDE_NO_DISCARD Mass_Result
@@ -382,9 +382,7 @@ assign(
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
-        source = token_value_force_immediate_integer(
-          context, &source_range, source, &descriptor_u64
-        );
+        source = token_value_force_immediate_integer(context, source, &descriptor_u64);
         source->descriptor = target->descriptor;
       } else {
         context_error_snprintf(
@@ -393,9 +391,7 @@ assign(
         return *context->result;
       }
     } else if (descriptor_is_integer(target->descriptor)) {
-      source = token_value_force_immediate_integer(
-        context, &source_range, source, target->descriptor
-      );
+      source = token_value_force_immediate_integer(context, source, target->descriptor);
     } else {
       context_error_snprintf(
         context, source_range, "Trying to assign a literal number to a non-integer value"
@@ -2020,9 +2016,7 @@ token_parse_operator_definition(
 
   Source_Range precedence_source_range = precedence_token->source_range;
   Value *precedence_value = token_parse_single(context, precedence_token);
-  precedence_value = token_value_force_immediate_integer(
-    context, &precedence_source_range, precedence_value, &descriptor_u64
-  );
+  precedence_value = token_value_force_immediate_integer(context, precedence_value, &descriptor_u64);
   MASS_ON_ERROR(*context->result) goto err;
 
   assert(precedence_value->storage.tag == Storage_Tag_Static);
@@ -2786,7 +2780,7 @@ mass_handle_cast_lazy_proc(
   u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
   u64 original_byte_size = descriptor_byte_size(source_descriptor);
   if (source_descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(context, source_range, value, target_descriptor);
+    value = token_value_force_immediate_integer(context, value, target_descriptor);
   } else if (cast_to_byte_size < original_byte_size) {
     value = value_make(context, target_descriptor, value->storage, *source_range);
     if (value->storage.tag == Storage_Tag_Static) {
@@ -4421,9 +4415,7 @@ mass_handle_if_expression_lazy_proc(
   const Source_Range *dummy_range = &payload->condition->source_range;
 
   if (condition->descriptor == &descriptor_number_literal) {
-    condition = token_value_force_immediate_integer(
-      context, &condition->source_range, condition, &descriptor_s64
-    );
+    condition = token_value_force_immediate_integer(context, condition, &descriptor_s64);
   } else if (condition->descriptor == &descriptor_lazy_value) {
     Value *temp_condition = value_force(
       context, condition, value_any(context, condition->source_range)
@@ -4992,9 +4984,7 @@ token_match_fixed_array_type(
 
   Value_View size_view = value_as_group(square_brace)->children;
   Value *size_value = compile_time_eval(context, size_view);
-  size_value = token_value_force_immediate_integer(
-    context, &size_view.source_range, size_value, &descriptor_u32
-  );
+  size_value = token_value_force_immediate_integer(context, size_value, &descriptor_u32);
   MASS_ON_ERROR(*context->result) return 0;
   u32 length = u64_to_u32(storage_static_value_up_to_u64(&size_value->storage));
 
@@ -5046,9 +5036,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
     } else if (value->storage.tag == Storage_Tag_Static) {
-      value = token_value_force_immediate_integer(
-        context, &value->source_range, value, &descriptor_u8
-      );
+      value = token_value_force_immediate_integer(context, value, &descriptor_u8);
       MASS_ON_ERROR(*context->result) return 0;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
@@ -5147,9 +5135,7 @@ token_define_global_variable(
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
   if (value->descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(
-      context, &expression.source_range, value, &descriptor_s64
-    );
+    value = token_value_force_immediate_integer(context, value, &descriptor_s64);
   }
 
   Value *global_value;
