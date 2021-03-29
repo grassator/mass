@@ -1227,31 +1227,70 @@ typedef struct {
 } Token_Match_Arg;
 
 const Descriptor *
-token_force_type(
+token_match_type(
   Execution_Context *context,
-  Scope *scope,
+  Value_View view
+);
+
+Value *
+token_parse_single(
+  Execution_Context *context,
   Value *value
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  if (!value) return 0;
-
-  const Descriptor *descriptor = 0;
-  Source_Range source_range = value->source_range;
-  if (value_is_symbol(value)) {
+  const Source_Range *source_range = &value->source_range;
+  if (value_is_group(value)) {
+    const Group *group = value_as_group(value);
+    switch(group->tag) {
+      case Group_Tag_Paren: {
+        return token_parse_expression(context, group->children, &(u64){0}, 0);
+      }
+      case Group_Tag_Curly: {
+        return token_parse_block(context, value);
+      }
+      case Group_Tag_Square: {
+        const Descriptor *pointee = token_match_type(context, group->children);
+        Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
+        *temp = (Descriptor) {
+          .tag = Descriptor_Tag_Pointer,
+          .name = source_from_source_range(source_range),
+          .Pointer.to = pointee,
+        };
+        return value_make(context, &descriptor_type, storage_static(temp), *source_range);
+      }
+    }
+  } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    Value *type_value = scope_lookup_force(scope, name);
-    descriptor = value_ensure_type(context, type_value, source_range);
-    if (!descriptor) {
-      MASS_ON_ERROR(*context->result) return 0;
+    value = scope_lookup_force(context->scope, name);
+    MASS_ON_ERROR(*context->result) return 0;
+    if (!value) {
+      //scope_print_names(context->scope);
       context_error_snprintf(
-        context, source_range, "Could not find type %"PRIslice,
+        context, *source_range,
+        "Undefined variable %"PRIslice,
         SLICE_EXPAND_PRINTF(name)
       );
+
+      return 0;
+    } else if (
+      value->storage.tag != Storage_Tag_Static &&
+      value->storage.tag != Storage_Tag_None
+    ) {
+      if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
+        context_error_snprintf(
+          context, value->source_range,
+          "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
+          " from a different epoch %"PRIu64 ". "
+          "This happens when you access value from runtime in compile-time execution "
+          "or a runtime value of one compile time execution in a different one.",
+          SLICE_EXPAND_PRINTF(name),
+          value->epoch,
+          context->epoch
+        );
+        return 0;
+      }
     }
-  } else {
-    descriptor = value_ensure_type(context, value, source_range);
   }
-  return descriptor;
+  return value;
 }
 
 typedef enum {
@@ -1626,13 +1665,12 @@ token_match_type(
   Value_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  if (!view.length) panic("Caller must not call token_match_type with empty token list");
 
   Descriptor *descriptor = token_match_fixed_array_type(context, view);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor) return descriptor;
-  Value *type = compile_time_eval(context, view);
-  return token_force_type(context, context->scope, type);
+  Value *type_value = compile_time_eval(context, view);
+  return value_ensure_type(context, type_value, view.source_range);
 }
 
 bool
@@ -1762,67 +1800,6 @@ token_match_return_type(
 
   err:
   return returns;
-}
-
-Value *
-token_parse_single(
-  Execution_Context *context,
-  Value *value
-) {
-  const Source_Range *source_range = &value->source_range;
-  if (value_is_group(value)) {
-    const Group *group = value_as_group(value);
-    switch(group->tag) {
-      case Group_Tag_Paren: {
-        return token_parse_expression(context, group->children, &(u64){0}, 0);
-      }
-      case Group_Tag_Curly: {
-        return token_parse_block(context, value);
-      }
-      case Group_Tag_Square: {
-        const Descriptor *pointee = token_match_type(context, group->children);
-        Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
-        *temp = (Descriptor) {
-          .tag = Descriptor_Tag_Pointer,
-          .name = source_from_source_range(source_range),
-          .Pointer.to = pointee,
-        };
-        return value_make(context, &descriptor_type, storage_static(temp), *source_range);
-      }
-    }
-  } else if(value_is_symbol(value)) {
-    Slice name = value_as_symbol(value)->name;
-    value = scope_lookup_force(context->scope, name);
-    MASS_ON_ERROR(*context->result) return 0;
-    if (!value) {
-      //scope_print_names(context->scope);
-      context_error_snprintf(
-        context, *source_range,
-        "Undefined variable %"PRIslice,
-        SLICE_EXPAND_PRINTF(name)
-      );
-
-      return 0;
-    } else if (
-      value->storage.tag != Storage_Tag_Static &&
-      value->storage.tag != Storage_Tag_None
-    ) {
-      if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
-        context_error_snprintf(
-          context, value->source_range,
-          "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
-          " from a different epoch %"PRIu64 ". "
-          "This happens when you access value from runtime in compile-time execution "
-          "or a runtime value of one compile time execution in a different one.",
-          SLICE_EXPAND_PRINTF(name),
-          value->epoch,
-          context->epoch
-        );
-        return 0;
-      }
-    }
-  }
-  return value;
 }
 
 PRELUDE_NO_DISCARD Mass_Result
