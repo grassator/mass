@@ -135,6 +135,12 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
+typedef enum Expected_Result_Storage Expected_Result_Storage;
+
+typedef struct Expected_Result Expected_Result;
+typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
+typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
+
 typedef Value * (*Lazy_Value_Proc)
   (Execution_Context * context, Value * result_value, void * payload);
 
@@ -564,6 +570,37 @@ typedef struct Value {
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
+typedef enum Expected_Result_Storage {
+  Expected_Result_Storage_None = 0,
+  Expected_Result_Storage_Static = 1,
+  Expected_Result_Storage_Memory = 2,
+  Expected_Result_Storage_Register = 4,
+  Expected_Result_Storage_Eflags = 8,
+} Expected_Result_Storage;
+
+typedef enum {
+  Expected_Result_Tag_Exact = 0,
+  Expected_Result_Tag_Flexible = 1,
+} Expected_Result_Tag;
+
+typedef struct {
+  Value * value;
+} Expected_Result_Exact;
+typedef struct {
+  const Descriptor * descriptor;
+  Expected_Result_Storage storage;
+  s32 _storage_padding;
+  u64 register_bit_set;
+} Expected_Result_Flexible;
+typedef struct Expected_Result {
+  Expected_Result_Tag tag;
+  char _tag_padding[4];
+  union {
+    Expected_Result_Exact Exact;
+    Expected_Result_Flexible Flexible;
+  };
+} Expected_Result;
+typedef dyn_array_type(Expected_Result) Array_Expected_Result;
 typedef struct Lazy_Value {
   Execution_Context context;
   const Descriptor * descriptor;
@@ -834,6 +871,15 @@ static Descriptor descriptor_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
+static Descriptor descriptor_expected_result_storage;
+static Descriptor descriptor_array_expected_result_storage_ptr;
+static Descriptor descriptor_expected_result_storage_pointer;
+static Descriptor descriptor_expected_result_storage_pointer_pointer;
+static Descriptor descriptor_expected_result;
+static Descriptor descriptor_array_expected_result_ptr;
+static Descriptor descriptor_expected_result_pointer;
+static Descriptor descriptor_expected_result_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(expected_result_tag, Expected_Result_Tag)
 static Descriptor descriptor_lazy_value_proc;
 static Descriptor descriptor_lazy_value;
 static Descriptor descriptor_array_lazy_value_ptr;
@@ -1343,6 +1389,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(value);
+MASS_DEFINE_OPAQUE_C_TYPE(expected_result_storage, Expected_Result_Storage)
+MASS_DEFINE_OPAQUE_C_TYPE(expected_result, Expected_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
 MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,

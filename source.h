@@ -142,8 +142,13 @@ token_parse_expression(
 PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
-  Value *value,
-  Value *result_value
+  const Expected_Result *expected_result,
+  Value *value
+);
+
+static inline Expected_Result
+expected_result_from_value(
+  Value *value
 );
 
 const Descriptor *

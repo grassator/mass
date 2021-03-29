@@ -694,6 +694,26 @@ main(void) {
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
+  push_type(type_enum("Expected_Result_Storage", (Enum_Item[]){
+    { "None", 0 },
+    { "Static", 1 << 0 },
+    { "Memory", 1 << 1 },
+    { "Register", 1 << 2 },
+    { "Eflags", 1 << 3 },
+  }));
+
+  push_type(type_union("Expected_Result", (Struct[]){
+    struct_fields("Exact", (Struct_Item[]){
+      { "Value *", "value" },
+    }),
+    struct_fields("Flexible", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
+      { "Expected_Result_Storage", "storage" },
+      { "s32", "_storage_padding" },
+      { "u64", "register_bit_set"},
+    }),
+  }));
+
   push_type(type_function("Lazy_Value_Proc", "Value *", (Argument[]){
     { "Execution_Context *", "context" },
     { "Value *", "result_value" },

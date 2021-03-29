@@ -6,6 +6,24 @@
 #include <stdatomic.h>
 #endif
 
+static inline Value *
+value_from_exact_expected_result(
+  const Expected_Result *expected_result
+) {
+  assert(expected_result->tag == Expected_Result_Tag_Exact);
+  return expected_result->Exact.value;
+}
+
+static inline Expected_Result
+expected_result_from_value(
+  Value *value
+) {
+  return (Expected_Result) {
+    .tag = Expected_Result_Tag_Exact,
+    .Exact = { .value = value },
+  };
+}
+
 static inline Value_View
 value_view_single(
   Value **value
@@ -372,7 +390,8 @@ assign(
   }
 
   if (source->descriptor == &descriptor_lazy_value) {
-    value_force(context, source, target);
+    Expected_Result expected_result = expected_result_from_value(target);
+    value_force(context, &expected_result, source);
     MASS_TRY(*context->result);
   }
 
@@ -1513,7 +1532,8 @@ mass_handle_statement_lazy_proc(
   Value *result_value,
   Value *lazy_value
 ) {
-  (void)value_force(context, lazy_value, &void_value);
+  Expected_Result expected_result = expected_result_from_value(&void_value);
+  (void)value_force(context, &expected_result, lazy_value);
   MASS_ON_ERROR(assign(context, result_value, &void_value)) return 0;
   return result_value;
 }
@@ -1803,8 +1823,8 @@ token_match_return_type(
 PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
-  Value *value,
-  Value *result_value
+  const Expected_Result *expected_result,
+  Value *value
 ) {
   MASS_ON_ERROR(*context->result) return 0;
   if (!value) return 0;
@@ -1812,6 +1832,7 @@ value_force(
   value = token_parse_single(context, value);
   MASS_ON_ERROR(*context->result) return 0;
 
+  Value *result_value = value_from_exact_expected_result(expected_result);
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
     lazy->proc(&lazy->context, result_value, lazy->payload);
@@ -2540,7 +2561,9 @@ compile_time_eval(
   assert(!dyn_array_length(eval_builder.code_block.instructions));
 
   Value *forced_value = value_any(&eval_context, view.source_range);
-  forced_value = value_force(&eval_context, expression_result_value, forced_value);
+  // FIXME :ExpectedAny
+  Expected_Result expected_result = expected_result_from_value(forced_value);
+  forced_value = value_force(&eval_context, &expected_result, expression_result_value);
   MASS_ON_ERROR(*context->result) return 0;
 
   // If we didn't generate any instructions there is no point
@@ -2774,7 +2797,9 @@ mass_handle_cast_lazy_proc(
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
   const Source_Range *source_range = &expression->source_range;
 
-  Value *value = value_force(context, expression, value_any(context, *source_range));
+  // FIXME :ExpectedAny
+  Expected_Result expected_result = expected_result_from_value(value_any(context, *source_range));
+  Value *value = value_force(context, &expected_result, expression);
   MASS_ON_ERROR(*context->result) return 0;
 
   u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
@@ -3015,7 +3040,9 @@ call_function_macro(
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          arg_value = value_force(&arg_context, parse_result, arg_value);
+          // FIXME :ExpectedAny
+          Expected_Result expected_result = expected_result_from_value(arg_value);
+          arg_value = value_force(&arg_context, &expected_result, parse_result);
         }
       } else {
         arg_value = *dyn_array_get(args, i);
@@ -3047,7 +3074,8 @@ call_function_macro(
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
     Value *parse_result = token_parse_block_no_scope(&body_context, body);
-    result_value = value_force(&body_context, parse_result, result_value);
+    Expected_Result expected_result = expected_result_from_value(result_value);
+    result_value = value_force(&body_context, &expected_result, parse_result);
     MASS_ON_ERROR(*context->result) return 0;
   }
 
@@ -3229,7 +3257,9 @@ token_handle_function_call(
     target_descriptor->tag == Descriptor_Tag_Function &&
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
-    Value *target = value_force(context, target_expression, value_any(context, source_range));
+    // FIXME :ExpectedAny
+    Expected_Result expected_result = expected_result_from_value(value_any(context, source_range));
+    Value *target = value_force(context, &expected_result, target_expression);
     MASS_ON_ERROR(*context->result) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
@@ -3644,13 +3674,15 @@ mass_handle_arithmetic_operation_lazy_proc(
         );
       }
 
-      temp_a = value_force(context, payload->lhs, temp_a);
+      Expected_Result expected_a = expected_result_from_value(temp_a);
+      temp_a = value_force(context, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_b = value_register_for_descriptor(
         context, register_acquire_temp(context->builder), descriptor, result_range
       );
-      temp_b = value_force(context, payload->rhs, temp_b);
+      Expected_Result expected_b = expected_result_from_value(temp_b);
+      temp_b = value_force(context, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -3686,12 +3718,14 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_a = value_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
-      temp_a = value_force(context, payload->lhs, temp_a);
+      Expected_Result expected_a = expected_result_from_value(temp_a);
+      temp_a = value_force(context, &expected_a, payload->lhs);
 
       Value *temp_b = value_register_for_descriptor(
         context, Register_D, descriptor, result_range
       );
-      temp_b = value_force(context, payload->rhs, temp_b);
+      Expected_Result expected_b = expected_result_from_value(temp_b);
+      temp_b = value_force(context, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -3721,13 +3755,15 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_dividend = value_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
-      temp_dividend = value_force(context, payload->lhs, temp_dividend);
+      Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
+      temp_dividend = value_force(context, &expected_dividend, payload->lhs);
 
       Register temp_divisor_register = register_acquire_temp(builder);
       Value *temp_divisor = value_register_for_descriptor(
         context, temp_divisor_register, descriptor, payload->rhs->source_range
       );
-      temp_divisor = value_force(context, payload->rhs, temp_divisor);
+      Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
+      temp_divisor = value_force(context, &expected_divisor, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -3833,11 +3869,14 @@ mass_handle_comparison_operation_lazy_proc(
   Compare_Type compare_type = payload->compare_type;
   Value *lhs = payload->lhs;
   Value *rhs = payload->rhs;
-  Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
 
-  Value *lhs_value = value_force(context, lhs, value_any(context, lhs_range));
-  Value *rhs_value = value_force(context, rhs, value_any(context, rhs_range));
+  // FIXME :ExpectedAny
+  Expected_Result expected_lhs = expected_result_from_value(value_any(context, lhs->source_range));
+  Value *lhs_value = value_force(context, &expected_lhs, lhs);
+  // FIXME :ExpectedAny
+  Expected_Result expected_rhs = expected_result_from_value(value_any(context, rhs->source_range));
+  Value *rhs_value = value_force(context, &expected_rhs, rhs);
 
   maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
   MASS_ON_ERROR(*context->result) return 0;
@@ -4190,8 +4229,12 @@ mass_handle_array_access_lazy_proc(
 ) {
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
   const Source_Range *array_range = &payload->array->source_range;
-  Value *array = value_force(context, payload->array, value_any(context, *array_range));
-  Value *index = value_force(context, payload->index, value_any(context, payload->index->source_range));
+  // FIXME :ExpectedAny
+  Expected_Result expected_array = expected_result_from_value(value_any(context, *array_range));
+  Value *array = value_force(context, &expected_array, payload->array);
+  // FIXME :ExpectedAny
+  Expected_Result expected_index = expected_result_from_value(value_any(context, payload->index->source_range));
+  Value *index = value_force(context, &expected_index, payload->index);
 
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -4417,9 +4460,9 @@ mass_handle_if_expression_lazy_proc(
   if (condition->descriptor == &descriptor_number_literal) {
     condition = token_value_force_immediate_integer(context, condition, &descriptor_s64);
   } else if (condition->descriptor == &descriptor_lazy_value) {
-    Value *temp_condition = value_force(
-      context, condition, value_any(context, condition->source_range)
-    );
+    // FIXME :ExpectedAny
+    Expected_Result expected_result = expected_result_from_value(value_any(context, condition->source_range));
+    Value *temp_condition = value_force(context, &expected_result, condition);
     MASS_ON_ERROR(*context->result) return 0;
     condition = temp_condition;
   }
@@ -4428,7 +4471,9 @@ mass_handle_if_expression_lazy_proc(
     context, &context->builder->code_block.instructions, &condition->source_range, condition
   );
 
-  result_value = value_force(context, then, result_value);
+  Expected_Result expected_result = expected_result_from_value(result_value);
+
+  result_value = value_force(context, &expected_result, then);
   MASS_ON_ERROR(*context->result) return 0;
 
   Label_Index after_label =
@@ -4443,7 +4488,7 @@ mass_handle_if_expression_lazy_proc(
     (Instruction) {.type = Instruction_Type_Label, .label = else_label}
   );
 
-  result_value = value_force(context, else_, result_value);
+  result_value = value_force(context, &expected_result, else_);
   MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(
@@ -4647,7 +4692,9 @@ mass_handle_block_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     Value *target = i == statement_count - 1 ? result_value : &void_value;
-    target = value_force(context, lazy_statement, target);
+    // FIXME :ExpectedAny
+    Expected_Result expected_result = expected_result_from_value(target);
+    target = value_force(context, &expected_result, lazy_statement);
   }
   return result_value;
 }
@@ -5018,7 +5065,10 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       return 0;
     }
     Value *raw_value = *dyn_array_get(args, i);
-    Value *value = value_force(context, raw_value, value_any(context, raw_value->source_range));
+    // FIXME :ExpectedAny
+    Expected_Result expected_result =
+      expected_result_from_value(value_any(context, raw_value->source_range));
+    Value *value = value_force(context, &expected_result, raw_value);
     MASS_ON_ERROR(*context->result) return 0;
 
     if (storage_is_label(&value->storage)) {
@@ -5184,12 +5234,16 @@ mass_handle_assignment_lazy_proc(
   Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
-  Value *target = value_force(context, payload->target, value_any(context, payload->source_range));
+  // FIXME :ExpectedAny
+  Expected_Result expected_target =
+    expected_result_from_value(value_any(context, payload->source_range));
+  Value *target = value_force(context, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor->tag == Descriptor_Tag_Function) {
     load_address(context, &payload->source_range, target, payload->expression);
   } else {
-    target = value_force(context, payload->expression, target);
+    Expected_Result expected_result = expected_result_from_value(target);
+    target = value_force(context, &expected_result, payload->expression);
   }
   return result_value;
 }
@@ -5339,7 +5393,9 @@ token_parse(
   Value_View view
 ) {
   Value *block_result = token_parse_block_view(context, view);
-  (void)value_force(context, block_result, &void_value);
+  // FIXME :ExpectedAny
+  Expected_Result expected_target = expected_result_from_value(&void_value);
+  (void)value_force(context, &expected_target, block_result);
   return *context->result;
 }
 
