@@ -1183,18 +1183,6 @@ value_ensure_type(
   return descriptor;
 }
 
-const Descriptor *
-scope_lookup_type(
-  Execution_Context *context,
-  Scope *scope,
-  Source_Range source_range,
-  Slice type_name
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  Value *value = scope_lookup_force(scope, type_name);
-  return value_ensure_type(context, value, source_range);
-}
-
 static inline Value_View
 value_view_match_till_end_of_statement(
   Value_View view,
@@ -1254,21 +1242,23 @@ token_force_type(
       panic("TODO: should be recursive");
     }
     Slice name = value_as_symbol(child)->name;
+    Value *type_value = scope_lookup_force(scope, name);
     Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
     *temp = (Descriptor) {
       .tag = Descriptor_Tag_Pointer,
       .name = name,
-      .Pointer.to = scope_lookup_type(context, scope, child->source_range, name),
+      .Pointer.to = value_ensure_type(context, type_value, source_range),
     };
     descriptor = temp;
   } else if (value_is_symbol(value)) {
-    const Symbol *symbol = value_as_symbol(value);
-    descriptor = scope_lookup_type(context, scope, source_range, symbol->name);
+    Slice name = value_as_symbol(value)->name;
+    Value *type_value = scope_lookup_force(scope, name);
+    descriptor = value_ensure_type(context, type_value, source_range);
     if (!descriptor) {
       MASS_ON_ERROR(*context->result) return 0;
       context_error_snprintf(
         context, source_range, "Could not find type %"PRIslice,
-        SLICE_EXPAND_PRINTF(symbol->name)
+        SLICE_EXPAND_PRINTF(name)
       );
     }
   } else {
@@ -4943,9 +4933,8 @@ token_match_fixed_array_type(
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  const Descriptor *descriptor = scope_lookup_type(
-    context, context->scope, type->source_range, value_as_symbol(type)->name
-  );
+  Value *type_value = scope_lookup_force(context->scope, value_as_symbol(type)->name);
+  const Descriptor *descriptor = value_ensure_type(context, type_value, view.source_range);
 
   Value_View size_view = value_as_group(square_brace)->children;
   Value *size_value = compile_time_eval(context, size_view);
