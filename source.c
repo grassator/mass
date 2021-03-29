@@ -3677,11 +3677,14 @@ mass_handle_arithmetic_operation_lazy_proc(
       Allocator *allocator = context->allocator;
       Function_Builder *builder = context->builder;
 
-      // Save RDX as it will be used for the overflow
-      // TODO we should not save / restore RDX if it is the result
-      Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
-        allocator, builder, &result_range, Register_D
-      );
+      // Save RDX as it will be used for the result overflow
+      // but we should not save or restore it if it is the result
+      Maybe_Saved_Register maybe_saved_rdx = {0};
+      if (!storage_is_register_index(&result_value->storage, Register_D)) {
+        maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+          allocator, builder, &result_range, Register_D
+        );
+      }
 
       Value *temp_a = value_register_for_descriptor(
         context, Register_A, descriptor, result_range
@@ -3728,10 +3731,13 @@ mass_handle_arithmetic_operation_lazy_proc(
       MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_divisor)) return;
 
       // Save RDX as it will be used for the remainder
-      // TODO we should not save / restore RDX if it is the result
-      Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
-        allocator, builder, &result_range, Register_D
-      );
+      // but we should not save or restore it if it is the result
+      Maybe_Saved_Register maybe_saved_rdx = {0};
+      if (!storage_is_register_index(&result_value->storage, Register_D)) {
+        maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+          allocator, builder, &result_range, Register_D
+        );
+      }
 
       if (descriptor_is_signed_integer(descriptor)){
         const X64_Mnemonic *widen = 0;
