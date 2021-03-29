@@ -520,9 +520,9 @@ scope_define_value(
   if (!scope->map) {
     scope->map = hash_map_make(Scope_Map, scope->allocator);
   }
-  if (hash_map_has(scope->map, name)) {
-    // We just checked that the map has the entry so it safe to deref right away
-    Scope_Entry *it = *hash_map_get(scope->map, name);
+  s32 hash = Scope_Map__hash(name);
+  Scope_Entry *it = scope_lookup_shallow_hashed(scope, hash, name);
+  if (it) {
     assert(it->tag == Scope_Entry_Tag_Value);
     Value *existing = it->Value.value;
     while (existing->next_overload) existing = existing->next_overload;
@@ -534,7 +534,7 @@ scope_define_value(
       .Value.value = value,
       .source_range = source_range,
     };
-    hash_map_set(scope->map, name, allocated);
+    hash_map_set_by_hash(scope->map, hash, name, allocated);
   }
 }
 
