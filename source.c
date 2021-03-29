@@ -1191,15 +1191,7 @@ scope_lookup_type(
   Slice type_name
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  Scope_Entry *scope_entry = scope_lookup(scope, type_name);
-  if (!scope_entry) {
-    context_error_snprintf(
-      context, source_range, "Could not find type %"PRIslice,
-      SLICE_EXPAND_PRINTF(type_name)
-    );
-    return 0;
-  }
-  Value *value = scope_entry_force(scope_entry);
+  Value *value = scope_lookup_force(scope, type_name);
   return value_ensure_type(context, value, source_range);
 }
 
