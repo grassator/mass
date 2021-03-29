@@ -3617,8 +3617,13 @@ mass_handle_arithmetic_operation_lazy_proc(
   Value *a = payload->lhs;
   Value *b = payload->rhs;
 
-  // FIXME use result_value here instead
-  Value *any_result = value_any_init(&(Value){0}, context, result_range);
+  // FIXME :NoAny
+  if(result_value->descriptor->tag == Descriptor_Tag_Any) {
+    Value *temp_result =
+      reserve_stack(context, context->builder, descriptor, result_value->source_range);
+    MASS_ON_ERROR(assign(context, result_value, temp_result)) return;
+  }
+
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
@@ -3685,7 +3690,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_b = value_register_for_descriptor(
         context, Register_D, descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->rhs, temp_b)) return;
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
 
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_instruction(
@@ -3697,45 +3702,89 @@ mass_handle_arithmetic_operation_lazy_proc(
       register_release_maybe_restore(builder, &maybe_saved_rdx);
       return;
     }
-    case Mass_Arithmetic_Operator_Divide: {
-      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
-      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
-
-      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
-      MASS_ON_ERROR(*context->result) return;
-      divide(context, &lhs->source_range, any_result, lhs, rhs);
-      break;
-    }
+    case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
-      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
-      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
+      Allocator *allocator = context->allocator;
+      Function_Builder *builder = context->builder;
+      Array_Instruction *instructions = &builder->code_block.instructions;
+      u64 byte_size = descriptor_byte_size(descriptor);
 
-      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
-      MASS_ON_ERROR(*context->result) return;
-      value_remainder(context, &lhs->source_range, any_result, lhs, rhs);
-      break;
+      if (payload->operator == Mass_Arithmetic_Operator_Divide) {
+        maybe_constant_fold(context, &result_range, result_value, a, b, /);
+      } else {
+        maybe_constant_fold(context, &result_range, result_value, a, b, %);
+      }
+
+      Value *temp_dividend = value_register_for_descriptor(
+        context, Register_A, descriptor, result_range
+      );
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_dividend)) return;
+
+      Register temp_divisor_register = register_acquire_temp(builder);
+      Value *temp_divisor = value_register_for_descriptor(
+        context, temp_divisor_register, descriptor, payload->rhs->source_range
+      );
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_divisor)) return;
+
+      // Save RDX as it will be used for the remainder
+      Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+        allocator, builder, &result_range, Register_D
+      );
+
+      if (descriptor_is_signed_integer(descriptor)){
+        const X64_Mnemonic *widen = 0;
+        switch (byte_size) {
+          case 8: widen = cqo; break;
+          case 4: widen = cdq; break;
+          case 2: widen = cwd; break;
+          case 1: widen = cbw; break;
+        }
+        assert(widen);
+        push_instruction(instructions, result_range, (Instruction) {.assembly = {widen}});
+        push_instruction(instructions, result_range, (Instruction) {.assembly = {idiv, {temp_divisor->storage}}});
+      } else {
+        if (byte_size == 1) {
+          Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
+          push_instruction(
+            instructions, result_range,
+            (Instruction) {.assembly = {movzx, {reg_ax, temp_dividend->storage}}}
+          );
+        } else {
+          // We need to zero-extend A to D which means just clearing D register
+          Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
+          push_instruction(instructions, result_range, (Instruction) {.assembly = {xor, {reg_d, reg_d}}});
+        }
+        push_instruction(instructions, result_range, (Instruction) {.assembly = {x64_div, {temp_divisor->storage}}});
+      }
+
+      if (payload->operator == Mass_Arithmetic_Operator_Divide) {
+        move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_dividend->storage);
+      } else {
+        if (byte_size == 1) {
+          // TODO I think it might be impossible to move into extended registers from AH
+          Storage reg_ah = storage_register_for_descriptor(Register_AH, descriptor);
+          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_ah);
+        } else {
+          // TODO saving to AX should not be necessary, but because we do not have global
+          //      register allocation and arguments might be in RDX we use RAX instead
+          Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
+          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_d);
+          //Value *temp_result =
+            //value_register_for_descriptor(context, Register_A, descriptor, *source_range);
+          //move_value(allocator, builder, source_range, &temp_result->storage, &remainder);
+          //move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
+        }
+      }
+
+      register_release(builder, temp_divisor_register);
+      // TODO we should not restore RDX if it is the result
+      register_release_maybe_restore(builder, &maybe_saved_rdx);
+      return;
     }
     default: {
       panic("Internal error: Unexpected operator");
       break;
     }
-  }
-
-  Function_Builder *builder = context->builder;
-  if (any_result->storage.tag != Storage_Tag_Static) {
-    // FIXME do proper register allocation
-    Value *stack_result = reserve_stack(context, builder, descriptor, result_range);
-    MASS_ON_ERROR(assign(context, stack_result, any_result)) return;
-    if (any_result->storage.tag == Storage_Tag_Register) {
-      ensure_register_released(context->builder, any_result->storage.Register.index);
-    }
-    MASS_ON_ERROR(assign(context, result_value, stack_result)) return;
-  } else {
-    MASS_ON_ERROR(assign(context, result_value, any_result)) return;
   }
 }
 
