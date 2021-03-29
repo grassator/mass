@@ -236,6 +236,13 @@ mnemonic(imul,
   encoding(0x69, _r, r64, r_m64, imm32),
 );
 
+mnemonic(mul,
+  encoding(0xF6, _op_code(4), r_m8),
+  encoding(0xF7, _op_code(4), r_m16),
+  encoding(0xF7, _op_code(4), r_m32),
+  encoding(0xF7, _op_code(4), r_m64),
+);
+
 mnemonic(idiv,
   encoding(0xF6, _op_code(7), r_m8),
   encoding(0xF7, _op_code(7), r_m16),

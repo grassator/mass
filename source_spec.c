@@ -475,6 +475,11 @@ spec("source") {
         check(checker);
         check(checker(-30, 3) == -30 * 3);
       }
+      it("should correctly handle u8 multiplication") {\
+        MATH_CHECKER_FN(u8, u8, *);
+        check(checker);
+        check(checker(128u, 3u) == 128u);
+      }
     }
   }
 

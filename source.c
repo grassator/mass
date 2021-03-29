@@ -3687,9 +3687,10 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
       MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->rhs, temp_b)) return;
 
+      const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_instruction(
         &builder->code_block.instructions, result_range,
-        (Instruction) {.assembly = {imul, {temp_b->storage}}}
+        (Instruction) {.assembly = {mnemonic, {temp_b->storage}}}
       );
       move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
 
