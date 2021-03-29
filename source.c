@@ -1650,19 +1650,26 @@ token_match_type(
   Value_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (!view.length) panic("Caller must not call token_match_type with empty token list");
 
   Descriptor *descriptor = token_match_fixed_array_type(context, view);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor) return descriptor;
-  if (!view.length) panic("Caller must not call token_match_type with empty token list");
   Value *token = value_view_get(view, 0);
-  if (view.length > 1) {
-    context_error_snprintf(
-      context, token->source_range, "Can not resolve type"
-    );
-    return 0;
+  // TODO fold into main parsing code
+  if (value_is_group(token) && value_as_group(token)->tag == Group_Tag_Square) {
+    if (view.length > 1) {
+      context_error_snprintf(
+        context, token->source_range, "Can not resolve type"
+      );
+      return 0;
+    }
+    return token_force_type(context, context->scope, token);
+  } else {
+    Value *type = compile_time_eval(context, view);
+    return token_force_type(context, context->scope, type);
   }
-  return token_force_type(context, context->scope, token);
+
 }
 
 bool
@@ -2466,29 +2473,6 @@ token_process_function_literal(
     },
   };
 
-  Value_View return_types_view = value_as_group(return_types)->children;
-  if (return_types_view.length == 0) {
-    descriptor->Function.info.returns = (Function_Return) { .descriptor = &descriptor_void, };
-  } else {
-    Value_View_Split_Iterator it = { .view = return_types_view };
-
-    for (u64 i = 0; !it.done; ++i) {
-      if (i > 0) {
-        context_error_snprintf(
-          context, return_types->source_range,
-          "Multiple return types are not supported at the moment"
-        );
-        return 0;
-      }
-      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-
-      Execution_Context arg_context = *context;
-      arg_context.scope = function_scope;
-      arg_context.builder = 0;
-      descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
-    }
-  }
-
   bool previous_argument_has_default_value = false;
   Value_View args_view = value_as_group(args)->children;
   if (args_view.length != 0) {
@@ -2518,6 +2502,29 @@ token_process_function_literal(
       } else {
         previous_argument_has_default_value = !!arg.maybe_default_expression.length;
       }
+    }
+  }
+
+  Value_View return_types_view = value_as_group(return_types)->children;
+  if (return_types_view.length == 0) {
+    descriptor->Function.info.returns = (Function_Return) { .descriptor = &descriptor_void, };
+  } else {
+    Value_View_Split_Iterator it = { .view = return_types_view };
+
+    for (u64 i = 0; !it.done; ++i) {
+      if (i > 0) {
+        context_error_snprintf(
+          context, return_types->source_range,
+          "Multiple return types are not supported at the moment"
+        );
+        return 0;
+      }
+      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+
+      Execution_Context arg_context = *context;
+      arg_context.scope = function_scope;
+      arg_context.builder = 0;
+      descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
     }
   }
 
@@ -3914,6 +3921,34 @@ mass_handle_address_of_lazy_proc(
 }
 
 Value *
+token_handle_type_of(
+  Execution_Context *context,
+  Value *args_token
+) {
+  Value *result = 0;
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  MASS_ON_ERROR(*context->result) goto err;
+  if (dyn_array_length(args) != 1) {
+    context_error_snprintf(
+      context, args_token->source_range,
+      "type_of() expects a sinle argument"
+    );
+    goto err;
+  }
+  Value *expression = *dyn_array_get(args, 0);
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
+
+  // TODO consider adding a const static values to avoid the cast
+  result = value_make(
+    context, &descriptor_type, storage_static((Descriptor *)descriptor), args_token->source_range
+  );
+
+  err:
+  dyn_array_destroy(args);
+  return result;
+}
+
+Value *
 mass_handle_paren_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3934,6 +3969,8 @@ mass_handle_paren_operator(
     );
   } else if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
+  } else if (slice_equal(target_name, slice_literal("type_of"))) {
+    return token_handle_type_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("storage_variant_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     Value *result = token_handle_storage_variant_of(context, &args_range, args);

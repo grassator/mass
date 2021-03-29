@@ -678,7 +678,7 @@ static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_char;
 static Descriptor descriptor_char_pointer;
-MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);
+MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);

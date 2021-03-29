@@ -823,7 +823,7 @@ main(void) {
     fprintf(file, "static Descriptor descriptor_char_pointer;\n");
 
     // The type of type needs to be defined manually
-    fprintf(file, "MASS_DEFINE_OPAQUE_DESCRIPTOR(type, sizeof(Descriptor) * 8);\n");
+    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);\n");
 
     // Also need to define built-in types
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");

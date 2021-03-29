@@ -905,7 +905,46 @@ spec("source") {
       scope_lookup_force(test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("Could not find type s33"));
+      spec_check_slice(error->message, slice_literal("Undefined variable s33"));
+    }
+
+    it("should be able to get the type_of an expression without evaluating it") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test_fn", &test_context,
+        "counter := 0\n"
+        "test_fn :: () -> (s64) {"
+          "type_of({ counter = 1; var := 0; var })\n"
+          "counter"
+        "}"
+      );
+      check(checker);
+      check(checker() == 0);
+    }
+
+    it("should be able to get the fields of the descriptor provided from type_of") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test_fn", &test_context,
+        "foo := 0\n"
+        "id :: (x : type_of(foo)) -> (type_of(foo)) { x }\n"
+        "test_fn :: () -> (s64) {"
+          "x : s64 = 42\n"
+          "id(x)"
+        "}"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
+
+    it("should report an error when non-type token is being used as a type") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: () -> () {"
+          "type_of();"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Parse_Error *error = &test_context.result->Error.details;
+      spec_check_slice(error->message, slice_literal("type_of() expects a sinle argument"));
     }
   }
 
