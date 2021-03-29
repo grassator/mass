@@ -776,11 +776,6 @@ make_if(
   return label;
 }
 
-typedef enum {
-  Arithmetic_Operation_Plus,
-  Arithmetic_Operation_Minus,
-} Arithmetic_Operation;
-
 void
 maybe_constant_fold_internal(
   Execution_Context *context,

@@ -3678,6 +3678,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       Function_Builder *builder = context->builder;
 
       // Save RDX as it will be used for the overflow
+      // TODO we should not save / restore RDX if it is the result
       Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
         allocator, builder, &result_range, Register_D
       );
@@ -3727,6 +3728,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_divisor)) return;
 
       // Save RDX as it will be used for the remainder
+      // TODO we should not save / restore RDX if it is the result
       Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
         allocator, builder, &result_range, Register_D
       );
@@ -3765,19 +3767,12 @@ mass_handle_arithmetic_operation_lazy_proc(
           Storage reg_ah = storage_register_for_descriptor(Register_AH, descriptor);
           move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_ah);
         } else {
-          // TODO saving to AX should not be necessary, but because we do not have global
-          //      register allocation and arguments might be in RDX we use RAX instead
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
           move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_d);
-          //Value *temp_result =
-            //value_register_for_descriptor(context, Register_A, descriptor, *source_range);
-          //move_value(allocator, builder, source_range, &temp_result->storage, &remainder);
-          //move_to_result_from_temp(allocator, builder, source_range, result_value, temp_result);
         }
       }
 
       register_release(builder, temp_divisor_register);
-      // TODO we should not restore RDX if it is the result
       register_release_maybe_restore(builder, &maybe_saved_rdx);
       return;
     }

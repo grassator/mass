@@ -102,24 +102,6 @@ fn_encode(
 );
 
 void
-divide(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *a,
-  Value *b
-);
-
-void
-value_remainder(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *a,
-  Value *b
-);
-
-void
 compare(
   Execution_Context *context,
   Compare_Type operation,
