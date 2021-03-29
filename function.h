@@ -72,7 +72,7 @@ instruction_add_source_location_internal(
       s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
       s64 constant_result = a_s64 _operator_ b_s64;\
       maybe_constant_fold_internal(fold_context, fold_a, constant_result, (_result_), (_loc_));\
-      return 0;\
+      return (_result_);\
     }\
   } while(0)
 
