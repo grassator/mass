@@ -6,6 +6,17 @@
 #include <stdatomic.h>
 #endif
 
+static inline Value_View
+value_view_single(
+  Value **value
+) {
+  return (Value_View) {
+    .values = value,
+    .length = 1,
+    .source_range = (*value)->source_range,
+  };
+}
+
 static inline Value *
 value_view_peek(
   Value_View view,
