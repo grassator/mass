@@ -3614,15 +3614,14 @@ mass_handle_arithmetic_operation_lazy_proc(
   assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
   const Source_Range result_range = payload->lhs->source_range;
+  Value *a = payload->lhs;
+  Value *b = payload->rhs;
 
   // FIXME use result_value here instead
   Value *any_result = value_any_init(&(Value){0}, context, result_range);
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
-      Value *a = payload->lhs;
-      Value *b = payload->rhs;
-
       if (payload->operator == Mass_Arithmetic_Operator_Add) {
         maybe_constant_fold(context, &result_range, result_value, a, b, +);
       } else {
@@ -3668,15 +3667,45 @@ mass_handle_arithmetic_operation_lazy_proc(
       return;
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, lhs));
-      Value *rhs = value_any_init(&(Value){0}, context, payload->rhs->source_range);
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, rhs));
+      maybe_constant_fold(context, &result_range, result_value, a, b, *);
 
-      maybe_resize_values_for_integer_math_operation(context, &lhs->source_range, &lhs, &rhs);
-      MASS_ON_ERROR(*context->result) return;
-      multiply(context, &lhs->source_range, any_result, lhs, rhs);
-      break;
+      // Try to reuse result_value if we can (if it is a register)
+      Value *temp_a;
+      if (
+        result_value->storage.tag == Storage_Tag_Register &&
+        result_value->storage.Register.index != Register_A // FIXME :ExplicitAcquireRegisterA
+      ) {
+        temp_a = value_register_for_descriptor(
+          context, result_value->storage.Register.index, descriptor, result_range
+        );
+      } else {
+        temp_a = value_register_for_descriptor(
+          context, register_acquire_temp(context->builder), descriptor, result_range
+        );
+      }
+
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
+
+      Value *temp_b = value_register_for_descriptor(
+        context, register_acquire_temp(context->builder), descriptor, result_range
+      );
+      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
+
+      // TODO support unsigned multiply
+      push_instruction(
+        &context->builder->code_block.instructions, result_range,
+        (Instruction) {.assembly = {imul, {temp_a->storage, temp_b->storage}}}
+      );
+      if (!storage_equal(&temp_a->storage, &result_value->storage)) {
+        move_value(
+          context->allocator, context->builder, &result_range,
+          &result_value->storage, &temp_a->storage
+        );
+        assert(temp_a->storage.tag == Storage_Tag_Register);
+        register_release(context->builder, temp_a->storage.Register.index);
+      }
+      register_release(context->builder, temp_b->storage.Register.index);
+      return;
     }
     case Mass_Arithmetic_Operator_Divide: {
       Value *lhs = value_any_init(&(Value){0}, context, payload->lhs->source_range);

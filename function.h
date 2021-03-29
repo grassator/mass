@@ -102,15 +102,6 @@ fn_encode(
 );
 
 void
-multiply(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *x,
-  Value *y
-);
-
-void
 divide(
   Execution_Context *context,
   const Source_Range *source_range,

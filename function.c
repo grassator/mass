@@ -801,44 +801,6 @@ maybe_constant_fold_internal(
   MASS_ON_ERROR(assign(context, result_value, imm_value)) return;
 }
 
-void
-multiply(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *x,
-  Value *y
-) {
-  Allocator *allocator = context->allocator;
-  Function_Builder *builder = context->builder;
-  Array_Instruction *instructions = &builder->code_block.instructions;
-  assert(same_value_type(x, y));
-  assert(descriptor_is_integer(x->descriptor));
-
-  maybe_constant_fold(context, source_range, result_value, x, y, *);
-
-  // TODO deal with signed / unsigned
-  // TODO support double the size of the result?
-  Value *y_temp = reserve_stack(context, builder, y->descriptor, *source_range);
-
-  Register temp_register_index = register_acquire_temp(builder);
-  Value *temp_register =
-    value_register_for_descriptor(context, temp_register_index, y->descriptor, *source_range);
-  move_value(allocator, builder, source_range, &temp_register->storage, &y->storage);
-  move_value(allocator, builder, source_range, &y_temp->storage, &temp_register->storage);
-
-  temp_register =
-    value_register_for_descriptor(context, temp_register_index, x->descriptor, *source_range);
-  move_value(allocator, builder, source_range, &temp_register->storage, &x->storage);
-
-  push_instruction(
-    instructions, *source_range,
-    (Instruction) {.assembly = {imul, {temp_register->storage, y_temp->storage}}}
-  );
-
-  move_to_result_from_temp(allocator, builder, source_range, result_value, temp_register);
-}
-
 typedef enum {
   Divide_Operation_Divide,
   Divide_Operation_Remainder,
