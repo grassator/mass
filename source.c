@@ -3634,7 +3634,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       // Try to reuse result_value if we can
-      // TODO should also be able to reuse memory
+      // TODO should also be able to reuse memory operands
       Value *temp_a;
       if (
         result_value->storage.tag == Storage_Tag_Register &&
@@ -3651,7 +3651,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
 
-      // TODO This can be optimized in cases where one of the operands is
+      // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_b = value_register_for_descriptor(
         context, register_acquire_temp(context->builder), descriptor, result_range
       );
