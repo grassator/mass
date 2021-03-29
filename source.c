@@ -3949,6 +3949,41 @@ token_handle_type_of(
 }
 
 Value *
+token_handle_size_of(
+  Execution_Context *context,
+  Value *args_token
+) {
+  Value *result = 0;
+  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  MASS_ON_ERROR(*context->result) goto err;
+  if (dyn_array_length(args) != 1) {
+    context_error_snprintf(
+      context, args_token->source_range,
+      "size_of() expects a sinle argument"
+    );
+    goto err;
+  }
+  Value *expression = *dyn_array_get(args, 0);
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
+  u64 byte_size = descriptor_byte_size(descriptor);
+
+  Number_Literal *literal = allocator_allocate(context->allocator, Number_Literal);
+  *literal = (Number_Literal) {
+    .base = 10,
+    .negative = false,
+    .bits = byte_size,
+  };
+
+  result = value_make(
+    context, &descriptor_number_literal, storage_static(literal), args_token->source_range
+  );
+
+  err:
+  dyn_array_destroy(args);
+  return result;
+}
+
+Value *
 mass_handle_paren_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -3971,6 +4006,8 @@ mass_handle_paren_operator(
     return token_process_c_struct_definition(context, args_token);
   } else if (slice_equal(target_name, slice_literal("type_of"))) {
     return token_handle_type_of(context, args_token);
+  } else if (slice_equal(target_name, slice_literal("size_of"))) {
+    return token_handle_size_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("storage_variant_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     Value *result = token_handle_storage_variant_of(context, &args_range, args);

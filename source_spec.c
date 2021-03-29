@@ -946,6 +946,30 @@ spec("source") {
       Parse_Error *error = &test_context.result->Error.details;
       spec_check_slice(error->message, slice_literal("type_of() expects a sinle argument"));
     }
+
+    it("should be able to get the size_of an expression") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test_fn", &test_context,
+        "test_fn :: () -> (s64) {"
+          "size_of({ var := 0; var })"
+        "}"
+      );
+      check(checker);
+      check(checker() == 8);
+    }
+
+    it("should be able to get the size_of an expression without evaluating it") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test_fn", &test_context,
+        "counter := 0\n"
+        "test_fn :: () -> (s64) {"
+          "size_of({ counter = 1; var := 0; var })\n"
+          "counter"
+        "}"
+      );
+      check(checker);
+      check(checker() == 0);
+    }
   }
 
   describe("Operators") {
