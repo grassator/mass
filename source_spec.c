@@ -842,11 +842,6 @@ spec("source") {
         "main :: (arg : [s32 s32]) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(
-        error->message,
-        slice_literal("Pointer type must have a single type inside")
-      );
     }
 
     it("should report an error when encountering multiple return types") {

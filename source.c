@@ -1237,31 +1237,7 @@ token_force_type(
 
   const Descriptor *descriptor = 0;
   Source_Range source_range = value->source_range;
-  if (value_is_group(value)) {
-    const Group *group = value_as_group(value);
-    if (group->tag != Group_Tag_Square) {
-      panic("TODO");
-    }
-    if (group->children.length != 1) {
-      context_error_snprintf(
-        context, source_range, "Pointer type must have a single type inside"
-      );
-      return 0;
-    }
-    Value *child = value_view_get(group->children, 0);
-    if (!value_is_symbol(child)) {
-      panic("TODO: should be recursive");
-    }
-    Slice name = value_as_symbol(child)->name;
-    Value *type_value = scope_lookup_force(scope, name);
-    Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
-    *temp = (Descriptor) {
-      .tag = Descriptor_Tag_Pointer,
-      .name = name,
-      .Pointer.to = value_ensure_type(context, type_value, source_range),
-    };
-    descriptor = temp;
-  } else if (value_is_symbol(value)) {
+  if (value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
     Value *type_value = scope_lookup_force(scope, name);
     descriptor = value_ensure_type(context, type_value, source_range);
@@ -1655,21 +1631,8 @@ token_match_type(
   Descriptor *descriptor = token_match_fixed_array_type(context, view);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor) return descriptor;
-  Value *token = value_view_get(view, 0);
-  // TODO fold into main parsing code
-  if (value_is_group(token) && value_as_group(token)->tag == Group_Tag_Square) {
-    if (view.length > 1) {
-      context_error_snprintf(
-        context, token->source_range, "Can not resolve type"
-      );
-      return 0;
-    }
-    return token_force_type(context, context->scope, token);
-  } else {
-    Value *type = compile_time_eval(context, view);
-    return token_force_type(context, context->scope, type);
-  }
-
+  Value *type = compile_time_eval(context, view);
+  return token_force_type(context, context->scope, type);
 }
 
 bool
@@ -1817,8 +1780,14 @@ token_parse_single(
         return token_parse_block(context, value);
       }
       case Group_Tag_Square: {
-        panic("TODO");
-        return 0;
+        const Descriptor *pointee = token_match_type(context, group->children);
+        Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
+        *temp = (Descriptor) {
+          .tag = Descriptor_Tag_Pointer,
+          .name = source_from_source_range(source_range),
+          .Pointer.to = pointee,
+        };
+        return value_make(context, &descriptor_type, storage_static(temp), *source_range);
       }
     }
   } else if(value_is_symbol(value)) {
@@ -2858,18 +2827,28 @@ token_handle_cast(
   Execution_Context *context,
   Value *args_token
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  MASS_ON_ERROR(*context->result) return 0;
+  Value_View_Split_Iterator it = { .view = value_as_group(args_token)->children };
 
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-  const Source_Range *source_range = &args_token->source_range;
-
-  Value *type = *dyn_array_get(args, 0);
-  Value *expression = *dyn_array_get(args, 1);
-  dyn_array_destroy(args);
-  const Descriptor *target_descriptor = value_ensure_type(context, type, *source_range);
+  // First argument is treated as a type
+  Value_View type_view = token_split_next(&it, &token_pattern_comma_operator);
+  const Descriptor *target_descriptor = token_match_type(context, type_view);
 
   if (!descriptor_is_integer(target_descriptor)) {
-    context_error_snprintf(context, *source_range, "Only integer types are supported for casts");
+    context_error_snprintf(context, it.view.source_range, "Only integer types are supported for casts");
+    return 0;
+  }
+
+  if (it.done) {
+    context_error_snprintf(context, it.view.source_range, "cast() expects two arguments");
+    return 0;
+  }
+
+  Value_View expression_view = token_split_next(&it, &token_pattern_comma_operator);
+  Value *expression = token_parse_expression(context, expression_view, &(u64){0}, 0);
+
+  if (!it.done) {
+    context_error_snprintf(context, it.view.source_range, "cast() expects two arguments");
     return 0;
   }
 
@@ -2880,7 +2859,7 @@ token_handle_cast(
   };
 
   return mass_make_lazy_value(
-    context, *source_range, payload, target_descriptor, mass_handle_cast_lazy_proc
+    context, it.view.source_range, payload, target_descriptor, mass_handle_cast_lazy_proc
   );
 }
 
@@ -4542,15 +4521,9 @@ token_parse_expression(
           }
           break;
         }
+        case Group_Tag_Square:
         case Group_Tag_Curly: {
           // Nothing special to do for now?
-          break;
-        }
-        case Group_Tag_Square: {
-          context_error_snprintf(
-            context, value->source_range,
-            "Unexpected [] in an expression"
-          );
           break;
         }
       }
