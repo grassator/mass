@@ -2019,8 +2019,7 @@ token_parse_operator_definition(
   }
 
   Source_Range precedence_source_range = precedence_token->source_range;
-  Value *precedence_value = value_any(context, precedence_source_range);
-  precedence_value = value_force(context, precedence_token, precedence_value);
+  Value *precedence_value = token_parse_single(context, precedence_token);
   precedence_value = token_value_force_immediate_integer(
     context, &precedence_source_range, precedence_value, &descriptor_u64
   );
