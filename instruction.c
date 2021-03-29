@@ -222,6 +222,11 @@ mnemonic(sub,
 );
 
 mnemonic(imul,
+  encoding(0xF6, _op_code(5), r_m8),
+  encoding(0xF7, _op_code(5), r_m16),
+  encoding(0xF7, _op_code(5), r_m32),
+  encoding(0xF7, _op_code(5), r_m64),
+
   encoding(0x0FAF, _r, r16, r_m16),
   encoding(0x0FAF, _r, r32, r_m32),
   encoding(0x0FAF, _r, r64, r_m64),

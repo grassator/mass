@@ -3669,42 +3669,31 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Multiply: {
       maybe_constant_fold(context, &result_range, result_value, a, b, *);
 
-      // Try to reuse result_value if we can (if it is a register)
-      Value *temp_a;
-      if (
-        result_value->storage.tag == Storage_Tag_Register &&
-        result_value->storage.Register.index != Register_A // FIXME :ExplicitAcquireRegisterA
-      ) {
-        temp_a = value_register_for_descriptor(
-          context, result_value->storage.Register.index, descriptor, result_range
-        );
-      } else {
-        temp_a = value_register_for_descriptor(
-          context, register_acquire_temp(context->builder), descriptor, result_range
-        );
-      }
+      Allocator *allocator = context->allocator;
+      Function_Builder *builder = context->builder;
 
+      // Save RDX as it will be used for the overflow
+      Maybe_Saved_Register maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+        allocator, builder, &result_range, Register_D
+      );
+
+      Value *temp_a = value_register_for_descriptor(
+        context, Register_A, descriptor, result_range
+      );
       MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->lhs, temp_a)) return;
 
       Value *temp_b = value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), descriptor, result_range
+        context, Register_D, descriptor, result_range
       );
-      MASS_ON_ERROR(value_force(context, &payload->rhs->source_range, payload->rhs, temp_b)) return;
+      MASS_ON_ERROR(value_force(context, &payload->lhs->source_range, payload->rhs, temp_b)) return;
 
-      // TODO support unsigned multiply
       push_instruction(
-        &context->builder->code_block.instructions, result_range,
-        (Instruction) {.assembly = {imul, {temp_a->storage, temp_b->storage}}}
+        &builder->code_block.instructions, result_range,
+        (Instruction) {.assembly = {imul, {temp_b->storage}}}
       );
-      if (!storage_equal(&temp_a->storage, &result_value->storage)) {
-        move_value(
-          context->allocator, context->builder, &result_range,
-          &result_value->storage, &temp_a->storage
-        );
-        assert(temp_a->storage.tag == Storage_Tag_Register);
-        register_release(context->builder, temp_a->storage.Register.index);
-      }
-      register_release(context->builder, temp_b->storage.Register.index);
+      move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
+
+      register_release_maybe_restore(builder, &maybe_saved_rdx);
       return;
     }
     case Mass_Arithmetic_Operator_Divide: {
