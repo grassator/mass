@@ -16,14 +16,13 @@ Value *
 reserve_stack_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
-  Function_Builder *fn,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
   s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
-  fn->stack_reserve = s32_align(fn->stack_reserve, byte_size);
-  fn->stack_reserve += byte_size;
-  Storage storage = stack(-fn->stack_reserve, byte_size);
+  context->builder->stack_reserve = s32_align(context->builder->stack_reserve, byte_size);
+  context->builder->stack_reserve += byte_size;
+  Storage storage = stack(-context->builder->stack_reserve, byte_size);
   return value_make_internal(
     compiler_source_location, context, descriptor, storage, source_range
   );
@@ -864,7 +863,7 @@ compare(
     ? a->descriptor
     : b->descriptor;
 
-  Value *temp_b = reserve_stack(context, builder, larger_descriptor, *source_range);
+  Value *temp_b = reserve_stack(context, larger_descriptor, *source_range);
   move_value(allocator, builder, source_range, &temp_b->storage, &b->storage);
 
   Value *reg_r11 = value_register_for_descriptor(context, Register_R11, larger_descriptor, *source_range);
@@ -1092,7 +1091,7 @@ make_and(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context, builder, &descriptor_s8, *source_range);
+  Value *result = reserve_stack(context, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("&&"));
 
   Value zero = {
@@ -1128,7 +1127,7 @@ make_or(
 ) {
   Program *program = context->program;
   Array_Instruction *instructions = &builder->code_block.instructions;
-  Value *result = reserve_stack(context, builder, &descriptor_s8, *source_range);
+  Value *result = reserve_stack(context, &descriptor_s8, *source_range);
   Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("||"));
 
   Value zero = {

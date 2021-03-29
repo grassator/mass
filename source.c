@@ -3016,7 +3016,7 @@ call_function_macro(
         assert(default_expression.length);
         const Source_Range *source_range = &default_expression.source_range;
         // FIXME avoid using a stack value
-        arg_value = reserve_stack(context, context->builder, arg_descriptor, *source_range);
+        arg_value = reserve_stack(context, arg_descriptor, *source_range);
         {
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
@@ -3110,7 +3110,7 @@ call_function_overload(
             }
           };
           Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
-          Value *stack_value = reserve_stack(context, builder, to_save.descriptor, *source_range);
+          Value *stack_value = reserve_stack(context, to_save.descriptor, *source_range);
           push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
           dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
         }
@@ -3146,7 +3146,7 @@ call_function_overload(
       MASS_ON_ERROR(assign(context, target_arg, source_arg)) return 0;
     } else {
       // Large values are copied to the stack and passed by a reference
-      Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
+      Value *stack_value = reserve_stack(context, source_descriptor, *source_range);
       MASS_ON_ERROR(assign(context, stack_value, source_arg)) return 0;
       load_address(context, source_range, target_arg, stack_value);
     }
@@ -3172,9 +3172,7 @@ call_function_overload(
     if (result_value->storage.tag == Storage_Tag_Memory) {
       result_operand = result_value->storage;
     } else {
-      result_operand = reserve_stack(
-        context, builder, descriptor->returns.descriptor, *source_range
-      )->storage;
+      result_operand = reserve_stack(context, descriptor->returns.descriptor, *source_range)->storage;
     }
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
@@ -3201,7 +3199,7 @@ call_function_overload(
   if (return_size <= 8) {
     if (return_size != 0) {
       // FIXME Should not be necessary with correct register allocation
-      saved_result = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
+      saved_result = reserve_stack(context, descriptor->returns.descriptor, *source_range);
       move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value->storage);
     }
   }
@@ -3358,7 +3356,7 @@ extend_integer_value(
   assert(descriptor_is_integer(value->descriptor));
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
-  Value *result = reserve_stack(context, context->builder, target_descriptor, *source_range);
+  Value *result = reserve_stack(context, target_descriptor, *source_range);
   move_value(context->allocator, context->builder, source_range, &result->storage, &value->storage);
   return result;
 }
@@ -3623,7 +3621,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   // FIXME :NoAny
   if(result_value->descriptor->tag == Descriptor_Tag_Any) {
     Value *temp_result =
-      reserve_stack(context, context->builder, descriptor, result_value->source_range);
+      reserve_stack(context, descriptor, result_value->source_range);
     MASS_ON_ERROR(assign(context, result_value, temp_result)) return 0;
   }
 
@@ -4927,7 +4925,7 @@ mass_handle_explicit_return_lazy_proc(
       ? &descriptor_s64
       : parse_result_descriptor;
     Value *stack_return =
-      reserve_stack(context, context->builder, stack_descriptor, fn_return->source_range);
+      reserve_stack(context, stack_descriptor, fn_return->source_range);
     *fn_return = *stack_return;
   }
   MASS_ON_ERROR(assign(context, fn_return, parse_result)) return 0;
@@ -5115,7 +5113,7 @@ token_maybe_parse_definition(
   const Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) return 0;
   Source_Range name_range = name_token->source_range;
-  Value *stack_value = reserve_stack(context, context->builder, descriptor, name_range);
+  Value *stack_value = reserve_stack(context, descriptor, name_range);
   Slice name = value_as_symbol(name_token)->name;
   scope_define_value(context->scope, name_range, name, stack_value);
   *match_length = peek_index;
@@ -5239,7 +5237,7 @@ token_define_local_variable(
   if (descriptor == &descriptor_void) {
     variable = value_make(context, stack_descriptor, (Storage){0}, *source_range);
   } else {
-    variable = reserve_stack(context, context->builder, stack_descriptor, *source_range);
+    variable = reserve_stack(context, stack_descriptor, *source_range);
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;
