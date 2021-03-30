@@ -282,6 +282,13 @@ mnemonic(call,
   encoding(0xFF, _op_code(2), r_m64),
 );
 
+mnemonic(x64_test,
+  encoding(0x84, _r, r_m8, r8),
+  encoding(0x85, _r, r_m16, r16),
+  encoding(0x85, _r, r_m32, r32),
+  encoding(0x85, _r, r_m64, r64),
+);
+
 mnemonic(cmp,
   encoding(0x3C, none, r_al, imm8),
   encoding(0x3D, none, r_ax, imm16),
