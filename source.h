@@ -86,6 +86,18 @@ assign(
   Value *source
 );
 
+static inline const Descriptor *
+expected_result_descriptor(
+  const Expected_Result *expected_result
+);
+
+PRELUDE_NO_DISCARD Value *
+expected_result_ensure_value_or_temp(
+  Execution_Context *context,
+  const Expected_Result *expected_result,
+  Value *value
+);
+
 static inline u64
 get_new_epoch();
 

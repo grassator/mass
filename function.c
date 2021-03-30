@@ -778,24 +778,25 @@ make_if(
   return label;
 }
 
-void
+Value *
 maybe_constant_fold_internal(
   Execution_Context *context,
-  Value *a,
   s64 constant_result,
-  Value *result_value,
+  const Expected_Result *expected_result,
   const Source_Range *source_range
 ) {
+  const Descriptor *descriptor = expected_result_descriptor(expected_result);
+  if (!descriptor) descriptor = &descriptor_s64;
   Storage imm_storage;
-  switch(a->storage.byte_size) {
+  switch(descriptor_byte_size(descriptor)) {
     case 1: imm_storage = imm8(s64_to_s8(constant_result)); break;
     case 2: imm_storage = imm16(s64_to_s16(constant_result)); break;
     case 4: imm_storage = imm32(s64_to_s32(constant_result)); break;
     case 8: imm_storage = imm64(s64_to_s64(constant_result)); break;
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
-  Value *imm_value = value_make(context, a->descriptor, imm_storage, *source_range);
-  MASS_ON_ERROR(assign(context, result_value, imm_value)) return;
+  Value *imm_value = value_make(context, descriptor, imm_storage, *source_range);
+  return expected_result_ensure_value_or_temp(context, expected_result, imm_value);
 }
 
 void

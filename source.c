@@ -14,6 +14,18 @@ value_from_exact_expected_result(
   return expected_result->Exact.value;
 }
 
+static inline const Descriptor *
+expected_result_descriptor(
+  const Expected_Result *expected_result
+) {
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: return expected_result->Exact.value->descriptor;
+    case Expected_Result_Tag_Flexible: return expected_result->Flexible.descriptor;
+  }
+  panic("Unknown Expected_Result tag");
+  return 0;
+}
+
 static inline Expected_Result
 expected_result_from_value(
   Value *value
@@ -3826,26 +3838,16 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
       if (payload->operator == Mass_Arithmetic_Operator_Add) {
-        maybe_constant_fold(context, &result_range, result_value, a, b, +);
+        maybe_constant_fold(context, &result_range, expected_result, a, b, +);
       } else {
-        maybe_constant_fold(context, &result_range, result_value, a, b, -);
+        maybe_constant_fold(context, &result_range, expected_result, a, b, -);
       }
 
       // Try to reuse result_value if we can
-      // TODO should also be able to reuse memory operands
-      Value *temp_a;
-      if (
-        result_value->storage.tag == Storage_Tag_Register &&
-        result_value->storage.Register.index != Register_A // FIXME :ExplicitAcquireRegisterA
-      ) {
-        temp_a = value_register_for_descriptor(
-          context, result_value->storage.Register.index, descriptor, result_range
-        );
-      } else {
-        temp_a = value_register_for_descriptor(
-          context, register_acquire_temp(context->builder), descriptor, result_range
-        );
-      }
+      // TODO should be able to reuse memory and register operands
+      Value *temp_a = value_register_for_descriptor(
+        context, register_acquire_temp(context->builder), descriptor, result_range
+      );
 
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(context, &expected_a, payload->lhs);
@@ -3874,7 +3876,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       return result_value;
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      maybe_constant_fold(context, &result_range, result_value, a, b, *);
+      maybe_constant_fold(context, &result_range, expected_result, a, b, *);
 
       Allocator *allocator = context->allocator;
       Function_Builder *builder = context->builder;
@@ -3920,9 +3922,9 @@ mass_handle_arithmetic_operation_lazy_proc(
       u64 byte_size = descriptor_byte_size(descriptor);
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
-        maybe_constant_fold(context, &result_range, result_value, a, b, /);
+        maybe_constant_fold(context, &result_range, expected_result, a, b, /);
       } else {
-        maybe_constant_fold(context, &result_range, result_value, a, b, %);
+        maybe_constant_fold(context, &result_range, expected_result, a, b, %);
       }
 
       Value *temp_dividend = value_register_for_descriptor(
@@ -4107,45 +4109,45 @@ mass_handle_comparison_operation_lazy_proc(
 
   switch(compare_type) {
     case Compare_Type_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, ==);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, ==);
       break;
     }
     case Compare_Type_Not_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, !=);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, !=);
       break;
     }
 
     case Compare_Type_Unsigned_Below: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, <);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <);
       break;
     }
     case Compare_Type_Unsigned_Below_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, <=);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <=);
       break;
     }
     case Compare_Type_Unsigned_Above: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, >);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >);
       break;
     }
     case Compare_Type_Unsigned_Above_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, >=);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >=);
       break;
     }
 
     case Compare_Type_Signed_Less: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, <);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <);
       break;
     }
     case Compare_Type_Signed_Less_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, <=);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <=);
       break;
     }
     case Compare_Type_Signed_Greater: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, >);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >);
       break;
     }
     case Compare_Type_Signed_Greater_Equal: {
-      maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, >=);
+      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >=);
       break;
     }
     default: {
