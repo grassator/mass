@@ -1877,27 +1877,11 @@ token_match_return_type(
 }
 
 PRELUDE_NO_DISCARD Value *
-value_force(
+expected_result_ensure_value_or_temp(
   Execution_Context *context,
   const Expected_Result *expected_result,
   Value *value
 ) {
-  MASS_ON_ERROR(*context->result) return 0;
-  if (!value) return 0;
-
-  value = token_parse_single(context, value);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  if (value->descriptor == &descriptor_lazy_value) {
-    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    Value *result = lazy->proc(&lazy->context, expected_result, lazy->payload);
-    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
-    MASS_ON_ERROR(*context->result) return 0;
-    // TODO is there a better way to cache the result?
-    *value = *result;
-    return result;
-  }
-
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
@@ -1958,6 +1942,31 @@ value_force(
       return 0;
     }
   }
+}
+
+PRELUDE_NO_DISCARD Value *
+value_force(
+  Execution_Context *context,
+  const Expected_Result *expected_result,
+  Value *value
+) {
+  MASS_ON_ERROR(*context->result) return 0;
+  if (!value) return 0;
+
+  value = token_parse_single(context, value);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  if (value->descriptor == &descriptor_lazy_value) {
+    Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    Value *result = lazy->proc(&lazy->context, expected_result, lazy->payload);
+    allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
+    MASS_ON_ERROR(*context->result) return 0;
+    // TODO is there a better way to cache the result?
+    *value = *result;
+    return result;
+  }
+
+  return expected_result_ensure_value_or_temp(context, expected_result, value);
 }
 
 void
