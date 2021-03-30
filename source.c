@@ -2950,8 +2950,7 @@ mass_handle_cast_lazy_proc(
   const Descriptor *source_descriptor = value_or_lazy_value_descriptor(expression);
   const Source_Range *source_range = &expression->source_range;
 
-  // FIXME :ExpectedAny
-  Expected_Result expected_source = expected_result_from_value(value_any(context, *source_range));
+  Expected_Result expected_source = expected_result_any(source_descriptor);
   Value *value = value_force(context, &expected_source, expression);
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -4501,10 +4500,7 @@ mass_handle_field_access_lazy_proc(
     }
   }
 
-  // FIXME :ExpectedExact
-  Value *result_value = value_from_exact_expected_result(expected_result);
-  MASS_ON_ERROR(assign(context, result_value, field_value)) return 0;
-  return result_value;
+  return expected_result_ensure_value_or_temp(context, expected_result, field_value);
 }
 
 typedef struct {
@@ -4556,12 +4552,8 @@ mass_handle_array_access_lazy_proc(
         storage_load_index_address(context, array_range, array, item_descriptor, index);
     }
   }
-  // FIXME :ExpectedExact
-  Value *result_value = value_from_exact_expected_result(expected_result);
-  // FIXME this might actually cause problems in assigning to an array element
-  MASS_ON_ERROR(assign(context, result_value, array_element_value)) return 0;
 
-  return result_value;
+  return expected_result_ensure_value_or_temp(context, expected_result, array_element_value);
 }
 
 Value *
