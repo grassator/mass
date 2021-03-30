@@ -2961,21 +2961,7 @@ mass_handle_cast_lazy_proc(
     }
   }
 
-  Value *result_value = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      // FIXME :ExpectedStack
-      result_value = reserve_stack(context, target_descriptor, *source_range);
-      break;
-    }
-  }
-
-  MASS_ON_ERROR(assign(context, result_value, value)) return 0;
-  return result_value;
+  return expected_result_ensure_value_or_temp(context, expected_result, value);
 }
 
 Value *
