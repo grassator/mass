@@ -1908,6 +1908,9 @@ expected_result_ensure_value_or_temp(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
+      if (!storage_equal(&result_value->storage, &value->storage)) {
+        value_release_if_temporary(context->builder, value);
+      }
       MASS_ON_ERROR(assign(context, result_value, value)) return 0;
       return result_value;
     }
@@ -3842,8 +3845,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
       value_release_if_temporary(context->builder, temp_b);
 
-      // FIXME This is very unsafe!!! handle temporary handover in a better way
-      value_release_if_temporary(context->builder, temp_a);
+      // temp_a is used as a result so it is intentionnaly not released
       return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Multiply: {
