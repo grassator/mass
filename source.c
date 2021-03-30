@@ -4048,19 +4048,19 @@ mass_handle_comparison_operation_lazy_proc(
   Compare_Type compare_type = payload->compare_type;
   Value *lhs = payload->lhs;
   Value *rhs = payload->rhs;
-  Source_Range lhs_range = lhs->source_range;
+  const Source_Range *source_range = &lhs->source_range;
 
   // FIXME :ExpectedAny
   Expected_Result expected_lhs = expected_result_from_value(value_any(context, lhs->source_range));
-  Value *lhs_value = value_force(context, &expected_lhs, lhs);
+  Value *a = value_force(context, &expected_lhs, lhs);
   // FIXME :ExpectedAny
   Expected_Result expected_rhs = expected_result_from_value(value_any(context, rhs->source_range));
-  Value *rhs_value = value_force(context, &expected_rhs, rhs);
+  Value *b = value_force(context, &expected_rhs, rhs);
 
-  maybe_resize_values_for_integer_math_operation(context, &lhs_range, &lhs_value, &rhs_value);
+  maybe_resize_values_for_integer_math_operation(context, source_range, &a, &b);
   MASS_ON_ERROR(*context->result) return 0;
 
-  if (descriptor_is_unsigned_integer(lhs_value->descriptor)) {
+  if (descriptor_is_unsigned_integer(a->descriptor)) {
     switch(compare_type) {
       case Compare_Type_Equal:
       case Compare_Type_Not_Equal: {
@@ -4100,7 +4100,75 @@ mass_handle_comparison_operation_lazy_proc(
 
   // FIXME :ExpectedExact
   Value *result_value = value_from_exact_expected_result(expected_result);
-  return compare(context, compare_type, &lhs_range, result_value, lhs_value, rhs_value);
+  Allocator *allocator = context->allocator;
+  Function_Builder *builder = context->builder;
+  Array_Instruction *instructions = &builder->code_block.instructions;
+
+  switch(compare_type) {
+    case Compare_Type_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, ==);
+      break;
+    }
+    case Compare_Type_Not_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, !=);
+      break;
+    }
+
+    case Compare_Type_Unsigned_Below: {
+      maybe_constant_fold(context, source_range, result_value, a, b, <);
+      break;
+    }
+    case Compare_Type_Unsigned_Below_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, <=);
+      break;
+    }
+    case Compare_Type_Unsigned_Above: {
+      maybe_constant_fold(context, source_range, result_value, a, b, >);
+      break;
+    }
+    case Compare_Type_Unsigned_Above_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, >=);
+      break;
+    }
+
+    case Compare_Type_Signed_Less: {
+      maybe_constant_fold(context, source_range, result_value, a, b, <);
+      break;
+    }
+    case Compare_Type_Signed_Less_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, <=);
+      break;
+    }
+    case Compare_Type_Signed_Greater: {
+      maybe_constant_fold(context, source_range, result_value, a, b, >);
+      break;
+    }
+    case Compare_Type_Signed_Greater_Equal: {
+      maybe_constant_fold(context, source_range, result_value, a, b, >=);
+      break;
+    }
+    default: {
+      assert(!"Unsupported comparison");
+    }
+  }
+
+  const Descriptor *larger_descriptor =
+    descriptor_byte_size(a->descriptor) > descriptor_byte_size(b->descriptor)
+    ? a->descriptor
+    : b->descriptor;
+
+  Value *temp_b = reserve_stack(context, larger_descriptor, *source_range);
+  move_value(allocator, builder, source_range, &temp_b->storage, &b->storage);
+
+  Value *reg_r11 = value_register_for_descriptor(context, Register_R11, larger_descriptor, *source_range);
+  move_value(allocator, builder, source_range, &reg_r11->storage, &a->storage);
+
+  push_instruction(instructions, *source_range, (Instruction) {.assembly = {cmp, {reg_r11->storage, temp_b->storage, 0}}});
+
+  // FIXME if the result_value operand is any we should create a temp value
+  Value *comparison_value = value_from_compare(context, compare_type, *source_range);
+  MASS_ON_ERROR(assign(context, result_value, comparison_value)) return 0;
+  return result_value;
 }
 
 static inline Value *
