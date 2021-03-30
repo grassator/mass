@@ -1943,8 +1943,8 @@ expected_result_ensure_value_or_temp(
           // FIXME verify register mask
           return value;
         }
-        Value *temp_result = value_register_for_descriptor(
-          context, register_acquire_temp(context->builder), expected_descriptor, value->source_range
+        Value *temp_result = value_temporary_register_for_descriptor(
+          context, expected_descriptor, value->source_range
         );
         MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
         return temp_result;
@@ -3692,8 +3692,8 @@ storage_load_index_address(
 
   s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
   // FIXME this acquires but never releases a register
-  Value *new_base_register = value_register_for_descriptor(
-    context, register_acquire_temp(context->builder), &descriptor_s64, index_value->source_range
+  Value *new_base_register = value_temporary_register_for_descriptor(
+    context, &descriptor_s64, index_value->source_range
   );
 
   // Move the index into the register
@@ -3708,9 +3708,8 @@ storage_load_index_address(
   Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
 
   // Multiply index by the item byte size
-  Register reg_byte_size = register_acquire_temp(context->builder);
-  Value *reg_byte_size_value = value_register_for_descriptor(
-    context, reg_byte_size, &descriptor_s64, index_value->source_range
+  Value *reg_byte_size_value = value_temporary_register_for_descriptor(
+    context, &descriptor_s64, index_value->source_range
   );
   move_value(
     context->allocator, context->builder, source_range,
@@ -3728,30 +3727,29 @@ storage_load_index_address(
     //      using an extra register and put the index into SIB
 
     // Load previous address into a temp register
-    Register temp_register = register_acquire_temp(context->builder);
-    Value temp_value = {
-      .descriptor = &descriptor_s64,
-      .storage = storage_register_for_descriptor(temp_register, &descriptor_s64)
-    };
+    Value *temp_value = value_temporary_register_for_descriptor(
+      context, &descriptor_s64, index_value->source_range
+    );
 
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
       move_value(
         context->allocator,
         context->builder,
         source_range,
-        &temp_value.storage,
+        &temp_value->storage,
         &target->storage
       );
     } else {
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-      load_address(context, source_range, &temp_value, target);
+      load_address(context, source_range, temp_value, target);
     }
     push_instruction(
       &context->builder->code_block.instructions, *source_range,
-      (Instruction) {.assembly = {add, {new_base_register->storage, temp_value.storage}}}
+      (Instruction) {.assembly = {add, {new_base_register->storage, temp_value->storage}}}
     );
-    register_release(context->builder, temp_register);
+    value_release_if_temporary(context->builder, temp_value);
   }
+  value_release_if_temporary(context->builder, reg_byte_size_value);
 
   return (Storage) {
     .tag = Storage_Tag_Memory,
@@ -3824,17 +3822,13 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
-      Value *temp_a = value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), descriptor, result_range
-      );
+      Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, result_range);
 
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(context, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Value *temp_b = value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), descriptor, result_range
-      );
+      Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, result_range);
       Expected_Result expected_b = expected_result_from_value(temp_b);
       temp_b = value_force(context, &expected_b, payload->rhs);
 
@@ -3846,10 +3840,10 @@ mass_handle_arithmetic_operation_lazy_proc(
         &context->builder->code_block.instructions, result_range,
         (Instruction) {.assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
       );
-      register_release(context->builder, temp_b->storage.Register.index);
+      value_release_if_temporary(context->builder, temp_b);
 
       // FIXME This is very unsafe!!! handle temporary handover in a better way
-      register_release(context->builder, temp_a->storage.Register.index);
+      value_release_if_temporary(context->builder, temp_a);
       return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Multiply: {
@@ -3934,9 +3928,8 @@ mass_handle_arithmetic_operation_lazy_proc(
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
       temp_dividend = value_force(context, &expected_dividend, payload->lhs);
 
-      Register temp_divisor_register = register_acquire_temp(builder);
-      Value *temp_divisor = value_register_for_descriptor(
-        context, temp_divisor_register, descriptor, payload->rhs->source_range
+      Value *temp_divisor = value_temporary_register_for_descriptor(
+        context, descriptor, payload->rhs->source_range
       );
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
       temp_divisor = value_force(context, &expected_divisor, payload->rhs);
@@ -3983,7 +3976,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         }
       }
 
-      register_release(builder, temp_divisor_register);
+      value_release_if_temporary(builder, temp_divisor);
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
       // FIXME figure out how to correctly return temporary values in registers
@@ -4128,15 +4121,13 @@ mass_handle_comparison_operation_lazy_proc(
 
   // Try to reuse result_value if we can
   // TODO should also be able to reuse memory operands
-  Register temp_a_reg = register_acquire_temp(context->builder);
-  Value *temp_a = value_register_for_descriptor(context, temp_a_reg, descriptor, *source_range);
+  Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, *source_range);
 
   Expected_Result expected_a = expected_result_from_value(temp_a);
   temp_a = value_force(context, &expected_a, payload->lhs);
 
   // TODO This can be optimized in cases where one of the operands is an immediate
-  Register temp_b_reg = register_acquire_temp(context->builder);
-  Value *temp_b = value_register_for_descriptor(context, temp_b_reg, descriptor, *source_range);
+  Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, *source_range);
   Expected_Result expected_b = expected_result_from_value(temp_b);
   temp_b = value_force(context, &expected_b, payload->rhs);
 
@@ -4149,8 +4140,8 @@ mass_handle_comparison_operation_lazy_proc(
 
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
 
-  register_release(context->builder, temp_a_reg);
-  register_release(context->builder, temp_b_reg);
+  value_release_if_temporary(context->builder, temp_a);
+  value_release_if_temporary(context->builder, temp_b);
 
   return expected_result_ensure_value_or_temp(context, expected_result, comparison_value);
 }

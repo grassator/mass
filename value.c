@@ -1108,6 +1108,54 @@ value_register_for_descriptor_internal(
 #define value_register_for_descriptor(...)\
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
+static inline Value *
+value_temporary_register_for_descriptor_internal(
+  Compiler_Source_Location compiler_source_location,
+  Execution_Context *context,
+  const Descriptor *descriptor,
+  Source_Range source_range
+) {
+  Register reg = register_acquire_temp(context->builder);
+  Value *value = value_make_internal(
+    compiler_source_location, context, descriptor,
+    storage_register_for_descriptor(reg, descriptor),
+    source_range
+  );
+  value->is_temporary = true;
+  return value;
+}
+#define value_temporary_register_for_descriptor(...)\
+  value_temporary_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+static inline void
+value_release_if_temporary(
+  Function_Builder *builder,
+  Value *value
+) {
+  if (!value->is_temporary) return;
+  switch (value->storage.tag) {
+    case Storage_Tag_Register: {
+      register_release(builder, value->storage.Register.index);
+      break;
+    }
+    case Storage_Tag_Xmm: {
+      register_release(builder, value->storage.Xmm.index);
+      break;
+    }
+    case Storage_Tag_Memory: {
+      panic("TODO support temporary memory (or at least stack)");
+      break;
+    }
+    case Storage_Tag_Any:
+    case Storage_Tag_None:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Static: {
+      panic("Unexpected temporary storage tag");
+      break;
+    }
+  }
+}
+
 static inline void *
 rip_value_pointer_from_label_index(
   Program *program,

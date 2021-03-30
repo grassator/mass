@@ -93,6 +93,23 @@ move_value(
   const Storage *source
 );
 
+static void
+register_release(
+  Function_Builder *builder,
+  Register reg_index
+);
+
+static void
+register_acquire(
+  Function_Builder *builder,
+  Register reg_index
+);
+
+static Register
+register_acquire_temp(
+  Function_Builder *builder
+);
+
 void
 fn_encode(
   Program *program,

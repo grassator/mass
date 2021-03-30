@@ -31,7 +31,7 @@ reserve_stack_internal(
 #define reserve_stack(...)\
   reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-void
+static void
 register_acquire(
   Function_Builder *builder,
   Register reg_index
@@ -41,7 +41,7 @@ register_acquire(
   register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
 }
 
-Register
+static Register
 register_acquire_temp(
   Function_Builder *builder
 ) {

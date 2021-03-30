@@ -565,6 +565,7 @@ typedef struct Value {
   Storage storage;
   Value * next_overload;
   u64 epoch;
+  u64 is_temporary;
   Source_Range source_range;
   Compiler_Source_Location compiler_source_location;
 } Value;
@@ -1376,6 +1377,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
     .name = slice_literal_fields("epoch"),
     .descriptor = &descriptor_u64,
     .offset = offsetof(Value, epoch),
+  },
+  {
+    .name = slice_literal_fields("is_temporary"),
+    .descriptor = &descriptor_u64,
+    .offset = offsetof(Value, is_temporary),
   },
   {
     .name = slice_literal_fields("source_range"),

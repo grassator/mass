@@ -690,6 +690,7 @@ main(void) {
     { "Storage", "storage" },
     { "Value *", "next_overload" },
     { "u64", "epoch" },
+    { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
