@@ -5526,9 +5526,7 @@ mass_handle_assignment_lazy_proc(
   Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
-  // FIXME :ExpectedAny
-  Expected_Result expected_target =
-    expected_result_from_value(value_any(context, payload->source_range));
+  Expected_Result expected_target = expected_result_any(descriptor);
   Value *target = value_force(context, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor->tag == Descriptor_Tag_Function) {
