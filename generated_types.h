@@ -203,6 +203,12 @@ typedef enum Module_Flags {
   Module_Flags_Has_Exports = 1,
 } Module_Flags;
 
+const char *module_flags_name(Module_Flags value) {
+  if (value == 1) return "Module_Flags_Has_Exports";
+  assert(!"Unexpected value for enum Module_Flags");
+  return 0;
+};
+
 typedef struct Module {
   Module_Flags flags;
   u32 _flags_padding;
@@ -225,6 +231,14 @@ typedef enum Group_Tag {
   Group_Tag_Curly = 3,
 } Group_Tag;
 
+const char *group_tag_name(Group_Tag value) {
+  if (value == 1) return "Group_Tag_Paren";
+  if (value == 2) return "Group_Tag_Square";
+  if (value == 3) return "Group_Tag_Curly";
+  assert(!"Unexpected value for enum Group_Tag");
+  return 0;
+};
+
 typedef struct Value_View {
   Value * * values;
   u64 length;
@@ -236,6 +250,13 @@ typedef enum Symbol_Type {
   Symbol_Type_Id_Like = 1,
   Symbol_Type_Operator_Like = 2,
 } Symbol_Type;
+
+const char *symbol_type_name(Symbol_Type value) {
+  if (value == 1) return "Symbol_Type_Id_Like";
+  if (value == 2) return "Symbol_Type_Operator_Like";
+  assert(!"Unexpected value for enum Symbol_Type");
+  return 0;
+};
 
 typedef struct Symbol {
   Symbol_Type type;
@@ -285,6 +306,14 @@ typedef enum Section_Permissions {
   Section_Permissions_Execute = 4,
 } Section_Permissions;
 
+const char *section_permissions_name(Section_Permissions value) {
+  if (value == 1) return "Section_Permissions_Read";
+  if (value == 2) return "Section_Permissions_Write";
+  if (value == 4) return "Section_Permissions_Execute";
+  assert(!"Unexpected value for enum Section_Permissions");
+  return 0;
+};
+
 typedef struct Section {
   Virtual_Memory_Buffer buffer;
   Slice name;
@@ -332,6 +361,47 @@ typedef enum Register {
   Register_Xmm15 = 31,
 } Register;
 
+const char *register_name(Register value) {
+  if (value == 0) return "Register_A";
+  if (value == 1) return "Register_C";
+  if (value == 2) return "Register_D";
+  if (value == 3) return "Register_B";
+  if (value == 4) return "Register_SP";
+  if (value == 4) return "Register_AH";
+  if (value == 5) return "Register_BP";
+  if (value == 4) return "Register_CH";
+  if (value == 6) return "Register_SI";
+  if (value == 4) return "Register_DH";
+  if (value == 7) return "Register_DI";
+  if (value == 4) return "Register_BH";
+  if (value == 8) return "Register_R8";
+  if (value == 9) return "Register_R9";
+  if (value == 10) return "Register_R10";
+  if (value == 11) return "Register_R11";
+  if (value == 12) return "Register_R12";
+  if (value == 13) return "Register_R13";
+  if (value == 14) return "Register_R14";
+  if (value == 15) return "Register_R15";
+  if (value == 16) return "Register_Xmm0";
+  if (value == 17) return "Register_Xmm1";
+  if (value == 18) return "Register_Xmm2";
+  if (value == 19) return "Register_Xmm3";
+  if (value == 20) return "Register_Xmm4";
+  if (value == 21) return "Register_Xmm5";
+  if (value == 22) return "Register_Xmm6";
+  if (value == 23) return "Register_Xmm7";
+  if (value == 24) return "Register_Xmm8";
+  if (value == 25) return "Register_Xmm9";
+  if (value == 26) return "Register_Xmm10";
+  if (value == 27) return "Register_Xmm11";
+  if (value == 28) return "Register_Xmm12";
+  if (value == 29) return "Register_Xmm13";
+  if (value == 30) return "Register_Xmm14";
+  if (value == 31) return "Register_Xmm15";
+  assert(!"Unexpected value for enum Register");
+  return 0;
+};
+
 typedef struct Label_Index {
   u64 value;
 } Label_Index;
@@ -357,6 +427,14 @@ typedef enum Number_Base {
   Number_Base_10 = 10,
   Number_Base_16 = 16,
 } Number_Base;
+
+const char *number_base_name(Number_Base value) {
+  if (value == 2) return "Number_Base_2";
+  if (value == 10) return "Number_Base_10";
+  if (value == 16) return "Number_Base_16";
+  assert(!"Unexpected value for enum Number_Base");
+  return 0;
+};
 
 typedef struct Number_Literal {
   Number_Base base;
@@ -395,6 +473,21 @@ typedef enum Compare_Type {
   Compare_Type_Signed_Greater = 9,
   Compare_Type_Signed_Greater_Equal = 10,
 } Compare_Type;
+
+const char *compare_type_name(Compare_Type value) {
+  if (value == 1) return "Compare_Type_Equal";
+  if (value == 2) return "Compare_Type_Not_Equal";
+  if (value == 3) return "Compare_Type_Unsigned_Below";
+  if (value == 4) return "Compare_Type_Unsigned_Below_Equal";
+  if (value == 5) return "Compare_Type_Unsigned_Above";
+  if (value == 6) return "Compare_Type_Unsigned_Above_Equal";
+  if (value == 7) return "Compare_Type_Signed_Less";
+  if (value == 8) return "Compare_Type_Signed_Less_Equal";
+  if (value == 9) return "Compare_Type_Signed_Greater";
+  if (value == 10) return "Compare_Type_Signed_Greater_Equal";
+  assert(!"Unexpected value for enum Compare_Type");
+  return 0;
+};
 
 typedef struct Maybe_Register {
   Register index;
@@ -511,10 +604,25 @@ typedef enum Operator_Fixity {
   Operator_Fixity_Postfix = 4,
 } Operator_Fixity;
 
+const char *operator_fixity_name(Operator_Fixity value) {
+  if (value == 1) return "Operator_Fixity_Infix";
+  if (value == 2) return "Operator_Fixity_Prefix";
+  if (value == 4) return "Operator_Fixity_Postfix";
+  assert(!"Unexpected value for enum Operator_Fixity");
+  return 0;
+};
+
 typedef enum Operator_Associativity {
   Operator_Associativity_Left = 0,
   Operator_Associativity_Right = 1,
 } Operator_Associativity;
+
+const char *operator_associativity_name(Operator_Associativity value) {
+  if (value == 0) return "Operator_Associativity_Left";
+  if (value == 1) return "Operator_Associativity_Right";
+  assert(!"Unexpected value for enum Operator_Associativity");
+  return 0;
+};
 
 typedef struct Execution_Context {
   Allocator * allocator;
@@ -580,6 +688,17 @@ typedef enum Expected_Result_Storage {
   Expected_Result_Storage_Eflags = 16,
 } Expected_Result_Storage;
 
+const char *expected_result_storage_name(Expected_Result_Storage value) {
+  if (value == 0) return "Expected_Result_Storage_None";
+  if (value == 1) return "Expected_Result_Storage_Static";
+  if (value == 2) return "Expected_Result_Storage_Memory";
+  if (value == 4) return "Expected_Result_Storage_Register";
+  if (value == 8) return "Expected_Result_Storage_Xmm";
+  if (value == 16) return "Expected_Result_Storage_Eflags";
+  assert(!"Unexpected value for enum Expected_Result_Storage");
+  return 0;
+};
+
 typedef enum {
   Expected_Result_Tag_Exact = 0,
   Expected_Result_Tag_Flexible = 1,
@@ -618,6 +737,16 @@ typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_No_Own_Return = 4,
   Descriptor_Function_Flags_Compile_Time = 8,
 } Descriptor_Function_Flags;
+
+const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
+  if (value == 0) return "Descriptor_Function_Flags_None";
+  if (value == 1) return "Descriptor_Function_Flags_Macro";
+  if (value == 2) return "Descriptor_Function_Flags_No_Own_Scope";
+  if (value == 4) return "Descriptor_Function_Flags_No_Own_Return";
+  if (value == 8) return "Descriptor_Function_Flags_Compile_Time";
+  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+  return 0;
+};
 
 typedef struct Descriptor_Struct_Field {
   Slice name;
