@@ -650,12 +650,11 @@ typedef dyn_array_type(Function_Info) Array_Function_Info;
 
 typedef enum {
   Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Any = 1,
-  Descriptor_Tag_Opaque = 2,
-  Descriptor_Tag_Function = 3,
-  Descriptor_Tag_Fixed_Size_Array = 4,
-  Descriptor_Tag_Struct = 5,
-  Descriptor_Tag_Pointer = 6,
+  Descriptor_Tag_Opaque = 1,
+  Descriptor_Tag_Function = 2,
+  Descriptor_Tag_Fixed_Size_Array = 3,
+  Descriptor_Tag_Struct = 4,
+  Descriptor_Tag_Pointer = 5,
 } Descriptor_Tag;
 
 typedef struct {

@@ -125,7 +125,6 @@ same_type(
       }
       return true;
     }
-    case Descriptor_Tag_Any:
     default: {
       assert(!"Unsupported descriptor type");
       return false;
@@ -188,10 +187,6 @@ descriptor_byte_size(
     case Descriptor_Tag_Pointer:
     case Descriptor_Tag_Function: {
       return 8;
-    }
-    case Descriptor_Tag_Any: {
-      panic("Trying to get byte size of an Any descriptor");
-      break;
     }
     default: {
       assert(!"Unknown Descriptor Type");
@@ -704,10 +699,6 @@ storage_static_equal_internal(
       }
       break;
     }
-    case Descriptor_Tag_Any: {
-      panic("Unexpected static storage any value");
-      break;
-    }
     case Descriptor_Tag_Function: {
       panic("Unexpected static storage function");
       break;
@@ -889,10 +880,6 @@ value_init_internal(
   COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
 )
 
-#define value_any_init(_VALUE_, _CONTEXT_, _SOURCE_RANGE_) value_init_internal(\
-  COMPILER_SOURCE_LOCATION, (_VALUE_), (_CONTEXT_)->epoch, &descriptor_any, (Storage){.tag = Storage_Tag_Any}, (_SOURCE_RANGE_)\
-)
-
 static inline Value *
 value_make_internal(
   Compiler_Source_Location compiler_source_location,
@@ -996,10 +983,6 @@ storage_eflags(
 // TODO consider adding explicit boolean descriptor type
 #define value_from_compare(_allocator_, _compare_type_, _SOURCE_RANGE_) value_make_internal(\
   COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
-)
-
-#define value_any(_CONTEXT_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_any, (Storage){.tag = Storage_Tag_Any}, (_SOURCE_RANGE_)\
 )
 
 #define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
@@ -1620,7 +1603,6 @@ same_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   const Descriptor *source
 ) {
-  if (target->tag == Descriptor_Tag_Any) return true;
   if (same_type(target, source)) return true;
   if (target == source) return true;
   if (target->tag != source->tag) return false;

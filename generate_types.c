@@ -770,7 +770,6 @@ main(void) {
 
   push_type(add_common_fields(type_union("Descriptor", (Struct[]){
     struct_empty("Void"),
-    struct_empty("Any"),
     struct_fields("Opaque", (Struct_Item[]){
       { "u64", "bit_size" },
     }),

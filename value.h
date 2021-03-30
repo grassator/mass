@@ -82,20 +82,6 @@ Value void_value = {
   .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
-Descriptor descriptor_any = {
-  .tag = Descriptor_Tag_Any,
-  .name = slice_literal_fields("any"),
-};
-
-Value *type_any_value = &(Value) {
-  .descriptor = &descriptor_type,
-  .storage = {
-    .tag = Storage_Tag_Static,
-    .Static.memory.Heap.pointer = &descriptor_any,
-  },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
-};
-
 static inline bool
 descriptor_is_unsigned_integer(
   const Descriptor *descriptor

@@ -395,6 +395,7 @@ move_value(
   push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, *source}}});
 }
 
+// FIXME Get rid of this function
 void
 move_to_result_from_temp(
   Allocator *allocator,
@@ -403,11 +404,6 @@ move_to_result_from_temp(
   Value *target,
   Value *temp_source
 ) {
-  if (target->descriptor->tag == Descriptor_Tag_Any) {
-    target->descriptor = temp_source->descriptor;
-    assert(!target->next_overload);
-    target->next_overload = temp_source->next_overload;
-  }
   if (target->storage.tag == Storage_Tag_Any) {
     target->storage = temp_source->storage;
     return;
@@ -509,7 +505,6 @@ fn_end(
   u8 alignment = 0x8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
-  assert(builder->function->returns.descriptor->tag != Descriptor_Tag_Any);
 
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);

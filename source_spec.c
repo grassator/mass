@@ -1617,7 +1617,6 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
 
-      check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
     }
 
@@ -1637,7 +1636,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(test_program->entry_point);
       ensure_compiled_function_body(&test_context, test_program->entry_point);
-      check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
       check(spec_check_mass_result(test_context.result));
 
       write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
@@ -1659,7 +1657,6 @@ spec("source") {
         check(spec_check_mass_result(test_context.result));
         check(test_program->entry_point);
         ensure_compiled_function_body(&test_context, test_program->entry_point);
-        check(test_program->entry_point->descriptor->tag != Descriptor_Tag_Any);
         check(spec_check_mass_result(test_context.result));
 
         write_executable("build\\print.exe", &test_context, Executable_Type_Cli);

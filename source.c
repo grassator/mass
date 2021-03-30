@@ -451,14 +451,6 @@ assign(
   if (target->descriptor->tag == Descriptor_Tag_Void) {
     return *context->result;
   }
-  if (target->descriptor->tag == Descriptor_Tag_Any) {
-    assert(target->storage.tag == Storage_Tag_Any);
-    target->epoch = source->epoch;
-    target->descriptor = source->descriptor;
-    target->storage = source->storage;
-    target->next_overload = source->next_overload;
-    return *context->result;
-  }
 
   if (source->descriptor == &descriptor_lazy_value) {
     value_force_exact(context, target, source);
@@ -2785,10 +2777,6 @@ compile_time_eval(
       temp_result->storage = (Storage){0};
       break;
     }
-    case Descriptor_Tag_Any: {
-      panic("Internal Error: We should never get Any type from comp time eval");
-      break;
-    }
     case Descriptor_Tag_Pointer:
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
@@ -3394,7 +3382,6 @@ call_function_overload(
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->storage, 0, 0}}});
   }
 
-  assert(result_value->descriptor->tag != Descriptor_Tag_Any);
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
@@ -3529,7 +3516,6 @@ token_handle_function_call(
     maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(overload));
 
   const Function_Info *function = &overload_descriptor->Function.info;
-  assert(function->returns.descriptor->tag != Descriptor_Tag_Any);
 
   Lazy_Value_Proc proc = (function->flags & Descriptor_Function_Flags_Macro)
     ? call_function_macro
@@ -3836,13 +3822,6 @@ mass_handle_arithmetic_operation_lazy_proc(
   // FIXME use expected_result_validate()
   //assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
-  // FIXME :NoAny
-  if(result_value->descriptor->tag == Descriptor_Tag_Any) {
-    Value *temp_result =
-      reserve_stack(context, descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, result_value, temp_result)) return 0;
-  }
-
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
@@ -4126,13 +4105,6 @@ mass_handle_comparison_operation_lazy_proc(
   // FIXME use expected_result_validate()
   //assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
-  // FIXME :NoAny
-  if(result_value->descriptor->tag == Descriptor_Tag_Any) {
-    Value *temp_result =
-      reserve_stack(context, descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, result_value, temp_result)) return 0;
-  }
-
   switch(compare_type) {
     case Compare_Type_Equal: {
       maybe_constant_fold(context, source_range, result_value, payload->lhs, payload->rhs, ==);
@@ -4202,7 +4174,6 @@ mass_handle_comparison_operation_lazy_proc(
     (Instruction) {.assembly = {cmp, {temp_a->storage, temp_b->storage, 0}}}
   );
 
-  assert(result_value->descriptor->tag != Descriptor_Tag_Any);
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
   MASS_ON_ERROR(assign(context, result_value, comparison_value)) return 0;
 
@@ -5246,23 +5217,10 @@ mass_handle_explicit_return_lazy_proc(
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
-  const Descriptor *parse_result_descriptor = value_or_lazy_value_descriptor(parse_result);
   Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
   assert(scope_value_entry);
   Value *fn_return = scope_entry_force(scope_value_entry);
   assert(fn_return);
-  bool is_any_return = fn_return->descriptor->tag == Descriptor_Tag_Any;
-
-  // FIXME with inline functions and explicit returns we can end up with multiple immediate
-  //       values that are trying to be moved in the same return value
-  if (is_any_return) {
-    const Descriptor *stack_descriptor = parse_result_descriptor == &descriptor_number_literal
-      ? &descriptor_s64
-      : parse_result_descriptor;
-    Value *stack_return =
-      reserve_stack(context, stack_descriptor, fn_return->source_range);
-    *fn_return = *stack_return;
-  }
   MASS_ON_ERROR(assign(context, fn_return, parse_result)) return 0;
 
   Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
@@ -5772,7 +5730,6 @@ scope_define_builtins(
     ));
   }
 
-  scope_define_value(scope, range, slice_literal("any"), type_any_value);
   scope_define_value(scope, range, slice_literal("Register_8"), type_register_8_value);
   scope_define_value(scope, range, slice_literal("Register_16"), type_register_16_value);
   scope_define_value(scope, range, slice_literal("Register_32"), type_register_32_value);
