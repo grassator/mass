@@ -4054,8 +4054,7 @@ mass_handle_startup_call_lazy_proc(
     dyn_array_push(context->program->startup_functions, startup_function);
   }
 
-  // FIXME :ExpectedCheck
-  return &void_value;
+  return expected_result_validate(expected_result, &void_value);
 }
 
 Value *
@@ -4982,8 +4981,7 @@ mass_handle_label_lazy_proc(
     }
   );
 
-  // :ExpectedCheck
-  return &void_value;
+  return expected_result_validate(expected_result, &void_value);
 }
 
 u64
@@ -5072,8 +5070,7 @@ mass_handle_explicit_return_lazy_proc(
     (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
   );
 
-  // :ExpectedCheck
-  return &void_value;
+  return expected_result_validate(expected_result, &void_value);
 }
 
 u64
@@ -5193,8 +5190,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes }
   );
 
-  // :ExpectedCheck
-  return &void_value;
+  return expected_result_validate(expected_result, &void_value);
 }
 
 u64
@@ -5339,8 +5335,7 @@ mass_handle_assignment_lazy_proc(
     target = value_force(context, &expected_assignment, payload->expression);
   }
 
-  // :ExpectedCheck
-  return &void_value;
+  return expected_result_validate(expected_result, &void_value);
 }
 
 void
