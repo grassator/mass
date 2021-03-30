@@ -121,7 +121,7 @@ same_type(
         Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
         Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
         if(!same_type(a_arg->value->descriptor, b_arg->value->descriptor)) return false;
-        if(storage_equal(&a_arg->value->storage, &b_arg->value->storage)) return false;
+        if(!storage_equal(&a_arg->value->storage, &b_arg->value->storage)) return false;
       }
       return true;
     }
