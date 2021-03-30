@@ -575,7 +575,8 @@ typedef enum Expected_Result_Storage {
   Expected_Result_Storage_Static = 1,
   Expected_Result_Storage_Memory = 2,
   Expected_Result_Storage_Register = 4,
-  Expected_Result_Storage_Eflags = 8,
+  Expected_Result_Storage_Xmm = 8,
+  Expected_Result_Storage_Eflags = 16,
 } Expected_Result_Storage;
 
 typedef enum {

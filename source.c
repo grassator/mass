@@ -24,6 +24,58 @@ expected_result_from_value(
   };
 }
 
+Value *
+expected_result_validate(
+  const Expected_Result *expected_result,
+  Value *actual_value
+) {
+  if (!actual_value) return 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      Value *expected_value = expected_result->Exact.value;
+      assert(same_value_type(expected_value, actual_value));
+      assert(storage_equal(&expected_value->storage, &actual_value->storage));
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
+      if (flexible->descriptor) {
+        assert(same_type(flexible->descriptor, actual_value->descriptor));
+      }
+      switch(actual_value->storage.tag) {
+        case Storage_Tag_None: break;
+        case Storage_Tag_Any: break;
+        case Storage_Tag_Eflags: {
+          assert(flexible->storage & Expected_Result_Storage_Eflags);
+          break;
+        }
+        case Storage_Tag_Register: {
+          assert(flexible->storage & Expected_Result_Storage_Register);
+          break;
+        }
+        case Storage_Tag_Xmm: {
+          assert(flexible->storage & Expected_Result_Storage_Xmm);
+          break;
+        }
+        case Storage_Tag_Static: {
+          assert(flexible->storage & Expected_Result_Storage_Static);
+          break;
+        }
+        case Storage_Tag_Memory: {
+          assert(flexible->storage & Expected_Result_Storage_Memory);
+          break;
+        }
+        default: {
+          panic("Unknown Storage tag");
+          break;
+        }
+      }
+      break;
+    }
+  }
+  return actual_value;
+}
+
 static inline Value_View
 value_view_single(
   Value **value
@@ -478,9 +530,13 @@ scope_entry_force(
           Value *next_overload = value->next_overload;
           Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
           Execution_Context *context = &lazy->context;
-          // FIXME :ExpectedAny
-          Expected_Result expected_result =
-            expected_result_from_value(value_any(context, entry->source_range));
+          Expected_Result expected_result = {
+            .tag = Expected_Result_Tag_Flexible,
+            .Flexible = {
+              .descriptor = lazy->descriptor,
+              .storage = Expected_Result_Storage_Static,
+            },
+          };
           Value *result = lazy->proc(context, &expected_result, lazy->payload);
           if (!result) return 0;
           *value = *result;
@@ -1915,14 +1971,14 @@ token_handle_user_defined_operator_proc(
   return token_parse_block(&body_context, operator->body);
 }
 
-Value *
+static Value *
 mass_handle_compile_time_eval_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
   Value_View *view
 ) {
-  // FIXME :ExpectedCheck
-  return compile_time_eval(context, *view);
+  Value *result = compile_time_eval(context, *view);
+  return expected_result_validate(expected_result, result);
 }
 
 static inline Value *

@@ -699,7 +699,8 @@ main(void) {
     { "Static", 1 << 0 },
     { "Memory", 1 << 1 },
     { "Register", 1 << 2 },
-    { "Eflags", 1 << 3 },
+    { "Xmm", 1 << 3 },
+    { "Eflags", 1 << 4 },
   }));
 
   push_type(type_union("Expected_Result", (Struct[]){
