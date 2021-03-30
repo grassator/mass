@@ -24,6 +24,25 @@ expected_result_from_value(
   };
 }
 
+static inline Expected_Result
+expected_result_any(
+  const Descriptor *descriptor
+) {
+  return (Expected_Result){
+    .tag = Expected_Result_Tag_Flexible,
+    .Flexible = {
+      .descriptor = descriptor,
+      .storage
+        = Expected_Result_Storage_Static
+        | Expected_Result_Storage_Memory
+        | Expected_Result_Storage_Register
+        | Expected_Result_Storage_Xmm
+        | Expected_Result_Storage_Eflags,
+      .register_bit_set = 0xffffffffffffffffllu,
+    },
+  };
+}
+
 Value *
 expected_result_validate(
   const Expected_Result *expected_result,
@@ -2694,17 +2713,7 @@ compile_time_eval(
   // Lazy evaluation should not generate any instructions
   assert(!dyn_array_length(eval_builder.code_block.instructions));
 
-  Expected_Result expected_result = {
-    .tag = Expected_Result_Tag_Flexible,
-    .Flexible = {
-      .storage
-        = Expected_Result_Storage_Static
-        | Expected_Result_Storage_Memory
-        | Expected_Result_Storage_Register
-        | Expected_Result_Storage_Xmm
-        | Expected_Result_Storage_Eflags
-    },
-  };
+  Expected_Result expected_result = expected_result_any(0);
   Value *forced_value = value_force(&eval_context, &expected_result, expression_result_value);
   MASS_ON_ERROR(*context->result) return 0;
 
