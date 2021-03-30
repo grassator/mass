@@ -531,6 +531,18 @@ spec("source") {
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
+    it("should work with a value instead of comparison as a condition") {
+      fn_type_s32_to_s64 is_zero = (fn_type_s32_to_s64)test_program_inline_source_function(
+        "is_zero", &test_context,
+        "is_zero :: (x : s32) -> (s64) {"
+          "if x then false else true"
+        "}"
+      );
+      check(is_zero);
+      check(is_zero(42) == false);
+      check(is_zero(-2) == false);
+      check(is_zero(0) == true);
+    }
     it("should report an error on missing `then` inside of an if expression") {
       test_program_inline_source_base(
         "main", &test_context,

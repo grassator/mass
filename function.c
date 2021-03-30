@@ -777,7 +777,7 @@ make_if(
         }
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), eflags->storage, 0}}});
+      push_instruction(instructions, *source_range, (Instruction) {.assembly = {jz, {code_label32(label), eflags->storage, 0}}});
     }
   }
   return label;
