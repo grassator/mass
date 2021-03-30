@@ -4521,11 +4521,11 @@ mass_handle_array_access_lazy_proc(
 ) {
   Mass_Array_Access_Lazy_Payload *payload = raw_payload;
   const Source_Range *array_range = &payload->array->source_range;
-  // FIXME :ExpectedAny
-  Expected_Result expected_array = expected_result_from_value(value_any(context, *array_range));
+  Expected_Result expected_array =
+    expected_result_any(value_or_lazy_value_descriptor(payload->array));
   Value *array = value_force(context, &expected_array, payload->array);
-  // FIXME :ExpectedAny
-  Expected_Result expected_index = expected_result_from_value(value_any(context, payload->index->source_range));
+  Expected_Result expected_index =
+    expected_result_any(value_or_lazy_value_descriptor(payload->index));
   Value *index = value_force(context, &expected_index, payload->index);
 
   MASS_ON_ERROR(*context->result) return 0;
