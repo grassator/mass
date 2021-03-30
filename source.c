@@ -3426,8 +3426,13 @@ token_handle_function_call(
     target_descriptor->tag == Descriptor_Tag_Function &&
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
-    // FIXME :ExpectedAny
-    Expected_Result expected_result = expected_result_from_value(value_any(context, source_range));
+    Expected_Result expected_result = {
+      .tag = Expected_Result_Tag_Flexible,
+      .Flexible = {
+        .descriptor = target_descriptor,
+        .storage = Expected_Result_Storage_Static,
+      },
+    };
     Value *target = value_force(context, &expected_result, target_expression);
     MASS_ON_ERROR(*context->result) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
