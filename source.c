@@ -1896,10 +1896,67 @@ value_force(
     // TODO is there a better way to cache the result?
     *value = *result;
     return result;
-  } else {
-    Value *result_value = value_from_exact_expected_result(expected_result);
-    MASS_ON_ERROR(assign(context, result_value, value)) return 0;
-    return result_value;
+  }
+
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      Value *result_value = value_from_exact_expected_result(expected_result);
+      MASS_ON_ERROR(assign(context, result_value, value)) return 0;
+      return result_value;
+    }
+    case Expected_Result_Tag_Flexible: {
+      if (!value) return 0;
+      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
+      const Descriptor *expected_descriptor =
+        flexible->descriptor ? flexible->descriptor : value->descriptor;
+      if (value->storage.tag == Storage_Tag_None) {
+        return value;
+      }
+      if (
+        value->storage.tag == Storage_Tag_Static &&
+        (flexible->storage & Expected_Result_Storage_Static)
+      ) {
+        assert(same_type(value->descriptor, expected_descriptor));
+        return value;
+      }
+      if (
+        value->storage.tag == Storage_Tag_Eflags &&
+        (flexible->storage & Expected_Result_Storage_Eflags)
+      ) {
+        return value;
+      }
+      if (
+        value->storage.tag == Storage_Tag_Memory &&
+        (flexible->storage & Expected_Result_Storage_Memory)
+      ) {
+        return value;
+      }
+      if (flexible->storage & Expected_Result_Storage_Register) {
+        if (value->storage.tag == Storage_Tag_Register) {
+          // FIXME verify register mask
+          return value;
+        }
+        Value *temp_result = value_register_for_descriptor(
+          context, register_acquire_temp(context->builder), expected_descriptor, value->source_range
+        );
+        MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
+        return temp_result;
+      }
+      if (flexible->storage & Expected_Result_Storage_Memory) {
+        assert(value->storage.tag != Storage_Tag_Register); // checked above
+        Value *temp_result = reserve_stack(context, expected_descriptor, value->source_range);
+        MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
+        return temp_result;
+      }
+      // FIXME support floats
+      assert(value->storage.tag != Storage_Tag_Xmm);
+      panic("Unable to put the value into the expected storage");
+      return value;
+    }
+    default: {
+      panic("Unknown Expected_Result tag");
+      return 0;
+    }
   }
 }
 
@@ -2628,10 +2685,18 @@ compile_time_eval(
   // Lazy evaluation should not generate any instructions
   assert(!dyn_array_length(eval_builder.code_block.instructions));
 
-  Value *forced_value = value_any(&eval_context, view.source_range);
-  // FIXME :ExpectedAny
-  Expected_Result expected_result = expected_result_from_value(forced_value);
-  forced_value = value_force(&eval_context, &expected_result, expression_result_value);
+  Expected_Result expected_result = {
+    .tag = Expected_Result_Tag_Flexible,
+    .Flexible = {
+      .storage
+        = Expected_Result_Storage_Static
+        | Expected_Result_Storage_Memory
+        | Expected_Result_Storage_Register
+        | Expected_Result_Storage_Xmm
+        | Expected_Result_Storage_Eflags
+    },
+  };
+  Value *forced_value = value_force(&eval_context, &expected_result, expression_result_value);
   MASS_ON_ERROR(*context->result) return 0;
 
   // If we didn't generate any instructions there is no point
@@ -2887,7 +2952,19 @@ mass_handle_cast_lazy_proc(
     }
   }
 
-  Value *result_value = value_from_exact_expected_result(expected_result);
+  Value *result_value = 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      result_value = value_from_exact_expected_result(expected_result);
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      // FIXME :ExpectedStack
+      result_value = reserve_stack(context, target_descriptor, *source_range);
+      break;
+    }
+  }
+
   MASS_ON_ERROR(assign(context, result_value, value)) return 0;
   return result_value;
 }
@@ -3131,7 +3208,18 @@ call_function_macro(
   Label_Index fake_return_label_index =
     make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
 
-  Value *result_value = value_from_exact_expected_result(expected_result);
+  Value *result_value = 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      result_value = value_from_exact_expected_result(expected_result);
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      // FIXME :ExpectedStack
+      result_value = reserve_stack(context, function->returns.descriptor, overload->source_range);
+      break;
+    }
+  }
   if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
     Value return_label = {
       .descriptor = &descriptor_void,
@@ -3189,7 +3277,22 @@ call_function_overload(
 
   Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
 
-  Value *result_value = value_from_exact_expected_result(expected_result);
+  Value *fn_return_value = function_return_value_for_descriptor(
+    context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
+  );
+
+  Value *result_value = 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      result_value = value_from_exact_expected_result(expected_result);
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      // FIXME :ExpectedStack
+      result_value = reserve_stack(context, descriptor->returns.descriptor, *source_range);
+      break;
+    }
+  }
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
       if (register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
@@ -3254,10 +3357,6 @@ call_function_overload(
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
-
-  Value *fn_return_value = function_return_value_for_descriptor(
-    context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
-  );
 
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
@@ -3709,13 +3808,31 @@ mass_handle_arithmetic_operation_lazy_proc(
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
   assert(descriptor_is_integer(descriptor));
-  // FIXME :ExpectedExact
-  Value *result_value = value_from_exact_expected_result(expected_result);
-  assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
   const Source_Range result_range = payload->lhs->source_range;
   Value *a = payload->lhs;
   Value *b = payload->rhs;
+
+  Value *result_value = 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      result_value = value_from_exact_expected_result(expected_result);
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
+      const Descriptor *temp_descriptor =
+        flexible->descriptor ? flexible->descriptor : descriptor;
+      assert(same_type_or_can_implicitly_move_cast(temp_descriptor, descriptor));
+      // FIXME allow other storage types
+      assert(flexible->storage & Expected_Result_Storage_Memory);
+      result_value = reserve_stack(context, descriptor, result_range);
+      break;
+    }
+  }
+
+  // FIXME use expected_result_validate()
+  //assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
 
   // FIXME :NoAny
   if(result_value->descriptor->tag == Descriptor_Tag_Any) {

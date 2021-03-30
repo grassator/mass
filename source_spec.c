@@ -422,6 +422,15 @@ spec("source") {
           "test :: (x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
     describe("division") {
+      #if 0
+      it("debug math witout a macro") {
+        MATH_CHECKER_FN(u8, u8, /);
+        check(checker);
+        check(checker(10u, 3u) == 10u / 3u);
+        check(checker(UINT8_MAX, 3u) == UINT8_MAX / 3u);
+      }
+      #endif
+
       #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
         it("should correctly handle u"#BITS" divide") {\
           MATH_CHECKER_FN(u##BITS, u##BITS, /);\
