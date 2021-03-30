@@ -3813,27 +3813,6 @@ mass_handle_arithmetic_operation_lazy_proc(
   Value *a = payload->lhs;
   Value *b = payload->rhs;
 
-  Value *result_value = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
-      const Descriptor *temp_descriptor =
-        flexible->descriptor ? flexible->descriptor : descriptor;
-      assert(same_type_or_can_implicitly_move_cast(temp_descriptor, descriptor));
-      // FIXME allow other storage types
-      assert(flexible->storage & Expected_Result_Storage_Memory);
-      result_value = reserve_stack(context, descriptor, result_range);
-      break;
-    }
-  }
-
-  // FIXME use expected_result_validate()
-  //assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
-
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
@@ -3867,13 +3846,11 @@ mass_handle_arithmetic_operation_lazy_proc(
         &context->builder->code_block.instructions, result_range,
         (Instruction) {.assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
       );
-      if (!storage_equal(&temp_a->storage, &result_value->storage)) {
-        move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
-        assert(temp_a->storage.tag == Storage_Tag_Register);
-        register_release(context->builder, temp_a->storage.Register.index);
-      }
       register_release(context->builder, temp_b->storage.Register.index);
-      return result_value;
+
+      // FIXME This is very unsafe!!! handle temporary handover in a better way
+      register_release(context->builder, temp_a->storage.Register.index);
+      return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Multiply: {
       maybe_constant_fold(context, &result_range, expected_result, a, b, *);
@@ -3883,8 +3860,15 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // Save RDX as it will be used for the result overflow
       // but we should not save or restore it if it is the result
+      // @CopyPaste :SaveRDX
       Maybe_Saved_Register maybe_saved_rdx = {0};
-      if (!storage_is_register_index(&result_value->storage, Register_D)) {
+      if (
+        expected_result->tag != Expected_Result_Tag_Exact ||
+        !storage_is_register_index(
+          &value_from_exact_expected_result(expected_result)->storage,
+          Register_D
+        )
+      ) {
         maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
           allocator, builder, &result_range, Register_D
         );
@@ -3909,10 +3893,11 @@ mass_handle_arithmetic_operation_lazy_proc(
         &builder->code_block.instructions, result_range,
         (Instruction) {.assembly = {mnemonic, {temp_b->storage}}}
       );
-      move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_a->storage);
-
       register_release_maybe_restore(builder, &maybe_saved_rdx);
-      return result_value;
+
+      // FIXME figure out how to correctly return temporary values in registers
+      //register_release(context->builder, temp_a->storage.Register.index);
+      return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
@@ -3925,6 +3910,22 @@ mass_handle_arithmetic_operation_lazy_proc(
         maybe_constant_fold(context, &result_range, expected_result, a, b, /);
       } else {
         maybe_constant_fold(context, &result_range, expected_result, a, b, %);
+      }
+
+      // Save RDX as it will be used for the result overflow
+      // but we should not save or restore it if it is the result
+      // @CopyPaste :SaveRDX
+      Maybe_Saved_Register maybe_saved_rdx = {0};
+      if (
+        expected_result->tag != Expected_Result_Tag_Exact ||
+        !storage_is_register_index(
+          &value_from_exact_expected_result(expected_result)->storage,
+          Register_D
+        )
+      ) {
+        maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
+          allocator, builder, &result_range, Register_D
+        );
       }
 
       Value *temp_dividend = value_register_for_descriptor(
@@ -3941,15 +3942,6 @@ mass_handle_arithmetic_operation_lazy_proc(
       temp_divisor = value_force(context, &expected_divisor, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
-
-      // Save RDX as it will be used for the remainder
-      // but we should not save or restore it if it is the result
-      Maybe_Saved_Register maybe_saved_rdx = {0};
-      if (!storage_is_register_index(&result_value->storage, Register_D)) {
-        maybe_saved_rdx = register_acquire_maybe_save_if_already_acquired(
-          allocator, builder, &result_range, Register_D
-        );
-      }
 
       if (descriptor_is_signed_integer(descriptor)){
         const X64_Mnemonic *widen = 0;
@@ -3977,9 +3969,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         push_instruction(instructions, result_range, (Instruction) {.assembly = {x64_div, {temp_divisor->storage}}});
       }
 
-      if (payload->operator == Mass_Arithmetic_Operator_Divide) {
-        move_value(context->allocator, context->builder, &result_range, &result_value->storage, &temp_dividend->storage);
-      } else {
+      if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
         if (byte_size == 1) {
           // It is not possible to access AH and an extended register like R15
           // in the same operation. To avoid this problem we just mov AH to AL
@@ -3987,16 +3977,18 @@ mass_handle_arithmetic_operation_lazy_proc(
           Storage reg_ah = storage_register_for_descriptor(Register_AH, &descriptor_s8);
           Storage reg_al = storage_register_for_descriptor(Register_A, &descriptor_s8);
           push_instruction(instructions, result_range, (Instruction) {.assembly = {mov, {reg_al, reg_ah}}});
-          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_al);
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
-          move_value(context->allocator, context->builder, &result_range, &result_value->storage, &reg_d);
+          move_value(context->allocator, context->builder, &result_range, &temp_dividend->storage, &reg_d);
         }
       }
 
       register_release(builder, temp_divisor_register);
       register_release_maybe_restore(builder, &maybe_saved_rdx);
-      return result_value;
+
+      // FIXME figure out how to correctly return temporary values in registers
+      //register_release(context->builder, temp_dividend->storage.Register.index);
+      return expected_result_ensure_value_or_temp(context, expected_result, temp_dividend);
     }
     default: {
       panic("Internal error: Unexpected operator");
