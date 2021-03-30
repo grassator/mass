@@ -3384,16 +3384,8 @@ call_function_overload(
     push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->storage, 0, 0}}});
   }
 
-  Value *saved_result = fn_return_value;
-  if (return_size <= 8) {
-    if (return_size != 0) {
-      // FIXME Should not be necessary with correct register allocation
-      saved_result = reserve_stack(context, descriptor->returns.descriptor, *source_range);
-      move_value(context->allocator, builder, source_range, &saved_result->storage, &fn_return_value->storage);
-    }
-  }
-
-  MASS_ON_ERROR(assign(context, result_value, saved_result)) return 0;
+  assert(result_value->descriptor->tag != Descriptor_Tag_Any);
+  MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
 
   for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
     Saved_Register *reg = dyn_array_get(saved_array, i);
