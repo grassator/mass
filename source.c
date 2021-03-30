@@ -4086,27 +4086,6 @@ mass_handle_comparison_operation_lazy_proc(
     }
   }
 
-  Value *result_value = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      const Expected_Result_Flexible *flexible = &expected_result->Flexible;
-      const Descriptor *temp_descriptor =
-        flexible->descriptor ? flexible->descriptor : descriptor;
-      assert(same_type_or_can_implicitly_move_cast(temp_descriptor, descriptor));
-      // FIXME allow other storage types
-      assert(flexible->storage & Expected_Result_Storage_Memory);
-      result_value = reserve_stack(context, descriptor, *source_range);
-      break;
-    }
-  }
-
-  // FIXME use expected_result_validate()
-  //assert(same_type_or_can_implicitly_move_cast(result_value->descriptor, descriptor));
-
   switch(compare_type) {
     case Compare_Type_Equal: {
       maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, ==);
@@ -4177,12 +4156,11 @@ mass_handle_comparison_operation_lazy_proc(
   );
 
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
-  MASS_ON_ERROR(assign(context, result_value, comparison_value)) return 0;
 
   register_release(context->builder, temp_a_reg);
   register_release(context->builder, temp_b_reg);
 
-  return result_value;
+  return expected_result_ensure_value_or_temp(context, expected_result, comparison_value);
 }
 
 static inline Value *
