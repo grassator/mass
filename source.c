@@ -3220,7 +3220,9 @@ call_function_macro(
     }
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
-      result_value = reserve_stack(context, function->returns.descriptor, overload->source_range);
+      result_value = function->returns.descriptor->tag == Descriptor_Tag_Void
+        ? &void_value
+        : reserve_stack(context, function->returns.descriptor, overload->source_range);
       break;
     }
   }
@@ -4751,9 +4753,8 @@ mass_handle_if_expression_lazy_proc(
   if (condition->descriptor == &descriptor_number_literal) {
     condition = token_value_force_immediate_integer(context, condition, &descriptor_s64);
   } else if (condition->descriptor == &descriptor_lazy_value) {
-    // FIXME :ExpectedAny
-    Expected_Result expected_condition =
-      expected_result_from_value(value_any(context, condition->source_range));
+    // TODO support any If-able descriptors instead of accepting literally anything
+    Expected_Result expected_condition = expected_result_any(0);
     Value *temp_condition = value_force(context, &expected_condition, condition);
     MASS_ON_ERROR(*context->result) return 0;
     condition = temp_condition;
