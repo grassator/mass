@@ -5227,6 +5227,9 @@ token_parse_statement_label(
     Source_Range source_range = symbol->source_range;
     Label_Index label = make_label(context->program, &context->program->memory.sections.code, name);
     value = value_make(context, &descriptor_void, code_label32(label), source_range);
+    // TODO figure out a better way to say that labels are compile-time known
+    //      Maybe there should be descriptor_label with static memory like Number_Literal
+    value->epoch = VALUE_STATIC_EPOCH;
     scope_define_value(label_scope, source_range, name, value);
     if (placeholder) {
       return peek_index;
@@ -5350,22 +5353,22 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   const Expected_Result *expected_result,
   Value *args_token
 ) {
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-
   Instruction_Bytes bytes = {
     .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
   };
 
-  for (u64 i = 0; i < dyn_array_length(args); ++i) {
-    if (bytes.length >= 15) {
+  Value_View_Split_Iterator it = { .view = value_as_group(args_token)->children };
+
+  for (u64 argument_count = 0; !it.done; argument_count += 1) {
+    if (argument_count >= 15) {
       context_error_snprintf(context, args_token->source_range, "Expected a maximum of 15 bytes");
       return 0;
     }
-    Value *raw_value = *dyn_array_get(args, i);
-    // FIXME :ExpectedAny
-    Expected_Result expected_byte =
-      expected_result_from_value(value_any(context, raw_value->source_range));
-    Value *value = value_force(context, &expected_byte, raw_value);
+
+    MASS_ON_ERROR(*context->result) return 0;
+
+    Value_View view = token_split_next(&it, &token_pattern_comma_operator);
+    Value *value = compile_time_eval(context, view);
     MASS_ON_ERROR(*context->result) return 0;
 
     if (storage_is_label(&value->storage)) {
@@ -5377,7 +5380,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
         return 0;
       }
       bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-      bytes.label_offset_in_instruction = u64_to_u8(i);
+      bytes.label_offset_in_instruction = u64_to_u8(argument_count);
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
