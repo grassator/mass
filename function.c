@@ -1023,6 +1023,7 @@ ensure_compiled_function_body(
     scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
+  // TODO this probably should be value_force_exact, but that breaks
   Expected_Result expected_target = expected_result_from_value(return_value);
   (void)value_force(&body_context, &expected_target, parse_result);
 

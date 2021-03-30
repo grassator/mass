@@ -146,6 +146,13 @@ value_force(
   Value *value
 );
 
+void
+value_force_exact(
+  Execution_Context *context,
+  Value *target,
+  Value *source
+);
+
 static inline Expected_Result
 expected_result_from_value(
   Value *value

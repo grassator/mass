@@ -390,8 +390,7 @@ assign(
   }
 
   if (source->descriptor == &descriptor_lazy_value) {
-    Expected_Result expected_result = expected_result_from_value(target);
-    (void)value_force(context, &expected_result, source);
+    value_force_exact(context, target, source);
     return *context->result;
   }
 
@@ -1846,6 +1845,17 @@ value_force(
     MASS_ON_ERROR(assign(context, result_value, value)) return 0;
     return result_value;
   }
+}
+
+void
+value_force_exact(
+  Execution_Context *context,
+  Value *target,
+  Value *source
+) {
+  Expected_Result expected_result = expected_result_from_value(target);
+  Value *forced = value_force(context, &expected_result, source);
+  assert(forced == target);
 }
 
 Array_Value_Ptr
