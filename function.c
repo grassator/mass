@@ -754,19 +754,27 @@ make_if(
         }
       }
     } else {
-      u64 byte_size = descriptor_byte_size(value->descriptor);
-      if (byte_size == 4 || byte_size == 8) {
+      Storage test_temp = value->storage;
+      if (test_temp.tag == Storage_Tag_Register) {
         push_instruction(
           instructions, *source_range,
-          (Instruction) {.assembly = {cmp, {value->storage, imm32(0), 0}}}
-        );
-      } else if (byte_size == 1) {
-        push_instruction(
-          instructions, *source_range,
-          (Instruction) {.assembly = {cmp, {value->storage, imm8(0), 0}}}
+          (Instruction) {.assembly = {x64_test, {test_temp, test_temp, 0}}}
         );
       } else {
-        assert(!"Unsupported value inside `if`");
+        u64 byte_size = descriptor_byte_size(value->descriptor);
+        if (byte_size == 4 || byte_size == 8) {
+          push_instruction(
+            instructions, *source_range,
+            (Instruction) {.assembly = {cmp, {value->storage, imm32(0), 0}}}
+          );
+        } else if (byte_size == 1) {
+          push_instruction(
+            instructions, *source_range,
+            (Instruction) {.assembly = {cmp, {value->storage, imm8(0), 0}}}
+          );
+        } else {
+          assert(!"Unsupported value inside `if`");
+        }
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
       push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), eflags->storage, 0}}});
