@@ -1905,6 +1905,7 @@ expected_result_ensure_value_or_temp(
   const Expected_Result *expected_result,
   Value *value
 ) {
+  MASS_ON_ERROR(*context->result) return 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
