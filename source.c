@@ -3700,7 +3700,7 @@ storage_load_index_address(
   // or the index are stored, but it is
 
   s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
-  // FIXME this acquires but never releases a register
+  // @Volatile :TemporaryRegisterForIndirectMemory
   Value *new_base_register = value_temporary_register_for_descriptor(
     context, &descriptor_s64, index_value->source_range
   );
@@ -4478,6 +4478,11 @@ mass_handle_array_access_lazy_proc(
     const Descriptor *item_descriptor = array->descriptor->Pointer.to;
     Storage storage = storage_load_index_address(context, array_range, array, item_descriptor, index);
     array_element_value = value_make(context, item_descriptor, storage, *array_range);
+    // @Volatile :TemporaryRegisterForIndirectMemory
+    // We have to mark this value as temporary so it is correctly released, but the whole
+    // setup is very awkward. Firstly it only works base registers. Secondly, the setting
+    // of temporary is disconnected from the creation of storage making it extra problematic.
+    array_element_value->is_temporary = true;
   } else {
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->storage.tag == Storage_Tag_Memory);
@@ -4497,6 +4502,8 @@ mass_handle_array_access_lazy_proc(
     } else {
       array_element_value->storage =
         storage_load_index_address(context, array_range, array, item_descriptor, index);
+      // @Volatile :TemporaryRegisterForIndirectMemory
+      array_element_value->is_temporary = true;
     }
   }
 
