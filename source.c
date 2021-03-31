@@ -1953,6 +1953,7 @@ expected_result_ensure_value_or_temp(
         Value *temp_result = value_temporary_register_for_descriptor(
           context, expected_descriptor, value->source_range
         );
+        value_release_if_temporary(context->builder, value);
         MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
         return temp_result;
       }
