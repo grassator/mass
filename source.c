@@ -2960,20 +2960,25 @@ mass_handle_cast_lazy_proc(
 
   u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
   u64 original_byte_size = descriptor_byte_size(source_descriptor);
+
+  Value *result_value = value;
   if (source_descriptor == &descriptor_number_literal) {
-    value = token_value_force_immediate_integer(context, value, target_descriptor);
+    result_value = token_value_force_immediate_integer(context, value, target_descriptor);
   } else if (cast_to_byte_size < original_byte_size) {
-    value = value_make(context, target_descriptor, value->storage, *source_range);
-    if (value->storage.tag == Storage_Tag_Static) {
+    result_value = value_make(context, target_descriptor, value->storage, *source_range);
+    if (result_value->storage.tag == Storage_Tag_Static) {
       // TODO this is quite awkward and unsafe. There is probably a better way
       void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
-      value->storage = storage_static_internal(memory, cast_to_byte_size);
+      result_value->storage = storage_static_internal(memory, cast_to_byte_size);
     } else {
-      value->storage.byte_size = cast_to_byte_size;
+      result_value->storage.byte_size = cast_to_byte_size;
     }
+    // TODO This is awkward and there might be a better way.
+    //      It is also might be necessary to somehow mark the original value as invalid maybe?
+    result_value->is_temporary = value->is_temporary;
   }
 
-  return expected_result_ensure_value_or_temp(context, expected_result, value);
+  return expected_result_ensure_value_or_temp(context, expected_result, result_value);
 }
 
 Value *
