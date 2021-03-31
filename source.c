@@ -3876,12 +3876,15 @@ mass_handle_arithmetic_operation_lazy_proc(
         );
       }
 
-      Value *temp_a = value_register_for_descriptor(
+      Value *temp_a = value_specific_temporary_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
+      temp_a->is_temporary = true;
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(context, &expected_a, payload->lhs);
 
+      // TODO we do not acquire here because it is done by maybe_saved_rdx,
+      //      but it is awkward that it is disconnected so need to think about
       Value *temp_b = value_register_for_descriptor(
         context, Register_D, descriptor, result_range
       );
@@ -3897,8 +3900,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
-      // FIXME figure out how to correctly return temporary values in registers
-      //register_release(context->builder, temp_a->storage.Register.index);
+      // temp_a is used as a result so it is intentionnaly not released
       return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Divide:
@@ -3930,7 +3932,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         );
       }
 
-      Value *temp_dividend = value_register_for_descriptor(
+      Value *temp_dividend = value_specific_temporary_register_for_descriptor(
         context, Register_A, descriptor, result_range
       );
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
@@ -3987,8 +3989,6 @@ mass_handle_arithmetic_operation_lazy_proc(
       value_release_if_temporary(builder, temp_divisor);
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
-      // FIXME figure out how to correctly return temporary values in registers
-      //register_release(context->builder, temp_dividend->storage.Register.index);
       return expected_result_ensure_value_or_temp(context, expected_result, temp_dividend);
     }
     default: {

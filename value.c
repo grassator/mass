@@ -1109,13 +1109,14 @@ value_register_for_descriptor_internal(
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
-value_temporary_register_for_descriptor_internal(
+value_specific_temporary_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
+  Register reg,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  Register reg = register_acquire_temp(context->builder);
+  register_acquire(context->builder, reg);
   Value *value = value_make_internal(
     compiler_source_location, context, descriptor,
     storage_register_for_descriptor(reg, descriptor),
@@ -1124,6 +1125,26 @@ value_temporary_register_for_descriptor_internal(
   value->is_temporary = true;
   return value;
 }
+
+#define value_specific_temporary_register_for_descriptor(...)\
+  value_specific_temporary_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+static inline Value *
+value_temporary_register_for_descriptor_internal(
+  Compiler_Source_Location compiler_source_location,
+  Execution_Context *context,
+  const Descriptor *descriptor,
+  Source_Range source_range
+) {
+  return value_specific_temporary_register_for_descriptor_internal(
+    compiler_source_location,
+    context,
+    register_find_available(context->builder),
+    descriptor,
+    source_range
+  );
+}
+
 #define value_temporary_register_for_descriptor(...)\
   value_temporary_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
@@ -1132,7 +1153,7 @@ value_release_if_temporary(
   Function_Builder *builder,
   Value *value
 ) {
-  if (!value->is_temporary) return;
+  if (!value || !value->is_temporary) return;
   switch (value->storage.tag) {
     case Storage_Tag_Register: {
       register_release(builder, value->storage.Register.index);
@@ -1143,7 +1164,11 @@ value_release_if_temporary(
       break;
     }
     case Storage_Tag_Memory: {
-      panic("TODO support temporary memory (or at least stack)");
+      // @Volatile :TemporaryRegisterForIndirectMemory
+      Memory_Location *location = &value->storage.Memory.location;
+      assert(location->tag == Memory_Location_Tag_Indirect);
+      register_release(builder, location->Indirect.base_register);
+      // TODO what about index register
       break;
     }
     case Storage_Tag_Any:
