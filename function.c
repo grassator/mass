@@ -31,7 +31,7 @@ reserve_stack_internal(
 #define reserve_stack(...)\
   reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-static void
+static inline Register
 register_acquire(
   Function_Builder *builder,
   Register reg_index
@@ -39,10 +39,11 @@ register_acquire(
   assert(!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
   register_bitset_set(&builder->used_register_bitset, reg_index);
   register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
+  return reg_index;
 }
 
 static Register
-register_acquire_temp(
+register_find_available(
   Function_Builder *builder
 ) {
   // FIXME We are skipping Register_A here as it is hardcoded in quite a few places still
@@ -53,14 +54,19 @@ register_acquire_temp(
   for (u32 i = 0; i < countof(temp_registers); ++i) {
     Register reg_index = temp_registers[i];
     if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-      register_acquire(builder, reg_index);
       return reg_index;
     }
   }
-
   // FIXME
   panic("Could not acquire a temp register");
   return -1;
+}
+
+static inline Register
+register_acquire_temp(
+  Function_Builder *builder
+) {
+  return register_acquire(builder, register_find_available(builder));
 }
 
 static inline void

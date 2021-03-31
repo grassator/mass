@@ -99,13 +99,18 @@ register_release(
   Register reg_index
 );
 
-static void
+static Register
+register_find_available(
+  Function_Builder *builder
+);
+
+static inline Register
 register_acquire(
   Function_Builder *builder,
   Register reg_index
 );
 
-static Register
+static inline Register
 register_acquire_temp(
   Function_Builder *builder
 );
