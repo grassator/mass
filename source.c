@@ -5476,6 +5476,7 @@ mass_handle_assignment_lazy_proc(
     Expected_Result expected_assignment = expected_result_from_value(target);
     target = value_force(context, &expected_assignment, payload->expression);
   }
+  value_release_if_temporary(context->builder, target);
 
   return expected_result_validate(expected_result, &void_value);
 }
