@@ -4929,13 +4929,34 @@ mass_handle_block_lazy_proc(
   Value *result_value = 0;
   for (u64 i = 0; i < statement_count; ++i) {
     MASS_ON_ERROR(*context->result) return 0;
+    u64 registers_before =
+      context->builder ? context->builder->code_block.register_occupied_bitset : 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
+    // Saving this source range for debugging because it will get overwritten when lazy is forced
+    Source_Range debug_source_range = lazy_statement->source_range;
+    (void)debug_source_range;
     if (i == statement_count - 1) {
       result_value = value_force(context, expected_result, lazy_statement);
+      result_value = expected_result_ensure_value_or_temp(context, expected_result, result_value);
     } else {
-      // FIXME :ExpectedAny
       Expected_Result expected_void = expected_result_from_value(&void_value);
       result_value = value_force(context, &expected_void, lazy_statement);
+    }
+    // We do not do cross-statement register allocation so can check that there
+    // are no stray registers retained across statement boundaries
+    if(context->builder && registers_before != context->builder->code_block.register_occupied_bitset) {
+      for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+        bool before = register_bitset_get(registers_before, reg_index);
+        bool after = register_bitset_get(context->builder->code_block.register_occupied_bitset, reg_index);
+        if (before != after) {
+          if (after) {
+            printf("Unreleased %s\n", register_name(reg_index));
+          } else {
+            printf("Falsly released %s\n", register_name(reg_index));
+          }
+        }
+      }
+      panic("Found unreleased registers");
     }
   }
   return result_value;
