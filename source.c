@@ -1927,7 +1927,10 @@ expected_result_ensure_value_or_temp(
         value->storage.tag == Storage_Tag_Static &&
         (flexible->storage & Expected_Result_Storage_Static)
       ) {
-        assert(same_type(value->descriptor, expected_descriptor));
+        value = maybe_coerce_number_literal_to_integer(context, value, expected_descriptor);
+        if (!same_type_or_can_implicitly_move_cast(expected_descriptor, value->descriptor)) {
+          panic("Unexpected type mismatch");
+        }
         return value;
       }
       if (
