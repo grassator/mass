@@ -124,7 +124,6 @@ register_release_maybe_restore(
   Function_Builder *builder,
   const Maybe_Saved_Register *maybe_saved_register
 ) {
-  register_release(builder, maybe_saved_register->index);
   if (maybe_saved_register->saved) {
     push_instruction(
       &builder->code_block.instructions, *maybe_saved_register->source_range,
@@ -133,6 +132,9 @@ register_release_maybe_restore(
         storage_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
       }}}
     );
+    register_release(builder, maybe_saved_register->saved_index);
+  } else {
+    register_release(builder, maybe_saved_register->index);
   }
 }
 
