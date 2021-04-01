@@ -55,6 +55,19 @@ expected_result_any(
   };
 }
 
+static inline Expected_Result
+expected_result_static(
+  const Descriptor *descriptor
+) {
+  return (Expected_Result){
+    .tag = Expected_Result_Tag_Flexible,
+    .Flexible = {
+      .descriptor = descriptor,
+      .storage = Expected_Result_Storage_Static
+    },
+  };
+}
+
 Value *
 expected_result_validate(
   const Expected_Result *expected_result,
@@ -553,13 +566,7 @@ scope_entry_force(
           Value *next_overload = value->next_overload;
           Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
           Execution_Context *context = &lazy->context;
-          Expected_Result expected_result = {
-            .tag = Expected_Result_Tag_Flexible,
-            .Flexible = {
-              .descriptor = lazy->descriptor,
-              .storage = Expected_Result_Storage_Static,
-            },
-          };
+          Expected_Result expected_result = expected_result_static(lazy->descriptor);
           Value *result = lazy->proc(context, &expected_result, lazy->payload);
           if (!result) return 0;
           *value = *result;
@@ -1604,6 +1611,18 @@ value_is_lazy_or_static(
   if (value->descriptor == &descriptor_lazy_value) return true;
   if (value->storage.tag == Storage_Tag_Static) return true;
   if (value->storage.tag == Storage_Tag_None) return true;
+  return false;
+}
+
+bool
+value_is_non_lazy_static(
+  Value *value
+) {
+  if (!value) return false;
+  if (value->descriptor != &descriptor_lazy_value) {
+    if (value->storage.tag == Storage_Tag_Static) return true;
+    if (value->storage.tag == Storage_Tag_None) return true;
+  }
   return false;
 }
 
@@ -3438,13 +3457,7 @@ token_handle_function_call(
     target_descriptor->tag == Descriptor_Tag_Function &&
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
-    Expected_Result expected_result = {
-      .tag = Expected_Result_Tag_Flexible,
-      .Flexible = {
-        .descriptor = target_descriptor,
-        .storage = Expected_Result_Storage_Static,
-      },
-    };
+    Expected_Result expected_result = expected_result_static(target_descriptor);
     Value *target = value_force(context, &expected_result, target_expression);
     MASS_ON_ERROR(*context->result) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
@@ -4011,18 +4024,25 @@ mass_handle_arithmetic_operation(
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
 
-  Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
-    allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
-  *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
-    .lhs = lhs,
-    .rhs = rhs,
-    .operator = (Mass_Arithmetic_Operator)(u64)operator_payload,
-  };
-
   const Descriptor *descriptor = large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
-  return mass_make_lazy_value(
-    context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
-  );
+
+  Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)operator_payload;
+
+  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
+    Expected_Result expected_result = expected_result_static(descriptor);
+    Mass_Arithmetic_Operator_Lazy_Payload lazy_payload =
+      { .lhs = lhs, .rhs = rhs, .operator = operator };
+    return mass_handle_arithmetic_operation_lazy_proc(context, &expected_result, &lazy_payload);
+  } else {
+    Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
+      allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
+    *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
+      .lhs = lhs, .rhs = rhs, .operator = operator,
+    };
+    return mass_make_lazy_value(
+      context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
+    );
+  }
 }
 
 typedef struct {
@@ -4164,16 +4184,28 @@ mass_handle_comparison_operation(
   Value_View arguments,
   void *raw_payload
 ) {
-  Mass_Comparison_Operator_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
-  *payload = (Mass_Comparison_Operator_Lazy_Payload) {
-    .lhs = token_parse_single(context, value_view_get(arguments, 0)),
-    .rhs = token_parse_single(context, value_view_get(arguments, 1)),
-    .compare_type = (Compare_Type)(u64)raw_payload,
-  };
-  return mass_make_lazy_value(
-    context, arguments.source_range, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
-  );
+  Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
+  Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
+  Compare_Type compare_type = (Compare_Type)(u64)raw_payload;
+
+  const Descriptor *descriptor =
+    large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
+
+  if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
+    Expected_Result expected_result = expected_result_static(descriptor);
+    Mass_Comparison_Operator_Lazy_Payload lazy_payload =
+      { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
+    return mass_handle_comparison_operation_lazy_proc(context, &expected_result, &lazy_payload);
+  } else {
+    Mass_Comparison_Operator_Lazy_Payload *payload =
+      allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
+    *payload = (Mass_Comparison_Operator_Lazy_Payload) {
+      .lhs = lhs, .rhs = rhs, .compare_type = compare_type,
+    };
+    return mass_make_lazy_value(
+      context, arguments.source_range, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
+    );
+  }
 }
 
 Value *
