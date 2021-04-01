@@ -462,6 +462,12 @@ maybe_coerce_number_literal_to_integer(
   return token_value_force_immediate_integer(context, value, target_descriptor);
 }
 
+Storage
+storage_field_access(
+  Storage *struct_storage,
+  Descriptor_Struct_Field *field
+);
+
 PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
@@ -483,7 +489,6 @@ assign(
   }
 
   Source_Range source_range = target->source_range;
-
   if (source->descriptor == &descriptor_number_literal) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
@@ -504,6 +509,19 @@ assign(
       );
       return *context->result;
     }
+  } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
+    if (!same_value_type_or_can_implicitly_move_cast(target, source)) goto err;
+    assert(target->storage.tag == Storage_Tag_Memory);
+    assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+
+    for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.fields); ++i) {
+      Descriptor_Struct_Field *field = dyn_array_get(source->descriptor->Struct.fields, i);
+      // FIXME turn these into values and do recursion
+      Storage source_field = storage_field_access(&source->storage, field);
+      Storage target_field = storage_field_access(&target->storage, field);
+      move_value(context->allocator, context->builder, &source_range, &target_field, &source_field);
+    }
+    return *context->result;
   } else if (
     source->descriptor->tag == Descriptor_Tag_Pointer &&
     source->storage.tag == Storage_Tag_Static
@@ -539,6 +557,8 @@ assign(
     move_value(context->allocator, context->builder, &source_range, &target->storage, &source->storage);
     return *context->result;
   }
+
+  err:
   context_error_snprintf(
     context, source_range,
     "Incompatible type: expected %"PRIslice", got %"PRIslice,
@@ -4452,6 +4472,39 @@ struct_find_field_by_name(
   return 0;
 }
 
+Storage
+storage_field_access(
+  Storage *struct_storage,
+  Descriptor_Struct_Field *field
+) {
+  switch(struct_storage->tag) {
+    default:
+    case Storage_Tag_Any:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm:
+    case Storage_Tag_None: {
+      panic("Internal Error: Unexpected storage type for structs");
+      break;
+    }
+    case Storage_Tag_Static: {
+      return storage_static_internal(
+        (s8 *)storage_static_as_c_type_internal(struct_storage, struct_storage->byte_size) + field->offset,
+        descriptor_byte_size(field->descriptor)
+      );
+    }
+    case Storage_Tag_Memory: {
+      Storage field_storage = *struct_storage;
+      assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      field_storage.byte_size = descriptor_byte_size(field->descriptor);
+      field_storage.Memory.location.Indirect.offset += field->offset;
+      return field_storage;
+    }
+  }
+
+  return (Storage){0};
+}
+
 typedef struct {
   Value *struct_;
   Descriptor_Struct_Field *field;
@@ -4466,37 +4519,9 @@ mass_handle_field_access_lazy_proc(
   Mass_Field_Access_Lazy_Payload *payload = raw_payload;
   Descriptor_Struct_Field *field = payload->field;
 
-  Value *field_value;
-  Storage *storage = &payload->struct_->storage;
-  const Source_Range *source_range = &payload->struct_->source_range;
-  switch(storage->tag) {
-    default:
-    case Storage_Tag_Any:
-    case Storage_Tag_Eflags:
-    case Storage_Tag_Register:
-    case Storage_Tag_Xmm:
-    case Storage_Tag_None: {
-      panic("Internal Error: Unexpected storage type for structs");
-      field_value = 0;
-      break;
-    }
-    case Storage_Tag_Static: {
-      Storage field_storage = storage_static_internal(
-        (s8 *)storage_static_as_c_type_internal(storage, storage->byte_size) + field->offset,
-        descriptor_byte_size(field->descriptor)
-      );
-      field_value = value_make(context, field->descriptor, field_storage, *source_range);
-      break;
-    }
-    case Storage_Tag_Memory: {
-      Storage field_storage = *storage;
-      assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      field_storage.byte_size = descriptor_byte_size(field->descriptor);
-      field_storage.Memory.location.Indirect.offset += field->offset;
-      field_value = value_make(context, field->descriptor, field_storage, *source_range);
-      break;
-    }
-  }
+  Storage field_storage = storage_field_access(&payload->struct_->storage, field);
+  Value *field_value =
+    value_make(context, field->descriptor, field_storage, payload->struct_->source_range);
 
   return expected_result_ensure_value_or_temp(context, expected_result, field_value);
 }
