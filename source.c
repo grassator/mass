@@ -540,6 +540,7 @@ assign(
     }
     return *context->result;
   } else if (
+    !context_is_compile_time_eval(context) &&
     source->descriptor->tag == Descriptor_Tag_Pointer &&
     source->storage.tag == Storage_Tag_Static
   ) {
