@@ -3846,8 +3846,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   const Expected_Result *expected_result,
   Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
-  const Descriptor *descriptor =
-    large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
+  const Descriptor *descriptor = expected_result_descriptor(expected_result);
   assert(descriptor_is_integer(descriptor));
 
   const Source_Range result_range = payload->lhs->source_range;
