@@ -536,7 +536,7 @@ assign(
         .storage = storage_field_access(&target->storage, field),
         .source_range = target->source_range,
       };
-      assign(context, &target_field, &source_field);
+      MASS_TRY(assign(context, &target_field, &source_field));
     }
     return *context->result;
   } else if (
