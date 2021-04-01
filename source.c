@@ -6,6 +6,13 @@
 #include <stdatomic.h>
 #endif
 
+static inline bool
+context_is_compile_time_eval(
+  const Execution_Context *context
+) {
+  return context->compilation->jit.program == context->program;
+}
+
 static inline Value *
 value_from_exact_expected_result(
   const Expected_Result *expected_result
@@ -509,17 +516,27 @@ assign(
       );
       return *context->result;
     }
-  } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
+  } else if (
+    source->descriptor->tag == Descriptor_Tag_Struct &&
+    source->descriptor != &descriptor_execution_context // FIXME find a better way
+  ) {
     if (!same_value_type_or_can_implicitly_move_cast(target, source)) goto err;
     assert(target->storage.tag == Storage_Tag_Memory);
     assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
 
     for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.fields); ++i) {
       Descriptor_Struct_Field *field = dyn_array_get(source->descriptor->Struct.fields, i);
-      // FIXME turn these into values and do recursion
-      Storage source_field = storage_field_access(&source->storage, field);
-      Storage target_field = storage_field_access(&target->storage, field);
-      move_value(context->allocator, context->builder, &source_range, &target_field, &source_field);
+      Value source_field = {
+        .descriptor = field->descriptor,
+        .storage = storage_field_access(&source->storage, field),
+        .source_range = source->source_range,
+      };
+      Value target_field = {
+        .descriptor = field->descriptor,
+        .storage = storage_field_access(&target->storage, field),
+        .source_range = target->source_range,
+      };
+      assign(context, &target_field, &source_field);
     }
     return *context->result;
   } else if (
@@ -536,7 +553,7 @@ assign(
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {
       // TODO should depend on constness of the static value I guess?
-      Section *section = &context->program->memory.sections.ro_data;
+      Section *section = &context->program->memory.sections.rw_data;
       u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
       u64 alignment = descriptor_alignment(static_pointer->descriptor);
 
@@ -4401,7 +4418,7 @@ mass_handle_paren_operator(
     Value *pointee = *dyn_array_get(args, 0);
     dyn_array_destroy(args);
 
-    if (context->compilation->jit.program == context->program) { // compile time
+    if (context_is_compile_time_eval(context)) { // compile time
       assert(pointee->epoch == VALUE_STATIC_EPOCH);
       assert(pointee->storage.tag == Storage_Tag_Memory);
       Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
