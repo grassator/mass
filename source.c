@@ -513,8 +513,7 @@ assign(
     // is also available in the compiled binary
     // TODO this probably needs to be recursive for structs.
     //      This might require support for relocations.
-    const void *source_memory =
-      storage_static_as_c_type_internal(&source->storage, source->storage.byte_size);
+    const void *source_memory = *storage_static_as_c_type(&source->storage, void *);
     Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
     assert(static_pointer);
     if (static_pointer->storage.tag == Storage_Tag_None) {

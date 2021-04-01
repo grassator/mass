@@ -17,9 +17,7 @@ startup(() -> () {
 //       relocations that would be required for copying to runtime
 //       a globally defined string as it contains a pointer.
 print :: macro (string : String) -> () {
-  WriteFile(cached_stdout_handle, c_string(string), cast(s32, string.length), 0, 0)
-  //FIXME make it work like this instead:
-  // WriteFile(cached_stdout_handle, c_string(string), string.length, 0, 0
+  WriteFile(cached_stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
 }
 
 fn print(integer : s64) {
