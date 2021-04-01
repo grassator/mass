@@ -31,9 +31,8 @@ fn print(integer : s64) {
 
   stack buffer u8[64]
   const output_size = if integer < 0 then {
-    // FIXME this should work
-    //static minus_code = "-".bytes.0
-    buffer.0 = "-".bytes.0
+    static minus_code = "-".bytes.0
+    buffer.0 = minus_code
     integer = 0 - integer
     count + 1
   } else {
@@ -44,7 +43,8 @@ fn print(integer : s64) {
     integer_index = integer_index + 1
     const digit = cast(u8, integer % 10)
     const digit_index = output_size - integer_index
-    buffer.(digit_index) = "0".bytes.0 + digit
+    static zero_code = "0".bytes.0
+    buffer.(digit_index) = zero_code + digit
     integer = integer / 10
   }
   WriteFile(cached_stdout_handle, &buffer, cast(s32, output_size), 0, 0)
