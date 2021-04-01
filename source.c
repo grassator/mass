@@ -3717,6 +3717,23 @@ storage_load_index_address(
   // or the index are stored, but it is
 
   s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
+
+
+  if (target->storage.tag == Storage_Tag_Static) {
+    index_value = token_value_force_immediate_integer(context, index_value, &descriptor_u64);
+    MASS_ON_ERROR(*context->result) return (Storage){0};
+    u64 index = *storage_static_as_c_type(&index_value->storage, u64);
+    // TODO do bounds checking if possible
+    s8 *target_bytes = 0;
+    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+      target_bytes =
+        *(s8**)storage_static_as_c_type_internal(&target->storage, target->storage.byte_size);
+    } else {
+      panic("TODO support more static dereferences");
+    }
+    return storage_static_internal(target_bytes + index, item_byte_size);
+  }
+
   // @Volatile :TemporaryRegisterForIndirectMemory
   Value *new_base_register = value_temporary_register_for_descriptor(
     context, &descriptor_s64, index_value->source_range
@@ -4518,7 +4535,7 @@ mass_handle_array_access_lazy_proc(
     // We have to mark this value as temporary so it is correctly released, but the whole
     // setup is very awkward. Firstly it only works base registers. Secondly, the setting
     // of temporary is disconnected from the creation of storage making it extra problematic.
-    array_element_value->is_temporary = true;
+    if (storage.tag != Storage_Tag_Static) array_element_value->is_temporary = true;
   } else {
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->storage.tag == Storage_Tag_Memory);
