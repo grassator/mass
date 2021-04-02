@@ -920,6 +920,14 @@ ensure_compiled_function_body(
         &builder.code_block.register_occupied_bitset,
         arg_value->storage.Register.index
       );
+    } else if(arg_value->storage.tag == Storage_Tag_Memory) {
+      assert(arg_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      register_bitset_set(
+        &builder.code_block.register_occupied_bitset,
+        arg_value->storage.Memory.location.Indirect.base_register
+      );
+    } else {
+      panic("Unexpected storage tag for an argument");
     }
   }
 
