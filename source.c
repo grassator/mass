@@ -572,9 +572,14 @@ assign(
         MASS_TRY(assign(context, static_pointer, &static_source_value));
       }
       assert(storage_is_label(&static_pointer->storage));
-      // FIXME this should use the same code as address_of to support pointers inside
-      //       complex types such as structs and arrays
-      load_address(context, &source_range, target, static_pointer);
+      if (storage_is_label(&target->storage)) {
+        dyn_array_push(context->program->relocations, (Relocation) {
+          .patch_at = target->storage,
+          .address_of = static_pointer->storage,
+        });
+      } else {
+        load_address(context, &source_range, target, static_pointer);
+      }
       return *context->result;
     } else if (storage_is_label(&target->storage)) {
       Label_Index label_index =
