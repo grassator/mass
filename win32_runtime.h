@@ -126,7 +126,7 @@ win32_get_function_index_from_address(
 
   u32 rva = u64_to_u32(code_section->base_rva + instruction_address - (DWORD64)code_buffer->memory);
 
-  // Do binary search
+  // Do a binary search
   s64 left_bound = 0;
   s64 right_bound = u64_to_s64(dyn_array_length(info->function_table)) - 1;
   while (left_bound <= right_bound) {
@@ -183,8 +183,6 @@ win32_print_stack(
   u64 current_offset = 0;
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    // DispatcherContext->ControlPc provides IP *after* the instruction that caused the exception
-    // so we add instruction byte size before comparing
     current_offset += instruction->encoded_byte_size;
     if (current_offset == relative_instruction_byte_offset) {
       printf("  at ");
@@ -199,7 +197,7 @@ win32_print_stack(
   GetCurrentThreadStackLimits(&low_limit, &high_limit);
 
   if (stack_pointer < low_limit || stack_pointer >= high_limit) {
-    printf("Outside of allocated stack\n");
+    printf("Outside of the allocated stack\n");
     return;
   }
 
