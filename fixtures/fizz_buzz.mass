@@ -13,9 +13,6 @@ startup(() -> () {
   cached_stdout_handle = GetStdHandle(-11)
 })
 
-// FIXME this must be a macro for now because we don't support
-//       relocations that would be required for copying to runtime
-//       a globally defined string as it contains a pointer.
 print :: macro (string : String) -> () {
   WriteFile(cached_stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
 }

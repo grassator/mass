@@ -3371,8 +3371,6 @@ call_function_overload(
 
   ensure_compiled_function_body(context, to_call);
 
-  Array_Saved_Register saved_array = dyn_array_make(Array_Saved_Register);
-
   Value *fn_return_value = function_return_value_for_descriptor(
     context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
@@ -3389,27 +3387,42 @@ call_function_overload(
       break;
     }
   }
+
+  u64 saved_registers_bit_set = 0;
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
-      if (register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
-        // We must not save the register that we will overwrite with the result
-        // otherwise we will overwrite it with the restored value
-        if (!storage_is_register_index(&result_value->storage, reg_index)) {
-          Value to_save = {
-            .descriptor = &descriptor_s64,
-            .storage = {
-              .tag = Storage_Tag_Register,
-              .byte_size = 8,
-              .Register.index = reg_index,
-            }
-          };
-          Storage source = storage_register_for_descriptor(reg_index, &descriptor_s64);
-          Value *stack_value = reserve_stack(context, to_save.descriptor, *source_range);
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {stack_value->storage, source}}});
-          dyn_array_push(saved_array, (Saved_Register){.saved = to_save, .stack_value = stack_value});
-        }
-      }
+    // FIXME this should use *target* volatile registers *NOT* the current builder
+    if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) continue;
+    if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) continue;
+    // We must not save the register that we will overwrite with the result
+    // otherwise we will overwrite it with the restored value
+    if (storage_is_register_index(&result_value->storage, reg_index)) continue;
+
+    Value *occupied_value = builder->code_block.register_occupied_values[reg_index];
+    assert(occupied_value);
+    if (occupied_value->storage.tag == Storage_Tag_Register) {
+      assert(occupied_value->storage.tag == Storage_Tag_Register);
+      assert(occupied_value->storage.Register.index == reg_index);
+      Storage stack_storage = reserve_stack_storage(context, occupied_value->storage.byte_size);
+      push_instruction(
+        instructions, *source_range,
+        (Instruction) {.assembly = {mov, {stack_storage, occupied_value->storage}}}
+      );
+      occupied_value->storage = stack_storage;
+    } else if (occupied_value->storage.tag == Storage_Tag_Memory) {
+      assert(occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      assert(occupied_value->storage.Memory.location.Indirect.base_register == reg_index);
+      Register temp_reg = register_acquire_temp(builder);
+      Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
+      Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
+      push_instruction(
+        instructions, *source_range,
+        (Instruction) {.assembly = {mov, {temp_reg_storage, original_reg_storage}}}
+      );
+      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;
+    } else {
+      panic("Unexpected storage tag for an argument");
     }
+    register_bitset_set(&saved_registers_bit_set, reg_index);
   }
 
   Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
@@ -3487,12 +3500,25 @@ call_function_overload(
 
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
 
-  for (u64 i = 0; i < dyn_array_length(saved_array); ++i) {
-    Saved_Register *reg = dyn_array_get(saved_array, i);
-    move_value(context->allocator, builder, source_range, &reg->saved.storage, &reg->stack_value->storage);
-    // TODO :FreeStackAllocation
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
+
+    Value *occupied_value = builder->code_block.register_occupied_values[reg_index];
+    assert(occupied_value->storage.tag == Storage_Tag_Memory);
+    Register temp_reg = occupied_value->storage.Memory.location.Indirect.base_register;
+    if (temp_reg == Register_SP) {
+      Storage reg_storage = storage_register_for_descriptor(reg_index, occupied_value->descriptor);
+      move_value(context->allocator, builder, source_range, &reg_storage, &occupied_value->storage);
+      occupied_value->storage = reg_storage;
+    } else {
+      Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
+      Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
+      push_instruction(
+        instructions, *source_range,
+        (Instruction) {.assembly = {mov, {original_reg_storage, temp_reg_storage}}}
+      );
+    }
   }
-  dyn_array_destroy(arguments);
 
   return result_value;
 }

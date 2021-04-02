@@ -1123,6 +1123,7 @@ value_specific_temporary_register_for_descriptor_internal(
     source_range
   );
   value->is_temporary = true;
+  context->builder->code_block.register_occupied_values[reg] = value;
   return value;
 }
 
@@ -1167,7 +1168,10 @@ value_release_if_temporary(
       // @Volatile :TemporaryRegisterForIndirectMemory
       Memory_Location *location = &value->storage.Memory.location;
       assert(location->tag == Memory_Location_Tag_Indirect);
-      register_release(builder, location->Indirect.base_register);
+      Register reg = location->Indirect.base_register;
+      if (reg != Register_SP) {
+        register_release(builder, reg);
+      }
       // TODO what about index register
       break;
     }

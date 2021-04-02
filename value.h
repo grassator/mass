@@ -195,7 +195,9 @@ typedef struct {
   Array_Instruction instructions;
   u64 register_volatile_bitset;
   u64 register_occupied_bitset;
+  Value *register_occupied_values[Register__Max];
 } Code_Block;
+static_assert(Register__Min == 0, "Should be psosible to use register indexes as array indexes");
 
 typedef enum {
   Function_Argument_Mode_Call,

@@ -1,5 +1,16 @@
 #include "function.h"
 
+Storage
+reserve_stack_storage(
+  Execution_Context *context,
+  u64 raw_byte_size
+) {
+  s32 byte_size = u64_to_s32(raw_byte_size);
+  context->builder->stack_reserve = s32_align(context->builder->stack_reserve, byte_size);
+  context->builder->stack_reserve += byte_size;
+  return stack(-context->builder->stack_reserve, byte_size);
+}
+
 // :StackDisplacementEncoding
 // There are three types of values that can be present on the stack in the current setup
 // 1) Parameters to the current function. In Win32 ABI that is every parameter past 4th.
@@ -19,10 +30,7 @@ reserve_stack_internal(
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  s32 byte_size = u64_to_s32(descriptor_byte_size(descriptor));
-  context->builder->stack_reserve = s32_align(context->builder->stack_reserve, byte_size);
-  context->builder->stack_reserve += byte_size;
-  Storage storage = stack(-context->builder->stack_reserve, byte_size);
+  Storage storage = reserve_stack_storage(context, descriptor_byte_size(descriptor));
   return value_make_internal(
     compiler_source_location, context, descriptor, storage, source_range
   );
@@ -75,6 +83,7 @@ ensure_register_released(
   Register reg_index
 ) {
   register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
+  builder->code_block.register_occupied_values[reg_index] = 0;
 }
 
 void
@@ -840,12 +849,6 @@ load_address(
   );
 }
 
-typedef struct {
-  Value saved;
-  Value *stack_value;
-} Saved_Register;
-typedef dyn_array_type(Saved_Register) Array_Saved_Register;
-
 void
 ensure_compiled_function_body(
   Execution_Context *context,
@@ -915,19 +918,18 @@ ensure_compiled_function_body(
       &body_context, function, index, Function_Argument_Mode_Body
     );
     scope_define_value(body_scope, arg_value->source_range, argument->name, arg_value);
+    Register arg_reg = Register_SP;
     if (arg_value->storage.tag == Storage_Tag_Register) {
-      register_bitset_set(
-        &builder.code_block.register_occupied_bitset,
-        arg_value->storage.Register.index
-      );
+      arg_reg = arg_value->storage.Register.index;
     } else if(arg_value->storage.tag == Storage_Tag_Memory) {
       assert(arg_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      register_bitset_set(
-        &builder.code_block.register_occupied_bitset,
-        arg_value->storage.Memory.location.Indirect.base_register
-      );
+      arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
     } else {
       panic("Unexpected storage tag for an argument");
+    }
+    if (arg_reg != Register_SP) {
+      register_bitset_set(&builder.code_block.register_occupied_bitset, arg_reg);
+      builder.code_block.register_occupied_values[arg_reg] = arg_value;
     }
   }
 
@@ -950,10 +952,9 @@ ensure_compiled_function_body(
     return_value->storage.tag == Storage_Tag_Memory &&
     return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect
   ) {
-    register_bitset_set(
-      &builder.code_block.register_occupied_bitset,
-      return_value->storage.Memory.location.Indirect.base_register
-    );
+    Register return_reg = return_value->storage.Memory.location.Indirect.base_register;
+    register_bitset_set(&builder.code_block.register_occupied_bitset, return_reg);
+    builder.code_block.register_occupied_values[return_reg] = return_value;
   }
 
   // Return value can be named in which case it should be accessible in the fn body

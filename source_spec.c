@@ -40,6 +40,7 @@ typedef struct {
 } Test_128bit;
 
 typedef Test_128bit (*fn_type_s64_to_test_128bit_struct)(s64);
+typedef s64 (*fn_type_test_128bit_struct_to_s64)(Test_128bit);
 
 bool
 spec_check_mass_result(
@@ -1549,6 +1550,21 @@ spec("source") {
       Test_128bit test_128bit = checker(42);
       check(test_128bit.x == 42);
       check(test_128bit.y == 21);
+    }
+
+    it("should correctly handle struct argument fields as arguments to another call") {
+      fn_type_test_128bit_struct_to_s64 checker = (fn_type_test_128bit_struct_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "Test_128bit :: c_struct({ x : s64; y : s64 });"
+        "test_sum :: (x : s64, y : s64) -> (s64) { x + y }\n"
+        "checker :: (x : Test_128bit) -> (s64) {"
+          "test_sum(x.x, x.y)"
+        "}"
+      );
+      check(checker);
+
+      Test_128bit test_128bit = { .x = 20, .y = 22 };
+      check(checker(test_128bit) == 42);
     }
   }
 
