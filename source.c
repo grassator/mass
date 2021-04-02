@@ -539,35 +539,52 @@ assign(
       MASS_TRY(assign(context, &target_field, &source_field));
     }
     return *context->result;
-  } else if (
-    !context_is_compile_time_eval(context) &&
-    source->descriptor->tag == Descriptor_Tag_Pointer &&
-    source->storage.tag == Storage_Tag_Static
-  ) {
-    // If a static value contains a pointer, we expect an entry
-    // in a special map that allows us to track whether the target memory
-    // is also available in the compiled binary
-    // TODO this probably needs to be recursive for structs.
-    //      This might require support for relocations.
-    const void *source_memory = *storage_static_as_c_type(&source->storage, void *);
-    Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
-    assert(static_pointer);
-    if (static_pointer->storage.tag == Storage_Tag_None) {
-      // TODO should depend on constness of the static value I guess?
-      Section *section = &context->program->memory.sections.rw_data;
-      u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
-      u64 alignment = descriptor_alignment(static_pointer->descriptor);
+  } else if (source->storage.tag == Storage_Tag_Static) {
+    if (
+      !context_is_compile_time_eval(context) &&
+      source->descriptor->tag == Descriptor_Tag_Pointer
+    ) {
+      // If a static value contains a pointer, we expect an entry in a special map used to track
+      // whether the target memory is also already copied to the compiled binary.
+      // This is done to only include static values actually used at runtime.
+      void *source_memory = *storage_static_as_c_type(&source->storage, void *);
+      Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
+      assert(static_pointer);
+      if (static_pointer->storage.tag == Storage_Tag_None) {
+        // TODO should depend on constness of the static value I guess?
+        //      Do not forget to make memory readable for ro_dar
+        Section *section = &context->program->memory.sections.rw_data;
+        u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
+        u64 alignment = descriptor_alignment(static_pointer->descriptor);
 
-      // TODO this should also be deduped
-      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-      static_pointer->storage = data_label32(label_index, byte_size);
+        // TODO this should also be deduped
+        Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
+        static_pointer->storage = data_label32(label_index, byte_size);
 
+        Value static_source_value = {
+          .descriptor = static_pointer->descriptor,
+          .storage = storage_static_internal(source_memory, byte_size),
+          .source_range = source->source_range,
+        };
+
+        // It is important to call assign here to make sure we recursively handle
+        // any complex types such as structs and arrays
+        MASS_TRY(assign(context, static_pointer, &static_source_value));
+      }
+      assert(storage_is_label(&static_pointer->storage));
+      // FIXME this should use the same code as address_of to support pointers inside
+      //       complex types such as structs and arrays
+      load_address(context, &source_range, target, static_pointer);
+      return *context->result;
+    } else if (storage_is_label(&target->storage)) {
+      Label_Index label_index =
+        target->storage.Memory.location.Instruction_Pointer_Relative.label_index;
       void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+      u64 byte_size = source->storage.byte_size;
+      const void *source_memory = storage_static_as_c_type_internal(&source->storage, byte_size);
       memcpy(section_memory, source_memory, byte_size);
+      return *context->result;
     }
-    assert(storage_is_label(&static_pointer->storage));
-    load_address(context, &source_range, target, static_pointer);
-    return *context->result;
   }
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
