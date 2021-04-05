@@ -6,6 +6,16 @@
     <Type Name="Source_Range">
         <DisplayString>{file->text.bytes + offsets.from,[offsets.to - offsets.from]}[{offsets.to - offsets.from}]</DisplayString>
     </Type>
+    <Type Name="Storage">
+      <DisplayString Condition="tag == Storage_Tag_None">_</DisplayString>
+      <DisplayString Condition="tag == Storage_Tag_Register">{Register.index,d}</DisplayString>
+    </Type>
+    <Type Name="Instruction">
+      <DisplayString Condition="type == Instruction_Type_Assembly">
+        {assembly.mnemonic->name} {assembly.operands[0]} {assembly.operands[1]} {assembly.operands[2
+        ]}
+      </DisplayString>
+    </Type>
     <Type Name="Array_u64">
         <DisplayString>[{data->length}]</DisplayString>
         <Expand>
@@ -37,6 +47,16 @@
         </Expand>
     </Type>
     <Type Name="Array_Function_Argument">
+      <DisplayString>[{data->length}]</DisplayString>
+      <Expand>
+        <Item Name="[length]">data->length</Item>
+        <ArrayItems>
+          <Size>data->length</Size>
+          <ValuePointer>data->items</ValuePointer>
+        </ArrayItems>
+      </Expand>
+    </Type>
+    <Type Name="Array_Instruction">
       <DisplayString>[{data->length}]</DisplayString>
       <Expand>
         <Item Name="[length]">data->length</Item>
