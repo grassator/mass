@@ -263,14 +263,40 @@ win32_init_runtime_info_for_function(
   #undef WIN32_WRITE_UNWIND_CODE
 }
 
-static inline u8
-win32_prolog_size(
+static inline const UNWIND_INFO *
+win32_unwind_info_for_function(
   const Section *section,
   const RUNTIME_FUNCTION *function
 ) {
   u32 offset_in_section = function->UnwindData - section->base_rva;
-  const UNWIND_INFO *info = (const void *)((s8 *)section->buffer.memory + offset_in_section);
-  return info->SizeOfProlog;
+  return (const void *)((s8 *)section->buffer.memory + offset_in_section);
+}
+
+static inline u32
+win32_unwind_info_pushed_register_count(
+  const UNWIND_INFO *info
+) {
+  u32 push_count = 0;
+  for (u32 i = 0; i < info->CountOfCodes; ++i) {
+    UNWIND_CODE code = info->UnwindCode[i];
+    switch(code.UnwindOp) {
+      case UWOP_ALLOC_SMALL: /* skip */ break;
+      case UWOP_ALLOC_LARGE: {
+        // Next op code contains the size
+        i += 1;
+        break;
+      }
+      case UWOP_PUSH_NONVOL: {
+        push_count += 1;
+        break;
+      }
+      default: {
+        panic("TODO unsupported UNWIND_CODE");
+        break;
+      }
+    }
+  }
+  return push_count;
 }
 
 #endif

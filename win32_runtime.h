@@ -169,18 +169,19 @@ win32_print_stack(
     printf("  stopped at external code at %016llX\n", instruction_address);
     return;
   }
+  Program_Memory *memory = &jit->program->memory;
+  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
   Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
   RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
-
-  Program_Memory *memory = &jit->program->memory;
-  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+  const UNWIND_INFO *unwind_info =
+    win32_unwind_info_for_function(&memory->sections.ro_data, function);
 
   u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
   u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
 
-  u64 current_offset = win32_prolog_size(&memory->sections.ro_data, function);
+  u64 current_offset = unwind_info->SizeOfProlog;
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     current_offset += instruction->encoded_byte_size;
@@ -190,7 +191,10 @@ win32_print_stack(
     }
   }
 
-  stack_pointer += builder->stack_reserve;
+  // Function prolog pushes the registers which changes RSP and we need to account for that
+  u32 register_push_count = win32_unwind_info_pushed_register_count(unwind_info);
+
+  stack_pointer += builder->stack_reserve + register_push_count * 8;
 
   u64 low_limit;
   u64 high_limit;
