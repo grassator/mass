@@ -180,7 +180,7 @@ win32_print_stack(
   u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
   u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
 
-  u64 current_offset = 0;
+  u64 current_offset = win32_prolog_size(&memory->sections.ro_data, function);
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     current_offset += instruction->encoded_byte_size;

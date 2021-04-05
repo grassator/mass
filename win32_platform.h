@@ -263,4 +263,14 @@ win32_init_runtime_info_for_function(
   #undef WIN32_WRITE_UNWIND_CODE
 }
 
+static inline u8
+win32_prolog_size(
+  const Section *section,
+  const RUNTIME_FUNCTION *function
+) {
+  u32 offset_in_section = function->UnwindData - section->base_rva;
+  const UNWIND_INFO *info = (const void *)((s8 *)section->buffer.memory + offset_in_section);
+  return info->SizeOfProlog;
+}
+
 #endif

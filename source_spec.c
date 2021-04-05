@@ -401,11 +401,11 @@ spec("source") {
       program_jit(&jit);
       check(spec_check_mass_result(test_context.result));
 
-      fn_type_s32_to_s32 checker = (fn_type_s32_to_s32)value_as_function(&jit, main);
+      fn_type_opaque checker = (fn_type_opaque)value_as_function(&jit, main);
 
       volatile bool caught_exception = false;
       __try {
-        checker(0);
+        checker();
       }
       __except(EXCEPTION_EXECUTE_HANDLER) {
         caught_exception = true;

@@ -1,2 +1,6 @@
-inner :: (x : s32) -> (s32) { x / x }
-main :: () -> () { inner(0) }
+explode :: (x : s32) -> (s32) {
+  x / x
+}
+main :: () -> () {
+  explode(0)
+}
