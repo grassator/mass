@@ -206,6 +206,10 @@ win32_print_stack(
   }
 
   u64 return_address = *(u64 *)stack_pointer;
+  // TODO Optimized forwarding functions can use JMP here instead of CALL/RET pair at the end
+  //      which means there should not be any adjustment.
+  stack_pointer += 0x8; // simulate return address pop with `ret` instruction
+
   win32_print_stack(stack_pointer, return_address, jit);
 }
 
