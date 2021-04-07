@@ -5494,7 +5494,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
   push_instruction(
     &context->builder->code_block.instructions, args_token->source_range,
-    (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes }
+    (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes, .scope = context->scope, }
   );
 
   return expected_result_validate(expected_result, &void_value);

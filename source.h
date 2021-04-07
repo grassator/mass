@@ -137,6 +137,17 @@ scope_define_builtins(
   Scope *scope
 );
 
+void
+scope_print_names(
+  const Scope *scope
+);
+
+static inline Scope_Entry *
+scope_lookup(
+  const Scope *scope,
+  Slice name
+);
+
 Value *
 compile_time_eval(
   Execution_Context *context,

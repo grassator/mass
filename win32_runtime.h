@@ -157,6 +157,36 @@ win32_get_runtime_function_callback(
   return dyn_array_get(info->function_table, runtime_function_index);
 }
 
+const Instruction *
+win32_instruction_for_address(
+  DWORD64 instruction_address,
+  Jit *jit
+) {
+  s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
+  if (runtime_function_index < 0) return 0;
+  Program_Memory *memory = &jit->program->memory;
+  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+
+  Win32_Jit_Info *info = jit->platform_specific_payload;
+  Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
+  RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
+  const UNWIND_INFO *unwind_info =
+    win32_unwind_info_for_function(&memory->sections.ro_data, function);
+
+  u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
+  u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
+
+  u64 current_offset = unwind_info->SizeOfProlog;
+  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
+    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
+    current_offset += instruction->encoded_byte_size;
+    if (current_offset == relative_instruction_byte_offset) {
+      return instruction;
+    }
+  }
+  return 0;
+}
+
 void
 win32_print_stack(
   DWORD64 stack_pointer,
@@ -259,6 +289,102 @@ win32_program_test_exception_handler(
           ) {
             // TODO support this for each stack frame
             win32_print_register_state(ContextRecord);
+          } else if (
+            slice_equal(command, slice_literal("locals"))
+          ) {
+            const Instruction *instruction =
+              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
+            if (instruction && instruction->scope) {
+              scope_print_names(instruction->scope);
+            } else {
+              printf("No debug information for current IP is available\n");
+            }
+          } else if (slice_starts_with(command, slice_literal("print "))) {
+            Slice variable_name = slice_sub(command, strlen("print "), command.length);
+            variable_name = slice_trim_whitespace(variable_name);
+            const Instruction *instruction =
+              win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
+            if (instruction && instruction->scope) {
+              Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_name);
+              if (scope_entry->tag != Scope_Entry_Tag_Value) {
+                panic("TODO support other scope entry types");
+              }
+              Value *value = scope_entry->Value.value;
+              if (value) {
+                if (value->descriptor->name.length) {
+                  // TODO print actual value
+                  printf("%"PRIslice" {0}", SLICE_EXPAND_PRINTF(value->descriptor->name));
+                  puts("");
+                }
+                // TODO
+                //print_operand(&value->storage);
+                //puts("");
+                if (value->descriptor == &descriptor_s64) {
+                  // TODO
+                  //switch(value->storage.tag) {
+                    //default:
+                    //case Storage_Tag_None:
+                    //case Storage_Tag_Any:
+                    //case Storage_Tag_Static:
+                    //case Storage_Tag_Eflags:
+                    //case Storage_Tag_Xmm:
+                    //case Storage_Tag_Memory: {
+                      //panic("TODO implement printing this storage type");
+                      //break;
+                    //}
+                    //case Storage_Tag_Register: {
+                      //assert(value->storage.byte_size == 8);
+                      //DWORD64 register_value = 0;
+                      //switch(value->storage.Register.index) {
+                        //case Register_A: register_value = ContextRecord->Rax; break;
+                        //case Register_C: register_value = ContextRecord->Rcx; break;
+                        //case Register_D: register_value = ContextRecord->Rdx; break;
+                        //case Register_B: register_value = ContextRecord->Rbx; break;
+                        //case Register_SP: register_value = ContextRecord->Rsp; break;
+                        //case Register_BP: register_value = ContextRecord->Rbp; break;
+                        //case Register_SI: register_value = ContextRecord->Rsi; break;
+                        //case Register_DI: register_value = ContextRecord->Rdi; break;
+                        //case Register_R8: register_value = ContextRecord->R8; break;
+                        //case Register_R9: register_value = ContextRecord->R9; break;
+                        //case Register_R10: register_value = ContextRecord->R10; break;
+                        //case Register_R11: register_value = ContextRecord->R11; break;
+                        //case Register_R12: register_value = ContextRecord->R12; break;
+                        //case Register_R13: register_value = ContextRecord->R13; break;
+                        //case Register_R14: register_value = ContextRecord->R14; break;
+                        //case Register_R15: register_value = ContextRecord->R15; break;
+                        //case Register_Xmm0:
+                        //case Register_Xmm1:
+                        //case Register_Xmm2:
+                        //case Register_Xmm3:
+                        //case Register_Xmm4:
+                        //case Register_Xmm5:
+                        //case Register_Xmm6:
+                        //case Register_Xmm7:
+                        //case Register_Xmm8:
+                        //case Register_Xmm9:
+                        //case Register_Xmm10:
+                        //case Register_Xmm11:
+                        //case Register_Xmm12:
+                        //case Register_Xmm13:
+                        //case Register_Xmm14:
+                        //case Register_Xmm15:
+                        //default: {
+                          //printf("TODO support XMM registers\n");
+                          //break;
+                        //}
+                      //}
+                      //printf("0x%016llX\n", register_value);
+                    //}
+                  //}
+                } else {
+                  printf("TODO support generic printing of values\n");
+                }
+              } else {
+                printf("No debug information for current IP is available\n");
+              }
+            } else {
+              printf("Undefined variable '%"PRIslice"'\n", SLICE_EXPAND_PRINTF(variable_name));
+            }
           } else {
             printf("Unknown command: %s", command_c_string);
           }

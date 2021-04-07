@@ -185,6 +185,7 @@ typedef struct {
   };
   Compiler_Source_Location compiler_source_location;
   Source_Range source_range;
+  Scope *scope;
   u8 encoded_byte_size;
 } Instruction;
 
@@ -319,6 +320,11 @@ static inline void *
 rip_value_pointer_from_label_index(
   Program *program,
   Label_Index label_index
+);
+
+void
+print_operand(
+  const Storage *operand
 );
 
 void
