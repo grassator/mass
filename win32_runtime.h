@@ -235,9 +235,34 @@ win32_program_test_exception_handler(
         break;
       }
       case EXCEPTION_BREAKPOINT: {
-        printf("User Breakpoint.\n");
-        win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
-        win32_print_register_state(ContextRecord);
+        printf("User Breakpoint hit\n");
+        char line_buffer[256] = {0};
+        for (;;) {
+          fputs("mdb> ", stdout);
+          const char *command_c_string = fgets(line_buffer, countof(line_buffer), stdin);
+          if (!command_c_string) break;
+
+          Slice command = slice_from_c_string(command_c_string);
+          command = slice_trim_whitespace(command);
+          if (
+            slice_equal(command, slice_literal("continue")) ||
+            slice_equal(command, slice_literal("cont"))
+          ) {
+            break;
+          } else if (
+            slice_equal(command, slice_literal("backtrace")) ||
+            slice_equal(command, slice_literal("bt"))
+          ) {
+            win32_print_stack(ContextRecord->Rsp, ContextRecord->Rip, exception_data->jit);
+          } else if (
+            slice_equal(command, slice_literal("registers"))
+          ) {
+            // TODO support this for each stack frame
+            win32_print_register_state(ContextRecord);
+          } else {
+            printf("Unknown command: %s", command_c_string);
+          }
+        }
         // Move instruction pointer over the int3 (0xCC) instruction
         ContextRecord->Rip += 1;
         return ExceptionContinueExecution;

@@ -18,6 +18,8 @@ print :: macro (string : String) -> () {
 }
 
 fn print(integer : s64) {
+  debugger;
+
   const count = {
     mut count = 0
     for mut temp = integer ; temp ; temp = temp / 10 {
