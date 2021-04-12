@@ -75,7 +75,7 @@ expected_result_static(
   };
 }
 
-Value *
+static Value *
 expected_result_validate(
   const Expected_Result *expected_result,
   Value *actual_value
@@ -218,7 +218,7 @@ value_view_from_value_array(
   u64 ID = _atomic_next_##ID++;
 #endif
 
-Scope *
+static inline Scope *
 scope_make(
   const Allocator *allocator,
   const Scope *parent
@@ -235,7 +235,7 @@ scope_make(
   return scope;
 }
 
-const Scope *
+static inline const Scope *
 scope_maybe_find_common_ancestor(
   const Scope *a,
   const Scope *b
@@ -338,7 +338,7 @@ context_merge_in_scope(
   context->scope = new_scope;
 }
 
-void
+static void
 scope_print_names(
   const Scope *scope
 ) {
@@ -390,7 +390,7 @@ scope_lookup(
   return 0;
 }
 
-Value *
+static Value *
 token_value_force_immediate_integer(
   Execution_Context *context,
   Value *value,
@@ -475,7 +475,7 @@ token_value_force_immediate_integer(
   return value;
 }
 
-Value *
+static inline Value *
 maybe_coerce_number_literal_to_integer(
   Execution_Context *context,
   Value *value,
@@ -486,13 +486,13 @@ maybe_coerce_number_literal_to_integer(
   return token_value_force_immediate_integer(context, value, target_descriptor);
 }
 
-Storage
+static Storage
 storage_field_access(
   Storage *struct_storage,
   Descriptor_Struct_Field *field
 );
 
-PRELUDE_NO_DISCARD Mass_Result
+static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
   Value *target,
@@ -846,7 +846,7 @@ const Token_Pattern token_pattern_semicolon = {
   .Symbol.name = slice_literal_fields(";"),
 };
 
-bool
+static inline bool
 value_match_single(
   const Value *value,
   const Token_Pattern *pattern
@@ -884,7 +884,7 @@ value_match_single(
   return true;
 }
 
-bool
+static inline bool
 value_match(
   const Value *value,
   const Token_Pattern *pattern
@@ -1301,7 +1301,7 @@ tokenize(
   return result;
 }
 
-Value *
+static inline Value *
 token_peek_match(
   Value_View view,
   u64 index,
@@ -1331,7 +1331,7 @@ typedef struct {
   bool done;
 } Value_View_Split_Iterator;
 
-Value_View
+static Value_View
 token_split_next(
   Value_View_Split_Iterator *it,
   const Token_Pattern *separator
@@ -1403,13 +1403,13 @@ typedef struct {
   Value *value;
 } Token_Match_Arg;
 
-const Descriptor *
+static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
   Value_View view
 );
 
-Value *
+static Value *
 token_parse_single(
   Execution_Context *context,
   Value *value
@@ -1475,7 +1475,7 @@ typedef enum {
   Macro_Match_Mode_Statement
 } Macro_Match_Mode;
 
-u64
+static u64
 token_match_pattern(
   Value_View view,
   Array_Macro_Pattern macro_pattern,
@@ -1542,7 +1542,7 @@ token_match_pattern(
   return view_index;
 }
 
-Value *
+static Value *
 token_apply_macro_syntax(
   Execution_Context *context,
   Array_Value_View match,
@@ -1583,7 +1583,7 @@ token_apply_macro_syntax(
   return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
 }
 
-bool
+static inline bool
 value_is_lazy_or_static(
   Value *value
 ) {
@@ -1593,7 +1593,7 @@ value_is_lazy_or_static(
   return false;
 }
 
-bool
+static inline bool
 value_is_non_lazy_static(
   Value *value
 ) {
@@ -1605,7 +1605,7 @@ value_is_non_lazy_static(
   return false;
 }
 
-Value *
+static Value *
 mass_handle_statement_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -1615,7 +1615,7 @@ mass_handle_statement_lazy_proc(
   return &void_value;
 }
 
-u64
+static u64
 token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
@@ -1653,13 +1653,13 @@ token_parse_macro_statement(
 
 hash_map_slice_template(Raw_Macro_Map, Value_View)
 
-Value *
+static Value *
 token_parse_block_view(
   Execution_Context *context,
   Value_View children_view
 );
 
-u64
+static u64
 token_parse_macro_rewrite(
   Execution_Context *context,
   Value_View value_view,
@@ -1721,7 +1721,7 @@ token_parse_macro_rewrite(
   return match_length;
 }
 
-Value *
+static Value *
 token_parse_macros(
   Execution_Context *context,
   Value_View value_view,
@@ -1748,13 +1748,13 @@ token_parse_macros(
   return 0;
 }
 
-Descriptor *
+static Descriptor *
 token_match_fixed_array_type(
   Execution_Context *context,
   Value_View view
 );
 
-const Descriptor *
+static inline const Descriptor *
 token_match_type(
   Execution_Context *context,
   Value_View view
@@ -1768,7 +1768,7 @@ token_match_type(
   return value_ensure_type(context, type_value, view.source_range);
 }
 
-bool
+static inline bool
 token_maybe_split_on_operator(
   Value_View view,
   Slice operator,
@@ -1797,7 +1797,7 @@ token_maybe_split_on_operator(
   return true;
 }
 
-Function_Argument
+static Function_Argument
 token_match_argument(
   Execution_Context *context,
   Value_View view,
@@ -1861,7 +1861,7 @@ token_match_argument(
   return arg;
 }
 
-Function_Return
+static Function_Return
 token_match_return_type(
   Execution_Context *context,
   Value_View view
@@ -1897,7 +1897,7 @@ token_match_return_type(
   return returns;
 }
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 expected_result_ensure_value_or_temp(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -1975,7 +1975,7 @@ expected_result_ensure_value_or_temp(
   }
 }
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -2000,7 +2000,7 @@ value_force(
   return expected_result_ensure_value_or_temp(context, expected_result, value);
 }
 
-void
+static inline void
 value_force_exact(
   Execution_Context *context,
   Value *target,
@@ -2011,7 +2011,7 @@ value_force_exact(
   assert(forced == target);
 }
 
-Array_Value_Ptr
+static Array_Value_Ptr
 token_match_call_arguments(
   Execution_Context *context,
   Value *token
@@ -2033,7 +2033,7 @@ token_match_call_arguments(
   return result;
 }
 
-void
+static inline void
 scope_add_macro(
   Scope *scope,
   Macro *macro
@@ -2044,7 +2044,7 @@ scope_add_macro(
   dyn_array_push(scope->macros, macro);
 }
 
-Value *
+static Value *
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
   Value_View args,
@@ -2096,7 +2096,7 @@ mass_make_lazy_value(
   return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
 }
 
-void
+static inline void
 scope_define_lazy_compile_time_expression(
   Execution_Context *context,
   Scope *scope,
@@ -2112,7 +2112,7 @@ scope_define_lazy_compile_time_expression(
   scope_define_value(scope, view.source_range, name, lazy_value);
 }
 
-u64
+static u64
 token_parse_exports(
   Execution_Context *context,
   Value_View view,
@@ -2176,7 +2176,7 @@ token_parse_exports(
   return peek_index;
 }
 
-u64
+static u64
 token_parse_operator_definition(
   Execution_Context *context,
   Value_View view,
@@ -2300,7 +2300,7 @@ token_parse_operator_definition(
   return peek_index;
 }
 
-Slice
+static inline Slice
 mass_normalize_import_path(
   const Allocator *allocator,
   Slice raw
@@ -2318,7 +2318,7 @@ mass_normalize_import_path(
   return slice_normalize_path(allocator, normalized_slashes);
 }
 
-Scope
+static Scope
 mass_import(
   Execution_Context context,
   Slice file_path
@@ -2353,7 +2353,7 @@ mass_import(
   return *module->export_scope;
 }
 
-u64
+static u64
 token_parse_syntax_definition(
   Execution_Context *context,
   Value_View view,
@@ -2490,7 +2490,7 @@ token_parse_syntax_definition(
   return peek_index;
 }
 
-bool
+static bool
 token_match_struct_field(
   Execution_Context *context,
   Descriptor *struct_descriptor,
@@ -2509,7 +2509,7 @@ token_match_struct_field(
   return true;
 }
 
-Descriptor
+static Descriptor
 mass_bit_type(
   u64 bit_size
 ) {
@@ -2519,7 +2519,7 @@ mass_bit_type(
   };
 }
 
-Value *
+static Value *
 token_process_c_struct_definition(
   Execution_Context *context,
   Value *args
@@ -2577,7 +2577,7 @@ token_process_c_struct_definition(
   return 0;
 }
 
-Value *
+static Value *
 token_process_function_literal(
   Execution_Context *context,
   Value *args,
@@ -2668,7 +2668,7 @@ get_new_epoch() {
   return epoch;
 }
 
-const Descriptor *
+static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
 ) {
@@ -2679,7 +2679,7 @@ value_or_lazy_value_descriptor(
   return value->descriptor;
 }
 
-Value *
+static Value *
 compile_time_eval(
   Execution_Context *context,
   Value_View view
@@ -2819,7 +2819,7 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-Value *
+static Value *
 token_handle_storage_variant_of(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -2873,7 +2873,7 @@ token_handle_storage_variant_of(
   return storage_value;
 }
 
-Value *
+static Value *
 token_handle_c_string(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -2909,7 +2909,7 @@ token_handle_c_string(
   return result_value;
 }
 
-External_Symbol
+static External_Symbol
 mass_compiler_external(
   Slice library_name,
   Slice symbol_name
@@ -2947,7 +2947,7 @@ typedef struct {
   Value *expression;
 } Mass_Cast_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_cast_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -2985,7 +2985,7 @@ mass_handle_cast_lazy_proc(
   return expected_result_ensure_value_or_temp(context, expected_result, result_value);
 }
 
-Value *
+static Value *
 token_handle_cast(
   Execution_Context *context,
   Value *args_token
@@ -3026,7 +3026,7 @@ token_handle_cast(
   );
 }
 
-Value *
+static Value *
 token_handle_negation(
   Execution_Context *context,
   Value_View args,
@@ -3051,14 +3051,14 @@ token_handle_negation(
   return negated_value;
 }
 
-void
+static void
 token_dispatch_operator(
   Execution_Context *context,
   Array_Value_Ptr *stack,
   Operator_Stack_Entry *operator_entry
 );
 
-bool
+static bool
 token_handle_operator(
   Execution_Context *context,
   Value_View view,
@@ -3122,7 +3122,7 @@ token_handle_operator(
   return true;
 }
 
-u64
+static u64
 token_parse_constant_definitions(
   Execution_Context *context,
   Value_View view,
@@ -3170,7 +3170,7 @@ typedef struct {
   Source_Range source_range;
 } Mass_Function_Call_Lazy_Payload;
 
-Value *
+static Value *
 call_function_macro(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -3279,7 +3279,7 @@ call_function_macro(
   return result_value;
 }
 
-Value *
+static Value *
 call_function_overload(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -3449,7 +3449,7 @@ call_function_overload(
   return result_value;
 }
 
-Value *
+static Value *
 token_handle_function_call(
   Execution_Context *context,
   Value *target_token,
@@ -3640,7 +3640,7 @@ signed_integer_next_size_descriptor(
   }
 }
 
-const Descriptor *
+static const Descriptor *
 large_enough_common_integer_descriptor_for_values(
   Execution_Context *context,
   const Value *left_value,
@@ -3712,7 +3712,7 @@ large_enough_common_integer_descriptor_for_values(
   }
 }
 
-void
+static void
 maybe_resize_values_for_integer_math_operation(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -3742,8 +3742,7 @@ maybe_resize_values_for_integer_math_operation(
   }
 }
 
-
-Storage
+static Storage
 storage_load_index_address(
   Execution_Context *context,
   const Source_Range *source_range,
@@ -3879,7 +3878,7 @@ typedef struct {
   Value *rhs;
 } Mass_Arithmetic_Operator_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4106,7 +4105,7 @@ typedef struct {
   Value *rhs;
 } Mass_Comparison_Operator_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4263,7 +4262,7 @@ mass_handle_comparison_operation(
   }
 }
 
-Value *
+static Value *
 mass_handle_arrow_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4276,7 +4275,7 @@ mass_handle_arrow_operator(
   return function_value;
 }
 
-Value *
+static Value *
 mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4303,7 +4302,7 @@ mass_handle_startup_call_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-Value *
+static Value *
 mass_handle_address_of_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4315,7 +4314,7 @@ mass_handle_address_of_lazy_proc(
   return result_value;
 }
 
-Value *
+static Value *
 token_handle_type_of(
   Execution_Context *context,
   Value *args_token
@@ -4343,7 +4342,7 @@ token_handle_type_of(
   return result;
 }
 
-Value *
+static Value *
 token_handle_size_of(
   Execution_Context *context,
   Value *args_token
@@ -4378,7 +4377,7 @@ token_handle_size_of(
   return result;
 }
 
-Value *
+static Value *
 mass_handle_paren_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4454,7 +4453,7 @@ mass_handle_paren_operator(
   }
 }
 
-Value *
+static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4477,7 +4476,7 @@ mass_handle_at_operator(
   }
 }
 
-Descriptor_Struct_Field *
+static inline Descriptor_Struct_Field *
 struct_find_field_by_name(
   const Descriptor *descriptor,
   Slice field_name
@@ -4492,7 +4491,7 @@ struct_find_field_by_name(
   return 0;
 }
 
-Storage
+static Storage
 storage_field_access(
   Storage *struct_storage,
   Descriptor_Struct_Field *field
@@ -4530,7 +4529,7 @@ typedef struct {
   Descriptor_Struct_Field *field;
 } Mass_Field_Access_Lazy_Payload;
 
-Value *
+static inline Value *
 mass_handle_field_access_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4551,7 +4550,7 @@ typedef struct {
   Value *index;
 } Mass_Array_Access_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_array_access_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4606,7 +4605,7 @@ mass_handle_array_access_lazy_proc(
   return expected_result_ensure_value_or_temp(context, expected_result, array_element_value);
 }
 
-Value *
+static Value *
 mass_handle_dot_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4701,7 +4700,7 @@ mass_handle_dot_operator(
   }
 }
 
-Value *
+static Value *
 mass_handle_macro_keyword(
   Execution_Context *context,
   Value_View args_view,
@@ -4728,7 +4727,7 @@ mass_handle_macro_keyword(
   }
 }
 
-void
+static void
 token_dispatch_operator(
   Execution_Context *context,
   Array_Value_Ptr *stack,
@@ -4780,7 +4779,7 @@ typedef struct {
   Value *else_;
 } Mass_If_Expression_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_if_expression_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4833,7 +4832,7 @@ mass_handle_if_expression_lazy_proc(
   return result_value;
 }
 
-Value *
+static Value *
 token_parse_if_expression(
   Execution_Context *context,
   Value_View view,
@@ -4898,7 +4897,7 @@ typedef Value *(*Expression_Matcher_Proc)(
   u64 *out_match_length
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
@@ -5012,7 +5011,7 @@ token_parse_expression(
   return result;
 }
 
-Value *
+static Value *
 mass_handle_block_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5058,7 +5057,7 @@ mass_handle_block_lazy_proc(
   return result_value;
 }
 
-Value *
+static Value *
 token_parse_block_view(
   Execution_Context *context,
   Value_View children_view
@@ -5158,7 +5157,7 @@ token_parse_block_view(
   }
 }
 
-Value *
+static inline Value *
 token_parse_block_no_scope(
   Execution_Context *context,
   Value *block
@@ -5169,7 +5168,7 @@ token_parse_block_no_scope(
   return token_parse_block_view(context, group->children);
 }
 
-Value *
+static inline Value *
 token_parse_block(
   Execution_Context *context,
   Value *block
@@ -5180,7 +5179,7 @@ token_parse_block(
   return token_parse_block_no_scope(&body_context, block);
 }
 
-u64
+static u64
 token_parse_statement_using(
   Execution_Context *context,
   Value_View view,
@@ -5212,7 +5211,7 @@ token_parse_statement_using(
   return peek_index;
 }
 
-Value *
+static Value *
 mass_handle_label_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5244,7 +5243,7 @@ mass_handle_label_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-u64
+static u64
 token_parse_statement_label(
   Execution_Context *context,
   Value_View view,
@@ -5295,7 +5294,7 @@ token_parse_statement_label(
   return peek_index;
 }
 
-Value *
+static Value *
 mass_handle_explicit_return_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5323,7 +5322,7 @@ mass_handle_explicit_return_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-u64
+static u64
 token_parse_explicit_return(
   Execution_Context *context,
   Value_View view,
@@ -5355,7 +5354,7 @@ token_parse_explicit_return(
   return peek_index;
 }
 
-Descriptor *
+static Descriptor *
 token_match_fixed_array_type(
   Execution_Context *context,
   Value_View view
@@ -5386,7 +5385,7 @@ token_match_fixed_array_type(
   return array_descriptor;
 }
 
-Value *
+static Value *
 mass_handle_inline_machine_code_bytes_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5443,7 +5442,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-u64
+static u64
 token_parse_inline_machine_code_bytes(
   Execution_Context *context,
   Value_View view,
@@ -5473,7 +5472,7 @@ token_parse_inline_machine_code_bytes(
   return peek_index;
 }
 
-Value *
+static Value *
 token_maybe_parse_definition(
   Execution_Context *context,
   Value_View view,
@@ -5497,7 +5496,7 @@ token_maybe_parse_definition(
   return stack_value;
 }
 
-u64
+static inline u64
 token_parse_definition_statement(
   Execution_Context *context,
   Value_View state,
@@ -5511,7 +5510,7 @@ token_parse_definition_statement(
   return match_length;
 }
 
-void
+static void
 token_define_global_variable(
   Execution_Context *context,
   Value *symbol,
@@ -5566,7 +5565,7 @@ typedef struct {
   Value *expression;
 } Mass_Assignment_Lazy_Payload;
 
-Value *
+static Value *
 mass_handle_assignment_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5634,7 +5633,7 @@ token_define_local_variable(
   out_lazy_value->payload = payload;
 }
 
-u64
+static u64
 token_parse_definition_and_assignment_statements(
   Execution_Context *context,
   Value_View view,
@@ -5679,7 +5678,7 @@ token_parse_definition_and_assignment_statements(
   return statement_length;
 }
 
-u64
+static u64
 token_parse_assignment(
   Execution_Context *context,
   Value_View view,
@@ -5726,7 +5725,7 @@ token_parse_assignment(
   return statement_length;
 }
 
-PRELUDE_NO_DISCARD Mass_Result
+static inline PRELUDE_NO_DISCARD Mass_Result
 token_parse(
   Execution_Context *context,
   Value_View view
@@ -5738,7 +5737,7 @@ token_parse(
   return *context->result;
 }
 
-void
+static void
 scope_define_builtins(
   const Allocator *allocator,
   Scope *scope
@@ -5929,7 +5928,7 @@ scope_define_builtins(
   }
 }
 
-Mass_Result
+static inline Mass_Result
 program_parse(
   Execution_Context *context
 ) {
@@ -5942,7 +5941,7 @@ program_parse(
   return *context->result;
 }
 
-Fixed_Buffer *
+static Fixed_Buffer *
 program_absolute_path(
   Slice raw_path
 ) {
@@ -5994,7 +5993,7 @@ program_absolute_path(
   return result_buffer;
 }
 
-void
+static inline void
 program_module_init(
   Module *module,
   Slice file_path,
@@ -6010,7 +6009,7 @@ program_module_init(
   };
 }
 
-Module *
+static Module *
 program_module_from_file(
   Execution_Context *context,
   Slice file_path,
@@ -6036,7 +6035,7 @@ program_module_from_file(
   return module;
 }
 
-Mass_Result
+static Mass_Result
 program_import_module(
   Execution_Context *context,
   Module *module

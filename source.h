@@ -79,7 +79,7 @@ typedef struct Scope {
 
 MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope);
 
-PRELUDE_NO_DISCARD Mass_Result
+static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
   Value *target,
@@ -91,7 +91,7 @@ expected_result_descriptor(
   const Expected_Result *expected_result
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 expected_result_ensure_value_or_temp(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -101,14 +101,14 @@ expected_result_ensure_value_or_temp(
 static inline u64
 get_new_epoch();
 
-Value *
+static inline Value *
 maybe_coerce_number_literal_to_integer(
   Execution_Context *context,
   Value *value,
   const Descriptor *target_descriptor
 );
 
-Scope *
+static inline Scope *
 scope_make(
   const Allocator *allocator,
   const Scope *parent
@@ -131,13 +131,13 @@ scope_define_operator(
   Operator *operator
 );
 
-void
+static void
 scope_define_builtins(
   const Allocator *allocator,
   Scope *scope
 );
 
-void
+static void
 scope_print_names(
   const Scope *scope
 );
@@ -148,13 +148,13 @@ scope_lookup(
   Slice name
 );
 
-Value *
+static Value *
 compile_time_eval(
   Execution_Context *context,
   Value_View view
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
   Value_View view,
@@ -162,14 +162,14 @@ token_parse_expression(
   const Token_Pattern *end_pattern
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
   const Expected_Result *expected_result,
   Value *value
 );
 
-void
+static void
 value_force_exact(
   Execution_Context *context,
   Value *target,
@@ -181,37 +181,37 @@ expected_result_from_value(
   Value *value
 );
 
-const Descriptor *
+static inline const Descriptor *
 value_or_lazy_value_descriptor(
   const Value *value
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 token_parse_block_no_scope(
   Execution_Context *context,
   Value *block
 );
 
-PRELUDE_NO_DISCARD Value *
+static PRELUDE_NO_DISCARD Value *
 token_parse_block(
   Execution_Context *program,
   Value *block
 );
 
-Module *
+static Module *
 program_module_from_file(
   Execution_Context *context,
   Slice file_path,
   Scope *scope
 );
 
-Mass_Result
+static Mass_Result
 program_import_module(
   Execution_Context *context,
   Module *module
 );
 
-void
+static void
 program_push_error_from_bucket_buffer(
   Execution_Context *context,
   Source_Range source_range,
