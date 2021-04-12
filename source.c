@@ -2021,8 +2021,10 @@ expected_result_ensure_value_or_temp(
         return value;
       }
       if (flexible->storage & Expected_Result_Storage_Register) {
-        if (value->storage.tag == Storage_Tag_Register) {
-          // FIXME verify register mask
+        if (
+          value->storage.tag == Storage_Tag_Register &&
+          (flexible->register_bit_set & (1llu << value->storage.Register.index))
+        ) {
           return value;
         }
         Value *temp_result = value_temporary_register_for_descriptor(
