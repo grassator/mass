@@ -321,6 +321,23 @@ scope_flatten_till(
   return scope_flatten_till_internal(allocator, scope, till, 0, 0, 0);
 }
 
+static void
+context_merge_in_scope(
+  Execution_Context *context,
+  Scope *using_scope
+) {
+  // This code injects a proxy scope that just uses the same data as the other
+  const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, using_scope);
+  assert(common_ancestor);
+  // TODO @Speed This is quite inefficient but I can't really think of something faster
+  Scope *proxy = scope_flatten_till(context->allocator, using_scope, common_ancestor);
+  proxy->parent = context->scope;
+  Scope *new_scope = scope_make(context->allocator, proxy);
+
+  // FIXME introduce a more generic mechanism for the statements to introduce a new scope
+  context->scope = new_scope;
+}
+
 void
 scope_print_names(
   const Scope *scope
@@ -1526,51 +1543,6 @@ token_match_pattern(
 }
 
 Value *
-token_make_fake_body(
-  Execution_Context *context,
-  Value_View children
-) {
-  Group *group = allocator_allocate(context->allocator, Group);
-  *group = (Group){
-    .tag = Group_Tag_Curly,
-    .children = children,
-  };
-
-  return value_make(context, &descriptor_group, storage_static(group), children.source_range);
-}
-
-Value *
-token_make_macro_capture_function(
-  Execution_Context *context,
-  Value *body,
-  Scope *captured_scope,
-  Array_Function_Argument arguments,
-  const Descriptor *return_descriptor,
-  Slice capture_name
-) {
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Function,
-    .name = capture_name,
-    .Function.info = {
-      .arguments = arguments,
-      .scope = captured_scope,
-      .body = body,
-      .flags
-        = Descriptor_Function_Flags_Macro
-        | Descriptor_Function_Flags_No_Own_Scope
-        | Descriptor_Function_Flags_No_Own_Return,
-      .returns = {
-        .name = {0},
-        .descriptor = return_descriptor,
-      }
-    },
-  };
-
-  return value_make(context, descriptor, (Storage){.tag = Storage_Tag_None}, body->source_range);
-}
-
-Value *
 token_apply_macro_syntax(
   Execution_Context *context,
   Array_Value_View match,
@@ -1592,65 +1564,16 @@ token_apply_macro_syntax(
     Slice capture_name = item->capture_name;
 
     if (!capture_name.length) continue;
-
     Value_View capture_view = *dyn_array_get(match, i);
-    Value *fake_body = token_make_fake_body(context, capture_view);
-
-    // FIXME because of hardcoded &descriptor_void we can only capture statements
-    //       which limits the usefulness of this type of macro. Need to figure out
-    //       a way to determine the return descriptor in such a way that it does not
-    //       break the lazy evaluation.
-    //       :SyntaxReturnDescriptor
-    const Descriptor *return_descriptor = &descriptor_void;
-
-    Array_Function_Argument empty_arguments = {&dyn_array_zero_items};
-    Value *result = token_make_macro_capture_function(
-      context, fake_body, captured_scope, empty_arguments, return_descriptor, capture_name
+    Macro_Capture *capture = allocator_allocate(context->allocator, Macro_Capture);
+    *capture = (Macro_Capture){
+      .name = item->capture_name,
+      .view = capture_view,
+      .scope = captured_scope,
+    };
+    Value *result = value_make(
+      context, &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
-    // This overload allows the macro implementation to pass in a scope into a captured that
-    // will be expanded with `using` to bring in values from into a local scope. It is used
-    // to expose `break` and `continue` statements to the body of the loop while avoiding their
-    // definition in the captured scope of an expansion
-    // TODO @Speed figure out a better way to do this
-    {
-      Array_Function_Argument overload_arguments = dyn_array_make(
-        Array_Function_Argument, .capacity = 1, .allocator = context->allocator
-      );
-      Source_Range source_range = capture_view.source_range;
-      Value *argument_value = value_make(context, &descriptor_scope, storage_none, source_range);
-      dyn_array_push(overload_arguments, (Function_Argument) {
-        .name = slice_literal("@spliced_scope"),
-        .value = argument_value,
-      });
-
-      Value *using = token_make_symbol(
-        context->allocator, slice_literal("using"), Symbol_Type_Id_Like, source_range
-      );
-      Value *scope_symbol = token_make_symbol(
-        context->allocator, slice_literal("@spliced_scope"), Symbol_Type_Id_Like, source_range
-      );
-      Value *semicolon = token_make_symbol(
-        context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
-      );
-
-      Value **scope_body_tokens = allocator_allocate_array(context->allocator, Value *, 4);
-      scope_body_tokens[0] = using;
-      scope_body_tokens[1] = scope_symbol;
-      scope_body_tokens[2] = semicolon;
-      scope_body_tokens[3] = fake_body;
-
-      Value_View scope_value_view = (Value_View) {
-        .values = scope_body_tokens,
-        .length = 4,
-        .source_range = capture_view.source_range,
-      };
-      Value *overload_body = token_make_fake_body(context, scope_value_view);
-      Value *scope_overload = token_make_macro_capture_function(
-        context, overload_body, captured_scope, overload_arguments, return_descriptor, capture_name
-      );
-      result->next_overload = scope_overload;
-    }
-
     scope_define_value(expansion_scope, capture_view.source_range, capture_name, result);
   }
 
@@ -3574,6 +3497,34 @@ token_handle_function_call(
     panic("unepexpected eager evaluation of function arguments");
   }
 
+  if (target_expression->descriptor == &descriptor_macro_capture) {
+    u64 arg_count = dyn_array_length(args);
+    Macro_Capture *capture = storage_static_as_c_type(&target_expression->storage, Macro_Capture);
+    Execution_Context capture_context = *context;
+    capture_context.scope = capture->scope;
+    if (arg_count == 0) {
+      // Nothing to do
+    } else if (arg_count == 1) {
+      Value *scope_arg = *dyn_array_get(args, 0);
+      if (scope_arg->descriptor != &descriptor_scope) {
+        context_error_snprintf(
+          context, scope_arg->source_range,
+          "Macro capture can only accept Scope as an argument"
+        );
+        goto err;
+      }
+      Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
+      context_merge_in_scope(&capture_context, argument_scope);
+    } else {
+      context_error_snprintf(
+        context, target_token->source_range,
+        "Too many arguments for a capture expansion. It can have only one optional Scope argument."
+      );
+      goto err;
+    }
+    return token_parse_block_view(&capture_context, capture->view);
+  }
+
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
   for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
     const Descriptor *to_call_descriptor =
@@ -5254,18 +5205,8 @@ token_parse_statement_using(
     goto err;
   }
 
-  // This code injects a proxy scope that just uses the same data as the other
-  Scope *current_scope = context->scope;
-  const Scope *using_scope = storage_static_as_c_type(&result->storage, Scope);
-  const Scope *common_ancestor = scope_maybe_find_common_ancestor(current_scope, using_scope);
-  assert(common_ancestor);
-  // TODO @Speed This is quite inefficient but I can't really think of something faster
-  Scope *proxy = scope_flatten_till(context->allocator, using_scope, common_ancestor);
-  proxy->parent = current_scope;
-  Scope *new_scope = scope_make(context->allocator, proxy);
-
-  // FIXME introduce a more generic mechanism for the statements to introduce a new scope
-  context->scope = new_scope;
+  Scope *using_scope = storage_static_as_c_type(&result->storage, Scope);
+  context_merge_in_scope(context, using_scope);
 
   err:
   return peek_index;

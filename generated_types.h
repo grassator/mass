@@ -81,6 +81,10 @@ typedef struct Number_Literal Number_Literal;
 typedef dyn_array_type(Number_Literal *) Array_Number_Literal_Ptr;
 typedef dyn_array_type(const Number_Literal *) Array_Const_Number_Literal_Ptr;
 
+typedef struct Macro_Capture Macro_Capture;
+typedef dyn_array_type(Macro_Capture *) Array_Macro_Capture_Ptr;
+typedef dyn_array_type(const Macro_Capture *) Array_Const_Macro_Capture_Ptr;
+
 typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
@@ -460,6 +464,14 @@ typedef struct Number_Literal {
   u64 bits;
 } Number_Literal;
 typedef dyn_array_type(Number_Literal) Array_Number_Literal;
+
+typedef struct Macro_Capture {
+  Scope * scope;
+  Slice name;
+  Value_View view;
+  Source_Range source_range;
+} Macro_Capture;
+typedef dyn_array_type(Macro_Capture) Array_Macro_Capture;
 
 typedef struct External_Symbol {
   Slice library_name;
@@ -970,6 +982,10 @@ static Descriptor descriptor_number_literal;
 static Descriptor descriptor_array_number_literal_ptr;
 static Descriptor descriptor_number_literal_pointer;
 static Descriptor descriptor_number_literal_pointer_pointer;
+static Descriptor descriptor_macro_capture;
+static Descriptor descriptor_array_macro_capture_ptr;
+static Descriptor descriptor_macro_capture_pointer;
+static Descriptor descriptor_macro_capture_pointer_pointer;
 static Descriptor descriptor_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
 static Descriptor descriptor_external_symbol_pointer;
@@ -1350,6 +1366,31 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(number_literal);
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture_ptr, Array_Macro_Capture_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro_capture, Array_Macro_Capture)
+MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture,
+  {
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .offset = offsetof(Macro_Capture, scope),
+  },
+  {
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .offset = offsetof(Macro_Capture, name),
+  },
+  {
+    .name = slice_literal_fields("view"),
+    .descriptor = &descriptor_value_view,
+    .offset = offsetof(Macro_Capture, view),
+  },
+  {
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .offset = offsetof(Macro_Capture, source_range),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(macro_capture);
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol_ptr, Array_External_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol, Array_External_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol,

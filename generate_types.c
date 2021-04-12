@@ -567,6 +567,13 @@ main(void) {
     { "u64", "bits" },
   }));
 
+  push_type(type_struct("Macro_Capture", (Struct_Item[]){
+    { "Scope *", "scope" },
+    { "Slice", "name" },
+    { "Value_View", "view" },
+    { "Source_Range", "source_range" },
+  }));
+
   push_type(type_struct("External_Symbol", (Struct_Item[]){
     { "Slice", "library_name" },
     { "Slice", "symbol_name" },
