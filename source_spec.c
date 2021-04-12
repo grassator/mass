@@ -1253,16 +1253,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    xit("should not allow changes to the passed arguments to inline function") {
-      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
-        "test", &test_context,
-        "process :: inline (y : s64) -> () { y = 20; }\n"
-        "test :: () -> (s64) { x := 42; process(x); x }"
-      );
-      check(checker);
-      check(checker() == 42);
-    }
-
     it("should be able to define and use a syntax macro without a capture") {
       fn_type_void_to_s32 checker = (fn_type_void_to_s32)test_program_inline_source_function(
         "checker", &test_context,
