@@ -1195,6 +1195,21 @@ dyn_array_sort_internal(
     (Prelude_Comparator_Function)(_comparator_)\
   )
 
+#define DYN_ARRAY_FOREACH(_it_type_, _it_name_, _array_)\
+  if (dyn_array_length(_array_)) \
+    for (\
+      _it_type_ *_it_name_ = dyn_array_get((_array_), 0), *_it_name_##_last = dyn_array_last(_array_);\
+      _it_name_ <= _it_name_##_last;\
+      _it_name_++\
+    )
+
+#define STATIC_ARRAY_FOREACH(_it_type_, _it_name_, _array_)\
+  for (\
+    _it_type_ *_it_name_ = (_array_), *_it_name_##_last = (_array_) + countof(_array_);\
+    _it_name_ < _it_name_##_last;\
+    _it_name_++\
+  )
+
 //////////////////////////////////////////////////////////////////////////////
 // Slice
 //////////////////////////////////////////////////////////////////////////////
@@ -3250,6 +3265,15 @@ bucket_buffer_allocator_make(
 ) {
   return bucket_buffer_allocator_init(buffer, bucket_buffer_allocate(buffer, Allocator));
 }
+
+#define bucket_buffer_vsprintf(_buffer_, _format_, _va_, _out_slice_)\
+  do {\
+    va_list vsprintf_va = (_va_);\
+    u64 vsprintf_size = s32_to_u64(vsnprintf(0, 0, (_format_), vsprintf_va)) + 1;\
+    u8 *vsprintf_bytes = bucket_buffer_allocate_bytes((_buffer_), vsprintf_size, 1);\
+    vsnprintf(vsprintf_bytes, vsprintf_size, (_format_), vsprintf_va);\
+    *(_out_slice_) = (Slice) { .bytes = vsprintf_bytes, .length = vsprintf_size };\
+  } while(0);
 
 
 //////////////////////////////////////////////////////////////////////////////
