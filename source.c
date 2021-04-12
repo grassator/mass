@@ -5115,7 +5115,6 @@ token_parse_block_view(
   Array_Value_Ptr lazy_statements = dyn_array_make(Array_Value_Ptr);
 
   u64 match_length = 0;
-  // FIXME deal with terminated vs unterminated statements
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) return 0;
     Value_View rest = value_view_rest(&children_view, start_index);
