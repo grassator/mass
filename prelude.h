@@ -431,6 +431,17 @@ typedef struct {
   Allocator_Handle handle;
 } Allocator;
 
+
+// If the caller takes ownership of a dynamically allocated object it will call
+// `deallocate` at some point on it. To be able to return a static object from
+// you can use this allocator that simply ignores deallocate calls
+static void allocator_static_deallocate(Allocator_Handle handle, void *address, u64 size){}
+static const Allocator allocator_static = {
+  0,
+  allocator_static_deallocate,
+  0,
+};
+
 static inline void *
 allocator_default_allocate(
   Allocator_Handle handle,

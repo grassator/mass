@@ -5,6 +5,10 @@
 #include "types.h"
 #include "encoding.h"
 
+static Array_Value_Ptr empty_value_array = {
+  .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
+};
+
 static inline bool
 register_is_xmm(
   Register reg

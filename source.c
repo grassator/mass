@@ -2016,19 +2016,21 @@ token_match_call_arguments(
   Execution_Context *context,
   Value *token
 ) {
-  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
-  if (context->result->tag != Mass_Result_Tag_Success) return result;
+  if (context->result->tag != Mass_Result_Tag_Success) return empty_value_array;
   const Group *group = value_as_group(token);
 
-  if (group->children.length != 0) {
-    Value_View_Split_Iterator it = { .view = group->children };
+  if (group->children.length == 0) {
+    return empty_value_array;
+  }
 
-    while (!it.done) {
-      if (context->result->tag != Mass_Result_Tag_Success) return result;
-      Value_View view = token_split_next(&it, &token_pattern_comma_operator);
-      Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
-      dyn_array_push(result, parse_result);
-    }
+  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
+  Value_View_Split_Iterator it = { .view = group->children };
+
+  while (!it.done) {
+    if (context->result->tag != Mass_Result_Tag_Success) return result;
+    Value_View view = token_split_next(&it, &token_pattern_comma_operator);
+    Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
+    dyn_array_push(result, parse_result);
   }
   return result;
 }
