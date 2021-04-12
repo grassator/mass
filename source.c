@@ -3308,10 +3308,14 @@ call_function_macro(
       break;
     }
     case Expected_Result_Tag_Flexible: {
+      const Descriptor *return_descriptor = function->returns.descriptor;
+      if (!return_descriptor) {
+        return_descriptor = expected_result_descriptor(expected_result);
+      }
       // FIXME :ExpectedStack
-      result_value = function->returns.descriptor->tag == Descriptor_Tag_Void
+      result_value = return_descriptor->tag == Descriptor_Tag_Void
         ? &void_value
-        : reserve_stack(context, function->returns.descriptor, overload->source_range);
+        : reserve_stack(context, return_descriptor, overload->source_range);
       break;
     }
   }
