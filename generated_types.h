@@ -157,13 +157,17 @@ typedef Value * (*Mass_Handle_Operator_Proc)
 
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
+typedef struct Memory_Layout_Item Memory_Layout_Item;
+typedef dyn_array_type(Memory_Layout_Item *) Array_Memory_Layout_Item_Ptr;
+typedef dyn_array_type(const Memory_Layout_Item *) Array_Const_Memory_Layout_Item_Ptr;
+
+typedef struct Memory_Layout Memory_Layout;
+typedef dyn_array_type(Memory_Layout *) Array_Memory_Layout_Ptr;
+typedef dyn_array_type(const Memory_Layout *) Array_Const_Memory_Layout_Ptr;
+
 typedef struct Descriptor_Struct_Field Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field *) Array_Descriptor_Struct_Field_Ptr;
 typedef dyn_array_type(const Descriptor_Struct_Field *) Array_Const_Descriptor_Struct_Field_Ptr;
-
-typedef struct Function_Argument Function_Argument;
-typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
-typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
 
 typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
@@ -793,20 +797,42 @@ const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   return 0;
 };
 
+typedef enum {
+  Memory_Layout_Item_Tag_Absolute = 0,
+  Memory_Layout_Item_Tag_Base_Relative = 1,
+} Memory_Layout_Item_Tag;
+
+typedef struct {
+  Storage storage;
+} Memory_Layout_Item_Absolute;
+typedef struct {
+  s64 offset;
+} Memory_Layout_Item_Base_Relative;
+typedef struct Memory_Layout_Item {
+  Memory_Layout_Item_Tag tag;
+  char _tag_padding[4];
+  Slice name;
+  const Descriptor * descriptor;
+  Source_Range source_range;
+  Value_View maybe_default_expression;
+  union {
+    Memory_Layout_Item_Absolute Absolute;
+    Memory_Layout_Item_Base_Relative Base_Relative;
+  };
+} Memory_Layout_Item;
+typedef dyn_array_type(Memory_Layout_Item) Array_Memory_Layout_Item;
+typedef struct Memory_Layout {
+  Storage base;
+  Array_Memory_Layout_Item items;
+} Memory_Layout;
+typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
+
 typedef struct Descriptor_Struct_Field {
   Slice name;
   const Descriptor * descriptor;
   u64 offset;
 } Descriptor_Struct_Field;
 typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
-
-typedef struct Function_Argument {
-  Slice name;
-  Source_Range source_range;
-  const Descriptor * descriptor;
-  Value_View maybe_default_expression;
-} Function_Argument;
-typedef dyn_array_type(Function_Argument) Array_Function_Argument;
 
 typedef struct Function_Return {
   Slice name;
@@ -817,7 +843,7 @@ typedef dyn_array_type(Function_Return) Array_Function_Return;
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
-  Array_Function_Argument arguments;
+  Memory_Layout memory_layout;
   Value * body;
   Scope * scope;
   Function_Return returns;
@@ -903,200 +929,253 @@ MASS_ENUMERATE_BUILT_IN_TYPES
 
 typedef dyn_array_type(Slice *) Array_Slice_Ptr;
 static Descriptor descriptor_source_position;
+static Descriptor descriptor_array_source_position;
 static Descriptor descriptor_array_source_position_ptr;
 static Descriptor descriptor_source_position_pointer;
 static Descriptor descriptor_source_position_pointer_pointer;
 static Descriptor descriptor_source_file;
+static Descriptor descriptor_array_source_file;
 static Descriptor descriptor_array_source_file_ptr;
 static Descriptor descriptor_source_file_pointer;
 static Descriptor descriptor_source_file_pointer_pointer;
 static Descriptor descriptor_source_range;
+static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
 static Descriptor descriptor_source_range_pointer;
 static Descriptor descriptor_source_range_pointer_pointer;
 static Descriptor descriptor_module_flags;
+static Descriptor descriptor_array_module_flags;
 static Descriptor descriptor_array_module_flags_ptr;
 static Descriptor descriptor_module_flags_pointer;
 static Descriptor descriptor_module_flags_pointer_pointer;
 static Descriptor descriptor_module;
+static Descriptor descriptor_array_module;
 static Descriptor descriptor_array_module_ptr;
 static Descriptor descriptor_module_pointer;
 static Descriptor descriptor_module_pointer_pointer;
 static Descriptor descriptor_parse_error;
+static Descriptor descriptor_array_parse_error;
 static Descriptor descriptor_array_parse_error_ptr;
 static Descriptor descriptor_parse_error_pointer;
 static Descriptor descriptor_parse_error_pointer_pointer;
 static Descriptor descriptor_group_tag;
+static Descriptor descriptor_array_group_tag;
 static Descriptor descriptor_array_group_tag_ptr;
 static Descriptor descriptor_group_tag_pointer;
 static Descriptor descriptor_group_tag_pointer_pointer;
 static Descriptor descriptor_value_view;
+static Descriptor descriptor_array_value_view;
 static Descriptor descriptor_array_value_view_ptr;
 static Descriptor descriptor_value_view_pointer;
 static Descriptor descriptor_value_view_pointer_pointer;
 static Descriptor descriptor_symbol_type;
+static Descriptor descriptor_array_symbol_type;
 static Descriptor descriptor_array_symbol_type_ptr;
 static Descriptor descriptor_symbol_type_pointer;
 static Descriptor descriptor_symbol_type_pointer_pointer;
 static Descriptor descriptor_symbol;
+static Descriptor descriptor_array_symbol;
 static Descriptor descriptor_array_symbol_ptr;
 static Descriptor descriptor_symbol_pointer;
 static Descriptor descriptor_symbol_pointer_pointer;
 static Descriptor descriptor_group;
+static Descriptor descriptor_array_group;
 static Descriptor descriptor_array_group_ptr;
 static Descriptor descriptor_group_pointer;
 static Descriptor descriptor_group_pointer_pointer;
 static Descriptor descriptor_token_pattern;
+static Descriptor descriptor_array_token_pattern;
 static Descriptor descriptor_array_token_pattern_ptr;
 static Descriptor descriptor_token_pattern_pointer;
 static Descriptor descriptor_token_pattern_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(token_pattern_tag, Token_Pattern_Tag)
 static Descriptor descriptor_section_permissions;
+static Descriptor descriptor_array_section_permissions;
 static Descriptor descriptor_array_section_permissions_ptr;
 static Descriptor descriptor_section_permissions_pointer;
 static Descriptor descriptor_section_permissions_pointer_pointer;
 static Descriptor descriptor_section;
+static Descriptor descriptor_array_section;
 static Descriptor descriptor_array_section_ptr;
 static Descriptor descriptor_section_pointer;
 static Descriptor descriptor_section_pointer_pointer;
 static Descriptor descriptor_register;
+static Descriptor descriptor_array_register;
 static Descriptor descriptor_array_register_ptr;
 static Descriptor descriptor_register_pointer;
 static Descriptor descriptor_register_pointer_pointer;
 static Descriptor descriptor_label_index;
+static Descriptor descriptor_array_label_index;
 static Descriptor descriptor_array_label_index_ptr;
 static Descriptor descriptor_label_index_pointer;
 static Descriptor descriptor_label_index_pointer_pointer;
 static Descriptor descriptor_label;
+static Descriptor descriptor_array_label;
 static Descriptor descriptor_array_label_ptr;
 static Descriptor descriptor_label_pointer;
 static Descriptor descriptor_label_pointer_pointer;
 static Descriptor descriptor_label_location_diff_patch_info;
+static Descriptor descriptor_array_label_location_diff_patch_info;
 static Descriptor descriptor_array_label_location_diff_patch_info_ptr;
 static Descriptor descriptor_label_location_diff_patch_info_pointer;
 static Descriptor descriptor_label_location_diff_patch_info_pointer_pointer;
 static Descriptor descriptor_number_base;
+static Descriptor descriptor_array_number_base;
 static Descriptor descriptor_array_number_base_ptr;
 static Descriptor descriptor_number_base_pointer;
 static Descriptor descriptor_number_base_pointer_pointer;
 static Descriptor descriptor_number_literal;
+static Descriptor descriptor_array_number_literal;
 static Descriptor descriptor_array_number_literal_ptr;
 static Descriptor descriptor_number_literal_pointer;
 static Descriptor descriptor_number_literal_pointer_pointer;
 static Descriptor descriptor_macro_capture;
+static Descriptor descriptor_array_macro_capture;
 static Descriptor descriptor_array_macro_capture_ptr;
 static Descriptor descriptor_macro_capture_pointer;
 static Descriptor descriptor_macro_capture_pointer_pointer;
 static Descriptor descriptor_external_symbol;
+static Descriptor descriptor_array_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
 static Descriptor descriptor_external_symbol_pointer;
 static Descriptor descriptor_external_symbol_pointer_pointer;
 static Descriptor descriptor_import_symbol;
+static Descriptor descriptor_array_import_symbol;
 static Descriptor descriptor_array_import_symbol_ptr;
 static Descriptor descriptor_import_symbol_pointer;
 static Descriptor descriptor_import_symbol_pointer_pointer;
 static Descriptor descriptor_import_library;
+static Descriptor descriptor_array_import_library;
 static Descriptor descriptor_array_import_library_ptr;
 static Descriptor descriptor_import_library_pointer;
 static Descriptor descriptor_import_library_pointer_pointer;
 static Descriptor descriptor_compare_type;
+static Descriptor descriptor_array_compare_type;
 static Descriptor descriptor_array_compare_type_ptr;
 static Descriptor descriptor_compare_type_pointer;
 static Descriptor descriptor_compare_type_pointer_pointer;
 static Descriptor descriptor_maybe_register;
+static Descriptor descriptor_array_maybe_register;
 static Descriptor descriptor_array_maybe_register_ptr;
 static Descriptor descriptor_maybe_register_pointer;
 static Descriptor descriptor_maybe_register_pointer_pointer;
 static Descriptor descriptor_memory_location;
+static Descriptor descriptor_array_memory_location;
 static Descriptor descriptor_array_memory_location_ptr;
 static Descriptor descriptor_memory_location_pointer;
 static Descriptor descriptor_memory_location_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
 static Descriptor descriptor_static_memory;
+static Descriptor descriptor_array_static_memory;
 static Descriptor descriptor_array_static_memory_ptr;
 static Descriptor descriptor_static_memory_pointer;
 static Descriptor descriptor_static_memory_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(static_memory_tag, Static_Memory_Tag)
 static Descriptor descriptor_storage;
+static Descriptor descriptor_array_storage;
 static Descriptor descriptor_array_storage_ptr;
 static Descriptor descriptor_storage_pointer;
 static Descriptor descriptor_storage_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static Descriptor descriptor_compiler_source_location;
+static Descriptor descriptor_array_compiler_source_location;
 static Descriptor descriptor_array_compiler_source_location_ptr;
 static Descriptor descriptor_compiler_source_location_pointer;
 static Descriptor descriptor_compiler_source_location_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
+static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
 static Descriptor descriptor_operator_fixity_pointer;
 static Descriptor descriptor_operator_fixity_pointer_pointer;
 static Descriptor descriptor_operator_associativity;
+static Descriptor descriptor_array_operator_associativity;
 static Descriptor descriptor_array_operator_associativity_ptr;
 static Descriptor descriptor_operator_associativity_pointer;
 static Descriptor descriptor_operator_associativity_pointer_pointer;
 static Descriptor descriptor_execution_context;
+static Descriptor descriptor_array_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
 static Descriptor descriptor_execution_context_pointer;
 static Descriptor descriptor_execution_context_pointer_pointer;
 static Descriptor descriptor_operator;
+static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
 static Descriptor descriptor_operator_pointer;
 static Descriptor descriptor_operator_pointer_pointer;
 static Descriptor descriptor_scope_entry;
+static Descriptor descriptor_array_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(scope_entry_tag, Scope_Entry_Tag)
 static Descriptor descriptor_value;
+static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
 static Descriptor descriptor_value_pointer;
 static Descriptor descriptor_value_pointer_pointer;
 static Descriptor descriptor_expected_result_storage;
+static Descriptor descriptor_array_expected_result_storage;
 static Descriptor descriptor_array_expected_result_storage_ptr;
 static Descriptor descriptor_expected_result_storage_pointer;
 static Descriptor descriptor_expected_result_storage_pointer_pointer;
 static Descriptor descriptor_expected_result;
+static Descriptor descriptor_array_expected_result;
 static Descriptor descriptor_array_expected_result_ptr;
 static Descriptor descriptor_expected_result_pointer;
 static Descriptor descriptor_expected_result_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(expected_result_tag, Expected_Result_Tag)
 static Descriptor descriptor_lazy_value_proc;
 static Descriptor descriptor_lazy_value;
+static Descriptor descriptor_array_lazy_value;
 static Descriptor descriptor_array_lazy_value_ptr;
 static Descriptor descriptor_lazy_value_pointer;
 static Descriptor descriptor_lazy_value_pointer_pointer;
 static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_descriptor_function_flags;
+static Descriptor descriptor_array_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
 static Descriptor descriptor_descriptor_function_flags_pointer;
 static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
+static Descriptor descriptor_memory_layout_item;
+static Descriptor descriptor_array_memory_layout_item;
+static Descriptor descriptor_array_memory_layout_item_ptr;
+static Descriptor descriptor_memory_layout_item_pointer;
+static Descriptor descriptor_memory_layout_item_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_tag, Memory_Layout_Item_Tag)
+static Descriptor descriptor_memory_layout;
+static Descriptor descriptor_array_memory_layout;
+static Descriptor descriptor_array_memory_layout_ptr;
+static Descriptor descriptor_memory_layout_pointer;
+static Descriptor descriptor_memory_layout_pointer_pointer;
 static Descriptor descriptor_descriptor_struct_field;
+static Descriptor descriptor_array_descriptor_struct_field;
 static Descriptor descriptor_array_descriptor_struct_field_ptr;
 static Descriptor descriptor_descriptor_struct_field_pointer;
 static Descriptor descriptor_descriptor_struct_field_pointer_pointer;
-static Descriptor descriptor_function_argument;
-static Descriptor descriptor_array_function_argument_ptr;
-static Descriptor descriptor_function_argument_pointer;
-static Descriptor descriptor_function_argument_pointer_pointer;
 static Descriptor descriptor_function_return;
+static Descriptor descriptor_array_function_return;
 static Descriptor descriptor_array_function_return_ptr;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
 static Descriptor descriptor_function_info;
+static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
 static Descriptor descriptor_function_info_pointer;
 static Descriptor descriptor_function_info_pointer_pointer;
 static Descriptor descriptor_descriptor;
+static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_descriptor_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static Descriptor descriptor_mass_result;
+static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(mass_result_tag, Mass_Result_Tag)
 static Descriptor descriptor_slice;
+static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
@@ -1627,6 +1706,22 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,
 );
 MASS_DEFINE_TYPE_VALUE(lazy_value);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
+MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item, Memory_Layout_Item)
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_ptr, Array_Memory_Layout_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)
+MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout,
+  {
+    .name = slice_literal_fields("base"),
+    .descriptor = &descriptor_storage,
+    .offset = offsetof(Memory_Layout, base),
+  },
+  {
+    .name = slice_literal_fields("items"),
+    .descriptor = &descriptor_array_memory_layout_item,
+    .offset = offsetof(Memory_Layout, items),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(memory_layout);
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field_ptr, Array_Descriptor_Struct_Field_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_struct_field, Array_Descriptor_Struct_Field)
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
@@ -1647,31 +1742,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct_field,
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_struct_field);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument,
-  {
-    .name = slice_literal_fields("name"),
-    .descriptor = &descriptor_slice,
-    .offset = offsetof(Function_Argument, name),
-  },
-  {
-    .name = slice_literal_fields("source_range"),
-    .descriptor = &descriptor_source_range,
-    .offset = offsetof(Function_Argument, source_range),
-  },
-  {
-    .name = slice_literal_fields("descriptor"),
-    .descriptor = &descriptor_descriptor_pointer,
-    .offset = offsetof(Function_Argument, descriptor),
-  },
-  {
-    .name = slice_literal_fields("maybe_default_expression"),
-    .descriptor = &descriptor_value_view,
-    .offset = offsetof(Function_Argument, maybe_default_expression),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(function_argument);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_return,
@@ -1701,9 +1771,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info,
     .offset = offsetof(Function_Info, _flags_padding),
   },
   {
-    .name = slice_literal_fields("arguments"),
-    .descriptor = &descriptor_array_function_argument,
-    .offset = offsetof(Function_Info, arguments),
+    .name = slice_literal_fields("memory_layout"),
+    .descriptor = &descriptor_memory_layout,
+    .offset = offsetof(Function_Info, memory_layout),
   },
   {
     .name = slice_literal_fields("body"),

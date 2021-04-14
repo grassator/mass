@@ -228,6 +228,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
@@ -236,6 +237,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
@@ -244,6 +246,7 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Tagged_Union: {
       char *lowercase_name = strtolower(type->union_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
@@ -767,17 +770,29 @@ main(void) {
     { "Compile_Time", 1 << 3 },
   }));
 
+  push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct[]){
+    struct_fields("Absolute", (Struct_Item[]){
+      { "Storage", "storage" },
+    }),
+    struct_fields("Base_Relative", (Struct_Item[]){
+      { "s64", "offset" },
+    }),
+  }), (Struct_Item[]){
+    { "Slice", "name" },
+    { "const Descriptor *", "descriptor" },
+    { "Source_Range", "source_range" },
+    { "Value_View", "maybe_default_expression" },
+  }));
+
+  push_type(type_struct("Memory_Layout", (Struct_Item[]){
+    { "Storage", "base" },
+    { "Array_Memory_Layout_Item", "items" },
+  }));
+
   push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
     { "u64", "offset" },
-  }));
-
-  push_type(type_struct("Function_Argument", (Struct_Item[]){
-    { "Slice", "name" },
-    { "Source_Range", "source_range" },
-    { "const Descriptor *", "descriptor"},
-    { "Value_View", "maybe_default_expression" },
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){
@@ -788,7 +803,7 @@ main(void) {
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Array_Function_Argument", "arguments" },
+    { "Memory_Layout", "memory_layout" },
     { "Value *", "body" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },

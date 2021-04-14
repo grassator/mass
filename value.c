@@ -114,12 +114,15 @@ same_type(
       if (!same_type(a->Function.info.returns.descriptor, b->Function.info.returns.descriptor)) {
         return false;
       }
-      if (dyn_array_length(a->Function.info.arguments) != dyn_array_length(b->Function.info.arguments)) {
+      if (
+        dyn_array_length(a->Function.info.memory_layout.items) !=
+        dyn_array_length(b->Function.info.memory_layout.items)
+      ) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->Function.info.arguments); ++i) {
-        Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
-        Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
+      for (u64 i = 0; i < dyn_array_length(a->Function.info.memory_layout.items); ++i) {
+        Memory_Layout_Item *a_arg = dyn_array_get(a->Function.info.memory_layout.items, i);
+        Memory_Layout_Item *b_arg = dyn_array_get(b->Function.info.memory_layout.items, i);
         if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;
@@ -1228,7 +1231,7 @@ value_global_c_string_from_slice_internal(
 
 Descriptor *
 descriptor_pointer_to(
-  Allocator *allocator,
+  const Allocator *allocator,
   const Descriptor *descriptor
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
@@ -1271,17 +1274,14 @@ value_as_function(
   return (fn_type_opaque)target;
 }
 
-Value *
-function_argument_value_at_index_internal(
-  Compiler_Source_Location source_location,
-  Execution_Context *context,
+static Storage
+function_argument_storage_for_index(
+  const Allocator *allocator,
   const Function_Info *function,
+  const Descriptor *arg_descriptor,
   u64 argument_index,
   Function_Argument_Mode mode
 ) {
-  Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
-  const Descriptor *arg_descriptor = argument->descriptor;
-  Source_Range source_range = argument->source_range;
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
   // :ReturnTypeLargerThanRegister
@@ -1297,43 +1297,53 @@ function_argument_value_at_index_internal(
 
   assert(countof(general_registers) == countof(float_registers));
 
-  Allocator *allocator = context->allocator;
   if (argument_index < countof(general_registers)) {
     Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
     Register reg = registers[argument_index];
     if (byte_size <= 8) {
-      return value_register_for_descriptor_internal(
-        source_location, context, reg, arg_descriptor, source_range
-      );
+      return storage_register_for_descriptor(reg, arg_descriptor);
     } else {
       switch(mode) {
         case Function_Argument_Mode_Call: {
           // For the caller we pretend that the type is a pointer since we do not have references
           const Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
-          return value_register_for_descriptor_internal(
-            source_location, context, reg, pointer_descriptor, source_range
-          );
+          return storage_register_for_descriptor(reg, pointer_descriptor);
         }
         case Function_Argument_Mode_Body: {
           // Large arguments are passed "by reference", i.e. their memory location in the register
-          return value_make_internal(source_location, context, arg_descriptor, (Storage) {
+          return (Storage) {
             .tag = Storage_Tag_Memory,
             .byte_size = byte_size,
             .Memory.location = {
               .tag = Memory_Location_Tag_Indirect,
               .Indirect = { .base_register = reg },
             }
-          }, source_range);
+          };
         }
       }
       panic("Unexpected function argument mode");
-      return 0;
+      return (Storage){0};
     }
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
-    Storage storage = stack(offset, byte_size);
-    return value_make_internal(source_location, context, arg_descriptor, storage, source_range);
+    return stack(offset, byte_size);
   }
+}
+
+Value *
+function_argument_value_at_index_internal(
+  Compiler_Source_Location source_location,
+  Execution_Context *context,
+  const Function_Info *function,
+  u64 argument_index,
+  Function_Argument_Mode mode
+) {
+  Memory_Layout_Item *argument = dyn_array_get(function->memory_layout.items, argument_index);
+  const Descriptor *arg_descriptor = argument->descriptor;
+  Source_Range source_range = argument->source_range;
+  Storage storage =
+    function_argument_storage_for_index(context->allocator, function, arg_descriptor, argument_index, mode);
+  return value_make_internal(source_location, context, arg_descriptor, storage, source_range);
 }
 #define function_argument_value_at_index(...)\
   function_argument_value_at_index_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)

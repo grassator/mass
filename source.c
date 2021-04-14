@@ -1797,13 +1797,13 @@ token_maybe_split_on_operator(
   return true;
 }
 
-static Function_Argument
+static Memory_Layout_Item
 token_match_argument(
   Execution_Context *context,
   Value_View view,
   Function_Info *function
 ) {
-  Function_Argument arg = {0};
+  Memory_Layout_Item arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Value_View default_expression;
@@ -1848,7 +1848,8 @@ token_match_argument(
   }
 
   const Descriptor *descriptor = token_match_type(context, type_expression);
-  arg = (Function_Argument) {
+  arg = (Memory_Layout_Item) {
+    .tag = Memory_Layout_Item_Tag_Absolute,
     .name = value_as_symbol(name_token)->name,
     .descriptor = descriptor,
     .maybe_default_expression = default_expression,
@@ -2592,44 +2593,12 @@ token_process_function_literal(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .Function.info = {
-      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
       .body = body,
       .scope = function_scope,
       .returns = 0,
     },
   };
-
-  bool previous_argument_has_default_value = false;
-  Value_View args_view = value_as_group(args)->children;
-  if (args_view.length != 0) {
-    descriptor->Function.info.arguments = dyn_array_make(
-      Array_Function_Argument,
-      .allocator = context->allocator,
-      .capacity = 4,
-    );
-
-    Value_View_Split_Iterator it = { .view = args_view };
-    while (!it.done) {
-      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-      Execution_Context arg_context = *context;
-      arg_context.scope = function_scope;
-      arg_context.builder = 0;
-      Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
-      dyn_array_push(descriptor->Function.info.arguments, arg);
-      MASS_ON_ERROR(*context->result) return 0;
-      if (previous_argument_has_default_value) {
-        if (!arg.maybe_default_expression.length ) {
-          context_error_snprintf(
-            context, arg_view.source_range,
-            "Non-default argument can not come after a default one"
-          );
-          return 0;
-        }
-      } else {
-        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
-      }
-    }
-  }
 
   Value_View return_types_view = value_as_group(return_types)->children;
   if (return_types_view.length == 0) {
@@ -2651,6 +2620,45 @@ token_process_function_literal(
       arg_context.scope = function_scope;
       arg_context.builder = 0;
       descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
+    }
+  }
+
+  bool previous_argument_has_default_value = false;
+  Value_View args_view = value_as_group(args)->children;
+  if (args_view.length != 0) {
+    descriptor->Function.info.memory_layout = (Memory_Layout){
+      .base = {0}, // FIXME provide stack location for arguments
+      .items = dyn_array_make(
+        Array_Memory_Layout_Item,
+        .allocator = context->allocator,
+        .capacity = 4,
+      ),
+    };
+
+    u64 index = 0;
+    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done; ++index) {
+      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+      Execution_Context arg_context = *context;
+      arg_context.scope = function_scope;
+      arg_context.builder = 0;
+      // FIXME unify this with the compile time functions below
+      Memory_Layout_Item arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
+      MASS_ON_ERROR(*context->result) return 0;
+      arg.Absolute.storage = function_argument_storage_for_index(
+        context->allocator, &descriptor->Function.info, arg.descriptor, index, Function_Argument_Mode_Call
+      );
+      dyn_array_push(descriptor->Function.info.memory_layout.items, arg);
+      if (previous_argument_has_default_value) {
+        if (!arg.maybe_default_expression.length ) {
+          context_error_snprintf(
+            context, arg_view.source_range,
+            "Non-default argument can not come after a default one"
+          );
+          return 0;
+        }
+      } else {
+        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
+      }
     }
   }
 
@@ -3187,9 +3195,9 @@ call_function_macro(
     ? function->scope
     : scope_make(context->allocator, function->scope);
 
-  for (u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+  for (u64 i = 0; i < dyn_array_length(function->memory_layout.items); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
-    Function_Argument *arg = dyn_array_get(function->arguments, i);
+    Memory_Layout_Item *arg = dyn_array_get(function->memory_layout.items, i);
     if (arg->name.length) {
       Value *arg_value;
       if (i >= dyn_array_length(args)) {
@@ -3350,10 +3358,17 @@ call_function_overload(
   }
 
   Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
-  for (u64 i = 0; i < dyn_array_length(descriptor->arguments); ++i) {
-    Function_Argument *target_arg_definition = dyn_array_get(descriptor->arguments, i);
-    Value *target_arg = function_argument_value_at_index(
-      context, descriptor, i, Function_Argument_Mode_Call
+  for (u64 i = 0; i < dyn_array_length(descriptor->memory_layout.items); ++i) {
+    Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->memory_layout.items, i);
+    //Value *target_arg = function_argument_value_at_index(
+      //context, descriptor, i, Function_Argument_Mode_Call
+    //);
+    assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
+    Value *target_arg = value_make(
+      context,
+      target_arg_definition->descriptor,
+      target_arg_definition->Absolute.storage,
+      target_arg_definition->source_range
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
@@ -4285,7 +4300,7 @@ mass_handle_startup_call_lazy_proc(
   if (
     !startup_function ||
     descriptor->tag != Descriptor_Tag_Function ||
-    dyn_array_length(descriptor->Function.info.arguments) ||
+    dyn_array_length(descriptor->Function.info.memory_layout.items) ||
     descriptor->Function.info.returns.descriptor != &descriptor_void
   ) {
     context_error_snprintf(
@@ -5827,31 +5842,34 @@ scope_define_builtins(
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\
+      .tag = Memory_Layout_Item_Tag_Absolute,\
       .name = slice_literal_fields(_NAME_),\
       .descriptor = (_DESCRIPTOR_),\
     }
 
   #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
   {\
-    Function_Argument raw_arguments[] = {__VA_ARGS__};\
+    Memory_Layout_Item raw_arguments[] = {__VA_ARGS__};\
     u64 arg_length = countof(raw_arguments);\
-    Array_Function_Argument arguments =\
-      dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
-    for (u64 i = 0; i < arg_length; ++i) {\
-      dyn_array_push(arguments, raw_arguments[i]);\
-    }\
     Descriptor *descriptor = allocator_allocate(allocator, Descriptor);\
     *descriptor = (Descriptor) {\
       .tag = Descriptor_Tag_Function,\
       .name = slice_literal(_NAME_),\
       .Function.info = {\
         .flags = Descriptor_Function_Flags_Compile_Time,\
-        .arguments = arguments,\
+        .memory_layout.items = \
+          dyn_array_make(Array_Memory_Layout_Item, .allocator = allocator, .capacity = arg_length),\
         .returns = {\
           .descriptor = (_RETURN_DESCRIPTOR_),\
         }\
       },\
     };\
+    for (u64 i = 0; i < arg_length; ++i) {\
+      raw_arguments[i].Absolute.storage = function_argument_storage_for_index(\
+        allocator, &descriptor->Function.info, raw_arguments[i].descriptor, i, Function_Argument_Mode_Call\
+      );\
+      dyn_array_push(descriptor->Function.info.memory_layout.items, raw_arguments[i]);\
+    }\
     Value *value = value_init(\
       allocator_allocate(allocator, Value),\
       VALUE_STATIC_EPOCH, descriptor, imm64((u64)_FN_), (Source_Range){0}\
