@@ -775,7 +775,8 @@ main(void) {
 
   push_type(type_struct("Function_Argument", (Struct_Item[]){
     { "Slice", "name" },
-    { "Value *", "value"},
+    { "Source_Range", "source_range" },
+    { "const Descriptor *", "descriptor"},
     { "Value_View", "maybe_default_expression" },
   }));
 

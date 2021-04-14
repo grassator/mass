@@ -1231,18 +1231,6 @@ spec("source") {
       check(checker() == 21);
     }
 
-    it("should be able to parse and run macro with a literal argument") {
-      fn_type_void_to_s8 checker = (fn_type_void_to_s8)test_program_inline_source_function(
-        "test", &test_context,
-        "broken_plus :: macro (x : u8, 0) -> (u8) { x + 1 }\n"
-        "broken_plus :: macro (x : u8, y : u8) -> (u8) { x + y }\n"
-        "test :: () -> (u8) { broken_plus(41, 0) }"
-      );
-      check(checker);
-      s8 actual = checker();
-      check(actual == 42);
-    }
-
     it("should allow changes to the passed arguments to macro function") {
       fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
         "test", &test_context,

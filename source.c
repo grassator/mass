@@ -534,7 +534,7 @@ assign(
       return *context->result;
     }
   } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
-    if (!same_value_type_or_can_implicitly_move_cast(target, source)) goto err;
+    if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
     assert(target->storage.tag == Storage_Tag_Memory);
     assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
 
@@ -607,7 +607,7 @@ assign(
   }
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
-  if (same_value_type_or_can_implicitly_move_cast(target, source)) {
+  if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
     move_value(context->allocator, context->builder, &source_range, &target->storage, &source->storage);
     return *context->result;
   }
@@ -1825,37 +1825,35 @@ token_match_argument(
   Value_View type_expression;
   Value_View name_tokens;
   Value *operator;
-  if (token_maybe_split_on_operator(
+  if (!token_maybe_split_on_operator(
     definition, slice_literal(":"), &name_tokens, &type_expression, &operator
   )) {
-    if (name_tokens.length == 0) {
-      context_error_snprintf(
-        context, operator->source_range,
-        "':' operator expects an identifier on the left hand side"
-      );
-      goto err;
-    }
-    Value *name_token = value_view_get(name_tokens, 0);
-    if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
-      context_error_snprintf(
-        context, operator->source_range,
-        "':' operator expects only a single identifier on the left hand side"
-      );
-      goto err;
-    }
-
-    const Descriptor *descriptor = token_match_type(context, type_expression);
-    arg = (Function_Argument) {
-      .name = value_as_symbol(name_token)->name,
-      .value = value_make(context, descriptor, storage_none, definition.source_range),
-      .maybe_default_expression = default_expression,
-    };
-  } else {
-    Value *value = compile_time_eval(context, view);
-    arg = (Function_Argument) { .value = value };
+    context_error_snprintf(context, definition.source_range, "Expected a type expression after `:`");
+    goto err;
+  }
+  if (name_tokens.length == 0) {
+    context_error_snprintf(
+      context, operator->source_range,
+      "':' operator expects an identifier on the left hand side"
+    );
+    goto err;
+  }
+  Value *name_token = value_view_get(name_tokens, 0);
+  if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
+    context_error_snprintf(
+      context, operator->source_range,
+      "':' operator expects only a single identifier on the left hand side"
+    );
+    goto err;
   }
 
-  //arg.value->epoch = VALUE_STATIC_EPOCH;
+  const Descriptor *descriptor = token_match_type(context, type_expression);
+  arg = (Function_Argument) {
+    .name = value_as_symbol(name_token)->name,
+    .descriptor = descriptor,
+    .maybe_default_expression = default_expression,
+    .source_range = definition.source_range,
+  };
 
   err:
   return arg;
@@ -2620,7 +2618,7 @@ token_process_function_literal(
       dyn_array_push(descriptor->Function.info.arguments, arg);
       MASS_ON_ERROR(*context->result) return 0;
       if (previous_argument_has_default_value) {
-        if (function_argument_is_exact(&arg) || !arg.maybe_default_expression.length ) {
+        if (!arg.maybe_default_expression.length ) {
           context_error_snprintf(
             context, arg_view.source_range,
             "Non-default argument can not come after a default one"
@@ -3193,16 +3191,14 @@ call_function_macro(
     MASS_ON_ERROR(*context->result) return 0;
     Function_Argument *arg = dyn_array_get(function->arguments, i);
     if (arg->name.length) {
-      assert(!function_argument_is_exact(arg));
       Value *arg_value;
-      const Descriptor *arg_descriptor = arg->value->descriptor;
       if (i >= dyn_array_length(args)) {
         // We should catch the missing default expression in the matcher
         Value_View default_expression = arg->maybe_default_expression;
         assert(default_expression.length);
         const Source_Range *source_range = &default_expression.source_range;
         // FIXME avoid using a stack value
-        arg_value = reserve_stack(context, arg_descriptor, *source_range);
+        arg_value = reserve_stack(context, arg->descriptor, *source_range);
         {
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
@@ -3215,7 +3211,7 @@ call_function_macro(
         arg_value = *dyn_array_get(args, i);
       }
 
-      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg_descriptor);
+      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
       scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
     }
   }
@@ -5832,10 +5828,7 @@ scope_define_builtins(
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\
       .name = slice_literal_fields(_NAME_),\
-      .value = value_init(\
-        allocator_allocate(allocator, Value),\
-        VALUE_STATIC_EPOCH, (_DESCRIPTOR_), storage_none, (Source_Range){0}\
-      )\
+      .descriptor = (_DESCRIPTOR_),\
     }
 
   #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\

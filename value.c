@@ -120,8 +120,7 @@ same_type(
       for (u64 i = 0; i < dyn_array_length(a->Function.info.arguments); ++i) {
         Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
         Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
-        if(!same_type(a_arg->value->descriptor, b_arg->value->descriptor)) return false;
-        if(!storage_equal(&a_arg->value->storage, &b_arg->value->storage)) return false;
+        if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;
     }
@@ -635,13 +634,6 @@ storage_is_register_index(
   Register reg_index
 ) {
   return storage->tag == Storage_Tag_Register && storage->Register.index == reg_index;
-}
-
-static inline bool
-function_argument_is_exact(
-  const Function_Argument *arg
-) {
-  return arg->value->storage.tag == Storage_Tag_Static;
 }
 
 bool
@@ -1288,8 +1280,8 @@ function_argument_value_at_index_internal(
   Function_Argument_Mode mode
 ) {
   Function_Argument *argument = dyn_array_get(function->arguments, argument_index);
-  const Descriptor *arg_descriptor = argument->value->descriptor;
-  Source_Range source_range = argument->value->source_range;
+  const Descriptor *arg_descriptor = argument->descriptor;
+  Source_Range source_range = argument->source_range;
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
   // :ReturnTypeLargerThanRegister
@@ -1701,27 +1693,24 @@ same_type_or_can_implicitly_move_cast(
 
 bool
 same_value_type_or_can_implicitly_move_cast(
-  Value *target,
+  const Descriptor *target,
   Value *source
 ) {
   if (source->descriptor == &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer
-    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+    if (target->tag == Descriptor_Tag_Pointer) {
       assert(source->storage.tag == Storage_Tag_Static);
       assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
       Number_Literal *literal = source->storage.Static.memory.Heap.pointer;
       return literal->bits == 0;
     } else {
       Literal_Cast_Result cast_result =
-        value_number_literal_cast_to(source, target->descriptor, &(u64){0}, &(u64){0});
+        value_number_literal_cast_to(source, target, &(u64){0}, &(u64){0});
       return cast_result == Literal_Cast_Result_Success;
     }
   }
 
-  return same_type_or_can_implicitly_move_cast(
-    value_or_lazy_value_descriptor(target),
-    value_or_lazy_value_descriptor(source)
-  );
+  return same_type_or_can_implicitly_move_cast(target, value_or_lazy_value_descriptor(source));
 }
 
 

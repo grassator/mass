@@ -912,7 +912,6 @@ ensure_compiled_function_body(
   for (u64 index = 0; index < dyn_array_length(function->arguments); ++index) {
     Function_Argument *argument = dyn_array_get(function->arguments, index);
     // Nothing to do since there is no way to refer to an exact argument in the body
-    if (function_argument_is_exact(argument)) continue;
     if (!argument->name.length) continue;
     Value *arg_value = function_argument_value_at_index(
       &body_context, function, index, Function_Argument_Mode_Body
@@ -989,31 +988,21 @@ calculate_arguments_match_score(
   s64 score = 0;
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->arguments); ++arg_index) {
     Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
-    Value *source_arg;
+    Value *source_arg = 0;
+    const Descriptor *source_descriptor;
     if (arg_index >= dyn_array_length(arguments)) {
       if (!target_arg->maybe_default_expression.length) return -1;
-      source_arg = target_arg->value;
+      source_descriptor = target_arg->descriptor;
     } else {
       source_arg = *dyn_array_get(arguments, arg_index);
+      source_descriptor = value_or_lazy_value_descriptor(source_arg);
     }
-    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
-    if (function_argument_is_exact(target_arg)) {
-      if (source_arg->descriptor == &descriptor_lazy_value) return -1;
-      if (same_value_type(target_arg->value, source_arg)) {
-        if (
-          source_arg->storage.tag == Storage_Tag_Static &&
-          storage_static_equal(target_arg->value, source_arg)
-        ) {
-          score += Score_Exact_Literal;
-        } else {
-          return -1;
-        }
-      } else {
-        return -1;
-      }
-    } else if (same_type(target_arg->value->descriptor, source_descriptor)) {
+    if (same_type(target_arg->descriptor, source_descriptor)) {
       score += Score_Exact_Type;
-    } else if(same_value_type_or_can_implicitly_move_cast(target_arg->value, source_arg)) {
+    } else if (
+      (source_arg && same_value_type_or_can_implicitly_move_cast(target_arg->descriptor, source_arg)) ||
+      same_type_or_can_implicitly_move_cast(target_arg->descriptor, source_descriptor)
+    ) {
       score += Score_Cast;
     } else {
       return -1;

@@ -802,7 +802,8 @@ typedef dyn_array_type(Descriptor_Struct_Field) Array_Descriptor_Struct_Field;
 
 typedef struct Function_Argument {
   Slice name;
-  Value * value;
+  Source_Range source_range;
+  const Descriptor * descriptor;
   Value_View maybe_default_expression;
 } Function_Argument;
 typedef dyn_array_type(Function_Argument) Array_Function_Argument;
@@ -1655,9 +1656,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument,
     .offset = offsetof(Function_Argument, name),
   },
   {
-    .name = slice_literal_fields("value"),
-    .descriptor = &descriptor_value_pointer,
-    .offset = offsetof(Function_Argument, value),
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .offset = offsetof(Function_Argument, source_range),
+  },
+  {
+    .name = slice_literal_fields("descriptor"),
+    .descriptor = &descriptor_descriptor_pointer,
+    .offset = offsetof(Function_Argument, descriptor),
   },
   {
     .name = slice_literal_fields("maybe_default_expression"),
