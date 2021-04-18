@@ -63,6 +63,7 @@ mass_error_to_string(
     fixed_buffer_resizing_append_slice(&result, (_SLICE_))
   #define APPEND_LITERAL(_STRING_)\
     APPEND_SLICE(slice_literal(_STRING_))
+  char number_buffer[128] = {0};
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
   switch(error->tag) {
     case Mass_Error_Tag_Unknown: {
@@ -116,6 +117,16 @@ mass_error_to_string(
       APPEND_SLICE(mismatch->expected->name);
       APPEND_LITERAL(", got ");
       APPEND_SLICE(mismatch->actual->name);
+    } break;
+    case Mass_Error_Tag_Epoch_Mismatch: {
+      Mass_Error_Epoch_Mismatch const *mismatch = &error->Epoch_Mismatch;
+      APPEND_LITERAL("Trying to access a runtime variable with epoch ");
+      snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->value->epoch);
+      APPEND_SLICE(slice_from_c_string(number_buffer));
+      APPEND_LITERAL(" from a different epoch %");
+      snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->expected_epoch);
+      APPEND_SLICE(slice_from_c_string(number_buffer));
+      APPEND_LITERAL(". ");
     } break;
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;

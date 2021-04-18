@@ -854,6 +854,10 @@ main(void) {
       { "const Descriptor *", "expected" },
       { "const Descriptor *", "actual" },
     }),
+    struct_fields("Epoch_Mismatch", (Struct_Item[]){
+      { "Value *", "value" },
+      { "u64", "expected_epoch" },
+    }),
     struct_fields("No_Matching_Overload", (Struct_Item[]){
       { "Value *", "target" },
       { "Array_Value_Ptr", "arguments" },

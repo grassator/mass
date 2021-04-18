@@ -1447,16 +1447,14 @@ token_parse_single(
       value->storage.tag != Storage_Tag_None
     ) {
       if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
-        context_error_snprintf(
-          context, value->source_range,
-          "Trying to access a runtime variable %"PRIslice" with epoch %"PRIu64
-          " from a different epoch %"PRIu64 ". "
-          "This happens when you access value from runtime in compile-time execution "
-          "or a runtime value of one compile time execution in a different one.",
-          SLICE_EXPAND_PRINTF(name),
-          value->epoch,
-          context->epoch
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Epoch_Mismatch,
+          .Epoch_Mismatch = { .value = value, .expected_epoch = context->epoch },
+          .source_range = *source_range,
+          .detailed_message =
+            "This happens when you access value from runtime in compile-time execution "
+            "or a runtime value from a different stack frame than current function call."
+        });
         return 0;
       }
     }
