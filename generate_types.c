@@ -836,6 +836,10 @@ main(void) {
     struct_fields("Variable_Definition_Invalid_Identifier", (Struct_Item[]){
       { "Value *", "id" },
     }),
+    struct_fields("Type_Mismatch", (Struct_Item[]){
+      { "const Descriptor *", "expected" },
+      { "const Descriptor *", "actual" },
+    }),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

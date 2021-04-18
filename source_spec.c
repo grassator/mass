@@ -735,9 +735,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message, slice_literal("Incompatible type: expected s32, got s64")
-      );
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_s32);
+      check(error->Type_Mismatch.actual == &descriptor_s64);
     }
 
     it("should report an overload overlap") {

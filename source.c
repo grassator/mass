@@ -613,11 +613,14 @@ assign(
   }
 
   err:
-  context_error_snprintf(
-    context, source_range,
-    "Incompatible type: expected %"PRIslice", got %"PRIslice,
-    SLICE_EXPAND_PRINTF(target->descriptor->name), SLICE_EXPAND_PRINTF(source->descriptor->name)
-  );
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Type_Mismatch,
+    .source_range = source_range,
+    .Type_Mismatch = {
+      .expected = target->descriptor,
+      .actual = source->descriptor,
+    },
+  });
   return *context->result;
 }
 

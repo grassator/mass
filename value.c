@@ -59,32 +59,44 @@ static Fixed_Buffer *
 mass_error_to_string(
   Mass_Error const* error
 ) {
+  #define APPEND_SLICE(_SLICE_)\
+    fixed_buffer_resizing_append_slice(&result, (_SLICE_))
+  #define APPEND_LITERAL(_STRING_)\
+    APPEND_SLICE(slice_literal(_STRING_))
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
   switch(error->tag) {
     case Mass_Error_Tag_Unknown: {
-      fixed_buffer_resizing_append_slice(&result, slice_literal("Unknown Error: "));
-      fixed_buffer_resizing_append_slice(&result, error->detailed_message);
+      APPEND_LITERAL("Unknown Error: ");
+      APPEND_SLICE(error->detailed_message);
     } break;
     case Mass_Error_Tag_Unimplemented: {
-      fixed_buffer_resizing_append_slice(&result, slice_literal("Unimplemented Feature: "));
-      fixed_buffer_resizing_append_slice(&result, error->detailed_message);
+      APPEND_LITERAL("Unimplemented Feature: ");
+      APPEND_SLICE(error->detailed_message);
     } break;
     case Mass_Error_Tag_Expression_Parse: {
-      fixed_buffer_resizing_append_slice(&result, slice_literal("Unable to parse the expression"));
+      APPEND_LITERAL("Unable to parse the expression");
     } break;
     case Mass_Error_Tag_Unexpected_Token: {
-      fixed_buffer_resizing_append_slice(&result, slice_literal("Unexpected token"));
+      APPEND_LITERAL("Unexpected token");
       if (error->Unexpected_Token.expected.length) {
-        fixed_buffer_resizing_append_slice(&result, slice_literal(", expected '"));
-        fixed_buffer_resizing_append_slice(&result, error->Unexpected_Token.expected);
-        fixed_buffer_resizing_append_slice(&result, slice_literal("'"));
+        APPEND_LITERAL(", expected '");
+        APPEND_SLICE(error->Unexpected_Token.expected);
+        APPEND_LITERAL("'");
       }
     } break;
     case Mass_Error_Tag_Variable_Definition_Invalid_Identifier: {
-      fixed_buffer_resizing_append_slice(&result,
-        slice_literal("Invalid identifier for a variable definition"));
+      APPEND_LITERAL("Invalid identifier for a variable definition");
+    } break;
+    case Mass_Error_Tag_Type_Mismatch: {
+      Mass_Error_Type_Mismatch const *mismatch = &error->Type_Mismatch;
+      APPEND_LITERAL("Type mismatch: expected ");
+      APPEND_SLICE(mismatch->expected->name);
+      APPEND_LITERAL(", got ");
+      APPEND_SLICE(mismatch->actual->name);
     } break;
   }
+  #undef APPEND_SLICE
+  #undef APPEND_LITERAL
   return result;
 }
 
