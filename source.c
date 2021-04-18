@@ -2612,10 +2612,11 @@ token_process_function_literal(
 
     for (u64 i = 0; !it.done; ++i) {
       if (i > 0) {
-        context_error_snprintf(
-          context, return_types->source_range,
-          "Multiple return types are not supported at the moment"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unimplemented,
+          .detailed_message = "Multiple return types are not supported at the moment",
+          .source_range = return_types->source_range,
+        });
         return 0;
       }
       Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);

@@ -503,7 +503,7 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Variable_Definition_Invalid_Identifier);
     }
-    it("should report an error when LHS of the := is not a symbol") {
+    it("should report an error for multi-definition assignment") {
       test_program_inline_source_base(
         "main", &test_context,
         "main :: () -> () { foo, bar := 42, 42 }"
@@ -871,10 +871,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Multiple return types are not supported at the moment")
-      );
+      check(error->tag == Mass_Error_Tag_Unimplemented);
     }
 
     it("should report an error when encountering wrong argument type to external()") {
