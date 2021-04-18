@@ -1452,12 +1452,11 @@ token_parse_single(
     MASS_ON_ERROR(*context->result) return 0;
     if (!value) {
       //scope_print_names(context->scope);
-      context_error_snprintf(
-        context, *source_range,
-        "Undefined variable %"PRIslice,
-        SLICE_EXPAND_PRINTF(name)
-      );
-
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Undefined_Variable,
+        .Undefined_Variable = { .name = name },
+        .source_range = *source_range,
+      });
       return 0;
     } else if (
       value->storage.tag != Storage_Tag_Static &&

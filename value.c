@@ -84,6 +84,10 @@ mass_error_to_string(
         APPEND_LITERAL("'");
       }
     } break;
+    case Mass_Error_Tag_Undefined_Variable: {
+      APPEND_LITERAL("Undefined variable ");
+      APPEND_SLICE(error->Undefined_Variable.name);
+    } break;
     case Mass_Error_Tag_Variable_Definition_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier for a variable definition");
     } break;

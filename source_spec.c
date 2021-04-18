@@ -589,10 +589,8 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Undefined variable ;")
-      );
+      check(error->tag == Mass_Error_Tag_Undefined_Variable);
+      spec_check_slice(error->Undefined_Variable.name, slice_literal(";"));
     }
 
     it("should report an error for an `if` statement with an incorrect condition") {
@@ -894,7 +892,8 @@ spec("source") {
       scope_lookup_force(test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(error->detailed_message, slice_literal("Undefined variable s33"));
+      check(error->tag == Mass_Error_Tag_Undefined_Variable);
+      spec_check_slice(error->Undefined_Variable.name, slice_literal("s33"));
     }
 
     it("should be able to get the type_of an expression without evaluating it") {
