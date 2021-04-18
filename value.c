@@ -73,6 +73,10 @@ mass_error_to_string(
         fixed_buffer_resizing_append_slice(&result, slice_literal("'"));
       }
     } break;
+    case Mass_Error_Tag_Variable_Definition_Invalid_Identifier: {
+      fixed_buffer_resizing_append_slice(&result,
+        slice_literal("Invalid identifier for a variable definition"));
+    } break;
   }
   return result;
 }

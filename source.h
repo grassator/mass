@@ -245,4 +245,13 @@ typedef struct {
     };\
   } while(0)
 
+static inline void
+context_error(
+  Execution_Context *context,
+  Mass_Error error
+) {
+  assert(context->result->tag != Mass_Result_Tag_Error);
+  *context->result = (Mass_Result) { .tag = Mass_Result_Tag_Error, .Error.error = error };
+}
+
 #endif

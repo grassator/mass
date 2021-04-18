@@ -501,10 +501,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Left hand side of the := is not a symbol")
-      );
+      check(error->tag == Mass_Error_Tag_Variable_Definition_Invalid_Identifier);
     }
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(

@@ -884,11 +884,15 @@ typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unknown = 0,
   Mass_Error_Tag_Unexpected_Token = 1,
+  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 2,
 } Mass_Error_Tag;
 
 typedef struct {
   Slice expected;
 } Mass_Error_Unexpected_Token;
+typedef struct {
+  Value * id;
+} Mass_Error_Variable_Definition_Invalid_Identifier;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
   char _tag_padding[4];
@@ -896,6 +900,7 @@ typedef struct Mass_Error {
   Source_Range source_range;
   union {
     Mass_Error_Unexpected_Token Unexpected_Token;
+    Mass_Error_Variable_Definition_Invalid_Identifier Variable_Definition_Invalid_Identifier;
   };
 } Mass_Error;
 typedef dyn_array_type(Mass_Error) Array_Mass_Error;

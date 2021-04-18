@@ -831,6 +831,9 @@ main(void) {
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),
+    struct_fields("Variable_Definition_Invalid_Identifier", (Struct_Item[]){
+      { "Value *", "id" },
+    }),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

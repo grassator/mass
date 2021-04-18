@@ -5676,10 +5676,11 @@ token_parse_definition_and_assignment_statements(
   Value *name_token = value_view_get(view, 0);
 
   if (!value_is_symbol(name_token)) {
-    context_error_snprintf(
-      context, name_token->source_range,
-      "Left hand side of the := is not a symbol"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Variable_Definition_Invalid_Identifier,
+      .source_range = name_token->source_range,
+      .Variable_Definition_Invalid_Identifier = {.id = name_token},
+    });
     goto err;
   }
 
