@@ -545,10 +545,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Could not parse the expression")
-      );
+      check(error->tag == Mass_Error_Tag_Expression_Parse);
     }
     it("should report an error on double `then` inside of an if expression") {
       test_program_inline_source_base(
@@ -557,10 +554,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Could not parse the expression")
-      );
+      check(error->tag == Mass_Error_Tag_Expression_Parse);
     }
     it("should be able to parse and run if statement") {
       fn_type_s32_to_s8 checker = (fn_type_s32_to_s8)test_program_inline_source_function(
@@ -608,10 +602,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Could not parse the expression")
-      );
+      check(error->tag == Mass_Error_Tag_Expression_Parse);
     }
   }
 

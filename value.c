@@ -69,6 +69,9 @@ mass_error_to_string(
       fixed_buffer_resizing_append_slice(&result, slice_literal("Unimplemented Feature: "));
       fixed_buffer_resizing_append_slice(&result, error->detailed_message);
     } break;
+    case Mass_Error_Tag_Expression_Parse: {
+      fixed_buffer_resizing_append_slice(&result, slice_literal("Unable to parse the expression"));
+    } break;
     case Mass_Error_Tag_Unexpected_Token: {
       fixed_buffer_resizing_append_slice(&result, slice_literal("Unexpected token"));
       if (error->Unexpected_Token.expected.length) {

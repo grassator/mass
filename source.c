@@ -5014,7 +5014,10 @@ token_parse_expression(
       result = *dyn_array_last(value_stack);
       result = token_parse_single(context, result);
     } else {
-      context_error_snprintf(context, view.source_range, "Could not parse the expression");
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Expression_Parse,
+        .source_range = view.source_range,
+      });
     }
   }
 
