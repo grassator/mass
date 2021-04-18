@@ -4642,11 +4642,14 @@ mass_handle_dot_operator(
     if (lhs_descriptor->tag == Descriptor_Tag_Struct) {
       Memory_Layout_Item *field = struct_find_field_by_name(lhs_descriptor, field_name);
       if (!field) {
-        context_error_snprintf(
-          context, rhs_range,
-          "Struct does not have a field `%"PRIslice"`",
-          SLICE_EXPAND_PRINTF(field_name)
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unknown_Field,
+          .source_range = rhs_range,
+          .Unknown_Field = {
+            .name = field_name,
+            .type = lhs_descriptor,
+          },
+        });
         return 0;
       }
 
@@ -4665,13 +4668,15 @@ mass_handle_dot_operator(
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
       Value *lookup = scope_lookup_force(module_scope, field_name);
       if (!lookup) {
-        scope_print_names(module_scope);
-        context_error_snprintf(
-          context, rhs_range,
-          // TODO provide module name
-          "Could not find name %"PRIslice" in the module",
-          SLICE_EXPAND_PRINTF(field_name)
-        );
+        //scope_print_names(module_scope);
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unknown_Field,
+          .source_range = rhs_range,
+          .Unknown_Field = {
+            .name = field_name,
+            .type = lhs->descriptor,
+          },
+        });
         return 0;
       }
       return lookup;

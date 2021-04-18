@@ -843,6 +843,10 @@ main(void) {
     struct_fields("Undefined_Variable", (Struct_Item[]){
       { "Slice", "name" },
     }),
+    struct_fields("Unknown_Field", (Struct_Item[]){
+      { "const Descriptor *", "type" },
+      { "Slice", "name" },
+    }),
     struct_fields("Invalid_Identifier", (Struct_Item[]){
       { "Value *", "id" },
     }),

@@ -88,6 +88,12 @@ mass_error_to_string(
       APPEND_LITERAL("Undefined variable ");
       APPEND_SLICE(error->Undefined_Variable.name);
     } break;
+    case Mass_Error_Tag_Unknown_Field: {
+      APPEND_LITERAL("Field ");
+      APPEND_SLICE(error->Unknown_Field.name);
+      APPEND_LITERAL("does not exist on type ");
+      APPEND_SLICE(error->Unknown_Field.type->name);
+    } break;
     case Mass_Error_Tag_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier");
     } break;
