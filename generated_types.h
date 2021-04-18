@@ -883,8 +883,9 @@ typedef struct Descriptor {
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unknown = 0,
-  Mass_Error_Tag_Unexpected_Token = 1,
-  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 2,
+  Mass_Error_Tag_Unimplemented = 1,
+  Mass_Error_Tag_Unexpected_Token = 2,
+  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 3,
 } Mass_Error_Tag;
 
 typedef struct {

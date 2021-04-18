@@ -510,10 +510,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Multiple assignment are not supported at the moment")
-      );
+      check(error->tag == Mass_Error_Tag_Unimplemented);
     }
   }
 

@@ -828,6 +828,7 @@ main(void) {
 
   push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
     struct_empty("Unknown"),
+    struct_empty("Unimplemented"),
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),
@@ -838,8 +839,6 @@ main(void) {
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },
   }));
-
-
 
   push_type(type_union("Mass_Result", (Struct[]){
     struct_empty("Success"),

@@ -5667,10 +5667,11 @@ token_parse_definition_and_assignment_statements(
     return 0;
   }
   if (lhs.length > 1) {
-    context_error_snprintf(
-      context, lhs.source_range,
-      "Multiple assignment are not supported at the moment"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Unimplemented,
+      .source_range = lhs.source_range,
+      .detailed_message = slice_literal("multiple assignments"),
+    });
     goto err;
   }
   Value *name_token = value_view_get(view, 0);
