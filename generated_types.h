@@ -893,7 +893,8 @@ typedef enum {
   Mass_Error_Tag_Unknown_Field = 8,
   Mass_Error_Tag_Invalid_Identifier = 9,
   Mass_Error_Tag_Type_Mismatch = 10,
-  Mass_Error_Tag_Undecidable_Overload = 11,
+  Mass_Error_Tag_No_Matching_Overload = 11,
+  Mass_Error_Tag_Undecidable_Overload = 12,
 } Mass_Error_Tag;
 
 typedef struct {
@@ -920,6 +921,10 @@ typedef struct {
   const Descriptor * actual;
 } Mass_Error_Type_Mismatch;
 typedef struct {
+  Value * target;
+  Array_Value_Ptr arguments;
+} Mass_Error_No_Matching_Overload;
+typedef struct {
   Value * a;
   Value * b;
 } Mass_Error_Undecidable_Overload;
@@ -936,6 +941,7 @@ typedef struct Mass_Error {
     Mass_Error_Unknown_Field Unknown_Field;
     Mass_Error_Invalid_Identifier Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;
+    Mass_Error_No_Matching_Overload No_Matching_Overload;
     Mass_Error_Undecidable_Overload Undecidable_Overload;
   };
 } Mass_Error;

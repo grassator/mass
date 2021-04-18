@@ -124,6 +124,12 @@ mass_error_to_string(
       APPEND_LITERAL(" or ");
       APPEND_SLICE(overloads->b->descriptor->name);
     } break;
+    case Mass_Error_Tag_No_Matching_Overload: {
+      // TODO provide better error message with argument types
+      APPEND_LITERAL("Could not find matching overload for call ");
+      Slice source = source_from_source_range(&error->source_range);
+      APPEND_SLICE(source);
+    } break;
   }
   #undef APPEND_SLICE
   #undef APPEND_LITERAL

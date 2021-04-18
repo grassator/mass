@@ -854,6 +854,10 @@ main(void) {
       { "const Descriptor *", "expected" },
       { "const Descriptor *", "actual" },
     }),
+    struct_fields("No_Matching_Overload", (Struct_Item[]){
+      { "Value *", "target" },
+      { "Array_Value_Ptr", "arguments" },
+    }),
     struct_fields("Undecidable_Overload", (Struct_Item[]){
       { "Value *", "a" },
       { "Value *", "b" },

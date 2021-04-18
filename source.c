@@ -3562,13 +3562,14 @@ token_handle_function_call(
   }
 
   if (match.score == -1) {
-    Slice source = source_from_source_range(&source_range);
-    // TODO provide types of actual arguments
-    context_error_snprintf(
-      context, source_range,
-      "Could not find matching overload for call %"PRIslice,
-      SLICE_EXPAND_PRINTF(source)
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_No_Matching_Overload,
+      .source_range = source_range,
+      .No_Matching_Overload = {
+        .target = target_expression,
+        .arguments = args,
+      },
+    });
     goto err;
   }
   if (match.score == best_conflict_match.score) {
@@ -3609,9 +3610,6 @@ token_handle_function_call(
   return mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
 
   err:
-  if (dyn_array_is_initialized(args)) {
-    dyn_array_destroy(args);
-  }
   return 0;
 }
 
@@ -4331,11 +4329,15 @@ token_handle_type_of(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   MASS_ON_ERROR(*context->result) goto err;
   if (dyn_array_length(args) != 1) {
-    context_error_snprintf(
-      context, args_token->source_range,
-      "type_of() expects a sinle argument"
-    );
-    goto err;
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_No_Matching_Overload,
+      .source_range = args_token->source_range,
+      .No_Matching_Overload = {
+        .target = 0, // TODO provide a proper target here
+        .arguments = args,
+      },
+    });
+    return 0;
   }
   Value *expression = *dyn_array_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);

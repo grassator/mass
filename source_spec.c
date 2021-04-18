@@ -935,7 +935,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(error->detailed_message, slice_literal("type_of() expects a sinle argument"));
+      check(error->tag == Mass_Error_Tag_No_Matching_Overload);
     }
 
     it("should be able to get the size_of an expression") {
