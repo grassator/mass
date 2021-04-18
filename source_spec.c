@@ -880,17 +880,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(error->detailed_message, slice_literal("Expected a type"));
-    }
-
-    it("should report an error when non-type token is being used as a type") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: (arg : 42) -> () {}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(error->detailed_message, slice_literal("Expected a type"));
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_type);
+      check(error->Type_Mismatch.actual->tag == Descriptor_Tag_Function);
     }
 
     it("should report an error when encountering an unknown type") {

@@ -1368,7 +1368,14 @@ value_ensure_type(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
   if (value->descriptor != &descriptor_type) {
-    context_error_snprintf(context, source_range, "Expected a type");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = source_range,
+      .Type_Mismatch = {
+        .expected = &descriptor_type,
+        .actual = value->descriptor,
+      },
+    });
     return 0;
   }
   const Descriptor *descriptor = storage_static_as_c_type(&value->storage, Descriptor);
