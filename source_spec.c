@@ -874,19 +874,6 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Unimplemented);
     }
 
-    it("should report an error when encountering wrong argument type to external()") {
-      test_program_inline_source_base(
-        "exit", &test_context,
-        "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Could not find matching overload for call external")
-      );
-    }
-
     it("should report an error when non-type id is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,
