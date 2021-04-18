@@ -837,6 +837,9 @@ main(void) {
     struct_fields("Operator_Infix_Suffix_Conflict", (Struct_Item[]){
       { "Slice", "symbol" },
     }),
+    struct_fields("Operator_Prefix_Conflict", (Struct_Item[]){
+      { "Slice", "symbol" },
+    }),
     struct_fields("Undefined_Variable", (Struct_Item[]){
       { "Slice", "name" },
     }),

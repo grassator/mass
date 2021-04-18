@@ -96,6 +96,11 @@ mass_error_to_string(
       APPEND_SLICE(error->Operator_Infix_Suffix_Conflict.symbol);
       APPEND_LITERAL(" defined in this scope");
     } break;
+    case Mass_Error_Tag_Operator_Prefix_Conflict: {
+      APPEND_LITERAL("There is already a prefix operator ");
+      APPEND_SLICE(error->Operator_Infix_Suffix_Conflict.symbol);
+      APPEND_LITERAL(" defined in this scope");
+    } break;
     case Mass_Error_Tag_Non_Trailing_Default_Argument: {
       APPEND_LITERAL("An argument without a default value can not come after an argument that has one");
     } break;

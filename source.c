@@ -746,11 +746,11 @@ scope_define_operator(
     Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
     if (operator->fixity == Operator_Fixity_Prefix) {
       if (operator_entry->maybe_prefix) {
-        context_error_snprintf(
-          context, source_range,
-          "There is already a prefix operator %"PRIslice" defined in this scope",
-          SLICE_EXPAND_PRINTF(name)
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Operator_Prefix_Conflict,
+          .source_range = source_range,
+          .Operator_Prefix_Conflict = {.symbol = name},
+        });
         return;
       } else {
         operator_entry->maybe_prefix = operator;
