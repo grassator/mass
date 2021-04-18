@@ -998,13 +998,13 @@ tokenize(
     state = Tokenizer_State_Default;\
   } while(0)
 
-#define TOKENIZER_HANDLE_ERROR(_MESSAGE_)\
+#define TOKENIZER_HANDLE_ERROR(_EXPECTED_SLICE_)\
   do {\
-    result = (const Mass_Result) {\
+    result = (Mass_Result) {\
       .tag = Mass_Result_Tag_Error,\
       .Error.error = {\
         .tag = Mass_Error_Tag_Unexpected_Token,\
-        .detailed_message = slice_literal(_MESSAGE_),\
+        .Unexpected_Token = { .expected = (_EXPECTED_SLICE_), },\
         .source_range = {\
           .file = file,\
           .offsets = {.from = i, .to = i},\
@@ -1081,10 +1081,10 @@ tokenize(
           if (!parent_value || !value_is_group(parent_value)) {
             panic("Tokenizer: unexpected closing char for group");
           }
-          s8 expected_paren = 0;
+          Slice expected_paren = {0};
           switch (parent->group->tag) {
             case Group_Tag_Paren: {
-              expected_paren = ')';
+              expected_paren = slice_literal(")");
               break;
             }
             case Group_Tag_Curly: {
@@ -1104,16 +1104,16 @@ tokenize(
                 dyn_array_pop(stack);
               }
 
-              expected_paren = '}';
+              expected_paren = slice_literal("}");
               break;
             }
             case Group_Tag_Square: {
-              expected_paren = ']';
+              expected_paren = slice_literal("]");
               break;
             }
           }
-          if (ch != expected_paren) {
-            TOKENIZER_HANDLE_ERROR("Mismatched closing brace");
+          if (ch != expected_paren.bytes[0]) {
+            TOKENIZER_HANDLE_ERROR(expected_paren);
           }
           parent_value->source_range.offsets.to = i + 1;
           Source_Range children_range = parent_value->source_range;
@@ -1127,7 +1127,7 @@ tokenize(
           stack.data->length = parent->index + 1; // pop the children
           dyn_array_pop(parent_stack);
         } else {
-          TOKENIZER_HANDLE_ERROR("Unpexpected input");
+          TOKENIZER_HANDLE_ERROR((Slice){0});
         }
         break;
       }

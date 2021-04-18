@@ -884,20 +884,18 @@ typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unknown = 0,
   Mass_Error_Tag_Unexpected_Token = 1,
-  Mass_Error_Tag_Type_Mismatch = 2,
 } Mass_Error_Tag;
 
 typedef struct {
-  const Descriptor * target;
-  const Descriptor * source;
-} Mass_Error_Type_Mismatch;
+  Slice expected;
+} Mass_Error_Unexpected_Token;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
   char _tag_padding[4];
   Slice detailed_message;
   Source_Range source_range;
   union {
-    Mass_Error_Type_Mismatch Type_Mismatch;
+    Mass_Error_Unexpected_Token Unexpected_Token;
   };
 } Mass_Error;
 typedef dyn_array_type(Mass_Error) Array_Mass_Error;

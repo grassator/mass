@@ -828,11 +828,9 @@ main(void) {
 
   push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
     struct_empty("Unknown"),
-    struct_empty("Unexpected_Token"),
-    struct_fields("Type_Mismatch", (Struct_Item[]){
-      { "const Descriptor *", "target" },
-      { "const Descriptor *", "source" },
-    })
+    struct_fields("Unexpected_Token", (Struct_Item[]){
+      { "Slice", "expected" },
+    }),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

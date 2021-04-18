@@ -6,6 +6,77 @@
 #include "win32_runtime.h"
 #endif
 
+Slice
+source_from_source_range(
+  const Source_Range *source_range
+) {
+  return slice_sub_range(source_range->file->text, source_range->offsets);
+}
+
+Source_Position
+source_file_offset_to_position(
+  const Source_File *file,
+  u64 offset
+) {
+  // Binary search in lines
+  s64 left_bound = 0;
+  s64 right_bound = dyn_array_length(file->line_ranges) - 1;
+  s64 line_index = 0;
+  while (left_bound <= right_bound) {
+    line_index = left_bound + (right_bound - left_bound) / 2;
+    Range_u64 *line = dyn_array_get(file->line_ranges, line_index);
+    if (offset < line->from) {
+      right_bound = line_index - 1;
+    } else if (offset >= line->to) {
+      left_bound = line_index + 1;
+    } else {
+      break;
+    }
+  }
+
+  u64 column = offset - dyn_array_get(file->line_ranges, line_index)->from;
+  return (Source_Position) {
+    .line = line_index + 1,
+    .column = column,
+  };
+}
+
+void
+source_range_print_start_position(
+  const Source_Range *source_range
+) {
+  if (!source_range->file || !dyn_array_is_initialized(source_range->file->line_ranges)) {
+    printf(":(0:0)\n");
+    return;
+  }
+  Source_Position from_position =
+    source_file_offset_to_position(source_range->file, source_range->offsets.from);
+  slice_print(source_range->file->path);
+  printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
+}
+
+static Fixed_Buffer *
+mass_error_to_string(
+  Mass_Error const* error
+) {
+  Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
+  switch(error->tag) {
+    case Mass_Error_Tag_Unknown: {
+      fixed_buffer_resizing_append_slice(&result, slice_literal("Unknown Error: "));
+      fixed_buffer_resizing_append_slice(&result, error->detailed_message);
+    } break;
+    case Mass_Error_Tag_Unexpected_Token: {
+      fixed_buffer_resizing_append_slice(&result, slice_literal("Unexpected token"));
+      if (error->Unexpected_Token.expected.length) {
+        fixed_buffer_resizing_append_slice(&result, slice_literal(", expected '"));
+        fixed_buffer_resizing_append_slice(&result, error->Unexpected_Token.expected);
+        fixed_buffer_resizing_append_slice(&result, slice_literal("'"));
+      }
+    } break;
+  }
+  return result;
+}
+
 static inline const void *
 storage_static_as_c_type_internal(
   const Storage *storage,
@@ -197,55 +268,6 @@ descriptor_byte_size(
     }
   }
   return 0;
-}
-
-Source_Position
-source_file_offset_to_position(
-  const Source_File *file,
-  u64 offset
-) {
-  // Binary search in lines
-  s64 left_bound = 0;
-  s64 right_bound = dyn_array_length(file->line_ranges) - 1;
-  s64 line_index = 0;
-  while (left_bound <= right_bound) {
-    line_index = left_bound + (right_bound - left_bound) / 2;
-    Range_u64 *line = dyn_array_get(file->line_ranges, line_index);
-    if (offset < line->from) {
-      right_bound = line_index - 1;
-    } else if (offset >= line->to) {
-      left_bound = line_index + 1;
-    } else {
-      break;
-    }
-  }
-
-  u64 column = offset - dyn_array_get(file->line_ranges, line_index)->from;
-  return (Source_Position) {
-    .line = line_index + 1,
-    .column = column,
-  };
-}
-
-Slice
-source_from_source_range(
-  const Source_Range *source_range
-) {
-  return slice_sub_range(source_range->file->text, source_range->offsets);
-}
-
-void
-source_range_print_start_position(
-  const Source_Range *source_range
-) {
-  if (!source_range->file || !dyn_array_is_initialized(source_range->file->line_ranges)) {
-    printf(":(0:0)\n");
-    return;
-  }
-  Source_Position from_position =
-    source_file_offset_to_position(source_range->file, source_range->offsets.from);
-  slice_print(source_range->file->path);
-  printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
 
 s64

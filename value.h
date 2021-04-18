@@ -65,6 +65,10 @@ MASS_ERROR(Slice message, Source_Range source_range) {
   };
 }
 
+static Fixed_Buffer *
+mass_error_to_string(
+  Mass_Error const* error
+);
 
 static inline Value
 type_value_for_descriptor(

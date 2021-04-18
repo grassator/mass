@@ -310,10 +310,10 @@ spec("source") {
         tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
+      check(error->tag == Mass_Error_Tag_Unexpected_Token);
       spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      spec_check_slice(error->detailed_message, slice_literal("Unexpected end of file. Expected a closing brace."));
     }
 
     it("should report a failure when encountering a mismatched brace that") {
@@ -323,10 +323,10 @@ spec("source") {
         tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
       Mass_Error *error = &result.Error.error;
+      check(error->tag == Mass_Error_Tag_Unexpected_Token);
       spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      spec_check_slice(error->detailed_message, slice_literal("Mismatched closing brace"));
     }
   }
 
