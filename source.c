@@ -3543,6 +3543,7 @@ token_handle_function_call(
   }
 
   struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
+  struct Overload_Match best_conflict_match = { .score = -1 };
   for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
     const Descriptor *to_call_descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
@@ -3559,22 +3560,13 @@ token_handle_function_call(
     const Function_Info *descriptor = &to_call_descriptor->Function.info;
     s64 score = calculate_arguments_match_score(descriptor, args);
     if (score == -1) continue; // no match
-    if (score == match.score) {
-      Slice previous_name = match.value->descriptor->name;
-      Slice current_name = to_call_descriptor->name;
-      // TODO provide names of matched overloads
-      context_error_snprintf(
-        context, source_range,
-        "Could not decide which overload to pick."
-        "Candidates are %"PRIslice" and %"PRIslice,
-        SLICE_EXPAND_PRINTF(previous_name), SLICE_EXPAND_PRINTF(current_name)
-      );
-      goto err;
-    } else if (score > match.score) {
+    if (score > match.score) {
       match.value = to_call;
       match.score = score;
     } else {
-      // Skip a worse match
+      if (score == match.score && score > best_conflict_match.score) {
+        best_conflict_match = match;
+      }
     }
   }
 
@@ -3586,6 +3578,14 @@ token_handle_function_call(
       "Could not find matching overload for call %"PRIslice,
       SLICE_EXPAND_PRINTF(source)
     );
+    goto err;
+  }
+  if (match.score == best_conflict_match.score) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Undecidable_Overload,
+      .Undecidable_Overload = { match.value, best_conflict_match.value },
+      .source_range = source_range,
+    });
     goto err;
   }
 

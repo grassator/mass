@@ -749,9 +749,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(slice_starts_with(
-        error->detailed_message, slice_literal("Could not decide which overload to pick")
-      ));
+      check(error->tag == Mass_Error_Tag_Undecidable_Overload);
     }
 
     it("should support default arguments") {

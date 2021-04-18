@@ -888,6 +888,7 @@ typedef enum {
   Mass_Error_Tag_Unexpected_Token = 3,
   Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 4,
   Mass_Error_Tag_Type_Mismatch = 5,
+  Mass_Error_Tag_Undecidable_Overload = 6,
 } Mass_Error_Tag;
 
 typedef struct {
@@ -900,6 +901,10 @@ typedef struct {
   const Descriptor * expected;
   const Descriptor * actual;
 } Mass_Error_Type_Mismatch;
+typedef struct {
+  Value * a;
+  Value * b;
+} Mass_Error_Undecidable_Overload;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
   char _tag_padding[4];
@@ -909,6 +914,7 @@ typedef struct Mass_Error {
     Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Variable_Definition_Invalid_Identifier Variable_Definition_Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;
+    Mass_Error_Undecidable_Overload Undecidable_Overload;
   };
 } Mass_Error;
 typedef dyn_array_type(Mass_Error) Array_Mass_Error;

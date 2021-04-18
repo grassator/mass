@@ -840,6 +840,10 @@ main(void) {
       { "const Descriptor *", "expected" },
       { "const Descriptor *", "actual" },
     }),
+    struct_fields("Undecidable_Overload", (Struct_Item[]){
+      { "Value *", "a" },
+      { "Value *", "b" },
+    }),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

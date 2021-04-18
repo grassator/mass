@@ -94,6 +94,13 @@ mass_error_to_string(
       APPEND_LITERAL(", got ");
       APPEND_SLICE(mismatch->actual->name);
     } break;
+    case Mass_Error_Tag_Undecidable_Overload: {
+      Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
+      APPEND_LITERAL("Could not decide which overload is better: ");
+      APPEND_SLICE(overloads->a->descriptor->name);
+      APPEND_LITERAL(" or ");
+      APPEND_SLICE(overloads->b->descriptor->name);
+    } break;
   }
   #undef APPEND_SLICE
   #undef APPEND_LITERAL
