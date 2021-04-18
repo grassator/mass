@@ -74,7 +74,7 @@ mass_error_to_string(
       APPEND_LITERAL("Unimplemented Feature: ");
       APPEND_SLICE(error->detailed_message);
     } break;
-    case Mass_Error_Tag_Expression_Parse: {
+    case Mass_Error_Tag_Parse: {
       APPEND_LITERAL("Unable to parse the expression");
     } break;
     case Mass_Error_Tag_Unexpected_Token: {

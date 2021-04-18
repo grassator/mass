@@ -4701,7 +4701,7 @@ mass_handle_dot_operator(
       );
     } else {
       context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Expression_Parse,
+        .tag = Mass_Error_Tag_Parse,
         .source_range = rhs_range,
         .detailed_message =
           "Right hand side of the . operator for an array must be an (expr) or a literal number"
@@ -4710,7 +4710,7 @@ mass_handle_dot_operator(
     }
   } else {
     context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Expression_Parse,
+      .tag = Mass_Error_Tag_Parse,
       .source_range = lhs_range,
       .detailed_message = "Left hand side of the . operator must be a struct or an array"
     });
@@ -5018,7 +5018,7 @@ token_parse_expression(
       result = token_parse_single(context, result);
     } else {
       context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Expression_Parse,
+        .tag = Mass_Error_Tag_Parse,
         .source_range = view.source_range,
       });
     }
@@ -5144,12 +5144,10 @@ token_parse_block_view(
 
     if (!match_length) {
       Value *token = value_view_get(rest, 0);
-      Slice source = source_from_source_range(&token->source_range);
-      context_error_snprintf(
-        context, token->source_range,
-        "Can not parse statement. Unexpected token %"PRIslice".",
-        SLICE_EXPAND_PRINTF(source)
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = token->source_range,
+      });
       return 0;
     }
     next_loop:;

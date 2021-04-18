@@ -884,7 +884,7 @@ typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unknown = 0,
   Mass_Error_Tag_Unimplemented = 1,
-  Mass_Error_Tag_Expression_Parse = 2,
+  Mass_Error_Tag_Parse = 2,
   Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
   Mass_Error_Tag_Unexpected_Token = 4,
   Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 5,
