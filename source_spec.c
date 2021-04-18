@@ -1389,9 +1389,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(slice_starts_with(
-        error->detailed_message, slice_literal("Expected an integer")
-      ));
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_u32);
+      check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
     it("should be able to define a variable with a fixed size array type") {

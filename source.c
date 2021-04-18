@@ -444,33 +444,17 @@ token_value_force_immediate_integer(
     }
     panic("Unexpected literal cast result");
   }
-
-  if (!descriptor_is_integer(value->descriptor)) {
-    context_error_snprintf(
-      context, *source_range,
-      "Expected an integer"
-    );
+  if (!same_value_type_or_can_implicitly_move_cast(target_descriptor, value)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = *source_range,
+      .Type_Mismatch = {
+        .expected = target_descriptor,
+        .actual = value->descriptor,
+      },
+    });
     return 0;
   }
-
-  if (value->storage.tag != Storage_Tag_Static) {
-    context_error_snprintf(
-      context, *source_range,
-      "Value is not an immediate"
-    );
-    return 0;
-  }
-
-  u64 target_byte_size = descriptor_byte_size(target_descriptor);
-  if (target_byte_size > descriptor_byte_size(value->descriptor)) {
-    context_error_snprintf(
-      context, *source_range,
-      "Static value does not fit into the target integer size %"PRIu64,
-      target_byte_size
-    );
-  }
-
-  // FIXME resize the value?
 
   return value;
 }
