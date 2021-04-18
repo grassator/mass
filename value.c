@@ -87,6 +87,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Variable_Definition_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier for a variable definition");
     } break;
+    case Mass_Error_Tag_Non_Trailing_Default_Argument: {
+      APPEND_LITERAL("An argument without a default value can not come after an argument that has one");
+    } break;
     case Mass_Error_Tag_Type_Mismatch: {
       Mass_Error_Type_Mismatch const *mismatch = &error->Type_Mismatch;
       APPEND_LITERAL("Type mismatch: expected ");

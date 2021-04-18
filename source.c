@@ -2655,10 +2655,10 @@ token_process_function_literal(
       dyn_array_push(descriptor->Function.info.memory_layout.items, arg);
       if (previous_argument_has_default_value) {
         if (!arg.maybe_default_expression.length ) {
-          context_error_snprintf(
-            context, arg_view.source_range,
-            "Non-default argument can not come after a default one"
-          );
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
+            .source_range = return_types->source_range,
+          });
           return 0;
         }
       } else {

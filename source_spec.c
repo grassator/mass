@@ -781,9 +781,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(slice_starts_with(
-        error->detailed_message, slice_literal("Non-default argument can not come after a default one")
-      ));
+      check(error->tag == Mass_Error_Tag_Non_Trailing_Default_Argument);
     }
 
     it("should support capturing static arguments") {

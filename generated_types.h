@@ -885,10 +885,11 @@ typedef enum {
   Mass_Error_Tag_Unknown = 0,
   Mass_Error_Tag_Unimplemented = 1,
   Mass_Error_Tag_Expression_Parse = 2,
-  Mass_Error_Tag_Unexpected_Token = 3,
-  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 4,
-  Mass_Error_Tag_Type_Mismatch = 5,
-  Mass_Error_Tag_Undecidable_Overload = 6,
+  Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
+  Mass_Error_Tag_Unexpected_Token = 4,
+  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 5,
+  Mass_Error_Tag_Type_Mismatch = 6,
+  Mass_Error_Tag_Undecidable_Overload = 7,
 } Mass_Error_Tag;
 
 typedef struct {
