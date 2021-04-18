@@ -4631,10 +4631,11 @@ mass_handle_dot_operator(
     lhs_descriptor == &descriptor_scope
   ) {
     if (!value_is_symbol(rhs)) {
-      context_error_snprintf(
-        context, rhs_range,
-        "Right hand side of the . operator on structs must be an identifier"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Invalid_Identifier,
+        .source_range = rhs_range,
+        .detailed_message = "Right hand side of the . operator on structs must be an identifier"
+      });
       return 0;
     }
     Slice field_name = value_as_symbol(rhs)->name;
@@ -4694,17 +4695,20 @@ mass_handle_dot_operator(
         context, lhs_range, lazy_payload, descriptor, mass_handle_array_access_lazy_proc
       );
     } else {
-      context_error_snprintf(
-        context, rhs_range,
-        "Right hand side of the . operator for an array must be a (expr) or a literal number"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Expression_Parse,
+        .source_range = rhs_range,
+        .detailed_message =
+          "Right hand side of the . operator for an array must be an (expr) or a literal number"
+      });
       return 0;
     }
   } else {
-    context_error_snprintf(
-      context, rhs_range,
-      "Left hand side of the . operator must be a struct"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Expression_Parse,
+      .source_range = lhs_range,
+      .detailed_message = "Left hand side of the . operator must be a struct or an array"
+    });
     return 0;
   }
 }

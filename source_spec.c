@@ -1443,10 +1443,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("Right hand side of the . operator on structs must be an identifier")
-      );
+      check(error->tag == Mass_Error_Tag_Invalid_Identifier);
     }
 
     it("should report an error when a struct does not have a request field") {
