@@ -834,6 +834,9 @@ main(void) {
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),
+    struct_fields("Operator_Infix_Suffix_Conflict", (Struct_Item[]){
+      { "Slice", "symbol" },
+    }),
     struct_fields("Undefined_Variable", (Struct_Item[]){
       { "Slice", "name" },
     }),

@@ -887,15 +887,19 @@ typedef enum {
   Mass_Error_Tag_Expression_Parse = 2,
   Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
   Mass_Error_Tag_Unexpected_Token = 4,
-  Mass_Error_Tag_Undefined_Variable = 5,
-  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 6,
-  Mass_Error_Tag_Type_Mismatch = 7,
-  Mass_Error_Tag_Undecidable_Overload = 8,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 5,
+  Mass_Error_Tag_Undefined_Variable = 6,
+  Mass_Error_Tag_Variable_Definition_Invalid_Identifier = 7,
+  Mass_Error_Tag_Type_Mismatch = 8,
+  Mass_Error_Tag_Undecidable_Overload = 9,
 } Mass_Error_Tag;
 
 typedef struct {
   Slice expected;
 } Mass_Error_Unexpected_Token;
+typedef struct {
+  Slice symbol;
+} Mass_Error_Operator_Infix_Suffix_Conflict;
 typedef struct {
   Slice name;
 } Mass_Error_Undefined_Variable;
@@ -917,6 +921,7 @@ typedef struct Mass_Error {
   Source_Range source_range;
   union {
     Mass_Error_Unexpected_Token Unexpected_Token;
+    Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
     Mass_Error_Undefined_Variable Undefined_Variable;
     Mass_Error_Variable_Definition_Invalid_Identifier Variable_Definition_Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;

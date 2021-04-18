@@ -1050,10 +1050,8 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("There is already a infix or postfix operator ** defined in this scope")
-      );
+      check(error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
+      spec_check_slice(error->Operator_Infix_Suffix_Conflict.symbol, slice_literal("**"));
     }
 
     it("should report an error when defining an overloaded infix and postfix operator") {
@@ -1065,10 +1063,8 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      spec_check_slice(
-        error->detailed_message,
-        slice_literal("There is already a infix or postfix operator ** defined in this scope")
-      );
+      check(error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
+      spec_check_slice(error->Operator_Infix_Suffix_Conflict.symbol, slice_literal("**"));
     }
 
     it("should have a built-in compile-time shift operator") {

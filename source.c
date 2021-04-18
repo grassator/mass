@@ -757,11 +757,11 @@ scope_define_operator(
       }
     } else {
       if (operator_entry->maybe_infix_or_postfix) {
-        context_error_snprintf(
-          context, source_range,
-          "There is already a infix or postfix operator %"PRIslice" defined in this scope",
-          SLICE_EXPAND_PRINTF(name)
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Operator_Infix_Suffix_Conflict,
+          .source_range = source_range,
+          .Operator_Infix_Suffix_Conflict = {.symbol = name},
+        });
         return;
       } else {
         operator_entry->maybe_infix_or_postfix = operator;
