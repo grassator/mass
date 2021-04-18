@@ -47,7 +47,10 @@ spec_check_mass_result(
   const Mass_Result *result
 ) {
   if (result->tag == Mass_Result_Tag_Success) return true;
-  slice_print(result->Error.error.detailed_message);
+  const Mass_Error *error = &result->Error.error;
+  Fixed_Buffer *error_buffer = mass_error_to_string(error);
+  slice_print(fixed_buffer_as_slice(error_buffer));
+  fixed_buffer_destroy(error_buffer);
   printf("\n  at ");
   source_range_print_start_position(&result->Error.error.source_range);
   return false;
