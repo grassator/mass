@@ -501,7 +501,7 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Variable_Definition_Invalid_Identifier);
+      check(error->tag == Mass_Error_Tag_Invalid_Identifier);
     }
     it("should report an error for multi-definition assignment") {
       test_program_inline_source_base(

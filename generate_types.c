@@ -843,7 +843,7 @@ main(void) {
     struct_fields("Undefined_Variable", (Struct_Item[]){
       { "Slice", "name" },
     }),
-    struct_fields("Variable_Definition_Invalid_Identifier", (Struct_Item[]){
+    struct_fields("Invalid_Identifier", (Struct_Item[]){
       { "Value *", "id" },
     }),
     struct_fields("Type_Mismatch", (Struct_Item[]){

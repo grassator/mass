@@ -88,8 +88,8 @@ mass_error_to_string(
       APPEND_LITERAL("Undefined variable ");
       APPEND_SLICE(error->Undefined_Variable.name);
     } break;
-    case Mass_Error_Tag_Variable_Definition_Invalid_Identifier: {
-      APPEND_LITERAL("Invalid identifier for a variable definition");
+    case Mass_Error_Tag_Invalid_Identifier: {
+      APPEND_LITERAL("Invalid identifier");
     } break;
     case Mass_Error_Tag_Operator_Infix_Suffix_Conflict: {
       APPEND_LITERAL("There is already a infix or postfix operator ");

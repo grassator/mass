@@ -5675,9 +5675,9 @@ token_parse_definition_and_assignment_statements(
 
   if (!value_is_symbol(name_token)) {
     context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Variable_Definition_Invalid_Identifier,
+      .tag = Mass_Error_Tag_Invalid_Identifier,
       .source_range = name_token->source_range,
-      .Variable_Definition_Invalid_Identifier = {.id = name_token},
+      .Invalid_Identifier = {.id = name_token},
     });
     goto err;
   }
