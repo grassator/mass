@@ -35,15 +35,15 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
 #define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, ...)\
-  dyn_array_struct(Descriptor_Struct_Field) descriptor_##_NAME_##_fields = {\
-    .length = countof((const Descriptor_Struct_Field[]){__VA_ARGS__}),\
+  dyn_array_struct(Memory_Layout_Item) descriptor_##_NAME_##_fields = {\
+    .length = countof((const Memory_Layout_Item[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
   };\
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
     .name = slice_literal_fields(#_NAME_),\
     .Struct = {\
-      .fields = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
+      .memory_layout.items = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
     },\
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\

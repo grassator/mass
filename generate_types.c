@@ -275,6 +275,7 @@ print_mass_descriptor_and_type(
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
         fprintf(file, "  {\n");
+        fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
         fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
         Slice lowercase_type = slice_from_c_string(strtolower(item->type));
         // TODO support const
@@ -294,7 +295,7 @@ print_mass_descriptor_and_type(
           lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
         }
         fprintf(file, ",\n");
-        fprintf(file, "    .offset = offsetof(%s, %s),\n", type->struct_.name, item->name);
+        fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", type->struct_.name, item->name);
         fprintf(file, "  },\n");
       }
       fprintf(file, ");\n");
@@ -789,12 +790,6 @@ main(void) {
     { "Array_Memory_Layout_Item", "items" },
   }));
 
-  push_type(type_struct("Descriptor_Struct_Field", (Struct_Item[]){
-    { "Slice", "name" },
-    { "const Descriptor *", "descriptor" },
-    { "u64", "offset" },
-  }));
-
   push_type(type_struct("Function_Return", (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
@@ -822,8 +817,7 @@ main(void) {
       { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
-      { "Slice", "name" },
-      { "Array_Descriptor_Struct_Field", "fields" },
+      { "Memory_Layout", "memory_layout" },
     }),
     struct_fields("Pointer", (Struct_Item[]){
       { "const Descriptor *", "to" },

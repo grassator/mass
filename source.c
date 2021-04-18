@@ -489,7 +489,7 @@ maybe_coerce_number_literal_to_integer(
 static Storage
 storage_field_access(
   Storage *struct_storage,
-  Descriptor_Struct_Field *field
+  Memory_Layout_Item *field
 );
 
 static PRELUDE_NO_DISCARD Mass_Result
@@ -538,8 +538,8 @@ assign(
     assert(target->storage.tag == Storage_Tag_Memory);
     assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
 
-    for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.fields); ++i) {
-      Descriptor_Struct_Field *field = dyn_array_get(source->descriptor->Struct.fields, i);
+    for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
+      Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);
       Value source_field = {
         .descriptor = field->descriptor,
         .storage = storage_field_access(&source->storage, field),
@@ -2558,7 +2558,7 @@ token_process_c_struct_definition(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .Struct = {
-      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+      .memory_layout.items = dyn_array_make(Array_Memory_Layout_Item),
     },
   };
 
@@ -4489,14 +4489,14 @@ mass_handle_at_operator(
   }
 }
 
-static inline Descriptor_Struct_Field *
+static inline Memory_Layout_Item *
 struct_find_field_by_name(
   const Descriptor *descriptor,
   Slice field_name
 ) {
   assert(descriptor->tag == Descriptor_Tag_Struct);
-  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(descriptor->Struct.fields, i);
+  for (u64 i = 0; i < dyn_array_length(descriptor->Struct.memory_layout.items); ++i) {
+    Memory_Layout_Item *field = dyn_array_get(descriptor->Struct.memory_layout.items, i);
     if (slice_equal(field->name, field_name)) {
       return field;
     }
@@ -4507,7 +4507,7 @@ struct_find_field_by_name(
 static Storage
 storage_field_access(
   Storage *struct_storage,
-  Descriptor_Struct_Field *field
+  Memory_Layout_Item *field
 ) {
   switch(struct_storage->tag) {
     default:
@@ -4520,8 +4520,9 @@ storage_field_access(
       break;
     }
     case Storage_Tag_Static: {
+      assert(field->tag == Memory_Layout_Item_Tag_Base_Relative); // FIXME
       return storage_static_internal(
-        (s8 *)storage_static_as_c_type_internal(struct_storage, struct_storage->byte_size) + field->offset,
+        (s8 *)storage_static_as_c_type_internal(struct_storage, struct_storage->byte_size) + field->Base_Relative.offset,
         descriptor_byte_size(field->descriptor)
       );
     }
@@ -4529,7 +4530,7 @@ storage_field_access(
       Storage field_storage = *struct_storage;
       assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
       field_storage.byte_size = descriptor_byte_size(field->descriptor);
-      field_storage.Memory.location.Indirect.offset += field->offset;
+      field_storage.Memory.location.Indirect.offset += field->Base_Relative.offset;
       return field_storage;
     }
   }
@@ -4539,7 +4540,7 @@ storage_field_access(
 
 typedef struct {
   Value *struct_;
-  Descriptor_Struct_Field *field;
+  Memory_Layout_Item *field;
 } Mass_Field_Access_Lazy_Payload;
 
 static inline Value *
@@ -4549,7 +4550,7 @@ mass_handle_field_access_lazy_proc(
   void *raw_payload
 ) {
   Mass_Field_Access_Lazy_Payload *payload = raw_payload;
-  Descriptor_Struct_Field *field = payload->field;
+  Memory_Layout_Item *field = payload->field;
 
   Storage field_storage = storage_field_access(&payload->struct_->storage, field);
   Value *field_value =
@@ -4643,7 +4644,7 @@ mass_handle_dot_operator(
     }
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs_descriptor->tag == Descriptor_Tag_Struct) {
-      Descriptor_Struct_Field *field = struct_find_field_by_name(lhs_descriptor, field_name);
+      Memory_Layout_Item *field = struct_find_field_by_name(lhs_descriptor, field_name);
       if (!field) {
         context_error_snprintf(
           context, rhs_range,

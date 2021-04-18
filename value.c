@@ -148,19 +148,21 @@ u64
 struct_byte_size(
   const Descriptor_Struct *Struct
 ) {
-  u64 count = dyn_array_length(Struct->fields);
+  u64 count = dyn_array_length(Struct->memory_layout.items);
   assert(count);
   u64 alignment = 0;
   u64 raw_size = 0;
   for (u64 i = 0; i < count; ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(Struct->fields, i);
+    Memory_Layout_Item *field = dyn_array_get(Struct->memory_layout.items, i);
     u64 field_alignment = descriptor_alignment(field->descriptor);
     alignment = u64_max(alignment, field_alignment);
     bool is_last_field = i == count - 1;
     u64 field_size_with_alignment = u64_max(field_alignment, descriptor_byte_size(field->descriptor));
     assert(field_size_with_alignment);
+    assert(field->tag == Memory_Layout_Item_Tag_Base_Relative);
+    // FIXME do padding when memory layout is created
     if (is_last_field) {
-      raw_size = field->offset + field_size_with_alignment;
+      raw_size = field->Base_Relative.offset + field_size_with_alignment;
     }
   }
   return u64_align(raw_size, alignment);
@@ -563,7 +565,7 @@ descriptor_struct_make(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .Struct = {
-      .fields = dyn_array_make(Array_Descriptor_Struct_Field),
+      .memory_layout.items = dyn_array_make(Array_Memory_Layout_Item),
     }
   };
   return descriptor;
@@ -576,8 +578,8 @@ descriptor_struct_add_field(
   Slice field_name
 ) {
   u64 offset = 0;
-  for (u64 i = 0; i < dyn_array_length(struct_descriptor->Struct.fields); ++i) {
-    Descriptor_Struct_Field *field = dyn_array_get(struct_descriptor->Struct.fields, i);
+  for (u64 i = 0; i < dyn_array_length(struct_descriptor->Struct.memory_layout.items); ++i) {
+    Memory_Layout_Item *field = dyn_array_get(struct_descriptor->Struct.memory_layout.items, i);
     u64 size = descriptor_byte_size(field->descriptor);
     offset = u64_align(offset, size);
     offset += size;
@@ -585,10 +587,11 @@ descriptor_struct_add_field(
 
   u64 size = descriptor_byte_size(field_descriptor);
   offset = u64_align(offset, size);
-  dyn_array_push(struct_descriptor->Struct.fields, (Descriptor_Struct_Field) {
+  dyn_array_push(struct_descriptor->Struct.memory_layout.items, (Memory_Layout_Item) {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = field_name,
     .descriptor = field_descriptor,
-    .offset = offset,
+    .Base_Relative.offset = offset,
   });
 }
 
@@ -677,19 +680,27 @@ storage_static_equal_internal(
     }
     case Descriptor_Tag_Struct: {
       // compare field by field
-      u64 a_field_count = dyn_array_length(a_descriptor->Struct.fields);
-      u64 b_field_count = dyn_array_length(b_descriptor->Struct.fields);
+      u64 a_field_count = dyn_array_length(a_descriptor->Struct.memory_layout.items);
+      u64 b_field_count = dyn_array_length(b_descriptor->Struct.memory_layout.items);
       if (a_field_count != b_field_count) {
         return false;
       }
       for (u64 i = 0; i < a_field_count; ++i) {
-        Descriptor_Struct_Field *a_field = dyn_array_get(a_descriptor->Struct.fields, i);
-        Descriptor_Struct_Field *b_field = dyn_array_get(b_descriptor->Struct.fields, i);
-        if (!storage_static_equal_internal(
-          a_field->descriptor, (s8 *)a_memory + a_field->offset,
-          b_field->descriptor, (s8 *)b_memory + b_field->offset
-        )) {
-          return false;
+        Memory_Layout_Item *a_field = dyn_array_get(a_descriptor->Struct.memory_layout.items, i);
+        Memory_Layout_Item *b_field = dyn_array_get(b_descriptor->Struct.memory_layout.items, i);
+        if (a_field->tag != b_field->tag) return false;
+        switch(a_field->tag) {
+          case Memory_Layout_Item_Tag_Base_Relative: {
+            if (!storage_static_equal_internal(
+              a_field->descriptor, (s8 *)a_memory + a_field->Base_Relative.offset,
+              b_field->descriptor, (s8 *)b_memory + b_field->Base_Relative.offset
+            )) {
+              return false;
+            }
+          } break;
+          case Memory_Layout_Item_Tag_Absolute: {
+            panic("TODO");
+          } break;
         }
       }
       break;
