@@ -47,9 +47,9 @@ spec_check_mass_result(
   const Mass_Result *result
 ) {
   if (result->tag == Mass_Result_Tag_Success) return true;
-  slice_print(result->Error.details.message);
+  slice_print(result->Error.error.detailed_message);
   printf("\n  at ");
-  source_range_print_start_position(&result->Error.details.source_range);
+  source_range_print_start_position(&result->Error.error.source_range);
   return false;
 }
 
@@ -309,11 +309,11 @@ spec("source") {
       Mass_Result result =
         tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &result.Error.details;
+      Mass_Error *error = &result.Error.error;
       spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      spec_check_slice(error->message, slice_literal("Unexpected end of file. Expected a closing brace."));
+      spec_check_slice(error->detailed_message, slice_literal("Unexpected end of file. Expected a closing brace."));
     }
 
     it("should report a failure when encountering a mismatched brace that") {
@@ -322,11 +322,11 @@ spec("source") {
       Mass_Result result =
         tokenize(test_context.compilation, &(Source_File){test_file_name, source}, &tokens);
       check(result.tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &result.Error.details;
+      Mass_Error *error = &result.Error.error;
       spec_check_slice(error->source_range.file->path, test_file_name);
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
-      spec_check_slice(error->message, slice_literal("Mismatched closing brace"));
+      spec_check_slice(error->detailed_message, slice_literal("Mismatched closing brace"));
     }
   }
 
@@ -500,9 +500,9 @@ spec("source") {
         "main :: () -> () { 2 := 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Left hand side of the := is not a symbol")
       );
     }
@@ -512,9 +512,9 @@ spec("source") {
         "main :: () -> () { foo, bar := 42, 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Multiple assignment are not supported at the moment")
       );
     }
@@ -550,9 +550,9 @@ spec("source") {
         "main :: () -> () { if true else 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Could not parse the expression")
       );
     }
@@ -562,9 +562,9 @@ spec("source") {
         "main :: () -> () { if true then 0 then 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Could not parse the expression")
       );
     }
@@ -600,9 +600,9 @@ spec("source") {
         "main :: () -> () { if; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Undefined variable ;")
       );
     }
@@ -613,9 +613,9 @@ spec("source") {
         "main :: () -> () { if (1 < 0) { 0 } 42; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Could not parse the expression")
       );
     }
@@ -749,9 +749,9 @@ spec("source") {
         "test :: () -> () { x : s32 = 0; y : s64 = 1; x = y; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message, slice_literal("Incompatible type: expected s32, got s64")
+        error->detailed_message, slice_literal("Incompatible type: expected s32, got s64")
       );
     }
 
@@ -763,9 +763,9 @@ spec("source") {
         "test :: () -> () { overload(1, 2) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       check(slice_starts_with(
-        error->message, slice_literal("Could not decide which overload to pick")
+        error->detailed_message, slice_literal("Could not decide which overload to pick")
       ));
     }
 
@@ -797,9 +797,9 @@ spec("source") {
         "test :: (x : s64, y : s64 = x, z : s32) -> () {}\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       check(slice_starts_with(
-        error->message, slice_literal("Non-default argument can not come after a default one")
+        error->detailed_message, slice_literal("Non-default argument can not come after a default one")
       ));
     }
 
@@ -887,9 +887,9 @@ spec("source") {
         "exit :: (status: s32) -> (s32, s32) {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Multiple return types are not supported at the moment")
       );
     }
@@ -900,9 +900,9 @@ spec("source") {
         "exit :: (status: s32) -> () external(\"kernel32.dll\", 42)"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Could not find matching overload for call external")
       );
     }
@@ -914,8 +914,8 @@ spec("source") {
         "main :: (arg : foo) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("Expected a type"));
+      Mass_Error *error = &test_context.result->Error.error;
+      spec_check_slice(error->detailed_message, slice_literal("Expected a type"));
     }
 
     it("should report an error when non-type token is being used as a type") {
@@ -924,8 +924,8 @@ spec("source") {
         "main :: (arg : 42) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("Expected a type"));
+      Mass_Error *error = &test_context.result->Error.error;
+      spec_check_slice(error->detailed_message, slice_literal("Expected a type"));
     }
 
     it("should report an error when encountering an unknown type") {
@@ -936,8 +936,8 @@ spec("source") {
       check(result.tag == Mass_Result_Tag_Success);
       scope_lookup_force(test_context.scope, slice_literal("main"));
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("Undefined variable s33"));
+      Mass_Error *error = &test_context.result->Error.error;
+      spec_check_slice(error->detailed_message, slice_literal("Undefined variable s33"));
     }
 
     it("should be able to get the type_of an expression without evaluating it") {
@@ -975,8 +975,8 @@ spec("source") {
         "}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
-      spec_check_slice(error->message, slice_literal("type_of() expects a sinle argument"));
+      Mass_Error *error = &test_context.result->Error.error;
+      spec_check_slice(error->detailed_message, slice_literal("type_of() expects a sinle argument"));
     }
 
     it("should be able to get the size_of an expression") {
@@ -1093,9 +1093,9 @@ spec("source") {
         "dummy :: () -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("There is already a infix or postfix operator ** defined in this scope")
       );
     }
@@ -1108,9 +1108,9 @@ spec("source") {
         "dummy :: () -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("There is already a infix or postfix operator ** defined in this scope")
       );
     }
@@ -1202,9 +1202,9 @@ spec("source") {
         "test :: () -> (s64) { foo := 42; @( foo ) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       check(slice_starts_with(
-        error->message,
+        error->detailed_message,
         slice_literal("Trying to access a runtime variable foo")
       ));
     }
@@ -1436,9 +1436,9 @@ spec("source") {
         "}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       check(slice_starts_with(
-        error->message, slice_literal("Expected an integer")
+        error->detailed_message, slice_literal("Expected an integer")
       ));
     }
 
@@ -1490,9 +1490,9 @@ spec("source") {
         "main :: () -> () { p : Point; p.(x) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Right hand side of the . operator on structs must be an identifier")
       );
     }
@@ -1504,9 +1504,9 @@ spec("source") {
         "main :: () -> () { p : Point; p.foo }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Parse_Error *error = &test_context.result->Error.details;
+      Mass_Error *error = &test_context.result->Error.error;
       spec_check_slice(
-        error->message,
+        error->detailed_message,
         slice_literal("Struct does not have a field `foo`")
       );
     }

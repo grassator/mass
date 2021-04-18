@@ -177,6 +177,10 @@ typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
 
+typedef struct Mass_Error Mass_Error;
+typedef dyn_array_type(Mass_Error *) Array_Mass_Error_Ptr;
+typedef dyn_array_type(const Mass_Error *) Array_Const_Mass_Error_Ptr;
+
 typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
@@ -878,12 +882,32 @@ typedef struct Descriptor {
 } Descriptor;
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
+  Mass_Error_Tag_Unknown = 0,
+  Mass_Error_Tag_Unexpected_Token = 1,
+  Mass_Error_Tag_Type_Mismatch = 2,
+} Mass_Error_Tag;
+
+typedef struct {
+  const Descriptor * target;
+  const Descriptor * source;
+} Mass_Error_Type_Mismatch;
+typedef struct Mass_Error {
+  Mass_Error_Tag tag;
+  char _tag_padding[4];
+  Slice detailed_message;
+  Source_Range source_range;
+  union {
+    Mass_Error_Type_Mismatch Type_Mismatch;
+  };
+} Mass_Error;
+typedef dyn_array_type(Mass_Error) Array_Mass_Error;
+typedef enum {
   Mass_Result_Tag_Success = 0,
   Mass_Result_Tag_Error = 1,
 } Mass_Result_Tag;
 
 typedef struct {
-  Parse_Error details;
+  Mass_Error error;
 } Mass_Result_Error;
 typedef struct Mass_Result {
   Mass_Result_Tag tag;
@@ -1151,6 +1175,12 @@ static Descriptor descriptor_array_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_descriptor_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
+static Descriptor descriptor_mass_error;
+static Descriptor descriptor_array_mass_error;
+static Descriptor descriptor_array_mass_error_ptr;
+static Descriptor descriptor_mass_error_pointer;
+static Descriptor descriptor_mass_error_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static Descriptor descriptor_mass_result;
 static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
@@ -1845,6 +1875,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info,
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor, Descriptor)
+MASS_DEFINE_OPAQUE_C_TYPE(mass_error, Mass_Error)
 MASS_DEFINE_OPAQUE_C_TYPE(mass_result, Mass_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)

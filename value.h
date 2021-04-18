@@ -50,15 +50,16 @@ register_bitset_get(
 
 PRELUDE_NO_DISCARD static inline Mass_Result
 MASS_SUCCESS() {
-  return (const Mass_Result){ .tag = Mass_Result_Tag_Success };
+  return (Mass_Result){.tag = Mass_Result_Tag_Success};
 }
 
 PRELUDE_NO_DISCARD static inline Mass_Result
 MASS_ERROR(Slice message, Source_Range source_range) {
-  return (const Mass_Result){
+  return (Mass_Result){
     .tag = Mass_Result_Tag_Error,
-    .Error.details = {
-      .message = message,
+    .Error.error = {
+      .tag = Mass_Error_Tag_Unknown,
+      .detailed_message = message,
       .source_range = source_range,
     }
   };

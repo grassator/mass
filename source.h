@@ -237,8 +237,9 @@ typedef struct {
     assert(0 <= snprintf(context_error_snprintf_buffer, context_error_snprintf_buffer_size, ##__VA_ARGS__));\
     *(_CONTEXT_)->result = (Mass_Result) {\
       .tag = Mass_Result_Tag_Error,\
-      .Error.details = {\
-        .message = slice_from_c_string(context_error_snprintf_buffer),\
+      .Error.error = {\
+        .tag = Mass_Error_Tag_Unknown,\
+        .detailed_message = slice_from_c_string(context_error_snprintf_buffer),\
         .source_range = (_SOURCE_RANGE_)\
       }\
     };\

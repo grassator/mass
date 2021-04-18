@@ -1002,8 +1002,9 @@ tokenize(
   do {\
     result = (const Mass_Result) {\
       .tag = Mass_Result_Tag_Error,\
-      .Error.details = {\
-        .message = slice_literal(_MESSAGE_),\
+      .Error.error = {\
+        .tag = Mass_Error_Tag_Unexpected_Token,\
+        .detailed_message = slice_literal(_MESSAGE_),\
         .source_range = {\
           .file = file,\
           .offsets = {.from = i, .to = i},\

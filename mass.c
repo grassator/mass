@@ -31,9 +31,9 @@ mass_cli_print_usage() {
 
 s32
 mass_cli_print_error(
-  Parse_Error *error
+  Mass_Error *error
 ) {
-  slice_print(error->message);
+  slice_print(error->detailed_message);
   printf("  at ");
   source_range_print_start_position(&error->source_range);
   return -1;
@@ -90,14 +90,14 @@ int main(s32 argc, char **argv) {
 
   Mass_Result result = program_import_module(&context, prelude_module);
   if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&result.Error.details);
+    return mass_cli_print_error(&result.Error.error);
   }
   Module *root_module = program_module_from_file(
     &context, file_path, module_scope
   );
   result = program_import_module(&context, root_module);
   if(result.tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&result.Error.details);
+    return mass_cli_print_error(&result.Error.error);
   }
 
   // FIXME use export scope for this
@@ -109,7 +109,7 @@ int main(s32 argc, char **argv) {
   context.program->entry_point = main;
   ensure_compiled_function_body(&context, main);
   if(context.result->tag != Mass_Result_Tag_Success) {
-    return mass_cli_print_error(&context.result->Error.details);
+    return mass_cli_print_error(&context.result->Error.error);
   }
 
   switch(mode) {

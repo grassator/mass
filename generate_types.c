@@ -826,10 +826,24 @@ main(void) {
     { "Slice", "name" },
   }));
 
+  push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
+    struct_empty("Unknown"),
+    struct_empty("Unexpected_Token"),
+    struct_fields("Type_Mismatch", (Struct_Item[]){
+      { "const Descriptor *", "target" },
+      { "const Descriptor *", "source" },
+    })
+  }), (Struct_Item[]){
+    { "Slice", "detailed_message" },
+    { "Source_Range", "source_range" },
+  }));
+
+
+
   push_type(type_union("Mass_Result", (Struct[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
-      { "Parse_Error", "details" },
+      { "Mass_Error", "error" },
     })
   }));
 
