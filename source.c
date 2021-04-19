@@ -5300,11 +5300,12 @@ mass_handle_label_lazy_proc(
     label_value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
   ) {
     Slice source = source_from_source_range(&source_range);
-    context_error_snprintf(
-      context, source_range,
-      "Trying to redefine variable %"PRIslice" as a label",
-      SLICE_EXPAND_PRINTF(source)
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Redifinition,
+      .source_range = source_range,
+      .Redifinition = { .name = source, .previous_source_range = label_value->source_range },
+      .detailed_message = "Trying to redefine a non-label variable as a label",
+    });
     return 0;
   }
 

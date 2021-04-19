@@ -89,6 +89,11 @@ mass_error_to_string(
       APPEND_LITERAL("Undefined variable ");
       APPEND_SLICE(error->Undefined_Variable.name);
     } break;
+    case Mass_Error_Tag_Redifinition: {
+      // TODO report original location somehow
+      APPEND_LITERAL("Redefinition of binding ");
+      APPEND_SLICE(error->Redifinition.name);
+    } break;
     case Mass_Error_Tag_Unknown_Field: {
       APPEND_LITERAL("Field ");
       APPEND_SLICE(error->Unknown_Field.name);

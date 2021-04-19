@@ -851,6 +851,10 @@ main(void) {
       { "Slice", "name" },
       { "u64", "is_operator" },
     }),
+    struct_fields("Redifinition", (Struct_Item[]){
+      { "Slice", "name" },
+      { "Source_Range", "previous_source_range" },
+    }),
     struct_fields("Unknown_Field", (Struct_Item[]){
       { "const Descriptor *", "type" },
       { "Slice", "name" },

@@ -893,12 +893,13 @@ typedef enum {
   Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 8,
   Mass_Error_Tag_Operator_Prefix_Conflict = 9,
   Mass_Error_Tag_Undefined_Variable = 10,
-  Mass_Error_Tag_Unknown_Field = 11,
-  Mass_Error_Tag_Invalid_Identifier = 12,
-  Mass_Error_Tag_Type_Mismatch = 13,
-  Mass_Error_Tag_Epoch_Mismatch = 14,
-  Mass_Error_Tag_No_Matching_Overload = 15,
-  Mass_Error_Tag_Undecidable_Overload = 16,
+  Mass_Error_Tag_Redifinition = 11,
+  Mass_Error_Tag_Unknown_Field = 12,
+  Mass_Error_Tag_Invalid_Identifier = 13,
+  Mass_Error_Tag_Type_Mismatch = 14,
+  Mass_Error_Tag_Epoch_Mismatch = 15,
+  Mass_Error_Tag_No_Matching_Overload = 16,
+  Mass_Error_Tag_Undecidable_Overload = 17,
 } Mass_Error_Tag;
 
 typedef struct {
@@ -920,6 +921,10 @@ typedef struct {
   Slice name;
   u64 is_operator;
 } Mass_Error_Undefined_Variable;
+typedef struct {
+  Slice name;
+  Source_Range previous_source_range;
+} Mass_Error_Redifinition;
 typedef struct {
   const Descriptor * type;
   Slice name;
@@ -955,6 +960,7 @@ typedef struct Mass_Error {
     Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
     Mass_Error_Operator_Prefix_Conflict Operator_Prefix_Conflict;
     Mass_Error_Undefined_Variable Undefined_Variable;
+    Mass_Error_Redifinition Redifinition;
     Mass_Error_Unknown_Field Unknown_Field;
     Mass_Error_Invalid_Identifier Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;
