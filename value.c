@@ -1821,7 +1821,10 @@ same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
 ) {
-  if (source->descriptor == &descriptor_number_literal) {
+  if (
+    source->descriptor == &descriptor_number_literal &&
+    target != &descriptor_number_literal
+  ) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer) {
       assert(source->storage.tag == Storage_Tag_Static);

@@ -512,7 +512,7 @@ assign(
       }
     } else if (descriptor_is_integer(target->descriptor)) {
       source = token_value_force_immediate_integer(context, source, target->descriptor);
-    } else {
+    } else if (source->descriptor != target->descriptor) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = source_range,
@@ -1912,7 +1912,10 @@ expected_result_ensure_value_or_temp(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
-      if (!storage_equal(&result_value->storage, &value->storage)) {
+      if (
+        value->storage.tag != Storage_Tag_Static &&
+        !storage_equal(&result_value->storage, &value->storage)
+      ) {
         value_release_if_temporary(context->builder, value);
       }
       MASS_ON_ERROR(assign(context, result_value, value)) return 0;
@@ -4873,6 +4876,13 @@ mass_handle_if_expression_lazy_proc(
 
   Value *result_value = value_force(context, expected_result, then);
   MASS_ON_ERROR(*context->result) return 0;
+
+  if (result_value->storage.tag == Storage_Tag_Static) {
+    Value *stack_result =
+      reserve_stack(context, result_value->descriptor, result_value->source_range);
+    MASS_ON_ERROR(assign(context, stack_result, result_value));
+    result_value = stack_result;
+  }
 
   Label_Index after_label =
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));

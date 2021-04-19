@@ -1151,6 +1151,21 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to use if / else to choose an implementation at compile time") {
+      Value *status = test_program_inline_source_base(
+        "TEST", &test_context,
+        "CONDITION :: 1\n"
+        "TEST :: if CONDITION then 42 else 1000\n"
+      );
+
+      check(status);
+      check(status->descriptor == &descriptor_number_literal);
+      check(status->storage.tag == Storage_Tag_Static);
+      Number_Literal *literal = storage_static_as_c_type(&status->storage, Number_Literal);
+      check(literal->bits == 42);
+      check(literal->negative == false);
+    }
+
     it("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test", &test_context,
