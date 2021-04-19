@@ -842,6 +842,7 @@ main(void) {
     }),
     struct_fields("Undefined_Variable", (Struct_Item[]){
       { "Slice", "name" },
+      { "u64", "is_operator" },
     }),
     struct_fields("Unknown_Field", (Struct_Item[]){
       { "const Descriptor *", "type" },

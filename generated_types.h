@@ -909,6 +909,7 @@ typedef struct {
 } Mass_Error_Operator_Prefix_Conflict;
 typedef struct {
   Slice name;
+  u64 is_operator;
 } Mass_Error_Undefined_Variable;
 typedef struct {
   const Descriptor * type;

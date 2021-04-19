@@ -3119,11 +3119,11 @@ token_handle_operator(
   }
 
   if (!operator_entry) {
-    context_error_snprintf(
-      context, source_range,
-      "Unknown operator %"PRIslice,
-      SLICE_EXPAND_PRINTF(new_operator)
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Undefined_Variable,
+      .source_range = source_range,
+      .Undefined_Variable = { .name = new_operator, .is_operator = true },
+    });
     return false;
   }
 
@@ -3541,10 +3541,12 @@ token_handle_function_call(
     } else if (arg_count == 1) {
       Value *scope_arg = *dyn_array_get(args, 0);
       if (scope_arg->descriptor != &descriptor_scope) {
-        context_error_snprintf(
-          context, scope_arg->source_range,
-          "Macro capture can only accept Scope as an argument"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = scope_arg->source_range,
+          .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
+          .detailed_message = "Macro capture can only accept a Scope argument",
+        });
         goto err;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
@@ -3719,14 +3721,17 @@ large_enough_common_integer_descriptor_for_values(
     return left_size > right_size ? left : right;
   } else {
     const Descriptor *signed_side = left_signed ? left : right;
+    const Descriptor *other_side = left_signed ? right : left;
     // If the signed and unsigned have the same size need to
     // increase the size of the signed one so it fits the unsigned
     if (left_size == right_size) {
       if (left_size == 8) {
-        context_error_snprintf(
-          context, left_value->source_range,
-          "Could not find large enough signed integer type to fit both operands"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = left_value->source_range,
+          .Type_Mismatch = { .expected = signed_side, .actual = other_side },
+          .detailed_message = "Could not find large enough signed integer to fit both operands"
+        });
         return 0;
       }
       return signed_integer_next_size_descriptor(signed_side);
@@ -4315,10 +4320,11 @@ mass_handle_startup_call_lazy_proc(
     dyn_array_length(descriptor->Function.info.memory_layout.items) ||
     descriptor->Function.info.returns.descriptor != &descriptor_void
   ) {
-    context_error_snprintf(
-      context, args_token->source_range,
-      "`startup` expects a () -> () {...} function as an argument"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "`startup` expects a () -> () {...} function as an argument"
+    });
   } else {
     ensure_compiled_function_body(context, startup_function);
     dyn_array_push(context->program->startup_functions, startup_function);
@@ -6121,10 +6127,11 @@ program_import_module(
       Scope_Map__Entry *entry = &module->export_scope->map->entries[i];
       if (!entry->occupied) continue;
       if (!module->own_scope->map || !hash_map_has(module->own_scope->map, entry->key)) {
-        context_error_snprintf(
-          context, entry->value->source_range,
-          "Trying to export a missing declaration %"PRIslice, SLICE_EXPAND_PRINTF(entry->key)
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Undefined_Variable,
+          .source_range = entry->value->source_range,
+          .Undefined_Variable = { .name = entry->key },
+        });
         break;
       }
     }
