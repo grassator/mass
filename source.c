@@ -502,17 +502,23 @@ assign(
         source = token_value_force_immediate_integer(context, source, &descriptor_u64);
         source->descriptor = target->descriptor;
       } else {
-        context_error_snprintf(
-          context, source_range, "Trying to assign a non-zero literal number to a pointer"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = source_range,
+          .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+          .detailed_message = "Trying to assign a non-zero literal number to a pointer",
+        });
         return *context->result;
       }
     } else if (descriptor_is_integer(target->descriptor)) {
       source = token_value_force_immediate_integer(context, source, target->descriptor);
     } else {
-      context_error_snprintf(
-        context, source_range, "Trying to assign a literal number to a non-integer value"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = source_range,
+        .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
+        .detailed_message = "Trying to assign a literal number to a non-integer value",
+      });
       return *context->result;
     }
   } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
@@ -3548,17 +3554,19 @@ token_handle_function_call(
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = scope_arg->source_range,
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
-          .detailed_message = "Macro capture can only accept a Scope argument",
+          .detailed_message = "Macro capture can only accept an optional Scope argument",
         });
         goto err;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
       context_merge_in_scope(&capture_context, argument_scope);
     } else {
-      context_error_snprintf(
-        context, target_token->source_range,
-        "Too many arguments for a capture expansion. It can have only one optional Scope argument."
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_No_Matching_Overload,
+        .source_range = target_token->source_range,
+        .No_Matching_Overload = { .target = target_expression, .arguments = args },
+        .detailed_message = "Macro capture can only accept an optional Scope argument"
+      });
       goto err;
     }
     return token_parse_block_view(&capture_context, capture->view);
@@ -3596,10 +3604,7 @@ token_handle_function_call(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Matching_Overload,
       .source_range = source_range,
-      .No_Matching_Overload = {
-        .target = target_expression,
-        .arguments = args,
-      },
+      .No_Matching_Overload = { .target = target_expression, .arguments = args },
     });
     goto err;
   }
@@ -3686,17 +3691,21 @@ large_enough_common_integer_descriptor_for_values(
   bool right_is_literal = right == &descriptor_number_literal;
 
   if (!left_is_integer && !left_is_literal) {
-    context_error_snprintf(
-      context, left_value->source_range,
-      "Value is not an integer"
-    );
+    // TODO :GenericIntegerType
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = left_value->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = left },
+    });
     return 0;
   }
   if (!right_is_integer && !right_is_literal) {
-    context_error_snprintf(
-      context, right_value->source_range,
-      "Value is not an integer"
-    );
+    // TODO :GenericIntegerType
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = right_value->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = right },
+    });
     return 0;
   }
 
