@@ -4803,18 +4803,16 @@ token_dispatch_operator(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Slice symbol = stack_entry->source;
   Operator *operator = stack_entry->operator;
 
   u64 argument_count = operator->argument_count;
 
   if (dyn_array_length(*stack) < argument_count) {
-    // FIXME provide source range
-    context_error_snprintf(
-      context, stack_entry->source_range,
-      "Operator %"PRIslice" required %"PRIu64", got %"PRIu64,
-      SLICE_EXPAND_PRINTF(symbol), argument_count, dyn_array_length(*stack)
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = stack_entry->source_range,
+      .detailed_message = "Not enough arguments for operator",
+    });
     return;
   }
   assert(argument_count);
