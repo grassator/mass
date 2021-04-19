@@ -56,6 +56,9 @@ spec_check_mass_result(
   return false;
 }
 
+typedef s64 (*Spec_Callback)();
+static s64 spec_callback() { return 42; }
+
 #define spec_check_slice(_ACTUAL_, _EXPECTED_)\
   do {\
     Slice actual = (_ACTUAL_);\
@@ -1189,6 +1192,16 @@ spec("source") {
       Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
       check(literal->bits == 42);
       check(literal->negative == false);
+    }
+
+    it("should be able to accept a function as an argument and call it") {
+      s64 (*checker)(Spec_Callback foo) =
+        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+          "foo", &test_context,
+          "fn foo(callback : fn() -> (s64)) -> (s64) { callback() }"
+        );
+      check(checker);
+      check(checker(spec_callback) == 42);
     }
 
     it("should not be able to use runtime values in a static context") {

@@ -1884,6 +1884,9 @@ token_match_argument(
   }
 
   const Descriptor *descriptor = token_match_type(context, type_expression);
+  if (descriptor && descriptor->tag == Descriptor_Tag_Function) {
+    descriptor = descriptor_pointer_to(context->allocator, descriptor);
+  }
   arg = (Memory_Layout_Item) {
     .tag = Memory_Layout_Item_Tag_Absolute,
     .name = value_as_symbol(name_token)->name,
@@ -5015,12 +5018,32 @@ token_parse_function_literal(
     returns = value_make(context, &descriptor_group, storage_static(group), keyword->source_range);
   }
 
-  Token_Maybe_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
-  if (!body) panic("TODO type-only?");
+  Value_View rest = value_view_rest(&view, peek_index);
 
-  *matched_length = peek_index;
+  Value *body = 0;
+  if (rest.length == 1) {
+    Value *maybe_body = value_view_get(rest, 0);
+    if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
+      body = maybe_body;
+    } else {
+      body = token_parse_single(context, maybe_body);
+    }
+  } else if (rest.length) {
+    body = token_parse_expression(context, rest, &(u64){0}, 0);
+    MASS_ON_ERROR(*context->result);
+  }
+
+  *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  return token_process_function_literal(context, name, args, returns, body);
+  Value *literal = token_process_function_literal(context, name, args, returns, body);
+  if (body) {
+    return literal;
+  } else {
+    // TODO when syntax switch is complete do not create a value for just the type definition
+    //      and it will also fix the const cast problem
+    Descriptor *descriptor = (Descriptor *)literal->descriptor;
+    return value_make(context, &descriptor_type, storage_static(descriptor), literal->source_range);
+  }
 }
 
 static inline u64
