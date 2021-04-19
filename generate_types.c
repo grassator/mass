@@ -831,6 +831,9 @@ main(void) {
     struct_empty("Unimplemented"),
     struct_empty("Parse"),
     struct_empty("Non_Trailing_Default_Argument"),
+    struct_fields("Integer_Range", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
+    }),
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),

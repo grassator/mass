@@ -118,6 +118,10 @@ mass_error_to_string(
       APPEND_LITERAL(", got ");
       APPEND_SLICE(mismatch->actual->name);
     } break;
+    case Mass_Error_Tag_Integer_Range: {
+      APPEND_LITERAL("Value does not fit into integer of type ");
+      APPEND_SLICE(error->Integer_Range.descriptor->name);
+    } break;
     case Mass_Error_Tag_Epoch_Mismatch: {
       Mass_Error_Epoch_Mismatch const *mismatch = &error->Epoch_Mismatch;
       APPEND_LITERAL("Trying to access a runtime variable with epoch ");

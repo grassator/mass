@@ -421,12 +421,12 @@ token_value_force_immediate_integer(
         return 0;
       }
       case Literal_Cast_Result_Target_Too_Small: {
-        context_error_snprintf(
-          context, *source_range,
-          // TODO maybe provide the range instead
-          "Literal value does not fit into the target integer size %u",
-          u64_to_u8(bit_size / 8)
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Integer_Range,
+          .source_range = *source_range,
+          .Integer_Range = { .descriptor = target_descriptor },
+          .detailed_message = "Literal value does not fit into the target integer size",
+        });
         return 0;
       }
       case Literal_Cast_Result_Target_Too_Big: {
@@ -434,9 +434,12 @@ token_value_force_immediate_integer(
         return 0;
       }
       case Literal_Cast_Result_Unsigned_Target_For_Negative_Literal: {
-        context_error_snprintf(
-          context, *source_range, "Can not convert a negative literal to an unsigned number"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Integer_Range,
+          .source_range = *source_range,
+          .Integer_Range = { .descriptor = target_descriptor },
+          .detailed_message = "Can not convert a negative literal to an unsigned number",
+        });
         return 0;
       }
     }

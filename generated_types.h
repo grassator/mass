@@ -886,18 +886,22 @@ typedef enum {
   Mass_Error_Tag_Unimplemented = 1,
   Mass_Error_Tag_Parse = 2,
   Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
-  Mass_Error_Tag_Unexpected_Token = 4,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 5,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 6,
-  Mass_Error_Tag_Undefined_Variable = 7,
-  Mass_Error_Tag_Unknown_Field = 8,
-  Mass_Error_Tag_Invalid_Identifier = 9,
-  Mass_Error_Tag_Type_Mismatch = 10,
-  Mass_Error_Tag_Epoch_Mismatch = 11,
-  Mass_Error_Tag_No_Matching_Overload = 12,
-  Mass_Error_Tag_Undecidable_Overload = 13,
+  Mass_Error_Tag_Integer_Range = 4,
+  Mass_Error_Tag_Unexpected_Token = 5,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 6,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 7,
+  Mass_Error_Tag_Undefined_Variable = 8,
+  Mass_Error_Tag_Unknown_Field = 9,
+  Mass_Error_Tag_Invalid_Identifier = 10,
+  Mass_Error_Tag_Type_Mismatch = 11,
+  Mass_Error_Tag_Epoch_Mismatch = 12,
+  Mass_Error_Tag_No_Matching_Overload = 13,
+  Mass_Error_Tag_Undecidable_Overload = 14,
 } Mass_Error_Tag;
 
+typedef struct {
+  const Descriptor * descriptor;
+} Mass_Error_Integer_Range;
 typedef struct {
   Slice expected;
 } Mass_Error_Unexpected_Token;
@@ -940,6 +944,7 @@ typedef struct Mass_Error {
   Slice detailed_message;
   Source_Range source_range;
   union {
+    Mass_Error_Integer_Range Integer_Range;
     Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
     Mass_Error_Operator_Prefix_Conflict Operator_Prefix_Conflict;
