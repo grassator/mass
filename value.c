@@ -98,6 +98,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier");
     } break;
+    case Mass_Error_Tag_Expected_Static: {
+      APPEND_LITERAL("Expected value to be static (compile-time known)");
+    } break;
     case Mass_Error_Tag_Operator_Infix_Suffix_Conflict: {
       APPEND_LITERAL("There is already a infix or postfix operator ");
       APPEND_SLICE(error->Operator_Infix_Suffix_Conflict.symbol);

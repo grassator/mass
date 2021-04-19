@@ -831,6 +831,7 @@ main(void) {
     struct_empty("Unimplemented"),
     struct_empty("Parse"),
     struct_empty("Non_Trailing_Default_Argument"),
+    struct_empty("Expected_Static"),
     struct_fields("Integer_Range", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
     }),

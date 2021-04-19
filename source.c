@@ -5269,7 +5269,10 @@ token_parse_statement_using(
   }
 
   if (result->storage.tag != Storage_Tag_Static) {
-    context_error_snprintf(context, rest.source_range, "Scope for `using` must be compile-time known");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Expected_Static,
+      .source_range = rest.source_range,
+    });
     goto err;
   }
 
@@ -5507,7 +5510,10 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
       bytes.memory[bytes.length++] = s64_to_u8(byte);
     } else {
-      context_error_snprintf(context, value->source_range, "Expected a compile-time known value");
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Expected_Static,
+        .source_range = value->source_range,
+      });
       return 0;
     }
   }
