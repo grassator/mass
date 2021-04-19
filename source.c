@@ -430,9 +430,7 @@ token_value_force_immediate_integer(
         return 0;
       }
       case Literal_Cast_Result_Target_Too_Big: {
-        context_error_snprintf(
-          context, *source_range, "Integers larger than 64 bits are not supported"
-        );
+        panic("Integers larger than 64 bits are not supported");
         return 0;
       }
       case Literal_Cast_Result_Unsigned_Target_For_Negative_Literal: {
@@ -1806,7 +1804,11 @@ token_match_argument(
     view, slice_literal("="), &definition, &default_expression, &equals
   )) {
     if (default_expression.length == 0) {
-      context_error_snprintf(context, equals->source_range, "Expected an expression after `=`");
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = equals->source_range,
+        .detailed_message = "Expected an expression after `=`"
+      });
       goto err;
     }
   } else {
@@ -1820,22 +1822,27 @@ token_match_argument(
   if (!token_maybe_split_on_operator(
     definition, slice_literal(":"), &name_tokens, &type_expression, &operator
   )) {
-    context_error_snprintf(context, definition.source_range, "Expected a type expression after `:`");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = definition.source_range,
+      .detailed_message = "Expected an expression after `:`"
+    });
     goto err;
   }
   if (name_tokens.length == 0) {
-    context_error_snprintf(
-      context, operator->source_range,
-      "':' operator expects an identifier on the left hand side"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = definition.source_range,
+      .detailed_message = "':' operator expects an identifier on the left hand side"
+    });
     goto err;
   }
   Value *name_token = value_view_get(name_tokens, 0);
   if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
-    context_error_snprintf(
-      context, operator->source_range,
-      "':' operator expects only a single identifier on the left hand side"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Invalid_Identifier,
+      .source_range = name_tokens.source_range,
+    });
     goto err;
   }
 
@@ -1865,17 +1872,18 @@ token_match_return_type(
   Value *operator;
   if (token_maybe_split_on_operator(view, slice_literal(":"), &lhs, &rhs, &operator)) {
     if (lhs.length == 0) {
-      context_error_snprintf(
-        context, operator->source_range,
-        "':' operator expects an identifier on the left hand side"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = operator->source_range,
+        .detailed_message = "':' operator expects an identifier on the left hand side"
+      });
       goto err;
     }
     if (lhs.length > 1 || !value_is_symbol(value_view_get(lhs, 0))) {
-      context_error_snprintf(
-        context, operator->source_range,
-        "':' operator expects only a single identifier on the left hand side"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Invalid_Identifier,
+        .source_range = lhs.source_range,
+      });
       goto err;
     }
     returns.descriptor = token_match_type(context, rhs);
@@ -2118,19 +2126,21 @@ token_parse_exports(
   Token_Maybe_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (!block) {
-    context_error_snprintf(
-      context, keyword_token->source_range,
-      "exports keyword must be followed {}"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = keyword_token->source_range,
+      .detailed_message = "exports keyword must be followed {}"
+    });
     goto err;
   }
 
   if (context->module->flags & Module_Flags_Has_Exports) {
-    // TODO support priting second range context->module->exports_source_range
-    context_error_snprintf(
-      context, keyword_token->source_range,
-      "A module can not have multiple exports statements. This is the original exports"
-    );
+    // TODO support printing second range context->module->exports_source_range
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = keyword_token->source_range,
+      .detailed_message = "A module can not have multiple exports statements",
+    });
     goto err;
   }
 
@@ -2153,10 +2163,11 @@ token_parse_exports(
       if (context->result->tag != Mass_Result_Tag_Success) goto err;
       Value_View item = token_split_next(&it, &token_pattern_comma_operator);
       if (item.length != 1 || !value_is_symbol(value_view_get(item, 0))) {
-        context_error_snprintf(
-          context, item.source_range,
-          "Exports {} block must contain a comma-separated identifier list"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = item.source_range,
+          .detailed_message = "Exports {} block must contain a comma-separated identifier list"
+        });
         goto err;
       }
       Value *symbol_token = value_view_get(item, 0);
@@ -2186,10 +2197,11 @@ token_parse_operator_definition(
   Token_Maybe_Match(precedence_token, .tag = Token_Pattern_Tag_Any);
 
   if (!precedence_token) {
-    context_error_snprintf(
-      context, keyword_token->source_range,
-      "'operator' keyword must be followed by a precedence number"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = keyword_token->source_range,
+      .detailed_message = "'operator' keyword must be followed by a precedence number"
+    });
     goto err;
   }
 
@@ -2204,20 +2216,22 @@ token_parse_operator_definition(
   Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   if (!pattern_token) {
-    context_error_snprintf(
-      context, precedence_source_range,
-      "Operator definition have a pattern in () following the precedence"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = precedence_source_range,
+      .detailed_message ="Operator definition must have a pattern in () following the precedence"
+    });
     goto err;
   }
 
   Token_Maybe_Match(body_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (!body_token) {
-    context_error_snprintf(
-      context, precedence_source_range,
-      "Operator definition have a macro body in {} following the pattern"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = precedence_source_range,
+      .detailed_message ="Operator definition must have a macro body in {} following the pattern"
+    });
     goto err;
   }
 
@@ -2254,19 +2268,20 @@ token_parse_operator_definition(
     arguments[1] = value_view_get(definition, 2);
   } else {
     operator_token = 0;
-    context_error_snprintf(
-      context, pattern_token->source_range,
-      "Expected the pattern to have two (for prefix / postfix) or three tokens"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = pattern_token->source_range,
+      .detailed_message ="Expected the pattern to have two (for prefix / postfix) or three tokens"
+    });
     goto err;
   }
 
   for (u8 i = 0; i < user_defined_operator->argument_count; ++i) {
     if (!value_is_symbol(arguments[i])) {
-      context_error_snprintf(
-        context, arguments[i]->source_range,
-        "Operator argument must be an identifier"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Invalid_Identifier,
+        .source_range = arguments[i]->source_range,
+      });
       goto err;
     }
     user_defined_operator->argument_names[i] = value_as_symbol(arguments[i])->name;
@@ -2329,11 +2344,9 @@ mass_import(
     const Scope *root_scope = context.compilation->root_scope;
     Scope *module_scope = scope_make(context.allocator, root_scope);
     module = program_module_from_file(&context, file_path, module_scope);
-    MASS_ON_ERROR(program_import_module(&context, module)) {
-      context_error_snprintf(
-        &context, (Source_Range){0},
-        "Failed to import module %"PRIslice, SLICE_EXPAND_PRINTF(file_path)
-      );
+    Mass_Result module_result = program_import_module(&context, module);
+    MASS_ON_ERROR(module_result) {
+      *context.result = module_result;
       return (Scope){0};
     }
     hash_map_set(context.compilation->module_map, file_path, module);
@@ -2363,10 +2376,11 @@ token_parse_syntax_definition(
   Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   if (!pattern_token) {
-    context_error_snprintf(
-      context, name->source_range,
-      "Syntax definition requires a parenthesized pattern definitions"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = name->source_range,
+      .detailed_message = "Syntax definition requires a parenthesized pattern definitions"
+    });
     goto err;
   }
 
@@ -2391,10 +2405,11 @@ token_parse_syntax_definition(
     } else if (value_is_group(value)) {
       const Group *group = value_as_group(value);
       if (group->children.length) {
-        context_error_snprintf(
-          context, value->source_range,
-          "Nested group matches are not supported in syntax declarations (yet)"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = value->source_range,
+          .detailed_message = "Nested group matches are not supported in syntax declarations"
+        });
         goto err;
       }
       dyn_array_push(pattern, (Macro_Pattern) {
@@ -2413,10 +2428,10 @@ token_parse_syntax_definition(
     ) {
       Value *symbol_token = value_view_peek(definition, ++i);
       if (!symbol_token || !value_is_symbol(symbol_token)) {
-        context_error_snprintf(
-          context, value->source_range,
-          "@ operator in a syntax definition requires an id after it"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Invalid_Identifier,
+          .source_range = value->source_range,
+        });
         goto err;
       }
       Macro_Pattern *last_pattern = 0;
@@ -2436,18 +2451,20 @@ token_parse_syntax_definition(
         panic("Internal Error: Unexpected @-like operator");
       }
       if (!last_pattern) {
-        context_error_snprintf(
-          context, value->source_range,
-          "@ requires a valid pattern before it"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = value->source_range,
+          .detailed_message = "@ requires a valid pattern before it"
+        });
         goto err;
       }
       last_pattern->capture_name = value_as_symbol(symbol_token)->name;
     } else {
-      context_error_snprintf(
-        context, value->source_range,
-        "Only compile time strings are allowed as values in the pattern"
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = value->source_range,
+        .detailed_message = "Expected a string token"
+      });
       goto err;
     }
   }
@@ -2520,27 +2537,29 @@ token_process_c_struct_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if (!value_match_group(args, Group_Tag_Paren)) {
-    context_error_snprintf(
-      context, args->source_range,
-      "c_struct must be followed by ()"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args->source_range,
+      .detailed_message = "c_struct must be followed by ()"
+    });
     goto err;
   }
   const Group *args_group = value_as_group(args);
   if (args_group->children.length != 1) {
-    context_error_snprintf(
-      context, args->source_range,
-      "c_struct expects 1 argument, got %"PRIu64,
-      args_group->children.length
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args->source_range,
+      .detailed_message = "c_struct expects one argument"
+    });
     goto err;
   }
   Value *layout_block = value_view_get(args_group->children, 0);
   if (!value_match_group(layout_block, Group_Tag_Curly)) {
-    context_error_snprintf(
-      context, args->source_range,
-      "c_struct expects a {} block as the argument"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args->source_range,
+      .detailed_message = "c_struct expects a {} block as the argument"
+    });
     goto err;
   }
 
@@ -2829,10 +2848,11 @@ token_handle_storage_variant_of(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   if (dyn_array_length(args) != 1) {
-    context_error_snprintf(
-      context, *source_range,
-      "storage_variant_of expects a single argument"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = *source_range,
+      .detailed_message = "storage_variant_of expects a single argument"
+    });
     return 0;
   }
 
@@ -2883,19 +2903,21 @@ token_handle_c_string(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   Value *result_value = 0;
   if (dyn_array_length(args) != 1) {
-    context_error_snprintf(
-      context, args_token->source_range,
-      "c_string expects a single compile-time known string"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "c_string expects a single compile-time known string"
+    });
     goto defer;
   }
   Value *arg_value = *dyn_array_get(args, 0);
   const Slice *c_string = value_as_slice(arg_value);
   if (!c_string) {
-    context_error_snprintf(
-      context, args_token->source_range,
-      "c_string expects a single compile-time known string"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "c_string expects a single compile-time known string"
+    });
     goto defer;
   }
 
@@ -3004,7 +3026,11 @@ token_handle_cast(
   }
 
   if (it.done) {
-    context_error_snprintf(context, it.view.source_range, "cast() expects two arguments");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = it.view.source_range,
+      .detailed_message = "cast() expects two arguments"
+    });
     return 0;
   }
 
@@ -3012,7 +3038,11 @@ token_handle_cast(
   Value *expression = token_parse_expression(context, expression_view, &(u64){0}, 0);
 
   if (!it.done) {
-    context_error_snprintf(context, it.view.source_range, "cast() expects two arguments");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = it.view.source_range,
+      .detailed_message = "cast() expects two arguments"
+    });
     return 0;
   }
 
@@ -3142,19 +3172,20 @@ token_parse_constant_definitions(
     return 0;
   }
   if (lhs.length > 1) {
-    context_error_snprintf(
-      context, lhs.source_range,
-      "Multiple assignment are not supported at the moment"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Unimplemented,
+      .source_range = lhs.source_range,
+      .detailed_message = "Multiple assignment are not supported at the moment"
+    });
     goto err;
   }
   Value *symbol = value_view_get(view, 0);
 
   if (!value_is_symbol(symbol)) {
-    context_error_snprintf(
-      context, symbol->source_range,
-      "Left hand side of the :: is not a symbol"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Invalid_Identifier,
+      .source_range = symbol->source_range,
+    });
     goto err;
   }
 
@@ -3580,14 +3611,7 @@ token_handle_function_call(
   }
 
   Value *overload = match.value;
-  if (!overload) {
-    // TODO add better error message
-    context_error_snprintf(
-      context, source_range,
-      "Could not find matching overload"
-    );
-    goto err;
-  }
+  assert(overload);
 
   Mass_Function_Call_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
@@ -4359,10 +4383,11 @@ token_handle_size_of(
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   MASS_ON_ERROR(*context->result) goto err;
   if (dyn_array_length(args) != 1) {
-    context_error_snprintf(
-      context, args_token->source_range,
-      "size_of() expects a sinle argument"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "size_of() expects a single argument"
+    });
     goto err;
   }
   Value *expression = *dyn_array_get(args, 0);
@@ -4422,7 +4447,11 @@ mass_handle_paren_operator(
   } else if (slice_equal(target_name, slice_literal("address_of"))) {
     Array_Value_Ptr args = token_match_call_arguments(context, args_token);
     if (dyn_array_length(args) != 1) {
-      context_error_snprintf(context, args_range, "address_of expects a single argument");
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = args_range,
+        .detailed_message = "address_of expects a single argument"
+      });
       return 0;
     }
     Value *pointee = *dyn_array_get(args, 0);
@@ -4476,10 +4505,11 @@ mass_handle_at_operator(
   } else if (value_match_group(body, Group_Tag_Paren) || value_match_group(body, Group_Tag_Curly)) {
     return compile_time_eval(context, value_as_group(body)->children);
   } else {
-    context_error_snprintf(
-      context, body_range,
-      "@ operator must be followed by a parenthesized expression"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = body_range,
+      .detailed_message = "@ operator must be followed by an expression in () or {}"
+    });
     return 0;
   }
 }
@@ -4737,10 +4767,11 @@ mass_handle_macro_keyword(
     macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
     return value_make(context, macro_descriptor, function_value->storage, source_range);
   } else {
-    context_error_snprintf(
-      context, source_range,
-      "Only literal functions (with a body) can be marked as macro"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = source_range,
+      .detailed_message = "Only literal functions (with a body) can be marked as macro"
+    });
     return 0;
   }
 }
@@ -5278,7 +5309,10 @@ token_parse_statement_label(
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
   if (rest.length != 1 || !value_is_symbol(value_view_get(rest, 0))) {
-    context_error_snprintf(context, rest.source_range, "Expected a label identifier identifier");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Invalid_Identifier,
+      .source_range = rest.source_range,
+    });
     goto err;
   }
 
@@ -5360,10 +5394,11 @@ token_parse_explicit_return(
 
   bool is_void = descriptor->tag == Descriptor_Tag_Void;
   if (!is_void && !has_return_expression) {
-    context_error_snprintf(
-      context, parse_result->source_range,
-      "Explicit return from a non-void function requires a value"
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = parse_result->source_range,
+      .detailed_message = "Explicit return from a non-void function requires a value"
+    });
     return 0;
   }
 
@@ -5418,7 +5453,11 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
   for (u64 argument_count = 0; !it.done; argument_count += 1) {
     if (argument_count >= 15) {
-      context_error_snprintf(context, args_token->source_range, "Expected a maximum of 15 bytes");
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = args_token->source_range,
+        .detailed_message = "Expected a maximum of 15 bytes"
+      });
       return 0;
     }
 
@@ -5430,10 +5469,11 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
     if (storage_is_label(&value->storage)) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
-        context_error_snprintf(
-          context, value->source_range,
-          "inline_machine_code_bytes only supports one label"
-        );
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = args_token->source_range,
+          .detailed_message = "inline_machine_code_bytes only supports one label"
+        });
         return 0;
       }
       bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
@@ -5474,13 +5514,21 @@ token_parse_inline_machine_code_bytes(
   Token_Match(id_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("inline_machine_code_bytes"));
   Token_Maybe_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
   if (!args_token) {
-    context_error_snprintf(context, id_token->source_range, "Expected ()");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = id_token->source_range,
+      .detailed_message = "Expected and argument list in parens"
+    });
     goto err;
   }
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   if (rest.length) {
-    context_error_snprintf(context, rest.source_range, "Expected the end of the statement");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = rest.source_range,
+      .detailed_message = "Expected the end of the statement"
+    });
     goto err;
   }
 
