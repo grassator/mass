@@ -1,6 +1,6 @@
-ExitProcess :: (status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
-GetStdHandle :: (handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
-WriteFile :: (
+fn ExitProcess(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
+fn GetStdHandle(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
+fn WriteFile(
   status : s64,
   buffer : [u8],
   size : s32,
@@ -13,7 +13,7 @@ startup(fn() {
   cached_stdout_handle = GetStdHandle(-11)
 })
 
-print :: macro(string : String) -> () {
+macro print(string : String) -> () {
   WriteFile(cached_stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
 }
 

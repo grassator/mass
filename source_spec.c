@@ -890,13 +890,10 @@ spec("source") {
     }
 
     it("should report an error when encountering an unknown type") {
-      Module *module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\error_unknown_type"), test_context.scope
+      test_program_inline_source_base(
+        "main", &test_context,
+        "fn main(status : s33) -> () {}"
       );
-      Mass_Result result = program_import_module(&test_context, module);
-      check(result.tag == Mass_Result_Tag_Success);
-      scope_lookup_force(test_context.scope, slice_literal("main"));
-      check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Undefined_Variable);
       spec_check_slice(error->Undefined_Variable.name, slice_literal("s33"));
