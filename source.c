@@ -446,10 +446,7 @@ token_value_force_immediate_integer(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = *source_range,
-      .Type_Mismatch = {
-        .expected = target_descriptor,
-        .actual = value->descriptor,
-      },
+      .Type_Mismatch = { .expected = target_descriptor, .actual = value->descriptor },
     });
     return 0;
   }
@@ -3021,7 +3018,12 @@ token_handle_cast(
   const Descriptor *target_descriptor = token_match_type(context, type_view);
 
   if (!descriptor_is_integer(target_descriptor)) {
-    context_error_snprintf(context, it.view.source_range, "Only integer types are supported for casts");
+    // TODO support saying that we want any integer type
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = it.view.source_range,
+      .Type_Mismatch = { .expected = &descriptor_type, .actual = target_descriptor },
+    });
     return 0;
   }
 
@@ -5240,7 +5242,11 @@ token_parse_statement_using(
   Value *result = token_parse_expression(context, rest, &(u64){0}, 0);
 
   if (result->descriptor != &descriptor_scope) {
-    context_error_snprintf(context, rest.source_range, "Expected a scope");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = rest.source_range,
+      .Type_Mismatch = { .expected = &descriptor_scope, .actual = result->descriptor },
+    });
     goto err;
   }
 
