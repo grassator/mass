@@ -13,11 +13,11 @@ startup(() -> () {
   cached_stdout_handle = GetStdHandle(-11)
 })
 
-print :: macro (string : String) -> () {
+print :: macro(string : String) -> () {
   WriteFile(cached_stdout_handle, string.bytes, cast(s32, string.length), 0, 0)
 }
 
-fn print(integer : s64) {
+print :: fn(integer : s64) {
   const count = {
     mut count = 0
     for mut temp = integer ; temp ; temp = temp / 10 {
@@ -47,7 +47,7 @@ fn print(integer : s64) {
   WriteFile(cached_stdout_handle, &buffer, cast(s32, output_size), 0, 0)
 }
 
-fn fizz_buzz() {
+fizz_buzz :: fn() {
   for i : s8 = 1; i <= 100; i = i + 1 {
     mut print_number = true
     if (i % 3 == 0) {
@@ -65,7 +65,7 @@ fn fizz_buzz() {
   }
 }
 
-fn main () {
+main :: fn() {
   fizz_buzz()
   ExitProcess(0)
 }

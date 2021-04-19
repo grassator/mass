@@ -1394,6 +1394,29 @@ value_view_match_till_end_of_statement(
   Value *(_id_) = token_peek_match(view, peek_index, &(Token_Pattern) { __VA_ARGS__ });\
   if (_id_) (++peek_index)
 
+static inline Value *
+token_expect_match(
+  Execution_Context *context,
+  Value_View view,
+  u64 *peek_index,
+  const Token_Pattern *pattern
+) {
+  Value *result = token_peek_match(view, *peek_index, pattern);
+  if (result) {
+    (*peek_index) += 1;
+  } else {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = value_view_slice(&view, *peek_index, *peek_index).source_range,
+    });
+  }
+  return result;
+}
+
+#define Token_Expect_Match(_id_, ...)\
+  Value *(_id_) = token_expect_match(context, view, &peek_index, &(Token_Pattern) { __VA_ARGS__ });\
+  MASS_ON_ERROR(*context->result) return 0
+
 #define Token_Match(_id_, ...)\
   Token_Maybe_Match(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
@@ -2140,16 +2163,7 @@ token_parse_exports(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   u64 peek_index = 0;
   Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("exports"));
-  Token_Maybe_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
-
-  if (!block) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = keyword_token->source_range,
-      .detailed_message = "exports keyword must be followed {}"
-    });
-    goto err;
-  }
+  Token_Expect_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (context->module->flags & Module_Flags_Has_Exports) {
     // TODO support printing second range context->module->exports_source_range
@@ -4975,6 +4989,41 @@ token_parse_if_expression(
   );
 }
 
+static Value *
+token_parse_function_literal(
+  Execution_Context *context,
+  Value_View view,
+  u64 *matched_length
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("fn"));
+  Token_Maybe_Match(maybe_name, .tag = Token_Pattern_Tag_Symbol);
+  Token_Expect_Match(args, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+
+  Value *returns;
+  Token_Maybe_Match(arrow, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("->"));
+  if (arrow) {
+    Token_Expect_Match(raw_return, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+    returns = raw_return;
+  } else {
+    Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);
+    returns = value_make(context, &descriptor_group, storage_static(group), keyword->source_range);
+  }
+
+  Token_Maybe_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+  if (!body) panic("TODO type-only?");
+
+  *matched_length = peek_index;
+  Value *literal = token_process_function_literal(context, args, returns, body);
+  // TODO this does not work because of const-ness of the descriptor, so probably need to pass in the name
+  //if (literal) {
+    //literal->descriptor->name = value_as_symbol(maybe_name)->name;
+  //}
+  return literal;
+}
+
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
   Value_View view,
@@ -5001,7 +5050,8 @@ token_parse_expression(
 
   static Expression_Matcher_Proc expression_matchers[] = {
     token_parse_macros,
-    token_parse_if_expression
+    token_parse_if_expression,
+    token_parse_function_literal
   };
 
   for (u64 i = 0; ; ++i) {
