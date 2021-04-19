@@ -3577,13 +3577,17 @@ token_handle_function_call(
   for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
     const Descriptor *to_call_descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
+    // TODO figure out a better way to report generic type errors
+    static Descriptor fake_function_descriptor = {
+      .tag = Descriptor_Tag_Function,
+      .name = slice_literal_fields("function"),
+    };
     if (to_call_descriptor->tag != Descriptor_Tag_Function) {
-      Slice source = source_from_source_range(&to_call->source_range);
-      context_error_snprintf(
-        context, to_call->source_range,
-        "%"PRIslice" is not a function",
-        SLICE_EXPAND_PRINTF(source)
-      );
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Type_Mismatch,
+        .source_range = to_call->source_range,
+        .Type_Mismatch = { .expected = &fake_function_descriptor, .actual = to_call_descriptor },
+      });
       goto err;
     }
     assert(to_call_descriptor->tag == Descriptor_Tag_Function);
