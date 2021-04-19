@@ -53,18 +53,6 @@ MASS_SUCCESS() {
   return (Mass_Result){.tag = Mass_Result_Tag_Success};
 }
 
-PRELUDE_NO_DISCARD static inline Mass_Result
-MASS_ERROR(Slice message, Source_Range source_range) {
-  return (Mass_Result){
-    .tag = Mass_Result_Tag_Error,
-    .Error.error = {
-      .tag = Mass_Error_Tag_Unknown,
-      .detailed_message = message,
-      .source_range = source_range,
-    }
-  };
-}
-
 static Fixed_Buffer *
 mass_error_to_string(
   Mass_Error const* error

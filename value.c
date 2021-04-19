@@ -66,10 +66,6 @@ mass_error_to_string(
   char number_buffer[128] = {0};
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
   switch(error->tag) {
-    case Mass_Error_Tag_Unknown: {
-      APPEND_LITERAL("Unknown Error: ");
-      APPEND_SLICE(error->detailed_message);
-    } break;
     case Mass_Error_Tag_Unimplemented: {
       APPEND_LITERAL("Unimplemented Feature: ");
       APPEND_SLICE(error->detailed_message);

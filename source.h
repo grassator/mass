@@ -211,40 +211,6 @@ program_import_module(
   Module *module
 );
 
-static void
-program_push_error_from_bucket_buffer(
-  Execution_Context *context,
-  Source_Range source_range,
-  Bucket_Buffer *buffer
-);
-
-typedef struct {
-  Bucket_Buffer *buffer;
-  char number_print_buffer[32];
-} Program_Error_Builder;
-
-#define context_error_snprintf(_CONTEXT_, _SOURCE_RANGE_, ...)\
-  do {\
-    assert((_CONTEXT_)->result->tag != Mass_Result_Tag_Error);\
-    /* Calculating the size of the buffer not including null termination */ \
-    int context_error_snprintf_buffer_size = snprintf(0, 0, ##__VA_ARGS__);\
-    /* negative value is an error when encoding a string */ \
-    assert(context_error_snprintf_buffer_size >= 0); \
-    context_error_snprintf_buffer_size += 1; \
-    char *context_error_snprintf_buffer = allocator_allocate_array(\
-      (_CONTEXT_)->allocator, char, context_error_snprintf_buffer_size\
-    );\
-    assert(0 <= snprintf(context_error_snprintf_buffer, context_error_snprintf_buffer_size, ##__VA_ARGS__));\
-    *(_CONTEXT_)->result = (Mass_Result) {\
-      .tag = Mass_Result_Tag_Error,\
-      .Error.error = {\
-        .tag = Mass_Error_Tag_Unknown,\
-        .detailed_message = slice_from_c_string(context_error_snprintf_buffer),\
-        .source_range = (_SOURCE_RANGE_)\
-      }\
-    };\
-  } while(0)
-
 static inline void
 context_error(
   Execution_Context *context,
