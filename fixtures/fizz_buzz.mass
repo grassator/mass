@@ -65,7 +65,7 @@ fizz_buzz :: fn() {
   }
 }
 
-main :: fn() {
+main :: fn main() {
   fizz_buzz()
   ExitProcess(0)
 }

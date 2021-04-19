@@ -2623,6 +2623,7 @@ token_process_c_struct_definition(
 static Value *
 token_process_function_literal(
   Execution_Context *context,
+  Slice name,
   Value *args,
   Value *return_types,
   Value *body
@@ -4342,7 +4343,8 @@ mass_handle_arrow_operator(
   Value *arguments = value_view_get(args_view, 0);
   Value *return_types = value_view_get(args_view, 1);
   Value *body = value_view_get(args_view, 2);
-  Value *function_value = token_process_function_literal(context, arguments, return_types, body);
+  Value *function_value =
+    token_process_function_literal(context, (Slice){0}, arguments, return_types, body);
   return function_value;
 }
 
@@ -5016,12 +5018,8 @@ token_parse_function_literal(
   if (!body) panic("TODO type-only?");
 
   *matched_length = peek_index;
-  Value *literal = token_process_function_literal(context, args, returns, body);
-  // TODO this does not work because of const-ness of the descriptor, so probably need to pass in the name
-  //if (literal) {
-    //literal->descriptor->name = value_as_symbol(maybe_name)->name;
-  //}
-  return literal;
+  Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
+  return token_process_function_literal(context, name, args, returns, body);
 }
 
 typedef Value *(*Expression_Matcher_Proc)(
