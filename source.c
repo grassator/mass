@@ -4798,34 +4798,6 @@ mass_handle_dot_operator(
   }
 }
 
-static Value *
-mass_handle_macro_keyword(
-  Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value *function_value = value_view_get(args_view, 0);
-  Source_Range source_range = function_value->source_range;
-  if (
-    function_value->descriptor->tag == Descriptor_Tag_Function &&
-    !value_is_external_symbol(function_value->descriptor->Function.info.body)
-  ) {
-    Descriptor *macro_descriptor = allocator_allocate(context->allocator, Descriptor);
-    *macro_descriptor = *function_value->descriptor;
-    macro_descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
-    return value_make(context, macro_descriptor, function_value->storage, source_range);
-  } else {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = source_range,
-      .detailed_message = "Only literal functions (with a body) can be marked as macro"
-    });
-    return 0;
-  }
-}
-
 static void
 token_dispatch_operator(
   Execution_Context *context,
@@ -5004,7 +4976,15 @@ token_parse_function_literal(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("fn"));
+  bool is_macro = false;
+  Token_Maybe_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("fn"));
+  if (!keyword) {
+    Token_Maybe_Match(macro, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("macro"));
+    keyword = macro;
+    is_macro = true;
+  }
+  if (!keyword) return 0;
+
   Token_Maybe_Match(maybe_name, .tag = Token_Pattern_Tag_Symbol);
   Token_Expect_Match(args, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
@@ -5021,27 +5001,44 @@ token_parse_function_literal(
   Value_View rest = value_view_rest(&view, peek_index);
 
   Value *body = 0;
+  bool body_is_literal = false;
   if (rest.length == 1) {
     Value *maybe_body = value_view_get(rest, 0);
     if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
       body = maybe_body;
+      body_is_literal = true;
     } else {
       body = token_parse_single(context, maybe_body);
     }
   } else if (rest.length) {
     body = token_parse_expression(context, rest, &(u64){0}, 0);
-    MASS_ON_ERROR(*context->result);
+    MASS_ON_ERROR(*context->result) return 0;
+  }
+
+  if (is_macro && !body_is_literal) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = rest.source_range,
+      .detailed_message = "Function-like macro must have a literal body in {}"
+    });
+    return 0;
   }
 
   *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
   Value *literal = token_process_function_literal(context, name, args, returns, body);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  // TODO when syntax switch is complete do not create a value for just the type definition
+  //      and it will also fix the const cast problem
+  Descriptor *descriptor = (Descriptor *)literal->descriptor;
+  assert(descriptor->tag == Descriptor_Tag_Function);
+  if(is_macro) {
+    descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+  }
   if (body) {
     return literal;
   } else {
-    // TODO when syntax switch is complete do not create a value for just the type definition
-    //      and it will also fix the const cast problem
-    Descriptor *descriptor = (Descriptor *)literal->descriptor;
     return value_make(context, &descriptor_type, storage_static(descriptor), literal->source_range);
   }
 }
@@ -5985,13 +5982,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Right,
     .argument_count = 3,
     .handler = mass_handle_arrow_operator,
-  ));
-  scope_define_operator(0, scope, range, slice_literal("macro"), allocator_make(allocator, Operator,
-    .precedence = 19,
-    .associativity = Operator_Associativity_Right,
-    .fixity = Operator_Fixity_Prefix,
-    .argument_count = 1,
-    .handler = mass_handle_macro_keyword,
   ));
 
   scope_define_operator(0, scope, range, slice_literal("-"), allocator_make(allocator, Operator,
