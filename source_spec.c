@@ -1680,7 +1680,7 @@ spec("source") {
         &test_context, slice_literal("lib\\prelude"), module_scope
       );
       Mass_Result result = program_import_module(&test_context, prelude_module);
-      check(result.tag == Mass_Result_Tag_Success);
+      check(spec_check_mass_result(&result));
       Module *fizz_buzz_module = program_module_from_file(
         &test_context, slice_literal("fixtures\\fizz_buzz"), module_scope
       );
@@ -1689,6 +1689,7 @@ spec("source") {
       Program *test_program = test_context.program;
 
       Value *fizz_buzz = scope_lookup_force(module_scope, slice_literal("fizz_buzz"));
+      check(spec_check_mass_result(test_context.result));
       check(fizz_buzz);
       ensure_compiled_function_body(&test_context, fizz_buzz);
       check(spec_check_mass_result(test_context.result));
