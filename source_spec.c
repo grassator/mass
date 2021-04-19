@@ -1151,6 +1151,16 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to use if / else statement at top leve") {
+      test_program_inline_source_base(
+        "DUMMY", &test_context,
+        "do_stuff :: () -> () {}\n"
+        "if 1 { do_stuff() }\n"
+        "DUMMY :: 42"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Success);
+    }
+
     it("should be able to use if / else to choose an implementation at compile time") {
       Value *value = test_program_inline_source_base(
         "TEST", &test_context,

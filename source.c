@@ -1580,7 +1580,11 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
+  if (body_context.builder) {
+    return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
+  } else {
+    return compile_time_eval(&body_context, macro->replacement);
+  }
 }
 
 static inline bool
