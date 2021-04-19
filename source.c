@@ -3107,12 +3107,7 @@ token_handle_operator(
 
   if (scope_entry) {
     if (scope_entry->tag != Scope_Entry_Tag_Operator) {
-      context_error_snprintf(
-        context, source_range,
-        "%"PRIslice" is not an operator",
-        SLICE_EXPAND_PRINTF(new_operator)
-      );
-      return false;
+      panic("Should have only gotten here if scope entry is an operator");
     }
     if (fixity_mask == Operator_Fixity_Prefix) {
       operator_entry = scope_entry->Operator.maybe_prefix;
