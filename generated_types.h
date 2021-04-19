@@ -888,21 +888,25 @@ typedef enum {
   Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
   Mass_Error_Tag_Expected_Static = 4,
   Mass_Error_Tag_Integer_Range = 5,
-  Mass_Error_Tag_Unexpected_Token = 6,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 7,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 8,
-  Mass_Error_Tag_Undefined_Variable = 9,
-  Mass_Error_Tag_Unknown_Field = 10,
-  Mass_Error_Tag_Invalid_Identifier = 11,
-  Mass_Error_Tag_Type_Mismatch = 12,
-  Mass_Error_Tag_Epoch_Mismatch = 13,
-  Mass_Error_Tag_No_Matching_Overload = 14,
-  Mass_Error_Tag_Undecidable_Overload = 15,
+  Mass_Error_Tag_File_Open = 6,
+  Mass_Error_Tag_Unexpected_Token = 7,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 8,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 9,
+  Mass_Error_Tag_Undefined_Variable = 10,
+  Mass_Error_Tag_Unknown_Field = 11,
+  Mass_Error_Tag_Invalid_Identifier = 12,
+  Mass_Error_Tag_Type_Mismatch = 13,
+  Mass_Error_Tag_Epoch_Mismatch = 14,
+  Mass_Error_Tag_No_Matching_Overload = 15,
+  Mass_Error_Tag_Undecidable_Overload = 16,
 } Mass_Error_Tag;
 
 typedef struct {
   const Descriptor * descriptor;
 } Mass_Error_Integer_Range;
+typedef struct {
+  Slice path;
+} Mass_Error_File_Open;
 typedef struct {
   Slice expected;
 } Mass_Error_Unexpected_Token;
@@ -946,6 +950,7 @@ typedef struct Mass_Error {
   Source_Range source_range;
   union {
     Mass_Error_Integer_Range Integer_Range;
+    Mass_Error_File_Open File_Open;
     Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
     Mass_Error_Operator_Prefix_Conflict Operator_Prefix_Conflict;

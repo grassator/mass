@@ -98,6 +98,10 @@ mass_error_to_string(
     case Mass_Error_Tag_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier");
     } break;
+    case Mass_Error_Tag_File_Open: {
+      APPEND_LITERAL("Can not open file ");
+      APPEND_SLICE(error->File_Open.path);
+    } break;
     case Mass_Error_Tag_Expected_Static: {
       APPEND_LITERAL("Expected value to be static (compile-time known)");
     } break;

@@ -6118,9 +6118,12 @@ program_module_from_file(
   }
   Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
   if (!buffer) {
-    context_error_snprintf(
-      context, (Source_Range){0}, "Unable to open the file %"PRIslice, SLICE_EXPAND_PRINTF(file_path)
-    );
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_File_Open,
+      .source_range = (Source_Range){0},
+      .detailed_message = "Unable to open the file",
+      .File_Open = {.path = file_path},
+    });
     return 0;
   }
 

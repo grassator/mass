@@ -835,6 +835,9 @@ main(void) {
     struct_fields("Integer_Range", (Struct_Item[]){
       { "const Descriptor *", "descriptor" },
     }),
+    struct_fields("File_Open", (Struct_Item[]){
+      { "Slice", "path" },
+    }),
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),
