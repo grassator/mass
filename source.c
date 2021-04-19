@@ -334,6 +334,10 @@ context_merge_in_scope(
   proxy->parent = context->scope;
   Scope *new_scope = scope_make(context->allocator, proxy);
 
+  // FIXME This kind of hackish, probably there is a better way
+  if (context->module && context->module->own_scope == context->scope) {
+    context->module->own_scope = new_scope;
+  }
   // FIXME introduce a more generic mechanism for the statements to introduce a new scope
   context->scope = new_scope;
 }
@@ -5269,7 +5273,7 @@ token_parse_statement_using(
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("using"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
-  Value *result = token_parse_expression(context, rest, &(u64){0}, 0);
+  Value *result = compile_time_eval(context, rest);
 
   if (result->descriptor != &descriptor_scope) {
     context_error(context, (Mass_Error) {
