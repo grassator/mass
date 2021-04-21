@@ -106,16 +106,18 @@ test_program_source_base(
   );
   test_context.module = prelude_module;
   Mass_Result result = program_import_module(&test_context, prelude_module);
-  if (result.tag != Mass_Result_Tag_Success) return 0;
+  if (!spec_check_mass_result(&result)) return 0;
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
       test_init_module(source.text);
+      program_parse(context);
     } break;
     case Test_Program_Source_Tag_File: {
-      panic("TODO");
+      Module *module = program_module_from_file(&test_context, source.path, test_context.scope);
+      program_import_module(&test_context, module);
     } break;
   }
-  program_parse(context);
+  if (!spec_check_mass_result(context->result)) return 0;
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
@@ -142,7 +144,6 @@ test_program_source_function(
   return fn;
 }
 
-
 static Value *
 test_program_inline_source_base(
   const char *id,
@@ -164,6 +165,30 @@ test_program_inline_source_function(
   return test_program_source_function(function_id, context, (Test_Program_Source) {
     .tag = Test_Program_Source_Tag_Inline,
     .text = slice_from_c_string(source),
+  });
+}
+
+static Value *
+test_program_external_source_base(
+  const char *id,
+  Execution_Context *context,
+  const char *path
+) {
+  return test_program_source_base(id, context, (Test_Program_Source) {
+    .tag = Test_Program_Source_Tag_File,
+    .path = slice_from_c_string(path),
+  });
+}
+
+fn_type_opaque
+test_program_external_source_function(
+  const char *function_id,
+  Execution_Context *context,
+  const char *path
+) {
+  return test_program_source_function(function_id, context, (Test_Program_Source) {
+    .tag = Test_Program_Source_Tag_File,
+    .path = slice_from_c_string(path),
   });
 }
 
@@ -436,25 +461,10 @@ spec("source") {
   #ifdef _WIN32
   describe("Win32: Structured Exceptions") {
     it("should be unwind stack on hardware exception on Windows") {
-      Module *module = program_module_from_file(
-        &test_context,
-        slice_literal("fixtures\\error_runtime_divide_by_zero"),
-        scope_make(test_context.allocator, test_context.scope)
+      fn_type_opaque checker = test_program_external_source_function(
+        "main", &test_context, "fixtures\\error_runtime_divide_by_zero"
       );
-      Mass_Result result = program_import_module(&test_context, module);
-      check(result.tag == Mass_Result_Tag_Success);
-      // FIXME lookup main in exported scope
-      Value *main = scope_lookup_force(module->own_scope, slice_literal("main"));
-      check(main);
-      ensure_compiled_function_body(&test_context, main);
-
-      Jit jit;
-      jit_init(&jit, test_context.program);
-      program_jit(&jit);
-      check(spec_check_mass_result(test_context.result));
-
-      fn_type_opaque checker = (fn_type_opaque)value_as_function(&jit, main);
-
+      check(checker);
       volatile bool caught_exception = false;
       __try {
         checker();
@@ -1657,107 +1667,67 @@ spec("source") {
     }
 
     it("should parse and write an executable that prints Hello, world!") {
-      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
-      Module *prelude_module = program_module_from_file(
-        &test_context, slice_literal("lib\\prelude"), module_scope
-      );
-      Mass_Result result = program_import_module(&test_context, prelude_module);
-      check(result.tag == Mass_Result_Tag_Success);
-      Module *module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\hello_world"), module_scope
-      );
-      program_import_module(&test_context, module);
       Program *test_program = test_context.program;
-      test_program->entry_point = scope_lookup_force(module_scope, slice_literal("main"));
-      check(spec_check_mass_result(test_context.result));
+      test_program->entry_point = test_program_external_source_base(
+        "main", &test_context, "fixtures\\hello_world"
+      );
       check(test_program->entry_point);
       ensure_compiled_function_body(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-
       write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
     }
 
     xit("should parse and write an executable with a lot of constant folding") {
-        Scope* module_scope = scope_make(test_context.allocator, test_context.scope);
-        Module* prelude_module = program_module_from_file(
-            &test_context, slice_literal("lib\\prelude"), module_scope
-        );
-        Mass_Result result = program_import_module(&test_context, prelude_module);
-        check(result.tag == Mass_Result_Tag_Success);
-        Module* module = program_module_from_file(
-            &test_context, slice_literal("..\\compile-time-benchmark\\print"), module_scope
-        );
-        program_import_module(&test_context, module);
-        Program* test_program = test_context.program;
-        test_program->entry_point = scope_lookup_force(module_scope, slice_literal("main"));
-        check(spec_check_mass_result(test_context.result));
-        check(test_program->entry_point);
-        ensure_compiled_function_body(&test_context, test_program->entry_point);
-        check(spec_check_mass_result(test_context.result));
+      Program *test_program = test_context.program;
+      test_program->entry_point = test_program_external_source_base(
+        "main", &test_context, "..\\compile-time-benchmark\\folding"
+      );
+      check(test_program->entry_point);
+      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      check(spec_check_mass_result(test_context.result));
+      write_executable("build\\folding.exe", &test_context, Executable_Type_Cli);
+    }
 
-        write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
+    xit("should parse and write an executable with a lot of print statements") {
+      Program *test_program = test_context.program;
+      test_program->entry_point = test_program_external_source_base(
+        "main", &test_context, "..\\compile-time-benchmark\\print"
+      );
+      check(test_program->entry_point);
+      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      check(spec_check_mass_result(test_context.result));
+      write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
     }
   }
 
   describe("Relocations") {
     it("should work in JIT code") {
-      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
-      Module *prelude_module = program_module_from_file(
-        &test_context, slice_literal("lib\\prelude"), module_scope
+      fn_type_opaque checker = test_program_external_source_function(
+        "test", &test_context, "fixtures\\relocations"
       );
-      Mass_Result result = program_import_module(&test_context, prelude_module);
-      check(result.tag == Mass_Result_Tag_Success);
-      Module *module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\relocations"), module_scope
-      );
-      result = program_import_module(&test_context, module);
-      check(spec_check_mass_result(test_context.result));
-      Program *test_program = test_context.program;
-
-      Value *test = scope_lookup_force(module_scope, slice_literal("test"));
-      check(test);
-      ensure_compiled_function_body(&test_context, test);
-      check(spec_check_mass_result(test_context.result));
-
-      Jit jit;
-      jit_init(&jit, test_program);
-      program_jit(&jit);
-      check(spec_check_mass_result(test_context.result));
-
-      fn_type_void_to_void checker = (fn_type_void_to_void)value_as_function(&jit, test);
+      check(checker);
       checker();
+    }
+
+    it("should work in an executable") {
+      Program *test_program = test_context.program;
+      test_program->entry_point = test_program_external_source_base(
+        "main", &test_context, "fixtures\\relocations"
+      );
+      check(test_program->entry_point);
+      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      check(spec_check_mass_result(test_context.result));
+      write_executable("build\\relocations.exe", &test_context, Executable_Type_Cli);
     }
   }
 
   describe("Complex Examples") {
     it("should be able to run fizz buzz") {
-      Scope *module_scope = scope_make(test_context.allocator, test_context.scope);
-      Module *prelude_module = program_module_from_file(
-        &test_context, slice_literal("lib\\prelude"), module_scope
+      fn_type_opaque fizz_buzz = test_program_external_source_function(
+        "fizz_buzz", &test_context, "fixtures\\fizz_buzz"
       );
-      Mass_Result result = program_import_module(&test_context, prelude_module);
-      check(spec_check_mass_result(&result));
-      Module *fizz_buzz_module = program_module_from_file(
-        &test_context, slice_literal("fixtures\\fizz_buzz"), module_scope
-      );
-      result = program_import_module(&test_context, fizz_buzz_module);
-      check(spec_check_mass_result(test_context.result));
-      Program *test_program = test_context.program;
-
-      Value *fizz_buzz = scope_lookup_force(module_scope, slice_literal("fizz_buzz"));
-      check(spec_check_mass_result(test_context.result));
       check(fizz_buzz);
-      ensure_compiled_function_body(&test_context, fizz_buzz);
-      check(spec_check_mass_result(test_context.result));
-
-      Jit jit;
-      jit_init(&jit, test_program);
-      program_jit(&jit);
-      check(spec_check_mass_result(test_context.result));
-
-      fn_type_void_to_void checker =
-        (fn_type_void_to_void)value_as_function(&jit, fizz_buzz);
-      checker();
+      fizz_buzz();
     }
   }
 }
