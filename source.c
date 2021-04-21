@@ -5043,36 +5043,6 @@ token_parse_function_literal(
   }
 }
 
-static inline u64
-token_parse_function_definition_statement(
-  Execution_Context *context,
-  Value_View source,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 match_length = 0;
-  Value_View view = value_view_match_till_end_of_statement(source, &match_length);
-
-  u64 fn_match_length = 0;
-  Value *literal = token_parse_function_literal(context, view, &fn_match_length);
-  if (!fn_match_length) return 0;
-  MASS_ON_ERROR(*context->result) return 0;
-  Slice name = literal->descriptor->name;
-  if (!name.length) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = literal->source_range,
-      .detailed_message = "Functions must specify a name when used as statements"
-    });
-    return 0;
-  }
-
-  scope_define_value(context->scope, literal->source_range, name, literal);
-  return match_length;
-}
-
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
   Value_View view,
@@ -6119,7 +6089,6 @@ scope_define_builtins(
     Array_Token_Statement_Matcher matchers =
       dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
 
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_function_definition_statement});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
