@@ -82,18 +82,39 @@ test_init_module(
   test_context.module = &test_module;
 }
 
-static Value *
-test_program_inline_source_base(
+typedef enum {
+  Test_Program_Source_Tag_Inline,
+  Test_Program_Source_Tag_File,
+} Test_Program_Source_Tag;
+
+typedef struct {
+  Test_Program_Source_Tag tag;
+  union {
+    Slice text;
+    Slice path;
+  };
+} Test_Program_Source;
+
+static inline Value *
+test_program_source_base(
   const char *id,
   Execution_Context *context,
-  const char *source
+  Test_Program_Source source
 ) {
   Module *prelude_module = program_module_from_file(
     &test_context, slice_literal("lib\\prelude"), test_context.scope
   );
+  test_context.module = prelude_module;
   Mass_Result result = program_import_module(&test_context, prelude_module);
   if (result.tag != Mass_Result_Tag_Success) return 0;
-  test_init_module(slice_from_c_string(source));
+  switch(source.tag) {
+    case Test_Program_Source_Tag_Inline: {
+      test_init_module(source.text);
+    } break;
+    case Test_Program_Source_Tag_File: {
+      panic("TODO");
+    } break;
+  }
   program_parse(context);
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
@@ -104,12 +125,12 @@ test_program_inline_source_base(
 }
 
 fn_type_opaque
-test_program_inline_source_function(
+test_program_source_function(
   const char *function_id,
   Execution_Context *context,
-  const char *source
+  Test_Program_Source source
 ) {
-  Value *value = test_program_inline_source_base(function_id, context, source);
+  Value *value = test_program_source_base(function_id, context, source);
   if (!spec_check_mass_result(context->result)) return 0;
   if (!value) return 0;
   Jit jit;
@@ -119,6 +140,31 @@ test_program_inline_source_function(
   fn_type_opaque fn = value_as_function(&jit, value);
   if (!spec_check_mass_result(context->result)) return 0;
   return fn;
+}
+
+
+static Value *
+test_program_inline_source_base(
+  const char *id,
+  Execution_Context *context,
+  const char *source
+) {
+  return test_program_source_base(id, context, (Test_Program_Source) {
+    .tag = Test_Program_Source_Tag_Inline,
+    .text = slice_from_c_string(source),
+  });
+}
+
+fn_type_opaque
+test_program_inline_source_function(
+  const char *function_id,
+  Execution_Context *context,
+  const char *source
+) {
+  return test_program_source_function(function_id, context, (Test_Program_Source) {
+    .tag = Test_Program_Source_Tag_Inline,
+    .text = slice_from_c_string(source),
+  });
 }
 
 
