@@ -73,6 +73,7 @@ static Compilation test_compilation = {0};
 static Execution_Context test_context = {0};
 static Slice test_file_name = slice_literal_fields("_test_.mass");
 static Module test_module = {0};
+static Jit test_jit;
 
 static inline void
 test_init_module(
@@ -135,11 +136,10 @@ test_program_source_function(
   Value *value = test_program_source_base(function_id, context, source);
   if (!spec_check_mass_result(context->result)) return 0;
   if (!value) return 0;
-  Jit jit;
-  jit_init(&jit, context->program);
-  program_jit(&jit);
+  jit_init(&test_jit, context->program);
+  program_jit(&test_jit);
   if (!spec_check_mass_result(context->result)) return 0;
-  fn_type_opaque fn = value_as_function(&jit, value);
+  fn_type_opaque fn = value_as_function(&test_jit, value);
   if (!spec_check_mass_result(context->result)) return 0;
   return fn;
 }
@@ -201,7 +201,7 @@ spec("source") {
   }
 
   after_each() {
-      compilation_deinit(&test_compilation);
+    compilation_deinit(&test_compilation);
   }
 
   describe("Scope") {

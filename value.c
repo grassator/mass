@@ -1549,8 +1549,8 @@ void
 jit_deinit(
   Jit *jit
 ) {
-  program_deinit(jit->program);
-  hash_map_destroy(jit->import_library_handles);
+  if (jit->program) program_deinit(jit->program);
+  if (jit->import_library_handles) hash_map_destroy(jit->import_library_handles);
 }
 
 void
