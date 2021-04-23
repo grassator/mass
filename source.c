@@ -4339,20 +4339,6 @@ mass_handle_comparison_operation(
 }
 
 static Value *
-mass_handle_arrow_operator(
-  Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
-) {
-  Value *arguments = value_view_get(args_view, 0);
-  Value *return_types = value_view_get(args_view, 1);
-  Value *body = value_view_get(args_view, 2);
-  Value *function_value =
-    token_process_function_literal(context, (Slice){0}, arguments, return_types, body);
-  return function_value;
-}
-
-static Value *
 mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -5945,13 +5931,6 @@ scope_define_builtins(
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
-  ));
-  scope_define_operator(0, scope, range, slice_literal("->"), allocator_make(allocator, Operator,
-    .precedence = 19,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Right,
-    .argument_count = 3,
-    .handler = mass_handle_arrow_operator,
   ));
 
   scope_define_operator(0, scope, range, slice_literal("-"), allocator_make(allocator, Operator,
