@@ -5895,18 +5895,6 @@ token_parse_assignment(
   return statement_length;
 }
 
-static inline PRELUDE_NO_DISCARD Mass_Result
-token_parse(
-  Execution_Context *context,
-  Value_View view
-) {
-  Value *block_result = token_parse_block_view(context, view);
-  // FIXME :ExpectedAny
-  Expected_Result expected_target = expected_result_from_value(&void_value);
-  (void)value_force(context, &expected_target, block_result);
-  return *context->result;
-}
-
 static void
 scope_define_builtins(
   const Allocator *allocator,
@@ -6092,8 +6080,9 @@ program_parse(
   Value_View tokens;
 
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
-  Value_View program_value_view = tokens;
-  MASS_TRY(token_parse(context, program_value_view));
+  Value *block_result = token_parse_block_view(context, tokens);
+  Expected_Result expected_target = expected_result_from_value(&void_value);
+  (void)value_force(context, &expected_target, block_result);
   return *context->result;
 }
 
