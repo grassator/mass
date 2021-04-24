@@ -996,6 +996,16 @@ spec("source") {
       check(checker);
       check(checker() == 0);
     }
+
+    it("should support defining a compile-time function") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "checker", &test_context,
+        "@fn compile_time_fn() -> (s64) { 42 }\n"
+        "fn checker() -> (s64) { compile_time_fn() }"
+      );
+      check(checker);
+      check(checker() == 42);
+    }
   }
 
   describe("Operators") {

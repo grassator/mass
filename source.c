@@ -4963,6 +4963,7 @@ token_parse_function_literal(
 
   u64 peek_index = 0;
   bool is_macro = false;
+  Token_Maybe_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
   Token_Maybe_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("fn"));
   if (!keyword) {
     Token_Maybe_Match(macro, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("macro"));
@@ -5001,13 +5002,22 @@ token_parse_function_literal(
     MASS_ON_ERROR(*context->result) return 0;
   }
 
-  if (is_macro && !body_is_literal) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = rest.source_range,
-      .detailed_message = "Function-like macro must have a literal body in {}"
-    });
-    return 0;
+  if (is_macro) {
+    if (!body_is_literal) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = rest.source_range,
+        .detailed_message = "Function-like macro must have a literal body in {}"
+      });
+      return 0;
+    } else if (at) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = at->source_range,
+        .detailed_message = "Function-like macro can not be marked compile time"
+      });
+      return 0;
+    }
   }
 
   *matched_length = view.length;
@@ -5021,6 +5031,9 @@ token_parse_function_literal(
   assert(descriptor->tag == Descriptor_Tag_Function);
   if(is_macro) {
     descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+  }
+  if (at) {
+    descriptor->Function.info.flags |= Descriptor_Function_Flags_Compile_Time;
   }
   if (body) {
     return literal;

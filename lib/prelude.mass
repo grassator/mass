@@ -63,6 +63,7 @@ operator 15 (x | y) { bitwise_or(x, y) }
 operator 15 (x & y) { bitwise_and(x, y) }
 
 syntax statement rewrite("fn" .@name ()@args ..@body) name :: fn name args body
+syntax statement rewrite("@" "fn" .@name ()@args ..@body) name :: @fn name args body
 syntax statement rewrite("macro" .@name ()@args ..@body) name :: macro name args body
 syntax statement rewrite("const" ..@binding "=" ..@expression) binding := expression
 syntax statement rewrite("mut" ..@binding "=" ..@expression) binding := expression
