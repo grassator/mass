@@ -20,9 +20,9 @@
 
 #define MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_)\
   static Descriptor descriptor_##_NAME_##_pointer = {\
-    .tag = Descriptor_Tag_Pointer,\
+    .tag = Descriptor_Tag_Pointer_To,\
     .name = slice_literal_fields(#_NAME_),\
-    .Pointer.to = &descriptor_##_NAME_,\
+    .Pointer_To.descriptor = &descriptor_##_NAME_,\
   }
 
 #define MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_)\

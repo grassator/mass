@@ -500,7 +500,7 @@ assign(
 
   Source_Range source_range = target->source_range;
   if (source->descriptor == &descriptor_number_literal) {
-    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(context, source, &descriptor_u64);
@@ -548,7 +548,7 @@ assign(
   } else if (source->storage.tag == Storage_Tag_Static) {
     if (
       !context_is_compile_time_eval(context) &&
-      source->descriptor->tag == Descriptor_Tag_Pointer
+      source->descriptor->tag == Descriptor_Tag_Pointer_To
     ) {
       // If a static value contains a pointer, we expect an entry in a special map used to track
       // whether the target memory is also already copied to the compiled binary.
@@ -1454,9 +1454,9 @@ token_parse_single(
         const Descriptor *pointee = token_match_type(context, group->children);
         Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
         *temp = (Descriptor) {
-          .tag = Descriptor_Tag_Pointer,
+          .tag = Descriptor_Tag_Pointer_To,
           .name = source_from_source_range(source_range),
-          .Pointer.to = pointee,
+          .Pointer_To.descriptor = pointee,
         };
         return value_make(context, &descriptor_type, storage_static(temp), *source_range);
       }
@@ -2853,7 +2853,7 @@ compile_time_eval(
       temp_result->storage = (Storage){0};
       break;
     }
-    case Descriptor_Tag_Pointer:
+    case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
     case Descriptor_Tag_Opaque: {
@@ -3839,7 +3839,7 @@ storage_load_index_address(
     u64 index = *storage_static_as_c_type(&index_value->storage, u64);
     // TODO do bounds checking if possible
     s8 *target_bytes = 0;
-    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       target_bytes =
         *(s8**)storage_static_as_c_type_internal(&target->storage, target->storage.byte_size);
     } else {
@@ -3888,7 +3888,7 @@ storage_load_index_address(
       context, &descriptor_s64, index_value->source_range
     );
 
-    if (target->descriptor->tag == Descriptor_Tag_Pointer) {
+    if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       move_value(
         context->allocator,
         context->builder,
@@ -4644,8 +4644,8 @@ mass_handle_array_access_lazy_proc(
 
   index = maybe_coerce_number_literal_to_integer(context, index, &descriptor_u64);
   Value *array_element_value;
-  if (array->descriptor->tag == Descriptor_Tag_Pointer) {
-    const Descriptor *item_descriptor = array->descriptor->Pointer.to;
+  if (array->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    const Descriptor *item_descriptor = array->descriptor->Pointer_To.descriptor;
     Storage storage = storage_load_index_address(context, array_range, array, item_descriptor, index);
     array_element_value = value_make(context, item_descriptor, storage, *array_range);
     // @Volatile :TemporaryRegisterForIndirectMemory
@@ -4749,14 +4749,14 @@ mass_handle_dot_operator(
     }
   } else if (
     lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-    lhs_descriptor->tag == Descriptor_Tag_Pointer
+    lhs_descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     if (value_match_group(rhs, Group_Tag_Paren) || value_is_number_literal(rhs)) {
       const Descriptor *descriptor = lhs_descriptor;
       if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
         descriptor = descriptor->Fixed_Size_Array.item;
       } else {
-        descriptor = descriptor->Pointer.to;
+        descriptor = descriptor->Pointer_To.descriptor;
       }
       Mass_Array_Access_Lazy_Payload *lazy_payload =
         allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
@@ -5901,6 +5901,7 @@ scope_define_enum(
   Scope *scope,
   Source_Range source_range,
   Slice enum_name,
+  const Descriptor *enum_descriptor,
   C_Enum_Item *items,
   u64 item_count
 ) {
@@ -5909,7 +5910,7 @@ scope_define_enum(
     C_Enum_Item *it = &items[i];
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_s32, storage_static(&it->value), source_range
+      VALUE_STATIC_EPOCH, enum_descriptor, storage_static(&it->value), source_range
     );
     scope_define_value(enum_scope, source_range, it->name, item_value);
   }
@@ -5940,12 +5941,8 @@ module_compiler_init(
 
   scope_define_enum(
     allocator, compiler_scope, source_range,
-    slice_literal("Operator_Fixity"), operator_fixity_items, countof(operator_fixity_items)
-  );
-
-  scope_define_enum(
-    allocator, compiler_scope, source_range,
-    slice_literal("Operator_Fixity"), operator_fixity_items, countof(operator_fixity_items)
+    slice_literal("Operator_Fixity"), &descriptor_operator_fixity,
+    operator_fixity_items, countof(operator_fixity_items)
   );
 }
 

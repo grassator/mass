@@ -250,7 +250,6 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
       break;
     }
     case Type_Tag_Function: {
@@ -261,7 +260,45 @@ print_mass_descriptor_and_type_forward_declaration(
   }
 }
 
-void
+static void
+print_mass_struct(
+  FILE *file,
+  const char *name,
+  Struct *struct_
+) {
+  char *lowercase_name = strtolower(name);
+  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
+  for (uint64_t i = 0; i < struct_->item_count; ++i) {
+    Struct_Item *item = &struct_->items[i];
+    fprintf(file, "  {\n");
+    fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
+    fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
+    Slice lowercase_type = slice_from_c_string(strtolower(item->type));
+    // TODO support const
+    Slice const_prefix = slice_literal("const ");
+    if (slice_starts_with(lowercase_type, const_prefix)) {
+      lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
+    }
+    Slice original_lowercase_type = lowercase_type;
+    Slice pointer_suffix = slice_literal(" *");
+    while (slice_ends_with(lowercase_type, pointer_suffix)) {
+      lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+    }
+    fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+    lowercase_type = original_lowercase_type;
+    while (slice_ends_with(lowercase_type, pointer_suffix)) {
+      fprintf(file, "_pointer");
+      lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+    }
+    fprintf(file, ",\n");
+    fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", name, item->name);
+    fprintf(file, "  },\n");
+  }
+  fprintf(file, ");\n");
+  fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
+}
+
+static void
 print_mass_descriptor_and_type(
   FILE *file,
   Type *type
@@ -271,35 +308,7 @@ print_mass_descriptor_and_type(
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->struct_.name);
-      fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
-      for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
-        Struct_Item *item = &type->struct_.items[i];
-        fprintf(file, "  {\n");
-        fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
-        fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
-        Slice lowercase_type = slice_from_c_string(strtolower(item->type));
-        // TODO support const
-        Slice const_prefix = slice_literal("const ");
-        if (slice_starts_with(lowercase_type, const_prefix)) {
-          lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
-        }
-        Slice original_lowercase_type = lowercase_type;
-        Slice pointer_suffix = slice_literal(" *");
-        while (slice_ends_with(lowercase_type, pointer_suffix)) {
-          lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-        }
-        fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
-        lowercase_type = original_lowercase_type;
-        while (slice_ends_with(lowercase_type, pointer_suffix)) {
-          fprintf(file, "_pointer");
-          lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-        }
-        fprintf(file, ",\n");
-        fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", type->struct_.name, item->name);
-        fprintf(file, "  },\n");
-      }
-      fprintf(file, ");\n");
-      fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
+      print_mass_struct(file, type->struct_.name, &type->struct_);
       break;
     }
     case Type_Tag_Enum: {
@@ -318,8 +327,65 @@ print_mass_descriptor_and_type(
       break;
     }
     case Type_Tag_Tagged_Union: {
+      fprintf(file, "/*union struct start */\n");
       char *lowercase_name = strtolower(type->union_.name);
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->union_.name);
+
+      // Write out the enum
+      {
+        fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
+
+        fprintf(file, "static C_Enum_Item %s_items[] = {\n", lowercase_name);
+        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+          Struct *item = &type->union_.items[i];
+          fprintf(
+            file, "{ .name = slice_literal_fields(\"%s\"), .value = %"PRIu64" },\n",
+            item->name, i
+          );
+        }
+        fprintf(file, "};\n");
+      }
+
+      // Write out individual structs
+      {
+        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+          Struct *struct_ = &type->union_.items[i];
+          if (struct_->item_count) {
+            char buffer[1024];
+            s32 result = snprintf(buffer, countof(buffer), "%s_%s", type->union_.name, struct_->name);
+            assert(result > 0);
+            print_mass_struct(file, buffer, struct_);
+          }
+        }
+      }
+
+      // Write out the tagged union struct
+      {
+        fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
+
+        fprintf(file, "  {\n");
+        fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
+        fprintf(file, "    .name = slice_literal_fields(\"%s_Tag\"),\n", type->union_.name);
+        fprintf(file, "    .descriptor = &descriptor_%s_tag,\n", lowercase_name);
+        fprintf(file, "    .Base_Relative.offset = offsetof(%s, tag),\n", type->union_.name);
+        fprintf(file, "  },\n");
+
+        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+          Struct *struct_ = &type->union_.items[i];
+          if (struct_->item_count) {
+            const char *struct_lowercase_name = strtolower(struct_->name);
+
+            fprintf(file, "  {\n");
+            fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
+            fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
+            fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
+            fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", type->union_.name, struct_->name);
+            fprintf(file, "  },\n");
+          }
+        }
+        fprintf(file, ");\n");
+        fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
+      }
+      fprintf(file, "/*union struct end*/\n");
       break;
     }
     case Type_Tag_Function: {
@@ -829,8 +895,8 @@ main(void) {
     struct_fields("Struct", (Struct_Item[]){
       { "Memory_Layout", "memory_layout" },
     }),
-    struct_fields("Pointer", (Struct_Item[]){
-      { "const Descriptor *", "to" },
+    struct_fields("Pointer_To", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
     }),
   }), (Struct_Item[]){
     { "Slice", "name" },

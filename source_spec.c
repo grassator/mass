@@ -1637,7 +1637,7 @@ spec("source") {
         "Infix :: mass.Operator_Fixity.Infix\n"
       );
       check(value);
-      check(value->descriptor == &descriptor_s32);
+      check(value->descriptor == &descriptor_operator_fixity);
       check(value->storage.tag == Storage_Tag_Static);
       s32 item_value = *storage_static_as_c_type(&value->storage, s32);
       check(item_value == Operator_Fixity_Infix);

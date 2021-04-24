@@ -237,22 +237,22 @@ same_type(
 ) {
   if (a->tag != b->tag) return false;
   switch(a->tag) {
-    case Descriptor_Tag_Pointer: {
+    case Descriptor_Tag_Pointer_To: {
       if (
-        a->Pointer.to->tag == Descriptor_Tag_Fixed_Size_Array &&
-        same_type(a->Pointer.to->Fixed_Size_Array.item, b->Pointer.to)
+        a->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
+        same_type(a->Pointer_To.descriptor->Fixed_Size_Array.item, b->Pointer_To.descriptor)
       ) return true;
       if (
-        b->Pointer.to->tag == Descriptor_Tag_Fixed_Size_Array &&
-        same_type(b->Pointer.to->Fixed_Size_Array.item, a->Pointer.to)
+        b->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
+        same_type(b->Pointer_To.descriptor->Fixed_Size_Array.item, a->Pointer_To.descriptor)
       ) return true;
       if (
-        a->Pointer.to->tag == Descriptor_Tag_Void ||
-        b->Pointer.to->tag == Descriptor_Tag_Void
+        a->Pointer_To.descriptor->tag == Descriptor_Tag_Void ||
+        b->Pointer_To.descriptor->tag == Descriptor_Tag_Void
       ) {
         return true;
       }
-      return same_type(a->Pointer.to, b->Pointer.to);
+      return same_type(a->Pointer_To.descriptor, b->Pointer_To.descriptor);
     }
     case Descriptor_Tag_Fixed_Size_Array: {
       return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
@@ -341,7 +341,7 @@ descriptor_byte_size(
       return descriptor_byte_size(descriptor->Fixed_Size_Array.item) *
         descriptor->Fixed_Size_Array.length;
     }
-    case Descriptor_Tag_Pointer:
+    case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Function: {
       return 8;
     }
@@ -762,7 +762,7 @@ storage_static_equal_internal(
     case Descriptor_Tag_Void: return true;
     // Opaques and pointers can be compared with memcmp
     case Descriptor_Tag_Opaque:
-    case Descriptor_Tag_Pointer: {
+    case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
     }
     case Descriptor_Tag_Fixed_Size_Array: {
@@ -1351,8 +1351,8 @@ descriptor_pointer_to(
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
-    .tag = Descriptor_Tag_Pointer,
-    .Pointer = {.to = descriptor },
+    .tag = Descriptor_Tag_Pointer_To,
+    .Pointer_To.descriptor = descriptor,
   };
   return result;
 }
@@ -1819,7 +1819,7 @@ same_value_type_or_can_implicitly_move_cast(
     target != &descriptor_number_literal
   ) {
     // Allow literal `0` to be cast to a pointer
-    if (target->tag == Descriptor_Tag_Pointer) {
+    if (target->tag == Descriptor_Tag_Pointer_To) {
       assert(source->storage.tag == Storage_Tag_Static);
       assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
       Number_Literal *literal = source->storage.Static.memory.Heap.pointer;

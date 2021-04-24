@@ -121,8 +121,8 @@ static inline const Descriptor *
 maybe_unwrap_pointer_descriptor(
   const Descriptor *descriptor
 ) {
-  if (descriptor->tag == Descriptor_Tag_Pointer) {
-    return descriptor->Pointer.to;
+  if (descriptor->tag == Descriptor_Tag_Pointer_To) {
+    return descriptor->Pointer_To.descriptor;
   }
   return descriptor;
 }
