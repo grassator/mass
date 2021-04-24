@@ -5896,6 +5896,60 @@ token_parse_assignment(
 }
 
 static void
+scope_define_enum(
+  const Allocator *allocator,
+  Scope *scope,
+  Source_Range source_range,
+  Slice enum_name,
+  C_Enum_Item *items,
+  u64 item_count
+) {
+  Scope *enum_scope = scope_make(allocator, 0);
+  for (u64 i = 0; i < item_count; ++i) {
+    C_Enum_Item *it = &items[i];
+    Value *item_value = value_init(
+      allocator_allocate(allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_s32, storage_static(&it->value), source_range
+    );
+    scope_define_value(enum_scope, source_range, it->name, item_value);
+  }
+
+  Value *enum_value = value_init(
+    allocator_allocate(allocator, Value),
+    VALUE_STATIC_EPOCH, &descriptor_scope, storage_static(enum_scope), source_range
+  );
+  scope_define_value(scope, source_range, enum_name, enum_value);
+}
+
+static void
+module_compiler_init(
+  Compilation *compilation,
+  Module *out_module
+) {
+  const Allocator *allocator = compilation->allocator;
+  Scope *compiler_scope = scope_make(allocator, compilation->root_scope);
+  *out_module = (Module) {
+    .source_file = {
+      .path = slice_literal("__mass_internal__"),
+    },
+    .own_scope = compiler_scope,
+    .export_scope = compiler_scope,
+  };
+  // TODO figure this out for compiler-generated values
+  Source_Range source_range = {0};
+
+  scope_define_enum(
+    allocator, compiler_scope, source_range,
+    slice_literal("Operator_Fixity"), operator_fixity_items, countof(operator_fixity_items)
+  );
+
+  scope_define_enum(
+    allocator, compiler_scope, source_range,
+    slice_literal("Operator_Fixity"), operator_fixity_items, countof(operator_fixity_items)
+  );
+}
+
+static void
 scope_define_builtins(
   const Allocator *allocator,
   Scope *scope

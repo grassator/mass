@@ -1575,14 +1575,7 @@ compilation_init(
   compilation->root_scope = scope_make(compilation->allocator, 0);
   scope_define_builtins(compilation->allocator, compilation->root_scope);
 
-  Scope *compiler_scope = scope_make(compilation->allocator, compilation->root_scope);
-  compilation->compiler_module = (Module) {
-    .source_file = {
-      .path = slice_literal("__mass_internal__"),
-    },
-    .own_scope = compiler_scope,
-    .export_scope = compiler_scope,
-  };
+  module_compiler_init(compilation, &compilation->compiler_module);
 
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
   program_init(compilation->allocator, jit_program);

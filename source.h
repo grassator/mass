@@ -132,6 +132,12 @@ scope_define_operator(
 );
 
 static void
+module_compiler_init(
+  Compilation *compilation,
+  Module *out_module
+);
+
+static void
 scope_define_builtins(
   const Allocator *allocator,
   Scope *scope

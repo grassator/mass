@@ -1630,6 +1630,18 @@ spec("source") {
       check(checker);
       check(checker() == 84);
     }
+    it("should support importing compiler functionality through `mass` module") {
+      Value *value = test_program_inline_source_base(
+        "Infix", &test_context,
+        "mass :: import(\"mass\")\n"
+        "Infix :: mass.Operator_Fixity.Infix\n"
+      );
+      check(value);
+      check(value->descriptor == &descriptor_s32);
+      check(value->storage.tag == Storage_Tag_Static);
+      s32 item_value = *storage_static_as_c_type(&value->storage, s32);
+      check(item_value == Operator_Fixity_Infix);
+    }
   }
 
   describe("PE32 Executables") {
