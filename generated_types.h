@@ -1318,6 +1318,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range,
 );
 MASS_DEFINE_TYPE_VALUE(source_range);
 MASS_DEFINE_OPAQUE_C_TYPE(module_flags, Module_Flags)
+static C_Enum_Item module_flags_items[] = {
+{ .name = slice_literal_fields("Has_Exports"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_ptr, Array_Module_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
 MASS_DEFINE_STRUCT_DESCRIPTOR(module,
@@ -1377,6 +1380,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error,
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
 MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
+static C_Enum_Item group_tag_items[] = {
+{ .name = slice_literal_fields("Paren"), .value = 1 },
+{ .name = slice_literal_fields("Square"), .value = 2 },
+{ .name = slice_literal_fields("Curly"), .value = 3 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view_ptr, Array_Value_View_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view, Array_Value_View)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
@@ -1401,6 +1409,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view,
 );
 MASS_DEFINE_TYPE_VALUE(value_view);
 MASS_DEFINE_OPAQUE_C_TYPE(symbol_type, Symbol_Type)
+static C_Enum_Item symbol_type_items[] = {
+{ .name = slice_literal_fields("Id_Like"), .value = 1 },
+{ .name = slice_literal_fields("Operator_Like"), .value = 2 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_symbol_ptr, Array_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_symbol, Array_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol,
@@ -1449,6 +1461,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(group,
 MASS_DEFINE_TYPE_VALUE(group);
 MASS_DEFINE_OPAQUE_C_TYPE(token_pattern, Token_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(section_permissions, Section_Permissions)
+static C_Enum_Item section_permissions_items[] = {
+{ .name = slice_literal_fields("Read"), .value = 1 },
+{ .name = slice_literal_fields("Write"), .value = 2 },
+{ .name = slice_literal_fields("Execute"), .value = 4 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_section_ptr, Array_Section_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_section, Array_Section)
 MASS_DEFINE_STRUCT_DESCRIPTOR(section,
@@ -1479,6 +1496,44 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section,
 );
 MASS_DEFINE_TYPE_VALUE(section);
 MASS_DEFINE_OPAQUE_C_TYPE(register, Register)
+static C_Enum_Item register_items[] = {
+{ .name = slice_literal_fields("A"), .value = 0 },
+{ .name = slice_literal_fields("C"), .value = 1 },
+{ .name = slice_literal_fields("D"), .value = 2 },
+{ .name = slice_literal_fields("B"), .value = 3 },
+{ .name = slice_literal_fields("SP"), .value = 4 },
+{ .name = slice_literal_fields("AH"), .value = 4 },
+{ .name = slice_literal_fields("BP"), .value = 5 },
+{ .name = slice_literal_fields("CH"), .value = 4 },
+{ .name = slice_literal_fields("SI"), .value = 6 },
+{ .name = slice_literal_fields("DH"), .value = 4 },
+{ .name = slice_literal_fields("DI"), .value = 7 },
+{ .name = slice_literal_fields("BH"), .value = 4 },
+{ .name = slice_literal_fields("R8"), .value = 8 },
+{ .name = slice_literal_fields("R9"), .value = 9 },
+{ .name = slice_literal_fields("R10"), .value = 10 },
+{ .name = slice_literal_fields("R11"), .value = 11 },
+{ .name = slice_literal_fields("R12"), .value = 12 },
+{ .name = slice_literal_fields("R13"), .value = 13 },
+{ .name = slice_literal_fields("R14"), .value = 14 },
+{ .name = slice_literal_fields("R15"), .value = 15 },
+{ .name = slice_literal_fields("Xmm0"), .value = 16 },
+{ .name = slice_literal_fields("Xmm1"), .value = 17 },
+{ .name = slice_literal_fields("Xmm2"), .value = 18 },
+{ .name = slice_literal_fields("Xmm3"), .value = 19 },
+{ .name = slice_literal_fields("Xmm4"), .value = 20 },
+{ .name = slice_literal_fields("Xmm5"), .value = 21 },
+{ .name = slice_literal_fields("Xmm6"), .value = 22 },
+{ .name = slice_literal_fields("Xmm7"), .value = 23 },
+{ .name = slice_literal_fields("Xmm8"), .value = 24 },
+{ .name = slice_literal_fields("Xmm9"), .value = 25 },
+{ .name = slice_literal_fields("Xmm10"), .value = 26 },
+{ .name = slice_literal_fields("Xmm11"), .value = 27 },
+{ .name = slice_literal_fields("Xmm12"), .value = 28 },
+{ .name = slice_literal_fields("Xmm13"), .value = 29 },
+{ .name = slice_literal_fields("Xmm14"), .value = 30 },
+{ .name = slice_literal_fields("Xmm15"), .value = 31 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_index_ptr, Array_Label_Index_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_index, Array_Label_Index)
 MASS_DEFINE_STRUCT_DESCRIPTOR(label_index,
@@ -1543,6 +1598,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(label_location_diff_patch_info,
 );
 MASS_DEFINE_TYPE_VALUE(label_location_diff_patch_info);
 MASS_DEFINE_OPAQUE_C_TYPE(number_base, Number_Base)
+static C_Enum_Item number_base_items[] = {
+{ .name = slice_literal_fields("2"), .value = 2 },
+{ .name = slice_literal_fields("10"), .value = 10 },
+{ .name = slice_literal_fields("16"), .value = 16 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal_ptr, Array_Number_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_number_literal, Array_Number_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(number_literal,
@@ -1647,6 +1707,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(import_library,
 );
 MASS_DEFINE_TYPE_VALUE(import_library);
 MASS_DEFINE_OPAQUE_C_TYPE(compare_type, Compare_Type)
+static C_Enum_Item compare_type_items[] = {
+{ .name = slice_literal_fields("Equal"), .value = 1 },
+{ .name = slice_literal_fields("Not_Equal"), .value = 2 },
+{ .name = slice_literal_fields("Unsigned_Below"), .value = 3 },
+{ .name = slice_literal_fields("Unsigned_Below_Equal"), .value = 4 },
+{ .name = slice_literal_fields("Unsigned_Above"), .value = 5 },
+{ .name = slice_literal_fields("Unsigned_Above_Equal"), .value = 6 },
+{ .name = slice_literal_fields("Signed_Less"), .value = 7 },
+{ .name = slice_literal_fields("Signed_Less_Equal"), .value = 8 },
+{ .name = slice_literal_fields("Signed_Greater"), .value = 9 },
+{ .name = slice_literal_fields("Signed_Greater_Equal"), .value = 10 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register_ptr, Array_Maybe_Register_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register, Array_Maybe_Register)
 MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register,
@@ -1691,7 +1763,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location,
 );
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
+static C_Enum_Item operator_fixity_items[] = {
+{ .name = slice_literal_fields("Infix"), .value = 1 },
+{ .name = slice_literal_fields("Prefix"), .value = 2 },
+{ .name = slice_literal_fields("Postfix"), .value = 4 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(operator_associativity, Operator_Associativity)
+static C_Enum_Item operator_associativity_items[] = {
+{ .name = slice_literal_fields("Left"), .value = 0 },
+{ .name = slice_literal_fields("Right"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context_ptr, Array_Execution_Context_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context, Array_Execution_Context)
 MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context,
@@ -1835,6 +1916,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value,
 );
 MASS_DEFINE_TYPE_VALUE(value);
 MASS_DEFINE_OPAQUE_C_TYPE(expected_result_storage, Expected_Result_Storage)
+static C_Enum_Item expected_result_storage_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Static"), .value = 1 },
+{ .name = slice_literal_fields("Memory"), .value = 2 },
+{ .name = slice_literal_fields("Register"), .value = 4 },
+{ .name = slice_literal_fields("Xmm"), .value = 8 },
+{ .name = slice_literal_fields("Eflags"), .value = 16 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(expected_result, Expected_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
@@ -1866,6 +1955,13 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value,
 );
 MASS_DEFINE_TYPE_VALUE(lazy_value);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
+static C_Enum_Item descriptor_function_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Macro"), .value = 1 },
+{ .name = slice_literal_fields("No_Own_Scope"), .value = 2 },
+{ .name = slice_literal_fields("No_Own_Return"), .value = 4 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 8 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item, Memory_Layout_Item)
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_ptr, Array_Memory_Layout_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)

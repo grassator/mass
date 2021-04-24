@@ -88,6 +88,11 @@
   MASS_PROCESS_BUILT_IN_TYPE(f32, 32)\
   MASS_PROCESS_BUILT_IN_TYPE(f64, 64)
 
+typedef struct {
+  Slice name;
+  s32 value;
+} C_Enum_Item;
+
 #include "generated_types.h"
 
 static Descriptor descriptor_void = {

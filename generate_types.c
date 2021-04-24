@@ -305,6 +305,16 @@ print_mass_descriptor_and_type(
     case Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->enum_.name);
+
+      fprintf(file, "static C_Enum_Item %s_items[] = {\n", lowercase_name);
+      for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
+        Enum_Item *item = &type->enum_.items[i];
+        fprintf(
+          file, "{ .name = slice_literal_fields(\"%s\"), .value = %d },\n",
+          item->name, item->value
+        );
+      }
+      fprintf(file, "};\n");
       break;
     }
     case Type_Tag_Tagged_Union: {
