@@ -2601,6 +2601,7 @@ virtual_memory_buffer_allocator_reallocate(
   u64 new_size_in_bytes,
   u64 alignment
 ) {
+  if (new_size_in_bytes <= old_size_in_bytes) return address;
   void *result = virtual_memory_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
   virtual_memory_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
