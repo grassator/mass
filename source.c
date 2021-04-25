@@ -3832,7 +3832,6 @@ storage_load_index_address(
 
   s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
 
-
   if (target->storage.tag == Storage_Tag_Static) {
     index_value = token_value_force_immediate_integer(context, index_value, &descriptor_u64);
     MASS_ON_ERROR(*context->result) return (Storage){0};
@@ -4612,10 +4611,49 @@ mass_handle_field_access_lazy_proc(
 ) {
   Mass_Field_Access_Lazy_Payload *payload = raw_payload;
   Memory_Layout_Item *field = payload->field;
+  Value *struct_ = payload->struct_;
 
-  Storage field_storage = storage_field_access(&payload->struct_->storage, field);
+  // Auto dereference pointers to structs
+  if (struct_->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    const Descriptor* pointee_descriptor = struct_->descriptor->Pointer_To.descriptor;
+    assert(pointee_descriptor->tag == Descriptor_Tag_Struct);
+    Storage base_storage;
+    bool is_temporary;
+    if (struct_->storage.tag == Storage_Tag_Register) {
+      base_storage = struct_->storage;
+      is_temporary = false;
+    } else {
+      base_storage = storage_register_for_descriptor(
+        register_acquire_temp(context->builder), pointee_descriptor
+      );
+      move_value(
+        context->allocator,
+        context->builder,
+        &struct_->source_range,
+        &base_storage,
+        &struct_->storage
+      );
+      is_temporary = true;
+    }
+
+    Storage indirect_storage = (Storage) {
+      .tag = Storage_Tag_Memory,
+      .byte_size = descriptor_byte_size(pointee_descriptor),
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = {
+          .base_register = base_storage.Register.index,
+        }
+      }
+    };
+    struct_ = value_make(context, pointee_descriptor, indirect_storage, struct_->source_range);
+    struct_->is_temporary = is_temporary;
+  }
+
+  Storage field_storage = storage_field_access(&struct_->storage, field);
   Value *field_value =
-    value_make(context, field->descriptor, field_storage, payload->struct_->source_range);
+    value_make(context, field->descriptor, field_storage, struct_->source_range);
+  value_release_if_temporary(context->builder, struct_);
 
   return expected_result_ensure_value_or_temp(context, expected_result, field_value);
 }
@@ -4693,10 +4731,16 @@ mass_handle_dot_operator(
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+
   if (
     lhs_descriptor->tag == Descriptor_Tag_Struct ||
+    (
+      lhs_descriptor->tag == Descriptor_Tag_Pointer_To &&
+      lhs_descriptor->Pointer_To.descriptor->tag == Descriptor_Tag_Struct
+    ) ||
     lhs_descriptor == &descriptor_scope
   ) {
+
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
@@ -4706,7 +4750,26 @@ mass_handle_dot_operator(
       return 0;
     }
     Slice field_name = value_as_symbol(rhs)->name;
-    if (lhs_descriptor->tag == Descriptor_Tag_Struct) {
+    if (lhs->descriptor == &descriptor_scope) {
+      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
+      Value *lookup = scope_lookup_force(module_scope, field_name);
+      if (!lookup) {
+        //scope_print_names(module_scope);
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unknown_Field,
+          .source_range = rhs_range,
+          .Unknown_Field = {
+            .name = field_name,
+            .type = lhs->descriptor,
+          },
+        });
+        return 0;
+      }
+      return lookup;
+    } else {
+      if (lhs_descriptor->tag == Descriptor_Tag_Pointer_To) {
+        lhs_descriptor = lhs_descriptor->Pointer_To.descriptor;
+      }
       Memory_Layout_Item *field = struct_find_field_by_name(lhs_descriptor, field_name);
       if (!field) {
         context_error(context, (Mass_Error) {
@@ -4730,23 +4793,6 @@ mass_handle_dot_operator(
       return mass_make_lazy_value(
         context, lhs_range, lazy_payload, field->descriptor, mass_handle_field_access_lazy_proc
       );
-    } else {
-      assert(lhs->descriptor == &descriptor_scope);
-      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(module_scope, field_name);
-      if (!lookup) {
-        //scope_print_names(module_scope);
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs_range,
-          .Unknown_Field = {
-            .name = field_name,
-            .type = lhs->descriptor,
-          },
-        });
-        return 0;
-      }
-      return lookup;
     }
   } else if (
     lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
