@@ -287,69 +287,87 @@ same_type(
   }
 }
 
-u64
-descriptor_alignment(
+static u64
+descriptor_bit_size(
   const Descriptor *descriptor
 ) {
-  if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
-    return descriptor_alignment(descriptor->Fixed_Size_Array.item);
-  }
-  return descriptor_byte_size(descriptor);
-}
-
-u64
-struct_byte_size(
-  const Descriptor_Struct *Struct
-) {
-  u64 count = dyn_array_length(Struct->memory_layout.items);
-  assert(count);
-  u64 alignment = 0;
-  u64 raw_size = 0;
-  for (u64 i = 0; i < count; ++i) {
-    Memory_Layout_Item *field = dyn_array_get(Struct->memory_layout.items, i);
-    u64 field_alignment = descriptor_alignment(field->descriptor);
-    alignment = u64_max(alignment, field_alignment);
-    bool is_last_field = i == count - 1;
-    u64 field_size_with_alignment = u64_max(field_alignment, descriptor_byte_size(field->descriptor));
-    assert(field_size_with_alignment);
-    assert(field->tag == Memory_Layout_Item_Tag_Base_Relative);
-    // FIXME do padding when memory layout is created
-    if (is_last_field) {
-      raw_size = field->Base_Relative.offset + field_size_with_alignment;
-    }
-  }
-  return u64_align(raw_size, alignment);
-}
-
-u64
-descriptor_byte_size(
-  const Descriptor *descriptor
-) {
-  assert(descriptor);
   switch(descriptor->tag) {
     case Descriptor_Tag_Void: {
       return 0;
     }
     case Descriptor_Tag_Struct: {
-      return struct_byte_size(&descriptor->Struct);
+      return descriptor->Struct.memory_layout.bit_size;
     }
     case Descriptor_Tag_Opaque: {
-      u64 size_of_byte = 8;
-      return u64_to_u32((descriptor->Opaque.bit_size + (size_of_byte - 1)) / size_of_byte);
+      return descriptor->Opaque.bit_size;
     }
     case Descriptor_Tag_Fixed_Size_Array: {
-      return descriptor_byte_size(descriptor->Fixed_Size_Array.item) *
+      // FIXME :ArrayBitAlignment should this align at least to bytes?
+      return descriptor_bit_size(descriptor->Fixed_Size_Array.item) *
         descriptor->Fixed_Size_Array.length;
     }
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Function: {
-      return 8;
+      return sizeof(void *) * CHAR_BIT;
     }
     default: {
       assert(!"Unknown Descriptor Type");
     }
   }
   return 0;
+}
+
+static u64
+descriptor_bit_alignment(
+  const Descriptor *descriptor
+) {
+  switch(descriptor->tag) {
+    case Descriptor_Tag_Void: {
+      return 0;
+    }
+    case Descriptor_Tag_Struct: {
+      return descriptor->Struct.memory_layout.bit_alignment;
+    }
+    case Descriptor_Tag_Opaque: {
+      return descriptor->Opaque.bit_size;
+    }
+    case Descriptor_Tag_Fixed_Size_Array: {
+      // FIXME :ArrayBitAlignment
+      return descriptor_bit_alignment(descriptor->Fixed_Size_Array.item);
+    }
+    case Descriptor_Tag_Pointer_To:
+    case Descriptor_Tag_Function: {
+      return sizeof(void *) * CHAR_BIT;
+    }
+    default: {
+      assert(!"Unknown Descriptor Type");
+    }
+  }
+  return 0;
+}
+
+static inline u64
+descriptor_byte_size(
+  const Descriptor *descriptor
+) {
+  u64 bit_size = descriptor_bit_size(descriptor);
+  u64 byte_size = (bit_size + (CHAR_BIT - 1)) / CHAR_BIT;
+  if (byte_size * CHAR_BIT != bit_size) {
+    panic("TODO support non-byte aligned sizes");
+  }
+  return byte_size;
+}
+
+static inline u64
+descriptor_byte_alignment(
+  const Descriptor *descriptor
+) {
+  u64 bit_size = descriptor_bit_alignment(descriptor);
+  u64 byte_size = (bit_size + (CHAR_BIT - 1)) / CHAR_BIT;
+  if (byte_size * CHAR_BIT != bit_size) {
+    panic("TODO support non-byte aligned sizes");
+  }
+  return byte_size;
 }
 
 s64
@@ -673,30 +691,6 @@ descriptor_struct_make(
     }
   };
   return descriptor;
-}
-
-void
-descriptor_struct_add_field(
-  Descriptor *struct_descriptor,
-  const Descriptor *field_descriptor,
-  Slice field_name
-) {
-  u64 offset = 0;
-  for (u64 i = 0; i < dyn_array_length(struct_descriptor->Struct.memory_layout.items); ++i) {
-    Memory_Layout_Item *field = dyn_array_get(struct_descriptor->Struct.memory_layout.items, i);
-    u64 size = descriptor_byte_size(field->descriptor);
-    offset = u64_align(offset, size);
-    offset += size;
-  }
-
-  u64 size = descriptor_byte_size(field_descriptor);
-  offset = u64_align(offset, size);
-  dyn_array_push(struct_descriptor->Struct.memory_layout.items, (Memory_Layout_Item) {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = field_name,
-    .descriptor = field_descriptor,
-    .Base_Relative.offset = offset,
-  });
 }
 
 static inline void
@@ -1069,7 +1063,7 @@ value_global_internal(
   Program *program = context->program;
   Section *section = &program->memory.sections.rw_data;
   u64 byte_size = descriptor_byte_size(descriptor);
-  u64 alignment = descriptor_alignment(descriptor);
+  u64 alignment = descriptor_byte_alignment(descriptor);
 
   Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
   return value_make_internal(

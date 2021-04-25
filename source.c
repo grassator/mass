@@ -561,7 +561,7 @@ assign(
         //      Do not forget to make memory readable for ro_dar
         Section *section = &context->program->memory.sections.rw_data;
         u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
-        u64 alignment = descriptor_alignment(static_pointer->descriptor);
+        u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
 
         // TODO this should also be deduped
         Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
@@ -2537,8 +2537,9 @@ token_parse_syntax_definition(
 static bool
 token_match_struct_field(
   Execution_Context *context,
-  Descriptor *struct_descriptor,
-  Value_View view
+  Value_View view,
+  Slice *out_name,
+  const Descriptor **out_descriptor
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2547,9 +2548,12 @@ token_match_struct_field(
   Token_Match_Operator(define, ":");
 
   Value_View rest = value_view_rest(&view, peek_index);
-  const Descriptor *descriptor = token_match_type(context, rest);
-  if (!descriptor) return false;
-  descriptor_struct_add_field(struct_descriptor, descriptor, value_as_symbol(symbol)->name);
+  const Descriptor *field_descriptor = token_match_type(context, rest);
+  if (!field_descriptor) return false;
+
+  *out_name = value_as_symbol(symbol)->name;
+  *out_descriptor = field_descriptor;
+
   return true;
 }
 
@@ -2598,23 +2602,61 @@ token_process_c_struct_definition(
   }
 
   Value *result = allocator_allocate(context->allocator, Value);
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
 
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Struct,
-    .Struct = {
-      .memory_layout.items = dyn_array_make(Array_Memory_Layout_Item),
-    },
-  };
+  u64 struct_bit_size = 0;
+  u64 struct_bit_alignment = 0;
+  Array_Memory_Layout_Item fields = dyn_array_make(Array_Memory_Layout_Item);
 
   const Group *layout_group = value_as_group(layout_block);
   if (layout_group->children.length != 0) {
     Value_View_Split_Iterator it = { .view = layout_group->children };
     while (!it.done) {
       Value_View field_view = token_split_next(&it, &token_pattern_semicolon);
-      token_match_struct_field(context, descriptor, field_view);
+      if (!field_view.length) continue;
+      Slice field_name;
+      const Descriptor *field_descriptor;
+      if (!token_match_struct_field(context, field_view, &field_name, &field_descriptor)) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Parse,
+          .source_range = field_view.source_range,
+          .detailed_message = "Invalid field definition"
+        });
+        return 0;
+      }
+
+      u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
+      struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
+      u64 field_bit_offset = struct_bit_size;
+      struct_bit_size += descriptor_bit_size(field_descriptor);
+      struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
+
+      u64 field_byte_offset = (field_bit_offset + (CHAR_BIT - 1)) / CHAR_BIT;
+      if (field_byte_offset * CHAR_BIT != field_bit_offset) {
+        panic("TODO support non-byte aligned sizes");
+      }
+
+      dyn_array_push(fields, (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Base_Relative,
+        .name = field_name,
+        .descriptor = field_descriptor,
+        .Base_Relative.offset = field_byte_offset,
+      });
     }
   }
+
+  struct_bit_size = u64_align(struct_bit_size, struct_bit_alignment);
+
+  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
+  *descriptor = (Descriptor) {
+    .tag = Descriptor_Tag_Struct,
+    .Struct = {
+      .memory_layout = {
+        .bit_size = struct_bit_size,
+        .bit_alignment = struct_bit_alignment,
+        .items = fields,
+      }
+    },
+  };
 
   *result = type_value_for_descriptor(descriptor);
   return result;
@@ -4502,7 +4544,7 @@ mass_handle_paren_operator(
       Program *runtime_program = context->compilation->runtime_program;
       Section *section = &runtime_program->memory.sections.rw_data;
       u64 byte_size = descriptor_byte_size(descriptor);
-      u64 alignment = descriptor_alignment(descriptor);
+      u64 alignment = descriptor_byte_alignment(descriptor);
 
       Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
       Storage pointer_storage = data_label32(label_index, byte_size);
@@ -5770,7 +5812,7 @@ token_define_global_variable(
     } else {
       Section *section = &context->program->memory.sections.rw_data;
       u64 byte_size = descriptor_byte_size(value->descriptor);
-      u64 alignment = descriptor_alignment(value->descriptor);
+      u64 alignment = descriptor_byte_alignment(value->descriptor);
 
       // TODO this should also be deduped
       Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
