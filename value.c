@@ -1307,7 +1307,24 @@ value_global_c_string_from_slice_internal(
 #define value_global_c_string_from_slice(...)\
   value_global_c_string_from_slice_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-Descriptor *
+static inline Descriptor *
+descriptor_function(
+  const Allocator *allocator,
+  Slice name,
+  Function_Info info
+) {
+  Descriptor *result = allocator_allocate(allocator, Descriptor);
+  *result = (Descriptor) {
+    .tag = Descriptor_Tag_Function,
+    .name = name,
+    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_alignment = sizeof(void *) * CHAR_BIT,
+    .Function.info = info,
+  };
+  return result;
+}
+
+static inline Descriptor *
 descriptor_pointer_to(
   const Allocator *allocator,
   const Descriptor *descriptor

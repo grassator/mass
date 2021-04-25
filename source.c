@@ -2670,19 +2670,12 @@ token_process_function_literal(
 
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Function,
-    .name = name,
-    .bit_size = sizeof(void *) * CHAR_BIT,
-    .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function.info = {
-      .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-      .body = body,
-      .scope = function_scope,
-      .returns = 0,
-    },
-  };
+  Descriptor *descriptor = descriptor_function(context->allocator, name, (Function_Info) {
+    .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
+    .body = body,
+    .scope = function_scope,
+    .returns = 0,
+  });
 
   Value_View return_types_view = value_as_group(return_types)->children;
   if (return_types_view.length == 0) {
@@ -2786,18 +2779,14 @@ compile_time_eval(
   eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
   eval_context.scope = scope_make(context->allocator, context->scope);
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor){
-    .tag = Descriptor_Tag_Function,
-    .name = slice_literal("$compile_time_eval$"),
-    .bit_size = sizeof(void *) * CHAR_BIT,
-    .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function.info = {
-      .returns = {
-        .descriptor = &descriptor_void,
-      },
+
+  static Slice eval_name = slice_literal_fields("$compile_time_eval$");
+  Descriptor *descriptor = descriptor_function(context->allocator, eval_name, (Function_Info) {
+    .returns = {
+      .descriptor = &descriptor_void,
     },
-  };
+  });
+
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval"));
   Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
   Function_Builder eval_builder = {
@@ -6124,21 +6113,14 @@ scope_define_builtins(
   {\
     Memory_Layout_Item raw_arguments[] = {__VA_ARGS__};\
     u64 arg_length = countof(raw_arguments);\
-    Descriptor *descriptor = allocator_allocate(allocator, Descriptor);\
-    *descriptor = (Descriptor) {\
-      .tag = Descriptor_Tag_Function,\
-      .name = slice_literal(_NAME_),\
-      .bit_size = sizeof(void *) * CHAR_BIT,\
-      .bit_alignment = sizeof(void *) * CHAR_BIT,\
-      .Function.info = {\
-        .flags = Descriptor_Function_Flags_Compile_Time,\
-        .memory_layout.items = \
-          dyn_array_make(Array_Memory_Layout_Item, .allocator = allocator, .capacity = arg_length),\
-        .returns = {\
-          .descriptor = (_RETURN_DESCRIPTOR_),\
-        }\
-      },\
-    };\
+    Descriptor *descriptor = descriptor_function(allocator,  slice_literal(_NAME_), (Function_Info) {\
+      .flags = Descriptor_Function_Flags_Compile_Time,\
+      .memory_layout.items = \
+        dyn_array_make(Array_Memory_Layout_Item, .allocator = allocator, .capacity = arg_length),\
+      .returns = {\
+        .descriptor = (_RETURN_DESCRIPTOR_),\
+      }\
+    });\
     for (u64 i = 0; i < arg_length; ++i) {\
       raw_arguments[i].Absolute.storage = function_argument_storage_for_index(\
         allocator, &descriptor->Function.info, raw_arguments[i].descriptor, i, Function_Argument_Mode_Call\
