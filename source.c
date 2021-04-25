@@ -4688,6 +4688,7 @@ mass_handle_dot_operator(
 ) {
   Value *lhs = token_parse_single(context, value_view_get(args_view, 0));
   Value *rhs = value_view_get(args_view, 1);
+  MASS_ON_ERROR(*context->result) return 0;
 
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
