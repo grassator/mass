@@ -34,7 +34,7 @@
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_##_pointer)
 
-#define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, ...)\
+#define MASS_DEFINE_STRUCT_DESCRIPTOR(_NAME_, _BIT_SIZE_, ...)\
   dyn_array_struct(Memory_Layout_Item) descriptor_##_NAME_##_fields = {\
     .length = countof((const Memory_Layout_Item[]){__VA_ARGS__}),\
     .items = {__VA_ARGS__},\
@@ -43,7 +43,10 @@
     .tag = Descriptor_Tag_Struct,\
     .name = slice_literal_fields(#_NAME_),\
     .Struct = {\
-      .memory_layout.items = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
+      .memory_layout = {\
+        .bit_size = (_BIT_SIZE_),\
+        .items = {(Dyn_Array_Internal *)&descriptor_##_NAME_##_fields},\
+      }\
     },\
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
@@ -71,7 +74,7 @@
   MASS_DEFINE_TYPE_VALUE(_NAME_);
 
 #define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
-  MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * 8)
+  MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT)
 
 #define MASS_ENUMERATE_INTEGER_TYPES\
   MASS_PROCESS_BUILT_IN_TYPE(s8, 8)\

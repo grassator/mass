@@ -267,7 +267,7 @@ print_mass_struct(
   Struct *struct_
 ) {
   char *lowercase_name = strtolower(name);
-  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
+  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, (sizeof(%s) * CHAR_BIT),\n", lowercase_name, name);
   for (uint64_t i = 0; i < struct_->item_count; ++i) {
     Struct_Item *item = &struct_->items[i];
     fprintf(file, "  {\n");
@@ -360,7 +360,7 @@ print_mass_descriptor_and_type(
 
       // Write out the tagged union struct
       {
-        fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s,\n", lowercase_name);
+        fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, (sizeof(%s) * CHAR_BIT),\n", lowercase_name, type->union_.name);
 
         fprintf(file, "  {\n");
         fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
@@ -862,6 +862,7 @@ main(void) {
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){
+    { "u64", "bit_size" },
     { "Storage", "base" },
     { "Array_Memory_Layout_Item", "items" },
   }));
