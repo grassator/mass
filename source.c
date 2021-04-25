@@ -1184,11 +1184,8 @@ tokenize(
           char *bytes = allocator_allocate_bytes(allocator, length, 1);
           memcpy(bytes, string_buffer->memory, length);
           {
-            Descriptor *bytes_descriptor = allocator_allocate(allocator, Descriptor);
-            *bytes_descriptor = (Descriptor) {
-              .tag = Descriptor_Tag_Fixed_Size_Array,
-              .Fixed_Size_Array = { .item = &descriptor_u8, .length = length },
-            };
+            Descriptor *bytes_descriptor =
+              descriptor_array_of(allocator, &descriptor_u8, u64_to_u32(length));
             value_init(
               hash_map_set(compilation->static_pointer_map, bytes, (Value){0}),
               VALUE_STATIC_EPOCH,
@@ -1452,12 +1449,7 @@ token_parse_single(
       }
       case Group_Tag_Square: {
         const Descriptor *pointee = token_match_type(context, group->children);
-        Descriptor *temp = allocator_allocate(context->allocator, Descriptor);
-        *temp = (Descriptor) {
-          .tag = Descriptor_Tag_Pointer_To,
-          .name = source_from_source_range(source_range),
-          .Pointer_To.descriptor = pointee,
-        };
+        Descriptor *temp = descriptor_pointer_to(context->allocator, pointee);
         return value_make(context, &descriptor_type, storage_static(temp), *source_range);
       }
     }
@@ -2563,7 +2555,8 @@ mass_bit_type(
 ) {
   return (Descriptor) {
     .tag = Descriptor_Tag_Opaque,
-    .Opaque = { .bit_size = bit_size },
+    .bit_size = bit_size,
+    .bit_alignment = bit_size, // TODO allow to set a different alignment
   };
 }
 
@@ -2649,10 +2642,10 @@ token_process_c_struct_definition(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
+    .bit_size = struct_bit_size,
+    .bit_alignment = struct_bit_alignment,
     .Struct = {
       .memory_layout = {
-        .bit_size = struct_bit_size,
-        .bit_alignment = struct_bit_alignment,
         .items = fields,
       }
     },
@@ -2681,6 +2674,8 @@ token_process_function_literal(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .name = name,
+    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function.info = {
       .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
       .body = body,
@@ -2795,6 +2790,8 @@ compile_time_eval(
   *descriptor = (Descriptor){
     .tag = Descriptor_Tag_Function,
     .name = slice_literal("$compile_time_eval$"),
+    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function.info = {
       .returns = {
         .descriptor = &descriptor_void,
@@ -3021,7 +3018,7 @@ mass_compiler_external(
   };
 }
 
-#define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+#define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
   _TYPE_ mass_##_TYPE_##_logical_shift_left(\
     _TYPE_ input,\
     u64 shift\
@@ -5627,15 +5624,7 @@ token_match_fixed_array_type(
   MASS_ON_ERROR(*context->result) return 0;
   u32 length = u64_to_u32(storage_static_value_up_to_u64(&size_value->storage));
 
-  Descriptor *array_descriptor = allocator_allocate(context->allocator, Descriptor);
-  *array_descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Fixed_Size_Array,
-    .name = source_from_source_range(&view.source_range),
-    .Fixed_Size_Array = {
-      .item = descriptor,
-      .length = length,
-    },
-  };
+  Descriptor *array_descriptor = descriptor_array_of(context->allocator, descriptor, length);
   return array_descriptor;
 }
 
@@ -6119,7 +6108,7 @@ scope_define_builtins(
   scope_define_value(scope, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, range, slice_literal("Scope"), type_scope_value);
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
+  #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, ...)\
     scope_define_value(scope, range, slice_literal(#_NAME_), type_##_NAME_##_value);
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
@@ -6139,6 +6128,8 @@ scope_define_builtins(
     *descriptor = (Descriptor) {\
       .tag = Descriptor_Tag_Function,\
       .name = slice_literal(_NAME_),\
+      .bit_size = sizeof(void *) * CHAR_BIT,\
+      .bit_alignment = sizeof(void *) * CHAR_BIT,\
       .Function.info = {\
         .flags = Descriptor_Function_Flags_Compile_Time,\
         .memory_layout.items = \
@@ -6161,7 +6152,7 @@ scope_define_builtins(
     scope_define_value(scope, range, slice_literal(_NAME_), value);\
   }
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
     MASS_DEFINE_COMPILE_TIME_FUNCTION(\
       mass_##_TYPE_##_logical_shift_left, "logical_shift_left", &descriptor_##_TYPE_,\
       MASS_FN_ARG_ANY_OF_TYPE("number", &descriptor_##_TYPE_),\
@@ -6170,7 +6161,7 @@ scope_define_builtins(
   MASS_ENUMERATE_INTEGER_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
     MASS_DEFINE_COMPILE_TIME_FUNCTION(\
       mass_##_TYPE_##_bitwise_and, "bitwise_and", &descriptor_##_TYPE_,\
       MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\
@@ -6179,7 +6170,7 @@ scope_define_builtins(
   MASS_ENUMERATE_INTEGER_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, _BIT_SIZE)\
+  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
     MASS_DEFINE_COMPILE_TIME_FUNCTION(\
       mass_##_TYPE_##_bitwise_or, "bitwise_or", &descriptor_##_TYPE_,\
       MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\

@@ -862,8 +862,6 @@ main(void) {
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){
-    { "u64", "bit_size" },
-    { "u64", "bit_alignment" },
     { "Storage", "base" },
     { "Array_Memory_Layout_Item", "items" },
   }));
@@ -884,9 +882,7 @@ main(void) {
 
   push_type(add_common_fields(type_union("Descriptor", (Struct[]){
     struct_empty("Void"),
-    struct_fields("Opaque", (Struct_Item[]){
-      { "u64", "bit_size" },
-    }),
+    struct_empty("Opaque"),
     struct_fields("Function", (Struct_Item[]){
       { "Function_Info", "info" },
     }),
@@ -902,6 +898,8 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Slice", "name" },
+    { "u64", "bit_size" },
+    { "u64", "bit_alignment" },
   }));
 
   push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
@@ -1019,8 +1017,8 @@ main(void) {
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
     fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
-    fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\\\n");
-    fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)\n");
+    fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(...)\\\n");
+    fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)\n");
     fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");
     fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
 

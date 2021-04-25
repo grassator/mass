@@ -822,8 +822,6 @@ typedef struct Memory_Layout_Item {
 } Memory_Layout_Item;
 typedef dyn_array_type(Memory_Layout_Item) Array_Memory_Layout_Item;
 typedef struct Memory_Layout {
-  u64 bit_size;
-  u64 bit_alignment;
   Storage base;
   Array_Memory_Layout_Item items;
 } Memory_Layout;
@@ -855,9 +853,6 @@ typedef enum {
 } Descriptor_Tag;
 
 typedef struct {
-  u64 bit_size;
-} Descriptor_Opaque;
-typedef struct {
   Function_Info info;
 } Descriptor_Function;
 typedef struct {
@@ -874,8 +869,9 @@ typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
   Slice name;
+  u64 bit_size;
+  u64 bit_alignment;
   union {
-    Descriptor_Opaque Opaque;
     Descriptor_Function Function;
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
     Descriptor_Struct Struct;
@@ -1004,8 +1000,8 @@ MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
-#define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, _BIT_SIZE_)\
-  MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_)
+#define MASS_PROCESS_BUILT_IN_TYPE(...)\
+  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)
 MASS_ENUMERATE_BUILT_IN_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
@@ -2433,18 +2429,6 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)
 MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout, Memory_Layout,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("bit_size"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Memory_Layout, bit_size),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("bit_alignment"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Memory_Layout, bit_alignment),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("base"),
     .descriptor = &descriptor_storage,
     .Base_Relative.offset = offsetof(Memory_Layout, base),
@@ -2525,15 +2509,6 @@ static C_Enum_Item descriptor_items[] = {
 { .name = slice_literal_fields("Struct"), .value = 4 },
 { .name = slice_literal_fields("Pointer_To"), .value = 5 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_opaque, Descriptor_Opaque,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("bit_size"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Descriptor_Opaque, bit_size),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(descriptor_opaque);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function, Descriptor_Function,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2582,12 +2557,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
     .name = slice_literal_fields("Descriptor_Tag"),
     .descriptor = &descriptor_descriptor_tag,
     .Base_Relative.offset = offsetof(Descriptor, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Opaque"),
-    .descriptor = &descriptor_descriptor_opaque,
-    .Base_Relative.offset = offsetof(Descriptor, Opaque),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

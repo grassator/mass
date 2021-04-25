@@ -291,59 +291,14 @@ static u64
 descriptor_bit_size(
   const Descriptor *descriptor
 ) {
-  switch(descriptor->tag) {
-    case Descriptor_Tag_Void: {
-      return 0;
-    }
-    case Descriptor_Tag_Struct: {
-      return descriptor->Struct.memory_layout.bit_size;
-    }
-    case Descriptor_Tag_Opaque: {
-      return descriptor->Opaque.bit_size;
-    }
-    case Descriptor_Tag_Fixed_Size_Array: {
-      // FIXME :ArrayBitAlignment should this align at least to bytes?
-      return descriptor_bit_size(descriptor->Fixed_Size_Array.item) *
-        descriptor->Fixed_Size_Array.length;
-    }
-    case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Function: {
-      return sizeof(void *) * CHAR_BIT;
-    }
-    default: {
-      assert(!"Unknown Descriptor Type");
-    }
-  }
-  return 0;
+  return descriptor->bit_size;
 }
 
 static u64
 descriptor_bit_alignment(
   const Descriptor *descriptor
 ) {
-  switch(descriptor->tag) {
-    case Descriptor_Tag_Void: {
-      return 0;
-    }
-    case Descriptor_Tag_Struct: {
-      return descriptor->Struct.memory_layout.bit_alignment;
-    }
-    case Descriptor_Tag_Opaque: {
-      return descriptor->Opaque.bit_size;
-    }
-    case Descriptor_Tag_Fixed_Size_Array: {
-      // FIXME :ArrayBitAlignment
-      return descriptor_bit_alignment(descriptor->Fixed_Size_Array.item);
-    }
-    case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Function: {
-      return sizeof(void *) * CHAR_BIT;
-    }
-    default: {
-      assert(!"Unknown Descriptor Type");
-    }
-  }
-  return 0;
+  return descriptor->bit_alignment;
 }
 
 static inline u64
@@ -1311,6 +1266,27 @@ rip_value_pointer(
   );
 }
 
+static inline Descriptor *
+descriptor_array_of(
+  const Allocator *allocator,
+  const Descriptor *item_descriptor,
+  u32 length
+) {
+  Descriptor *result = allocator_allocate(allocator, Descriptor);
+  u64 item_bit_alignment = descriptor_bit_alignment(item_descriptor);
+  u64 aligned_item_size = u64_align(descriptor_bit_size(item_descriptor), item_bit_alignment);
+  *result = (Descriptor) {
+    .tag = Descriptor_Tag_Fixed_Size_Array,
+    .bit_size = aligned_item_size * length,
+    .bit_alignment = item_bit_alignment,
+    .Fixed_Size_Array = {
+      .item = item_descriptor,
+      .length = length,
+    },
+  };
+  return result;
+}
+
 static inline Value *
 value_global_c_string_from_slice_internal(
   Compiler_Source_Location compiler_source_location,
@@ -1318,15 +1294,8 @@ value_global_c_string_from_slice_internal(
   Slice slice,
   Source_Range source_range
 ) {
-  s32 length = (s32)slice.length + 1;
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Fixed_Size_Array,
-    .Fixed_Size_Array = {
-      .item = &descriptor_u8,
-      .length = length,
-    },
-  };
+  u32 length = u64_to_u32(slice.length + 1);
+  Descriptor *descriptor = descriptor_array_of(context->allocator, &descriptor_u8, length);
 
   Value *string_value =
     value_global_internal(compiler_source_location, context, descriptor, source_range);
@@ -1346,24 +1315,9 @@ descriptor_pointer_to(
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
     .tag = Descriptor_Tag_Pointer_To,
+    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Pointer_To.descriptor = descriptor,
-  };
-  return result;
-}
-
-Descriptor *
-descriptor_array_of(
-  Allocator *allocator,
-  Descriptor *descriptor,
-  u32 length
-) {
-  Descriptor *result = allocator_allocate(allocator, Descriptor);
-  *result = (Descriptor) {
-    .tag = Descriptor_Tag_Fixed_Size_Array,
-    .Fixed_Size_Array = {
-      .item = descriptor,
-      .length = length,
-    },
   };
   return result;
 }
@@ -1754,7 +1708,7 @@ value_number_literal_cast_to(
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
-  u64 bit_size = target_descriptor->Opaque.bit_size;
+  u64 bit_size = target_descriptor->bit_size;
   if (bit_size > 64) {
     return Literal_Cast_Result_Target_Too_Big;
   }

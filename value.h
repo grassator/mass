@@ -66,12 +66,12 @@ type_value_for_descriptor(
 }
 
 // TODO Shrink to 4 bits when supported
-MASS_DEFINE_OPAQUE_TYPE(register_8, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_16, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_32, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_64, 8);
-MASS_DEFINE_OPAQUE_TYPE(immediate, sizeof(Slice));
-MASS_DEFINE_OPAQUE_TYPE(eflags, sizeof(Storage_Eflags));
+MASS_DEFINE_OPAQUE_TYPE(register_8, 8, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_16, 8, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_32, 8, 8);
+MASS_DEFINE_OPAQUE_TYPE(register_64, 8, 8);
+MASS_DEFINE_OPAQUE_C_TYPE(immediate, Slice);
+MASS_DEFINE_OPAQUE_C_TYPE(eflags, Storage_Eflags);
 
 Value void_value = {
   .descriptor = &descriptor_void,
@@ -135,6 +135,13 @@ descriptor_bit_size(
 static inline u64
 descriptor_byte_size(
   const Descriptor *descriptor
+);
+
+static inline Descriptor *
+descriptor_array_of(
+  const Allocator *allocator,
+  const Descriptor *item_descriptor,
+  u32 length
 );
 
 bool
