@@ -3403,7 +3403,11 @@ call_function_overload(
     }
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
-      result_value = reserve_stack(context, descriptor->returns.descriptor, *source_range);
+      if (descriptor->returns.descriptor->tag == Descriptor_Tag_Void) {
+        result_value = value_make(context, &descriptor_void, (Storage){0}, *source_range);
+      } else {
+        result_value = reserve_stack(context, descriptor->returns.descriptor, *source_range);
+      }
       break;
     }
   }
