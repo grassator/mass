@@ -4643,7 +4643,10 @@ mass_handle_field_access_lazy_proc(
 ) {
   Mass_Field_Access_Lazy_Payload *payload = raw_payload;
   Memory_Layout_Item *field = payload->field;
-  Value *struct_ = payload->struct_;
+
+  Expected_Result expected_struct =
+    expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
+  Value *struct_ = value_force(context, &expected_struct, payload->struct_);
 
   // Auto dereference pointers to structs
   if (struct_->descriptor->tag == Descriptor_Tag_Pointer_To) {
