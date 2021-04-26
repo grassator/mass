@@ -261,38 +261,47 @@ print_mass_descriptor_and_type_forward_declaration(
 }
 
 static void
+print_mass_struct_item(
+  FILE *file,
+  const char *struct_name,
+  Struct_Item *item
+) {
+  fprintf(file, "  {\n");
+  fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
+  fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
+  Slice lowercase_type = slice_from_c_string(strtolower(item->type));
+  // TODO support const
+  Slice const_prefix = slice_literal("const ");
+  if (slice_starts_with(lowercase_type, const_prefix)) {
+    lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
+  }
+  Slice original_lowercase_type = lowercase_type;
+  Slice pointer_suffix = slice_literal(" *");
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+  fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+  lowercase_type = original_lowercase_type;
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    fprintf(file, "_pointer");
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+  fprintf(file, ",\n");
+  fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", struct_name, item->name);
+  fprintf(file, "  },\n");
+}
+
+static void
 print_mass_struct(
   FILE *file,
-  const char *name,
+  const char *struct_name,
   Struct *struct_
 ) {
-  char *lowercase_name = strtolower(name);
-  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, name);
+  char *lowercase_name = strtolower(struct_name);
+  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, struct_name);
   for (uint64_t i = 0; i < struct_->item_count; ++i) {
     Struct_Item *item = &struct_->items[i];
-    fprintf(file, "  {\n");
-    fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
-    fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
-    Slice lowercase_type = slice_from_c_string(strtolower(item->type));
-    // TODO support const
-    Slice const_prefix = slice_literal("const ");
-    if (slice_starts_with(lowercase_type, const_prefix)) {
-      lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
-    }
-    Slice original_lowercase_type = lowercase_type;
-    Slice pointer_suffix = slice_literal(" *");
-    while (slice_ends_with(lowercase_type, pointer_suffix)) {
-      lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-    }
-    fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
-    lowercase_type = original_lowercase_type;
-    while (slice_ends_with(lowercase_type, pointer_suffix)) {
-      fprintf(file, "_pointer");
-      lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-    }
-    fprintf(file, ",\n");
-    fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", name, item->name);
-    fprintf(file, "  },\n");
+    print_mass_struct_item(file, struct_name, item);
   }
   fprintf(file, ");\n");
   fprintf(file, "MASS_DEFINE_TYPE_VALUE(%s);\n", lowercase_name);
@@ -368,6 +377,11 @@ print_mass_descriptor_and_type(
         fprintf(file, "    .descriptor = &descriptor_%s_tag,\n", lowercase_name);
         fprintf(file, "    .Base_Relative.offset = offsetof(%s, tag),\n", type->union_.name);
         fprintf(file, "  },\n");
+
+        for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
+          Struct_Item *item = &type->union_.common.items[i];
+          print_mass_struct_item(file, type->union_.name, item);
+        }
 
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct *struct_ = &type->union_.items[i];
