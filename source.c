@@ -4722,7 +4722,10 @@ mass_handle_field_access_lazy_proc(
   Storage field_storage = storage_field_access(&struct_->storage, field);
   Value *field_value =
     value_make(context, field->descriptor, field_storage, struct_->source_range);
-  value_release_if_temporary(context->builder, struct_);
+  // Since storage_field_access reuses indirect memory storage of the struct
+  // the release of memory will be based on the field value release and we need
+  // to propagate the temporary flag correctly
+  field_value->is_temporary = struct_->is_temporary;
 
   return expected_result_ensure_value_or_temp(context, expected_result, field_value);
 }
