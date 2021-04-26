@@ -4693,7 +4693,7 @@ mass_handle_field_access_lazy_proc(
       is_temporary = false;
     } else {
       base_storage = storage_register_for_descriptor(
-        register_acquire_temp(context->builder), pointee_descriptor
+        register_acquire_temp(context->builder), struct_->descriptor
       );
       move_value(
         context->allocator,
