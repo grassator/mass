@@ -334,7 +334,7 @@ print_mass_descriptor_and_type(
       {
         fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s_tag, %s_Tag)\n", lowercase_name, type->union_.name);
 
-        fprintf(file, "static C_Enum_Item %s_items[] = {\n", lowercase_name);
+        fprintf(file, "static C_Enum_Item %s_tag_items[] = {\n", lowercase_name);
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct *item = &type->union_.items[i];
           fprintf(
@@ -364,7 +364,7 @@ print_mass_descriptor_and_type(
 
         fprintf(file, "  {\n");
         fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
-        fprintf(file, "    .name = slice_literal_fields(\"%s_Tag\"),\n", type->union_.name);
+        fprintf(file, "    .name = slice_literal_fields(\"tag\"),\n");
         fprintf(file, "    .descriptor = &descriptor_%s_tag,\n", lowercase_name);
         fprintf(file, "    .Base_Relative.offset = offsetof(%s, tag),\n", type->union_.name);
         fprintf(file, "  },\n");
