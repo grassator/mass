@@ -1,6 +1,7 @@
 #ifndef C_MACRO_H
 #define C_MACRO_H
 #include <stddef.h>
+#include <limits.h>
 
 #define COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS\
   {\
