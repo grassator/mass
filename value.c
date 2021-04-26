@@ -93,7 +93,7 @@ mass_error_to_string(
     case Mass_Error_Tag_Unknown_Field: {
       APPEND_LITERAL("Field ");
       APPEND_SLICE(error->Unknown_Field.name);
-      APPEND_LITERAL("does not exist on type ");
+      APPEND_LITERAL(" does not exist on type ");
       APPEND_SLICE(error->Unknown_Field.type->name);
     } break;
     case Mass_Error_Tag_Invalid_Identifier: {
