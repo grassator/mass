@@ -3449,17 +3449,45 @@ call_function_overload(
     register_bitset_set(&saved_registers_bit_set, reg_index);
   }
 
+  // :ArgumentRegisterAcqure
+  u64 argument_register_bit_set = 0;
+
   Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
   for (u64 i = 0; i < dyn_array_length(descriptor->memory_layout.items); ++i) {
     Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->memory_layout.items, i);
-    //Value *target_arg = function_argument_value_at_index(
-      //context, descriptor, i, Function_Argument_Mode_Call
-    //);
     assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
+
+    // :ArgumentRegisterAcqure Once the argument is loaded into the register, that register
+    // must not be used as a temporary for any other argument loading. So we acquire them
+    // here and release after the function call
+    Storage target_storage = target_arg_definition->Absolute.storage;
+    switch(target_storage.tag) {
+      default:
+      case Storage_Tag_Any:
+      case Storage_Tag_Eflags:
+      case Storage_Tag_None:
+      case Storage_Tag_Static: {
+        panic("Internal Error: Unexpected storage type for a function argument");
+        break;
+      }
+      case Storage_Tag_Register:
+      case Storage_Tag_Xmm: {
+        Register reg_index = target_storage.Register.index;
+        register_acquire(context->builder, reg_index);
+        register_bitset_set(&argument_register_bit_set, reg_index);
+      } break;
+      case Storage_Tag_Memory: {
+        if (target_storage.Memory.location.tag == Memory_Location_Tag_Indirect) {
+          Register reg_index = target_storage.Memory.location.Indirect.base_register;
+          register_acquire(context->builder, reg_index);
+          register_bitset_set(&argument_register_bit_set, reg_index);
+        }
+      } break;
+    }
     Value *target_arg = value_make(
       context,
       target_arg_definition->descriptor,
-      target_arg_definition->Absolute.storage,
+      target_storage,
       target_arg_definition->source_range
     );
     Value *source_arg;
@@ -3530,6 +3558,12 @@ call_function_overload(
   }
 
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
+
+  // :ArgumentRegisterAcqure
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    if (!register_bitset_get(argument_register_bit_set, reg_index)) continue;
+    register_release(context->builder, reg_index);
+  }
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
