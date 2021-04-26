@@ -2849,11 +2849,12 @@ fixed_buffer_allocator_reallocate(
   u64 alignment
 ) {
   Fixed_Buffer *buffer = (Fixed_Buffer *)handle.raw;
-    if (address == buffer->last_allocation) {
+  if (address == buffer->last_allocation) {
     buffer->occupied = (s8 *)address - buffer->memory;
     return fixed_buffer_allocate_bytes(buffer, new_size_in_bytes, alignment);
   }
 
+  if (new_size_in_bytes <= old_size_in_bytes) return address;
   void *result = fixed_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
   fixed_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
@@ -3251,6 +3252,7 @@ bucket_buffer_allocator_reallocate(
   u64 new_size_in_bytes,
   u64 alignment
 ) {
+  if (new_size_in_bytes <= old_size_in_bytes) return address;
   void *result = bucket_buffer_allocator_allocate(handle, new_size_in_bytes, alignment);
   memcpy(result, address, old_size_in_bytes);
   bucket_buffer_allocator_deallocate(handle, address, old_size_in_bytes);
@@ -3453,8 +3455,12 @@ struct Hash_Map_Make_Options {
     struct Hash_Map_Make_Options *options\
   ) {\
     _hash_map_type_ *map = allocator_allocate(options->allocator, _hash_map_type_);\
-    u32 capacity_power_of_2 = (u32)(ceil(log2((f64)options->initial_capacity)));\
-    u64 capacity = 1llu << capacity_power_of_2;\
+    u32 capacity_power_of_2 = 1;\
+    u64 capacity = 2;\
+    while(capacity < options->initial_capacity) {\
+      capacity_power_of_2 += 1;\
+      capacity = capacity << 1;\
+    }\
     u64 entry_byte_size = sizeof(map->entries[0]);\
     u64 entry_array_byte_size = entry_byte_size * capacity;\
     *map = (_hash_map_type_) {\
