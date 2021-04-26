@@ -3417,6 +3417,10 @@ call_function_overload(
     // FIXME this should use *target* volatile registers *NOT* the current builder
     if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) continue;
+
+    register_bitset_set(&saved_registers_bit_set, reg_index);
+
+    // :NoSaveResult
     // We must not save the register that we will overwrite with the result
     // otherwise we will overwrite it with the restored value
     if (storage_is_register_index(&result_value->storage, reg_index)) continue;
@@ -3442,14 +3446,20 @@ call_function_overload(
         instructions, *source_range,
         (Instruction) {.assembly = {mov, {temp_reg_storage, original_reg_storage}}}
       );
-      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;
+      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;;
     } else {
       panic("Unexpected storage tag for an argument");
     }
-    register_bitset_set(&saved_registers_bit_set, reg_index);
   }
 
-  // :ArgumentRegisterAcqure
+  // The "release" of registers has to happen as a separate loop to make sure
+  // we do not use any of them for the temporaries
+  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+    if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
+    register_bitset_unset(&context->builder->code_block.register_occupied_bitset, reg_index);
+  }
+
+  // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
 
   Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
@@ -3457,7 +3467,7 @@ call_function_overload(
     Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->memory_layout.items, i);
     assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
 
-    // :ArgumentRegisterAcqure Once the argument is loaded into the register, that register
+    // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
     // must not be used as a temporary for any other argument loading. So we acquire them
     // here and release after the function call
     Storage target_storage = target_arg_definition->Absolute.storage;
@@ -3559,14 +3569,18 @@ call_function_overload(
 
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
 
-  // :ArgumentRegisterAcqure
+  // :ArgumentRegisterAcquire
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(argument_register_bit_set, reg_index)) continue;
-    register_release(context->builder, reg_index);
+    register_bitset_unset(&context->builder->code_block.register_occupied_bitset, reg_index);
   }
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
+    register_acquire(context->builder, reg_index);
+
+    // :NoSaveResult
+    if (storage_is_register_index(&result_value->storage, reg_index)) continue;
 
     Value *occupied_value = builder->code_block.register_occupied_values[reg_index];
     assert(occupied_value->storage.tag == Storage_Tag_Memory);
