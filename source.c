@@ -4598,13 +4598,20 @@ mass_handle_at_operator(
   void *unused_payload
 ) {
   Value *body = value_view_get(args_view, 0);
+  assert(args_view.length == 1);
   Source_Range body_range = body->source_range;
   if (value_match_symbol(body, slice_literal("scope"))) {
     return value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
   } else if (value_match_symbol(body, slice_literal("context"))) {
-    return value_make(context, &descriptor_execution_context, storage_static(context), body_range);
-  } else if (value_match_group(body, Group_Tag_Paren) || value_match_group(body, Group_Tag_Curly)) {
+    // TODO context is transient, which, combined with lazy evaluation means that
+    //      we must copy it here. The whole setup is a bit shaky and needs to be re-thought.
+    Execution_Context *copy = allocator_allocate(context->allocator, Execution_Context);
+    *copy = *context;
+    return value_make(context, &descriptor_execution_context, storage_static(copy), body_range);
+  } else if (value_match_group(body, Group_Tag_Paren)) {
     return compile_time_eval(context, value_as_group(body)->children);
+  } else if (value_match_group(body, Group_Tag_Curly)) {
+    return compile_time_eval(context, args_view);
   } else {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
