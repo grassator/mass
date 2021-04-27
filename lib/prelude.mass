@@ -1,11 +1,11 @@
 // TODO ..@condition should be parsed as an expression instead of a wildcard
 syntax statement("if" ..@condition {}@then_branch) {
-  () = if condition() then { then_branch(); () } else {}
+  () = if condition() then { then_branch() } else {}
 }
 
 // TODO ..@condition should be parsed as an expression instead of a wildcard
 syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
-  () = if condition() then { then_branch(); () } else { else_branch(); () }
+  () = if condition() then { then_branch() } else { else_branch() }
 }
 
 // TODO think of a better solution
