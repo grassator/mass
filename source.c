@@ -1008,31 +1008,34 @@ tokenize(
     };\
     goto err;\
   } while (0)
-#define push_line()\
-  do {\
-    current_line.to = i + 1;\
-    dyn_array_push(file->line_ranges, current_line);\
-    current_line.from = current_line.to;\
-    current_token_range.offsets = (Range_u64){i + 1, i + 1};\
-    tokenizer_maybe_push_fake_semicolon(\
-      allocator, &stack, &parent_stack, current_token_range\
-    );\
-  } while(0)
 
   u64 i = 0;
   for (; i < file->text.length; ++i) {
     u8 ch = file->text.bytes[i];
     u8 peek = i + 1 < file->text.length ? file->text.bytes[i + 1] : 0;
 
+    // Normalize line endings
+    if (ch == '\r') {
+      if (peek == '\n') continue;
+      ch = '\n';
+    }
+
+    if (ch == '\n') {
+      current_line.to = i + 1;
+      dyn_array_push(file->line_ranges, current_line);
+      current_line.from = current_line.to;
+    }
+
     retry: switch(state) {
       case Tokenizer_State_Default: {
         current_token_range.offsets = (Range_u64){.from = i, .to = i};
-        if (ch == '\n') {
-          push_line();
-        } else if (ch == '\r') {
-          if (peek == '\n') i++;
-          push_line();
-        } else if (isspace(ch)) {
+        if (isspace(ch)) {
+          if (ch == '\n') {
+            current_token_range.offsets = (Range_u64){i + 1, i + 1};
+            tokenizer_maybe_push_fake_semicolon(
+              allocator, &stack, &parent_stack, current_token_range
+            );
+          }
           continue;
         } else if (ch == '0' && peek == 'x') {
           i++;
