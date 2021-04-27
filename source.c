@@ -1831,6 +1831,7 @@ token_match_argument(
   Value_View default_expression;
   Value_View definition;
   Value *equals;
+  bool is_inferred_type = false;
 
   if (token_maybe_split_on_operator(
     view, slice_literal("="), &definition, &default_expression, &equals
@@ -1843,42 +1844,72 @@ token_match_argument(
       });
       goto err;
     }
+  } else if (token_maybe_split_on_operator(
+    view, slice_literal(":="), &definition, &default_expression, &equals
+  )) {
+    is_inferred_type = true;
+    if (default_expression.length == 0) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = equals->source_range,
+        .detailed_message = "Expected an expression after `:=`"
+      });
+      goto err;
+    }
   } else {
     definition = view;
     default_expression = (Value_View){0};
   }
 
-  Value_View type_expression;
-  Value_View name_tokens;
-  Value *operator;
-  if (!token_maybe_split_on_operator(
-    definition, slice_literal(":"), &name_tokens, &type_expression, &operator
-  )) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = definition.source_range,
-      .detailed_message = "Expected an expression after `:`"
-    });
-    goto err;
-  }
-  if (name_tokens.length == 0) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = definition.source_range,
-      .detailed_message = "':' operator expects an identifier on the left hand side"
-    });
-    goto err;
-  }
-  Value *name_token = value_view_get(name_tokens, 0);
-  if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Invalid_Identifier,
-      .source_range = name_tokens.source_range,
-    });
-    goto err;
+  const Descriptor *descriptor;
+  Value *name_token;
+  if (is_inferred_type) {
+    if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = definition.source_range,
+        .detailed_message = "Expected an argument name",
+      });
+      goto err;
+    }
+    name_token = value_view_get(definition, 0);
+    Value *parsed_default_expression =
+      token_parse_expression(context, default_expression, &(u64){0}, 0);
+    descriptor = value_or_lazy_value_descriptor(parsed_default_expression);
+    if (descriptor == &descriptor_number_literal) descriptor = &descriptor_s64;
+  } else {
+    Value_View type_expression;
+    Value_View name_tokens;
+    Value *operator;
+    if (!token_maybe_split_on_operator(
+      definition, slice_literal(":"), &name_tokens, &type_expression, &operator
+    )) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = definition.source_range,
+        .detailed_message = "Expected an expression after `:`",
+      });
+      goto err;
+    }
+    if (name_tokens.length == 0) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = definition.source_range,
+        .detailed_message = "':' operator expects an identifier on the left hand side",
+      });
+      goto err;
+    }
+    name_token = value_view_get(name_tokens, 0);
+    if (name_tokens.length > 1 || !value_is_symbol(name_token)) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Invalid_Identifier,
+        .source_range = name_tokens.source_range,
+      });
+      goto err;
+    }
+    descriptor = token_match_type(context, type_expression);
   }
 
-  const Descriptor *descriptor = token_match_type(context, type_expression);
   if (descriptor && descriptor->tag == Descriptor_Tag_Function) {
     descriptor = descriptor_pointer_to(context->allocator, descriptor);
   }

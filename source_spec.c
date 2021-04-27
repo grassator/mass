@@ -813,6 +813,17 @@ spec("source") {
       check(actual == 42);
     }
 
+    it("should support default arguments with inference") {
+      fn_type_void_to_s64 checker = (fn_type_void_to_s64)test_program_inline_source_function(
+        "test", &test_context,
+        "fn test_default(x : s64, y := 20) -> (s64) { x + y }\n"
+        "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+      );
+      check(checker);
+      s64 actual = checker();
+      check(actual == 42);
+    }
+
     it("should disallow default arguments coming after non-default ones") {
       test_program_inline_source_function(
         "test", &test_context,
