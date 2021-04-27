@@ -70,14 +70,18 @@ syntax statement rewrite("mut" ..@binding "=" ..@expression) binding := expressi
 syntax statement rewrite("stack" .@name ..@type) name : type
 syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expression
 
-fn fail(context : Execution_Context, message : String) {
+fn fail(context : Execution_Context, name : String, message : String) {
   mass :: import("mass")
   result := context.result
   result.tag = mass.Mass_Result_Tag.Error
   result.Error.error.tag = mass.Mass_Error_Tag.User_Defined
-  result.Error.error.User_Defined.name = "fail()"
+  result.Error.error.User_Defined.name = name
   result.Error.error.detailed_message = message
   result.Error.error.source_range = @source_range
+}
+
+macro static_assert(condition : bool, message : String) {
+  @{if condition == false { fail(@context, "Static Assert Failed", message) }}
 }
 
 
