@@ -29,9 +29,7 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end;
 }
 
-import :: macro (file_path : String) -> (Scope) {
-  mass_import(@context, file_path)
-}
+syntax("import" .@file_path) (mass_import(@context, file_path()))
 
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre();
@@ -71,7 +69,7 @@ syntax statement rewrite("stack" .@name ..@type) name : type
 syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expression
 
 fn fail(context : Execution_Context, name : String, message : String) {
-  mass :: import("mass")
+  mass :: import "mass"
   result := context.result
   result.tag = mass.Mass_Result_Tag.Error
   result.Error.error.tag = mass.Mass_Error_Tag.User_Defined
