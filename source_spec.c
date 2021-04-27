@@ -1666,6 +1666,17 @@ spec("source") {
       s32 item_value = *storage_static_as_c_type(&value->storage, s32);
       check(item_value == Operator_Fixity_Infix);
     }
+    fit("should support importing compiler functionality through `mass` module") {
+     test_program_inline_source_function(
+        "checker", &test_context,
+        "fn checker() { @(fail(@context, \"Oops\")) }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_User_Defined);
+      spec_check_slice(error->User_Defined.name, slice_literal("fail()"));
+      spec_check_slice(error->detailed_message, slice_literal("Oops"));
+    }
   }
 
   describe("PE32 Executables") {

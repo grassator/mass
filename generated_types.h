@@ -881,24 +881,28 @@ typedef struct Descriptor {
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unimplemented = 0,
-  Mass_Error_Tag_Parse = 1,
-  Mass_Error_Tag_Non_Trailing_Default_Argument = 2,
-  Mass_Error_Tag_Expected_Static = 3,
-  Mass_Error_Tag_Integer_Range = 4,
-  Mass_Error_Tag_File_Open = 5,
-  Mass_Error_Tag_Unexpected_Token = 6,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 7,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 8,
-  Mass_Error_Tag_Undefined_Variable = 9,
-  Mass_Error_Tag_Redifinition = 10,
-  Mass_Error_Tag_Unknown_Field = 11,
-  Mass_Error_Tag_Invalid_Identifier = 12,
-  Mass_Error_Tag_Type_Mismatch = 13,
-  Mass_Error_Tag_Epoch_Mismatch = 14,
-  Mass_Error_Tag_No_Matching_Overload = 15,
-  Mass_Error_Tag_Undecidable_Overload = 16,
+  Mass_Error_Tag_User_Defined = 1,
+  Mass_Error_Tag_Parse = 2,
+  Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
+  Mass_Error_Tag_Expected_Static = 4,
+  Mass_Error_Tag_Integer_Range = 5,
+  Mass_Error_Tag_File_Open = 6,
+  Mass_Error_Tag_Unexpected_Token = 7,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 8,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 9,
+  Mass_Error_Tag_Undefined_Variable = 10,
+  Mass_Error_Tag_Redifinition = 11,
+  Mass_Error_Tag_Unknown_Field = 12,
+  Mass_Error_Tag_Invalid_Identifier = 13,
+  Mass_Error_Tag_Type_Mismatch = 14,
+  Mass_Error_Tag_Epoch_Mismatch = 15,
+  Mass_Error_Tag_No_Matching_Overload = 16,
+  Mass_Error_Tag_Undecidable_Overload = 17,
 } Mass_Error_Tag;
 
+typedef struct {
+  Slice name;
+} Mass_Error_User_Defined;
 typedef struct {
   const Descriptor * descriptor;
 } Mass_Error_Integer_Range;
@@ -951,6 +955,7 @@ typedef struct Mass_Error {
   Slice detailed_message;
   Source_Range source_range;
   union {
+    Mass_Error_User_Defined User_Defined;
     Mass_Error_Integer_Range Integer_Range;
     Mass_Error_File_Open File_Open;
     Mass_Error_Unexpected_Token Unexpected_Token;
@@ -2649,23 +2654,33 @@ MASS_DEFINE_TYPE_VALUE(descriptor);
 MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unimplemented"), .value = 0 },
-{ .name = slice_literal_fields("Parse"), .value = 1 },
-{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 2 },
-{ .name = slice_literal_fields("Expected_Static"), .value = 3 },
-{ .name = slice_literal_fields("Integer_Range"), .value = 4 },
-{ .name = slice_literal_fields("File_Open"), .value = 5 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 6 },
-{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 7 },
-{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 8 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 9 },
-{ .name = slice_literal_fields("Redifinition"), .value = 10 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 11 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 12 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 13 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 14 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 15 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 16 },
+{ .name = slice_literal_fields("User_Defined"), .value = 1 },
+{ .name = slice_literal_fields("Parse"), .value = 2 },
+{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 3 },
+{ .name = slice_literal_fields("Expected_Static"), .value = 4 },
+{ .name = slice_literal_fields("Integer_Range"), .value = 5 },
+{ .name = slice_literal_fields("File_Open"), .value = 6 },
+{ .name = slice_literal_fields("Unexpected_Token"), .value = 7 },
+{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 8 },
+{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 9 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 10 },
+{ .name = slice_literal_fields("Redifinition"), .value = 11 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 12 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 13 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 14 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 15 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 16 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 17 },
 };
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_User_Defined, name),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_error_user_defined);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_integer_range, Mass_Error_Integer_Range,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2843,6 +2858,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
     .Base_Relative.offset = offsetof(Mass_Error, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("User_Defined"),
+    .descriptor = &descriptor_mass_error_user_defined,
+    .Base_Relative.offset = offsetof(Mass_Error, User_Defined),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

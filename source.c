@@ -4622,6 +4622,10 @@ mass_handle_at_operator(
     Execution_Context *copy = allocator_allocate(context->allocator, Execution_Context);
     *copy = *context;
     return value_make(context, &descriptor_execution_context, storage_static(copy), body_range);
+  } else if (value_match_symbol(body, slice_literal("source_range"))) {
+    Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);
+    *source_range = args_view.source_range;
+    return value_make(context, &descriptor_source_range, storage_static(source_range), body_range);
   } else if (value_match_group(body, Group_Tag_Paren)) {
     return compile_time_eval(context, value_as_group(body)->children);
   } else if (value_match_group(body, Group_Tag_Curly)) {
@@ -6089,6 +6093,18 @@ module_compiler_init(
     slice_literal("Operator_Fixity"), &descriptor_operator_fixity,
     operator_fixity_items, countof(operator_fixity_items)
   );
+
+  scope_define_enum(
+    allocator, compiler_scope, source_range,
+    slice_literal("Mass_Result_Tag"), &descriptor_mass_result_tag,
+    mass_result_tag_items, countof(mass_result_tag_items)
+  );
+
+  scope_define_enum(
+    allocator, compiler_scope, source_range,
+    slice_literal("Mass_Error_Tag"), &descriptor_mass_error_tag,
+    mass_error_tag_items, countof(mass_error_tag_items)
+  );
 }
 
 static void
@@ -6161,6 +6177,10 @@ scope_define_builtins(
   scope_define_value(scope, range, slice_literal("External_Symbol"), type_external_symbol_value);
   scope_define_value(scope, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, range, slice_literal("Scope"), type_scope_value);
+  scope_define_value(scope, range, slice_literal("Execution_Context"), type_execution_context_value);
+
+  // TODO provide a better way to expose tagged unions
+  scope_define_value(scope, range, slice_literal("Mass_Error_User_Defined"), type_mass_error_user_defined_value);
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, ...)\
     scope_define_value(scope, range, slice_literal(#_NAME_), type_##_NAME_##_value);

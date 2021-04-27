@@ -70,6 +70,11 @@ mass_error_to_string(
       APPEND_LITERAL("Unimplemented Feature: ");
       APPEND_SLICE(error->detailed_message);
     } break;
+    case Mass_Error_Tag_User_Defined: {
+      APPEND_SLICE(error->User_Defined.name);
+      APPEND_LITERAL(": ");
+      APPEND_SLICE(error->detailed_message);
+    } break;
     case Mass_Error_Tag_Parse: {
       APPEND_LITERAL("Unable to parse the expression");
     } break;

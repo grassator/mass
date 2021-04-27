@@ -918,6 +918,9 @@ main(void) {
 
   push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
     struct_empty("Unimplemented"),
+    struct_fields("User_Defined", (Struct_Item[]){
+      { "Slice", "name" },
+    }),
     struct_empty("Parse"),
     struct_empty("Non_Trailing_Default_Argument"),
     struct_empty("Expected_Static"),
