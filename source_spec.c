@@ -77,7 +77,7 @@ test_program_source_base(
   );
   test_context.module = prelude_module;
   Mass_Result result = program_import_module(&test_context, prelude_module);
-  if (!spec_check_mass_result(&result)) return 0;
+  MASS_ON_ERROR(result) return 0;
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
       test_init_module(source.text);
@@ -88,7 +88,7 @@ test_program_source_base(
       program_import_module(&test_context, module);
     } break;
   }
-  if (!spec_check_mass_result(context->result)) return 0;
+  MASS_ON_ERROR(*context->result) return 0;
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
@@ -104,13 +104,13 @@ test_program_source_function(
   Test_Program_Source source
 ) {
   Value *value = test_program_source_base(function_id, context, source);
-  if (!spec_check_mass_result(context->result)) return 0;
+  MASS_ON_ERROR(*context->result) return 0;
   if (!value) return 0;
   jit_init(&test_jit, context->program);
   program_jit(&test_jit);
-  if (!spec_check_mass_result(context->result)) return 0;
+  MASS_ON_ERROR(*context->result) return 0;
   fn_type_opaque fn = value_as_function(&test_jit, value);
-  if (!spec_check_mass_result(context->result)) return 0;
+  MASS_ON_ERROR(*context->result) return 0;
   return fn;
 }
 

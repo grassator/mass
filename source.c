@@ -2965,17 +2965,6 @@ token_handle_c_string(
   return result_value;
 }
 
-static External_Symbol
-mass_compiler_external(
-  Slice library_name,
-  Slice symbol_name
-) {
-  return (External_Symbol) {
-    .library_name = library_name,
-    .symbol_name = symbol_name,
-  };
-}
-
 #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
   _TYPE_ mass_##_TYPE_##_logical_shift_left(\
     _TYPE_ input,\
