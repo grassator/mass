@@ -2076,6 +2076,7 @@ value_force_exact(
 ) {
   Expected_Result expected_result = expected_result_from_value(target);
   Value *forced = value_force(context, &expected_result, source);
+  MASS_ON_ERROR(*context->result) return;
   assert(forced == target);
 }
 
