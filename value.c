@@ -1034,6 +1034,23 @@ value_global_internal(
   value_global_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Storage
+storage_indirect(
+  u64 byte_size,
+  Register reg
+) {
+  return (Storage){
+    .tag = Storage_Tag_Memory,
+    .byte_size = byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base_register = reg
+      },
+    },
+  };
+}
+
+static inline Storage
 storage_eflags(
   Compare_Type compare_type
 ) {

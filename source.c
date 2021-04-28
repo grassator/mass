@@ -2881,16 +2881,8 @@ compile_time_eval(
   };
 
   // Use memory-indirect addressing to copy
-  Value *out_value = value_make(&eval_context, result_descriptor, (Storage){
-    .tag = Storage_Tag_Memory,
-    .byte_size = result_byte_size,
-    .Memory.location = {
-      .tag = Memory_Location_Tag_Indirect,
-      .Indirect = {
-        .base_register = out_register
-      },
-    },
-  }, view.source_range);
+  Storage out_storage = storage_indirect(result_byte_size, out_register);
+  Value *out_value = value_make(&eval_context, result_descriptor, out_storage, view.source_range);
 
   MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
     context->result = eval_context.result;
@@ -4021,16 +4013,7 @@ storage_load_index_address(
   }
   value_release_if_temporary(context->builder, reg_byte_size_value);
 
-  return (Storage) {
-    .tag = Storage_Tag_Memory,
-    .byte_size = item_byte_size,
-    .Memory.location = {
-      .tag = Memory_Location_Tag_Indirect,
-      .Indirect = {
-        .base_register = new_base_register->storage.Register.index,
-      }
-    }
-  };
+  return storage_indirect(item_byte_size, new_base_register->storage.Register.index);
 }
 
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
@@ -4764,17 +4747,9 @@ mass_handle_field_access_lazy_proc(
       is_temporary = true;
     }
 
-    Storage indirect_storage = (Storage) {
-      .tag = Storage_Tag_Memory,
-      .byte_size = descriptor_byte_size(pointee_descriptor),
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = {
-          .base_register = base_storage.Register.index,
-        }
-      }
-    };
-    struct_ = value_make(context, pointee_descriptor, indirect_storage, struct_->source_range);
+    Storage pointee_storage =
+      storage_indirect(descriptor_byte_size(pointee_descriptor), base_storage.Register.index);
+    struct_ = value_make(context, pointee_descriptor, pointee_storage, struct_->source_range);
     struct_->is_temporary = is_temporary;
   }
 
