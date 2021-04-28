@@ -2844,7 +2844,7 @@ compile_time_eval(
   // Lazy evaluation should not generate any instructions
   assert(!dyn_array_length(eval_builder.code_block.instructions));
 
-  Expected_Result expected_result = expected_result_any(0);
+  Expected_Result expected_result = expected_result_any(result_descriptor);
   Value *forced_value = value_force(&eval_context, &expected_result, expression_result_value);
   MASS_ON_ERROR(*context->result) return 0;
 
