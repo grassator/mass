@@ -1193,7 +1193,7 @@ tokenize(
               hash_map_set(compilation->static_pointer_map, bytes, (Value){0}),
               VALUE_STATIC_EPOCH,
               bytes_descriptor,
-              (Storage){.tag = Storage_Tag_None},
+              storage_none,
               current_token_range
             );
           }
@@ -2774,7 +2774,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context, descriptor, (Storage){0}, args->source_range);
+  Value *result = value_make(context, descriptor, storage_none, args->source_range);
   // TODO this is not going to be true for lambdas with capture
   result->epoch = VALUE_STATIC_EPOCH;
   return result;
@@ -2909,10 +2909,10 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = value_make(context, out_value->descriptor, (Storage){0}, view.source_range);
+  Value *temp_result = value_make(context, out_value->descriptor, storage_none, view.source_range);
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
-      temp_result->storage = (Storage){0};
+      temp_result->storage = storage_none;
       break;
     }
     case Descriptor_Tag_Pointer_To:
@@ -3438,7 +3438,7 @@ call_function_overload(
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
       if (descriptor->returns.descriptor->tag == Descriptor_Tag_Void) {
-        result_value = value_make(context, &descriptor_void, (Storage){0}, *source_range);
+        result_value = value_make(context, &descriptor_void, storage_none, *source_range);
       } else {
         result_value = reserve_stack(context, descriptor->returns.descriptor, *source_range);
       }
@@ -5964,7 +5964,7 @@ token_define_local_variable(
   const Source_Range *source_range = &symbol->source_range;
   Value *variable;
   if (descriptor == &descriptor_void) {
-    variable = value_make(context, stack_descriptor, (Storage){0}, *source_range);
+    variable = value_make(context, stack_descriptor, storage_none, *source_range);
   } else {
     variable = reserve_stack(context, stack_descriptor, *source_range);
   }
