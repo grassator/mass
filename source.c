@@ -2693,7 +2693,7 @@ token_process_c_struct_definition(
   return 0;
 }
 
-static Value *
+static Descriptor *
 token_process_function_literal(
   Execution_Context *context,
   Slice name,
@@ -2775,10 +2775,7 @@ token_process_function_literal(
     }
   }
 
-  Value *result = value_make(context, descriptor, storage_none, args->source_range);
-  // TODO this is not going to be true for lambdas with capture
-  result->epoch = VALUE_STATIC_EPOCH;
-  return result;
+  return descriptor;
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
@@ -5173,12 +5170,9 @@ token_parse_function_literal(
 
   *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Value *literal = token_process_function_literal(context, name, args, returns, body);
+  Descriptor *descriptor = token_process_function_literal(context, name, args, returns, body);
   MASS_ON_ERROR(*context->result) return 0;
 
-  // TODO when syntax switch is complete do not create a value for just the type definition
-  //      and it will also fix the const cast problem
-  Descriptor *descriptor = (Descriptor *)literal->descriptor;
   assert(descriptor->tag == Descriptor_Tag_Function);
   if(is_macro) {
     descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
@@ -5187,9 +5181,11 @@ token_parse_function_literal(
     descriptor->Function.info.flags |= Descriptor_Function_Flags_Compile_Time;
   }
   if (body) {
+    Value *literal = value_make(context, descriptor, storage_none, view.source_range);
+    literal->epoch = VALUE_STATIC_EPOCH;
     return literal;
   } else {
-    return value_make(context, &descriptor_type, storage_static(descriptor), literal->source_range);
+    return value_make(context, &descriptor_type, storage_static(descriptor), view.source_range);
   }
 }
 
