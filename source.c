@@ -3538,14 +3538,11 @@ call_function_overload(
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
+
+    source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
+
     const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
-    if (
-      descriptor_byte_size(source_descriptor) <= 8 ||
-      // TODO Number literals are larger than a register, but only converted into
-      //      a proper value in the assign below so need this explicit check.
-      //      Maybe we should do the conversion at some step before?
-      source_descriptor == &descriptor_number_literal
-    ) {
+    if (descriptor_byte_size(source_descriptor) <= 8) {
       MASS_ON_ERROR(assign(context, target_arg, source_arg)) return 0;
     } else {
       // Large values are copied to the stack and passed by a reference
