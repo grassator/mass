@@ -6186,12 +6186,6 @@ scope_define_builtins(
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_compiler_external, "external", &descriptor_external_symbol,
-    MASS_FN_ARG_ANY_OF_TYPE("library_name", &descriptor_slice),
-    MASS_FN_ARG_ANY_OF_TYPE("symbol_name", &descriptor_slice)
-  );
-
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
     MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context),
     MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice)
