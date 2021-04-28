@@ -2928,61 +2928,6 @@ typedef struct {
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
 static Value *
-token_handle_storage_variant_of(
-  Execution_Context *context,
-  const Source_Range *source_range,
-  Array_Value_Ptr args
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  if (dyn_array_length(args) != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = *source_range,
-      .detailed_message = "storage_variant_of expects a single argument"
-    });
-    return 0;
-  }
-
-  Value *value = *dyn_array_get(args, 0);
-
-  Value *storage_value;
-  switch(value->storage.tag) {
-    default:
-    case Storage_Tag_None:
-    case Storage_Tag_Any:
-    case Storage_Tag_Static:
-    case Storage_Tag_Eflags:
-    case Storage_Tag_Xmm:
-    case Storage_Tag_Memory: {
-      panic("TODO implement operand reflection for more types");
-      storage_value = 0;
-      break;
-    }
-    case Storage_Tag_Register: {
-      Descriptor *result_descriptor = 0;
-      switch(value->storage.byte_size) {
-        case 1: result_descriptor = &descriptor_register_8; break;
-        case 2: result_descriptor = &descriptor_register_16; break;
-        case 4: result_descriptor = &descriptor_register_32; break;
-        case 8: result_descriptor = &descriptor_register_64; break;
-        default: {
-          panic("Internal Error: Unsupported register size");
-          break;
-        }
-      }
-      storage_value = value_make(
-        context,
-        result_descriptor,
-        imm8(value->storage.Register.index),
-        *source_range
-      );
-    }
-  }
-  return storage_value;
-}
-
-static Value *
 token_handle_c_string(
   Execution_Context *context,
   const Expected_Result *expected_result,
@@ -4562,11 +4507,6 @@ mass_handle_paren_operator(
     return token_handle_type_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("size_of"))) {
     return token_handle_size_of(context, args_token);
-  } else if (slice_equal(target_name, slice_literal("storage_variant_of"))) {
-    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-    Value *result = token_handle_storage_variant_of(context, &args_range, args);
-    dyn_array_destroy(args);
-    return result;
   } else if (slice_equal(target_name, slice_literal("startup"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
@@ -6173,10 +6113,6 @@ scope_define_builtins(
     ));
   }
 
-  scope_define_value(scope, range, slice_literal("Register_8"), type_register_8_value);
-  scope_define_value(scope, range, slice_literal("Register_16"), type_register_16_value);
-  scope_define_value(scope, range, slice_literal("Register_32"), type_register_32_value);
-  scope_define_value(scope, range, slice_literal("Register_64"), type_register_64_value);
   scope_define_value(scope, range, slice_literal("External_Symbol"), type_external_symbol_value);
   scope_define_value(scope, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, range, slice_literal("Scope"), type_scope_value);

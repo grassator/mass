@@ -393,22 +393,6 @@ spec("source") {
     }
     #endif
 
-    #ifdef _WIN32
-    // This test relies on Windows calling convention
-    it("should be able to retrieve the register used for a particular value") {
-      s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
-        "foo", &test_context,
-        "fn foo(x : s64) -> (Register_64) {"
-          "storage_variant_of(x)"
-        "}"
-      );
-      check(checker);
-      Register actual = checker();
-      Register expected = Register_C;
-      check(actual == expected, "Expected %d, got %d", expected, actual);
-    }
-    #endif
-
     it("should be able to reference a declared label in raw machine code bytes") {
       // TODO only run on X64 hosts
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(

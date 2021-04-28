@@ -65,14 +65,6 @@ type_value_for_descriptor(
   return MASS_TYPE_VALUE(descriptor);
 }
 
-// TODO Shrink to 4 bits when supported
-MASS_DEFINE_OPAQUE_TYPE(register_8, 8, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_16, 8, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_32, 8, 8);
-MASS_DEFINE_OPAQUE_TYPE(register_64, 8, 8);
-MASS_DEFINE_OPAQUE_C_TYPE(immediate, Slice);
-MASS_DEFINE_OPAQUE_C_TYPE(eflags, Storage_Eflags);
-
 Value void_value = {
   .descriptor = &descriptor_void,
   .storage = { .tag = Storage_Tag_None },
