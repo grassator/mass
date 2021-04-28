@@ -1016,8 +1016,7 @@ tokenize(
 
     // Normalize line endings
     if (ch == '\r') {
-      if (peek == '\n') continue;
-      ch = '\n';
+      if (peek != '\n') ch = '\n';
     }
 
     if (ch == '\n') {
