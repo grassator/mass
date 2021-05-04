@@ -160,23 +160,7 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-hash_map_slice_template(Imported_Module_Map, Module *)
-
-typedef struct Jit {
-  bool is_stack_unwinding_in_progress;
-  Program *program;
-  Jit_Import_Library_Handle_Map *import_library_handles;
-  void *platform_specific_payload;
-} Jit;
-
-bool
-pointer_equal(
-  const void * const *a,
-  const void * const *b
-) {
-  return *a == *b;
-}
-hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, pointer_equal)
+hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
 
 typedef struct Compilation {
   Virtual_Memory_Buffer allocation_buffer;

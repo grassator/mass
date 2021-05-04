@@ -215,6 +215,12 @@ typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 
+hash_map_slice_template(Imported_Module_Map, Module *)
+
+typedef struct Jit Jit;
+typedef dyn_array_type(Jit *) Array_Jit_Ptr;
+typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
+
 
 // Type Definitions
 
@@ -1088,6 +1094,14 @@ typedef struct Program {
 } Program;
 typedef dyn_array_type(Program) Array_Program;
 
+typedef struct Jit {
+  u64 is_stack_unwinding_in_progress;
+  Program * program;
+  Jit_Import_Library_Handle_Map * import_library_handles;
+  void * platform_specific_payload;
+} Jit;
+typedef dyn_array_type(Jit) Array_Jit;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -1390,6 +1404,12 @@ static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(imported_module_map, Imported_Module_Map);
+static Descriptor descriptor_jit;
+static Descriptor descriptor_array_jit;
+static Descriptor descriptor_array_jit_ptr;
+static Descriptor descriptor_jit_pointer;
+static Descriptor descriptor_jit_pointer_pointer;
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
@@ -3472,6 +3492,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);
+MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
+MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("is_stack_unwinding_in_progress"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit, is_stack_unwinding_in_progress),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("program"),
+    .descriptor = &descriptor_program_pointer,
+    .Base_Relative.offset = offsetof(Jit, program),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("import_library_handles"),
+    .descriptor = &descriptor_jit_import_library_handle_map_pointer,
+    .Base_Relative.offset = offsetof(Jit, import_library_handles),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("platform_specific_payload"),
+    .descriptor = &descriptor_void_pointer,
+    .Base_Relative.offset = offsetof(Jit, platform_specific_payload),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(jit);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,

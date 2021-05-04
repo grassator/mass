@@ -3400,6 +3400,14 @@ hash_pointer(
   return hash_u64((u64)address);
 }
 
+static inline bool
+const_void_pointer_equal(
+  void const * const *a,
+  void const * const *b
+) {
+  return *a == *b;
+}
+
 static const s32 hash_byte_start = 7;
 
 static inline s32

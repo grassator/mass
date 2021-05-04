@@ -1180,6 +1180,19 @@ main(void) {
     .value_type = "void *",
   }));
 
+  push_type(type_hash_map({
+    .name = "Imported_Module_Map",
+    .key_type = "Slice",
+    .value_type = "Module *",
+  }));
+
+  push_type(type_struct("Jit", (Struct_Item[]){
+    { "u64", "is_stack_unwinding_in_progress" },
+    { "Program *", "program" },
+    { "Jit_Import_Library_Handle_Map *", "import_library_handles" },
+    { "void *", "platform_specific_payload" },
+  }));
+
   {
     const char *filename = "../generated_types.h";
     #pragma warning(disable : 4996)
