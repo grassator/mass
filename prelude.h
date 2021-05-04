@@ -15,6 +15,17 @@
 #include <ctype.h> // isspace, isdigit etc
 #include <math.h> // ceilf, etc
 
+// Bring in SIMD headers
+#if defined(_MSC_VER)
+  #include <intrin.h>
+#elif defined(__GNUC__)
+  #if defined(__x86_64__) || defined(__i386__)
+    #include <x86intrin.h>
+  #elif defined(__ARM_NEON__)
+    #include <arm_neon.h>
+  #endif
+#endif
+
 // Force <windows.h> to not include definition for min() and max() macros
 #define NOMINMAX
 
@@ -168,6 +179,72 @@ static_assert(sizeof(void *) == sizeof(u64), "Prelude only supports 64bit archit
 #define PRELUDE_MAP_NUMERIC_TYPES(_FUNC_)\
   PRELUDE_MAP_INTEGER_TYPES(_FUNC_)\
   PRELUDE_MAP_FLOAT_TYPES(_FUNC_)
+
+//////////////////////////////////////////////////////////////////////////////
+// Atomics
+//////////////////////////////////////////////////////////////////////////////
+
+#ifndef __STDC_NO_ATOMICS__
+  #include <stdatomic.h>
+  #define PRELUDE_ATOMIC _Atomic
+#else
+  #ifdef _MSC_VER
+    #include <windows.h>
+    #define PRELUDE_ATOMIC
+  #endif
+#endif
+
+
+#ifdef PRELUDE_ATOMIC
+typedef struct {
+  PRELUDE_ATOMIC u64 raw;
+} Atomic_u64;
+
+static inline u64
+atomic_u64_increment(
+  Atomic_u64 *value
+) {
+  #ifdef _MSC_VER
+  return InterlockedIncrement64(&value->raw);
+  #else
+  return ++value->raw;
+  #endif
+}
+
+static inline u64
+atomic_u64_decrement(
+  Atomic_u64 *value
+) {
+  #ifdef _MSC_VER
+  return InterlockedDecrement64(&value->raw);
+  #else
+  return --value->raw;
+  #endif
+}
+
+static inline u64
+atomic_u64_exchange(
+  Atomic_u64 *value,
+  u64 new_value
+) {
+  #ifdef _MSC_VER
+  return InterlockedExchange64(&value->raw, new_value);
+  #else
+  return atomic_exchange(&value->raw, new_value);
+  #endif
+}
+
+static inline u64
+atomic_u64_load(
+  Atomic_u64 *value
+) {
+  #ifdef _MSC_VER
+  return InterlockedCompareExchange64(&value->raw, 0, 0);
+  #else
+  return atomic_load(&value->raw);
+  #endif
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Integer Casts
@@ -2090,6 +2167,42 @@ code_point_is_ascii_space(
   }
 }
 
+/// Returns new buffer_pointer
+/// NULL return value indicates an invalid code point
+/// If the buffer does not have enough space, the result is the same as the input
+static inline u8 *
+utf8_encode(
+  u32 code_point,
+  u8 *buffer,
+  u64 buffer_size
+) {
+  if (code_point <= 0x007F) {
+    if (buffer_size < 1) return buffer;
+    *buffer++ = (u8)(code_point);
+    return buffer;
+  }
+
+  if (code_point >= 0x80 && code_point <= 0x07FF) {
+    if (buffer_size < 2) return buffer;
+    *buffer++ = (u8)(0xC0 | (code_point >> 6));
+    *buffer++ = (u8)(0x80 | (code_point & 0x3F));
+  } else if (code_point >= 0x0800 && code_point <= 0xFFFF) {
+    if (buffer_size < 3) return buffer;
+    *buffer++ = (u8)(0xE0 | (code_point >> 12));
+    *buffer++ = (u8)(0x80 | ((code_point >> 6) & 0x3F));
+    *buffer++ = (u8)(0x80 | (code_point & 0x3F));
+  } else if (code_point >= 0x10000 && code_point <= 0x10FFFF) {
+    if (buffer_size < 4) return buffer;
+    *buffer++ = (u8)(0xF0 | (code_point >> 18));
+    *buffer++ = (u8)(0x80 | ((code_point >> 12) & 0x3F));
+    *buffer++ = (u8)(0x80 | ((code_point >> 6) & 0x3F));
+    *buffer++ = (u8)(0x80 | (code_point & 0x3F));
+  } else {
+    return 0;
+  }
+  return buffer;
+}
+
 // The `utf8_decode` function has following copyright and license
 //
 // Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
@@ -2351,7 +2464,8 @@ utf16_to_utf8_raw(
   u64 target_byte_size
 ) {
   u64 source_wide_length = source_byte_size / 2;
-  u64 target_index = 0;
+  char *target_cursor = target;
+  char *target_end = target + target_byte_size;
 
   for (u64 source_index = 0; source_index < source_wide_length; ++source_index) {
     u32 code_point = source[source_index];
@@ -2371,33 +2485,10 @@ utf16_to_utf8_raw(
         code_point = 0xfffd;
       }
     }
-
-    if (code_point <= 0x7f) {
-      if (target_index >= target_byte_size) return target_byte_size;
-      target[target_index] = (s8) code_point;
-      target_index += 1;
-    } else if (code_point <= 0x7ff) {
-      if (target_index + 1 >= target_byte_size) return target_byte_size;
-      target[target_index + 0] = (s8) (((code_point >> 6) & 0x1f) | 0xc0);
-      target[target_index + 1] = (s8) (((code_point >> 0) & 0x3f) | 0x80);
-      target_index += 2;
-    } else if (code_point <= 0xffff) {
-      if (target_index + 2 >= target_byte_size) return target_byte_size;
-      target[target_index + 0] = (s8) (((code_point >> 12) & 0x0f) | 0xd0);
-      target[target_index + 1] = (s8) (((code_point >>  6) & 0x3f) | 0x80);
-      target[target_index + 2] = (s8) (((code_point >>  0) & 0x3f) | 0x80);
-      target_index += 3;
-    } else {
-      if (target_index + 3 >= target_byte_size) return target_byte_size;
-      target[target_index + 0] = (s8) (((code_point >> 18) & 0x07) | 0xf0);
-      target[target_index + 1] = (s8) (((code_point >> 12) & 0x3f) | 0x80);
-      target[target_index + 2] = (s8) (((code_point >>  6) & 0x3f) | 0x80);
-      target[target_index + 3] = (s8) (((code_point >>  0) & 0x3f) | 0x80);
-      target_index += 4;
-    }
+    target_cursor = utf8_encode(code_point, target_cursor, target_end - target_cursor);
   }
 
-  return target_index;
+  return target_cursor - target;
 }
 
 Slice
