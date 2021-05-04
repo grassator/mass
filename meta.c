@@ -52,14 +52,14 @@ typedef struct Type Type;
 typedef struct {
   const char *type;
   const char *name;
-} Argument;
+} Argument_Type;
 
 typedef struct {
   const char *name;
   const char *returns;
-  Argument *arguments;
+  Argument_Type *arguments;
   uint64_t argument_count;
-} Function;
+} Function_Type;
 
 typedef enum {
   Type_Tag_Struct,
@@ -74,7 +74,7 @@ typedef struct Type {
   Struct_Type struct_;
   Enum_Type enum_;
   Tagged_Union_Type union_;
-  Function function;
+  Function_Type function;
   Hash_Map_Type hash_map;
 } Type;
 
@@ -107,7 +107,7 @@ print_c_type_forward_declaration(
     case Type_Tag_Function: {
       fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
       for (uint64_t i = 0; i < type->function.argument_count; ++i) {
-        Argument *arg = &type->function.arguments[i];
+        Argument_Type *arg = &type->function.arguments[i];
         if (i != 0) fprintf(file, ", ");
         fprintf(file, "%s %s", arg->type, arg->name);
       }
@@ -1025,7 +1025,7 @@ main(void) {
     }),
   }));
 
-  push_type(type_function("Lazy_Value_Proc", "Value *", (Argument[]){
+  push_type(type_function("Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "const Expected_Result *", "expected_result" },
     { "void *", "payload" },
@@ -1038,7 +1038,7 @@ main(void) {
     { "void *", "payload" },
   }));
 
-  push_type(type_function("Mass_Handle_Operator_Proc", "Value *", (Argument[]){
+  push_type(type_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "void *", "payload" },
