@@ -37,7 +37,7 @@ typedef struct {
   Struct_Type common;
   Struct_Type *items;
   uint64_t item_count;
-} Tagged_Union;
+} Tagged_Union_Type;
 
 typedef struct {
   const char *name;
@@ -73,7 +73,7 @@ typedef struct Type {
   Type_Tag tag;
   Struct_Type struct_;
   Enum_Type enum_;
-  Tagged_Union union_;
+  Tagged_Union_Type union_;
   Function function;
   Hash_Map hash_map;
 } Type;
