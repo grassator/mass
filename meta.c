@@ -570,7 +570,7 @@ add_common_fields_internal(
 Type types[4096] = {0};
 uint32_t type_count = 0;
 
-static inline void
+static inline Type *
 push_type(
   Type type
 ) {
@@ -578,7 +578,8 @@ push_type(
     fprintf(stderr, "Too many types defined");
     exit(1);
   }
-  types[type_count++] = type;
+  types[type_count] = type;
+  return &types[type_count++];
 }
 
 int
@@ -683,7 +684,7 @@ main(void) {
     { "Section", "ro_data" },
   }));
 
-  push_type(type_enum("Register", (Enum_Item[]){
+  Type *Register_Type = push_type(type_enum("Register", (Enum_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
     { "D", 0b0010 },
@@ -881,6 +882,14 @@ main(void) {
     { "Source_Range", "source_range" },
     { "Scope *", "scope" },
     { "u64", "encoded_byte_size" },
+  }));
+
+  push_type(type_struct("Code_Block", (Struct_Item[]){
+    { "Label_Index", "end_label" },
+    { "Array_Instruction", "instructions" },
+    { "u64", "register_volatile_bitset" },
+    { "u64", "register_occupied_bitset" },
+    { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
   }));
 
   push_type(type_enum("Function_Argument_Mode", (Enum_Item[]){

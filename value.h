@@ -160,15 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-typedef struct {
-  Label_Index end_label;
-  Array_Instruction instructions;
-  u64 register_volatile_bitset;
-  u64 register_occupied_bitset;
-  Value *register_occupied_values[Register__Max];
-} Code_Block;
-static_assert(Register__Min == 0, "Should be psosible to use register indexes as array indexes");
-
 typedef struct Function_Builder {
   bool frozen;
   s32 stack_reserve;

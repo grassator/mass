@@ -133,6 +133,10 @@ typedef struct Instruction Instruction;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
 
+typedef struct Code_Block Code_Block;
+typedef dyn_array_type(Code_Block *) Array_Code_Block_Ptr;
+typedef dyn_array_type(const Code_Block *) Array_Const_Code_Block_Ptr;
+
 typedef enum Function_Argument_Mode Function_Argument_Mode;
 
 typedef enum Operator_Fixity Operator_Fixity;
@@ -702,6 +706,15 @@ typedef struct Instruction {
   };
 } Instruction;
 typedef dyn_array_type(Instruction) Array_Instruction;
+typedef struct Code_Block {
+  Label_Index end_label;
+  Array_Instruction instructions;
+  u64 register_volatile_bitset;
+  u64 register_occupied_bitset;
+  Value * register_occupied_values[36];
+} Code_Block;
+typedef dyn_array_type(Code_Block) Array_Code_Block;
+
 typedef enum Function_Argument_Mode {
   Function_Argument_Mode_Call = 0,
   Function_Argument_Mode_Body = 1,
@@ -1270,6 +1283,11 @@ static Descriptor descriptor_array_instruction;
 static Descriptor descriptor_array_instruction_ptr;
 static Descriptor descriptor_instruction_pointer;
 static Descriptor descriptor_instruction_pointer_pointer;
+static Descriptor descriptor_code_block;
+static Descriptor descriptor_array_code_block;
+static Descriptor descriptor_array_code_block_ptr;
+static Descriptor descriptor_code_block_pointer;
+static Descriptor descriptor_code_block_pointer_pointer;
 static Descriptor descriptor_function_argument_mode;
 static Descriptor descriptor_array_function_argument_mode;
 static Descriptor descriptor_array_function_argument_mode_ptr;
@@ -1374,6 +1392,7 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
+static Descriptor descriptor_value_pointer_36 = MASS_DESCRIPTOR_STATIC_ARRAY(Value *, 36, &descriptor_value_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
@@ -2359,6 +2378,41 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
 );
 MASS_DEFINE_TYPE_VALUE(instruction);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_code_block_ptr, Array_Code_Block_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_code_block, Array_Code_Block)
+MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("end_label"),
+    .descriptor = &descriptor_label_index,
+    .Base_Relative.offset = offsetof(Code_Block, end_label),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("instructions"),
+    .descriptor = &descriptor_array_instruction,
+    .Base_Relative.offset = offsetof(Code_Block, instructions),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_volatile_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Code_Block, register_volatile_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_occupied_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Code_Block, register_occupied_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_occupied_values"),
+    .descriptor = &descriptor_value_pointer_36,
+    .Base_Relative.offset = offsetof(Code_Block, register_occupied_values),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(code_block);
 MASS_DEFINE_OPAQUE_C_TYPE(function_argument_mode, Function_Argument_Mode)
 static C_Enum_Item function_argument_mode_items[] = {
 { .name = slice_literal_fields("Call"), .value = 0 },
