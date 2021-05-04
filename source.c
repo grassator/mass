@@ -2,10 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-#ifndef __STDC_NO_ATOMICS__
-#include <stdatomic.h>
-#endif
-
 static inline bool
 context_is_compile_time_eval(
   const Execution_Context *context
@@ -208,22 +204,13 @@ value_view_from_value_array(
   };
 }
 
-#ifdef _MSC_VER
-#define ATOMIC_COUNTER(ID)\
-  volatile static u64 _atomic_next_##ID = 0;\
-  u64 ID = InterlockedIncrement64(&_atomic_next_##ID);
-#else
-#define ATOMIC_COUNTER(ID)\
-  _Atomic static u64 _atomic_next_##ID = 0;\
-  u64 ID = _atomic_next_##ID++;
-#endif
-
 static inline Scope *
 scope_make(
   const Allocator *allocator,
   const Scope *parent
 ) {
-  ATOMIC_COUNTER(id);
+  static Atomic_u64 next_id = {0};
+  u64 id = atomic_u64_increment(&next_id);
 
   Scope *scope = allocator_allocate(allocator, Scope);
   *scope = (Scope) {
@@ -2781,7 +2768,8 @@ typedef void (*Compile_Time_Eval_Proc)(void *);
 
 static inline u64
 get_new_epoch() {
-  ATOMIC_COUNTER(epoch);
+  static Atomic_u64 next_epoch = {0};
+  u64 epoch = atomic_u64_increment(&next_epoch);
   return epoch;
 }
 
