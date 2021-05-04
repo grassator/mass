@@ -258,14 +258,20 @@ print_mass_array_descriptors_for_struct(
   Struct *struct_
 ) {
   static Fixed_Array_Descriptor_Set *already_defined_set = 0;
-  if (already_defined_set == 0) {
-    already_defined_set = hash_map_make(Fixed_Array_Descriptor_Set);
-  }
+  if (!already_defined_set) already_defined_set = hash_map_make(Fixed_Array_Descriptor_Set);
+  static Fixed_Buffer *temp = 0;
+  if (!temp) temp = fixed_buffer_make(.capacity = 1024);
+  static Bucket_Buffer *names_buffer = 0;
+  if (!names_buffer) names_buffer = bucket_buffer_make();
+
   for (uint64_t i = 0; i < struct_->item_count; ++i) {
     Struct_Item *item = &struct_->items[i];
     if (item->array_length <= 1) continue;
-    Slice type_slice = slice_from_c_string(item->type);
-    if (hash_map_has(already_defined_set, type_slice)) continue;
+    temp->occupied = 0;
+    fixed_buffer_append_slice(temp, slice_from_c_string(item->type));
+    fixed_buffer_append_u32(temp, item->array_length);
+    if (hash_map_has(already_defined_set, fixed_buffer_as_slice(temp))) continue;
+    Slice type_slice = bucket_buffer_append_slice(names_buffer, fixed_buffer_as_slice(temp));
     hash_map_set(already_defined_set, type_slice, true);
     fprintf(file, "static Descriptor ");
     print_mass_struct_item_type(file, item);
