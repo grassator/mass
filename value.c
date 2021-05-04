@@ -536,7 +536,7 @@ code_label32(
 }
 
 static inline Storage
-storage_static_internal(
+storage_static_inline_internal(
   void *value,
   u64 byte_size
 ) {
@@ -566,12 +566,35 @@ storage_static_internal(
       break;
     }
     default: {
-      result.Static.memory.tag = Static_Memory_Tag_Heap;
-      result.Static.memory.Heap.pointer = value;
+      panic("Type is too large for inline storage");
       break;
     }
   }
   return result;
+}
+
+#define storage_static_inline(_VALUE_)\
+  storage_static_inline_internal((_VALUE_), sizeof(*(_VALUE_)))
+
+static inline Storage
+storage_static_internal(
+  void *value,
+  u64 byte_size
+) {
+  if (byte_size <= 8) {
+    return storage_static_inline_internal(value, byte_size);
+  }
+
+  return (Storage){
+    .tag = Storage_Tag_Static,
+    .byte_size = byte_size,
+    .Static = {
+      .memory = {
+        .tag = Static_Memory_Tag_Heap,
+        .Heap.pointer = value,
+      },
+    },
+  };
 }
 
 #define storage_static(_VALUE_)\

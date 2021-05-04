@@ -5441,11 +5441,7 @@ mass_handle_label_lazy_proc(
   Value *label_value
 ) {
   Source_Range source_range = label_value->source_range;
-  if (
-    label_value->descriptor != &descriptor_void ||
-    label_value->storage.tag != Storage_Tag_Memory ||
-    label_value->storage.Memory.location.tag != Memory_Location_Tag_Instruction_Pointer_Relative
-  ) {
+  if (label_value->descriptor != &descriptor_label_index) {
     Slice source = source_from_source_range(&source_range);
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Redifinition,
@@ -5460,7 +5456,7 @@ mass_handle_label_lazy_proc(
     &context->builder->code_block.instructions, source_range,
     (Instruction) {
       .type = Instruction_Type_Label,
-      .label = label_value->storage.Memory.location.Instruction_Pointer_Relative.label_index
+      .label = *storage_static_as_c_type(&label_value->storage, Label_Index),
     }
   );
 
@@ -5504,10 +5500,7 @@ token_parse_statement_label(
 
     Source_Range source_range = symbol->source_range;
     Label_Index label = make_label(context->program, &context->program->memory.sections.code, name);
-    value = value_make(context, &descriptor_void, code_label32(label), source_range);
-    // TODO figure out a better way to say that labels are compile-time known
-    //      Maybe there should be descriptor_label with static memory like Number_Literal
-    value->epoch = VALUE_STATIC_EPOCH;
+    value = value_make(context, &descriptor_label_index, storage_static_inline(&label), source_range);
     scope_define_value(label_scope, source_range, name, value);
     if (placeholder) {
       return peek_index;
@@ -5633,7 +5626,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     Value *value = compile_time_eval(context, view);
     MASS_ON_ERROR(*context->result) return 0;
 
-    if (storage_is_label(&value->storage)) {
+    if (value->descriptor == &descriptor_label_index) {
       if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
@@ -5642,7 +5635,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
         });
         return 0;
       }
-      bytes.label_index = value->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+      bytes.label_index = *storage_static_as_c_type(&value->storage, Label_Index);
       bytes.label_offset_in_instruction = u64_to_u8(argument_count);
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
