@@ -297,13 +297,13 @@ typedef enum {
   Token_Pattern_Tag_String = 4,
 } Token_Pattern_Tag;
 
-typedef struct {
+typedef struct Token_Pattern_Symbol {
   Slice name;
 } Token_Pattern_Symbol;
-typedef struct {
+typedef struct Token_Pattern_Group {
   Group_Tag tag;
 } Token_Pattern_Group;
-typedef struct {
+typedef struct Token_Pattern_String {
   Slice slice;
 } Token_Pattern_String;
 typedef struct Token_Pattern {
@@ -537,10 +537,10 @@ typedef enum {
   Memory_Location_Tag_Indirect = 1,
 } Memory_Location_Tag;
 
-typedef struct {
+typedef struct Memory_Location_Instruction_Pointer_Relative {
   Label_Index label_index;
 } Memory_Location_Instruction_Pointer_Relative;
-typedef struct {
+typedef struct Memory_Location_Indirect {
   Register base_register;
   u32 _base_register_padding;
   Maybe_Register maybe_index_register;
@@ -563,19 +563,19 @@ typedef enum {
   Static_Memory_Tag_Heap = 4,
 } Static_Memory_Tag;
 
-typedef struct {
+typedef struct Static_Memory_U8 {
   u8 value;
 } Static_Memory_U8;
-typedef struct {
+typedef struct Static_Memory_U16 {
   u16 value;
 } Static_Memory_U16;
-typedef struct {
+typedef struct Static_Memory_U32 {
   u32 value;
 } Static_Memory_U32;
-typedef struct {
+typedef struct Static_Memory_U64 {
   u64 value;
 } Static_Memory_U64;
-typedef struct {
+typedef struct Static_Memory_Heap {
   void * pointer;
 } Static_Memory_Heap;
 typedef struct Static_Memory {
@@ -600,19 +600,19 @@ typedef enum {
   Storage_Tag_Memory = 6,
 } Storage_Tag;
 
-typedef struct {
+typedef struct Storage_Eflags {
   Compare_Type compare_type;
 } Storage_Eflags;
-typedef struct {
+typedef struct Storage_Register {
   Register index;
 } Storage_Register;
-typedef struct {
+typedef struct Storage_Xmm {
   Register index;
 } Storage_Xmm;
-typedef struct {
+typedef struct Storage_Static {
   Static_Memory memory;
 } Storage_Static;
-typedef struct {
+typedef struct Storage_Memory {
   Memory_Location location;
 } Storage_Memory;
 typedef struct Storage {
@@ -694,10 +694,10 @@ typedef enum {
   Scope_Entry_Tag_Operator = 1,
 } Scope_Entry_Tag;
 
-typedef struct {
+typedef struct Scope_Entry_Value {
   Value * value;
 } Scope_Entry_Value;
-typedef struct {
+typedef struct Scope_Entry_Operator {
   Operator * maybe_prefix;
   Operator * maybe_infix_or_postfix;
 } Scope_Entry_Operator;
@@ -750,10 +750,10 @@ typedef enum {
   Expected_Result_Tag_Flexible = 1,
 } Expected_Result_Tag;
 
-typedef struct {
+typedef struct Expected_Result_Exact {
   Value * value;
 } Expected_Result_Exact;
-typedef struct {
+typedef struct Expected_Result_Flexible {
   const Descriptor * descriptor;
   Expected_Result_Storage storage;
   s32 _storage_padding;
@@ -802,10 +802,10 @@ typedef enum {
   Memory_Layout_Item_Tag_Base_Relative = 1,
 } Memory_Layout_Item_Tag;
 
-typedef struct {
+typedef struct Memory_Layout_Item_Absolute {
   Storage storage;
 } Memory_Layout_Item_Absolute;
-typedef struct {
+typedef struct Memory_Layout_Item_Base_Relative {
   s64 offset;
 } Memory_Layout_Item_Base_Relative;
 typedef struct Memory_Layout_Item {
@@ -852,17 +852,17 @@ typedef enum {
   Descriptor_Tag_Pointer_To = 5,
 } Descriptor_Tag;
 
-typedef struct {
+typedef struct Descriptor_Function {
   Function_Info info;
 } Descriptor_Function;
-typedef struct {
+typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
   u64 length;
 } Descriptor_Fixed_Size_Array;
-typedef struct {
+typedef struct Descriptor_Struct {
   Memory_Layout memory_layout;
 } Descriptor_Struct;
-typedef struct {
+typedef struct Descriptor_Pointer_To {
   const Descriptor * descriptor;
 } Descriptor_Pointer_To;
 typedef struct Descriptor {
@@ -900,52 +900,52 @@ typedef enum {
   Mass_Error_Tag_Undecidable_Overload = 17,
 } Mass_Error_Tag;
 
-typedef struct {
+typedef struct Mass_Error_User_Defined {
   Slice name;
 } Mass_Error_User_Defined;
-typedef struct {
+typedef struct Mass_Error_Integer_Range {
   const Descriptor * descriptor;
 } Mass_Error_Integer_Range;
-typedef struct {
+typedef struct Mass_Error_File_Open {
   Slice path;
 } Mass_Error_File_Open;
-typedef struct {
+typedef struct Mass_Error_Unexpected_Token {
   Slice expected;
 } Mass_Error_Unexpected_Token;
-typedef struct {
+typedef struct Mass_Error_Operator_Infix_Suffix_Conflict {
   Slice symbol;
 } Mass_Error_Operator_Infix_Suffix_Conflict;
-typedef struct {
+typedef struct Mass_Error_Operator_Prefix_Conflict {
   Slice symbol;
 } Mass_Error_Operator_Prefix_Conflict;
-typedef struct {
+typedef struct Mass_Error_Undefined_Variable {
   Slice name;
   u64 is_operator;
 } Mass_Error_Undefined_Variable;
-typedef struct {
+typedef struct Mass_Error_Redifinition {
   Slice name;
   Source_Range previous_source_range;
 } Mass_Error_Redifinition;
-typedef struct {
+typedef struct Mass_Error_Unknown_Field {
   const Descriptor * type;
   Slice name;
 } Mass_Error_Unknown_Field;
-typedef struct {
+typedef struct Mass_Error_Invalid_Identifier {
   Value * id;
 } Mass_Error_Invalid_Identifier;
-typedef struct {
+typedef struct Mass_Error_Type_Mismatch {
   const Descriptor * expected;
   const Descriptor * actual;
 } Mass_Error_Type_Mismatch;
-typedef struct {
+typedef struct Mass_Error_Epoch_Mismatch {
   Value * value;
   u64 expected_epoch;
 } Mass_Error_Epoch_Mismatch;
-typedef struct {
+typedef struct Mass_Error_No_Matching_Overload {
   Value * target;
   Array_Value_Ptr arguments;
 } Mass_Error_No_Matching_Overload;
-typedef struct {
+typedef struct Mass_Error_Undecidable_Overload {
   Value * a;
   Value * b;
 } Mass_Error_Undecidable_Overload;
@@ -977,7 +977,7 @@ typedef enum {
   Mass_Result_Tag_Error = 1,
 } Mass_Result_Tag;
 
-typedef struct {
+typedef struct Mass_Result_Error {
   Mass_Error error;
 } Mass_Result_Error;
 typedef struct Mass_Result {

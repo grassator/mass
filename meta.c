@@ -121,22 +121,30 @@ strtolower(
 }
 
 void
+print_c_struct(
+  FILE *file,
+  Struct *struct_,
+  const char *name
+) {
+  fprintf(file, "typedef struct %s {\n", name);
+  for (uint64_t i = 0; i < struct_->item_count; ++i) {
+    Struct_Item *item = &struct_->items[i];
+    fprintf(file, "  %s %s", item->type, item->name);
+    if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
+    fprintf(file, ";\n");
+  }
+  fprintf(file, "} %s;\n", name);
+}
+
+void
 print_c_type(
   FILE *file,
   Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
-      fprintf(file, "typedef struct %s {\n", type->struct_.name);
-      for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
-        Struct_Item *item = &type->struct_.items[i];
-        fprintf(file, "  %s %s", item->type, item->name);
-        if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
-        fprintf(file, ";\n");
-      }
-      fprintf(file, "} %s;\n", type->struct_.name);
-      fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n",
-        type->struct_.name, type->struct_.name);
+      print_c_struct(file, &type->struct_, type->struct_.name);
+      fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->struct_.name, type->struct_.name);
       break;
     }
     case Type_Tag_Enum: {
@@ -181,14 +189,9 @@ print_c_type(
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
           Struct *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
-            fprintf(file, "typedef struct {\n");
-            for (uint64_t item_index = 0; item_index < struct_->item_count; ++item_index) {
-              Struct_Item *item = &struct_->items[item_index];
-              fprintf(file, "  %s %s", item->type, item->name);
-              if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
-              fprintf(file, ";\n");
-            }
-            fprintf(file, "} %s_%s;\n", type->union_.name, struct_->name);
+            char name_buffer[1024];
+            assert(snprintf(name_buffer, countof(name_buffer), "%s_%s", type->union_.name, struct_->name) > 0);
+            print_c_struct(file, struct_, name_buffer);
           }
         }
       }
