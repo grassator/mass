@@ -45,7 +45,7 @@ typedef struct {
   const char *value_type;
   const char *hash_function;
   const char *equal_function;
-} Hash_Map;
+} Hash_Map_Type;
 
 typedef struct Type Type;
 
@@ -75,7 +75,7 @@ typedef struct Type {
   Enum_Type enum_;
   Tagged_Union_Type union_;
   Function function;
-  Hash_Map hash_map;
+  Hash_Map_Type hash_map;
 } Type;
 
 void
@@ -232,7 +232,7 @@ print_c_type(
       break;
     }
     case Type_Tag_Hash_Map: {
-      Hash_Map *map = &type->hash_map;
+      Hash_Map_Type *map = &type->hash_map;
       if (strcmp(map->key_type, "Slice") == 0) {
         assert(!map->hash_function);
         assert(!map->equal_function);
