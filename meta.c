@@ -30,12 +30,12 @@ typedef struct {
   const char *name;
   Struct_Item *items;
   uint64_t item_count;
-} Struct;
+} Struct_Type;
 
 typedef struct {
   const char *name;
-  Struct common;
-  Struct *items;
+  Struct_Type common;
+  Struct_Type *items;
   uint64_t item_count;
 } Tagged_Union;
 
@@ -71,7 +71,7 @@ typedef enum {
 
 typedef struct Type {
   Type_Tag tag;
-  Struct struct_;
+  Struct_Type struct_;
   Enum_Type enum_;
   Tagged_Union union_;
   Function function;
@@ -137,7 +137,7 @@ strtolower(
 void
 print_c_struct(
   FILE *file,
-  Struct *struct_,
+  Struct_Type *struct_,
   const char *name
 ) {
   fprintf(file, "typedef struct %s {\n", name);
@@ -185,7 +185,7 @@ print_c_type(
       {
         fprintf(file, "typedef enum {\n");
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *item = &type->union_.items[i];
+          Struct_Type *item = &type->union_.items[i];
           fprintf(file, "  %s_Tag_%s = %" PRIu64  ",\n", type->union_.name, item->name, i);
         }
         fprintf(file, "} %s_Tag;\n\n", type->union_.name);
@@ -194,7 +194,7 @@ print_c_type(
       // Write out individual structs
       {
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *struct_ = &type->union_.items[i];
+          Struct_Type *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
             char name_buffer[1024];
             assert(snprintf(name_buffer, countof(name_buffer), "%s_%s", type->union_.name, struct_->name) > 0);
@@ -214,7 +214,7 @@ print_c_type(
         }
         fprintf(file, "  union {\n");
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *struct_ = &type->union_.items[i];
+          Struct_Type *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
             fprintf(file, "    %s_%s %s;\n",
               type->union_.name, struct_->name, struct_->name);
@@ -274,7 +274,7 @@ hash_map_slice_template(Fixed_Array_Descriptor_Set, bool)
 void
 print_mass_array_descriptors_for_struct(
   FILE *file,
-  Struct *struct_
+  Struct_Type *struct_
 ) {
   static Fixed_Array_Descriptor_Set *already_defined_set = 0;
   if (!already_defined_set) already_defined_set = hash_map_make(Fixed_Array_Descriptor_Set);
@@ -313,7 +313,7 @@ print_mass_descriptor_fixed_array_types(
     }
     case Type_Tag_Tagged_Union: {
       for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-        Struct *struct_ = &type->union_.items[i];
+        Struct_Type *struct_ = &type->union_.items[i];
         print_mass_array_descriptors_for_struct(file, struct_);
       }
       break;
@@ -408,7 +408,7 @@ static void
 print_mass_struct(
   FILE *file,
   const char *struct_name,
-  Struct *struct_
+  Struct_Type *struct_
 ) {
   char *lowercase_name = strtolower(struct_name);
   fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, struct_name);
@@ -458,7 +458,7 @@ print_mass_descriptor_and_type(
 
         fprintf(file, "static C_Enum_Item %s_tag_items[] = {\n", lowercase_name);
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *item = &type->union_.items[i];
+          Struct_Type *item = &type->union_.items[i];
           fprintf(
             file, "{ .name = slice_literal_fields(\"%s\"), .value = %"PRIu64" },\n",
             item->name, i
@@ -470,7 +470,7 @@ print_mass_descriptor_and_type(
       // Write out individual structs
       {
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *struct_ = &type->union_.items[i];
+          Struct_Type *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
             char buffer[1024];
             s32 result = snprintf(buffer, countof(buffer), "%s_%s", type->union_.name, struct_->name);
@@ -497,7 +497,7 @@ print_mass_descriptor_and_type(
         }
 
         for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct *struct_ = &type->union_.items[i];
+          Struct_Type *struct_ = &type->union_.items[i];
           if (struct_->item_count) {
             const char *struct_lowercase_name = strtolower(struct_->name);
 
@@ -563,7 +563,7 @@ print_mass_descriptor_and_type(
 static inline Type
 add_common_fields_internal(
   Type type,
-  Struct common
+  Struct_Type common
 ) {
   assert(type.tag == Type_Tag_Tagged_Union);
   type.union_.common = common;
@@ -573,7 +573,7 @@ add_common_fields_internal(
 #define add_common_fields(_TYPE_, ...)\
   add_common_fields_internal(\
     _TYPE_,\
-    (Struct)struct_fields("", __VA_ARGS__)\
+    (Struct_Type)struct_fields("", __VA_ARGS__)\
   )
 
 #define type_struct(_NAME_STRING_, ...)\
@@ -681,7 +681,7 @@ main(void) {
     { "Value_View", "children" },
   }));
 
-  push_type(add_common_fields(type_union("Token_Pattern", (Struct[]){
+  push_type(add_common_fields(type_union("Token_Pattern", (Struct_Type[]){
     struct_empty("Invalid"),
     struct_empty("Any"),
     struct_fields("Symbol", (Struct_Item[]){
@@ -836,7 +836,7 @@ main(void) {
     { "u32", "has_value" },
   }));
 
-  push_type(type_union("Memory_Location", (Struct[]){
+  push_type(type_union("Memory_Location", (Struct_Type[]){
     struct_fields("Instruction_Pointer_Relative", (Struct_Item[]){
       { "Label_Index", "label_index" },
     }),
@@ -848,7 +848,7 @@ main(void) {
     }),
   }));
 
-  push_type(type_union("Static_Memory", (Struct[]){
+  push_type(type_union("Static_Memory", (Struct_Type[]){
     //struct_fields("S8", (Struct_Item[]){{ "s8", "value" }}),
     //struct_fields("S16", (Struct_Item[]){{ "s16", "value" }}),
     //struct_fields("S32", (Struct_Item[]){{ "s32", "value" }}),
@@ -862,7 +862,7 @@ main(void) {
     }),
   }));
 
-  push_type(add_common_fields(type_union("Storage", (Struct[]){
+  push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),
     struct_empty("Any"),
     struct_fields("Eflags", (Struct_Item[]){
@@ -896,7 +896,7 @@ main(void) {
     { "u64", "line_number" },
   }));
 
-  push_type(add_common_fields(type_union("Instruction", (Struct[]){
+  push_type(add_common_fields(type_union("Instruction", (Struct_Type[]){
     struct_fields("Assembly", (Struct_Item[]){
       { "const X64_Mnemonic *", "mnemonic" },
       { "Storage", "operands", 3 },
@@ -982,7 +982,7 @@ main(void) {
     { "void *", "handler_payload" },
   }));
 
-  push_type(add_common_fields(type_union("Scope_Entry", (Struct[]){
+  push_type(add_common_fields(type_union("Scope_Entry", (Struct_Type[]){
     struct_fields("Value", (Struct_Item[]){
       { "Value *", "value" },
     }),
@@ -1013,7 +1013,7 @@ main(void) {
     { "Eflags", 1 << 4 },
   }));
 
-  push_type(type_union("Expected_Result", (Struct[]){
+  push_type(type_union("Expected_Result", (Struct_Type[]){
     struct_fields("Exact", (Struct_Item[]){
       { "Value *", "value" },
     }),
@@ -1052,7 +1052,7 @@ main(void) {
     { "Compile_Time", 1 << 3 },
   }));
 
-  push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct[]){
+  push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct_Type[]){
     struct_fields("Absolute", (Struct_Item[]){
       { "Storage", "storage" },
     }),
@@ -1085,7 +1085,7 @@ main(void) {
     { "Function_Return", "returns" },
   }));
 
-  push_type(add_common_fields(type_union("Descriptor", (Struct[]){
+  push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Void"),
     struct_empty("Opaque"),
     struct_fields("Function", (Struct_Item[]){
@@ -1107,7 +1107,7 @@ main(void) {
     { "u64", "bit_alignment" },
   }));
 
-  push_type(add_common_fields(type_union("Mass_Error", (Struct[]){
+  push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
     struct_fields("User_Defined", (Struct_Item[]){
       { "Slice", "name" },
@@ -1166,7 +1166,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_union("Mass_Result", (Struct[]){
+  push_type(type_union("Mass_Result", (Struct_Type[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
       { "Mass_Error", "error" },
