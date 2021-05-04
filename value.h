@@ -160,21 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-typedef struct Function_Builder {
-  bool frozen;
-  s32 stack_reserve;
-  u32 max_call_parameters_stack_size;
-  Code_Block code_block;
-  u64 used_register_bitset;
-  Slice source;
-
-  const Function_Info *function;
-  Label_Index label_index;
-} Function_Builder;
-typedef dyn_array_type(Function_Builder) Array_Function_Builder;
-
-MASS_DEFINE_OPAQUE_C_TYPE(function_builder, Function_Builder);
-
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;

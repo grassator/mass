@@ -885,6 +885,17 @@ main(void) {
     { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
   }));
 
+  push_type(type_struct("Function_Builder", (Struct_Item[]){
+    { "u64", "frozen" },
+    { "s32", "stack_reserve" },
+    { "u32", "max_call_parameters_stack_size" },
+    { "Code_Block", "code_block" },
+    { "u64", "used_register_bitset" },
+    { "Slice", "source" },
+    { "const Function_Info *", "function" },
+    { "Label_Index", "label_index" },
+  }));
+
   push_type(type_enum("Function_Argument_Mode", (Enum_Item[]){
     { "Call", 0 },
     { "Body", 1 },

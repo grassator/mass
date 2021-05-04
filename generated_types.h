@@ -137,6 +137,10 @@ typedef struct Code_Block Code_Block;
 typedef dyn_array_type(Code_Block *) Array_Code_Block_Ptr;
 typedef dyn_array_type(const Code_Block *) Array_Const_Code_Block_Ptr;
 
+typedef struct Function_Builder Function_Builder;
+typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
+typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
+
 typedef enum Function_Argument_Mode Function_Argument_Mode;
 
 typedef enum Operator_Fixity Operator_Fixity;
@@ -693,6 +697,18 @@ typedef struct Code_Block {
   Value * register_occupied_values[36];
 } Code_Block;
 typedef dyn_array_type(Code_Block) Array_Code_Block;
+
+typedef struct Function_Builder {
+  u64 frozen;
+  s32 stack_reserve;
+  u32 max_call_parameters_stack_size;
+  Code_Block code_block;
+  u64 used_register_bitset;
+  Slice source;
+  const Function_Info * function;
+  Label_Index label_index;
+} Function_Builder;
+typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 typedef enum Function_Argument_Mode {
   Function_Argument_Mode_Call = 0,
@@ -1252,6 +1268,11 @@ static Descriptor descriptor_array_code_block;
 static Descriptor descriptor_array_code_block_ptr;
 static Descriptor descriptor_code_block_pointer;
 static Descriptor descriptor_code_block_pointer_pointer;
+static Descriptor descriptor_function_builder;
+static Descriptor descriptor_array_function_builder;
+static Descriptor descriptor_array_function_builder_ptr;
+static Descriptor descriptor_function_builder_pointer;
+static Descriptor descriptor_function_builder_pointer_pointer;
 static Descriptor descriptor_function_argument_mode;
 static Descriptor descriptor_array_function_argument_mode;
 static Descriptor descriptor_array_function_argument_mode_ptr;
@@ -2377,6 +2398,59 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   },
 );
 MASS_DEFINE_TYPE_VALUE(code_block);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("frozen"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Function_Builder, frozen),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("stack_reserve"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Function_Builder, stack_reserve),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("max_call_parameters_stack_size"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Function_Builder, max_call_parameters_stack_size),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("code_block"),
+    .descriptor = &descriptor_code_block,
+    .Base_Relative.offset = offsetof(Function_Builder, code_block),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("used_register_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Function_Builder, used_register_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("source"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Function_Builder, source),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("function"),
+    .descriptor = &descriptor_function_info_pointer,
+    .Base_Relative.offset = offsetof(Function_Builder, function),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("label_index"),
+    .descriptor = &descriptor_label_index,
+    .Base_Relative.offset = offsetof(Function_Builder, label_index),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_builder);
 MASS_DEFINE_OPAQUE_C_TYPE(function_argument_mode, Function_Argument_Mode)
 static C_Enum_Item function_argument_mode_items[] = {
 { .name = slice_literal_fields("Call"), .value = 0 },
