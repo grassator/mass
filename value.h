@@ -200,13 +200,6 @@ typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 MASS_DEFINE_OPAQUE_C_TYPE(function_builder, Function_Builder);
 
 typedef struct {
-  Virtual_Memory_Buffer buffer;
-  Section rw_data;
-  Section code;
-  Section ro_data;
-} Program_Memory;
-
-typedef struct {
   Storage patch_at;
   Storage address_of;
 } Relocation;

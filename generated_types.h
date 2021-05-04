@@ -63,6 +63,10 @@ typedef struct Section Section;
 typedef dyn_array_type(Section *) Array_Section_Ptr;
 typedef dyn_array_type(const Section *) Array_Const_Section_Ptr;
 
+typedef struct Program_Memory Program_Memory;
+typedef dyn_array_type(Program_Memory *) Array_Program_Memory_Ptr;
+typedef dyn_array_type(const Program_Memory *) Array_Const_Program_Memory_Ptr;
+
 typedef enum Register Register;
 
 typedef struct Label_Index Label_Index;
@@ -347,6 +351,14 @@ typedef struct Section {
   Section_Permissions permissions;
 } Section;
 typedef dyn_array_type(Section) Array_Section;
+
+typedef struct Program_Memory {
+  Virtual_Memory_Buffer buffer;
+  Section rw_data;
+  Section code;
+  Section ro_data;
+} Program_Memory;
+typedef dyn_array_type(Program_Memory) Array_Program_Memory;
 
 typedef enum Register {
   Register_A = 0,
@@ -1121,6 +1133,11 @@ static Descriptor descriptor_array_section;
 static Descriptor descriptor_array_section_ptr;
 static Descriptor descriptor_section_pointer;
 static Descriptor descriptor_section_pointer_pointer;
+static Descriptor descriptor_program_memory;
+static Descriptor descriptor_array_program_memory;
+static Descriptor descriptor_array_program_memory_ptr;
+static Descriptor descriptor_program_memory_pointer;
+static Descriptor descriptor_program_memory_pointer_pointer;
 static Descriptor descriptor_register;
 static Descriptor descriptor_array_register;
 static Descriptor descriptor_array_register_ptr;
@@ -1604,6 +1621,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(section, Section,
   },
 );
 MASS_DEFINE_TYPE_VALUE(section);
+MASS_DEFINE_OPAQUE_C_TYPE(array_program_memory_ptr, Array_Program_Memory_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_program_memory, Array_Program_Memory)
+MASS_DEFINE_STRUCT_DESCRIPTOR(program_memory, Program_Memory,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("buffer"),
+    .descriptor = &descriptor_virtual_memory_buffer,
+    .Base_Relative.offset = offsetof(Program_Memory, buffer),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("rw_data"),
+    .descriptor = &descriptor_section,
+    .Base_Relative.offset = offsetof(Program_Memory, rw_data),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("code"),
+    .descriptor = &descriptor_section,
+    .Base_Relative.offset = offsetof(Program_Memory, code),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("ro_data"),
+    .descriptor = &descriptor_section,
+    .Base_Relative.offset = offsetof(Program_Memory, ro_data),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(program_memory);
 MASS_DEFINE_OPAQUE_C_TYPE(register, Register)
 static C_Enum_Item register_items[] = {
 { .name = slice_literal_fields("A"), .value = 0 },

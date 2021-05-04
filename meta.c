@@ -670,6 +670,13 @@ main(void) {
     { "Section_Permissions", "permissions" },
   }));
 
+  push_type(type_struct("Program_Memory", (Struct_Item[]){
+    { "Virtual_Memory_Buffer", "buffer" },
+    { "Section", "rw_data" },
+    { "Section", "code" },
+    { "Section", "ro_data" },
+  }));
+
   push_type(type_enum("Register", (Enum_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
