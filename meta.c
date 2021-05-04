@@ -60,15 +60,15 @@ typedef struct {
 } Function_Type;
 
 typedef enum {
-  Type_Tag_Struct,
-  Type_Tag_Tagged_Union,
-  Type_Tag_Enum,
-  Type_Tag_Function,
-  Type_Tag_Hash_Map,
-} Type_Tag;
+  Meta_Type_Tag_Struct,
+  Meta_Type_Tag_Tagged_Union,
+  Meta_Type_Tag_Enum,
+  Meta_Type_Tag_Function,
+  Meta_Type_Tag_Hash_Map,
+} Meta_Type_Tag;
 
 typedef struct {
-  Type_Tag tag;
+  Meta_Type_Tag tag;
   Struct_Type struct_;
   Enum_Type enum_;
   Tagged_Union_Type union_;
@@ -82,7 +82,7 @@ print_c_type_forward_declaration(
   Meta_Type *type
 ) {
   switch(type->tag) {
-    case Type_Tag_Struct: {
+    case Meta_Type_Tag_Struct: {
       fprintf(file, "typedef struct %s %s;\n", type->struct_.name, type->struct_.name);
       fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n",
         type->struct_.name, type->struct_.name);
@@ -90,11 +90,11 @@ print_c_type_forward_declaration(
         type->struct_.name, type->struct_.name);
       break;
     }
-    case Type_Tag_Enum: {
+    case Meta_Type_Tag_Enum: {
       fprintf(file, "typedef enum %s %s;\n", type->enum_.name, type->enum_.name);
       break;
     }
-    case Type_Tag_Tagged_Union: {
+    case Meta_Type_Tag_Tagged_Union: {
       fprintf(file, "typedef struct %s %s;\n", type->union_.name, type->union_.name);
       fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n",
         type->union_.name, type->union_.name);
@@ -102,7 +102,7 @@ print_c_type_forward_declaration(
         type->union_.name, type->union_.name);
       break;
     }
-    case Type_Tag_Function: {
+    case Meta_Type_Tag_Function: {
       fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
       for (uint64_t i = 0; i < type->function.argument_count; ++i) {
         Argument_Type *arg = &type->function.arguments[i];
@@ -112,7 +112,7 @@ print_c_type_forward_declaration(
       fprintf(file, ");\n");
       break;
     }
-    case Type_Tag_Hash_Map: {
+    case Meta_Type_Tag_Hash_Map: {
       fprintf(file, "typedef struct %s %s;\n", type->hash_map.name, type->hash_map.name);
       break;
     }
@@ -154,12 +154,12 @@ print_c_type(
   Meta_Type *type
 ) {
   switch(type->tag) {
-    case Type_Tag_Struct: {
+    case Meta_Type_Tag_Struct: {
       print_c_struct(file, &type->struct_, type->struct_.name);
       fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->struct_.name, type->struct_.name);
       break;
     }
-    case Type_Tag_Enum: {
+    case Meta_Type_Tag_Enum: {
       fprintf(file, "typedef enum %s {\n", type->enum_.name);
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
         Enum_Type_Item *item = &type->enum_.items[i];
@@ -178,7 +178,7 @@ print_c_type(
       fprintf(file, "};\n\n");
       break;
     }
-    case Type_Tag_Tagged_Union: {
+    case Meta_Type_Tag_Tagged_Union: {
       // Write out the enum
       {
         fprintf(file, "typedef enum {\n");
@@ -225,11 +225,11 @@ print_c_type(
       }
       break;
     }
-    case Type_Tag_Function: {
+    case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
       break;
     }
-    case Type_Tag_Hash_Map: {
+    case Meta_Type_Tag_Hash_Map: {
       Hash_Map_Type *map = &type->hash_map;
       if (strcmp(map->key_type, "Slice") == 0) {
         assert(!map->hash_function);
@@ -305,20 +305,20 @@ print_mass_descriptor_fixed_array_types(
   Meta_Type *type
 ) {
   switch(type->tag) {
-    case Type_Tag_Struct: {
+    case Meta_Type_Tag_Struct: {
       print_mass_array_descriptors_for_struct(file, &type->struct_);
       break;
     }
-    case Type_Tag_Tagged_Union: {
+    case Meta_Type_Tag_Tagged_Union: {
       for (uint64_t i = 0; i < type->union_.item_count; ++i) {
         Struct_Type *struct_ = &type->union_.items[i];
         print_mass_array_descriptors_for_struct(file, struct_);
       }
       break;
     }
-    case Type_Tag_Enum:
-    case Type_Tag_Function:
-    case Type_Tag_Hash_Map: {
+    case Meta_Type_Tag_Enum:
+    case Meta_Type_Tag_Function:
+    case Meta_Type_Tag_Hash_Map: {
       break;
     }
   }
@@ -330,7 +330,7 @@ print_mass_descriptor_and_type_forward_declaration(
   Meta_Type *type
 ) {
   switch(type->tag) {
-    case Type_Tag_Struct: {
+    case Meta_Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
@@ -339,7 +339,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
-    case Type_Tag_Enum: {
+    case Meta_Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
@@ -348,7 +348,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
-    case Type_Tag_Tagged_Union: {
+    case Meta_Type_Tag_Tagged_Union: {
       char *lowercase_name = strtolower(type->union_.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
@@ -357,12 +357,12 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
     }
-    case Type_Tag_Function: {
+    case Meta_Type_Tag_Function: {
       char *lowercase_name = strtolower(type->function.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       break;
     }
-    case Type_Tag_Hash_Map: {
+    case Meta_Type_Tag_Hash_Map: {
       char *lowercase_name = strtolower(type->hash_map.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s);\n", lowercase_name, type->hash_map.name);
       break;
@@ -424,14 +424,14 @@ print_mass_descriptor_and_type(
   Meta_Type *type
 ) {
   switch(type->tag) {
-    case Type_Tag_Struct: {
+    case Meta_Type_Tag_Struct: {
       char *lowercase_name = strtolower(type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->struct_.name);
       print_mass_struct(file, type->struct_.name, &type->struct_);
       break;
     }
-    case Type_Tag_Enum: {
+    case Meta_Type_Tag_Enum: {
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->enum_.name);
 
@@ -446,7 +446,7 @@ print_mass_descriptor_and_type(
       fprintf(file, "};\n");
       break;
     }
-    case Type_Tag_Tagged_Union: {
+    case Meta_Type_Tag_Tagged_Union: {
       fprintf(file, "/*union struct start */\n");
       char *lowercase_name = strtolower(type->union_.name);
 
@@ -513,11 +513,11 @@ print_mass_descriptor_and_type(
       fprintf(file, "/*union struct end*/\n");
       break;
     }
-    case Type_Tag_Function: {
+    case Meta_Type_Tag_Function: {
       // TODO
       break;
     }
-    case Type_Tag_Hash_Map: {
+    case Meta_Type_Tag_Hash_Map: {
       // TODO
       break;
     }
@@ -540,7 +540,7 @@ print_mass_descriptor_and_type(
 
 #define type_enum(_NAME_STRING_, ...)\
   (Meta_Type){\
-    .tag = Type_Tag_Enum,\
+    .tag = Meta_Type_Tag_Enum,\
     .enum_ = {\
       .name = _NAME_STRING_,\
       .items = (__VA_ARGS__),\
@@ -550,7 +550,7 @@ print_mass_descriptor_and_type(
 
 #define type_union(_NAME_STRING_, ...)\
   (Meta_Type){\
-    .tag = Type_Tag_Tagged_Union,\
+    .tag = Meta_Type_Tag_Tagged_Union,\
     .union_ = {\
       .name = _NAME_STRING_,\
       .items = (__VA_ARGS__),\
@@ -563,7 +563,7 @@ add_common_fields_internal(
   Meta_Type type,
   Struct_Type common
 ) {
-  assert(type.tag == Type_Tag_Tagged_Union);
+  assert(type.tag == Meta_Type_Tag_Tagged_Union);
   type.union_.common = common;
   return type;
 }
@@ -576,19 +576,19 @@ add_common_fields_internal(
 
 #define type_struct(_NAME_STRING_, ...)\
   (Meta_Type){\
-    .tag = Type_Tag_Struct,\
+    .tag = Meta_Type_Tag_Struct,\
     .struct_ = struct_fields(_NAME_STRING_, __VA_ARGS__)\
   }
 
 #define type_hash_map(...)\
   (Meta_Type){\
-    .tag = Type_Tag_Hash_Map,\
+    .tag = Meta_Type_Tag_Hash_Map,\
     .hash_map = __VA_ARGS__\
   }
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
   (Meta_Type){\
-    .tag = Type_Tag_Function,\
+    .tag = Meta_Type_Tag_Function,\
     .function = {\
       .name = (_NAME_STRING_),\
       .returns = (_RETURNS_),\
