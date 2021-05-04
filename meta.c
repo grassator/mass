@@ -148,19 +148,12 @@ print_c_type(
       break;
     }
     case Type_Tag_Enum: {
-      s32 max_value = INT32_MIN;
-      s32 min_value = INT32_MAX;
       fprintf(file, "typedef enum %s {\n", type->enum_.name);
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
         Enum_Item *item = &type->enum_.items[i];
         fprintf(file, "  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
-        max_value = s32_max(max_value, item->value);
-        min_value = s32_min(min_value, item->value);
       }
       fprintf(file, "} %s;\n\n", type->enum_.name);
-
-      fprintf(file, "#define %s__Max %i\n", type->enum_.name, max_value);
-      fprintf(file, "#define %s__Min %i\n\n", type->enum_.name, min_value);
 
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->enum_.name);

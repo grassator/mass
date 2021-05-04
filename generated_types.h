@@ -235,9 +235,6 @@ typedef enum Module_Flags {
   Module_Flags_Has_Exports = 1,
 } Module_Flags;
 
-#define Module_Flags__Max 1
-#define Module_Flags__Min 1
-
 const char *module_flags_name(Module_Flags value) {
   if (value == 1) return "Module_Flags_Has_Exports";
   assert(!"Unexpected value for enum Module_Flags");
@@ -266,9 +263,6 @@ typedef enum Group_Tag {
   Group_Tag_Curly = 3,
 } Group_Tag;
 
-#define Group_Tag__Max 3
-#define Group_Tag__Min 1
-
 const char *group_tag_name(Group_Tag value) {
   if (value == 1) return "Group_Tag_Paren";
   if (value == 2) return "Group_Tag_Square";
@@ -288,9 +282,6 @@ typedef enum Symbol_Type {
   Symbol_Type_Id_Like = 1,
   Symbol_Type_Operator_Like = 2,
 } Symbol_Type;
-
-#define Symbol_Type__Max 2
-#define Symbol_Type__Min 1
 
 const char *symbol_type_name(Symbol_Type value) {
   if (value == 1) return "Symbol_Type_Id_Like";
@@ -346,9 +337,6 @@ typedef enum Section_Permissions {
   Section_Permissions_Write = 2,
   Section_Permissions_Execute = 4,
 } Section_Permissions;
-
-#define Section_Permissions__Max 4
-#define Section_Permissions__Min 1
 
 const char *section_permissions_name(Section_Permissions value) {
   if (value == 1) return "Section_Permissions_Read";
@@ -412,9 +400,6 @@ typedef enum Register {
   Register_Xmm14 = 30,
   Register_Xmm15 = 31,
 } Register;
-
-#define Register__Max 31
-#define Register__Min 0
 
 const char *register_name(Register value) {
   if (value == 0) return "Register_A";
@@ -483,9 +468,6 @@ typedef enum Number_Base {
   Number_Base_16 = 16,
 } Number_Base;
 
-#define Number_Base__Max 16
-#define Number_Base__Min 2
-
 const char *number_base_name(Number_Base value) {
   if (value == 2) return "Number_Base_2";
   if (value == 10) return "Number_Base_10";
@@ -539,9 +521,6 @@ typedef enum Compare_Type {
   Compare_Type_Signed_Greater = 9,
   Compare_Type_Signed_Greater_Equal = 10,
 } Compare_Type;
-
-#define Compare_Type__Max 10
-#define Compare_Type__Min 1
 
 const char *compare_type_name(Compare_Type value) {
   if (value == 1) return "Compare_Type_Equal";
@@ -720,9 +699,6 @@ typedef enum Function_Argument_Mode {
   Function_Argument_Mode_Body = 1,
 } Function_Argument_Mode;
 
-#define Function_Argument_Mode__Max 1
-#define Function_Argument_Mode__Min 0
-
 const char *function_argument_mode_name(Function_Argument_Mode value) {
   if (value == 0) return "Function_Argument_Mode_Call";
   if (value == 1) return "Function_Argument_Mode_Body";
@@ -736,9 +712,6 @@ typedef enum Operator_Fixity {
   Operator_Fixity_Postfix = 4,
 } Operator_Fixity;
 
-#define Operator_Fixity__Max 4
-#define Operator_Fixity__Min 1
-
 const char *operator_fixity_name(Operator_Fixity value) {
   if (value == 1) return "Operator_Fixity_Infix";
   if (value == 2) return "Operator_Fixity_Prefix";
@@ -751,9 +724,6 @@ typedef enum Operator_Associativity {
   Operator_Associativity_Left = 0,
   Operator_Associativity_Right = 1,
 } Operator_Associativity;
-
-#define Operator_Associativity__Max 1
-#define Operator_Associativity__Min 0
 
 const char *operator_associativity_name(Operator_Associativity value) {
   if (value == 0) return "Operator_Associativity_Left";
@@ -837,9 +807,6 @@ typedef enum Expected_Result_Storage {
   Expected_Result_Storage_Eflags = 16,
 } Expected_Result_Storage;
 
-#define Expected_Result_Storage__Max 16
-#define Expected_Result_Storage__Min 0
-
 const char *expected_result_storage_name(Expected_Result_Storage value) {
   if (value == 0) return "Expected_Result_Storage_None";
   if (value == 1) return "Expected_Result_Storage_Static";
@@ -889,9 +856,6 @@ typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_No_Own_Return = 4,
   Descriptor_Function_Flags_Compile_Time = 8,
 } Descriptor_Function_Flags;
-
-#define Descriptor_Function_Flags__Max 8
-#define Descriptor_Function_Flags__Min 0
 
 const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   if (value == 0) return "Descriptor_Function_Flags_None";
