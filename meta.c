@@ -845,6 +845,11 @@ main(void) {
     { "u64", "byte_size" },
   }));
 
+  push_type(type_struct("Relocation", (Struct_Item[]){
+    { "Storage", "patch_at" },
+    { "Storage", "address_of" },
+  }));
+
   push_type(type_struct("Compiler_Source_Location", (Struct_Item[]){
     { "const char *", "filename" },
     { "const char *", "function_name" },
@@ -870,6 +875,11 @@ main(void) {
     { "Source_Range", "source_range" },
     { "Scope *", "scope" },
     { "u64", "encoded_byte_size" },
+  }));
+
+  push_type(type_enum("Function_Argument_Mode", (Enum_Item[]){
+    { "Call", 0 },
+    { "Body", 1 },
   }));
 
   push_type(type_enum("Operator_Fixity", (Enum_Item[]){

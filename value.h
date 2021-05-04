@@ -169,11 +169,6 @@ typedef struct {
 } Code_Block;
 static_assert(Register__Min == 0, "Should be psosible to use register indexes as array indexes");
 
-typedef enum {
-  Function_Argument_Mode_Call,
-  Function_Argument_Mode_Body,
-} Function_Argument_Mode;
-
 typedef struct {
   s32 stack_reserve;
   u8 size_of_prolog;
@@ -198,12 +193,6 @@ typedef struct Function_Builder {
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
 MASS_DEFINE_OPAQUE_C_TYPE(function_builder, Function_Builder);
-
-typedef struct {
-  Storage patch_at;
-  Storage address_of;
-} Relocation;
-typedef dyn_array_type(Relocation) Array_Relocation;
 
 typedef struct Program {
   Array_Import_Library import_libraries;

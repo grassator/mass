@@ -121,6 +121,10 @@ typedef struct Storage Storage;
 typedef dyn_array_type(Storage *) Array_Storage_Ptr;
 typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
 
+typedef struct Relocation Relocation;
+typedef dyn_array_type(Relocation *) Array_Relocation_Ptr;
+typedef dyn_array_type(const Relocation *) Array_Const_Relocation_Ptr;
+
 typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
@@ -128,6 +132,8 @@ typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_So
 typedef struct Instruction Instruction;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
+
+typedef enum Function_Argument_Mode Function_Argument_Mode;
 
 typedef enum Operator_Fixity Operator_Fixity;
 
@@ -646,6 +652,12 @@ typedef struct Storage {
   };
 } Storage;
 typedef dyn_array_type(Storage) Array_Storage;
+typedef struct Relocation {
+  Storage patch_at;
+  Storage address_of;
+} Relocation;
+typedef dyn_array_type(Relocation) Array_Relocation;
+
 typedef struct Compiler_Source_Location {
   const char * filename;
   const char * function_name;
@@ -686,6 +698,21 @@ typedef struct Instruction {
   };
 } Instruction;
 typedef dyn_array_type(Instruction) Array_Instruction;
+typedef enum Function_Argument_Mode {
+  Function_Argument_Mode_Call = 0,
+  Function_Argument_Mode_Body = 1,
+} Function_Argument_Mode;
+
+#define Function_Argument_Mode__Max 1
+#define Function_Argument_Mode__Min 0
+
+const char *function_argument_mode_name(Function_Argument_Mode value) {
+  if (value == 0) return "Function_Argument_Mode_Call";
+  if (value == 1) return "Function_Argument_Mode_Body";
+  assert(!"Unexpected value for enum Function_Argument_Mode");
+  return 0;
+};
+
 typedef enum Operator_Fixity {
   Operator_Fixity_Infix = 1,
   Operator_Fixity_Prefix = 2,
@@ -1213,6 +1240,11 @@ static Descriptor descriptor_array_storage;
 static Descriptor descriptor_array_storage_ptr;
 static Descriptor descriptor_storage_pointer;
 static Descriptor descriptor_storage_pointer_pointer;
+static Descriptor descriptor_relocation;
+static Descriptor descriptor_array_relocation;
+static Descriptor descriptor_array_relocation_ptr;
+static Descriptor descriptor_relocation_pointer;
+static Descriptor descriptor_relocation_pointer_pointer;
 static Descriptor descriptor_compiler_source_location;
 static Descriptor descriptor_array_compiler_source_location;
 static Descriptor descriptor_array_compiler_source_location_ptr;
@@ -1223,6 +1255,11 @@ static Descriptor descriptor_array_instruction;
 static Descriptor descriptor_array_instruction_ptr;
 static Descriptor descriptor_instruction_pointer;
 static Descriptor descriptor_instruction_pointer_pointer;
+static Descriptor descriptor_function_argument_mode;
+static Descriptor descriptor_array_function_argument_mode;
+static Descriptor descriptor_array_function_argument_mode_ptr;
+static Descriptor descriptor_function_argument_mode_pointer;
+static Descriptor descriptor_function_argument_mode_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
@@ -2151,6 +2188,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
 );
 MASS_DEFINE_TYPE_VALUE(storage);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_relocation_ptr, Array_Relocation_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_relocation, Array_Relocation)
+MASS_DEFINE_STRUCT_DESCRIPTOR(relocation, Relocation,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("patch_at"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Relocation, patch_at),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("address_of"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Relocation, address_of),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(relocation);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location_ptr, Array_Compiler_Source_Location_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compiler_source_location, Array_Compiler_Source_Location)
 MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location, Compiler_Source_Location,
@@ -2284,6 +2338,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
 );
 MASS_DEFINE_TYPE_VALUE(instruction);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(function_argument_mode, Function_Argument_Mode)
+static C_Enum_Item function_argument_mode_items[] = {
+{ .name = slice_literal_fields("Call"), .value = 0 },
+{ .name = slice_literal_fields("Body"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 static C_Enum_Item operator_fixity_items[] = {
 { .name = slice_literal_fields("Infix"), .value = 1 },
