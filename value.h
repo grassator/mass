@@ -169,16 +169,6 @@ typedef struct {
 } Code_Block;
 static_assert(Register__Min == 0, "Should be psosible to use register indexes as array indexes");
 
-typedef struct {
-  s32 stack_reserve;
-  u8 size_of_prolog;
-  u32 begin_rva;
-  u32 end_rva;
-  u8 stack_allocation_offset_in_prolog;
-  u8 volatile_register_push_offsets[16];
-} Function_Layout;
-typedef dyn_array_type(Function_Layout) Array_Function_Layout;
-
 typedef struct Function_Builder {
   bool frozen;
   s32 stack_reserve;

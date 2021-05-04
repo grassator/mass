@@ -139,6 +139,10 @@ typedef enum Operator_Fixity Operator_Fixity;
 
 typedef enum Operator_Associativity Operator_Associativity;
 
+typedef struct Function_Layout Function_Layout;
+typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
+typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
+
 typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
 typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
@@ -745,6 +749,17 @@ const char *operator_associativity_name(Operator_Associativity value) {
   return 0;
 };
 
+typedef struct Function_Layout {
+  s32 stack_reserve;
+  u8 stack_allocation_offset_in_prolog;
+  u8 size_of_prolog;
+  u16 _padding;
+  u32 begin_rva;
+  u32 end_rva;
+  u8 volatile_register_push_offsets[16];
+} Function_Layout;
+typedef dyn_array_type(Function_Layout) Array_Function_Layout;
+
 typedef struct Execution_Context {
   Allocator * allocator;
   Compilation * compilation;
@@ -1270,6 +1285,11 @@ static Descriptor descriptor_array_operator_associativity;
 static Descriptor descriptor_array_operator_associativity_ptr;
 static Descriptor descriptor_operator_associativity_pointer;
 static Descriptor descriptor_operator_associativity_pointer_pointer;
+static Descriptor descriptor_function_layout;
+static Descriptor descriptor_array_function_layout;
+static Descriptor descriptor_array_function_layout_ptr;
+static Descriptor descriptor_function_layout_pointer;
+static Descriptor descriptor_function_layout_pointer_pointer;
 static Descriptor descriptor_execution_context;
 static Descriptor descriptor_array_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
@@ -1354,6 +1374,7 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
+static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position, Source_Position,
@@ -2354,6 +2375,53 @@ static C_Enum_Item operator_associativity_items[] = {
 { .name = slice_literal_fields("Left"), .value = 0 },
 { .name = slice_literal_fields("Right"), .value = 1 },
 };
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout_ptr, Array_Function_Layout_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_layout, Array_Function_Layout)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("stack_reserve"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Function_Layout, stack_reserve),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("stack_allocation_offset_in_prolog"),
+    .descriptor = &descriptor_u8,
+    .Base_Relative.offset = offsetof(Function_Layout, stack_allocation_offset_in_prolog),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("size_of_prolog"),
+    .descriptor = &descriptor_u8,
+    .Base_Relative.offset = offsetof(Function_Layout, size_of_prolog),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("_padding"),
+    .descriptor = &descriptor_u16,
+    .Base_Relative.offset = offsetof(Function_Layout, _padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("begin_rva"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Function_Layout, begin_rva),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("end_rva"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Function_Layout, end_rva),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("volatile_register_push_offsets"),
+    .descriptor = &descriptor_u8_16,
+    .Base_Relative.offset = offsetof(Function_Layout, volatile_register_push_offsets),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_layout);
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context_ptr, Array_Execution_Context_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context, Array_Execution_Context)
 MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,

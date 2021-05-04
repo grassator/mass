@@ -899,6 +899,16 @@ main(void) {
     { "Right", 1 },
   }));
 
+  push_type(type_struct("Function_Layout", (Struct_Item[]){
+    { "s32", "stack_reserve" },
+    { "u8", "stack_allocation_offset_in_prolog" },
+    { "u8", "size_of_prolog" },
+    { "u16", "_padding" },
+    { "u32", "begin_rva" },
+    { "u32", "end_rva" },
+    { "u8", "volatile_register_push_offsets", 16 },
+  }));
+
   push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
     { "Compilation *", "compilation" },
