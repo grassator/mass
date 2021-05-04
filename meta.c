@@ -47,8 +47,6 @@ typedef struct {
   const char *equal_function;
 } Hash_Map_Type;
 
-typedef struct Type Type;
-
 typedef struct {
   const char *type;
   const char *name;
@@ -69,19 +67,19 @@ typedef enum {
   Type_Tag_Hash_Map,
 } Type_Tag;
 
-typedef struct Type {
+typedef struct {
   Type_Tag tag;
   Struct_Type struct_;
   Enum_Type enum_;
   Tagged_Union_Type union_;
   Function_Type function;
   Hash_Map_Type hash_map;
-} Type;
+} Meta_Type;
 
 void
 print_c_type_forward_declaration(
   FILE *file,
-  Type *type
+  Meta_Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
@@ -153,7 +151,7 @@ print_c_struct(
 void
 print_c_type(
   FILE *file,
-  Type *type
+  Meta_Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
@@ -304,7 +302,7 @@ print_mass_array_descriptors_for_struct(
 void
 print_mass_descriptor_fixed_array_types(
   FILE *file,
-  Type *type
+  Meta_Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
@@ -329,7 +327,7 @@ print_mass_descriptor_fixed_array_types(
 void
 print_mass_descriptor_and_type_forward_declaration(
   FILE *file,
-  Type *type
+  Meta_Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
@@ -423,7 +421,7 @@ print_mass_struct(
 static void
 print_mass_descriptor_and_type(
   FILE *file,
-  Type *type
+  Meta_Type *type
 ) {
   switch(type->tag) {
     case Type_Tag_Struct: {
@@ -541,7 +539,7 @@ print_mass_descriptor_and_type(
   }
 
 #define type_enum(_NAME_STRING_, ...)\
-  (Type){\
+  (Meta_Type){\
     .tag = Type_Tag_Enum,\
     .enum_ = {\
       .name = _NAME_STRING_,\
@@ -551,7 +549,7 @@ print_mass_descriptor_and_type(
   }
 
 #define type_union(_NAME_STRING_, ...)\
-  (Type){\
+  (Meta_Type){\
     .tag = Type_Tag_Tagged_Union,\
     .union_ = {\
       .name = _NAME_STRING_,\
@@ -560,9 +558,9 @@ print_mass_descriptor_and_type(
     }\
   }
 
-static inline Type
+static inline Meta_Type
 add_common_fields_internal(
-  Type type,
+  Meta_Type type,
   Struct_Type common
 ) {
   assert(type.tag == Type_Tag_Tagged_Union);
@@ -577,19 +575,19 @@ add_common_fields_internal(
   )
 
 #define type_struct(_NAME_STRING_, ...)\
-  (Type){\
+  (Meta_Type){\
     .tag = Type_Tag_Struct,\
     .struct_ = struct_fields(_NAME_STRING_, __VA_ARGS__)\
   }
 
 #define type_hash_map(...)\
-  (Type){\
+  (Meta_Type){\
     .tag = Type_Tag_Hash_Map,\
     .hash_map = __VA_ARGS__\
   }
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
-  (Type){\
+  (Meta_Type){\
     .tag = Type_Tag_Function,\
     .function = {\
       .name = (_NAME_STRING_),\
@@ -600,12 +598,12 @@ add_common_fields_internal(
   }
 
 
-Type types[4096] = {0};
+Meta_Type types[4096] = {0};
 uint32_t type_count = 0;
 
-static inline Type *
+static inline Meta_Type *
 push_type(
-  Type type
+  Meta_Type type
 ) {
   if (type_count >= countof(types)) {
     fprintf(stderr, "Too many types defined");
@@ -717,7 +715,7 @@ main(void) {
     { "Section", "ro_data" },
   }));
 
-  Type *Register_Type = push_type(type_enum("Register", (Enum_Type_Item[]){
+  Meta_Type *Register_Type = push_type(type_enum("Register", (Enum_Type_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
     { "D", 0b0010 },
