@@ -127,6 +127,8 @@ typedef struct Instruction Instruction;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
 
+#define INSTRUCTION_BYTES_NO_LABEL (255)
+
 typedef struct Code_Block Code_Block;
 typedef dyn_array_type(Code_Block *) Array_Code_Block_Ptr;
 typedef dyn_array_type(const Code_Block *) Array_Const_Code_Block_Ptr;

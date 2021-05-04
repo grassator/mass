@@ -59,21 +59,31 @@ typedef struct {
   uint64_t argument_count;
 } Function_Type;
 
+typedef struct {
+  const char *name;
+  u64 bits;
+  bool negative;
+} Meta_Number_Literal;
+
 typedef enum {
   Meta_Type_Tag_Struct,
   Meta_Type_Tag_Tagged_Union,
   Meta_Type_Tag_Enum,
   Meta_Type_Tag_Function,
   Meta_Type_Tag_Hash_Map,
+  Meta_Type_Tag_Number_Literal,
 } Meta_Type_Tag;
 
 typedef struct {
   Meta_Type_Tag tag;
-  Struct_Type struct_;
-  Enum_Type enum_;
-  Tagged_Union_Type union_;
-  Function_Type function;
-  Hash_Map_Type hash_map;
+  union {
+    Struct_Type struct_;
+    Enum_Type enum_;
+    Tagged_Union_Type union_;
+    Function_Type function;
+    Hash_Map_Type hash_map;
+    Meta_Number_Literal number_literal;
+  };
 } Meta_Type;
 
 void
@@ -114,6 +124,11 @@ print_c_type_forward_declaration(
     }
     case Meta_Type_Tag_Hash_Map: {
       fprintf(file, "typedef struct %s %s;\n", type->hash_map.name, type->hash_map.name);
+      break;
+    }
+    case Meta_Type_Tag_Number_Literal: {
+      fprintf(file, "#define %s (%s%"PRIu64")\n", type->number_literal.name,
+        type->number_literal.negative ? "-" : "", type->number_literal.bits);
       break;
     }
   }
@@ -225,6 +240,7 @@ print_c_type(
       }
       break;
     }
+    case Meta_Type_Tag_Number_Literal:
     case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
       break;
@@ -318,6 +334,7 @@ print_mass_descriptor_fixed_array_types(
     }
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
+    case Meta_Type_Tag_Number_Literal:
     case Meta_Type_Tag_Hash_Map: {
       break;
     }
@@ -365,6 +382,10 @@ print_mass_descriptor_and_type_forward_declaration(
     case Meta_Type_Tag_Hash_Map: {
       char *lowercase_name = strtolower(type->hash_map.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s);\n", lowercase_name, type->hash_map.name);
+      break;
+    }
+    case Meta_Type_Tag_Number_Literal: {
+      // TODO define global number literal values
       break;
     }
   }
@@ -521,6 +542,10 @@ print_mass_descriptor_and_type(
       // TODO
       break;
     }
+    case Meta_Type_Tag_Number_Literal: {
+      // TODO define global number literal values
+      break;
+    }
   }
 }
 
@@ -584,6 +609,12 @@ add_common_fields_internal(
   (Meta_Type){\
     .tag = Meta_Type_Tag_Hash_Map,\
     .hash_map = __VA_ARGS__\
+  }
+
+#define meta_number_literal(...)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_Number_Literal,\
+    .number_literal = __VA_ARGS__\
   }
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
@@ -913,6 +944,12 @@ main(void) {
     { "Source_Range", "source_range" },
     { "Scope *", "scope" },
     { "u64", "encoded_byte_size" },
+  }));
+
+  push_type(meta_number_literal({
+    .name = "INSTRUCTION_BYTES_NO_LABEL",
+    .bits = 255,
+    .negative = false,
   }));
 
   push_type(type_struct("Code_Block", (Struct_Item[]){

@@ -158,8 +158,6 @@ source_from_source_range(
   const Source_Range *source_range
 );
 
-#define INSTRUCTION_BYTES_NO_LABEL 255
-
 void *
 rip_value_pointer(
   Program *program,
