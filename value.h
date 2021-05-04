@@ -160,7 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
 
 typedef struct Jit {

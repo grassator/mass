@@ -39,6 +39,12 @@ typedef struct {
   uint64_t item_count;
 } Tagged_Union;
 
+typedef struct {
+  const char *name;
+  const char *key_type;
+  const char *value_type;
+} Hash_Map;
+
 typedef struct Type Type;
 
 typedef struct {
@@ -58,6 +64,7 @@ typedef enum {
   Type_Tag_Tagged_Union,
   Type_Tag_Enum,
   Type_Tag_Function,
+  Type_Tag_Hash_Map,
 } Type_Tag;
 
 typedef struct Type {
@@ -66,6 +73,7 @@ typedef struct Type {
   Enum enum_;
   Tagged_Union union_;
   Function function;
+  Hash_Map hash_map;
 } Type;
 
 void
@@ -102,6 +110,13 @@ print_c_type_forward_declaration(
         fprintf(file, "%s %s", arg->type, arg->name);
       }
       fprintf(file, ");\n");
+      break;
+    }
+    case Type_Tag_Hash_Map: {
+      if (strcmp(type->hash_map.key_type, "Slice") != 0) {
+        panic("TODO support non-Slice hash maps");
+      }
+      fprintf(file, "hash_map_slice_template(%s, %s)\n", type->hash_map.name, type->hash_map.value_type);
       break;
     }
   }
@@ -213,7 +228,8 @@ print_c_type(
       }
       break;
     }
-    case Type_Tag_Function: {
+    case Type_Tag_Function:
+    case Type_Tag_Hash_Map: {
       // We only need a forward declaration so nothing to do here
       break;
     }
@@ -285,9 +301,6 @@ print_mass_descriptor_fixed_array_types(
       print_mass_array_descriptors_for_struct(file, &type->struct_);
       break;
     }
-    case Type_Tag_Enum: {
-      break;
-    }
     case Type_Tag_Tagged_Union: {
       for (uint64_t i = 0; i < type->union_.item_count; ++i) {
         Struct *struct_ = &type->union_.items[i];
@@ -295,7 +308,9 @@ print_mass_descriptor_fixed_array_types(
       }
       break;
     }
-    case Type_Tag_Function: {
+    case Type_Tag_Enum:
+    case Type_Tag_Function:
+    case Type_Tag_Hash_Map: {
       break;
     }
   }
@@ -337,6 +352,11 @@ print_mass_descriptor_and_type_forward_declaration(
     case Type_Tag_Function: {
       char *lowercase_name = strtolower(type->function.name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      break;
+    }
+    case Type_Tag_Hash_Map: {
+      char *lowercase_name = strtolower(type->hash_map.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s);\n", lowercase_name, type->hash_map.name);
       break;
     }
   }
@@ -486,7 +506,11 @@ print_mass_descriptor_and_type(
       break;
     }
     case Type_Tag_Function: {
-
+      // TODO
+      break;
+    }
+    case Type_Tag_Hash_Map: {
+      // TODO
       break;
     }
   }
@@ -546,6 +570,12 @@ add_common_fields_internal(
   (Type){\
     .tag = Type_Tag_Struct,\
     .struct_ = struct_fields(_NAME_STRING_, __VA_ARGS__)\
+  }
+
+#define type_hash_map(...)\
+  (Type){\
+    .tag = Type_Tag_Hash_Map,\
+    .hash_map = __VA_ARGS__\
   }
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
@@ -1142,6 +1172,12 @@ main(void) {
     { "Value *", "entry_point" },
     { "Array_Function_Builder", "functions" },
     { "Program_Memory", "memory" },
+  }));
+
+  push_type(type_hash_map({
+    .name = "Jit_Import_Library_Handle_Map",
+    .key_type = "Slice",
+    .value_type = "void *",
   }));
 
   {

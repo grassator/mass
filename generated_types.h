@@ -213,6 +213,8 @@ typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
+hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
+
 
 // Type Definitions
 
@@ -1387,6 +1389,7 @@ static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
