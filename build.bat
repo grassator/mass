@@ -14,10 +14,10 @@ set FLAGS=/Od /std:c11 /nologo /WX /F 16777216 /FC /Zo /Zi^
   /wd4255 /wd4505 /wd4201 /wd4668 /wd4820 /wd5045 /wd4100 /wd4214 /wd5105^
   /D UNICODE /D _UNICODE
 
-cl %FLAGS% ..\generate_types.c
+cl %FLAGS% ..\meta.c
 if %errorlevel% neq 0 (goto Fail)
 
-.\generate_types
+.\meta
 if %errorlevel% neq 0 (goto Fail)
 
 cl %FLAGS% ..\source_spec.c
