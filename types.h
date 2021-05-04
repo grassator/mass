@@ -19,6 +19,17 @@
 #define COMPILER_SOURCE_LOCATION\
   ((Compiler_Source_Location)COMPILER_SOURCE_LOCATION_FIELDS)
 
+#define MASS_DESCRIPTOR_STATIC_ARRAY(_C_TYPE_, _LENGTH_, ...)\
+  {\
+    .tag = Descriptor_Tag_Fixed_Size_Array,\
+    .bit_size = (sizeof(_C_TYPE_) * CHAR_BIT * (_LENGTH_)),\
+    .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
+    .Fixed_Size_Array = {\
+      .item = (__VA_ARGS__),\
+      .length = (_LENGTH_),\
+    },\
+  }
+
 #define MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_)\
   static Descriptor descriptor_##_NAME_##_pointer = {\
     .tag = Descriptor_Tag_Pointer_To,\

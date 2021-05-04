@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
   const char *type;
   const char *name;
+  u32 array_length;
 } Struct_Item;
 
 typedef struct {
@@ -129,7 +130,9 @@ print_c_type(
       fprintf(file, "typedef struct %s {\n", type->struct_.name);
       for (uint64_t i = 0; i < type->struct_.item_count; ++i) {
         Struct_Item *item = &type->struct_.items[i];
-        fprintf(file, "  %s %s;\n", item->type, item->name);
+        fprintf(file, "  %s %s", item->type, item->name);
+        if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
+        fprintf(file, ";\n");
       }
       fprintf(file, "} %s;\n", type->struct_.name);
       fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n",
@@ -181,7 +184,9 @@ print_c_type(
             fprintf(file, "typedef struct {\n");
             for (uint64_t item_index = 0; item_index < struct_->item_count; ++item_index) {
               Struct_Item *item = &struct_->items[item_index];
-              fprintf(file, "  %s %s;\n", item->type, item->name);
+              fprintf(file, "  %s %s", item->type, item->name);
+              if (item->array_length > 1) fprintf(file, "[%u]", item->array_length);
+              fprintf(file, ";\n");
             }
             fprintf(file, "} %s_%s;\n", type->union_.name, struct_->name);
           }
@@ -214,6 +219,81 @@ print_c_type(
     }
     case Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
+      break;
+    }
+  }
+}
+
+static void
+print_mass_struct_item_type(
+  FILE *file,
+  Struct_Item *item
+) {
+  Slice const_prefix = slice_literal("const ");
+  Slice lowercase_type = slice_from_c_string(strtolower(item->type));
+  if (slice_starts_with(lowercase_type, const_prefix)) {
+    lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
+  }
+  Slice original_lowercase_type = lowercase_type;
+  Slice pointer_suffix = slice_literal(" *");
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+  fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+  lowercase_type = original_lowercase_type;
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    fprintf(file, "_pointer");
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+}
+
+hash_map_slice_template(Fixed_Array_Descriptor_Set, bool)
+
+void
+print_mass_array_descriptors_for_struct(
+  FILE *file,
+  Struct *struct_
+) {
+  static Fixed_Array_Descriptor_Set *already_defined_set = 0;
+  if (already_defined_set == 0) {
+    already_defined_set = hash_map_make(Fixed_Array_Descriptor_Set);
+  }
+  for (uint64_t i = 0; i < struct_->item_count; ++i) {
+    Struct_Item *item = &struct_->items[i];
+    if (item->array_length <= 1) continue;
+    Slice type_slice = slice_from_c_string(item->type);
+    if (hash_map_has(already_defined_set, type_slice)) continue;
+    hash_map_set(already_defined_set, type_slice, true);
+    fprintf(file, "static Descriptor ");
+    print_mass_struct_item_type(file, item);
+    fprintf(file, "_%u = MASS_DESCRIPTOR_STATIC_ARRAY(%s, %u, &",
+      item->array_length, item->type, item->array_length);
+    print_mass_struct_item_type(file, item);
+    fprintf(file, ");\n");
+  }
+}
+
+void
+print_mass_descriptor_fixed_array_types(
+  FILE *file,
+  Type *type
+) {
+  switch(type->tag) {
+    case Type_Tag_Struct: {
+      print_mass_array_descriptors_for_struct(file, &type->struct_);
+      break;
+    }
+    case Type_Tag_Enum: {
+      break;
+    }
+    case Type_Tag_Tagged_Union: {
+      for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+        Struct *struct_ = &type->union_.items[i];
+        print_mass_array_descriptors_for_struct(file, struct_);
+      }
+      break;
+    }
+    case Type_Tag_Function: {
       break;
     }
   }
@@ -286,6 +366,7 @@ print_mass_struct_item(
     fprintf(file, "_pointer");
     lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
   }
+  if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
   fprintf(file, ",\n");
   fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", struct_name, item->name);
   fprintf(file, "  },\n");
@@ -1047,6 +1128,9 @@ main(void) {
 
     for (uint32_t i = 0; i < type_count; ++i) {
       print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
+    }
+    for (uint32_t i = 0; i < type_count; ++i) {
+      print_mass_descriptor_fixed_array_types(file, &types[i]);
     }
     for (uint32_t i = 0; i < type_count; ++i) {
       print_mass_descriptor_and_type(file, &types[i]);
