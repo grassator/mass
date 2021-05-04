@@ -1044,7 +1044,7 @@ value_global_internal(
   Source_Range source_range
 ) {
   Program *program = context->program;
-  Section *section = &program->memory.sections.rw_data;
+  Section *section = &program->memory.rw_data;
   u64 byte_size = descriptor_byte_size(descriptor);
   u64 alignment = descriptor_byte_alignment(descriptor);
 
@@ -1394,7 +1394,7 @@ value_as_function(
     jit->program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
   );
   Section *section = label->section;
-  assert(section == &jit->program->memory.sections.code);
+  assert(section == &jit->program->memory.code);
   s8 *target = section->buffer.memory + label->offset_in_section;
   return (fn_type_opaque)target;
 }
@@ -1497,7 +1497,7 @@ program_init(
 
   u64 offset_in_memory = 0;
 
-  program->memory.sections.code = (Section){
+  program->memory.code = (Section){
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_CODE_SIZE,
@@ -1505,9 +1505,9 @@ program_init(
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Execute,
   };
-  offset_in_memory += program->memory.sections.code.buffer.capacity;
+  offset_in_memory += program->memory.code.buffer.capacity;
 
-  program->memory.sections.rw_data = (Section){
+  program->memory.rw_data = (Section){
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_RW_DATA_SIZE,
@@ -1515,9 +1515,9 @@ program_init(
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Read | Section_Permissions_Write,
   };
-  offset_in_memory += program->memory.sections.rw_data.buffer.capacity;
+  offset_in_memory += program->memory.rw_data.buffer.capacity;
 
-  program->memory.sections.ro_data = (Section){
+  program->memory.ro_data = (Section){
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_RO_DATA_SIZE,
@@ -1724,7 +1724,7 @@ import_symbol(
   Import_Symbol *symbol = import_library_find_symbol(library, symbol_name);
 
   if (!symbol) {
-    Label_Index label = make_label(program, &program->memory.sections.ro_data, symbol_name);
+    Label_Index label = make_label(program, &program->memory.ro_data, symbol_name);
     symbol = dyn_array_push(library->symbols, (Import_Symbol) {
       .name = symbol_name,
       .label32 = label,

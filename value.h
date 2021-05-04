@@ -201,14 +201,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(function_builder, Function_Builder);
 
 typedef struct {
   Virtual_Memory_Buffer buffer;
-  union {
-    struct {
-      Section rw_data;
-      Section code;
-      Section ro_data;
-    };
-    Section list[3];
-  } sections;
+  Section rw_data;
+  Section code;
+  Section ro_data;
 } Program_Memory;
 
 typedef struct {

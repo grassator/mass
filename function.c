@@ -748,7 +748,7 @@ make_if(
 ) {
   Program *program = context->program;
   bool is_always_true = false;
-  Label_Index label = make_label(program, &program->memory.sections.code, slice_literal("if"));
+  Label_Index label = make_label(program, &program->memory.code, slice_literal("if"));
   if(value->storage.tag == Storage_Tag_Static) {
     s64 imm = storage_static_value_up_to_s64(&value->storage);
     if (imm == 0) return label;
@@ -937,7 +937,7 @@ ensure_compiled_function_body(
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("anonymous_function");
-  Label_Index fn_label = make_label(program, &program->memory.sections.code, fn_name);
+  Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
   fn_value->storage = code_label32(fn_label);
 
   Function_Builder builder = (Function_Builder){
@@ -945,7 +945,7 @@ ensure_compiled_function_body(
     .label_index = fn_label,
     .code_block = {
       // FIXME use fn_value->descriptor->name
-      .end_label = make_label(program, &program->memory.sections.code, slice_literal("fn end")),
+      .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
@@ -1077,7 +1077,7 @@ program_init_startup_code(
       .returns = {.descriptor = &descriptor_void},
     },
   };
-  Label_Index fn_label = make_label(program, &program->memory.sections.code, slice_literal("__startup"));
+  Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
   Storage storage = code_label32(fn_label);
 
   // FIXME Create a special source range for internal values
@@ -1089,7 +1089,7 @@ program_init_startup_code(
     .label_index = fn_label,
     .frozen = true,
     .code_block = {
-      .end_label = make_label(program, &program->memory.sections.code, slice_literal("__startup end")),
+      .end_label = make_label(program, &program->memory.code, slice_literal("__startup end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };

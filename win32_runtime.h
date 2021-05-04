@@ -119,7 +119,7 @@ win32_get_function_index_from_address(
   Jit *jit
 ) {
   Win32_Jit_Info *info = jit->platform_specific_payload;
-  Section *code_section = &jit->program->memory.sections.code;
+  Section *code_section = &jit->program->memory.code;
   Virtual_Memory_Buffer *code_buffer = &code_section->buffer;
   if(instruction_address < (DWORD64)code_buffer->memory) return -1;
   if(instruction_address >= (DWORD64)code_buffer->memory + code_buffer->occupied) return -1;
@@ -165,13 +165,13 @@ win32_instruction_for_address(
   s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
   if (runtime_function_index < 0) return 0;
   Program_Memory *memory = &jit->program->memory;
-  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+  Virtual_Memory_Buffer *code_buffer = &memory->code.buffer;
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
   Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
   RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
   const UNWIND_INFO *unwind_info =
-    win32_unwind_info_for_function(&memory->sections.ro_data, function);
+    win32_unwind_info_for_function(&memory->ro_data, function);
 
   u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
   u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
@@ -200,13 +200,13 @@ win32_print_stack(
     return;
   }
   Program_Memory *memory = &jit->program->memory;
-  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
+  Virtual_Memory_Buffer *code_buffer = &memory->code.buffer;
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
   Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
   RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
   const UNWIND_INFO *unwind_info =
-    win32_unwind_info_for_function(&memory->sections.ro_data, function);
+    win32_unwind_info_for_function(&memory->ro_data, function);
 
   u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
   u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
@@ -506,8 +506,8 @@ win32_program_jit(
 ) {
   Program *program = jit->program;
   Program_Memory *memory = &jit->program->memory;
-  Virtual_Memory_Buffer *code_buffer = &memory->sections.code.buffer;
-  Virtual_Memory_Buffer *ro_data_buffer = &memory->sections.ro_data.buffer;
+  Virtual_Memory_Buffer *code_buffer = &memory->code.buffer;
+  Virtual_Memory_Buffer *ro_data_buffer = &memory->ro_data.buffer;
 
   // Memory protection works on per-page level so with incremental JIT there are two options:
   // 1. Waste memory every time we do JIT due to padding to page size.
@@ -531,7 +531,7 @@ win32_program_jit(
     *info = (Win32_Jit_Info) {
       .temp_buffer = temp_buffer,
       .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
-      .trampoline_rva = memory->sections.code.base_rva + make_trampoline(
+      .trampoline_rva = memory->code.base_rva + make_trampoline(
         program, code_buffer, (u64)win32_program_test_exception_handler
       ),
       .function_table = dyn_array_make(
@@ -600,13 +600,13 @@ win32_program_jit(
 
     RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
     UNWIND_INFO *unwind_info = win32_init_runtime_info_for_function(
-      builder, &layout, function, &memory->sections.ro_data
+      builder, &layout, function, &memory->ro_data
     );
     // Handler (if present) must immediately follow the unwind info struct
     {
       unwind_info->Flags |= UNW_FLAG_EHANDLER;
       u64 offset = virtual_memory_buffer_append_u32(
-        &memory->sections.ro_data.buffer, info->trampoline_rva
+        &memory->ro_data.buffer, info->trampoline_rva
       );
       assert(offset % sizeof(DWORD) == 0);
       // :ExceptionDataAlignment
@@ -617,7 +617,7 @@ win32_program_jit(
       // to just mark the struct as packed and let the compiler deal with
       // potentially misaligned reads and writes.
       Win32_Exception_Data *exception_data = virtual_memory_buffer_allocate_bytes(
-        &memory->sections.ro_data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
+        &memory->ro_data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
       );
       *exception_data = (Win32_Exception_Data) {
         .builder = builder,
@@ -632,12 +632,12 @@ win32_program_jit(
   program_patch_labels(program);
 
   // Setup permissions for read-only data segment
-  win32_section_protect_from(&memory->sections.ro_data, ro_data_protected_size);
+  win32_section_protect_from(&memory->ro_data, ro_data_protected_size);
 
   // Setup permissions for the code segment
   {
-    win32_section_protect_from(&memory->sections.code, code_protected_size);
-    u64 size_to_flush = memory->sections.code.buffer.occupied - code_protected_size;
+    win32_section_protect_from(&memory->code, code_protected_size);
+    u64 size_to_flush = memory->code.buffer.occupied - code_protected_size;
     if (size_to_flush) {
       if (!FlushInstructionCache(
         GetCurrentProcess(),

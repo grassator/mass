@@ -546,7 +546,7 @@ assign(
       if (static_pointer->storage.tag == Storage_Tag_None) {
         // TODO should depend on constness of the static value I guess?
         //      Do not forget to make memory readable for ro_dar
-        Section *section = &context->program->memory.sections.rw_data;
+        Section *section = &context->program->memory.rw_data;
         u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
         u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
 
@@ -2806,13 +2806,13 @@ compile_time_eval(
     },
   });
 
-  Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval"));
+  Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
   Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
   Function_Builder eval_builder = {
     .function = &descriptor->Function.info,
     .label_index = eval_label_index,
     .code_block = {
-      .end_label = make_label(jit->program, &jit->program->memory.sections.code, slice_literal("compile_time_eval_end")),
+      .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
@@ -3261,7 +3261,7 @@ call_function_macro(
   // jump to correct location and put value in the right place
   Program *program = context->program;
   Label_Index fake_return_label_index =
-    make_label(program, &program->memory.sections.code, MASS_RETURN_LABEL_NAME);
+    make_label(program, &program->memory.code, MASS_RETURN_LABEL_NAME);
 
   Value *result_value = 0;
   switch(expected_result->tag) {
@@ -4508,7 +4508,7 @@ mass_handle_paren_operator(
       // TODO put this into a separate section and make readonly after relocations are done
       //      this section can probably be zero-initialized
       Program *runtime_program = context->compilation->runtime_program;
-      Section *section = &runtime_program->memory.sections.rw_data;
+      Section *section = &runtime_program->memory.rw_data;
       u64 byte_size = descriptor_byte_size(descriptor);
       u64 alignment = descriptor_byte_alignment(descriptor);
 
@@ -4935,7 +4935,7 @@ mass_handle_if_expression_lazy_proc(
   }
 
   Label_Index after_label =
-    make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
+    make_label(context->program, &context->program->memory.code, slice_literal("if end"));
   push_instruction(
     &context->builder->code_block.instructions, *dummy_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {code_label32(after_label), 0, 0}}}
@@ -5499,7 +5499,7 @@ token_parse_statement_label(
     Scope *label_scope = context->scope;
 
     Source_Range source_range = symbol->source_range;
-    Label_Index label = make_label(context->program, &context->program->memory.sections.code, name);
+    Label_Index label = make_label(context->program, &context->program->memory.code, name);
     value = value_make(context, &descriptor_label_index, storage_static_inline(&label), source_range);
     scope_define_value(label_scope, source_range, name, value);
     if (placeholder) {
@@ -5769,7 +5769,7 @@ token_define_global_variable(
       //global_value = value_global(context, fn_pointer, rhs.source_range);
       //load_address(context, &view.source_range, on_stack, value);
     } else {
-      Section *section = &context->program->memory.sections.rw_data;
+      Section *section = &context->program->memory.rw_data;
       u64 byte_size = descriptor_byte_size(value->descriptor);
       u64 alignment = descriptor_byte_alignment(value->descriptor);
 

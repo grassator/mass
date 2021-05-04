@@ -53,7 +53,7 @@ encode_ro_data_section(
 ) {
   #define get_rva() s64_to_s32(s32_to_s64(header->VirtualAddress) + u64_to_s64(buffer->occupied))
 
-  Section *section = &program->memory.sections.ro_data;
+  Section *section = &program->memory.ro_data;
   section->base_rva = header->VirtualAddress;
   Virtual_Memory_Buffer *buffer = &section->buffer;
 
@@ -195,7 +195,7 @@ encode_text_section(
 ) {
   Program *program = context->program;
 
-  Section *section = &program->memory.sections.code;
+  Section *section = &program->memory.code;
   section->base_rva = header->VirtualAddress;
   Virtual_Memory_Buffer *buffer = &section->buffer;
 
@@ -324,7 +324,7 @@ write_executable(
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->memory.sections.code.permissions
+        program->memory.code.permissions
       ),
     },
     {
@@ -334,7 +334,7 @@ write_executable(
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->memory.sections.ro_data.permissions
+        program->memory.ro_data.permissions
       ),
     },
     {
@@ -344,7 +344,7 @@ write_executable(
       .SizeOfRawData = 0,
       .PointerToRawData = 0,
       .Characteristics = win32_section_permissions_to_pe32_section_characteristics(
-        program->memory.sections.rw_data.permissions
+        program->memory.rw_data.permissions
       ),
     },
     {0}
@@ -363,14 +363,14 @@ write_executable(
 
   // Prepare .text section
   IMAGE_SECTION_HEADER *text_section_header = &sections[0];
-  Virtual_Memory_Buffer *text_section_buffer = &program->memory.sections.code.buffer;
+  Virtual_Memory_Buffer *text_section_buffer = &program->memory.code.buffer;
   text_section_header->PointerToRawData = offsets.file;
   text_section_header->VirtualAddress = offsets.virtual;
   Encoded_Text_Section encoded_text_section = encode_text_section(context, text_section_header);
   offsets = pe32_offset_after_size(&offsets, text_section_header->SizeOfRawData);
 
   // Prepare .rdata section
-  Virtual_Memory_Buffer *ro_data_section_buffer = &program->memory.sections.ro_data.buffer;
+  Virtual_Memory_Buffer *ro_data_section_buffer = &program->memory.ro_data.buffer;
   IMAGE_SECTION_HEADER *ro_data_section_header = &sections[1];
   ro_data_section_header->PointerToRawData = offsets.file;
   ro_data_section_header->VirtualAddress = offsets.virtual;
@@ -380,7 +380,7 @@ write_executable(
   offsets = pe32_offset_after_size(&offsets, ro_data_section_header->SizeOfRawData);
 
   // Fill in the header for .data section
-  Section *rw_data_section = &program->memory.sections.rw_data;
+  Section *rw_data_section = &program->memory.rw_data;
   Virtual_Memory_Buffer *rw_data_section_buffer = &rw_data_section->buffer;
   IMAGE_SECTION_HEADER *rw_data_section_header = &sections[2];
   // FIXME @Hack currently encoder does not like empty data section so adding a zero there
