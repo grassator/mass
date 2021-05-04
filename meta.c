@@ -43,6 +43,8 @@ typedef struct {
   const char *name;
   const char *key_type;
   const char *value_type;
+  const char *hash_function;
+  const char *equal_function;
 } Hash_Map;
 
 typedef struct Type Type;
@@ -113,10 +115,7 @@ print_c_type_forward_declaration(
       break;
     }
     case Type_Tag_Hash_Map: {
-      if (strcmp(type->hash_map.key_type, "Slice") != 0) {
-        panic("TODO support non-Slice hash maps");
-      }
-      fprintf(file, "hash_map_slice_template(%s, %s)\n", type->hash_map.name, type->hash_map.value_type);
+      fprintf(file, "typedef struct %s %s;\n", type->hash_map.name, type->hash_map.name);
       break;
     }
   }
@@ -228,9 +227,20 @@ print_c_type(
       }
       break;
     }
-    case Type_Tag_Function:
-    case Type_Tag_Hash_Map: {
+    case Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
+      break;
+    }
+    case Type_Tag_Hash_Map: {
+      Hash_Map *map = &type->hash_map;
+      if (strcmp(map->key_type, "Slice") == 0) {
+        assert(!map->hash_function);
+        assert(!map->equal_function);
+        fprintf(file, "hash_map_slice_template(%s, %s)\n", map->name, map->value_type);
+      } else {
+        fprintf(file, "hash_map_template(%s, %s, %s, %s, %s)\n",
+          map->name, map->key_type, map->value_type, map->hash_function, map->equal_function);
+      }
       break;
     }
   }
@@ -1191,6 +1201,14 @@ main(void) {
     { "Program *", "program" },
     { "Jit_Import_Library_Handle_Map *", "import_library_handles" },
     { "void *", "platform_specific_payload" },
+  }));
+
+  push_type(type_hash_map({
+    .name = "Static_Pointer_Map",
+    .key_type = "const void *",
+    .value_type = "Value",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
   }));
 
   {

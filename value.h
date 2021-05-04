@@ -160,8 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
-
 typedef struct Compilation {
   Virtual_Memory_Buffer allocation_buffer;
   Allocator *allocator;

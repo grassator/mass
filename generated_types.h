@@ -213,13 +213,15 @@ typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
-hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
+typedef struct Jit_Import_Library_Handle_Map Jit_Import_Library_Handle_Map;
 
-hash_map_slice_template(Imported_Module_Map, Module *)
+typedef struct Imported_Module_Map Imported_Module_Map;
 
 typedef struct Jit Jit;
 typedef dyn_array_type(Jit *) Array_Jit_Ptr;
 typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
+
+typedef struct Static_Pointer_Map Static_Pointer_Map;
 
 
 // Type Definitions
@@ -1094,6 +1096,8 @@ typedef struct Program {
 } Program;
 typedef dyn_array_type(Program) Array_Program;
 
+hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
+hash_map_slice_template(Imported_Module_Map, Module *)
 typedef struct Jit {
   u64 is_stack_unwinding_in_progress;
   Program * program;
@@ -1102,6 +1106,7 @@ typedef struct Jit {
 } Jit;
 typedef dyn_array_type(Jit) Array_Jit;
 
+hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -1410,6 +1415,7 @@ static Descriptor descriptor_array_jit;
 static Descriptor descriptor_array_jit_ptr;
 static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_map, Static_Pointer_Map);
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
