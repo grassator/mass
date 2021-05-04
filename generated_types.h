@@ -5,10 +5,6 @@ typedef void(*fn_type_opaque)();
 
 typedef struct Scope Scope;
 
-typedef struct Function_Builder Function_Builder;
-
-typedef struct Program Program;
-
 typedef struct Compilation Compilation;
 
 typedef struct X64_Mnemonic X64_Mnemonic;
@@ -212,6 +208,10 @@ typedef dyn_array_type(const Mass_Error *) Array_Const_Mass_Error_Ptr;
 typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
+
+typedef struct Program Program;
+typedef dyn_array_type(Program *) Array_Program_Ptr;
+typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
 
 // Type Definitions
@@ -1074,6 +1074,18 @@ typedef struct Mass_Result {
   };
 } Mass_Result;
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
+typedef struct Program {
+  Array_Import_Library import_libraries;
+  Array_Label labels;
+  Array_Label_Location_Diff_Patch_Info patch_info_array;
+  Array_Value_Ptr startup_functions;
+  Array_Relocation relocations;
+  Value * entry_point;
+  Array_Function_Builder functions;
+  Program_Memory memory;
+} Program;
+typedef dyn_array_type(Program) Array_Program;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -1370,6 +1382,11 @@ static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
+static Descriptor descriptor_program;
+static Descriptor descriptor_array_program;
+static Descriptor descriptor_array_program_ptr;
+static Descriptor descriptor_program_pointer;
+static Descriptor descriptor_program_pointer_pointer;
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
@@ -3399,6 +3416,59 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result, Mass_Result,
 );
 MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
+MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("import_libraries"),
+    .descriptor = &descriptor_array_import_library,
+    .Base_Relative.offset = offsetof(Program, import_libraries),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("labels"),
+    .descriptor = &descriptor_array_label,
+    .Base_Relative.offset = offsetof(Program, labels),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("patch_info_array"),
+    .descriptor = &descriptor_array_label_location_diff_patch_info,
+    .Base_Relative.offset = offsetof(Program, patch_info_array),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("startup_functions"),
+    .descriptor = &descriptor_array_value_ptr,
+    .Base_Relative.offset = offsetof(Program, startup_functions),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("relocations"),
+    .descriptor = &descriptor_array_relocation,
+    .Base_Relative.offset = offsetof(Program, relocations),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("entry_point"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Program, entry_point),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("functions"),
+    .descriptor = &descriptor_array_function_builder,
+    .Base_Relative.offset = offsetof(Program, functions),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("memory"),
+    .descriptor = &descriptor_program_memory,
+    .Base_Relative.offset = offsetof(Program, memory),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(program);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,

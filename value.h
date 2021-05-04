@@ -160,18 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-typedef struct Program {
-  Array_Import_Library import_libraries;
-  Array_Label labels;
-  Array_Label_Location_Diff_Patch_Info patch_info_array;
-  Array_Value_Ptr startup_functions;
-  Array_Relocation relocations;
-  Value *entry_point;
-  Array_Function_Builder functions;
-  Program_Memory memory;
-} Program;
-MASS_DEFINE_OPAQUE_C_TYPE(program, Program);
-
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
 

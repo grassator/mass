@@ -1133,6 +1133,17 @@ main(void) {
     })
   }));
 
+  push_type(type_struct("Program", (Struct_Item[]){
+    { "Array_Import_Library", "import_libraries" },
+    { "Array_Label", "labels" },
+    { "Array_Label_Location_Diff_Patch_Info", "patch_info_array" },
+    { "Array_Value_Ptr", "startup_functions" },
+    { "Array_Relocation", "relocations" },
+    { "Value *", "entry_point" },
+    { "Array_Function_Builder", "functions" },
+    { "Program_Memory", "memory" },
+  }));
+
   {
     const char *filename = "../generated_types.h";
     #pragma warning(disable : 4996)
@@ -1149,8 +1160,6 @@ main(void) {
     {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
-      fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
-      fprintf(file, "typedef struct Program Program;\n\n");
       fprintf(file, "typedef struct Compilation Compilation;\n\n");
       fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
     }
