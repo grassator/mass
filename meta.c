@@ -12,13 +12,13 @@
 typedef struct {
   const char *name;
   int32_t value;
-} Enum_Item;
+} Enum_Type_Item;
 
 typedef struct {
   const char *name;
-  Enum_Item *items;
+  Enum_Type_Item *items;
   uint64_t item_count;
-} Enum;
+} Enum_Type;
 
 typedef struct {
   const char *type;
@@ -72,7 +72,7 @@ typedef enum {
 typedef struct Type {
   Type_Tag tag;
   Struct struct_;
-  Enum enum_;
+  Enum_Type enum_;
   Tagged_Union union_;
   Function function;
   Hash_Map hash_map;
@@ -164,7 +164,7 @@ print_c_type(
     case Type_Tag_Enum: {
       fprintf(file, "typedef enum %s {\n", type->enum_.name);
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Item *item = &type->enum_.items[i];
+        Enum_Type_Item *item = &type->enum_.items[i];
         fprintf(file, "  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
       }
       fprintf(file, "} %s;\n\n", type->enum_.name);
@@ -172,7 +172,7 @@ print_c_type(
       char *lowercase_name = strtolower(type->enum_.name);
       fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->enum_.name);
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Item *item = &type->enum_.items[i];
+        Enum_Type_Item *item = &type->enum_.items[i];
         fprintf(file, "  if (value == %d) return \"%s_%s\";\n", item->value, type->enum_.name, item->name);
       }
       fprintf(file, "  assert(!\"Unexpected value for enum %s\");\n", type->enum_.name);
@@ -439,7 +439,7 @@ print_mass_descriptor_and_type(
 
       fprintf(file, "static C_Enum_Item %s_items[] = {\n", lowercase_name);
       for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Item *item = &type->enum_.items[i];
+        Enum_Type_Item *item = &type->enum_.items[i];
         fprintf(
           file, "{ .name = slice_literal_fields(\"%s\"), .value = %d },\n",
           item->name, item->value
@@ -634,7 +634,7 @@ main(void) {
     { "Range_u64", "offsets" },
   }));
 
-  push_type(type_enum("Module_Flags", (Enum_Item[]){
+  push_type(type_enum("Module_Flags", (Enum_Type_Item[]){
     { "Has_Exports", 1 << 0 },
   }));
 
@@ -652,7 +652,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_enum("Group_Tag", (Enum_Item[]){
+  push_type(type_enum("Group_Tag", (Enum_Type_Item[]){
     { "Paren", 1 },
     { "Square", 2 },
     { "Curly", 3 },
@@ -664,7 +664,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_enum("Symbol_Type", (Enum_Item[]){
+  push_type(type_enum("Symbol_Type", (Enum_Type_Item[]){
     { "Id_Like", 1 },
     { "Operator_Like", 2 },
   }));
@@ -697,7 +697,7 @@ main(void) {
     { "Token_Pattern *", "or" },
   }));
 
-  push_type(type_enum("Section_Permissions", (Enum_Item[]){
+  push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){
     { "Read",    1 << 0 },
     { "Write",   1 << 1 },
     { "Execute", 1 << 2 },
@@ -717,7 +717,7 @@ main(void) {
     { "Section", "ro_data" },
   }));
 
-  Type *Register_Type = push_type(type_enum("Register", (Enum_Item[]){
+  Type *Register_Type = push_type(type_enum("Register", (Enum_Type_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
     { "D", 0b0010 },
@@ -780,7 +780,7 @@ main(void) {
     { "s32 *", "patch_target" },
   }));
 
-   push_type(type_enum("Number_Base", (Enum_Item[]){
+   push_type(type_enum("Number_Base", (Enum_Type_Item[]){
     { "2", 2 },
     { "10", 10 },
     { "16", 16 },
@@ -814,7 +814,7 @@ main(void) {
     { "Array_Import_Symbol", "symbols" },
   }));
 
-  push_type(type_enum("Compare_Type", (Enum_Item[]){
+  push_type(type_enum("Compare_Type", (Enum_Type_Item[]){
     { "Equal", 1 },
     { "Not_Equal", 2 },
 
@@ -936,18 +936,18 @@ main(void) {
     { "Label_Index", "label_index" },
   }));
 
-  push_type(type_enum("Function_Argument_Mode", (Enum_Item[]){
+  push_type(type_enum("Function_Argument_Mode", (Enum_Type_Item[]){
     { "Call", 0 },
     { "Body", 1 },
   }));
 
-  push_type(type_enum("Operator_Fixity", (Enum_Item[]){
+  push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
     { "Postfix", 1 << 2 },
   }));
 
-  push_type(type_enum("Operator_Associativity", (Enum_Item[]){
+  push_type(type_enum("Operator_Associativity", (Enum_Type_Item[]){
     { "Left", 0 },
     { "Right", 1 },
   }));
@@ -1004,7 +1004,7 @@ main(void) {
     { "Compiler_Source_Location", "compiler_source_location" },
   }));
 
-  push_type(type_enum("Expected_Result_Storage", (Enum_Item[]){
+  push_type(type_enum("Expected_Result_Storage", (Enum_Type_Item[]){
     { "None", 0 },
     { "Static", 1 << 0 },
     { "Memory", 1 << 1 },
@@ -1044,7 +1044,7 @@ main(void) {
     { "void *", "payload" },
   }));
 
-  push_type(type_enum("Descriptor_Function_Flags", (Enum_Item[]){
+  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Macro", 1 << 0 },
     { "No_Own_Scope", 1 << 1 },
@@ -1211,6 +1211,18 @@ main(void) {
     .equal_function = "const_void_pointer_equal",
   }));
 
+  push_type(type_struct("Compilation", (Struct_Item[]){
+    { "Virtual_Memory_Buffer", "allocation_buffer" },
+    { "Allocator *", "allocator" },
+    { "Jit", "jit" },
+    { "Module", "compiler_module" },
+    { "Static_Pointer_Map *", "static_pointer_map" },
+    { "Imported_Module_Map *", "module_map" },
+    { "Scope *", "root_scope" },
+    { "Program *", "runtime_program" },
+    { "Mass_Result *", "result" },
+  }));
+
   {
     const char *filename = "../generated_types.h";
     #pragma warning(disable : 4996)
@@ -1227,7 +1239,6 @@ main(void) {
     {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
       fprintf(file, "typedef struct Scope Scope;\n\n");
-      fprintf(file, "typedef struct Compilation Compilation;\n\n");
       fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
     }
 
@@ -1245,11 +1256,8 @@ main(void) {
 
     fprintf(file, "\n// Mass Type Reflection\n\n");
 
-    fprintf(file, "static Descriptor descriptor_function_builder_pointer;\n");
-    fprintf(file, "static Descriptor descriptor_program_pointer;\n");
     fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
     fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
-    fprintf(file, "static Descriptor descriptor_compilation_pointer;\n");
     fprintf(file, "static Descriptor descriptor_void;\n");
     fprintf(file, "static Descriptor descriptor_void_pointer;\n");
     fprintf(file, "static Descriptor descriptor_char;\n");

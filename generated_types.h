@@ -5,8 +5,6 @@ typedef void(*fn_type_opaque)();
 
 typedef struct Scope Scope;
 
-typedef struct Compilation Compilation;
-
 typedef struct X64_Mnemonic X64_Mnemonic;
 
 // Forward declarations
@@ -222,6 +220,10 @@ typedef dyn_array_type(Jit *) Array_Jit_Ptr;
 typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
 
 typedef struct Static_Pointer_Map Static_Pointer_Map;
+
+typedef struct Compilation Compilation;
+typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
+typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
 
 // Type Definitions
@@ -1107,15 +1109,25 @@ typedef struct Jit {
 typedef dyn_array_type(Jit) Array_Jit;
 
 hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
+typedef struct Compilation {
+  Virtual_Memory_Buffer allocation_buffer;
+  Allocator * allocator;
+  Jit jit;
+  Module compiler_module;
+  Static_Pointer_Map * static_pointer_map;
+  Imported_Module_Map * module_map;
+  Scope * root_scope;
+  Program * runtime_program;
+  Mass_Result * result;
+} Compilation;
+typedef dyn_array_type(Compilation) Array_Compilation;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
 
-static Descriptor descriptor_function_builder_pointer;
-static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_scope_pointer;
-static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_char;
@@ -1416,6 +1428,11 @@ static Descriptor descriptor_array_jit_ptr;
 static Descriptor descriptor_jit_pointer;
 static Descriptor descriptor_jit_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(static_pointer_map, Static_Pointer_Map);
+static Descriptor descriptor_compilation;
+static Descriptor descriptor_array_compilation;
+static Descriptor descriptor_array_compilation_ptr;
+static Descriptor descriptor_compilation_pointer;
+static Descriptor descriptor_compilation_pointer_pointer;
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
@@ -3527,6 +3544,65 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
   },
 );
 MASS_DEFINE_TYPE_VALUE(jit);
+MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
+MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("allocation_buffer"),
+    .descriptor = &descriptor_virtual_memory_buffer,
+    .Base_Relative.offset = offsetof(Compilation, allocation_buffer),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .Base_Relative.offset = offsetof(Compilation, allocator),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("jit"),
+    .descriptor = &descriptor_jit,
+    .Base_Relative.offset = offsetof(Compilation, jit),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("compiler_module"),
+    .descriptor = &descriptor_module,
+    .Base_Relative.offset = offsetof(Compilation, compiler_module),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("static_pointer_map"),
+    .descriptor = &descriptor_static_pointer_map_pointer,
+    .Base_Relative.offset = offsetof(Compilation, static_pointer_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("module_map"),
+    .descriptor = &descriptor_imported_module_map_pointer,
+    .Base_Relative.offset = offsetof(Compilation, module_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("root_scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .Base_Relative.offset = offsetof(Compilation, root_scope),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("runtime_program"),
+    .descriptor = &descriptor_program_pointer,
+    .Base_Relative.offset = offsetof(Compilation, runtime_program),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("result"),
+    .descriptor = &descriptor_mass_result_pointer,
+    .Base_Relative.offset = offsetof(Compilation, result),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(compilation);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(slice, Slice,

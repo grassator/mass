@@ -160,20 +160,6 @@ source_from_source_range(
 
 #define INSTRUCTION_BYTES_NO_LABEL 255
 
-typedef struct Compilation {
-  Virtual_Memory_Buffer allocation_buffer;
-  Allocator *allocator;
-  Jit jit;
-  Module compiler_module;
-  Static_Pointer_Map *static_pointer_map;
-  Imported_Module_Map *module_map;
-  Scope *root_scope;
-  Program *runtime_program;
-  Mass_Result *result;
-} Compilation;
-
-MASS_DEFINE_OPAQUE_C_TYPE(compilation, Compilation);
-
 void *
 rip_value_pointer(
   Program *program,
