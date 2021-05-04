@@ -158,39 +158,7 @@ source_from_source_range(
   const Source_Range *source_range
 );
 
-typedef enum {
-  Instruction_Type_Assembly,
-  Instruction_Type_Label,
-  Instruction_Type_Bytes,
-} Instruction_Type;
-
-typedef struct {
-  const X64_Mnemonic *mnemonic;
-  Storage operands[3];
-} Instruction_Assembly;
-
 #define INSTRUCTION_BYTES_NO_LABEL 255
-typedef struct {
-  u8 memory[15];
-  u8 length;
-  Label_Index label_index;
-  u8 label_offset_in_instruction;
-} Instruction_Bytes;
-
-typedef struct {
-  Instruction_Type type;
-  union {
-    Instruction_Assembly assembly;
-    Label_Index label;
-    Instruction_Bytes Bytes;
-  };
-  Compiler_Source_Location compiler_source_location;
-  Source_Range source_range;
-  Scope *scope;
-  u8 encoded_byte_size;
-} Instruction;
-
-typedef dyn_array_type(Instruction) Array_Instruction;
 
 typedef struct {
   Label_Index end_label;

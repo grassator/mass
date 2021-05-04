@@ -3308,8 +3308,8 @@ call_function_macro(
       push_instruction(
         &context->builder->code_block.instructions, overload->source_range,
         (Instruction) {
-          .type = Instruction_Type_Label,
-          .label = fake_return_label_index
+          .tag = Instruction_Tag_Label,
+          .Label.index = fake_return_label_index
         }
       );
     }
@@ -3378,7 +3378,7 @@ call_function_overload(
       Storage stack_storage = reserve_stack_storage(context, occupied_value->storage.byte_size);
       push_instruction(
         instructions, *source_range,
-        (Instruction) {.assembly = {mov, {stack_storage, occupied_value->storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {stack_storage, occupied_value->storage}}}
       );
       occupied_value->storage = stack_storage;
     } else if (occupied_value->storage.tag == Storage_Tag_Memory) {
@@ -3389,7 +3389,7 @@ call_function_overload(
       Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
       push_instruction(
         instructions, *source_range,
-        (Instruction) {.assembly = {mov, {temp_reg_storage, original_reg_storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_reg_storage, original_reg_storage}}}
       );
       occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;;
     } else {
@@ -3491,7 +3491,7 @@ call_function_overload(
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
       instructions, *source_range,
-      (Instruction) {.assembly = {lea, {reg_c, result_operand}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_c, result_operand}}}
     );
   }
 
@@ -3503,10 +3503,10 @@ call_function_overload(
   if (to_call->storage.tag == Storage_Tag_Static) {
     // TODO it will not be safe to use this register with other calling conventions
     Storage reg = storage_register_for_descriptor(Register_A, to_call_descriptor);
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg, to_call->storage}}});
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {reg}}});
+    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, to_call->storage}}});
+    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}});
   } else {
-    push_instruction(instructions, *source_range, (Instruction) {.assembly = {call, {to_call->storage, 0, 0}}});
+    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {to_call->storage, 0, 0}}});
   }
 
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
@@ -3536,7 +3536,7 @@ call_function_overload(
       Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
       push_instruction(
         instructions, *source_range,
-        (Instruction) {.assembly = {mov, {original_reg_storage, temp_reg_storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {original_reg_storage, temp_reg_storage}}}
       );
     }
   }
@@ -3896,7 +3896,7 @@ storage_load_index_address(
 
   push_instruction(
     &context->builder->code_block.instructions, *source_range,
-    (Instruction) {.assembly = {imul, {new_base_register->storage, reg_byte_size_value->storage}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {imul, {new_base_register->storage, reg_byte_size_value->storage}}}
   );
 
   {
@@ -3923,7 +3923,7 @@ storage_load_index_address(
     }
     push_instruction(
       &context->builder->code_block.instructions, *source_range,
-      (Instruction) {.assembly = {add, {new_base_register->storage, temp_value->storage}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {new_base_register->storage, temp_value->storage}}}
     );
     value_release_if_temporary(context->builder, temp_value);
   }
@@ -4006,7 +4006,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       push_instruction(
         &context->builder->code_block.instructions, result_range,
-        (Instruction) {.assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
       );
       value_release_if_temporary(context->builder, temp_b);
 
@@ -4055,7 +4055,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_instruction(
         &builder->code_block.instructions, result_range,
-        (Instruction) {.assembly = {mnemonic, {temp_b->storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mnemonic, {temp_b->storage}}}
       );
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
@@ -4114,21 +4114,21 @@ mass_handle_arithmetic_operation_lazy_proc(
           case 1: widen = cbw; break;
         }
         assert(widen);
-        push_instruction(instructions, result_range, (Instruction) {.assembly = {widen}});
-        push_instruction(instructions, result_range, (Instruction) {.assembly = {idiv, {temp_divisor->storage}}});
+        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {widen}});
+        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {idiv, {temp_divisor->storage}}});
       } else {
         if (byte_size == 1) {
           Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
           push_instruction(
             instructions, result_range,
-            (Instruction) {.assembly = {movzx, {reg_ax, temp_dividend->storage}}}
+            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movzx, {reg_ax, temp_dividend->storage}}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
-          push_instruction(instructions, result_range, (Instruction) {.assembly = {xor, {reg_d, reg_d}}});
+          push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {xor, {reg_d, reg_d}}});
         }
-        push_instruction(instructions, result_range, (Instruction) {.assembly = {x64_div, {temp_divisor->storage}}});
+        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {x64_div, {temp_divisor->storage}}});
       }
 
       if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
@@ -4138,7 +4138,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           // This is not optimal but will do for now.
           Storage reg_ah = storage_register_for_descriptor(Register_AH, &descriptor_s8);
           Storage reg_al = storage_register_for_descriptor(Register_A, &descriptor_s8);
-          push_instruction(instructions, result_range, (Instruction) {.assembly = {mov, {reg_al, reg_ah}}});
+          push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_al, reg_ah}}});
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
           move_value(context->allocator, context->builder, &result_range, &temp_dividend->storage, &reg_d);
@@ -4309,7 +4309,7 @@ mass_handle_comparison_operation_lazy_proc(
 
   push_instruction(
     &context->builder->code_block.instructions, *source_range,
-    (Instruction) {.assembly = {cmp, {temp_a->storage, temp_b->storage, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {temp_a->storage, temp_b->storage, 0}}}
   );
 
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
@@ -4938,12 +4938,12 @@ mass_handle_if_expression_lazy_proc(
     make_label(context->program, &context->program->memory.sections.code, slice_literal("if end"));
   push_instruction(
     &context->builder->code_block.instructions, *dummy_range,
-    (Instruction) {.assembly = {jmp, {code_label32(after_label), 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {code_label32(after_label), 0, 0}}}
   );
 
   push_instruction(
     &context->builder->code_block.instructions, *dummy_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = else_label}
+    (Instruction) {.tag = Instruction_Tag_Label, .Label.index = else_label}
   );
 
   Expected_Result expected_else = expected_result_from_value(result_value);
@@ -4952,7 +4952,7 @@ mass_handle_if_expression_lazy_proc(
 
   push_instruction(
     &context->builder->code_block.instructions, *dummy_range,
-    (Instruction) {.type = Instruction_Type_Label, .label = after_label}
+    (Instruction) {.tag = Instruction_Tag_Label, .Label.index = after_label}
   );
 
   return result_value;
@@ -5455,8 +5455,8 @@ mass_handle_label_lazy_proc(
   push_instruction(
     &context->builder->code_block.instructions, source_range,
     (Instruction) {
-      .type = Instruction_Type_Label,
-      .label = *storage_static_as_c_type(&label_value->storage, Label_Index),
+      .tag = Instruction_Tag_Label,
+      .Label.index = *storage_static_as_c_type(&label_value->storage, Label_Index),
     }
   );
 
@@ -5536,7 +5536,7 @@ mass_handle_explicit_return_lazy_proc(
   push_instruction(
     &context->builder->code_block.instructions,
     fn_return->source_range,
-    (Instruction) {.assembly = {jmp, {return_label->storage, 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label->storage, 0, 0}}}
   );
 
   return expected_result_validate(expected_result, &void_value);
@@ -5657,7 +5657,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
   push_instruction(
     &context->builder->code_block.instructions, args_token->source_range,
-    (Instruction) { .type = Instruction_Type_Bytes, .Bytes = bytes, .scope = context->scope, }
+    (Instruction) { .tag = Instruction_Tag_Bytes, .Bytes = bytes, .scope = context->scope, }
   );
 
   return expected_result_validate(expected_result, &void_value);

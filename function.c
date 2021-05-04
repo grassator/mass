@@ -125,7 +125,7 @@ register_acquire_maybe_save_if_already_acquired(
 
   push_instruction(
     &builder->code_block.instructions, *source_range,
-    (Instruction) {.assembly = {mov, {
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {
       storage_register_for_descriptor(result.saved_index, &descriptor_s64),
       storage_register_for_descriptor(reg_index, &descriptor_s64)
     }}}
@@ -142,7 +142,7 @@ register_release_maybe_restore(
   if (maybe_saved_register->saved) {
     push_instruction(
       &builder->code_block.instructions, *maybe_saved_register->source_range,
-      (Instruction) {.assembly = {mov, {
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {
         storage_register_for_descriptor(maybe_saved_register->index, &descriptor_s64),
         storage_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
       }}}
@@ -175,9 +175,11 @@ move_value(
   if (target->tag == Storage_Tag_Xmm || source->tag == Storage_Tag_Xmm) {
     assert(target_size == source_size);
     if (target_size == 4) {
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movss, {*target, *source, 0}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movss, {*target, *source, 0}}});
     } else if (target_size == 8) {
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsd, {*target, *source, 0}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsd, {*target, *source, 0}}});
     } else {
       panic("Internal Error: XMM operand of unexpected size");
     }
@@ -196,45 +198,55 @@ move_value(
     }
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {sete, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {sete, {temp, *source}}});
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setne, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setne, {temp, *source}}});
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setb, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setb, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setbe, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setbe, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Above: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {seta, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {seta, {temp, *source}}});
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setae, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setae, {temp, *source}}});
         break;
       }
 
       case Compare_Type_Signed_Less: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setl, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setl, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setle, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setle, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Greater: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setg, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setg, {temp, *source}}});
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {setge, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setge, {temp, *source}}});
         break;
       }
       default: {
@@ -245,8 +257,10 @@ move_value(
       assert(temp.tag == Storage_Tag_Register);
       Storage resized_temp = temp;
       resized_temp.byte_size = target->byte_size;
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {resized_temp, temp}}});
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, resized_temp}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {resized_temp, temp}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, resized_temp}}});
       register_release(builder, temp.Register.index);
     }
     return;
@@ -273,7 +287,7 @@ move_value(
         Storage adjusted_source = storage_static_internal(memory, chunk_size);
         push_instruction(
           instructions, *source_range,
-          (Instruction) {.assembly = {mov, {adjusted_target, adjusted_source}}}
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {adjusted_target, adjusted_source}}}
         );
       }
       return;
@@ -281,7 +295,8 @@ move_value(
     s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {xor, {*target, *target}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {xor, {*target, *target}}});
       return;
     }
     Storage adjusted_source;
@@ -322,11 +337,14 @@ move_value(
         .byte_size = adjusted_source.byte_size,
         .Register.index = register_acquire_temp(builder),
       };
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp, adjusted_source}}});
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, temp}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp, adjusted_source}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
       register_release(builder, temp.Register.index);
     } else {
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, adjusted_source}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, adjusted_source}}});
     }
     return;
   }
@@ -344,9 +362,11 @@ move_value(
             .Register = target->Register,
             .byte_size = 4,
           };
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {adjusted_target, *source}}});
+          push_instruction(instructions, *source_range,
+            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {adjusted_target, *source}}});
         } else {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {*target, *source}}});
+          push_instruction(instructions, *source_range,
+            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {*target, *source}}});
         }
       } else {
         Storage temp = {
@@ -354,8 +374,10 @@ move_value(
           .byte_size = target->byte_size,
           .Register.index = register_acquire_temp(builder),
         };
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {movsx, {temp, *source}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, temp}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {temp, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
         register_release(builder, temp.Register.index);
       }
       return;
@@ -379,19 +401,29 @@ move_value(
         Storage reg_rsi = storage_register_for_descriptor(Register_SI, &descriptor_s64);
         Storage reg_rdi = storage_register_for_descriptor(Register_DI, &descriptor_s64);
         Storage reg_rcx = storage_register_for_descriptor(Register_C, &descriptor_s64);
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp_rsi, reg_rsi}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp_rdi, reg_rdi}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {temp_rcx, reg_rcx}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rsi, reg_rsi}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rdi, reg_rdi}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rcx, reg_rcx}}});
 
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rsi, *source}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {lea, {reg_rdi, *target}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_rsi, *source}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_rdi, *target}}});
         Storage size_operand = imm64(target_size);
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg_rcx, size_operand}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {rep_movsb}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rcx, size_operand}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {rep_movsb}});
 
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg_rsi, temp_rsi}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg_rdi, temp_rdi}}});
-        push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {reg_rcx, temp_rcx}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rsi, temp_rsi}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rdi, temp_rdi}}});
+        push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rcx, temp_rcx}}});
       }
       register_release(builder, temp_rsi.Register.index);
       register_release(builder, temp_rdi.Register.index);
@@ -409,7 +441,8 @@ move_value(
     return;
   }
 
-  push_instruction(instructions, *source_range, (Instruction) {.assembly = {mov, {*target, *source}}});
+  push_instruction(instructions, *source_range,
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
 }
 
 // FIXME Get rid of this function
@@ -483,8 +516,8 @@ fn_normalize_instruction_operands(
 ) {
   // :StorageNormalization
   // Normalizing operands to simplify future handling in the encoder
-  for (u8 storage_index = 0; storage_index < countof(instruction->assembly.operands); ++storage_index) {
-    Storage *storage = &instruction->assembly.operands[storage_index];
+  for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
+    Storage *storage = &instruction->Assembly.operands[storage_index];
     if (
       storage->tag == Storage_Tag_Memory &&
       storage->Memory.location.tag == Memory_Location_Tag_Indirect &&
@@ -503,9 +536,9 @@ fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
 ) {
   Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
   if (!last_instruction) return;
-  if (last_instruction->type != Instruction_Type_Assembly) return;
-  if (last_instruction->assembly.mnemonic != jmp) return;
-  Storage storage = last_instruction->assembly.operands[0];
+  if (last_instruction->tag != Instruction_Tag_Assembly) return;
+  if (last_instruction->Assembly.mnemonic != jmp) return;
+  Storage storage = last_instruction->Assembly.operands[0];
   if (!storage_is_label(&storage)) return;
   if (storage.Memory.location.Instruction_Pointer_Relative.label_index.value
     != builder->code_block.end_label.value) return;
@@ -541,11 +574,11 @@ make_trampoline(
   u32 result = u64_to_u32(buffer->occupied);
   encode_instruction_with_compiler_location(
     program, buffer,
-    &(Instruction) {.assembly = {mov, {rax, imm64(address)}}}
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, imm64(address)}}}
   );
   encode_instruction_with_compiler_location(
     program, buffer,
-    &(Instruction) {.assembly = {jmp, {rax}}}
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {rax}}}
   );
   return result;
 }
@@ -587,8 +620,8 @@ fn_encode(
   Storage stack_size_operand = imm_auto_8_or_32(out_layout->stack_reserve);
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
-      .type = Instruction_Type_Label,
-      .label = label_index
+      .tag = Instruction_Tag_Label,
+      .Label.index = label_index
     }
   );
 
@@ -603,14 +636,16 @@ fn_encode(
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(
-          program, buffer, &(Instruction) {.assembly = {push, {to_save}}}
+          program, buffer,
+          &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {push, {to_save}}}
         );
       }
     }
   }
 
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.assembly = {sub, {rsp, stack_size_operand}}}
+    program, buffer,
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {sub, {rsp, stack_size_operand}}}
   );
   out_layout->stack_allocation_offset_in_prolog =
     u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
@@ -624,7 +659,7 @@ fn_encode(
 
   encode_instruction_with_compiler_location(
     program, buffer, &(Instruction) {
-      .type = Instruction_Type_Label, .label = builder->code_block.end_label
+      .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label
     }
   );
 
@@ -633,12 +668,14 @@ fn_encode(
     // FIXME :RegisterAllocation
     //       make sure that return value is always available in RCX at this point
     encode_instruction_with_compiler_location(
-      program, buffer, &(Instruction) {.assembly = {mov, {rax, rcx}}}
+      program, buffer,
+      &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}}
     );
   }
 
   encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {.assembly = {add, {rsp, stack_size_operand}}}
+    program, buffer,
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {rsp, stack_size_operand}}}
   );
 
   // :RegisterPushPop
@@ -648,16 +685,18 @@ fn_encode(
       if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(
-          program, buffer, &(Instruction) {.assembly = {pop, {to_save}}}
+          program, buffer, &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {pop, {to_save}}}
         );
       }
     }
   }
 
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {ret, {0}}});
+  encode_instruction_with_compiler_location(program, buffer,
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ret, {0}}});
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 
-  encode_instruction_with_compiler_location(program, buffer, &(Instruction) {.assembly = {int3, {0}}});
+  encode_instruction_with_compiler_location(program, buffer,
+    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {int3, {0}}});
 }
 
 Value *
@@ -720,45 +759,55 @@ make_if(
     if (value->storage.tag == Storage_Tag_Eflags) {
       switch(value->storage.Eflags.compare_type) {
         case Compare_Type_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jne, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jne, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Not_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {je, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {je, {code_label32(label), value->storage, 0}}});
           break;
         }
 
         case Compare_Type_Unsigned_Below: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jae, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jae, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Below_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {ja, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ja, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jbe, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jbe, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jb, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jb, {code_label32(label), value->storage, 0}}});
           break;
         }
 
         case Compare_Type_Signed_Less: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jge, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jge, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Less_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jg, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jg, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jle, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jle, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater_Equal: {
-          push_instruction(instructions, *source_range, (Instruction) {.assembly = {jl, {code_label32(label), value->storage, 0}}});
+          push_instruction(instructions, *source_range,
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jl, {code_label32(label), value->storage, 0}}});
           break;
         }
         default: {
@@ -770,26 +819,27 @@ make_if(
       if (test_temp.tag == Storage_Tag_Register) {
         push_instruction(
           instructions, *source_range,
-          (Instruction) {.assembly = {x64_test, {test_temp, test_temp, 0}}}
+          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {x64_test, {test_temp, test_temp, 0}}}
         );
       } else {
         u64 byte_size = descriptor_byte_size(value->descriptor);
         if (byte_size == 4 || byte_size == 8) {
           push_instruction(
             instructions, *source_range,
-            (Instruction) {.assembly = {cmp, {value->storage, imm32(0), 0}}}
+            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm32(0), 0}}}
           );
         } else if (byte_size == 1) {
           push_instruction(
             instructions, *source_range,
-            (Instruction) {.assembly = {cmp, {value->storage, imm8(0), 0}}}
+            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm8(0), 0}}}
           );
         } else {
           assert(!"Unsupported value inside `if`");
         }
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
-      push_instruction(instructions, *source_range, (Instruction) {.assembly = {jz, {code_label32(label), eflags->storage, 0}}});
+      push_instruction(instructions, *source_range,
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jz, {code_label32(label), eflags->storage, 0}}});
     }
   }
   return label;
@@ -841,7 +891,7 @@ load_address(
 
   push_instruction(
     &context->builder->code_block.instructions, *source_range,
-    (Instruction) {.assembly = {lea, {temp_register->storage, source_operand, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_register->storage, source_operand, 0}}}
   );
 
   move_to_result_from_temp(
@@ -1052,11 +1102,11 @@ program_init_startup_code(
     Relocation *relocation = dyn_array_get(program->relocations, i);
     push_instruction(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.assembly = {lea, {register_a, relocation->address_of, 0}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {register_a, relocation->address_of, 0}}}
     );
     push_instruction(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.assembly = {mov, {relocation->patch_at, register_a, 0}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {relocation->patch_at, register_a, 0}}}
     );
   }
 
@@ -1065,12 +1115,12 @@ program_init_startup_code(
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
     push_instruction(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.assembly = {call, {fn->storage, 0, 0}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {fn->storage, 0, 0}}}
     );
   }
   push_instruction(
     &builder.code_block.instructions, source_range,
-    (Instruction) {.assembly = {jmp, {program->entry_point->storage, 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {program->entry_point->storage, 0, 0}}}
   );
 
   program->entry_point = function;

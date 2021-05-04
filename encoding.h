@@ -40,7 +40,7 @@ typedef struct {
   Operand_Encoding operands[3];
 } Instruction_Encoding;
 
-typedef struct {
+typedef struct X64_Mnemonic {
   const char *name;
   const Instruction_Encoding *encoding_list;
   u32 encoding_count;

@@ -11,6 +11,8 @@ typedef struct Program Program;
 
 typedef struct Compilation Compilation;
 
+typedef struct X64_Mnemonic X64_Mnemonic;
+
 // Forward declarations
 
 typedef struct Source_Position Source_Position;
@@ -118,6 +120,10 @@ typedef dyn_array_type(const Storage *) Array_Const_Storage_Ptr;
 typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
+
+typedef struct Instruction Instruction;
+typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
+typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
 
 typedef enum Operator_Fixity Operator_Fixity;
 
@@ -635,6 +641,39 @@ typedef struct Compiler_Source_Location {
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
+typedef enum {
+  Instruction_Tag_Assembly = 0,
+  Instruction_Tag_Label = 1,
+  Instruction_Tag_Bytes = 2,
+} Instruction_Tag;
+
+typedef struct Instruction_Assembly {
+  const X64_Mnemonic * mnemonic;
+  Storage operands[3];
+} Instruction_Assembly;
+typedef struct Instruction_Label {
+  Label_Index index;
+} Instruction_Label;
+typedef struct Instruction_Bytes {
+  Label_Index label_index;
+  u8 memory[15];
+  u8 length;
+  u64 label_offset_in_instruction;
+} Instruction_Bytes;
+typedef struct Instruction {
+  Instruction_Tag tag;
+  char _tag_padding[4];
+  Compiler_Source_Location compiler_source_location;
+  Source_Range source_range;
+  Scope * scope;
+  u64 encoded_byte_size;
+  union {
+    Instruction_Assembly Assembly;
+    Instruction_Label Label;
+    Instruction_Bytes Bytes;
+  };
+} Instruction;
+typedef dyn_array_type(Instruction) Array_Instruction;
 typedef enum Operator_Fixity {
   Operator_Fixity_Infix = 1,
   Operator_Fixity_Prefix = 2,
@@ -994,6 +1033,7 @@ _Pragma("warning (pop)")
 
 static Descriptor descriptor_function_builder_pointer;
 static Descriptor descriptor_program_pointer;
+static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_scope_pointer;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_void;
@@ -1161,6 +1201,11 @@ static Descriptor descriptor_array_compiler_source_location;
 static Descriptor descriptor_array_compiler_source_location_ptr;
 static Descriptor descriptor_compiler_source_location_pointer;
 static Descriptor descriptor_compiler_source_location_pointer_pointer;
+static Descriptor descriptor_instruction;
+static Descriptor descriptor_array_instruction;
+static Descriptor descriptor_array_instruction_ptr;
+static Descriptor descriptor_instruction_pointer;
+static Descriptor descriptor_instruction_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
@@ -1253,6 +1298,8 @@ static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
+static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
+static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position, Source_Position,
@@ -2081,6 +2128,116 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location, Compiler_Source_Location
   },
 );
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
+/*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(instruction_tag, Instruction_Tag)
+static C_Enum_Item instruction_tag_items[] = {
+{ .name = slice_literal_fields("Assembly"), .value = 0 },
+{ .name = slice_literal_fields("Label"), .value = 1 },
+{ .name = slice_literal_fields("Bytes"), .value = 2 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("mnemonic"),
+    .descriptor = &descriptor_x64_mnemonic_pointer,
+    .Base_Relative.offset = offsetof(Instruction_Assembly, mnemonic),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("operands"),
+    .descriptor = &descriptor_storage_3,
+    .Base_Relative.offset = offsetof(Instruction_Assembly, operands),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_assembly);
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label, Instruction_Label,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("index"),
+    .descriptor = &descriptor_label_index,
+    .Base_Relative.offset = offsetof(Instruction_Label, index),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_label);
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bytes, Instruction_Bytes,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("label_index"),
+    .descriptor = &descriptor_label_index,
+    .Base_Relative.offset = offsetof(Instruction_Bytes, label_index),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("memory"),
+    .descriptor = &descriptor_u8_15,
+    .Base_Relative.offset = offsetof(Instruction_Bytes, memory),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("length"),
+    .descriptor = &descriptor_u8,
+    .Base_Relative.offset = offsetof(Instruction_Bytes, length),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("label_offset_in_instruction"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Instruction_Bytes, label_offset_in_instruction),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_bytes);
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_instruction_tag,
+    .Base_Relative.offset = offsetof(Instruction, tag),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("compiler_source_location"),
+    .descriptor = &descriptor_compiler_source_location,
+    .Base_Relative.offset = offsetof(Instruction, compiler_source_location),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Instruction, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .Base_Relative.offset = offsetof(Instruction, scope),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("encoded_byte_size"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Instruction, encoded_byte_size),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Assembly"),
+    .descriptor = &descriptor_instruction_assembly,
+    .Base_Relative.offset = offsetof(Instruction, Assembly),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Label"),
+    .descriptor = &descriptor_instruction_label,
+    .Base_Relative.offset = offsetof(Instruction, Label),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Bytes"),
+    .descriptor = &descriptor_instruction_bytes,
+    .Base_Relative.offset = offsetof(Instruction, Bytes),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(operator_fixity, Operator_Fixity)
 static C_Enum_Item operator_fixity_items[] = {
 { .name = slice_literal_fields("Infix"), .value = 1 },

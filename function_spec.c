@@ -93,7 +93,7 @@ spec("function") {
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
           check(instruction_equal(
-            instruction, &(Instruction){.assembly = {xor, reg_a, reg_a}}
+            instruction, &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {xor, reg_a, reg_a}}
           ));
         }
       }
@@ -117,9 +117,9 @@ spec("function") {
           move_value(temp_allocator, builder, &test_range, &reg_a->storage, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
-          check(instruction->assembly.mnemonic == mov);
-          check(storage_equal(&instruction->assembly.operands[0], &reg_a->storage));
-          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->assembly.operands[1]);
+          check(instruction->Assembly.mnemonic == mov);
+          check(storage_equal(&instruction->Assembly.operands[0], &reg_a->storage));
+          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->Assembly.operands[1]);
           s64 expected_immediate = storage_static_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
@@ -143,9 +143,9 @@ spec("function") {
           move_value(temp_allocator, builder, &test_range, &memory->storage, &immediates[j]->storage);
           check(dyn_array_length(builder->code_block.instructions) == 1);
           Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
-          check(instruction->assembly.mnemonic == mov);
-          check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
-          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->assembly.operands[1]);
+          check(instruction->Assembly.mnemonic == mov);
+          check(storage_equal(&instruction->Assembly.operands[0], &memory->storage));
+          s64 actual_immediate = storage_static_value_up_to_s64(&instruction->Assembly.operands[1]);
           s64 expected_immediate = storage_static_value_up_to_s64(&immediates[j]->storage);
           check(actual_immediate == expected_immediate);
         }
@@ -157,9 +157,9 @@ spec("function") {
       move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate);
       check(dyn_array_length(builder->code_block.instructions) == 1);
       Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
-      check(instruction->assembly.mnemonic == mov);
-      check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
-      check(instruction->assembly.operands[1].byte_size == 4);
+      check(instruction->Assembly.mnemonic == mov);
+      check(storage_equal(&instruction->Assembly.operands[0], &memory->storage));
+      check(instruction->Assembly.operands[1].byte_size == 4);
     }
     it("should use a temp register for a imm64 to memory move") {
       Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
@@ -169,11 +169,11 @@ spec("function") {
       Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s64, (Source_Range){0});
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 0),
-        &(Instruction){.assembly = {mov, temp_reg->storage, immediate->storage}}
+        &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {mov, temp_reg->storage, immediate->storage}}
       ));
       check(instruction_equal(
         dyn_array_get(builder->code_block.instructions, 1),
-        &(Instruction){.assembly = {mov, memory->storage, temp_reg->storage}}
+        &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {mov, memory->storage, temp_reg->storage}}
       ));
     }
     it("should use appropriate setCC instruction when moving from eflags") {
@@ -189,9 +189,9 @@ spec("function") {
         move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 1);
         Instruction *instruction = dyn_array_get(builder->code_block.instructions, 0);
-        check(instruction->assembly.mnemonic == tests[i].mnemonic);
-        check(storage_equal(&instruction->assembly.operands[0], &memory->storage));
-        check(storage_equal(&instruction->assembly.operands[1], &eflags->storage));
+        check(instruction->Assembly.mnemonic == tests[i].mnemonic);
+        check(storage_equal(&instruction->Assembly.operands[0], &memory->storage));
+        check(storage_equal(&instruction->Assembly.operands[1], &eflags->storage));
       }
     }
     it("should use a temporary register for setCC to more than a byte") {
@@ -213,15 +213,15 @@ spec("function") {
         check(dyn_array_length(builder->code_block.instructions) == 3);
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 0),
-          &(Instruction){.assembly = {sete, temp_reg->storage, eflags->storage}}
+          &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {sete, temp_reg->storage, eflags->storage}}
         ));
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 1),
-          &(Instruction){.assembly = {movsx, resized_temp_reg->storage, temp_reg->storage}}
+          &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {movsx, resized_temp_reg->storage, temp_reg->storage}}
         ));
         check(instruction_equal(
           dyn_array_get(builder->code_block.instructions, 2),
-          &(Instruction){.assembly = {mov, memory->storage, resized_temp_reg->storage}}
+          &(Instruction){.tag = Instruction_Tag_Assembly, .Assembly = {mov, memory->storage, resized_temp_reg->storage}}
         ));
       }
     }

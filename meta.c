@@ -844,6 +844,27 @@ main(void) {
     { "u64", "line_number" },
   }));
 
+  push_type(add_common_fields(type_union("Instruction", (Struct[]){
+    struct_fields("Assembly", (Struct_Item[]){
+      { "const X64_Mnemonic *", "mnemonic" },
+      { "Storage", "operands", 3 },
+    }),
+    struct_fields("Label", (Struct_Item[]){
+      { "Label_Index", "index" },
+    }),
+    struct_fields("Bytes", (Struct_Item[]){
+      { "Label_Index", "label_index" },
+      { "u8", "memory", 15 },
+      { "u8", "length" },
+      { "u64", "label_offset_in_instruction" },
+    }),
+  }), (Struct_Item[]){
+    { "Compiler_Source_Location", "compiler_source_location" },
+    { "Source_Range", "source_range" },
+    { "Scope *", "scope" },
+    { "u64", "encoded_byte_size" },
+  }));
+
   push_type(type_enum("Operator_Fixity", (Enum_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
@@ -1085,6 +1106,7 @@ main(void) {
       fprintf(file, "typedef struct Function_Builder Function_Builder;\n\n");
       fprintf(file, "typedef struct Program Program;\n\n");
       fprintf(file, "typedef struct Compilation Compilation;\n\n");
+      fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
     }
 
     fprintf(file, "// Forward declarations\n\n");
@@ -1103,6 +1125,7 @@ main(void) {
 
     fprintf(file, "static Descriptor descriptor_function_builder_pointer;\n");
     fprintf(file, "static Descriptor descriptor_program_pointer;\n");
+    fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
     fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
     fprintf(file, "static Descriptor descriptor_compilation_pointer;\n");
     fprintf(file, "static Descriptor descriptor_void;\n");

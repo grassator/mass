@@ -24,7 +24,7 @@ encode_instruction_assembly(
   const Instruction_Encoding *encoding,
   u32 storage_count
 ) {
-  assert(instruction->type == Instruction_Type_Assembly);
+  assert(instruction->tag == Instruction_Tag_Assembly);
   u64 original_buffer_length = buffer->occupied;
 
   s8 mod_r_m_storage_index = -1;
@@ -44,7 +44,7 @@ encode_instruction_assembly(
   s32 displacement = 0;
 
   for (u8 storage_index = 0; storage_index < storage_count; ++storage_index) {
-    Storage *storage = &instruction->assembly.operands[storage_index];
+    Storage *storage = &instruction->Assembly.operands[storage_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
 
     if (storage->byte_size == 2) {
@@ -224,7 +224,7 @@ encode_instruction_assembly(
 
   // Write out displacement
   if (mod_r_m_storage_index != -1 && mod != MOD_Register) {
-    const Storage *storage = &instruction->assembly.operands[mod_r_m_storage_index];
+    const Storage *storage = &instruction->Assembly.operands[mod_r_m_storage_index];
     assert (storage->tag == Storage_Tag_Memory);
     const Memory_Location *location = &storage->Memory.location;
     switch(location->tag) {
@@ -261,7 +261,7 @@ encode_instruction_assembly(
     if (operand_encoding->type != Operand_Encoding_Type_Immediate) {
       continue;
     }
-    Storage *storage = &instruction->assembly.operands[storage_index];
+    Storage *storage = &instruction->Assembly.operands[storage_index];
     if (storage_is_label(storage)) {
       Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
       s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
@@ -302,15 +302,15 @@ encode_instruction(
   Instruction *instruction
 ) {
   // TODO turn into a switch statement on type
-  if (instruction->type == Instruction_Type_Label) {
-    Label *label = program_get_label(program, instruction->label);
+  if (instruction->tag == Instruction_Tag_Label) {
+    Label *label = program_get_label(program, instruction->Label.index);
     assert(!label->resolved);
     label->section = &program->memory.sections.code;
     label->offset_in_section = u64_to_u32(buffer->occupied);
     label->resolved = true;
     instruction->encoded_byte_size = 0;
     return;
-  } else if (instruction->type == Instruction_Type_Bytes) {
+  } else if (instruction->tag == Instruction_Tag_Bytes) {
     u32 instruction_start_offset = u64_to_u32(buffer->occupied);
     Slice slice = {
       .bytes = (char *)instruction->Bytes.memory,
@@ -334,12 +334,12 @@ encode_instruction(
     return;
   }
 
-  u32 storage_count = countof(instruction->assembly.operands);
-  for (u32 index = 0; index < instruction->assembly.mnemonic->encoding_count; ++index) {
-    const Instruction_Encoding *encoding = &instruction->assembly.mnemonic->encoding_list[index];
+  u32 storage_count = countof(instruction->Assembly.operands);
+  for (u32 index = 0; index < instruction->Assembly.mnemonic->encoding_count; ++index) {
+    const Instruction_Encoding *encoding = &instruction->Assembly.mnemonic->encoding_list[index];
     for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
-      Storage *storage = &instruction->assembly.operands[storage_index];
+      Storage *storage = &instruction->Assembly.operands[storage_index];
       u32 encoding_size = s32_to_u32(operand_encoding->size);
 
       if (operand_encoding->size != Operand_Size_Any) {
@@ -438,9 +438,9 @@ encode_instruction(
   const Source_Range *source_range = &instruction->source_range;
   printf("Source code at ");
   source_range_print_start_position(source_range);
-  printf("%s", instruction->assembly.mnemonic->name);
+  printf("%s", instruction->Assembly.mnemonic->name);
   for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
-    Storage *storage = &instruction->assembly.operands[storage_index];
+    Storage *storage = &instruction->Assembly.operands[storage_index];
     printf(" ");
     print_operand(storage);
   }

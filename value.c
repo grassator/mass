@@ -890,13 +890,13 @@ instruction_equal(
   const Instruction *a,
   const Instruction *b
 ) {
-  if (a->type != b->type) return false;
-  switch(a->type) {
-    case Instruction_Type_Assembly: {
-      if (a->assembly.mnemonic != b->assembly.mnemonic) return false;
-      for (u64 i = 0; i < countof(a->assembly.operands); ++i) {
-        const Storage *a_storage = &a->assembly.operands[i];
-        const Storage *b_storage = &b->assembly.operands[i];
+  if (a->tag != b->tag) return false;
+  switch(a->tag) {
+    case Instruction_Tag_Assembly: {
+      if (a->Assembly.mnemonic != b->Assembly.mnemonic) return false;
+      for (u64 i = 0; i < countof(a->Assembly.operands); ++i) {
+        const Storage *a_storage = &a->Assembly.operands[i];
+        const Storage *b_storage = &b->Assembly.operands[i];
         if (a_storage->tag != b_storage->tag) return false;
         // FIXME Use immediates instead of static storage for instructions
         if (a_storage->tag == Storage_Tag_Static) {
@@ -933,10 +933,10 @@ instruction_equal(
       }
       break;
     }
-    case Instruction_Type_Label: {
-      return a->label.value == b->label.value;
+    case Instruction_Tag_Label: {
+      return a->Label.index.value == b->Label.index.value;
     }
-    case Instruction_Type_Bytes: {
+    case Instruction_Tag_Bytes: {
       if (a->Bytes.length != b->Bytes.length) return false;
       return !!memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length);
     }
