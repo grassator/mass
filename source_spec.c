@@ -388,7 +388,7 @@ spec("source") {
           "result"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
     #endif
@@ -406,7 +406,7 @@ spec("source") {
           "42"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -418,7 +418,7 @@ spec("source") {
       fn_type_opaque checker = test_program_external_source_function(
         "main", &test_context, "fixtures\\error_runtime_divide_by_zero"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       volatile bool caught_exception = false;
       __try {
         checker();
@@ -442,7 +442,7 @@ spec("source") {
       #if 0
       it("debug math witout a macro") {
         MATH_CHECKER_FN(u8, u8, /);
-        check(checker);
+        check(spec_check_mass_result(test_context.result));
         check(checker(10u, 3u) == 10u / 3u);
         check(checker(UINT8_MAX, 3u) == UINT8_MAX / 3u);
       }
@@ -451,13 +451,13 @@ spec("source") {
       #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
         it("should correctly handle u"#BITS" divide") {\
           MATH_CHECKER_FN(u##BITS, u##BITS, /);\
-          check(checker);\
+          check(spec_check_mass_result(test_context.result));\
           check(checker(10u, 3u) == 10u / 3u);\
           check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX / 3u);\
         }\
         it("should correctly handle u"#BITS" remainder") {\
           MATH_CHECKER_FN(u##BITS, u##BITS, %);\
-          check(checker);\
+          check(spec_check_mass_result(test_context.result));\
           check(checker(10u, 3u) == 10u % 3u);\
           check(checker(13u, 10u) == 13u % 10u);\
           check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX % 3u);\
@@ -472,7 +472,7 @@ spec("source") {
       #define MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(BITS)\
         it("should correctly handle s"#BITS" divide") {\
           MATH_CHECKER_FN(s##BITS, s##BITS, /);\
-          check(checker);\
+          check(spec_check_mass_result(test_context.result));\
           check(checker(10, 3) == 10 / 3);\
           check(checker(10, -3) == 10 / -3);\
           check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX / 3);\
@@ -480,7 +480,7 @@ spec("source") {
         }\
         it("should correctly handle s"#BITS" remainder") {\
           MATH_CHECKER_FN(s##BITS, s##BITS, %);\
-          check(checker);\
+          check(spec_check_mass_result(test_context.result));\
           check(checker(10, 3) == 10 % 3);\
           check(checker(10, -3) == 10 % -3);\
           check(checker(13, 10) == 13 % 10);\
@@ -498,12 +498,12 @@ spec("source") {
     describe("multiplication") {
       it("should correctly handle s8 multiplication") {\
         MATH_CHECKER_FN(s8, s8, *);
-        check(checker);
+        check(spec_check_mass_result(test_context.result));
         check(checker(-30, 3) == -30 * 3);
       }
       it("should correctly handle u8 multiplication") {\
         MATH_CHECKER_FN(u8, u8, *);
-        check(checker);
+        check(spec_check_mass_result(test_context.result));
         check(checker(128u, 3u) == 128u);
       }
     }
@@ -538,7 +538,7 @@ spec("source") {
           "if x < 0 then 0 else 1"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
@@ -580,7 +580,7 @@ spec("source") {
           "1\n"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
@@ -593,7 +593,7 @@ spec("source") {
           "0"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(42) == 1);
       check(checker(-2) == 0);
     }
@@ -626,7 +626,7 @@ spec("source") {
         "foo", &test_context,
         "fn foo() -> (s64) { 42 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -635,7 +635,7 @@ spec("source") {
         "foo", &test_context,
         "fn foo(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
@@ -645,7 +645,7 @@ spec("source") {
         "fn inner(x : s64) -> () { x = 21 };"
         "fn outer(x : s64) -> (s64) { inner(1); x }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker(42);
       check(actual == 42);
     }
@@ -655,7 +655,7 @@ spec("source") {
         "foo", &test_context,
         "fn foo(x : s64) -> (s64) { x }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(42) == 42);
     }
 
@@ -664,7 +664,7 @@ spec("source") {
         "foo", &test_context,
         "fn foo() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -673,7 +673,7 @@ spec("source") {
         "foo", &test_context,
         "fn foo() -> (s64) { () = 10; 42 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -683,7 +683,7 @@ spec("source") {
         "fn proxy() -> (s32) { plus(1, 2); plus(40, 2) }\n"
         "fn plus(x : s32, y : s32) -> (s32) { x + y }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s32 answer = checker();
       check(answer == 42);
     }
@@ -693,7 +693,7 @@ spec("source") {
         "checker", &test_context,
         "fn checker() -> (s64) { fn local() -> (s64) { 42 }; local() }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 answer = checker();
       check(answer == 42);
     }
@@ -705,7 +705,7 @@ spec("source") {
         "fn my_size_of(x : s64) -> (s64) { 8 }\n"
         "fn checker(x : s32) -> (s64) { my_size_of(x) }\n"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
       check(size == 4);
     }
@@ -716,7 +716,7 @@ spec("source") {
         "fn size_of(x : s32) -> (s64) { 4 }\n"
         "fn checker(x : s32) -> (s64) { fn size_of(x : s64) -> (s64) { 8 }; size_of(x) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
       check(size == 4);
     }
@@ -751,7 +751,7 @@ spec("source") {
         "fn test_default(x : s64, y : s64 = 20) -> (s64) { x + y }\n"
         "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 42);
     }
@@ -762,7 +762,7 @@ spec("source") {
         "fn test_default(x : s64, y : s64 = x) -> (s64) { x + y }\n"
         "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 42);
     }
@@ -773,7 +773,7 @@ spec("source") {
         "fn test_default(x : s64, y := 20) -> (s64) { x + y }\n"
         "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 42);
     }
@@ -793,7 +793,7 @@ spec("source") {
         "checker", &test_context,
         "checker :: { ANSWER :: 42; fn() -> (s64) { ANSWER } }\n"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 42);
     }
@@ -803,7 +803,7 @@ spec("source") {
         "checker", &test_context,
         "fn checker(x : s32) -> (s32) { if x > 0 { return x }; 0 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
       check(actual == 42);
     }
@@ -813,7 +813,7 @@ spec("source") {
         "checker", &test_context,
         "fn checker() -> (s32) { local := fn() -> (s32) { 42 }; local() }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s32 actual = checker();
       check(actual == 42);
     }
@@ -826,7 +826,7 @@ spec("source") {
           "result"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -839,7 +839,7 @@ spec("source") {
           "this_scope.result"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -908,7 +908,7 @@ spec("source") {
           "counter"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 0);
     }
 
@@ -922,7 +922,7 @@ spec("source") {
           "id(x)"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -945,7 +945,7 @@ spec("source") {
           "size_of({ var := 0; var })"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 8);
     }
 
@@ -958,7 +958,7 @@ spec("source") {
           "counter"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 0);
     }
 
@@ -968,7 +968,7 @@ spec("source") {
         "@fn compile_time_fn() -> (s64) { 42 }\n"
         "fn checker() -> (s64) { compile_time_fn() }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
   }
@@ -980,7 +980,7 @@ spec("source") {
         "mass :: import \"mass\"\n"
         "fn checker() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == Descriptor_Tag_Struct);
     }
 
@@ -989,7 +989,7 @@ spec("source") {
             "checker", &test_context,
             "fn checker() -> (s64) { \\42\\ }"
         );
-        check(checker);
+        check(spec_check_mass_result(test_context.result));
         check(checker() == 42);
     }
 
@@ -998,7 +998,7 @@ spec("source") {
         "plus", &test_context,
         "fn plus(x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(30, 10, 2) == 42);
     }
 
@@ -1007,7 +1007,7 @@ spec("source") {
         "plus_one", &test_context,
         "fn plus_one(x : s64) -> (s64) { x - -1 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(41) == 42);
     }
 
@@ -1017,7 +1017,7 @@ spec("source") {
         "fn id(ignored : s64, x : s64) -> (s64) { x }\n"
         "fn plus() -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1027,7 +1027,7 @@ spec("source") {
         "operator 18 (++ x) { x = x + 1; x };"
         "fn test() -> (s64) { y := 41; ++y }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1037,7 +1037,7 @@ spec("source") {
         "operator 18 (x ++) { result := x; x = x + 1; result };"
         "fn test() -> (s64) { y := 42; y++ }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1048,7 +1048,7 @@ spec("source") {
         "operator 19 (x ++) { result := x; x = x + 1; result };"
         "fn test() -> (s64) { y := 41; ++y++ }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1059,7 +1059,7 @@ spec("source") {
         "operator 14 (x ++ y) { x + y };"
         "fn test(x: s64, y: s64) -> (s64) { x ++ ++y }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(40, 1) == 42);
     }
 
@@ -1069,7 +1069,7 @@ spec("source") {
         "operator 15 (x ** y) { x * y };"
         "fn test() -> (s64) { 21 ** 2 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1104,7 +1104,7 @@ spec("source") {
         "test", &test_context,
         "fn test() -> (s64) { 2 << 1 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 4);
     }
@@ -1114,7 +1114,7 @@ spec("source") {
         "test", &test_context,
         "fn test() -> (s64) { 0b110 & 0b011 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 0b10);
     }
@@ -1124,7 +1124,7 @@ spec("source") {
         "test", &test_context,
         "fn test() -> ([s64]) { x := 0 & 1; &x }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual);
     }
@@ -1134,7 +1134,7 @@ spec("source") {
         "test", &test_context,
         "fn test() -> (s64) { 0b110 | 0b011 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
       check(actual == 0b111);
     }
@@ -1176,7 +1176,7 @@ spec("source") {
         "checker", &test_context,
         "fn checker() -> (s64) { @{ 20 + 22 } }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1226,7 +1226,7 @@ spec("source") {
           "foo", &test_context,
           "fn foo(callback : fn() -> (s64)) -> (s64) { callback() }"
         );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
     }
 
@@ -1248,7 +1248,7 @@ spec("source") {
         "macro id(x : s64) -> (s64) { x }\n"
         "fn test() -> (s64) { id(42) }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1258,7 +1258,7 @@ spec("source") {
         "macro id(x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
         "fn test() -> (s64) { id(42) + 1 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 21);
     }
 
@@ -1268,7 +1268,7 @@ spec("source") {
         "macro process(y : s64) -> () { y = 42; }\n"
         "fn test() -> (s64) { x := 20; process(x); x }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1278,7 +1278,7 @@ spec("source") {
         "syntax (\"the\" \"answer\") 42;"
         "fn checker() -> (s32) { the answer }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1288,7 +1288,7 @@ spec("source") {
         "syntax statement (\"block\" {}@body) body();"
         "fn checker() -> (s64) { result := 20; block { result = 42 }; result }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1298,7 +1298,7 @@ spec("source") {
         "syntax statement (\"comment\" ..@ignore);"
         "fn checker() -> (s64) { x := 42; comment x = x + 1; x }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1309,7 +1309,7 @@ spec("source") {
         "syntax (\"negative\" .@x) (cast(s32, 0) - x());"
         "fn checker() -> (s32) { negative 42 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == -42);
     }
 
@@ -1347,7 +1347,7 @@ spec("source") {
           "sum"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(0) == 0);
       check(checker(1) == 0);
     }
@@ -1366,7 +1366,7 @@ spec("source") {
           "sum"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(0) == 0);
       check(checker(1) == 1);
       check(checker(2) == 3);
@@ -1389,7 +1389,7 @@ spec("source") {
         "BAR :: id(FOO)\n"
         "fn test() -> (s64) { BAR }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
   }
@@ -1430,7 +1430,7 @@ spec("source") {
           "x"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1449,7 +1449,7 @@ spec("source") {
         "checker", &test_context,
         "fn checker() -> ([u8]) { c_string(\"test\") }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       const char *string = checker();
       check(strcmp(string, "test") == 0);
     }
@@ -1482,7 +1482,7 @@ spec("source") {
           "foo.0"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       u8 actual = checker();
       check(actual == 42);
     }
@@ -1497,7 +1497,7 @@ spec("source") {
           "x : int8;"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       checker();
     }
 
@@ -1510,7 +1510,7 @@ spec("source") {
           "p.x + p.y"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
 
@@ -1545,7 +1545,7 @@ spec("source") {
           "input.y\n"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
 
       Test_128bit test_128bit = {.x = 21, .y = 42};
       check(checker(&test_128bit));
@@ -1562,7 +1562,7 @@ spec("source") {
           "result"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
 
       Test_128bit test_128bit = checker(42);
       check(test_128bit.x == 42);
@@ -1578,7 +1578,7 @@ spec("source") {
           "test_sum(x.x, x.y)"
         "}"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
 
       Test_128bit test_128bit = { .x = 20, .y = 22 };
       check(checker(test_128bit) == 42);
@@ -1591,7 +1591,7 @@ spec("source") {
         "return_200", &test_context,
         "fn return_200() -> (u8) { 200 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 200);
     }
 
@@ -1600,7 +1600,7 @@ spec("source") {
         "test", &test_context,
         "fn test() -> (s8) { x : u8 = 200; x < 0 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == false);
     }
   }
@@ -1611,7 +1611,7 @@ spec("source") {
         "add_one", &test_context,
         "fn add_one(x : s16) -> (s16) { x + 1 }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker(8) == 9);
     }
   }
@@ -1624,7 +1624,7 @@ spec("source") {
         "sample_module :: import(\"fixtures/sample_module\")\n"
         "fn checker() -> (s32) { sample_module.the_answer }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
     // TODO somehow test that modules are only imported once
@@ -1635,7 +1635,7 @@ spec("source") {
         "B :: import(\"fixtures\\\\sample_module\")\n"
         "fn checker() -> (s64) { A.the_answer + B.the_answer }"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       check(checker() == 84);
     }
     it("should support importing compiler functionality through `mass` module") {
@@ -1726,7 +1726,7 @@ spec("source") {
       fn_type_opaque checker = test_program_external_source_function(
         "test", &test_context, "fixtures\\relocations"
       );
-      check(checker);
+      check(spec_check_mass_result(test_context.result));
       checker();
     }
 
