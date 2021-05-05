@@ -4559,6 +4559,28 @@ mass_handle_reflect_operator(
 }
 
 static Value *
+mass_handle_reify_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  void *unused_payload
+) {
+  assert(args_view.length == 1);
+  Value *reflected_value = compile_time_eval(context, args_view);
+  if (reflected_value->descriptor != &descriptor_value_pointer) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = reflected_value->source_range,
+      .Type_Mismatch = {
+        .expected = &descriptor_value_pointer,
+        .actual = reflected_value->descriptor
+      },
+    });
+    return 0;
+  }
+  return *storage_static_as_c_type(&reflected_value->storage, Value *);
+}
+
+static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -6067,6 +6089,13 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_reflect_operator,
+  ));
+  scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
+    .precedence = 29,
+    .fixity = Operator_Fixity_Postfix,
+    .associativity = Operator_Associativity_Left,
+    .argument_count = 1,
+    .handler = mass_handle_reify_operator,
   ));
   scope_define_operator(0, scope, range, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,

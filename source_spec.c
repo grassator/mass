@@ -974,7 +974,7 @@ spec("source") {
   }
 
   describe("Operators") {
-    it("should be able to use backslash operator for reflection") {
+    it("should be able to use prefix backslash operator for reflection") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
         "mass :: import \"mass\"\n"
@@ -982,6 +982,15 @@ spec("source") {
       );
       check(checker);
       check(checker() == Descriptor_Tag_Struct);
+    }
+
+    it("should be able to use postfix backslash operator for reification") {
+        s64(*checker)() = (s64(*)())test_program_inline_source_function(
+            "checker", &test_context,
+            "fn checker() -> (s64) { \\42\\ }"
+        );
+        check(checker);
+        check(checker() == 42);
     }
 
     it("should be able to parse and run a triple plus function") {
