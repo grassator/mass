@@ -515,7 +515,7 @@ assign(
   } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
     assert(target->storage.tag == Storage_Tag_Memory);
-    assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+    //assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
 
     for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
       Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);
@@ -785,6 +785,7 @@ code_point_is_operator(
     case '$':
     case '*':
     case '/':
+    case '\\':
     case ':':
     case ';':
     case ',':
@@ -4534,13 +4535,37 @@ mass_handle_paren_operator(
 }
 
 static Value *
+mass_handle_reflect_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  void *unused_payload
+) {
+  assert(args_view.length == 1);
+  Value *source_value = value_view_get(args_view, 0);
+  value_init(
+    hash_map_set(context->compilation->static_pointer_map, source_value, (Value){0}),
+    VALUE_STATIC_EPOCH,
+    &descriptor_value,
+    storage_none,
+    source_value->source_range
+  );
+
+  return value_make(
+    context,
+    &descriptor_value_pointer,
+    storage_static_inline(&source_value),
+    args_view.source_range
+  );
+}
+
+static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
   void *unused_payload
 ) {
-  Value *body = value_view_get(args_view, 0);
   assert(args_view.length == 1);
+  Value *body = value_view_get(args_view, 0);
   Source_Range body_range = body->source_range;
   if (value_match_symbol(body, slice_literal("scope"))) {
     return value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
@@ -5962,13 +5987,14 @@ scope_define_enum(
   Scope *scope,
   Source_Range source_range,
   Slice enum_name,
-  const Descriptor *enum_descriptor,
+  Value *enum_type_value,
   C_Enum_Item *items,
   u64 item_count
 ) {
   Scope *enum_scope = scope_make(allocator, 0);
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
+    const Descriptor *enum_descriptor = storage_static_as_c_type(&enum_type_value->storage, Descriptor);
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
       VALUE_STATIC_EPOCH, enum_descriptor, storage_static(&it->value), source_range
@@ -5981,6 +6007,8 @@ scope_define_enum(
     VALUE_STATIC_EPOCH, &descriptor_scope, storage_static(enum_scope), source_range
   );
   scope_define_value(scope, source_range, enum_name, enum_value);
+
+  scope_define_value(enum_scope, source_range, slice_literal("_Type"), enum_type_value);
 }
 
 static void
@@ -6002,21 +6030,29 @@ module_compiler_init(
 
   scope_define_enum(
     allocator, compiler_scope, source_range,
-    slice_literal("Operator_Fixity"), &descriptor_operator_fixity,
+    slice_literal("Operator_Fixity"), type_operator_fixity_value,
     operator_fixity_items, countof(operator_fixity_items)
   );
 
   scope_define_enum(
     allocator, compiler_scope, source_range,
-    slice_literal("Mass_Result_Tag"), &descriptor_mass_result_tag,
+    slice_literal("Mass_Result_Tag"), type_mass_result_tag_value,
     mass_result_tag_items, countof(mass_result_tag_items)
   );
 
   scope_define_enum(
     allocator, compiler_scope, source_range,
-    slice_literal("Mass_Error_Tag"), &descriptor_mass_error_tag,
+    slice_literal("Mass_Error_Tag"), type_mass_error_tag_value,
     mass_error_tag_items, countof(mass_error_tag_items)
   );
+
+  scope_define_enum(
+    allocator, compiler_scope, source_range,
+    slice_literal("Descriptor_Tag"), type_descriptor_tag_value,
+    descriptor_tag_items, countof(descriptor_tag_items)
+  );
+
+  scope_define_value(compiler_scope, source_range, slice_literal("Value"), type_value_value);
 }
 
 static void
@@ -6025,6 +6061,13 @@ scope_define_builtins(
   Scope *scope
 ) {
   Source_Range range = {0};
+  scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
+    .precedence = 30,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 1,
+    .handler = mass_handle_reflect_operator,
+  ));
   scope_define_operator(0, scope, range, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,

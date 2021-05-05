@@ -974,6 +974,16 @@ spec("source") {
   }
 
   describe("Operators") {
+    it("should be able to use backslash operator for reflection") {
+      Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "mass :: import \"mass\"\n"
+        "fn checker() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
+      );
+      check(checker);
+      check(checker() == Descriptor_Tag_Struct);
+    }
+
     it("should be able to parse and run a triple plus function") {
       s64(*checker)(s64, s64, s64) = (s64(*)(s64, s64, s64))test_program_inline_source_function(
         "plus", &test_context,
