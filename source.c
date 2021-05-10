@@ -400,8 +400,9 @@ token_value_force_immediate_integer(
       case Literal_Cast_Result_Success: {
         // Always copy full value. Truncation is handled by the byte_size of the immediate
         u64 byte_size = u64_to_u32(bit_size / 8);
-        return value_make(
-          context,
+        return value_init(
+          allocator_allocate(context->allocator, Value),
+          VALUE_STATIC_EPOCH,
           target_descriptor,
           storage_static_internal(&bits, byte_size),
           value->source_range
@@ -1440,7 +1441,10 @@ token_parse_single(
       case Group_Tag_Square: {
         const Descriptor *pointee = token_match_type(context, group->children);
         Descriptor *temp = descriptor_pointer_to(context->allocator, pointee);
-        return value_make(context, &descriptor_type, storage_static(temp), *source_range);
+        return value_init(
+          allocator_allocate(context->allocator, Value),
+          VALUE_STATIC_EPOCH, &descriptor_type, storage_static(temp), *source_range
+        );
       }
     }
   } else if(value_is_symbol(value)) {
@@ -1455,21 +1459,17 @@ token_parse_single(
         .source_range = *source_range,
       });
       return 0;
-    } else if (
-      value->storage.tag != Storage_Tag_Static &&
-      value->storage.tag != Storage_Tag_None
-    ) {
-      if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Epoch_Mismatch,
-          .Epoch_Mismatch = { .value = value, .expected_epoch = context->epoch },
-          .source_range = *source_range,
-          .detailed_message =
-            "This happens when you access value from runtime in compile-time execution "
-            "or a runtime value from a different stack frame than current function call."
-        });
-        return 0;
-      }
+    }
+    if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Epoch_Mismatch,
+        .Epoch_Mismatch = { .value = value, .expected_epoch = context->epoch },
+        .source_range = *source_range,
+        .detailed_message =
+          "This happens when you access value from runtime in compile-time execution "
+          "or a runtime value from a different stack frame than current function call."
+      });
+      return 0;
     }
   }
   return value;
@@ -1576,8 +1576,9 @@ token_apply_macro_syntax(
       .view = capture_view,
       .scope = captured_scope,
     };
-    Value *result = value_make(
-      context, &descriptor_macro_capture, storage_static(capture), capture_view.source_range
+    Value *result = value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
     scope_define_value(expansion_scope, capture_view.source_range, capture_name, result);
   }
@@ -2151,7 +2152,10 @@ mass_make_lazy_value(
     .proc = proc,
     .payload = payload,
   };
-  return value_make(context, &descriptor_lazy_value, storage_static(lazy), source_range);
+  return value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH, &descriptor_lazy_value, storage_static(lazy), source_range
+  );
 }
 
 static inline void
@@ -2837,7 +2841,7 @@ compile_time_eval(
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
     if (forced_value->descriptor->tag == Descriptor_Tag_Function) {
-      // It is only allowed to to pass through funciton definitions not compiled ones
+      // It is only allowed to to pass through function definitions, not the compiled functions
       assert(forced_value->storage.tag == Storage_Tag_None);
     }
     return forced_value;
@@ -2887,7 +2891,10 @@ compile_time_eval(
   fn_type_opaque jitted_code = value_as_function(jit, eval_value);
   jitted_code();
 
-  Value *temp_result = value_make(context, out_value->descriptor, storage_none, view.source_range);
+  Value *temp_result = value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH, out_value->descriptor, storage_none, view.source_range
+  );
   switch(out_value->descriptor->tag) {
     case Descriptor_Tag_Void: {
       temp_result->storage = storage_none;
@@ -3087,8 +3094,9 @@ token_handle_negation(
     Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
     *negated = *original;
     negated->negative = !negated->negative;
-    negated_value = value_make(
-      context, &descriptor_number_literal, storage_static(negated), value->source_range
+    negated_value = value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(negated), value->source_range
     );
   } else {
     panic("TODO support general negation");
@@ -4329,6 +4337,8 @@ mass_handle_comparison_operation(
 ) {
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
+  MASS_ON_ERROR(*context->result) return 0;
+
   Compare_Type compare_type = (Compare_Type)(u64)raw_payload;
 
   const Descriptor *descriptor =
@@ -4414,8 +4424,12 @@ token_handle_type_of(
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
 
   // TODO consider adding a const static values to avoid the cast
-  result = value_make(
-    context, &descriptor_type, storage_static((Descriptor *)descriptor), args_token->source_range
+  result = value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH,
+    &descriptor_type,
+    storage_static((Descriptor *)descriptor),
+    args_token->source_range
   );
 
   err:
@@ -4450,8 +4464,9 @@ token_handle_size_of(
     .bits = byte_size,
   };
 
-  result = value_make(
-    context, &descriptor_number_literal, storage_static(literal), args_token->source_range
+  result = value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(literal), args_token->source_range
   );
 
   err:
@@ -4550,8 +4565,9 @@ mass_handle_reflect_operator(
     source_value->source_range
   );
 
-  return value_make(
-    context,
+  return value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH,
     &descriptor_value_pointer,
     storage_static_inline(&source_value),
     args_view.source_range
@@ -4590,17 +4606,26 @@ mass_handle_at_operator(
   Value *body = value_view_get(args_view, 0);
   Source_Range body_range = body->source_range;
   if (value_match_symbol(body, slice_literal("scope"))) {
-    return value_make(context, &descriptor_scope, storage_static(context->scope), body_range);
+    return value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_scope, storage_static(context->scope), body_range
+    );
   } else if (value_match_symbol(body, slice_literal("context"))) {
     // TODO context is transient, which, combined with lazy evaluation means that
     //      we must copy it here. The whole setup is a bit shaky and needs to be re-thought.
     Execution_Context *copy = allocator_allocate(context->allocator, Execution_Context);
     *copy = *context;
-    return value_make(context, &descriptor_execution_context, storage_static(copy), body_range);
+    return value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_execution_context, storage_static(copy), body_range
+    );
   } else if (value_match_symbol(body, slice_literal("source_range"))) {
     Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);
     *source_range = args_view.source_range;
-    return value_make(context, &descriptor_source_range, storage_static(source_range), body_range);
+    return value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_source_range, storage_static(source_range), body_range
+    );
   } else if (value_match_group(body, Group_Tag_Paren)) {
     return compile_time_eval(context, value_as_group(body)->children);
   } else if (value_match_group(body, Group_Tag_Curly)) {
@@ -4714,6 +4739,9 @@ mass_handle_field_access_lazy_proc(
   Storage field_storage = storage_field_access(&struct_->storage, field);
   Value *field_value =
     value_make(context, field->descriptor, field_storage, struct_->source_range);
+  if (field_storage.tag == Storage_Tag_Static) {
+    field_value->epoch = VALUE_STATIC_EPOCH;
+  }
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
@@ -4777,6 +4805,10 @@ mass_handle_array_access_lazy_proc(
       // @Volatile :TemporaryRegisterForIndirectMemory
       array_element_value->is_temporary = true;
     }
+  }
+
+  if (array_element_value->storage.tag == Storage_Tag_Static) {
+    array_element_value->epoch = VALUE_STATIC_EPOCH;
   }
 
   return expected_result_ensure_value_or_temp(context, expected_result, array_element_value);
@@ -5093,7 +5125,10 @@ token_parse_function_literal(
     returns = raw_return;
   } else {
     Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);
-    returns = value_make(context, &descriptor_group, storage_static(group), keyword->source_range);
+    returns = value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_group, storage_static(group), keyword->source_range
+    );
   }
 
   Value_View rest = value_view_rest(&view, peek_index);
@@ -5148,7 +5183,10 @@ token_parse_function_literal(
     literal->epoch = VALUE_STATIC_EPOCH;
     return literal;
   } else {
-    return value_make(context, &descriptor_type, storage_static(descriptor), view.source_range);
+    return value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_type, storage_static(descriptor), view.source_range
+    );
   }
 }
 
@@ -5302,6 +5340,7 @@ mass_handle_block_lazy_proc(
       Expected_Result expected_void = expected_result_from_value(&void_value);
       result_value = value_force(context, &expected_void, lazy_statement);
     }
+    MASS_ON_ERROR(*context->result) return 0;
     // We do not do cross-statement register allocation so can check that there
     // are no stray registers retained across statement boundaries
     if(context->builder && registers_before != context->builder->code_block.register_occupied_bitset) {
@@ -5369,8 +5408,9 @@ token_parse_block_view(
             Value_View matched_view = value_view_slice(&rest, 0, match_length);
             Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
             *lazy_value_storage = lazy_value;
-            Value *lazy_statement = value_make(
-              context,
+            Value *lazy_statement = value_init(
+              allocator_allocate(context->allocator, Value),
+              VALUE_STATIC_EPOCH,
               &descriptor_lazy_value,
               storage_static(lazy_value_storage),
               matched_view.source_range
@@ -5547,7 +5587,10 @@ token_parse_statement_label(
 
     Source_Range source_range = symbol->source_range;
     Label_Index label = make_label(context->program, &context->program->memory.code, name);
-    value = value_make(context, &descriptor_label_index, storage_static_inline(&label), source_range);
+    value = value_init(
+      allocator_allocate(context->allocator, Value),
+      VALUE_STATIC_EPOCH, &descriptor_label_index, storage_static_inline(&label), source_range
+    );
     scope_define_value(label_scope, source_range, name, value);
     if (placeholder) {
       return peek_index;
@@ -5862,7 +5905,7 @@ mass_handle_assignment_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-void
+static void
 token_define_local_variable(
   Execution_Context *context,
   Value *symbol,

@@ -140,7 +140,7 @@ mass_error_to_string(
       APPEND_LITERAL("Trying to access a runtime variable with epoch ");
       snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->value->epoch);
       APPEND_SLICE(slice_from_c_string(number_buffer));
-      APPEND_LITERAL(" from a different epoch %");
+      APPEND_LITERAL(" from a different epoch ");
       snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->expected_epoch);
       APPEND_SLICE(slice_from_c_string(number_buffer));
       APPEND_LITERAL(". ");

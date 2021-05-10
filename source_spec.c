@@ -1381,7 +1381,7 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
 
-    it("should be able to parse and run macro id function") {
+    it("should be able to parse and run macro id function at compile time") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "FOO :: 42\n"
