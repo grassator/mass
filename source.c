@@ -2873,7 +2873,7 @@ compile_time_eval(
     return 0;
   }
 
-  MASS_ON_ERROR(assign(&eval_context, out_value, expression_result_value)) {
+  MASS_ON_ERROR(assign(&eval_context, out_value, forced_value)) {
     context->result = eval_context.result;
     return 0;
   }
