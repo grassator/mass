@@ -15,10 +15,10 @@ fi
 rm -rf build
 mkdir -p build
 
-$CC $FLAGS generate_types.c -o build/generate_types -lm
+$CC $FLAGS meta.c -o build/meta -lm
 
 cd build
-./generate_types
+./meta
 cd ..
 
 $CC $FLAGS mass.c -o build/mass -lm
