@@ -2848,16 +2848,10 @@ compile_time_eval(
   }
 
   u64 result_byte_size = descriptor_byte_size(result_descriptor);
-
-  // Need to ensure 16-byte alignment here because result value might be __m128
-  // TODO When we support AVX-2 or AVX-512, this might need to increase further
-  #define COMPILE_TIME_RESULT_ALIGNMENT 16
-
-  // Avoid heap allocation for small results by having a fixed-sized buffer on the stack
-  _Alignas(COMPILE_TIME_RESULT_ALIGNMENT) u8 stack_result[16] = {0};
-  void *result = result_byte_size <= sizeof(stack_result)
-    ? stack_result
-    : allocator_allocate_bytes(context->allocator, result_byte_size, COMPILE_TIME_RESULT_ALIGNMENT);
+  u64 result_alignment = descriptor_byte_alignment(result_descriptor);
+  void *result = result_byte_size // void type has zero size
+    ? allocator_allocate_bytes(context->allocator, result_byte_size, result_alignment)
+    : 0;
 
   // Load the address of the result
   Register out_register = register_acquire_temp(&eval_builder);
