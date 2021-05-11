@@ -68,7 +68,7 @@ syntax statement rewrite("mut" ..@binding "=" ..@expression) binding := expressi
 syntax statement rewrite("stack" .@name ..@type) name : type
 syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expression
 
-fn fail(context : Execution_Context, name : String, message : String) {
+@fn fail(context : Execution_Context, name : String, message : String) {
   mass :: import "mass"
   result := context.result
   result.tag = mass.Mass_Result_Tag.Error

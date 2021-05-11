@@ -1653,7 +1653,7 @@ spec("source") {
     it("should support failing the compilation by calling fail() at compile time") {
      test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() { @(fail(@context, \"fail()\", \"Oops\")) }\n"
+        "fn checker() { fail(@context, \"fail()\", \"Oops\") }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
