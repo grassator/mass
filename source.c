@@ -2840,6 +2840,8 @@ compile_time_eval(
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
+    assert(forced_value->epoch == VALUE_STATIC_EPOCH || value_is_non_lazy_static(forced_value));
+    forced_value->epoch = VALUE_STATIC_EPOCH;
     if (forced_value->descriptor->tag == Descriptor_Tag_Function) {
       // It is only allowed to to pass through function definitions, not the compiled functions
       assert(forced_value->storage.tag == Storage_Tag_None);

@@ -1239,6 +1239,16 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Epoch_Mismatch);
     }
+
+    it("should support compile-time arithmetic operations") {
+      s64 (*checker)() = (s64 (*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "RESULT :: 40 + 1 + 1\n"
+        "fn checker() -> (s64) { RESULT }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Macro") {
