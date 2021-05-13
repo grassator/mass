@@ -4169,6 +4169,8 @@ mass_handle_arithmetic_operation(
   Value *lhs = token_parse_single(context, value_view_get(arguments, 0));
   Value *rhs = token_parse_single(context, value_view_get(arguments, 1));
 
+  MASS_ON_ERROR(*context->result) return 0;
+
   const Descriptor *descriptor = large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
 
   Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)operator_payload;
