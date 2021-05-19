@@ -889,8 +889,7 @@ ensure_compiled_function_body(
   assert(descriptor->tag == Descriptor_Tag_Function);
   const Function_Info *function = &descriptor->Function.info;
 
-  // No need to compile macro body as it will be compiled inline
-  if (function->flags & Descriptor_Function_Flags_Macro) return;
+  assert(!(function->flags & Descriptor_Function_Flags_Macro));
 
   if (value_is_external_symbol(function->body)) {
     assert(function->body->descriptor == &descriptor_external_symbol);
