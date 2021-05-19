@@ -886,17 +886,13 @@ typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
-  Descriptor_Function_Flags_No_Own_Scope = 2,
-  Descriptor_Function_Flags_No_Own_Return = 4,
-  Descriptor_Function_Flags_Compile_Time = 8,
+  Descriptor_Function_Flags_Compile_Time = 4,
 } Descriptor_Function_Flags;
 
 const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   if (value == 0) return "Descriptor_Function_Flags_None";
   if (value == 1) return "Descriptor_Function_Flags_Macro";
-  if (value == 2) return "Descriptor_Function_Flags_No_Own_Scope";
-  if (value == 4) return "Descriptor_Function_Flags_No_Own_Return";
-  if (value == 8) return "Descriptor_Function_Flags_Compile_Time";
+  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
   assert(!"Unexpected value for enum Descriptor_Function_Flags");
   return 0;
 };
@@ -2899,9 +2895,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Macro"), .value = 1 },
-{ .name = slice_literal_fields("No_Own_Scope"), .value = 2 },
-{ .name = slice_literal_fields("No_Own_Return"), .value = 4 },
-{ .name = slice_literal_fields("Compile_Time"), .value = 8 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
 };
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_tag, Memory_Layout_Item_Tag)

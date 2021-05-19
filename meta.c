@@ -1082,9 +1082,7 @@ main(void) {
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Macro", 1 << 0 },
-    { "No_Own_Scope", 1 << 1 },
-    { "No_Own_Return", 1 << 2 },
-    { "Compile_Time", 1 << 3 },
+    { "Compile_Time", 1 << 2 },
   }));
 
   push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct_Type[]){

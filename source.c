@@ -3230,9 +3230,7 @@ call_function_macro(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = (function->flags & Descriptor_Function_Flags_No_Own_Scope)
-    ? function->scope
-    : scope_make(context->allocator, function->scope);
+  Scope *body_scope = scope_make(context->allocator, function->scope);
 
   for (u64 i = 0; i < dyn_array_length(function->memory_layout.items); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
@@ -3287,15 +3285,13 @@ call_function_macro(
       break;
     }
   }
-  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
-    Value return_label = {
-      .descriptor = &descriptor_void,
-      .storage = code_label32(fake_return_label_index),
-      .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-    };
-    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
-    scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
-  }
+  Value return_label = {
+    .descriptor = &descriptor_void,
+    .storage = code_label32(fake_return_label_index),
+    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
+  };
+  scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
+  scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
 
   Value *body = function->body;
   {
@@ -3306,19 +3302,17 @@ call_function_macro(
     MASS_ON_ERROR(*context->result) return 0;
   }
 
-  if (!(function->flags & Descriptor_Function_Flags_No_Own_Return)) {
-    // @Hack if there are no instructions generated so far there definitely was no jumps
-    //       to return so we can avoid generating this instructions which also can enable
-    //       optimizations in the compile_time_eval that check for the instruction count.
-    if (dyn_array_length(context->builder->code_block.instructions)) {
-      push_instruction(
-        &context->builder->code_block.instructions, overload->source_range,
-        (Instruction) {
-          .tag = Instruction_Tag_Label,
-          .Label.index = fake_return_label_index
-        }
-      );
-    }
+  // @Hack if there are no instructions generated so far there definitely was no jumps
+  //       to return so we can avoid generating this instructions which also can enable
+  //       optimizations in the compile_time_eval that check for the instruction count.
+  if (dyn_array_length(context->builder->code_block.instructions)) {
+    push_instruction(
+      &context->builder->code_block.instructions, overload->source_range,
+      (Instruction) {
+        .tag = Instruction_Tag_Label,
+        .Label.index = fake_return_label_index
+      }
+    );
   }
   dyn_array_destroy(args);
   return result_value;
