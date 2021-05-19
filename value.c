@@ -1227,7 +1227,7 @@ value_specific_temporary_register_for_descriptor_internal(
     source_range
   );
   value->is_temporary = true;
-  context->builder->code_block.register_occupied_values[reg] = value;
+  context->builder->register_occupied_values[reg] = value;
   return value;
 }
 

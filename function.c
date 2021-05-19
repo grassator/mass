@@ -44,9 +44,9 @@ register_acquire(
   Function_Builder *builder,
   Register reg_index
 ) {
-  assert(!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
+  assert(!register_bitset_get(builder->register_occupied_bitset, reg_index));
   register_bitset_set(&builder->used_register_bitset, reg_index);
-  register_bitset_set(&builder->code_block.register_occupied_bitset, reg_index);
+  register_bitset_set(&builder->register_occupied_bitset, reg_index);
   return reg_index;
 }
 
@@ -61,7 +61,7 @@ register_find_available(
   };
   for (u32 i = 0; i < countof(temp_registers); ++i) {
     Register reg_index = temp_registers[i];
-    if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+    if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) {
       return reg_index;
     }
   }
@@ -82,8 +82,8 @@ ensure_register_released(
   Function_Builder *builder,
   Register reg_index
 ) {
-  register_bitset_unset(&builder->code_block.register_occupied_bitset, reg_index);
-  builder->code_block.register_occupied_values[reg_index] = 0;
+  register_bitset_unset(&builder->register_occupied_bitset, reg_index);
+  builder->register_occupied_values[reg_index] = 0;
 }
 
 void
@@ -91,7 +91,7 @@ register_release(
   Function_Builder *builder,
   Register reg_index
 ) {
-  assert(register_bitset_get(builder->code_block.register_occupied_bitset, reg_index));
+  assert(register_bitset_get(builder->register_occupied_bitset, reg_index));
   ensure_register_released(builder, reg_index);
 }
 
@@ -115,7 +115,7 @@ register_acquire_maybe_save_if_already_acquired(
     .source_range = source_range,
     .index = reg_index,
   };
-  if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) {
+  if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) {
     register_acquire(builder, reg_index);
     return result;
   }
@@ -612,7 +612,7 @@ fn_encode(
   u8 push_index = 0;
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
-      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
@@ -663,7 +663,7 @@ fn_encode(
   // Pop non-volatile registers (in original order)
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
-      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(
           program, buffer, &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {pop, {to_save}}}
@@ -923,8 +923,8 @@ ensure_compiled_function_body(
   Function_Builder builder = (Function_Builder){
     .function = function,
     .label_index = fn_label,
+    .register_volatile_bitset = program->platform_info.register_volatile_bitset,
     .code_block = {
-      .register_volatile_bitset = program->platform_info.register_volatile_bitset,
       // FIXME use fn_value->descriptor->name
       .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
@@ -957,8 +957,8 @@ ensure_compiled_function_body(
       panic("Unexpected storage tag for an argument");
     }
     if (arg_reg != Register_SP) {
-      register_bitset_set(&builder.code_block.register_occupied_bitset, arg_reg);
-      builder.code_block.register_occupied_values[arg_reg] = arg_value;
+      register_bitset_set(&builder.register_occupied_bitset, arg_reg);
+      builder.register_occupied_values[arg_reg] = arg_value;
     }
   }
 
@@ -982,8 +982,8 @@ ensure_compiled_function_body(
     return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect
   ) {
     Register return_reg = return_value->storage.Memory.location.Indirect.base_register;
-    register_bitset_set(&builder.code_block.register_occupied_bitset, return_reg);
-    builder.code_block.register_occupied_values[return_reg] = return_value;
+    register_bitset_set(&builder.register_occupied_bitset, return_reg);
+    builder.register_occupied_values[return_reg] = return_value;
   }
 
   // Return value can be named in which case it should be accessible in the fn body

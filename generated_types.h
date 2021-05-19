@@ -710,9 +710,6 @@ typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct Code_Block {
   Label_Index end_label;
   Array_Instruction instructions;
-  u64 register_volatile_bitset;
-  u64 register_occupied_bitset;
-  Value * register_occupied_values[36];
 } Code_Block;
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
@@ -722,6 +719,9 @@ typedef struct Function_Builder {
   u32 max_call_parameters_stack_size;
   Code_Block code_block;
   u64 used_register_bitset;
+  u64 register_volatile_bitset;
+  u64 register_occupied_bitset;
+  Value * register_occupied_values[36];
   Slice source;
   const Function_Info * function;
   Label_Index label_index;
@@ -2454,24 +2454,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
     .descriptor = &descriptor_array_instruction,
     .Base_Relative.offset = offsetof(Code_Block, instructions),
   },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_volatile_bitset"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Code_Block, register_volatile_bitset),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_occupied_bitset"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Code_Block, register_occupied_bitset),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_occupied_values"),
-    .descriptor = &descriptor_value_pointer_36,
-    .Base_Relative.offset = offsetof(Code_Block, register_occupied_values),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(code_block);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
@@ -2506,6 +2488,24 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .name = slice_literal_fields("used_register_bitset"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Function_Builder, used_register_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_volatile_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Function_Builder, register_volatile_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_occupied_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Function_Builder, register_occupied_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_occupied_values"),
+    .descriptor = &descriptor_value_pointer_36,
+    .Base_Relative.offset = offsetof(Function_Builder, register_occupied_values),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

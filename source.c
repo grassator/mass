@@ -2816,8 +2816,8 @@ compile_time_eval(
   Function_Builder eval_builder = {
     .function = &descriptor->Function.info,
     .label_index = eval_label_index,
+    .register_volatile_bitset = jit->program->platform_info.register_volatile_bitset,
     .code_block = {
-      .register_volatile_bitset = jit->program->platform_info.register_volatile_bitset,
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
@@ -3360,8 +3360,8 @@ call_function_overload(
   u64 saved_registers_bit_set = 0;
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     // FIXME this should use *target* volatile registers *NOT* the current builder
-    if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) continue;
-    if (!register_bitset_get(builder->code_block.register_occupied_bitset, reg_index)) continue;
+    if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) continue;
+    if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
 
     register_bitset_set(&saved_registers_bit_set, reg_index);
 
@@ -3370,7 +3370,7 @@ call_function_overload(
     // otherwise we will overwrite it with the restored value
     if (storage_is_register_index(&result_value->storage, reg_index)) continue;
 
-    Value *occupied_value = builder->code_block.register_occupied_values[reg_index];
+    Value *occupied_value = builder->register_occupied_values[reg_index];
     assert(occupied_value);
     if (occupied_value->storage.tag == Storage_Tag_Register) {
       assert(occupied_value->storage.tag == Storage_Tag_Register);
@@ -3401,7 +3401,7 @@ call_function_overload(
   // we do not use any of them for the temporaries
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
-    register_bitset_unset(&context->builder->code_block.register_occupied_bitset, reg_index);
+    register_bitset_unset(&context->builder->register_occupied_bitset, reg_index);
   }
 
   // :ArgumentRegisterAcquire
@@ -3514,7 +3514,7 @@ call_function_overload(
   // :ArgumentRegisterAcquire
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(argument_register_bit_set, reg_index)) continue;
-    register_bitset_unset(&context->builder->code_block.register_occupied_bitset, reg_index);
+    register_bitset_unset(&context->builder->register_occupied_bitset, reg_index);
   }
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
@@ -3524,7 +3524,7 @@ call_function_overload(
     // :NoSaveResult
     if (storage_is_register_index(&result_value->storage, reg_index)) continue;
 
-    Value *occupied_value = builder->code_block.register_occupied_values[reg_index];
+    Value *occupied_value = builder->register_occupied_values[reg_index];
     assert(occupied_value->storage.tag == Storage_Tag_Memory);
     Register temp_reg = occupied_value->storage.Memory.location.Indirect.base_register;
     if (temp_reg == Register_SP) {
@@ -5321,7 +5321,7 @@ mass_handle_block_lazy_proc(
   for (u64 i = 0; i < statement_count; ++i) {
     MASS_ON_ERROR(*context->result) return 0;
     u64 registers_before =
-      context->builder ? context->builder->code_block.register_occupied_bitset : 0;
+      context->builder ? context->builder->register_occupied_bitset : 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     // Saving this source range for debugging because it will get overwritten when lazy is forced
     Source_Range debug_source_range = lazy_statement->source_range;
@@ -5336,10 +5336,10 @@ mass_handle_block_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
     // We do not do cross-statement register allocation so can check that there
     // are no stray registers retained across statement boundaries
-    if(context->builder && registers_before != context->builder->code_block.register_occupied_bitset) {
+    if(context->builder && registers_before != context->builder->register_occupied_bitset) {
       for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
         bool before = register_bitset_get(registers_before, reg_index);
-        bool after = register_bitset_get(context->builder->code_block.register_occupied_bitset, reg_index);
+        bool after = register_bitset_get(context->builder->register_occupied_bitset, reg_index);
         if (before != after) {
           if (after) {
             printf("Unreleased %s\n", register_name(reg_index));

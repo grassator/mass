@@ -212,7 +212,7 @@ win32_init_runtime_info_for_function(
   u8 unwind_code_index = 0;
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
-      if (!register_bitset_get(builder->code_block.register_volatile_bitset, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         WIN32_WRITE_UNWIND_CODE((UNWIND_CODE) {
           .CodeOffset = layout->volatile_register_push_offsets[unwind_code_index],
           .UnwindOp = UWOP_PUSH_NONVOL,

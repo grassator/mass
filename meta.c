@@ -955,9 +955,6 @@ main(void) {
   push_type(type_struct("Code_Block", (Struct_Item[]){
     { "Label_Index", "end_label" },
     { "Array_Instruction", "instructions" },
-    { "u64", "register_volatile_bitset" },
-    { "u64", "register_occupied_bitset" },
-    { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
   }));
 
   push_type(type_struct("Function_Builder", (Struct_Item[]){
@@ -966,6 +963,9 @@ main(void) {
     { "u32", "max_call_parameters_stack_size" },
     { "Code_Block", "code_block" },
     { "u64", "used_register_bitset" },
+    { "u64", "register_volatile_bitset" },
+    { "u64", "register_occupied_bitset" },
+    { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
     { "Label_Index", "label_index" },
