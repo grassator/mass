@@ -1475,12 +1475,10 @@ function_argument_value_at_index_internal(
 
 const Platform_Info *
 program_host_platform_info() {
-  #ifdef _WIN32
-    #if defined(_M_AMD64) || defined(__x86_64__)
-    return &platform_info_x86_64_windows;
-    #else
-    static_assert(false, "TODO add Platform_Info for this host system");
-    #endif
+  #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
+  return &platform_info_x86_64_windows;
+  #elif defined(__linux__) && defined(__x86_64__)
+  return &platform_info_x86_64_linux;
   #else
   static_assert(false, "TODO add Platform_Info for this host system");
   #endif

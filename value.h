@@ -17,6 +17,21 @@ static const Platform_Info platform_info_x86_64_windows = {
   ),
 };
 
+static const Platform_Info platform_info_x86_64_linux = {
+  // This is system V ABI that is used in multiple systems so might be worth refactoring
+  .register_volatile_bitset = (
+    // Arguments
+    (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
+    (1llu << Register_C) | (1llu << Register_R8) | (1llu << Register_R9) |
+
+    // Varargs / Return
+    (1llu << Register_A) |
+
+    // Other
+    (1llu << Register_R10) | (1llu << Register_R11)
+  ),
+};
+
 static Array_Value_Ptr empty_value_array = {
   .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
 };
