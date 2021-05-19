@@ -1473,10 +1473,24 @@ function_argument_value_at_index_internal(
 #define function_argument_value_at_index(...)\
   function_argument_value_at_index_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
+const Platform_Info *
+program_host_platform_info() {
+  #ifdef _WIN32
+    #if defined(_M_AMD64) || defined(__x86_64__)
+    return &platform_info_x86_64_windows;
+    #else
+    static_assert(false, "TODO add Platform_Info for this host system");
+    #endif
+  #else
+  static_assert(false, "TODO add Platform_Info for this host system");
+  #endif
+}
+
 void
 program_init(
   Allocator *allocator,
-  Program *program
+  Program *program,
+  const Platform_Info *platform_info
 ) {
   *program = (Program) {
     .labels = dyn_array_make(Array_Label, .capacity = 128, .allocator = allocator),
@@ -1485,6 +1499,7 @@ program_init(
     .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
     .relocations = dyn_array_make(Array_Relocation, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
+    .platform_info = *platform_info,
   };
 
   #define MAX_CODE_SIZE (640llu * 1024llu * 1024llu) // 640Mb
@@ -1580,7 +1595,8 @@ compilation_init(
   compilation->result = allocator_allocate(compilation->allocator, Mass_Result);
 
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, compilation->runtime_program);
+  // TODO Allow for a different target platform
+  program_init(compilation->allocator, compilation->runtime_program, program_host_platform_info());
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
   scope_define_builtins(compilation->allocator, compilation->root_scope);
@@ -1588,7 +1604,7 @@ compilation_init(
   module_compiler_init(compilation, &compilation->compiler_module);
 
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, jit_program);
+  program_init(compilation->allocator, jit_program, program_host_platform_info());
   jit_init(&compilation->jit, jit_program);
 }
 

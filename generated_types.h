@@ -209,6 +209,10 @@ typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
+typedef struct Platform_Info Platform_Info;
+typedef dyn_array_type(Platform_Info *) Array_Platform_Info_Ptr;
+typedef dyn_array_type(const Platform_Info *) Array_Const_Platform_Info_Ptr;
+
 typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
@@ -1088,6 +1092,11 @@ typedef struct Mass_Result {
   };
 } Mass_Result;
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
+typedef struct Platform_Info {
+  u64 register_volatile_bitset;
+} Platform_Info;
+typedef dyn_array_type(Platform_Info) Array_Platform_Info;
+
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;
@@ -1097,6 +1106,7 @@ typedef struct Program {
   Value * entry_point;
   Array_Function_Builder functions;
   Program_Memory memory;
+  Platform_Info platform_info;
 } Program;
 typedef dyn_array_type(Program) Array_Program;
 
@@ -1417,6 +1427,11 @@ static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
+static Descriptor descriptor_platform_info;
+static Descriptor descriptor_array_platform_info;
+static Descriptor descriptor_array_platform_info_ptr;
+static Descriptor descriptor_platform_info_pointer;
+static Descriptor descriptor_platform_info_pointer_pointer;
 static Descriptor descriptor_program;
 static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
@@ -3464,6 +3479,17 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result, Mass_Result,
 );
 MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_platform_info_ptr, Array_Platform_Info_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_platform_info, Array_Platform_Info)
+MASS_DEFINE_STRUCT_DESCRIPTOR(platform_info, Platform_Info,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_volatile_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Platform_Info, register_volatile_bitset),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(platform_info);
 MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
 MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
@@ -3514,6 +3540,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
     .name = slice_literal_fields("memory"),
     .descriptor = &descriptor_program_memory,
     .Base_Relative.offset = offsetof(Program, memory),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("platform_info"),
+    .descriptor = &descriptor_platform_info,
+    .Base_Relative.offset = offsetof(Program, platform_info),
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);

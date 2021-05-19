@@ -1208,6 +1208,10 @@ main(void) {
     })
   }));
 
+  push_type(type_struct("Platform_Info", (Struct_Item[]){
+    { "u64", "register_volatile_bitset" },
+  }));
+
   push_type(type_struct("Program", (Struct_Item[]){
     { "Array_Import_Library", "import_libraries" },
     { "Array_Label", "labels" },
@@ -1217,6 +1221,7 @@ main(void) {
     { "Value *", "entry_point" },
     { "Array_Function_Builder", "functions" },
     { "Program_Memory", "memory" },
+    { "Platform_Info", "platform_info"},
   }));
 
   push_type(type_hash_map({

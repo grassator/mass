@@ -468,25 +468,6 @@ move_to_result_from_temp(
   }
 }
 
-// TODO move to platform code somehow
-void
-win32_set_volatile_registers_for_function(
-  Function_Builder *builder
-) {
-  // Arguments
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_C);
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_D);
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R8);
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R9);
-
-  // Return
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_A);
-
-  // Other
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R10);
-  register_bitset_set(&builder->code_block.register_volatile_bitset, Register_R11);
-}
-
 // :StackDisplacementEncoding
 s64
 fn_adjust_stack_displacement(
@@ -944,13 +925,13 @@ ensure_compiled_function_body(
     .function = function,
     .label_index = fn_label,
     .code_block = {
+      .register_volatile_bitset = program->platform_info.register_volatile_bitset,
       // FIXME use fn_value->descriptor->name
       .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
 
-  win32_set_volatile_registers_for_function(&builder);
 
   Execution_Context body_context = *context;
   Scope *body_scope = scope_make(context->allocator, function->scope);

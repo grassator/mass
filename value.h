@@ -4,6 +4,19 @@
 #include <inttypes.h>
 #include "types.h"
 
+static const Platform_Info platform_info_x86_64_windows = {
+  .register_volatile_bitset = (
+    // Arguments
+    (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |
+
+    // Return
+    (1llu << Register_A) |
+
+    // Other
+    (1llu << Register_R10) | (1llu << Register_R11)
+  ),
+};
+
 static Array_Value_Ptr empty_value_array = {
   .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
 };
