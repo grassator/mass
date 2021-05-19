@@ -2817,6 +2817,7 @@ compile_time_eval(
     .function = &descriptor->Function.info,
     .label_index = eval_label_index,
     .code_block = {
+      .register_volatile_bitset = jit->program->platform_info.register_volatile_bitset,
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
