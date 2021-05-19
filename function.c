@@ -880,20 +880,17 @@ load_address(
   );
 }
 
-void
+static void
 ensure_compiled_function_body(
   Execution_Context *context,
   Value *fn_value
 ) {
-  // If the value already has the operand we assume it is compiled
-  if (fn_value->storage.tag != Storage_Tag_None) return;
-
-  assert(fn_value->descriptor->tag == Descriptor_Tag_Function);
-  const Function_Info *function = &fn_value->descriptor->Function.info;
+  const Descriptor *descriptor = maybe_unwrap_pointer_descriptor(fn_value->descriptor);
+  assert(descriptor->tag == Descriptor_Tag_Function);
+  const Function_Info *function = &descriptor->Function.info;
 
   // No need to compile macro body as it will be compiled inline
   if (function->flags & Descriptor_Function_Flags_Macro) return;
-  assert(function->body);
 
   if (value_is_external_symbol(function->body)) {
     assert(function->body->descriptor == &descriptor_external_symbol);
@@ -913,6 +910,9 @@ ensure_compiled_function_body(
       return;
     }
   }
+
+  // If the value already has the operand we assume it is compiled
+  if (fn_value->storage.tag != Storage_Tag_None) return;
 
   // TODO better name (coming from the function)
   Slice fn_name = fn_value->descriptor->name.length
