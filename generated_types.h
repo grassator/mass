@@ -708,6 +708,7 @@ typedef struct Instruction {
 } Instruction;
 typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct Code_Block {
+  Label_Index start_label;
   Label_Index end_label;
   Array_Instruction instructions;
 } Code_Block;
@@ -724,7 +725,6 @@ typedef struct Function_Builder {
   Value * register_occupied_values[36];
   Slice source;
   const Function_Info * function;
-  Label_Index label_index;
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
@@ -2444,6 +2444,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_code_block, Array_Code_Block)
 MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("start_label"),
+    .descriptor = &descriptor_label_index,
+    .Base_Relative.offset = offsetof(Code_Block, start_label),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("end_label"),
     .descriptor = &descriptor_label_index,
     .Base_Relative.offset = offsetof(Code_Block, end_label),
@@ -2518,12 +2524,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .name = slice_literal_fields("function"),
     .descriptor = &descriptor_function_info_pointer,
     .Base_Relative.offset = offsetof(Function_Builder, function),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("label_index"),
-    .descriptor = &descriptor_label_index,
-    .Base_Relative.offset = offsetof(Function_Builder, label_index),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_builder);

@@ -589,7 +589,7 @@ fn_encode(
     .stack_reserve = builder->stack_reserve,
   };
 
-  Label_Index label_index = builder->label_index;
+  Label_Index label_index = builder->code_block.start_label;
 
   Label *label = program_get_label(program, label_index);
 
@@ -905,7 +905,7 @@ ensure_compiled_function_body(
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     if (builder->function == function) {
-      fn_value->storage = code_label32(builder->label_index);
+      fn_value->storage = code_label32(builder->code_block.start_label);
       return;
     }
   }
@@ -922,9 +922,9 @@ ensure_compiled_function_body(
 
   Function_Builder builder = (Function_Builder){
     .function = function,
-    .label_index = fn_label,
     .register_volatile_bitset = program->platform_info.register_volatile_bitset,
     .code_block = {
+      .start_label = fn_label,
       // FIXME use fn_value->descriptor->name
       .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
@@ -1066,9 +1066,9 @@ program_init_startup_code(
 
   Function_Builder builder = (Function_Builder){
     .function = &descriptor->Function.info,
-    .label_index = fn_label,
     .frozen = true,
     .code_block = {
+      .start_label = fn_label,
       .end_label = make_label(program, &program->memory.code, slice_literal("__startup end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },

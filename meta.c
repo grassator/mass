@@ -953,6 +953,7 @@ main(void) {
   }));
 
   push_type(type_struct("Code_Block", (Struct_Item[]){
+    { "Label_Index", "start_label" },
     { "Label_Index", "end_label" },
     { "Array_Instruction", "instructions" },
   }));
@@ -968,7 +969,6 @@ main(void) {
     { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
-    { "Label_Index", "label_index" },
   }));
 
   push_type(type_enum("Function_Argument_Mode", (Enum_Type_Item[]){
