@@ -3402,10 +3402,10 @@ hash_pointer(
 
 static inline bool
 const_void_pointer_equal(
-  void const * const *a,
-  void const * const *b
+  void const *a,
+  void const *b
 ) {
-  return *a == *b;
+  return a == b;
 }
 
 static const s32 hash_byte_start = 7;
@@ -3678,6 +3678,9 @@ struct Hash_Map_Make_Options {
 
 #define hash_map_slice_template(_hash_map_type_, _value_type_)\
   hash_map_template(_hash_map_type_, Slice, _value_type_, hash_slice, slice_equal)
+
+#define hash_map_pointer_template(_hash_map_type_, _key_type_, _value_type_)\
+  hash_map_template(_hash_map_type_, _key_type_, _value_type_, hash_pointer, const_void_pointer_equal)
 
 #define hash_map_make(_hash_map_type_, ...)\
   _hash_map_type_##__make(\
