@@ -54,15 +54,35 @@ source_range_print_start_position(
   slice_print(source_range->file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }
+#define APPEND_SLICE(_SLICE_)\
+  fixed_buffer_resizing_append_slice(&result, (_SLICE_))
+#define APPEND_LITERAL(_STRING_)\
+  APPEND_SLICE(slice_literal(_STRING_))
+
+static void
+mass_error_append_function_signature_string(
+  Fixed_Buffer *result,
+  const Descriptor *descriptor
+) {
+  APPEND_SLICE(descriptor->name);
+  APPEND_LITERAL("(");
+  bool first = true;
+  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info.arguments) {
+    if (first) first = false;
+    else APPEND_LITERAL(", ");
+    APPEND_SLICE(arg->name);
+    APPEND_LITERAL(" : ");
+    APPEND_SLICE(arg->descriptor->name);
+  }
+  APPEND_LITERAL(") -> (");
+  APPEND_SLICE(descriptor->Function.info.returns.descriptor->name);
+  APPEND_LITERAL(")");
+}
 
 static Fixed_Buffer *
 mass_error_to_string(
   Mass_Error const* error
 ) {
-  #define APPEND_SLICE(_SLICE_)\
-    fixed_buffer_resizing_append_slice(&result, (_SLICE_))
-  #define APPEND_LITERAL(_STRING_)\
-    APPEND_SLICE(slice_literal(_STRING_))
   char number_buffer[128] = {0};
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
   switch(error->tag) {
@@ -147,10 +167,10 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
-      APPEND_LITERAL("Could not decide which overload is better: ");
-      APPEND_SLICE(overloads->a->descriptor->name);
-      APPEND_LITERAL(" or ");
-      APPEND_SLICE(overloads->b->descriptor->name);
+      APPEND_LITERAL("Could not decide which overload is better: \n  ");
+      mass_error_append_function_signature_string(result, overloads->a->descriptor);
+      APPEND_LITERAL("\n  ");
+      mass_error_append_function_signature_string(result, overloads->b->descriptor);
     } break;
     case Mass_Error_Tag_No_Matching_Overload: {
       // TODO provide better error message with argument types
