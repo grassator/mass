@@ -4,6 +4,12 @@
 #include "prelude.h"
 #include "value.h"
 
+static Storage
+ensure_compiled_function_body(
+  Execution_Context *context,
+  Value *fn_value
+);
+
 Value *
 reserve_stack(
   Allocator *allocator,
@@ -133,12 +139,12 @@ compare(
   Value *b
 );
 
-void
+static void
 load_address(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
-  const Value *memory
+  Storage storage
 );
 
 Value *

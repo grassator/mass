@@ -1109,11 +1109,16 @@ main(void) {
     { "const Descriptor *", "descriptor" },
   }));
 
+  push_type(type_struct("Function_Body", (Struct_Item[]){
+    { "Value *", "value" },
+    { "Storage", "runtime_storage"},
+    { "Storage", "compile_time_storage"},
+  }));
+
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Memory_Layout", "memory_layout" },
-    { "Value *", "body" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },
   }));

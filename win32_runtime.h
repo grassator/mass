@@ -596,6 +596,7 @@ win32_program_jit(
   for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout layout;
+
     fn_encode(program, code_buffer, builder, &layout);
 
     RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
@@ -668,7 +669,7 @@ win32_program_jit(
   u64 startup_count = dyn_array_length(program->startup_functions);
   for (u64 i = info->previous_counts.startup; i < startup_count; ++i) {
     Value *value = *dyn_array_get(program->startup_functions, i);
-    fn_type_opaque fn = value_as_function(jit, value);
+    fn_type_opaque fn = value_as_function(program, value);
     fn();
   }
 

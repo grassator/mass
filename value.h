@@ -204,7 +204,7 @@ storage_is_register_index(
 
 fn_type_opaque
 value_as_function(
-  const Jit *jit,
+  Program *program,
   Value *value
 );
 

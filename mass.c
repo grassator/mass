@@ -135,7 +135,7 @@ int main(s32 argc, char **argv) {
       Jit jit;
       jit_init(&jit, context.program);
       program_jit(&jit);
-      fn_type_opaque main = value_as_function(&jit, jit.program->entry_point);
+      fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
       main();
       return 0;
     }

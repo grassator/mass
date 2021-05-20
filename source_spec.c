@@ -109,7 +109,7 @@ test_program_source_function(
   jit_init(&test_jit, context->program);
   program_jit(&test_jit);
   MASS_ON_ERROR(*context->result) return 0;
-  fn_type_opaque fn = value_as_function(&test_jit, value);
+  fn_type_opaque fn = value_as_function(test_jit.program, value);
   MASS_ON_ERROR(*context->result) return 0;
   return fn;
 }

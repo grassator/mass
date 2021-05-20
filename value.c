@@ -1386,17 +1386,23 @@ descriptor_pointer_to(
 
 fn_type_opaque
 value_as_function(
-  const Jit *jit,
+  Program *program,
   Value *value
 ) {
-  assert(storage_is_label(&value->storage));
-  Label *label = program_get_label(
-    jit->program, value->storage.Memory.location.Instruction_Pointer_Relative.label_index
-  );
-  Section *section = label->section;
-  assert(section == &jit->program->memory.code);
-  s8 *target = section->buffer.memory + label->offset_in_section;
-  return (fn_type_opaque)target;
+  assert(value->descriptor->tag == Descriptor_Tag_Function);
+  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
+    Function_Builder *builder = dyn_array_get(program->functions, i);
+    if (builder->function != &value->descriptor->Function.info) continue;
+
+    Label *label = program_get_label(program, builder->code_block.start_label);
+    Section *section = label->section;
+    assert(section == &program->memory.code);
+    s8 *target = section->buffer.memory + label->offset_in_section;
+
+    return (fn_type_opaque)target;
+  }
+  panic("Could not find resolve runtime function for value");
+  return 0;
 }
 
 static Storage
@@ -1616,6 +1622,13 @@ compilation_deinit(
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
 }
+
+static inline bool
+context_is_compile_time_eval(
+  const Execution_Context *context
+) {
+  return context->compilation->jit.program == context->program;
+};
 
 Execution_Context
 execution_context_from_compilation(

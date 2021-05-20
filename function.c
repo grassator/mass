@@ -847,32 +847,32 @@ maybe_constant_fold_internal(
   return expected_result_ensure_value_or_temp(context, expected_result, imm_value);
 }
 
-void
+static void
 load_address(
   Execution_Context *context,
   const Source_Range *source_range,
   Value *result_value,
-  const Value *memory
+  Storage source
 ) {
-  assert(memory->storage.tag == Storage_Tag_Memory);
-  Descriptor *result_descriptor = descriptor_pointer_to(context->allocator, memory->descriptor);
+  // FIXME enable this check when the reference args are more explicit in the call code
+  //assert(result_value->descriptor->tag == Descriptor_Tag_Pointer_To);
+  assert(source.tag == Storage_Tag_Memory);
 
   Value *temp_register = result_value->storage.tag == Storage_Tag_Register
     ? result_value
     : value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), result_descriptor, *source_range
+        context, register_acquire_temp(context->builder), result_value->descriptor, *source_range
     );
 
   // TODO rethink operand sizing
   // We need to manually adjust the size here because even if we loading one byte
   // the right side is treated as an opaque address and does not participate in
   // instruction encoding.
-  Storage source_operand = memory->storage;
-  source_operand.byte_size = descriptor_byte_size(result_descriptor);
+  source.byte_size = descriptor_byte_size(result_value->descriptor);
 
   push_instruction(
     &context->builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_register->storage, source_operand, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_register->storage, source, 0}}}
   );
 
   move_to_result_from_temp(
@@ -880,64 +880,60 @@ load_address(
   );
 }
 
-static void
+static Storage
 ensure_compiled_function_body(
   Execution_Context *context,
   Value *fn_value
 ) {
-  const Descriptor *descriptor = maybe_unwrap_pointer_descriptor(fn_value->descriptor);
+  if (fn_value->descriptor->tag == Descriptor_Tag_Pointer_To) {
+    return fn_value->storage;
+  }
+  const Descriptor *descriptor = fn_value->descriptor;
   assert(descriptor->tag == Descriptor_Tag_Function);
   const Function_Info *function = &descriptor->Function.info;
 
   assert(!(function->flags & Descriptor_Function_Flags_Macro));
+  // TODO figure out how to avoid the const cast here
+  Function_Body *body = (Function_Body *)storage_static_as_c_type(&fn_value->storage, Function_Body);
 
-  if (value_is_external_symbol(function->body)) {
-    assert(function->body->descriptor == &descriptor_external_symbol);
-    assert(function->body->storage.tag == Storage_Tag_Static);
-    const External_Symbol *symbol = storage_static_as_c_type(&function->body->storage, External_Symbol);
-    fn_value->storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
-    return;
+  Storage *label_storage = context_is_compile_time_eval(context)
+    ? &body->compile_time_storage
+    : &body->runtime_storage;
+
+  if (label_storage->tag != Storage_Tag_None) return *label_storage;
+
+  if (value_is_external_symbol(body->value)) {
+    const External_Symbol *symbol = storage_static_as_c_type(&body->value->storage, External_Symbol);
+    *label_storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
+    return *label_storage;
   }
 
   Program *program = context->program;
-  // FIXME @Speed switch this to a hash map lookup
-  // If we already built the function for the target program just set the operand
-  for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder->function == function) {
-      fn_value->storage = code_label32(builder->code_block.start_label);
-      return;
-    }
-  }
 
-  // If the value already has the operand we assume it is compiled
-  if (fn_value->storage.tag != Storage_Tag_None) return;
-
-  // TODO better name (coming from the function)
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("anonymous_function");
-  Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
-  fn_value->storage = code_label32(fn_label);
 
-  Function_Builder builder = (Function_Builder){
+  Label_Index call_label = make_label(program, &program->memory.code, fn_name);
+  // It is important to cache the label here for recursive calls
+  *label_storage = code_label32(call_label);
+
+  Function_Builder *builder = &(Function_Builder){
     .function = function,
     .register_volatile_bitset = program->platform_info.register_volatile_bitset,
     .code_block = {
-      .start_label = fn_label,
+      .start_label = call_label,
       // FIXME use fn_value->descriptor->name
       .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
 
-
   Execution_Context body_context = *context;
   Scope *body_scope = scope_make(context->allocator, function->scope);
   body_context.scope = body_scope;
-  body_context.builder = &builder;
+  body_context.builder = builder;
   body_context.epoch = get_new_epoch();
-
 
   for (u64 index = 0; index < dyn_array_length(function->memory_layout.items); ++index) {
     Memory_Layout_Item *argument = dyn_array_get(function->memory_layout.items, index);
@@ -957,8 +953,8 @@ ensure_compiled_function_body(
       panic("Unexpected storage tag for an argument");
     }
     if (arg_reg != Register_SP) {
-      register_bitset_set(&builder.register_occupied_bitset, arg_reg);
-      builder.register_occupied_values[arg_reg] = arg_value;
+      register_bitset_set(&builder->register_occupied_bitset, arg_reg);
+      builder->register_occupied_values[arg_reg] = arg_value;
     }
   }
 
@@ -971,7 +967,7 @@ ensure_compiled_function_body(
   scope_define_value(body_scope, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
   Value *return_label_value =
-    value_make(context, &descriptor_void, code_label32(builder.code_block.end_label), return_range);
+    value_make(context, &descriptor_void, code_label32(builder->code_block.end_label), return_range);
   scope_define_value(body_scope, return_value->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
 
   // :ReturnTypeLargerThanRegister
@@ -982,23 +978,25 @@ ensure_compiled_function_body(
     return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect
   ) {
     Register return_reg = return_value->storage.Memory.location.Indirect.base_register;
-    register_bitset_set(&builder.register_occupied_bitset, return_reg);
-    builder.register_occupied_values[return_reg] = return_value;
+    register_bitset_set(&builder->register_occupied_bitset, return_reg);
+    builder->register_occupied_values[return_reg] = return_value;
   }
 
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
     scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
   }
-  Value *parse_result = token_parse_block_no_scope(&body_context, function->body);
-  MASS_ON_ERROR(*context->result) return;
+  Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
+  MASS_ON_ERROR(*context->result) return (Storage){0};
 
   value_force_exact(&body_context, return_value, parse_result);
 
-  fn_end(program, &builder);
+  fn_end(program, builder);
 
   // Only push the builder at the end to avoid problems in nested JIT compiles
-  dyn_array_push(program->functions, builder);
+  dyn_array_push(program->functions, *builder);
+
+  return code_label32(builder->code_block.start_label);
 }
 
 
@@ -1052,7 +1050,6 @@ program_init_startup_code(
     .tag = Descriptor_Tag_Function,
     .Function.info = {
       .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-      .body = 0,
       .scope = 0,
       .returns = {.descriptor = &descriptor_void},
     },
@@ -1093,14 +1090,16 @@ program_init_startup_code(
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
+    Storage label_storage = ensure_compiled_function_body(context, fn);
     push_instruction(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {fn->storage, 0, 0}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {label_storage, 0, 0}}}
     );
   }
+  Storage entry_label_storage = ensure_compiled_function_body(context, program->entry_point);
   push_instruction(
     &builder.code_block.instructions, source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {program->entry_point->storage, 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {entry_label_storage, 0, 0}}}
   );
 
   program->entry_point = function;

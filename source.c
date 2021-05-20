@@ -2,13 +2,6 @@
 #include "source.h"
 #include "function.h"
 
-static inline bool
-context_is_compile_time_eval(
-  const Execution_Context *context
-) {
-  return context->compilation->jit.program == context->program;
-}
-
 static inline Value *
 value_from_exact_expected_result(
   const Expected_Result *expected_result
@@ -572,7 +565,7 @@ assign(
           .address_of = static_pointer->storage,
         });
       } else {
-        load_address(context, &source_range, target, static_pointer);
+        load_address(context, &source_range, target, static_pointer->storage);
       }
       return *context->result;
     } else if (storage_is_label(&target->storage)) {
@@ -2689,8 +2682,7 @@ token_process_function_literal(
   Execution_Context *context,
   Slice name,
   Value *args,
-  Value *return_types,
-  Value *body
+  Value *return_types
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -2698,7 +2690,6 @@ token_process_function_literal(
 
   Descriptor *descriptor = descriptor_function(context->allocator, name, (Function_Info) {
     .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-    .body = body,
     .scope = function_scope,
     .returns = 0,
   });
@@ -2843,10 +2834,6 @@ compile_time_eval(
   if (!dyn_array_length(eval_builder.code_block.instructions)) {
     assert(forced_value->epoch == VALUE_STATIC_EPOCH || value_is_non_lazy_static(forced_value));
     forced_value->epoch = VALUE_STATIC_EPOCH;
-    if (forced_value->descriptor->tag == Descriptor_Tag_Function) {
-      // It is only allowed to to pass through function definitions, not the compiled functions
-      assert(forced_value->storage.tag == Storage_Tag_None);
-    }
     return forced_value;
   }
 
@@ -2885,7 +2872,7 @@ compile_time_eval(
 
   program_jit(jit);
 
-  fn_type_opaque jitted_code = value_as_function(jit, eval_value);
+  fn_type_opaque jitted_code = value_as_function(jit->program, eval_value);
   jitted_code();
 
   Value *temp_result = value_init(
@@ -2949,7 +2936,7 @@ token_handle_c_string(
   const Value *c_string_bytes =
     value_global_c_string_from_slice(context, *c_string, arg_value->source_range);
   result_value = value_from_exact_expected_result(expected_result);
-  load_address(context, &arg_value->source_range, result_value, c_string_bytes);
+  load_address(context, &arg_value->source_range, result_value, c_string_bytes->storage);
 
   defer:
   dyn_array_destroy(args);
@@ -3223,9 +3210,11 @@ call_function_macro(
   const Expected_Result *expected_result,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
-  Value *overload = payload->overload;
+  Value *fn_value = payload->overload;
   Array_Value_Ptr args = payload->args;
-  const Function_Info *function = &overload->descriptor->Function.info;
+  const Function_Info *function = &fn_value->descriptor->Function.info;
+  assert(function->flags & Descriptor_Function_Flags_Macro);
+  const Function_Body *body = storage_static_as_c_type(&fn_value->storage, Function_Body);
 
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
@@ -3281,7 +3270,7 @@ call_function_macro(
       // FIXME :ExpectedStack
       result_value = return_descriptor->tag == Descriptor_Tag_Void
         ? &void_value
-        : reserve_stack(context, return_descriptor, overload->source_range);
+        : reserve_stack(context, return_descriptor, fn_value->source_range);
       break;
     }
   }
@@ -3293,11 +3282,10 @@ call_function_macro(
   scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
   scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
 
-  Value *body = function->body;
   {
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
-    Value *parse_result = token_parse_block_no_scope(&body_context, body);
+    Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
     result_value = value_force(&body_context, expected_result, parse_result);
     MASS_ON_ERROR(*context->result) return 0;
   }
@@ -3307,7 +3295,7 @@ call_function_macro(
   //       optimizations in the compile_time_eval that check for the instruction count.
   if (dyn_array_length(context->builder->code_block.instructions)) {
     push_instruction(
-      &context->builder->code_block.instructions, overload->source_range,
+      &context->builder->code_block.instructions, fn_value->source_range,
       (Instruction) {
         .tag = Instruction_Tag_Label,
         .Label.index = fake_return_label_index
@@ -3334,7 +3322,7 @@ call_function_overload(
   assert(to_call_descriptor->tag == Descriptor_Tag_Function);
   const Function_Info *descriptor = &to_call_descriptor->Function.info;
 
-  ensure_compiled_function_body(context, to_call);
+  Storage call_storage = ensure_compiled_function_body(context, to_call);
 
   Value *fn_return_value = function_return_value_for_descriptor(
     context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
@@ -3466,7 +3454,7 @@ call_function_overload(
       // Large values are copied to the stack and passed by a reference
       Value *stack_value = reserve_stack(context, source_descriptor, *source_range);
       MASS_ON_ERROR(assign(context, stack_value, source_arg)) return 0;
-      load_address(context, source_range, target_arg, stack_value);
+      load_address(context, source_range, target_arg, stack_value->storage);
     }
     Slice name = target_arg_definition->name;
     if (name.length) {
@@ -3500,13 +3488,13 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (to_call->storage.tag == Storage_Tag_Static) {
+  if (call_storage.tag == Storage_Tag_Static) {
     // TODO it will not be safe to use this register with other calling conventions
     Storage reg = storage_register_for_descriptor(Register_A, to_call_descriptor);
-    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, to_call->storage}}});
+    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, call_storage}}});
     push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}});
   } else {
-    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {to_call->storage, 0, 0}}});
+    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {call_storage, 0, 0}}});
   }
 
   MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
@@ -3919,7 +3907,7 @@ storage_load_index_address(
       );
     } else {
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-      load_address(context, source_range, temp_value, target);
+      load_address(context, source_range, temp_value, target->storage);
     }
     push_instruction(
       &context->builder->code_block.instructions, *source_range,
@@ -4390,7 +4378,7 @@ mass_handle_address_of_lazy_proc(
 ) {
   // FIXME :ExpectedExact
   Value *result_value = value_from_exact_expected_result(expected_result);
-  load_address(context, &result_value->source_range, result_value, pointee);
+  load_address(context, &result_value->source_range, result_value, pointee->storage);
   return result_value;
 }
 
@@ -5126,18 +5114,18 @@ token_parse_function_literal(
 
   Value_View rest = value_view_rest(&view, peek_index);
 
-  Value *body = 0;
+  Value *body_value = 0;
   bool body_is_literal = false;
   if (rest.length == 1) {
     Value *maybe_body = value_view_get(rest, 0);
     if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
-      body = maybe_body;
+      body_value = maybe_body;
       body_is_literal = true;
     } else {
-      body = token_parse_single(context, maybe_body);
+      body_value = token_parse_single(context, maybe_body);
     }
   } else if (rest.length) {
-    body = token_parse_expression(context, rest, &(u64){0}, 0);
+    body_value = token_parse_expression(context, rest, &(u64){0}, 0);
     MASS_ON_ERROR(*context->result) return 0;
   }
 
@@ -5161,7 +5149,7 @@ token_parse_function_literal(
 
   *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Descriptor *descriptor = token_process_function_literal(context, name, args, returns, body);
+  Descriptor *descriptor = token_process_function_literal(context, name, args, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
   assert(descriptor->tag == Descriptor_Tag_Function);
@@ -5171,8 +5159,12 @@ token_parse_function_literal(
   if (at) {
     descriptor->Function.info.flags |= Descriptor_Function_Flags_Compile_Time;
   }
-  if (body) {
-    Value *literal = value_make(context, descriptor, storage_none, view.source_range);
+  if (body_value) {
+    Function_Body *body = allocator_allocate(context->allocator, Function_Body);
+    *body = (Function_Body){
+      .value = body_value,
+    };
+    Value *literal = value_make(context, descriptor, storage_static(body), view.source_range);
     literal->epoch = VALUE_STATIC_EPOCH;
     return literal;
   } else {
@@ -5888,7 +5880,10 @@ mass_handle_assignment_lazy_proc(
   Value *target = value_force(context, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor->tag == Descriptor_Tag_Function) {
-    load_address(context, &payload->source_range, target, payload->expression);
+    assert(payload->expression->descriptor != &descriptor_lazy_value);
+    // TODO make sure the function is not overloaded or resolve overload based on the target type
+    Storage fn_storage = ensure_compiled_function_body(context, payload->expression);
+    load_address(context, &payload->source_range, target, fn_storage);
   } else {
     Expected_Result expected_assignment = expected_result_from_value(target);
     target = value_force(context, &expected_assignment, payload->expression);
@@ -6228,9 +6223,15 @@ scope_define_builtins(
       );\
       dyn_array_push(descriptor->Function.info.memory_layout.items, raw_arguments[i]);\
     }\
+    Function_Body *body = allocator_allocate(allocator, Function_Body);\
+    *body = (Function_Body){\
+      .value = 0,\
+      .runtime_storage = {0},\
+      .compile_time_storage = imm64((u64)_FN_),\
+    };\
     Value *value = value_init(\
       allocator_allocate(allocator, Value),\
-      VALUE_STATIC_EPOCH, descriptor, imm64((u64)_FN_), (Source_Range){0}\
+      VALUE_STATIC_EPOCH, descriptor, storage_static(body), (Source_Range){0}\
     );\
     scope_define_value(scope, range, slice_literal(_NAME_), value);\
   }
