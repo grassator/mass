@@ -963,17 +963,17 @@ ensure_compiled_function_body(
     dyn_array_destroy(arguments_layout.items);
   }
 
-  // TODO that is probably not what we want for the highlighted range
-  Source_Range return_range = fn_value->source_range;
+  const Function_Return *returns = &function->returns;
   Value *return_value = function_return_value_for_descriptor(
-    &body_context, function->returns.descriptor, Function_Argument_Mode_Body, return_range
+    &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
   );
 
   scope_define_value(body_scope, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
-  Value *return_label_value =
-    value_make(context, &descriptor_void, code_label32(builder->code_block.end_label), return_range);
-  scope_define_value(body_scope, return_value->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
+  Value *return_label_value = value_make(
+    context, &descriptor_void, code_label32(builder->code_block.end_label), returns->source_range
+  );
+  scope_define_value(body_scope, returns->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
 
   // :ReturnTypeLargerThanRegister
   // Make sure we don't stomp the address of a larger-than-register

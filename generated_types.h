@@ -938,6 +938,7 @@ typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
 typedef struct Function_Return {
   Slice name;
   const Descriptor * descriptor;
+  Source_Range source_range;
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
@@ -3031,6 +3032,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
     .name = slice_literal_fields("descriptor"),
     .descriptor = &descriptor_descriptor_pointer,
     .Base_Relative.offset = offsetof(Function_Return, descriptor),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Function_Return, source_range),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);

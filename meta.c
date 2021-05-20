@@ -1107,6 +1107,7 @@ main(void) {
   push_type(type_struct("Function_Return", (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
+    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Function_Body", (Struct_Item[]){

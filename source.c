@@ -1910,7 +1910,9 @@ token_match_return_type(
   Execution_Context *context,
   Value_View view
 ) {
-  Function_Return returns = {0};
+  Function_Return returns = {
+    .source_range = view.source_range,
+  };
   if (context->result->tag != Mass_Result_Tag_Success) return returns;
 
   Value_View lhs;
