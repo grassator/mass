@@ -3210,9 +3210,9 @@ call_function_macro(
   // should not have access to locals inside the call scope.
   Scope *body_scope = scope_make(context->allocator, function->scope);
 
-  for (u64 i = 0; i < dyn_array_length(function->arguments_layout.items); ++i) {
+  for(u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
-    Memory_Layout_Item *arg = dyn_array_get(function->arguments_layout.items, i);
+    Function_Argument *arg = dyn_array_get(function->arguments, i);
     if (arg->name.length) {
       Value *arg_value;
       if (i >= dyn_array_length(args)) {
@@ -3226,9 +3226,7 @@ call_function_macro(
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          // FIXME :ExpectedAny
-          Expected_Result expected_arg = expected_result_from_value(arg_value);
-          arg_value = value_force(&arg_context, &expected_arg, parse_result);
+          value_force_exact(&arg_context, arg_value, parse_result);
         }
       } else {
         arg_value = *dyn_array_get(args, i);
