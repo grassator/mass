@@ -17,19 +17,22 @@ static const Platform_Info platform_info_x86_64_windows = {
   ),
 };
 
+#define X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET (\
+  /* Arguments */\
+  (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |\
+  (1llu << Register_C) | (1llu << Register_R8) | (1llu << Register_R9) |\
+  /* Varargs / Return */\
+  (1llu << Register_A) |\
+  /* Other */\
+  (1llu << Register_R10) | (1llu << Register_R11)\
+)
+
 static const Platform_Info platform_info_x86_64_linux = {
-  // This is system V ABI that is used in multiple systems so might be worth refactoring
-  .register_volatile_bitset = (
-    // Arguments
-    (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
-    (1llu << Register_C) | (1llu << Register_R8) | (1llu << Register_R9) |
+  .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
+};
 
-    // Varargs / Return
-    (1llu << Register_A) |
-
-    // Other
-    (1llu << Register_R10) | (1llu << Register_R11)
-  ),
+static const Platform_Info platform_info_x86_64_darwin = {
+  .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
 };
 
 static Array_Value_Ptr empty_value_array = {

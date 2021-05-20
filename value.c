@@ -1485,6 +1485,8 @@ program_host_platform_info() {
   return &platform_info_x86_64_windows;
   #elif defined(__linux__) && defined(__x86_64__)
   return &platform_info_x86_64_linux;
+  #elif defined(__MACH__) && defined(__x86_64__)
+  return &platform_info_x86_64_darwin;
   #else
   static_assert(false, "TODO add Platform_Info for this host system");
   #endif
