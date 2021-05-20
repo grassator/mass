@@ -2748,30 +2748,9 @@ token_process_function_literal(
       previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
   }
-  descriptor->Function.info.memory_layout = (Memory_Layout){
-    .base = {0}, // FIXME provide stack location for arguments
-    .items = dyn_array_make(
-      Array_Memory_Layout_Item,
-      .allocator = context->allocator,
-      .capacity = dyn_array_length(descriptor->Function.info.arguments),
-    ),
-  };
-  // FIXME unify this with the compile time functions below
-  u64 index = 0;
-  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info.arguments) {
-    dyn_array_push(descriptor->Function.info.memory_layout.items, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Absolute,
-      .Absolute = {
-        .storage = function_argument_storage_for_index(
-          context->allocator, &descriptor->Function.info, arg->descriptor, index++, Function_Argument_Mode_Call
-        ),
-      },
-      .name = arg->name,
-      .descriptor = arg->descriptor,
-      .maybe_default_expression = arg->maybe_default_expression,
-      .source_range = arg->source_range,
-    });
-  }
+  descriptor->Function.info.memory_layout = function_arguments_memory_layout(
+    context->allocator, &descriptor->Function.info, Function_Argument_Mode_Call
+  );
 
   return descriptor;
 }
@@ -6216,29 +6195,27 @@ scope_define_builtins(
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\
-      .tag = Memory_Layout_Item_Tag_Absolute,\
       .name = slice_literal_fields(_NAME_),\
       .descriptor = (_DESCRIPTOR_),\
     }
 
   #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
   {\
-    Memory_Layout_Item raw_arguments[] = {__VA_ARGS__};\
+    Function_Argument raw_arguments[] = {__VA_ARGS__};\
     u64 arg_length = countof(raw_arguments);\
+    Array_Function_Argument arguments = \
+      dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
+    for (u64 i = 0; i < arg_length; ++i) {\
+      dyn_array_push(arguments, raw_arguments[i]);\
+    }\
     Descriptor *descriptor = descriptor_function(allocator,  slice_literal(_NAME_), (Function_Info) {\
       .flags = Descriptor_Function_Flags_Compile_Time,\
-      .memory_layout.items = \
-        dyn_array_make(Array_Memory_Layout_Item, .allocator = allocator, .capacity = arg_length),\
-      .returns = {\
-        .descriptor = (_RETURN_DESCRIPTOR_),\
-      }\
+      .arguments = arguments,\
+      .returns = { .descriptor = (_RETURN_DESCRIPTOR_), }\
     });\
-    for (u64 i = 0; i < arg_length; ++i) {\
-      raw_arguments[i].Absolute.storage = function_argument_storage_for_index(\
-        allocator, &descriptor->Function.info, raw_arguments[i].descriptor, i, Function_Argument_Mode_Call\
-      );\
-      dyn_array_push(descriptor->Function.info.memory_layout.items, raw_arguments[i]);\
-    }\
+    descriptor->Function.info.memory_layout = function_arguments_memory_layout(\
+      allocator, &descriptor->Function.info, Function_Argument_Mode_Call\
+    );\
     Function_Body *body = allocator_allocate(allocator, Function_Body);\
     *body = (Function_Body){\
       .value = 0,\

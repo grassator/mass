@@ -1461,23 +1461,38 @@ function_argument_storage_for_index(
   }
 }
 
-Value *
-function_argument_value_at_index_internal(
-  Compiler_Source_Location source_location,
-  Execution_Context *context,
+static Memory_Layout
+function_arguments_memory_layout(
+  const Allocator *allocator,
   const Function_Info *function,
-  u64 argument_index,
   Function_Argument_Mode mode
 ) {
-  Memory_Layout_Item *argument = dyn_array_get(function->memory_layout.items, argument_index);
-  const Descriptor *arg_descriptor = argument->descriptor;
-  Source_Range source_range = argument->source_range;
-  Storage storage =
-    function_argument_storage_for_index(context->allocator, function, arg_descriptor, argument_index, mode);
-  return value_make_internal(source_location, context, arg_descriptor, storage, source_range);
+  Memory_Layout layout = {
+    .base = {0}, // FIXME provide stack location for arguments?
+    .items = dyn_array_make(
+      Array_Memory_Layout_Item,
+      .allocator = allocator,
+      .capacity = dyn_array_length(function->arguments),
+    ),
+  };
+  u64 index = 0;
+  DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
+    dyn_array_push(layout.items, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Absolute,
+      .Absolute = {
+        .storage = function_argument_storage_for_index(
+          allocator, function, arg->descriptor, index++, mode
+        ),
+      },
+      .name = arg->name,
+      .descriptor = arg->descriptor,
+      .maybe_default_expression = arg->maybe_default_expression,
+      .source_range = arg->source_range,
+    });
+  }
+
+  return layout;
 }
-#define function_argument_value_at_index(...)\
-  function_argument_value_at_index_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 const Platform_Info *
 program_host_platform_info() {

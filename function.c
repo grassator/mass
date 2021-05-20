@@ -935,27 +935,32 @@ ensure_compiled_function_body(
   body_context.builder = builder;
   body_context.epoch = get_new_epoch();
 
-  for (u64 index = 0; index < dyn_array_length(function->memory_layout.items); ++index) {
-    Memory_Layout_Item *argument = dyn_array_get(function->memory_layout.items, index);
-    // Nothing to do since there is no way to refer to an exact argument in the body
-    if (!argument->name.length) continue;
-    Value *arg_value = function_argument_value_at_index(
-      &body_context, function, index, Function_Argument_Mode_Body
+  {
+    Memory_Layout arguments_layout = function_arguments_memory_layout(
+      allocator_default, function, Function_Argument_Mode_Body
     );
-    scope_define_value(body_scope, arg_value->source_range, argument->name, arg_value);
-    Register arg_reg = Register_SP;
-    if (arg_value->storage.tag == Storage_Tag_Register) {
-      arg_reg = arg_value->storage.Register.index;
-    } else if(arg_value->storage.tag == Storage_Tag_Memory) {
-      assert(arg_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
-    } else {
-      panic("Unexpected storage tag for an argument");
+
+    DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout.items) {
+      assert(item->tag == Memory_Layout_Item_Tag_Absolute);
+      Value *arg_value = value_make(
+        &body_context, item->descriptor, item->Absolute.storage, item->source_range
+      );
+      scope_define_value(body_scope, arg_value->source_range, item->name, arg_value);
+      Register arg_reg = Register_SP;
+      if (arg_value->storage.tag == Storage_Tag_Register) {
+        arg_reg = arg_value->storage.Register.index;
+      } else if(arg_value->storage.tag == Storage_Tag_Memory) {
+        assert(arg_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+        arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
+      } else {
+        panic("Unexpected storage tag for an argument");
+      }
+      if (arg_reg != Register_SP) {
+        register_bitset_set(&builder->register_occupied_bitset, arg_reg);
+        builder->register_occupied_values[arg_reg] = arg_value;
+      }
     }
-    if (arg_reg != Register_SP) {
-      register_bitset_set(&builder->register_occupied_bitset, arg_reg);
-      builder->register_occupied_values[arg_reg] = arg_value;
-    }
+    dyn_array_destroy(arguments_layout.items);
   }
 
   // TODO that is probably not what we want for the highlighted range
