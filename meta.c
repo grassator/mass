@@ -1115,9 +1115,17 @@ main(void) {
     { "Storage", "compile_time_storage"},
   }));
 
+  push_type(type_struct("Function_Argument", (Struct_Item[]){
+    { "Slice", "name" },
+    { "const Descriptor *", "descriptor" },
+    { "Source_Range", "source_range" },
+    { "Value_View", "maybe_default_expression" },
+  }));
+
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
+    { "Array_Function_Argument", "arguments" },
     { "Memory_Layout", "memory_layout" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },

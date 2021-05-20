@@ -197,6 +197,10 @@ typedef struct Function_Body Function_Body;
 typedef dyn_array_type(Function_Body *) Array_Function_Body_Ptr;
 typedef dyn_array_type(const Function_Body *) Array_Const_Function_Body_Ptr;
 
+typedef struct Function_Argument Function_Argument;
+typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
+typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
+
 typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
@@ -944,9 +948,18 @@ typedef struct Function_Body {
 } Function_Body;
 typedef dyn_array_type(Function_Body) Array_Function_Body;
 
+typedef struct Function_Argument {
+  Slice name;
+  const Descriptor * descriptor;
+  Source_Range source_range;
+  Value_View maybe_default_expression;
+} Function_Argument;
+typedef dyn_array_type(Function_Argument) Array_Function_Argument;
+
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
+  Array_Function_Argument arguments;
   Memory_Layout memory_layout;
   Scope * scope;
   Function_Return returns;
@@ -1418,6 +1431,11 @@ static Descriptor descriptor_array_function_body;
 static Descriptor descriptor_array_function_body_ptr;
 static Descriptor descriptor_function_body_pointer;
 static Descriptor descriptor_function_body_pointer_pointer;
+static Descriptor descriptor_function_argument;
+static Descriptor descriptor_array_function_argument;
+static Descriptor descriptor_array_function_argument_ptr;
+static Descriptor descriptor_function_argument_pointer;
+static Descriptor descriptor_function_argument_pointer_pointer;
 static Descriptor descriptor_function_info;
 static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
@@ -3039,6 +3057,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_body, Function_Body,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_body);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument, Function_Argument,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Function_Argument, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("descriptor"),
+    .descriptor = &descriptor_descriptor_pointer,
+    .Base_Relative.offset = offsetof(Function_Argument, descriptor),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Function_Argument, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("maybe_default_expression"),
+    .descriptor = &descriptor_value_view,
+    .Base_Relative.offset = offsetof(Function_Argument, maybe_default_expression),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_argument);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
@@ -3053,6 +3100,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
     .name = slice_literal_fields("_flags_padding"),
     .descriptor = &descriptor_u32,
     .Base_Relative.offset = offsetof(Function_Info, _flags_padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("arguments"),
+    .descriptor = &descriptor_array_function_argument,
+    .Base_Relative.offset = offsetof(Function_Info, arguments),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

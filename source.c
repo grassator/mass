@@ -1800,13 +1800,13 @@ token_maybe_split_on_operator(
   return true;
 }
 
-static Memory_Layout_Item
+static Function_Argument
 token_match_argument(
   Execution_Context *context,
   Value_View view,
   Function_Info *function
 ) {
-  Memory_Layout_Item arg = {0};
+  Function_Argument arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Value_View default_expression;
@@ -1894,8 +1894,7 @@ token_match_argument(
   if (descriptor && descriptor->tag == Descriptor_Tag_Function) {
     descriptor = descriptor_pointer_to(context->allocator, descriptor);
   }
-  arg = (Memory_Layout_Item) {
-    .tag = Memory_Layout_Item_Tag_Absolute,
+  arg = (Function_Argument) {
     .name = value_as_symbol(name_token)->name,
     .descriptor = descriptor,
     .maybe_default_expression = default_expression,
@@ -2689,6 +2688,7 @@ token_process_function_literal(
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
   Descriptor *descriptor = descriptor_function(context->allocator, name, (Function_Info) {
+    .arguments = (Array_Function_Argument){&dyn_array_zero_items},
     .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
     .scope = function_scope,
     .returns = 0,
@@ -2720,41 +2720,57 @@ token_process_function_literal(
 
   bool previous_argument_has_default_value = false;
   Value_View args_view = value_as_group(args)->children;
-  if (args_view.length != 0) {
-    descriptor->Function.info.memory_layout = (Memory_Layout){
-      .base = {0}, // FIXME provide stack location for arguments
-      .items = dyn_array_make(
-        Array_Memory_Layout_Item,
-        .allocator = context->allocator,
-        .capacity = 4,
-      ),
-    };
+  if (args_view.length == 0) return descriptor;
 
-    u64 index = 0;
-    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done; ++index) {
-      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-      Execution_Context arg_context = *context;
-      arg_context.scope = function_scope;
-      arg_context.builder = 0;
-      // FIXME unify this with the compile time functions below
-      Memory_Layout_Item arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
-      MASS_ON_ERROR(*context->result) return 0;
-      arg.Absolute.storage = function_argument_storage_for_index(
-        context->allocator, &descriptor->Function.info, arg.descriptor, index, Function_Argument_Mode_Call
-      );
-      dyn_array_push(descriptor->Function.info.memory_layout.items, arg);
-      if (previous_argument_has_default_value) {
-        if (!arg.maybe_default_expression.length ) {
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
-            .source_range = return_types->source_range,
-          });
-          return 0;
-        }
-      } else {
-        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
+  descriptor->Function.info.arguments = dyn_array_make(
+    Array_Function_Argument,
+    .allocator = context->allocator,
+    .capacity = 4
+  );
+
+  for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
+    Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+    Execution_Context arg_context = *context;
+    arg_context.scope = function_scope;
+    arg_context.builder = 0;
+    Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
+    MASS_ON_ERROR(*context->result) return 0;
+    dyn_array_push(descriptor->Function.info.arguments, arg);
+    if (previous_argument_has_default_value) {
+      if (!arg.maybe_default_expression.length ) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
+          .source_range = return_types->source_range,
+        });
+        return 0;
       }
+    } else {
+      previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
+  }
+  descriptor->Function.info.memory_layout = (Memory_Layout){
+    .base = {0}, // FIXME provide stack location for arguments
+    .items = dyn_array_make(
+      Array_Memory_Layout_Item,
+      .allocator = context->allocator,
+      .capacity = dyn_array_length(descriptor->Function.info.arguments),
+    ),
+  };
+  // FIXME unify this with the compile time functions below
+  u64 index = 0;
+  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info.arguments) {
+    dyn_array_push(descriptor->Function.info.memory_layout.items, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Absolute,
+      .Absolute = {
+        .storage = function_argument_storage_for_index(
+          context->allocator, &descriptor->Function.info, arg->descriptor, index++, Function_Argument_Mode_Call
+        ),
+      },
+      .name = arg->name,
+      .descriptor = arg->descriptor,
+      .maybe_default_expression = arg->maybe_default_expression,
+      .source_range = arg->source_range,
+    });
   }
 
   return descriptor;
