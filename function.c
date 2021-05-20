@@ -1050,16 +1050,8 @@ program_init_startup_code(
 ) {
   Program *program = context->program;
   assert(program->entry_point->descriptor->tag == Descriptor_Tag_Function);
-  Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Function,
-    .Function.info = {
-      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-      .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-      .scope = 0,
-      .returns = {.descriptor = &descriptor_void},
-    },
-  };
+  Descriptor *descriptor =
+    descriptor_function(context->allocator, slice_literal("__startup"), 0 /* scope */);
   Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
   Storage storage = code_label32(fn_label);
 

@@ -1356,7 +1356,7 @@ static inline Descriptor *
 descriptor_function(
   const Allocator *allocator,
   Slice name,
-  Function_Info info
+  Scope *scope
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
@@ -1364,7 +1364,12 @@ descriptor_function(
     .name = name,
     .bit_size = sizeof(void *) * CHAR_BIT,
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function.info = info,
+    .Function.info = (Function_Info) {
+      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
+      .scope = scope,
+      .returns = {.descriptor = &descriptor_void},
+    },
   };
   return result;
 }

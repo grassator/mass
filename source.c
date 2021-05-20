@@ -2689,12 +2689,7 @@ token_process_function_literal(
 
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
-  Descriptor *descriptor = descriptor_function(context->allocator, name, (Function_Info) {
-    .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-    .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-    .scope = function_scope,
-    .returns = 0,
-  });
+  Descriptor *descriptor = descriptor_function(context->allocator, name, function_scope);
 
   Value_View return_types_view = value_as_group(return_types)->children;
   if (return_types_view.length == 0) {
@@ -2793,11 +2788,8 @@ compile_time_eval(
   eval_context.scope = scope_make(context->allocator, context->scope);
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
-  Descriptor *descriptor = descriptor_function(context->allocator, eval_name, (Function_Info) {
-    .returns = {
-      .descriptor = &descriptor_void,
-    },
-  });
+  Descriptor *descriptor = descriptor_function(context->allocator, eval_name, context->scope);
+  descriptor->Function.info.returns.descriptor = &descriptor_void;
 
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
   Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
@@ -6210,12 +6202,12 @@ scope_define_builtins(
     for (u64 i = 0; i < arg_length; ++i) {\
       dyn_array_push(arguments, raw_arguments[i]);\
     }\
-    Descriptor *descriptor = descriptor_function(allocator,  slice_literal(_NAME_), (Function_Info) {\
-      .flags = Descriptor_Function_Flags_Compile_Time,\
-      .arguments = arguments,\
-      .returns = { .descriptor = (_RETURN_DESCRIPTOR_), }\
-    });\
-    descriptor->Function.info.arguments_layout = function_arguments_memory_layout(\
+    Descriptor *descriptor = descriptor_function(allocator,  slice_literal(_NAME_), 0);\
+    Function_Info *function = &descriptor->Function.info;\
+    function->flags = Descriptor_Function_Flags_Compile_Time;\
+    function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
+    function->arguments = arguments;\
+    function->arguments_layout = function_arguments_memory_layout(\
       allocator, &descriptor->Function.info, Function_Argument_Mode_Call\
     );\
     Function_Body *body = allocator_allocate(allocator, Function_Body);\
