@@ -2691,7 +2691,7 @@ token_process_function_literal(
 
   Descriptor *descriptor = descriptor_function(context->allocator, name, (Function_Info) {
     .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-    .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
+    .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
     .scope = function_scope,
     .returns = 0,
   });
@@ -2750,7 +2750,7 @@ token_process_function_literal(
       previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
   }
-  descriptor->Function.info.memory_layout = function_arguments_memory_layout(
+  descriptor->Function.info.arguments_layout = function_arguments_memory_layout(
     context->allocator, &descriptor->Function.info, Function_Argument_Mode_Call
   );
 
@@ -3218,9 +3218,9 @@ call_function_macro(
   // should not have access to locals inside the call scope.
   Scope *body_scope = scope_make(context->allocator, function->scope);
 
-  for (u64 i = 0; i < dyn_array_length(function->memory_layout.items); ++i) {
+  for (u64 i = 0; i < dyn_array_length(function->arguments_layout.items); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
-    Memory_Layout_Item *arg = dyn_array_get(function->memory_layout.items, i);
+    Memory_Layout_Item *arg = dyn_array_get(function->arguments_layout.items, i);
     if (arg->name.length) {
       Value *arg_value;
       if (i >= dyn_array_length(args)) {
@@ -3393,8 +3393,8 @@ call_function_overload(
   u64 argument_register_bit_set = 0;
 
   Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
-  for (u64 i = 0; i < dyn_array_length(descriptor->memory_layout.items); ++i) {
-    Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->memory_layout.items, i);
+  for (u64 i = 0; i < dyn_array_length(descriptor->arguments_layout.items); ++i) {
+    Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->arguments_layout.items, i);
     assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
 
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
@@ -4351,7 +4351,7 @@ mass_handle_startup_call_lazy_proc(
   if (
     !startup_function ||
     descriptor->tag != Descriptor_Tag_Function ||
-    dyn_array_length(descriptor->Function.info.memory_layout.items) ||
+    dyn_array_length(descriptor->Function.info.arguments) ||
     descriptor->Function.info.returns.descriptor != &descriptor_void
   ) {
     context_error(context, (Mass_Error) {
@@ -6215,7 +6215,7 @@ scope_define_builtins(
       .arguments = arguments,\
       .returns = { .descriptor = (_RETURN_DESCRIPTOR_), }\
     });\
-    descriptor->Function.info.memory_layout = function_arguments_memory_layout(\
+    descriptor->Function.info.arguments_layout = function_arguments_memory_layout(\
       allocator, &descriptor->Function.info, Function_Argument_Mode_Call\
     );\
     Function_Body *body = allocator_allocate(allocator, Function_Body);\

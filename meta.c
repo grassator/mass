@@ -1127,7 +1127,7 @@ main(void) {
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Function_Argument", "arguments" },
-    { "Memory_Layout", "memory_layout" },
+    { "Memory_Layout", "arguments_layout" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },
   }));

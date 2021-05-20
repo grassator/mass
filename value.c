@@ -273,14 +273,14 @@ same_type(
         return false;
       }
       if (
-        dyn_array_length(a->Function.info.memory_layout.items) !=
-        dyn_array_length(b->Function.info.memory_layout.items)
+        dyn_array_length(a->Function.info.arguments) !=
+        dyn_array_length(b->Function.info.arguments)
       ) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->Function.info.memory_layout.items); ++i) {
-        Memory_Layout_Item *a_arg = dyn_array_get(a->Function.info.memory_layout.items, i);
-        Memory_Layout_Item *b_arg = dyn_array_get(b->Function.info.memory_layout.items, i);
+      for (u64 i = 0; i < dyn_array_length(a->Function.info.arguments); ++i) {
+        Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
+        Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
         if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;

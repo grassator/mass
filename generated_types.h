@@ -961,7 +961,7 @@ typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
   Array_Function_Argument arguments;
-  Memory_Layout memory_layout;
+  Memory_Layout arguments_layout;
   Scope * scope;
   Function_Return returns;
 } Function_Info;
@@ -3116,9 +3116,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("memory_layout"),
+    .name = slice_literal_fields("arguments_layout"),
     .descriptor = &descriptor_memory_layout,
-    .Base_Relative.offset = offsetof(Function_Info, memory_layout),
+    .Base_Relative.offset = offsetof(Function_Info, arguments_layout),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

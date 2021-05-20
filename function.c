@@ -1019,8 +1019,8 @@ calculate_arguments_match_score(
   };
   assert(dyn_array_length(arguments) < 1000);
   s64 score = 0;
-  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->memory_layout.items); ++arg_index) {
-    Memory_Layout_Item *target_arg = dyn_array_get(descriptor->memory_layout.items, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->arguments); ++arg_index) {
+    Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
     Value *source_arg = 0;
     const Descriptor *source_descriptor;
     if (arg_index >= dyn_array_length(arguments)) {
@@ -1054,7 +1054,8 @@ program_init_startup_code(
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Function,
     .Function.info = {
-      .memory_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
+      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+      .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
       .scope = 0,
       .returns = {.descriptor = &descriptor_void},
     },
