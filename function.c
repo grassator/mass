@@ -829,6 +829,7 @@ make_if(
 Value *
 maybe_constant_fold_internal(
   Execution_Context *context,
+  Function_Builder *builder,
   s64 constant_result,
   const Expected_Result *expected_result,
   const Source_Range *source_range
@@ -844,7 +845,7 @@ maybe_constant_fold_internal(
     default: imm_storage = (Storage){0}; panic("Unexpected operand size"); break;
   }
   Value *imm_value = value_make(context, descriptor, imm_storage, *source_range);
-  return expected_result_ensure_value_or_temp(context, expected_result, imm_value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, imm_value);
 }
 
 static void
@@ -994,7 +995,7 @@ ensure_compiled_function_body(
   Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
   MASS_ON_ERROR(*context->result) return (Storage){0};
 
-  value_force_exact(&body_context, return_value, parse_result);
+  value_force_exact(&body_context, builder, return_value, parse_result);
 
   fn_end(program, builder);
 

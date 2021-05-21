@@ -1062,6 +1062,7 @@ main(void) {
 
   push_type(type_function("Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
+    { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
     { "void *", "payload" },
   }));

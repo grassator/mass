@@ -61,7 +61,7 @@ instruction_add_source_location_internal(
   )
 
 // TODO properly support unsigned numbers
-#define maybe_constant_fold(_context_, _loc_, _result_, _a_, _b_, _operator_)\
+#define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     Execution_Context *fold_context = (_context_);\
     Value *fold_a = (_a_);\
@@ -78,7 +78,7 @@ instruction_add_source_location_internal(
       s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
       s64 constant_result = a_s64 _operator_ b_s64;\
       /* printf("%lld %s %lld = %lld", a_s64, #_operator_, b_s64, constant_result); */\
-      return maybe_constant_fold_internal(fold_context, constant_result, (_result_), (_loc_));\
+      return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, (_result_), (_loc_));\
     }\
   } while(0)
 

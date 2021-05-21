@@ -462,6 +462,7 @@ storage_field_access(
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
+  Function_Builder *builder,
   Value *target,
   Value *source
 ) {
@@ -475,7 +476,7 @@ assign(
   }
 
   if (source->descriptor == &descriptor_lazy_value) {
-    value_force_exact(context, target, source);
+    value_force_exact(context, builder, target, source);
     return *context->result;
   }
 
@@ -523,7 +524,7 @@ assign(
         .storage = storage_field_access(&target->storage, field),
         .source_range = target->source_range,
       };
-      MASS_TRY(assign(context, &target_field, &source_field));
+      MASS_TRY(assign(context, builder, &target_field, &source_field));
     }
     return *context->result;
   } else if (source->storage.tag == Storage_Tag_Static) {
@@ -556,7 +557,7 @@ assign(
 
         // It is important to call assign here to make sure we recursively handle
         // any complex types such as structs and arrays
-        MASS_TRY(assign(context, static_pointer, &static_source_value));
+        MASS_TRY(assign(context, builder, static_pointer, &static_source_value));
       }
       assert(storage_is_label(&static_pointer->storage));
       if (storage_is_label(&target->storage)) {
@@ -597,8 +598,9 @@ assign(
   return *context->result;
 }
 
-Value *
+static Value *
 scope_entry_force(
+  Function_Builder *builder,
   Scope_Entry *entry
 ) {
   switch(entry->tag) {
@@ -616,7 +618,7 @@ scope_entry_force(
           Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
           Execution_Context *context = &lazy->context;
           Expected_Result expected_result = expected_result_static(lazy->descriptor);
-          Value *result = lazy->proc(context, &expected_result, lazy->payload);
+          Value *result = lazy->proc(context, builder, &expected_result, lazy->payload);
           if (!result) return 0;
           *value = *result;
           value->next_overload = next_overload;
@@ -629,8 +631,9 @@ scope_entry_force(
   return 0;
 }
 
-Value *
+static Value *
 scope_lookup_force(
+  Function_Builder *builder,
   const Scope *scope,
   Slice name
 ) {
@@ -645,7 +648,7 @@ scope_lookup_force(
   }
 
   // Force lazy entries
-  if (!scope_entry_force(entry)) return 0;
+  if (!scope_entry_force(builder, entry)) return 0;
 
   assert(entry->tag == Scope_Entry_Tag_Value);
   Value *result = entry->Value.value;
@@ -661,7 +664,7 @@ scope_lookup_force(
       if (!parent) break;
       Scope_Entry *overload_entry = scope_lookup_shallow_hashed(parent, hash, name);
       if (!overload_entry) continue;
-      Value *overload = scope_entry_force(overload_entry);
+      Value *overload = scope_entry_force(builder, overload_entry);
       if (value_or_lazy_value_descriptor(overload)->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
@@ -1442,7 +1445,7 @@ token_parse_single(
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    value = scope_lookup_force(context->scope, name);
+    value = scope_lookup_force(context->builder, context->scope, name);
     MASS_ON_ERROR(*context->result) return 0;
     if (!value) {
       //scope_print_names(context->scope);
@@ -1611,10 +1614,11 @@ value_is_non_lazy_static(
 static Value *
 mass_handle_statement_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *lazy_value
 ) {
-  (void)value_force(context, expected_result, lazy_value);
+  (void)value_force(context, builder, expected_result, lazy_value);
   return &void_value;
 }
 
@@ -1947,6 +1951,7 @@ token_match_return_type(
 static PRELUDE_NO_DISCARD Value *
 expected_result_ensure_value_or_temp(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
 ) {
@@ -1960,7 +1965,7 @@ expected_result_ensure_value_or_temp(
       ) {
         value_release_if_temporary(context->builder, value);
       }
-      MASS_ON_ERROR(assign(context, result_value, value)) return 0;
+      MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
       return result_value;
     }
     case Expected_Result_Tag_Flexible: {
@@ -2004,13 +2009,13 @@ expected_result_ensure_value_or_temp(
           context, expected_descriptor, value->source_range
         );
         value_release_if_temporary(context->builder, value);
-        MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
+        MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
         return temp_result;
       }
       if (flexible->storage & Expected_Result_Storage_Memory) {
         assert(value->storage.tag != Storage_Tag_Register); // checked above
         Value *temp_result = reserve_stack(context, expected_descriptor, value->source_range);
-        MASS_ON_ERROR(assign(context, temp_result, value)) return 0;
+        MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
         return temp_result;
       }
       // FIXME support floats
@@ -2028,6 +2033,7 @@ expected_result_ensure_value_or_temp(
 static PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *value
 ) {
@@ -2039,7 +2045,7 @@ value_force(
 
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-    Value *result = lazy->proc(&lazy->context, expected_result, lazy->payload);
+    Value *result = lazy->proc(&lazy->context, builder, expected_result, lazy->payload);
     allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
     MASS_ON_ERROR(*context->result) return 0;
     // TODO is there a better way to cache the result?
@@ -2047,17 +2053,18 @@ value_force(
     return result;
   }
 
-  return expected_result_ensure_value_or_temp(context, expected_result, value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, value);
 }
 
 static inline void
 value_force_exact(
   Execution_Context *context,
+  Function_Builder *builder,
   Value *target,
   Value *source
 ) {
   Expected_Result expected_result = expected_result_from_value(target);
-  Value *forced = value_force(context, &expected_result, source);
+  Value *forced = value_force(context, builder, &expected_result, source);
   MASS_ON_ERROR(*context->result) return;
   assert(forced == target);
 }
@@ -2124,6 +2131,7 @@ token_handle_user_defined_operator_proc(
 static Value *
 mass_handle_compile_time_eval_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value_View *view
 ) {
@@ -2815,7 +2823,9 @@ compile_time_eval(
   assert(!dyn_array_length(eval_builder.code_block.instructions));
 
   Expected_Result expected_result = expected_result_any(result_descriptor);
-  Value *forced_value = value_force(&eval_context, &expected_result, expression_result_value);
+  Value *forced_value = value_force(
+    &eval_context, &eval_builder, &expected_result, expression_result_value
+  );
   MASS_ON_ERROR(*context->result) return 0;
 
   // If we didn't generate any instructions there is no point
@@ -2847,12 +2857,12 @@ compile_time_eval(
   Storage out_storage = storage_indirect(result_byte_size, out_register);
   Value *out_value = value_make(&eval_context, result_descriptor, out_storage, view.source_range);
 
-  MASS_ON_ERROR(assign(&eval_context, &out_value_register, &result_address)) {
+  MASS_ON_ERROR(assign(&eval_context, &eval_builder, &out_value_register, &result_address)) {
     context->result = eval_context.result;
     return 0;
   }
 
-  MASS_ON_ERROR(assign(&eval_context, out_value, forced_value)) {
+  MASS_ON_ERROR(assign(&eval_context, &eval_builder, out_value, forced_value)) {
     context->result = eval_context.result;
     return 0;
   }
@@ -2898,6 +2908,7 @@ typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 static Value *
 token_handle_c_string(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *args_token
 ) {
@@ -2963,6 +2974,7 @@ typedef struct {
 static Value *
 mass_handle_cast_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_Cast_Lazy_Payload *payload
 ) {
@@ -2972,7 +2984,7 @@ mass_handle_cast_lazy_proc(
   const Source_Range *source_range = &expression->source_range;
 
   Expected_Result expected_source = expected_result_any(source_descriptor);
-  Value *value = value_force(context, &expected_source, expression);
+  Value *value = value_force(context, builder, &expected_source, expression);
   MASS_ON_ERROR(*context->result) return 0;
 
   u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
@@ -2995,7 +3007,7 @@ mass_handle_cast_lazy_proc(
     result_value->is_temporary = value->is_temporary;
   }
 
-  return expected_result_ensure_value_or_temp(context, expected_result, result_value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, result_value);
 }
 
 static Value *
@@ -3196,6 +3208,7 @@ typedef struct {
 static Value *
 call_function_macro(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
@@ -3226,7 +3239,7 @@ call_function_macro(
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
           Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          value_force_exact(&arg_context, arg_value, parse_result);
+          value_force_exact(&arg_context, builder, arg_value, parse_result);
         }
       } else {
         arg_value = *dyn_array_get(args, i);
@@ -3273,7 +3286,7 @@ call_function_macro(
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
     Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
-    result_value = value_force(&body_context, expected_result, parse_result);
+    result_value = value_force(&body_context, builder, expected_result, parse_result);
     MASS_ON_ERROR(*context->result) return 0;
   }
 
@@ -3296,6 +3309,7 @@ call_function_macro(
 static Value *
 call_function_overload(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_Function_Call_Lazy_Payload *payload
 ) {
@@ -3303,7 +3317,6 @@ call_function_overload(
   Value *to_call = payload->overload;
   Array_Value_Ptr arguments = payload->args;
 
-  Function_Builder *builder = context->builder;
   Array_Instruction *instructions = &builder->code_block.instructions;
   const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
   assert(to_call_descriptor->tag == Descriptor_Tag_Function);
@@ -3436,11 +3449,11 @@ call_function_overload(
 
     const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
     if (descriptor_byte_size(source_descriptor) <= 8) {
-      MASS_ON_ERROR(assign(context, target_arg, source_arg)) return 0;
+      MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     } else {
       // Large values are copied to the stack and passed by a reference
       Value *stack_value = reserve_stack(context, source_descriptor, *source_range);
-      MASS_ON_ERROR(assign(context, stack_value, source_arg)) return 0;
+      MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
       load_address(context, source_range, target_arg, stack_value->storage);
     }
     Slice name = target_arg_definition->name;
@@ -3484,7 +3497,7 @@ call_function_overload(
     push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {call_storage, 0, 0}}});
   }
 
-  MASS_ON_ERROR(assign(context, result_value, fn_return_value)) return 0;
+  MASS_ON_ERROR(assign(context, builder, result_value, fn_return_value)) return 0;
 
   // :ArgumentRegisterAcquire
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
@@ -3539,7 +3552,7 @@ token_handle_function_call(
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
     Expected_Result expected_result = expected_result_static(target_descriptor);
-    Value *target = value_force(context, &expected_result, target_expression);
+    Value *target = value_force(context, context->builder, &expected_result, target_expression);
     MASS_ON_ERROR(*context->result) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
@@ -3945,6 +3958,7 @@ typedef struct {
 static Value *
 mass_handle_arithmetic_operation_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_Arithmetic_Operator_Lazy_Payload *payload
 ) {
@@ -3959,9 +3973,9 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
       if (payload->operator == Mass_Arithmetic_Operator_Add) {
-        maybe_constant_fold(context, &result_range, expected_result, a, b, +);
+        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, +);
       } else {
-        maybe_constant_fold(context, &result_range, expected_result, a, b, -);
+        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, -);
       }
 
       // Try to reuse result_value if we can
@@ -3969,12 +3983,12 @@ mass_handle_arithmetic_operation_lazy_proc(
       Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, result_range);
 
       Expected_Result expected_a = expected_result_from_value(temp_a);
-      temp_a = value_force(context, &expected_a, payload->lhs);
+      temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, result_range);
       Expected_Result expected_b = expected_result_from_value(temp_b);
-      temp_b = value_force(context, &expected_b, payload->rhs);
+      temp_b = value_force(context, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -3987,13 +4001,12 @@ mass_handle_arithmetic_operation_lazy_proc(
       value_release_if_temporary(context->builder, temp_b);
 
       // temp_a is used as a result so it is intentionnaly not released
-      return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
+      return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      maybe_constant_fold(context, &result_range, expected_result, a, b, *);
+      maybe_constant_fold(context, builder, &result_range, expected_result, a, b, *);
 
       Allocator *allocator = context->allocator;
-      Function_Builder *builder = context->builder;
 
       // Save RDX as it will be used for the result overflow
       // but we should not save or restore it if it is the result
@@ -4016,7 +4029,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       );
       temp_a->is_temporary = true;
       Expected_Result expected_a = expected_result_from_value(temp_a);
-      temp_a = value_force(context, &expected_a, payload->lhs);
+      temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
       // TODO we do not acquire here because it is done by maybe_saved_rdx,
       //      but it is awkward that it is disconnected so need to think about
@@ -4024,7 +4037,7 @@ mass_handle_arithmetic_operation_lazy_proc(
         context, Register_D, descriptor, result_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_b);
-      temp_b = value_force(context, &expected_b, payload->rhs);
+      temp_b = value_force(context, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -4036,19 +4049,18 @@ mass_handle_arithmetic_operation_lazy_proc(
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
       // temp_a is used as a result so it is intentionnaly not released
-      return expected_result_ensure_value_or_temp(context, expected_result, temp_a);
+      return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_a);
     }
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
       Allocator *allocator = context->allocator;
-      Function_Builder *builder = context->builder;
       Array_Instruction *instructions = &builder->code_block.instructions;
       u64 byte_size = descriptor_byte_size(descriptor);
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
-        maybe_constant_fold(context, &result_range, expected_result, a, b, /);
+        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, /);
       } else {
-        maybe_constant_fold(context, &result_range, expected_result, a, b, %);
+        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, %);
       }
 
       // Save RDX as it will be used for the result overflow
@@ -4071,13 +4083,13 @@ mass_handle_arithmetic_operation_lazy_proc(
         context, Register_A, descriptor, result_range
       );
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
-      temp_dividend = value_force(context, &expected_dividend, payload->lhs);
+      temp_dividend = value_force(context, builder, &expected_dividend, payload->lhs);
 
       Value *temp_divisor = value_temporary_register_for_descriptor(
         context, descriptor, payload->rhs->source_range
       );
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
-      temp_divisor = value_force(context, &expected_divisor, payload->rhs);
+      temp_divisor = value_force(context, builder, &expected_divisor, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -4124,7 +4136,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       value_release_if_temporary(builder, temp_divisor);
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
-      return expected_result_ensure_value_or_temp(context, expected_result, temp_dividend);
+      return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_dividend);
     }
     default: {
       panic("Internal error: Unexpected operator");
@@ -4152,7 +4164,7 @@ mass_handle_arithmetic_operation(
     Expected_Result expected_result = expected_result_static(descriptor);
     Mass_Arithmetic_Operator_Lazy_Payload lazy_payload =
       { .lhs = lhs, .rhs = rhs, .operator = operator };
-    return mass_handle_arithmetic_operation_lazy_proc(context, &expected_result, &lazy_payload);
+    return mass_handle_arithmetic_operation_lazy_proc(context, context->builder, &expected_result, &lazy_payload);
   } else {
     Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
       allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
@@ -4174,6 +4186,7 @@ typedef struct {
 static Value *
 mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   void *raw_payload
 ) {
@@ -4225,45 +4238,45 @@ mass_handle_comparison_operation_lazy_proc(
 
   switch(compare_type) {
     case Compare_Type_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, ==);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, ==);
       break;
     }
     case Compare_Type_Not_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, !=);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, !=);
       break;
     }
 
     case Compare_Type_Unsigned_Below: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, <);
       break;
     }
     case Compare_Type_Unsigned_Below_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <=);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, <=);
       break;
     }
     case Compare_Type_Unsigned_Above: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, >);
       break;
     }
     case Compare_Type_Unsigned_Above_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >=);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, >=);
       break;
     }
 
     case Compare_Type_Signed_Less: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, <);
       break;
     }
     case Compare_Type_Signed_Less_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, <=);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, <=);
       break;
     }
     case Compare_Type_Signed_Greater: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, >);
       break;
     }
     case Compare_Type_Signed_Greater_Equal: {
-      maybe_constant_fold(context, source_range, expected_result, payload->lhs, payload->rhs, >=);
+      maybe_constant_fold(context, builder, source_range, expected_result, payload->lhs, payload->rhs, >=);
       break;
     }
     default: {
@@ -4276,12 +4289,12 @@ mass_handle_comparison_operation_lazy_proc(
   Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, *source_range);
 
   Expected_Result expected_a = expected_result_from_value(temp_a);
-  temp_a = value_force(context, &expected_a, payload->lhs);
+  temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
   // TODO This can be optimized in cases where one of the operands is an immediate
   Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, *source_range);
   Expected_Result expected_b = expected_result_from_value(temp_b);
-  temp_b = value_force(context, &expected_b, payload->rhs);
+  temp_b = value_force(context, builder, &expected_b, payload->rhs);
 
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -4295,7 +4308,7 @@ mass_handle_comparison_operation_lazy_proc(
   value_release_if_temporary(context->builder, temp_a);
   value_release_if_temporary(context->builder, temp_b);
 
-  return expected_result_ensure_value_or_temp(context, expected_result, comparison_value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, comparison_value);
 }
 
 static inline Value *
@@ -4317,7 +4330,7 @@ mass_handle_comparison_operation(
     Expected_Result expected_result = expected_result_static(descriptor);
     Mass_Comparison_Operator_Lazy_Payload lazy_payload =
       { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
-    return mass_handle_comparison_operation_lazy_proc(context, &expected_result, &lazy_payload);
+    return mass_handle_comparison_operation_lazy_proc(context, context->builder, &expected_result, &lazy_payload);
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
@@ -4333,6 +4346,7 @@ mass_handle_comparison_operation(
 static Value *
 mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *args_token
 ) {
@@ -4361,6 +4375,7 @@ mass_handle_startup_call_lazy_proc(
 static Value *
 mass_handle_address_of_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *pointee
 ) {
@@ -4666,6 +4681,7 @@ typedef struct {
 static inline Value *
 mass_handle_field_access_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   void *raw_payload
 ) {
@@ -4674,7 +4690,7 @@ mass_handle_field_access_lazy_proc(
 
   Expected_Result expected_struct =
     expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
-  Value *struct_ = value_force(context, &expected_struct, payload->struct_);
+  Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
 
   // Auto dereference pointers to structs
   if (struct_->descriptor->tag == Descriptor_Tag_Pointer_To) {
@@ -4716,7 +4732,7 @@ mass_handle_field_access_lazy_proc(
   // to propagate the temporary flag correctly
   field_value->is_temporary = struct_->is_temporary;
 
-  return expected_result_ensure_value_or_temp(context, expected_result, field_value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, field_value);
 }
 
 typedef struct {
@@ -4727,6 +4743,7 @@ typedef struct {
 static Value *
 mass_handle_array_access_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   void *raw_payload
 ) {
@@ -4734,10 +4751,10 @@ mass_handle_array_access_lazy_proc(
   const Source_Range *array_range = &payload->array->source_range;
   Expected_Result expected_array =
     expected_result_any(value_or_lazy_value_descriptor(payload->array));
-  Value *array = value_force(context, &expected_array, payload->array);
+  Value *array = value_force(context, builder, &expected_array, payload->array);
   Expected_Result expected_index =
     expected_result_any(value_or_lazy_value_descriptor(payload->index));
-  Value *index = value_force(context, &expected_index, payload->index);
+  Value *index = value_force(context, builder, &expected_index, payload->index);
 
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -4780,7 +4797,7 @@ mass_handle_array_access_lazy_proc(
     array_element_value->epoch = VALUE_STATIC_EPOCH;
   }
 
-  return expected_result_ensure_value_or_temp(context, expected_result, array_element_value);
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, array_element_value);
 }
 
 static Value *
@@ -4817,7 +4834,7 @@ mass_handle_dot_operator(
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs->descriptor == &descriptor_scope) {
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(module_scope, field_name);
+      Value *lookup = scope_lookup_force(context->builder, module_scope, field_name);
       if (!lookup) {
         //scope_print_names(module_scope);
         context_error(context, (Mass_Error) {
@@ -4949,6 +4966,7 @@ typedef struct {
 static Value *
 mass_handle_if_expression_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_If_Expression_Lazy_Payload *payload
 ) {
@@ -4963,7 +4981,7 @@ mass_handle_if_expression_lazy_proc(
   } else if (condition->descriptor == &descriptor_lazy_value) {
     // TODO support any If-able descriptors instead of accepting literally anything
     Expected_Result expected_condition = expected_result_any(0);
-    Value *temp_condition = value_force(context, &expected_condition, condition);
+    Value *temp_condition = value_force(context, builder, &expected_condition, condition);
     MASS_ON_ERROR(*context->result) return 0;
     condition = temp_condition;
   }
@@ -4972,13 +4990,13 @@ mass_handle_if_expression_lazy_proc(
     context, &context->builder->code_block.instructions, &condition->source_range, condition
   );
 
-  Value *result_value = value_force(context, expected_result, then);
+  Value *result_value = value_force(context, builder, expected_result, then);
   MASS_ON_ERROR(*context->result) return 0;
 
   if (result_value->storage.tag == Storage_Tag_Static) {
     Value *stack_result =
       reserve_stack(context, result_value->descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, stack_result, result_value));
+    MASS_ON_ERROR(assign(context, builder, stack_result, result_value));
     result_value = stack_result;
   }
 
@@ -4995,7 +5013,7 @@ mass_handle_if_expression_lazy_proc(
   );
 
   Expected_Result expected_else = expected_result_from_value(result_value);
-  result_value = value_force(context, &expected_else, else_);
+  result_value = value_force(context, builder, &expected_else, else_);
   MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(
@@ -5290,6 +5308,7 @@ token_parse_expression(
 static Value *
 mass_handle_block_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   void *raw_payload
 ) {
@@ -5307,11 +5326,11 @@ mass_handle_block_lazy_proc(
     Source_Range debug_source_range = lazy_statement->source_range;
     (void)debug_source_range;
     if (i == statement_count - 1) {
-      result_value = value_force(context, expected_result, lazy_statement);
-      result_value = expected_result_ensure_value_or_temp(context, expected_result, result_value);
+      result_value = value_force(context, builder, expected_result, lazy_statement);
+      result_value = expected_result_ensure_value_or_temp(context, builder, expected_result, result_value);
     } else {
       Expected_Result expected_void = expected_result_from_value(&void_value);
-      result_value = value_force(context, &expected_void, lazy_statement);
+      result_value = value_force(context, builder, &expected_void, lazy_statement);
     }
     MASS_ON_ERROR(*context->result) return 0;
     // We do not do cross-statement register allocation so can check that there
@@ -5497,6 +5516,7 @@ token_parse_statement_using(
 static Value *
 mass_handle_label_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *label_value
 ) {
@@ -5554,7 +5574,7 @@ token_parse_statement_label(
   Scope_Entry *scope_entry = scope_lookup(context->scope, name);
   Value *value;
   if (scope_entry) {
-    value = scope_entry_force(scope_entry);
+    value = scope_entry_force(context->builder, scope_entry);
   } else {
     Scope *label_scope = context->scope;
 
@@ -5580,18 +5600,19 @@ token_parse_statement_label(
 static Value *
 mass_handle_explicit_return_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
   Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
   assert(scope_value_entry);
-  Value *fn_return = scope_entry_force(scope_value_entry);
+  Value *fn_return = scope_entry_force(builder, scope_value_entry);
   assert(fn_return);
-  MASS_ON_ERROR(assign(context, fn_return, parse_result)) return 0;
+  MASS_ON_ERROR(assign(context, builder, fn_return, parse_result)) return 0;
 
   Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
   assert(scope_label_entry);
-  Value *return_label = scope_entry_force(scope_label_entry);
+  Value *return_label = scope_entry_force(builder, scope_label_entry);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
   assert(storage_is_label(&return_label->storage));
@@ -5648,7 +5669,7 @@ token_match_fixed_array_type(
   u64 peek_index = 0;
   Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  Value *type_value = scope_lookup_force(context->scope, value_as_symbol(type)->name);
+  Value *type_value = scope_lookup_force(context->builder, context->scope, value_as_symbol(type)->name);
   const Descriptor *descriptor = value_ensure_type(context, type_value, view.source_range);
 
   Value_View size_view = value_as_group(square_brace)->children;
@@ -5664,6 +5685,7 @@ token_match_fixed_array_type(
 static Value *
 mass_handle_inline_machine_code_bytes_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Value *args_token
 ) {
@@ -5860,12 +5882,13 @@ typedef struct {
 static Value *
 mass_handle_assignment_lazy_proc(
   Execution_Context *context,
+  Function_Builder *builder,
   const Expected_Result *expected_result,
   Mass_Assignment_Lazy_Payload *payload
 ) {
   const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
   Expected_Result expected_target = expected_result_any(descriptor);
-  Value *target = value_force(context, &expected_target, payload->target);
+  Value *target = value_force(context, builder, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
   if (descriptor->tag == Descriptor_Tag_Function) {
     assert(payload->expression->descriptor != &descriptor_lazy_value);
@@ -5874,7 +5897,7 @@ mass_handle_assignment_lazy_proc(
     load_address(context, &payload->source_range, target, fn_storage);
   } else {
     Expected_Result expected_assignment = expected_result_from_value(target);
-    target = value_force(context, &expected_assignment, payload->expression);
+    target = value_force(context, builder, &expected_assignment, payload->expression);
   }
   value_release_if_temporary(context->builder, target);
 
@@ -6290,7 +6313,7 @@ program_parse(
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
   Value *block_result = token_parse_block_view(context, tokens);
   Expected_Result expected_target = expected_result_from_value(&void_value);
-  (void)value_force(context, &expected_target, block_result);
+  (void)value_force(context, context->builder, &expected_target, block_result);
   return *context->result;
 }
 

@@ -90,7 +90,7 @@ test_program_source_base(
   }
   MASS_ON_ERROR(*context->result) return 0;
   // FIXME lookup main in exported scope
-  Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
+  Value *value = scope_lookup_force(test_context.builder, test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
     ensure_compiled_function_body(context, value);
   }

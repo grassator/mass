@@ -170,7 +170,7 @@ typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
 typedef dyn_array_type(const Expected_Result *) Array_Const_Expected_Result_Ptr;
 
 typedef Value * (*Lazy_Value_Proc)
-  (Execution_Context * context, const Expected_Result * expected_result, void * payload);
+  (Execution_Context * context, Function_Builder * builder, const Expected_Result * expected_result, void * payload);
 
 typedef struct Lazy_Value Lazy_Value;
 typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
