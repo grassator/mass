@@ -3627,6 +3627,7 @@ token_handle_function_call(
     } else {
       if (score == match.score && score > best_conflict_match.score) {
         best_conflict_match = match;
+        match.value = to_call;
       }
     }
   }
