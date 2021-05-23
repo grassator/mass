@@ -2831,8 +2831,10 @@ compile_time_eval(
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
-  if (!dyn_array_length(eval_builder.code_block.instructions)) {
-    assert(forced_value->epoch == VALUE_STATIC_EPOCH || value_is_non_lazy_static(forced_value));
+  if (
+    !dyn_array_length(eval_builder.code_block.instructions) &&
+    (forced_value->epoch == VALUE_STATIC_EPOCH || value_is_non_lazy_static(forced_value))
+  ) {
     forced_value->epoch = VALUE_STATIC_EPOCH;
     return forced_value;
   }
@@ -5769,14 +5771,29 @@ token_parse_inline_machine_code_bytes(
   return peek_index;
 }
 
+typedef struct {
+  Value *name_token;
+  const Descriptor *descriptor;
+} Mass_Variable_Definition_Lazy_Payload;
+
 static Value *
-token_maybe_parse_definition(
+mass_handle_variable_definition_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Variable_Definition_Lazy_Payload *payload
+) {
+  return reserve_stack(context, builder, payload->descriptor, payload->name_token->source_range);
+}
+
+static u64
+token_parse_definition(
   Execution_Context *context,
   Value_View view,
-  u64 *match_length
+  Lazy_Value *unused_lazy_value,
+  Value **out_definition_value
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  *match_length = 0;
 
   u64 peek_index = 0;
   Token_Match(name_token, .tag = Token_Pattern_Tag_Symbol);
@@ -5785,26 +5802,25 @@ token_maybe_parse_definition(
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   const Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) return 0;
-  Source_Range name_range = name_token->source_range;
-  Value *stack_value = reserve_stack(context, context->builder, descriptor, name_range);
+
+  Mass_Variable_Definition_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+  *payload = (Mass_Variable_Definition_Lazy_Payload){
+    .name_token = name_token,
+    .descriptor = descriptor,
+  };
+
+  // We are creating a custom lazy value here instead of a statement because if the value
+  // is never referenced we can skip running the lazy proc. This is safe because these
+  // definitions do not have an initializer and thus do not produce side effects.
+  Value *variable_value = mass_make_lazy_value(
+    context, name_token->source_range, payload, descriptor, mass_handle_variable_definition_lazy_proc
+  );
+  if (out_definition_value) *out_definition_value = variable_value;
   Slice name = value_as_symbol(name_token)->name;
-  scope_define_value(context->scope, name_range, name, stack_value);
-  *match_length = peek_index;
-  return stack_value;
-}
+  scope_define_value(context->scope, name_token->source_range, name, variable_value);
 
-static inline u64
-token_parse_definition_statement(
-  Execution_Context *context,
-  Value_View state,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 match_length = 0;
-  token_maybe_parse_definition(context, state, &match_length);
-  return match_length;
+  return peek_index;
 }
 
 static void
@@ -6002,7 +6018,8 @@ token_parse_assignment(
   Mass_Assignment_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
 
-  Value *target = token_maybe_parse_definition(context, lhs, &(u64){0});
+  Value *target = 0;
+  token_parse_definition(context, lhs, 0, &target);
   if (target) {
     Value *expression_parse = token_parse_expression(context, rhs, &(u64){0}, 0);
     *payload = (Mass_Assignment_Lazy_Payload) {
@@ -6272,7 +6289,7 @@ scope_define_builtins(
 
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_statement});
+    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
     dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
