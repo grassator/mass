@@ -1010,7 +1010,6 @@ main(void) {
     { "u64", "epoch" },
     { "Program *", "program" },
     { "Scope *", "scope" },
-    { "Function_Builder *", "builder" },
     { "Module *", "module" },
     { "Mass_Result *", "result" },
   }));

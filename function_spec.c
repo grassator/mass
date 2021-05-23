@@ -39,7 +39,6 @@ spec("function") {
     *result = (Mass_Result){0};
     *temp_context = (Execution_Context) {
       .allocator = temp_allocator,
-      .builder = builder,
       .result = result,
     };
   }

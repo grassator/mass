@@ -1594,10 +1594,10 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
-  if (body_context.builder) {
-    return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
-  } else {
+  if (body_context.flags & Execution_Context_Flags_Global) {
     return compile_time_eval(&body_context, macro->replacement);
+  } else {
+    return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
   }
 }
 
@@ -2719,7 +2719,6 @@ token_process_function_literal(
 
       Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
-      arg_context.builder = 0;
       descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
     }
   }
@@ -2738,7 +2737,6 @@ token_process_function_literal(
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
     Execution_Context arg_context = *context;
     arg_context.scope = function_scope;
-    arg_context.builder = 0;
     Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
     MASS_ON_ERROR(*context->result) return 0;
     dyn_array_push(descriptor->Function.info.arguments, arg);
@@ -2811,9 +2809,8 @@ compile_time_eval(
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
+    .source = source_from_source_range(source_range),
   };
-  eval_context.builder = &eval_builder;
-  eval_context.builder->source = source_from_source_range(source_range);
 
   Value *expression_result_value = token_parse_expression(&eval_context, view, &(u64){0}, 0);
   MASS_ON_ERROR(*eval_context.result) {

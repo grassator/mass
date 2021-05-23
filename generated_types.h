@@ -807,7 +807,6 @@ typedef struct Execution_Context {
   u64 epoch;
   Program * program;
   Scope * scope;
-  Function_Builder * builder;
   Module * module;
   Mass_Result * result;
 } Execution_Context;
@@ -2694,12 +2693,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
     .name = slice_literal_fields("scope"),
     .descriptor = &descriptor_scope_pointer,
     .Base_Relative.offset = offsetof(Execution_Context, scope),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("builder"),
-    .descriptor = &descriptor_function_builder_pointer,
-    .Base_Relative.offset = offsetof(Execution_Context, builder),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
