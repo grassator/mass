@@ -997,8 +997,15 @@ main(void) {
     { "u8", "volatile_register_push_offsets", 16 },
   }));
 
+  push_type(type_enum("Execution_Context_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Global", 1 << 0 },
+  }));
+
   push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
+    { "Execution_Context_Flags", "flags" },
+    { "s32", "_flags_padding" },
     { "Compilation *", "compilation" },
     { "u64", "epoch" },
     { "Program *", "program" },

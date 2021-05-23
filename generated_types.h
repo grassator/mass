@@ -147,6 +147,8 @@ typedef struct Function_Layout Function_Layout;
 typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
 typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
 
+typedef enum Execution_Context_Flags Execution_Context_Flags;
+
 typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
 typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
@@ -785,8 +787,22 @@ typedef struct Function_Layout {
 } Function_Layout;
 typedef dyn_array_type(Function_Layout) Array_Function_Layout;
 
+typedef enum Execution_Context_Flags {
+  Execution_Context_Flags_None = 0,
+  Execution_Context_Flags_Global = 1,
+} Execution_Context_Flags;
+
+const char *execution_context_flags_name(Execution_Context_Flags value) {
+  if (value == 0) return "Execution_Context_Flags_None";
+  if (value == 1) return "Execution_Context_Flags_Global";
+  assert(!"Unexpected value for enum Execution_Context_Flags");
+  return 0;
+};
+
 typedef struct Execution_Context {
   Allocator * allocator;
+  Execution_Context_Flags flags;
+  s32 _flags_padding;
   Compilation * compilation;
   u64 epoch;
   Program * program;
@@ -1370,6 +1386,11 @@ static Descriptor descriptor_array_function_layout;
 static Descriptor descriptor_array_function_layout_ptr;
 static Descriptor descriptor_function_layout_pointer;
 static Descriptor descriptor_function_layout_pointer_pointer;
+static Descriptor descriptor_execution_context_flags;
+static Descriptor descriptor_array_execution_context_flags;
+static Descriptor descriptor_array_execution_context_flags_ptr;
+static Descriptor descriptor_execution_context_flags_pointer;
+static Descriptor descriptor_execution_context_flags_pointer_pointer;
 static Descriptor descriptor_execution_context;
 static Descriptor descriptor_array_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
@@ -2624,6 +2645,11 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_layout, Function_Layout,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_layout);
+MASS_DEFINE_OPAQUE_C_TYPE(execution_context_flags, Execution_Context_Flags)
+static C_Enum_Item execution_context_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Global"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context_ptr, Array_Execution_Context_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_execution_context, Array_Execution_Context)
 MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
@@ -2632,6 +2658,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
     .name = slice_literal_fields("allocator"),
     .descriptor = &descriptor_allocator_pointer,
     .Base_Relative.offset = offsetof(Execution_Context, allocator),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("flags"),
+    .descriptor = &descriptor_execution_context_flags,
+    .Base_Relative.offset = offsetof(Execution_Context, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("_flags_padding"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Execution_Context, _flags_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

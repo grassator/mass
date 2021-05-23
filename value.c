@@ -1680,6 +1680,7 @@ execution_context_from_compilation(
   Compilation *compilation
 ) {
   return (Execution_Context) {
+    .flags = Execution_Context_Flags_Global,
     .allocator = compilation->allocator,
     .program = compilation->runtime_program,
     .compilation = compilation,

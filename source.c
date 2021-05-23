@@ -2792,6 +2792,7 @@ compile_time_eval(
 
   Jit *jit = &context->compilation->jit;
   Execution_Context eval_context = *context;
+  eval_context.flags &= ~Execution_Context_Flags_Global;
   eval_context.epoch = get_new_epoch();
   eval_context.program = jit->program;
   eval_context.scope = scope_make(context->allocator, context->scope);
@@ -5987,10 +5988,10 @@ token_parse_definition_and_assignment_statements(
     goto err;
   }
 
-  if (context->builder) {
-    token_define_local_variable(context, name_token, out_lazy_value, rhs);
-  } else {
+  if (context->flags & Execution_Context_Flags_Global) {
     token_define_global_variable(context, name_token, rhs);
+  } else {
+    token_define_local_variable(context, name_token, out_lazy_value, rhs);
   }
 
   err:
@@ -6421,6 +6422,7 @@ program_import_module(
 ) {
   MASS_TRY(*context->result);
   Execution_Context import_context = *context;
+  import_context.flags |= Execution_Context_Flags_Global;
   import_context.module = module;
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);

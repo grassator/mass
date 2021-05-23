@@ -934,6 +934,7 @@ ensure_compiled_function_body(
 
   Execution_Context body_context = *context;
   Scope *body_scope = scope_make(context->allocator, function->scope);
+  body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.builder = builder;
   body_context.epoch = get_new_epoch();
