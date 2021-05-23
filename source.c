@@ -5592,15 +5592,11 @@ mass_handle_explicit_return_lazy_proc(
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
-  Scope_Entry *scope_value_entry = scope_lookup(context->scope, MASS_RETURN_VALUE_NAME);
-  assert(scope_value_entry);
-  Value *fn_return = scope_entry_force(builder, scope_value_entry);
+  Value *fn_return = scope_lookup_force(builder, context->scope, MASS_RETURN_VALUE_NAME);
   assert(fn_return);
   MASS_ON_ERROR(assign(context, builder, fn_return, parse_result)) return 0;
 
-  Scope_Entry *scope_label_entry = scope_lookup(context->scope, MASS_RETURN_LABEL_NAME);
-  assert(scope_label_entry);
-  Value *return_label = scope_entry_force(builder, scope_label_entry);
+  Value *return_label = scope_lookup_force(builder, context->scope, MASS_RETURN_LABEL_NAME);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
   assert(storage_is_label(&return_label->storage));
