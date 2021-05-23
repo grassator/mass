@@ -3560,23 +3560,21 @@ token_handle_function_call(
 
   if (
     target_descriptor->tag == Descriptor_Tag_Function &&
-    (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
+    (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time) &&
+    target_descriptor != context->current_compile_time_function_descriptor
   ) {
-    Expected_Result expected_result = expected_result_static(target_descriptor);
-    Value *target = value_force(context, 0, &expected_result, target_expression);
-    MASS_ON_ERROR(*context->result) return 0;
-    Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
-    *non_compile_time_descriptor = *target->descriptor;
-    // Need to remove Compile_Time flag otherwise we will go into an infinite loop
-    non_compile_time_descriptor->Function.info.flags &= ~Descriptor_Function_Flags_Compile_Time;
-    Value *fake_target_value =
-      value_make(context, non_compile_time_descriptor, target->storage, source_range);
+    // This is necessary to avoid infinite recursion as the compile_time_eval called below
+    // will end up here as well. Indirect calls are allowed so we do not need a full stack
+    const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
+    context->current_compile_time_function_descriptor = target_descriptor;
     Value_View fake_eval_view = {
-      .values = (Value *[]){fake_target_value, args_token},
+      .values = (Value *[]){target_expression, args_token},
       .length = 2,
       .source_range = source_range,
     };
-    return compile_time_eval(context, fake_eval_view);
+    Value *result = compile_time_eval(context, fake_eval_view);
+    context->current_compile_time_function_descriptor = saved_descriptor;
+    return result;
   }
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
