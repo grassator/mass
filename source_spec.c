@@ -971,6 +971,16 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should be able to accept a function as an argument and call it") {
+      s64 (*checker)(Spec_Callback foo) =
+        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+          "foo", &test_context,
+          "fn foo(callback : fn() -> (s64)) -> (s64) { callback() }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(spec_callback) == 42);
+    }
   }
 
   describe("Operators") {
@@ -1218,16 +1228,6 @@ spec("source") {
       Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
       check(literal->bits == 42);
       check(literal->negative == false);
-    }
-
-    it("should be able to accept a function as an argument and call it") {
-      s64 (*checker)(Spec_Callback foo) =
-        (s64 (*)(Spec_Callback))test_program_inline_source_function(
-          "foo", &test_context,
-          "fn foo(callback : fn() -> (s64)) -> (s64) { callback() }"
-        );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(spec_callback) == 42);
     }
 
     xit("should not be able to use runtime values in a static context") {
