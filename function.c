@@ -1,14 +1,14 @@
 #include "function.h"
 
-Storage
+static Storage
 reserve_stack_storage(
-  Execution_Context *context,
+  Function_Builder *builder,
   u64 raw_byte_size
 ) {
   s32 byte_size = u64_to_s32(raw_byte_size);
-  context->builder->stack_reserve = s32_align(context->builder->stack_reserve, byte_size);
-  context->builder->stack_reserve += byte_size;
-  return stack(-context->builder->stack_reserve, byte_size);
+  builder->stack_reserve = s32_align(builder->stack_reserve, byte_size);
+  builder->stack_reserve += byte_size;
+  return stack(-builder->stack_reserve, byte_size);
 }
 
 // :StackDisplacementEncoding
@@ -27,10 +27,11 @@ Value *
 reserve_stack_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
+  Function_Builder *builder,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  Storage storage = reserve_stack_storage(context, descriptor_byte_size(descriptor));
+  Storage storage = reserve_stack_storage(builder, descriptor_byte_size(descriptor));
   return value_make_internal(
     compiler_source_location, context, descriptor, storage, source_range
   );
@@ -851,6 +852,7 @@ maybe_constant_fold_internal(
 static void
 load_address(
   Execution_Context *context,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Storage source
@@ -862,7 +864,7 @@ load_address(
   Value *temp_register = result_value->storage.tag == Storage_Tag_Register
     ? result_value
     : value_register_for_descriptor(
-        context, register_acquire_temp(context->builder), result_value->descriptor, *source_range
+        context, register_acquire_temp(builder), result_value->descriptor, *source_range
     );
 
   // TODO rethink operand sizing
@@ -872,12 +874,12 @@ load_address(
   source.byte_size = descriptor_byte_size(result_value->descriptor);
 
   push_instruction(
-    &context->builder->code_block.instructions, *source_range,
+    &builder->code_block.instructions, *source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_register->storage, source, 0}}}
   );
 
   move_to_result_from_temp(
-    context->allocator, context->builder, source_range, result_value, temp_register
+    context->allocator, builder, source_range, result_value, temp_register
   );
 }
 

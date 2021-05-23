@@ -566,7 +566,7 @@ assign(
           .address_of = static_pointer->storage,
         });
       } else {
-        load_address(context, &source_range, target, static_pointer->storage);
+        load_address(context, builder, &source_range, target, static_pointer->storage);
       }
       return *context->result;
     } else if (storage_is_label(&target->storage)) {
@@ -582,7 +582,7 @@ assign(
 
   assert(source->descriptor->tag != Descriptor_Tag_Function);
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
-    move_value(context->allocator, context->builder, &source_range, &target->storage, &source->storage);
+    move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
     return *context->result;
   }
 
@@ -1963,7 +1963,7 @@ expected_result_ensure_value_or_temp(
         value->storage.tag != Storage_Tag_Static &&
         !storage_equal(&result_value->storage, &value->storage)
       ) {
-        value_release_if_temporary(context->builder, value);
+        value_release_if_temporary(builder, value);
       }
       MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
       return result_value;
@@ -2006,15 +2006,15 @@ expected_result_ensure_value_or_temp(
           return value;
         }
         Value *temp_result = value_temporary_register_for_descriptor(
-          context, expected_descriptor, value->source_range
+          context, builder, expected_descriptor, value->source_range
         );
-        value_release_if_temporary(context->builder, value);
+        value_release_if_temporary(builder, value);
         MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
         return temp_result;
       }
       if (flexible->storage & Expected_Result_Storage_Memory) {
         assert(value->storage.tag != Storage_Tag_Register); // checked above
-        Value *temp_result = reserve_stack(context, expected_descriptor, value->source_range);
+        Value *temp_result = reserve_stack(context, builder, expected_descriptor, value->source_range);
         MASS_ON_ERROR(assign(context, builder, temp_result, value)) return 0;
         return temp_result;
       }
@@ -2936,7 +2936,7 @@ token_handle_c_string(
   const Value *c_string_bytes =
     value_global_c_string_from_slice(context, *c_string, arg_value->source_range);
   result_value = value_from_exact_expected_result(expected_result);
-  load_address(context, &arg_value->source_range, result_value, c_string_bytes->storage);
+  load_address(context, builder, &arg_value->source_range, result_value, c_string_bytes->storage);
 
   defer:
   dyn_array_destroy(args);
@@ -3234,7 +3234,7 @@ call_function_macro(
         assert(default_expression.length);
         const Source_Range *source_range = &default_expression.source_range;
         // FIXME avoid using a stack value
-        arg_value = reserve_stack(context, arg->descriptor, *source_range);
+        arg_value = reserve_stack(context, builder, arg->descriptor, *source_range);
         {
           Execution_Context arg_context = *context;
           arg_context.scope = body_scope;
@@ -3270,7 +3270,7 @@ call_function_macro(
       // FIXME :ExpectedStack
       result_value = return_descriptor->tag == Descriptor_Tag_Void
         ? &void_value
-        : reserve_stack(context, return_descriptor, fn_value->source_range);
+        : reserve_stack(context, builder, return_descriptor, fn_value->source_range);
       break;
     }
   }
@@ -3293,13 +3293,10 @@ call_function_macro(
   // @Hack if there are no instructions generated so far there definitely was no jumps
   //       to return so we can avoid generating this instructions which also can enable
   //       optimizations in the compile_time_eval that check for the instruction count.
-  if (dyn_array_length(context->builder->code_block.instructions)) {
+  if (dyn_array_length(builder->code_block.instructions)) {
     push_instruction(
-      &context->builder->code_block.instructions, fn_value->source_range,
-      (Instruction) {
-        .tag = Instruction_Tag_Label,
-        .Label.index = fake_return_label_index
-      }
+      &builder->code_block.instructions, fn_value->source_range,
+      (Instruction) { .tag = Instruction_Tag_Label, .Label.index = fake_return_label_index }
     );
   }
   dyn_array_destroy(args);
@@ -3339,7 +3336,7 @@ call_function_overload(
       if (descriptor->returns.descriptor->tag == Descriptor_Tag_Void) {
         result_value = value_make(context, &descriptor_void, storage_none, *source_range);
       } else {
-        result_value = reserve_stack(context, descriptor->returns.descriptor, *source_range);
+        result_value = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
       }
       break;
     }
@@ -3363,7 +3360,7 @@ call_function_overload(
     if (occupied_value->storage.tag == Storage_Tag_Register) {
       assert(occupied_value->storage.tag == Storage_Tag_Register);
       assert(occupied_value->storage.Register.index == reg_index);
-      Storage stack_storage = reserve_stack_storage(context, occupied_value->storage.byte_size);
+      Storage stack_storage = reserve_stack_storage(builder, occupied_value->storage.byte_size);
       push_instruction(
         instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {stack_storage, occupied_value->storage}}}
@@ -3389,7 +3386,7 @@ call_function_overload(
   // we do not use any of them for the temporaries
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
-    register_bitset_unset(&context->builder->register_occupied_bitset, reg_index);
+    register_bitset_unset(&builder->register_occupied_bitset, reg_index);
   }
 
   // :ArgumentRegisterAcquire
@@ -3416,13 +3413,13 @@ call_function_overload(
       case Storage_Tag_Register:
       case Storage_Tag_Xmm: {
         Register reg_index = target_storage.Register.index;
-        register_acquire(context->builder, reg_index);
+        register_acquire(builder, reg_index);
         register_bitset_set(&argument_register_bit_set, reg_index);
       } break;
       case Storage_Tag_Memory: {
         if (target_storage.Memory.location.tag == Memory_Location_Tag_Indirect) {
           Register reg_index = target_storage.Memory.location.Indirect.base_register;
-          register_acquire(context->builder, reg_index);
+          register_acquire(builder, reg_index);
           register_bitset_set(&argument_register_bit_set, reg_index);
         }
       } break;
@@ -3452,9 +3449,9 @@ call_function_overload(
       MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     } else {
       // Large values are copied to the stack and passed by a reference
-      Value *stack_value = reserve_stack(context, source_descriptor, *source_range);
+      Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
       MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
-      load_address(context, source_range, target_arg, stack_value->storage);
+      load_address(context, builder, source_range, target_arg, stack_value->storage);
     }
     Slice name = target_arg_definition->name;
     if (name.length) {
@@ -3474,7 +3471,7 @@ call_function_overload(
     if (result_value->storage.tag == Storage_Tag_Memory) {
       result_operand = result_value->storage;
     } else {
-      result_operand = reserve_stack(context, descriptor->returns.descriptor, *source_range)->storage;
+      result_operand = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range)->storage;
     }
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
@@ -3502,12 +3499,12 @@ call_function_overload(
   // :ArgumentRegisterAcquire
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(argument_register_bit_set, reg_index)) continue;
-    register_bitset_unset(&context->builder->register_occupied_bitset, reg_index);
+    register_bitset_unset(&builder->register_occupied_bitset, reg_index);
   }
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
-    register_acquire(context->builder, reg_index);
+    register_acquire(builder, reg_index);
 
     // :NoSaveResult
     if (storage_is_register_index(&result_value->storage, reg_index)) continue;
@@ -3552,7 +3549,7 @@ token_handle_function_call(
     (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time)
   ) {
     Expected_Result expected_result = expected_result_static(target_descriptor);
-    Value *target = value_force(context, context->builder, &expected_result, target_expression);
+    Value *target = value_force(context, 0, &expected_result, target_expression);
     MASS_ON_ERROR(*context->result) return 0;
     Descriptor *non_compile_time_descriptor = allocator_allocate(context->allocator, Descriptor);
     *non_compile_time_descriptor = *target->descriptor;
@@ -3568,17 +3565,8 @@ token_handle_function_call(
     return compile_time_eval(context, fake_eval_view);
   }
 
-  u64 instruction_count = dyn_array_length(context->builder->code_block.instructions);
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   MASS_ON_ERROR(*context->result) goto err;
-  if(instruction_count != dyn_array_length(context->builder->code_block.instructions)) {
-    // token_match_call_arguments is expected to use lazy evaluation, i.e. not produce
-    // any actual instructions in the current block. Such eager evaluations would be
-    // wasteful as before the function prototype is known we don't know the storage for
-    // each of the arguments. It also might end up stomping a registers for one of the
-    // previous arguments when calculating the next one.
-    panic("unepexpected eager evaluation of function arguments");
-  }
 
   if (target_expression->descriptor == &descriptor_macro_capture) {
     u64 arg_count = dyn_array_length(args);
@@ -3690,6 +3678,7 @@ token_handle_function_call(
 static inline Value *
 extend_integer_value(
   Execution_Context *context,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value *value,
   const Descriptor *target_descriptor
@@ -3697,8 +3686,8 @@ extend_integer_value(
   assert(descriptor_is_integer(value->descriptor));
   assert(descriptor_is_integer(target_descriptor));
   assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
-  Value *result = reserve_stack(context, target_descriptor, *source_range);
-  move_value(context->allocator, context->builder, source_range, &result->storage, &value->storage);
+  Value *result = reserve_stack(context, builder, target_descriptor, *source_range);
+  move_value(context->allocator, builder, source_range, &result->storage, &value->storage);
   return result;
 }
 
@@ -3802,6 +3791,7 @@ large_enough_common_integer_descriptor_for_values(
 static void
 maybe_resize_values_for_integer_math_operation(
   Execution_Context *context,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value **lhs_pointer,
   Value **rhs_pointer
@@ -3817,14 +3807,14 @@ maybe_resize_values_for_integer_math_operation(
     if (ld == &descriptor_number_literal) {
       *lhs_pointer = maybe_coerce_number_literal_to_integer(context, *lhs_pointer, result_descriptor);
     } else {
-      *lhs_pointer = extend_integer_value(context, source_range, *lhs_pointer, result_descriptor);
+      *lhs_pointer = extend_integer_value(context, builder, source_range, *lhs_pointer, result_descriptor);
     }
   }
   if (rd != result_descriptor) {
     if (rd == &descriptor_number_literal) {
       *rhs_pointer = maybe_coerce_number_literal_to_integer(context, *rhs_pointer, result_descriptor);
     } else {
-      *rhs_pointer = extend_integer_value(context, source_range, *rhs_pointer, result_descriptor);
+      *rhs_pointer = extend_integer_value(context, builder, source_range, *rhs_pointer, result_descriptor);
     }
   }
 }
@@ -3832,6 +3822,7 @@ maybe_resize_values_for_integer_math_operation(
 static Storage
 storage_load_index_address(
   Execution_Context *context,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value *target,
   const Descriptor *item_descriptor,
@@ -3859,33 +3850,30 @@ storage_load_index_address(
   }
 
   // @Volatile :TemporaryRegisterForIndirectMemory
-  Value *new_base_register = value_temporary_register_for_descriptor(
-    context, &descriptor_s64, index_value->source_range
+  Value *new_base = value_temporary_register_for_descriptor(
+    context, builder, &descriptor_s64, index_value->source_range
   );
 
   // Move the index into the register
-  move_value(
-    context->allocator,
-    context->builder,
-    source_range,
-    &new_base_register->storage,
-    &index_value->storage
-  );
+  move_value(context->allocator, builder, source_range, &new_base->storage, &index_value->storage);
 
   Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
 
   // Multiply index by the item byte size
   Value *reg_byte_size_value = value_temporary_register_for_descriptor(
-    context, &descriptor_s64, index_value->source_range
+    context, builder, &descriptor_s64, index_value->source_range
   );
   move_value(
-    context->allocator, context->builder, source_range,
+    context->allocator, builder, source_range,
     &reg_byte_size_value->storage, &byte_size_value->storage
   );
 
   push_instruction(
-    &context->builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {imul, {new_base_register->storage, reg_byte_size_value->storage}}}
+    &builder->code_block.instructions, *source_range,
+    (Instruction) {
+      .tag = Instruction_Tag_Assembly,
+      .Assembly = {imul, {new_base->storage, reg_byte_size_value->storage}}
+    }
   );
 
   {
@@ -3895,30 +3883,24 @@ storage_load_index_address(
 
     // Load previous address into a temp register
     Value *temp_value = value_temporary_register_for_descriptor(
-      context, &descriptor_s64, index_value->source_range
+      context, builder, &descriptor_s64, index_value->source_range
     );
 
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
-      move_value(
-        context->allocator,
-        context->builder,
-        source_range,
-        &temp_value->storage,
-        &target->storage
-      );
+      move_value(context->allocator, builder, source_range, &temp_value->storage, &target->storage);
     } else {
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-      load_address(context, source_range, temp_value, target->storage);
+      load_address(context, builder, source_range, temp_value, target->storage);
     }
     push_instruction(
-      &context->builder->code_block.instructions, *source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {new_base_register->storage, temp_value->storage}}}
+      &builder->code_block.instructions, *source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {new_base->storage, temp_value->storage}}}
     );
-    value_release_if_temporary(context->builder, temp_value);
+    value_release_if_temporary(builder, temp_value);
   }
-  value_release_if_temporary(context->builder, reg_byte_size_value);
+  value_release_if_temporary(builder, reg_byte_size_value);
 
-  return storage_indirect(item_byte_size, new_base_register->storage.Register.index);
+  return storage_indirect(item_byte_size, new_base->storage.Register.index);
 }
 
 #define MASS_ARITHMETIC_OPERATOR(APPLY)\
@@ -3980,13 +3962,15 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
-      Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, result_range);
+      Value *temp_a =
+        value_temporary_register_for_descriptor(context, builder, descriptor, result_range);
 
       Expected_Result expected_a = expected_result_from_value(temp_a);
       temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, result_range);
+      Value *temp_b =
+        value_temporary_register_for_descriptor(context, builder, descriptor, result_range);
       Expected_Result expected_b = expected_result_from_value(temp_b);
       temp_b = value_force(context, builder, &expected_b, payload->rhs);
 
@@ -3995,10 +3979,10 @@ mass_handle_arithmetic_operation_lazy_proc(
       const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
 
       push_instruction(
-        &context->builder->code_block.instructions, result_range,
+        &builder->code_block.instructions, result_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
       );
-      value_release_if_temporary(context->builder, temp_b);
+      value_release_if_temporary(builder, temp_b);
 
       // temp_a is used as a result so it is intentionnaly not released
       return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_a);
@@ -4025,7 +4009,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       Value *temp_a = value_specific_temporary_register_for_descriptor(
-        context, Register_A, descriptor, result_range
+        context, builder, Register_A, descriptor, result_range
       );
       temp_a->is_temporary = true;
       Expected_Result expected_a = expected_result_from_value(temp_a);
@@ -4080,13 +4064,13 @@ mass_handle_arithmetic_operation_lazy_proc(
       }
 
       Value *temp_dividend = value_specific_temporary_register_for_descriptor(
-        context, Register_A, descriptor, result_range
+        context, builder, Register_A, descriptor, result_range
       );
       Expected_Result expected_dividend = expected_result_from_value(temp_dividend);
       temp_dividend = value_force(context, builder, &expected_dividend, payload->lhs);
 
       Value *temp_divisor = value_temporary_register_for_descriptor(
-        context, descriptor, payload->rhs->source_range
+        context, builder, descriptor, payload->rhs->source_range
       );
       Expected_Result expected_divisor = expected_result_from_value(temp_divisor);
       temp_divisor = value_force(context, builder, &expected_divisor, payload->rhs);
@@ -4129,7 +4113,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_al, reg_ah}}});
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
-          move_value(context->allocator, context->builder, &result_range, &temp_dividend->storage, &reg_d);
+          move_value(context->allocator, builder, &result_range, &temp_dividend->storage, &reg_d);
         }
       }
 
@@ -4164,7 +4148,7 @@ mass_handle_arithmetic_operation(
     Expected_Result expected_result = expected_result_static(descriptor);
     Mass_Arithmetic_Operator_Lazy_Payload lazy_payload =
       { .lhs = lhs, .rhs = rhs, .operator = operator };
-    return mass_handle_arithmetic_operation_lazy_proc(context, context->builder, &expected_result, &lazy_payload);
+    return mass_handle_arithmetic_operation_lazy_proc(context, 0, &expected_result, &lazy_payload);
   } else {
     Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
       allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
@@ -4286,27 +4270,29 @@ mass_handle_comparison_operation_lazy_proc(
 
   // Try to reuse result_value if we can
   // TODO should also be able to reuse memory operands
-  Value *temp_a = value_temporary_register_for_descriptor(context, descriptor, *source_range);
+  Value *temp_a =
+    value_temporary_register_for_descriptor(context, builder, descriptor, *source_range);
 
   Expected_Result expected_a = expected_result_from_value(temp_a);
   temp_a = value_force(context, builder, &expected_a, payload->lhs);
 
   // TODO This can be optimized in cases where one of the operands is an immediate
-  Value *temp_b = value_temporary_register_for_descriptor(context, descriptor, *source_range);
+  Value *temp_b =
+    value_temporary_register_for_descriptor(context, builder, descriptor, *source_range);
   Expected_Result expected_b = expected_result_from_value(temp_b);
   temp_b = value_force(context, builder, &expected_b, payload->rhs);
 
   MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(
-    &context->builder->code_block.instructions, *source_range,
+    &builder->code_block.instructions, *source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {temp_a->storage, temp_b->storage, 0}}}
   );
 
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
 
-  value_release_if_temporary(context->builder, temp_a);
-  value_release_if_temporary(context->builder, temp_b);
+  value_release_if_temporary(builder, temp_a);
+  value_release_if_temporary(builder, temp_b);
 
   return expected_result_ensure_value_or_temp(context, builder, expected_result, comparison_value);
 }
@@ -4330,7 +4316,7 @@ mass_handle_comparison_operation(
     Expected_Result expected_result = expected_result_static(descriptor);
     Mass_Comparison_Operator_Lazy_Payload lazy_payload =
       { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
-    return mass_handle_comparison_operation_lazy_proc(context, context->builder, &expected_result, &lazy_payload);
+    return mass_handle_comparison_operation_lazy_proc(context, 0, &expected_result, &lazy_payload);
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
@@ -4381,7 +4367,7 @@ mass_handle_address_of_lazy_proc(
 ) {
   // FIXME :ExpectedExact
   Value *result_value = value_from_exact_expected_result(expected_result);
-  load_address(context, &result_value->source_range, result_value, pointee->storage);
+  load_address(context, builder, &result_value->source_range, result_value, pointee->storage);
   return result_value;
 }
 
@@ -4703,11 +4689,11 @@ mass_handle_field_access_lazy_proc(
       is_temporary = false;
     } else {
       base_storage = storage_register_for_descriptor(
-        register_acquire_temp(context->builder), struct_->descriptor
+        register_acquire_temp(builder), struct_->descriptor
       );
       move_value(
         context->allocator,
-        context->builder,
+        builder,
         &struct_->source_range,
         &base_storage,
         &struct_->storage
@@ -4762,7 +4748,8 @@ mass_handle_array_access_lazy_proc(
   Value *array_element_value;
   if (array->descriptor->tag == Descriptor_Tag_Pointer_To) {
     const Descriptor *item_descriptor = array->descriptor->Pointer_To.descriptor;
-    Storage storage = storage_load_index_address(context, array_range, array, item_descriptor, index);
+    Storage storage =
+      storage_load_index_address(context, builder, array_range, array, item_descriptor, index);
     array_element_value = value_make(context, item_descriptor, storage, *array_range);
     // @Volatile :TemporaryRegisterForIndirectMemory
     // We have to mark this value as temporary so it is correctly released, but the whole
@@ -4787,7 +4774,7 @@ mass_handle_array_access_lazy_proc(
       array_element_value->storage.Memory.location.Indirect.offset = index_number * item_byte_size;
     } else {
       array_element_value->storage =
-        storage_load_index_address(context, array_range, array, item_descriptor, index);
+        storage_load_index_address(context, builder, array_range, array, item_descriptor, index);
       // @Volatile :TemporaryRegisterForIndirectMemory
       array_element_value->is_temporary = true;
     }
@@ -4834,7 +4821,7 @@ mass_handle_dot_operator(
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs->descriptor == &descriptor_scope) {
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(context->builder, module_scope, field_name);
+      Value *lookup = scope_lookup_force(0, module_scope, field_name);
       if (!lookup) {
         //scope_print_names(module_scope);
         context_error(context, (Mass_Error) {
@@ -4987,7 +4974,7 @@ mass_handle_if_expression_lazy_proc(
   }
 
   Label_Index else_label = make_if(
-    context, &context->builder->code_block.instructions, &condition->source_range, condition
+    context, &builder->code_block.instructions, &condition->source_range, condition
   );
 
   Value *result_value = value_force(context, builder, expected_result, then);
@@ -4995,7 +4982,7 @@ mass_handle_if_expression_lazy_proc(
 
   if (result_value->storage.tag == Storage_Tag_Static) {
     Value *stack_result =
-      reserve_stack(context, result_value->descriptor, result_value->source_range);
+      reserve_stack(context, builder, result_value->descriptor, result_value->source_range);
     MASS_ON_ERROR(assign(context, builder, stack_result, result_value));
     result_value = stack_result;
   }
@@ -5003,12 +4990,12 @@ mass_handle_if_expression_lazy_proc(
   Label_Index after_label =
     make_label(context->program, &context->program->memory.code, slice_literal("if end"));
   push_instruction(
-    &context->builder->code_block.instructions, *dummy_range,
+    &builder->code_block.instructions, *dummy_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {code_label32(after_label), 0, 0}}}
   );
 
   push_instruction(
-    &context->builder->code_block.instructions, *dummy_range,
+    &builder->code_block.instructions, *dummy_range,
     (Instruction) {.tag = Instruction_Tag_Label, .Label.index = else_label}
   );
 
@@ -5017,7 +5004,7 @@ mass_handle_if_expression_lazy_proc(
   MASS_ON_ERROR(*context->result) return 0;
 
   push_instruction(
-    &context->builder->code_block.instructions, *dummy_range,
+    &builder->code_block.instructions, *dummy_range,
     (Instruction) {.tag = Instruction_Tag_Label, .Label.index = after_label}
   );
 
@@ -5319,8 +5306,7 @@ mass_handle_block_lazy_proc(
   Value *result_value = 0;
   for (u64 i = 0; i < statement_count; ++i) {
     MASS_ON_ERROR(*context->result) return 0;
-    u64 registers_before =
-      context->builder ? context->builder->register_occupied_bitset : 0;
+    u64 registers_before = builder ? builder->register_occupied_bitset : 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
     // Saving this source range for debugging because it will get overwritten when lazy is forced
     Source_Range debug_source_range = lazy_statement->source_range;
@@ -5335,10 +5321,10 @@ mass_handle_block_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
     // We do not do cross-statement register allocation so can check that there
     // are no stray registers retained across statement boundaries
-    if(context->builder && registers_before != context->builder->register_occupied_bitset) {
+    if(builder && registers_before != builder->register_occupied_bitset) {
       for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
         bool before = register_bitset_get(registers_before, reg_index);
-        bool after = register_bitset_get(context->builder->register_occupied_bitset, reg_index);
+        bool after = register_bitset_get(builder->register_occupied_bitset, reg_index);
         if (before != after) {
           if (after) {
             printf("Unreleased %s\n", register_name(reg_index));
@@ -5533,7 +5519,7 @@ mass_handle_label_lazy_proc(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, source_range,
+    &builder->code_block.instructions, source_range,
     (Instruction) {
       .tag = Instruction_Tag_Label,
       .Label.index = *storage_static_as_c_type(&label_value->storage, Label_Index),
@@ -5618,7 +5604,7 @@ mass_handle_explicit_return_lazy_proc(
   assert(storage_is_label(&return_label->storage));
 
   push_instruction(
-    &context->builder->code_block.instructions,
+    &builder->code_block.instructions,
     fn_return->source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label->storage, 0, 0}}}
   );
@@ -5667,9 +5653,9 @@ token_match_fixed_array_type(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(type, .tag = Token_Pattern_Tag_Symbol);
+  Token_Match(type, .tag = Token_Pattern_Tag_Any);
   Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  Value *type_value = scope_lookup_force(context->builder, context->scope, value_as_symbol(type)->name);
+  Value *type_value = compile_time_eval(context, value_view_single(&type));
   const Descriptor *descriptor = value_ensure_type(context, type_value, view.source_range);
 
   Value_View size_view = value_as_group(square_brace)->children;
@@ -5741,7 +5727,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   }
 
   push_instruction(
-    &context->builder->code_block.instructions, args_token->source_range,
+    &builder->code_block.instructions, args_token->source_range,
     (Instruction) { .tag = Instruction_Tag_Bytes, .Bytes = bytes, .scope = context->scope, }
   );
 
@@ -5803,7 +5789,7 @@ token_maybe_parse_definition(
   const Descriptor *descriptor = token_match_type(context, rest);
   MASS_ON_ERROR(*context->result) return 0;
   Source_Range name_range = name_token->source_range;
-  Value *stack_value = reserve_stack(context, descriptor, name_range);
+  Value *stack_value = reserve_stack(context, context->builder, descriptor, name_range);
   Slice name = value_as_symbol(name_token)->name;
   scope_define_value(context->scope, name_range, name, stack_value);
   *match_length = peek_index;
@@ -5894,12 +5880,12 @@ mass_handle_assignment_lazy_proc(
     assert(payload->expression->descriptor != &descriptor_lazy_value);
     // TODO make sure the function is not overloaded or resolve overload based on the target type
     Storage fn_storage = ensure_compiled_function_body(context, payload->expression);
-    load_address(context, &payload->source_range, target, fn_storage);
+    load_address(context, builder, &payload->source_range, target, fn_storage);
   } else {
     Expected_Result expected_assignment = expected_result_from_value(target);
     target = value_force(context, builder, &expected_assignment, payload->expression);
   }
-  value_release_if_temporary(context->builder, target);
+  value_release_if_temporary(builder, target);
 
   return expected_result_validate(expected_result, &void_value);
 }
@@ -5933,7 +5919,7 @@ token_define_local_variable(
   if (descriptor == &descriptor_void) {
     variable = value_make(context, stack_descriptor, storage_none, *source_range);
   } else {
-    variable = reserve_stack(context, stack_descriptor, *source_range);
+    variable = reserve_stack(context, context->builder, stack_descriptor, *source_range);
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;
@@ -6313,7 +6299,7 @@ program_parse(
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
   Value *block_result = token_parse_block_view(context, tokens);
   Expected_Result expected_target = expected_result_from_value(&void_value);
-  (void)value_force(context, context->builder, &expected_target, block_result);
+  (void)value_force(context, 0, &expected_target, block_result);
   return *context->result;
 }
 

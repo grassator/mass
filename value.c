@@ -1236,18 +1236,19 @@ static inline Value *
 value_specific_temporary_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
+  Function_Builder *builder,
   Register reg,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  register_acquire(context->builder, reg);
+  register_acquire(builder, reg);
   Value *value = value_make_internal(
     compiler_source_location, context, descriptor,
     storage_register_for_descriptor(reg, descriptor),
     source_range
   );
   value->is_temporary = true;
-  context->builder->register_occupied_values[reg] = value;
+  builder->register_occupied_values[reg] = value;
   return value;
 }
 
@@ -1258,13 +1259,15 @@ static inline Value *
 value_temporary_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
+  Function_Builder *builder,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
   return value_specific_temporary_register_for_descriptor_internal(
     compiler_source_location,
     context,
-    register_find_available(context->builder),
+    builder,
+    register_find_available(builder),
     descriptor,
     source_range
   );

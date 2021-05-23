@@ -142,6 +142,7 @@ compare(
 static void
 load_address(
   Execution_Context *context,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value *result_value,
   Storage storage
