@@ -1230,7 +1230,7 @@ spec("source") {
       check(checker(spec_callback) == 42);
     }
 
-    it("should not be able to use runtime values in a static context") {
+    xit("should not be able to use runtime values in a static context") {
       test_program_inline_source_base(
         "test", &test_context,
         "fn test() -> (s64) { foo := 42; @( foo ) }"

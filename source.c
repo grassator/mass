@@ -5784,7 +5784,11 @@ mass_handle_variable_definition_lazy_proc(
   const Expected_Result *expected_result,
   Mass_Variable_Definition_Lazy_Payload *payload
 ) {
-  return reserve_stack(context, builder, payload->descriptor, payload->name_token->source_range);
+  if (payload->descriptor == &descriptor_void) {
+    return value_make(context, payload->descriptor, storage_none, payload->name_token->source_range);
+  } else {
+    return reserve_stack(context, builder, payload->descriptor, payload->name_token->source_range);
+  }
 }
 
 static u64
@@ -5917,38 +5921,44 @@ token_define_local_variable(
   MASS_ON_ERROR(*context->result) return;
   const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
 
-  const Descriptor *stack_descriptor;
+  const Descriptor *variable_descriptor;
   if (descriptor == &descriptor_number_literal) {
     // x := 42 should always be initialized to s64 to avoid weird suprises
-    stack_descriptor = &descriptor_s64;
+    variable_descriptor = &descriptor_s64;
   } else if (descriptor->tag == Descriptor_Tag_Function) {
-    stack_descriptor = descriptor_pointer_to(context->allocator, descriptor);
+    variable_descriptor = descriptor_pointer_to(context->allocator, descriptor);
     ensure_compiled_function_body(context, value);
   } else {
-    stack_descriptor = descriptor;
+    variable_descriptor = descriptor;
   }
+
+  Mass_Variable_Definition_Lazy_Payload *variable_payload =
+    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+  *variable_payload = (Mass_Variable_Definition_Lazy_Payload){
+    .name_token = symbol,
+    .descriptor = variable_descriptor,
+  };
+
+  Value *variable_value = mass_make_lazy_value(
+    context, symbol->source_range, variable_payload, variable_descriptor,
+    mass_handle_variable_definition_lazy_proc
+  );
 
   const Source_Range *source_range = &symbol->source_range;
-  Value *variable;
-  if (descriptor == &descriptor_void) {
-    variable = value_make(context, stack_descriptor, storage_none, *source_range);
-  } else {
-    variable = reserve_stack(context, context->builder, stack_descriptor, *source_range);
-  }
 
   Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, *source_range, scope_name, variable);
+  scope_define_value(context->scope, *source_range, scope_name, variable_value);
 
-  Mass_Assignment_Lazy_Payload *payload =
+  Mass_Assignment_Lazy_Payload *assignment_payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
-  *payload = (Mass_Assignment_Lazy_Payload) {
+  *assignment_payload = (Mass_Assignment_Lazy_Payload) {
     .source_range = *source_range,
-    .target = variable,
+    .target = variable_value,
     .expression = value,
   };
 
   out_lazy_value->proc = mass_handle_assignment_lazy_proc;
-  out_lazy_value->payload = payload;
+  out_lazy_value->payload = assignment_payload;
 }
 
 static u64
