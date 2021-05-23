@@ -1445,9 +1445,8 @@ token_parse_single(
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    value = scope_lookup_force(context->builder, context->scope, name);
-    MASS_ON_ERROR(*context->result) return 0;
-    if (!value) {
+    Scope_Entry *entry = scope_lookup(context->scope, name);
+    if (!entry) {
       //scope_print_names(context->scope);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undefined_Variable,
@@ -1456,6 +1455,9 @@ token_parse_single(
       });
       return 0;
     }
+    assert(entry->tag == Scope_Entry_Tag_Value);
+    value = scope_entry_force(context->builder, entry);
+    MASS_ON_ERROR(*context->result) return 0;
     if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
