@@ -599,8 +599,18 @@ assign(
 }
 
 static Value *
-scope_entry_force(
+mass_handle_compile_time_eval_lazy_proc(
+  Execution_Context *context,
   Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value_View *view
+) {
+  Value *result = compile_time_eval(context, *view);
+  return expected_result_validate(expected_result, result);
+}
+
+static Value *
+scope_entry_force(
   Scope_Entry *entry
 ) {
   switch(entry->tag) {
@@ -610,6 +620,8 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Value: {
       for (Value *value = entry->Value.value; value; value = value->next_overload) {
+        // TODO consider creating a separate type for static lazy values where we do not
+        //      know what the result type is and that do not need a builder to resolve
         if (
           value->descriptor == &descriptor_lazy_value &&
           !value_or_lazy_value_descriptor(value) // defined with ::
@@ -618,7 +630,8 @@ scope_entry_force(
           Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
           Execution_Context *context = &lazy->context;
           Expected_Result expected_result = expected_result_static(lazy->descriptor);
-          Value *result = lazy->proc(context, builder, &expected_result, lazy->payload);
+          assert(lazy->proc == mass_handle_compile_time_eval_lazy_proc);
+          Value *result = lazy->proc(context, 0, &expected_result, lazy->payload);
           if (!result) return 0;
           *value = *result;
           value->next_overload = next_overload;
@@ -633,7 +646,6 @@ scope_entry_force(
 
 static Value *
 scope_lookup_force(
-  Function_Builder *builder,
   const Scope *scope,
   Slice name
 ) {
@@ -648,7 +660,7 @@ scope_lookup_force(
   }
 
   // Force lazy entries
-  if (!scope_entry_force(builder, entry)) return 0;
+  if (!scope_entry_force(entry)) return 0;
 
   assert(entry->tag == Scope_Entry_Tag_Value);
   Value *result = entry->Value.value;
@@ -664,7 +676,7 @@ scope_lookup_force(
       if (!parent) break;
       Scope_Entry *overload_entry = scope_lookup_shallow_hashed(parent, hash, name);
       if (!overload_entry) continue;
-      Value *overload = scope_entry_force(builder, overload_entry);
+      Value *overload = scope_entry_force(overload_entry);
       if (value_or_lazy_value_descriptor(overload)->tag != Descriptor_Tag_Function) {
         panic("There should only be function overloads");
       }
@@ -1445,8 +1457,9 @@ token_parse_single(
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    Scope_Entry *entry = scope_lookup(context->scope, name);
-    if (!entry) {
+    value = scope_lookup_force(context->scope, name);
+    MASS_ON_ERROR(*context->result) return 0;
+    if (!value) {
       //scope_print_names(context->scope);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undefined_Variable,
@@ -1455,9 +1468,6 @@ token_parse_single(
       });
       return 0;
     }
-    assert(entry->tag == Scope_Entry_Tag_Value);
-    value = scope_entry_force(context->builder, entry);
-    MASS_ON_ERROR(*context->result) return 0;
     if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
@@ -2128,17 +2138,6 @@ token_handle_user_defined_operator_proc(
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
   return token_parse_block(&body_context, operator->body);
-}
-
-static Value *
-mass_handle_compile_time_eval_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Value_View *view
-) {
-  Value *result = compile_time_eval(context, *view);
-  return expected_result_validate(expected_result, result);
 }
 
 static inline Value *
@@ -4823,7 +4822,7 @@ mass_handle_dot_operator(
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs->descriptor == &descriptor_scope) {
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(0, module_scope, field_name);
+      Value *lookup = scope_lookup_force(module_scope, field_name);
       if (!lookup) {
         //scope_print_names(module_scope);
         context_error(context, (Mass_Error) {
@@ -5562,7 +5561,7 @@ token_parse_statement_label(
   Scope_Entry *scope_entry = scope_lookup(context->scope, name);
   Value *value;
   if (scope_entry) {
-    value = scope_entry_force(context->builder, scope_entry);
+    value = scope_entry_force(scope_entry);
   } else {
     Scope *label_scope = context->scope;
 
@@ -5592,11 +5591,11 @@ mass_handle_explicit_return_lazy_proc(
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
-  Value *fn_return = scope_lookup_force(builder, context->scope, MASS_RETURN_VALUE_NAME);
+  Value *fn_return = scope_lookup_force(context->scope, MASS_RETURN_VALUE_NAME);
   assert(fn_return);
   MASS_ON_ERROR(assign(context, builder, fn_return, parse_result)) return 0;
 
-  Value *return_label = scope_lookup_force(builder, context->scope, MASS_RETURN_LABEL_NAME);
+  Value *return_label = scope_lookup_force(context->scope, MASS_RETURN_LABEL_NAME);
   assert(return_label);
   assert(return_label->descriptor == &descriptor_void);
   assert(storage_is_label(&return_label->storage));

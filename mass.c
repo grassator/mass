@@ -101,7 +101,7 @@ int main(s32 argc, char **argv) {
   }
 
   // FIXME use export scope for this
-  Value *main = scope_lookup_force(context.builder, root_module->own_scope, slice_literal("main"));
+  Value *main = scope_lookup_force(root_module->own_scope, slice_literal("main"));
   if (!main) {
     printf("Could not find entry point function `main`");
     return -1;
