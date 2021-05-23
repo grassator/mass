@@ -2945,27 +2945,40 @@ token_handle_c_string(
   return result_value;
 }
 
-#define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
-  _TYPE_ mass_##_TYPE_##_logical_shift_left(\
-    _TYPE_ input,\
-    u64 shift\
-  ) {\
-    return input << shift;\
-  }\
-  _TYPE_ mass_##_TYPE_##_bitwise_and(\
-    _TYPE_ a,\
-    _TYPE_ b\
-  ) {\
-    return a & b;\
-  }\
-  _TYPE_ mass_##_TYPE_##_bitwise_or(\
-    _TYPE_ a,\
-    _TYPE_ b\
-  ) {\
-    return a | b;\
-  }
-MASS_ENUMERATE_INTEGER_TYPES
-#undef MASS_PROCESS_BUILT_IN_TYPE
+static Number_Literal
+mass_number_literal_logical_shift_left(
+  Number_Literal input,
+  Number_Literal shift
+) {
+  // TODO use proper bigint / bigdecimal library
+  Number_Literal result = input;
+  result.bits = input.bits << shift.bits;
+  return result;
+}
+
+static Number_Literal
+mass_number_literal_bitwise_and(
+  Number_Literal a,
+  Number_Literal b
+) {
+  // TODO use proper bigint / bigdecimal library
+  Number_Literal result = a;
+  result.bits = a.bits & b.bits;
+  result.negative = a.negative & b.negative;
+  return result;
+}
+
+static Number_Literal
+mass_number_literal_bitwise_or(
+  Number_Literal a,
+  Number_Literal b
+) {
+  // TODO use proper bigint / bigdecimal library
+  Number_Literal result = a;
+  result.bits = a.bits | b.bits;
+  result.negative = a.negative | b.negative;
+  return result;
+}
 
 typedef struct {
   const Descriptor *target;
@@ -6253,32 +6266,23 @@ scope_define_builtins(
     scope_define_value(scope, range, slice_literal(_NAME_), value);\
   }
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
-    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
-      mass_##_TYPE_##_logical_shift_left, "logical_shift_left", &descriptor_##_TYPE_,\
-      MASS_FN_ARG_ANY_OF_TYPE("number", &descriptor_##_TYPE_),\
-      MASS_FN_ARG_ANY_OF_TYPE("shift", &descriptor_u64)\
-    )
-  MASS_ENUMERATE_INTEGER_TYPES
-  #undef MASS_PROCESS_BUILT_IN_TYPE
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_logical_shift_left, "logical_shift_left", &descriptor_number_literal,
+    MASS_FN_ARG_ANY_OF_TYPE("number", &descriptor_number_literal),
+    MASS_FN_ARG_ANY_OF_TYPE("shift", &descriptor_number_literal)
+  )
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
-    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
-      mass_##_TYPE_##_bitwise_and, "bitwise_and", &descriptor_##_TYPE_,\
-      MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\
-      MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_##_TYPE_)\
-    )
-  MASS_ENUMERATE_INTEGER_TYPES
-  #undef MASS_PROCESS_BUILT_IN_TYPE
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_bitwise_and, "bitwise_and", &descriptor_number_literal,
+    MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_number_literal),
+    MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_number_literal)
+  )
 
-  #define MASS_PROCESS_BUILT_IN_TYPE(_TYPE_, ...)\
-    MASS_DEFINE_COMPILE_TIME_FUNCTION(\
-      mass_##_TYPE_##_bitwise_or, "bitwise_or", &descriptor_##_TYPE_,\
-      MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_##_TYPE_),\
-      MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_##_TYPE_)\
-    )
-  MASS_ENUMERATE_INTEGER_TYPES
-  #undef MASS_PROCESS_BUILT_IN_TYPE
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_bitwise_or, "bitwise_or", &descriptor_number_literal,
+    MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_number_literal),
+    MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_number_literal)
+  )
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
