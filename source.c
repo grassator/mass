@@ -582,7 +582,6 @@ assign(
     }
   }
 
-  assert(source->descriptor->tag != Descriptor_Tag_Function);
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
     move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
     return *context->result;
@@ -2848,24 +2847,13 @@ compile_time_eval(
   fn_type_opaque jitted_code = c_function_from_label(jit->program, eval_label_index);
   jitted_code();
 
-  Value *temp_result = value_init(
+  return value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH, out_value->descriptor, storage_none, view.source_range
+    VALUE_STATIC_EPOCH,
+    out_value->descriptor,
+    storage_static_internal(result, result_byte_size),
+    view.source_range
   );
-  switch(out_value->descriptor->tag) {
-    case Descriptor_Tag_Pointer_To:
-    case Descriptor_Tag_Struct:
-    case Descriptor_Tag_Fixed_Size_Array:
-    case Descriptor_Tag_Opaque: {
-      temp_result->storage = storage_static_internal(result, result_byte_size);
-      break;
-    }
-    case Descriptor_Tag_Function: {
-      assert(out_value->storage.tag == Storage_Tag_None);
-      break;
-    }
-  }
-  return temp_result;
 }
 
 typedef struct {
