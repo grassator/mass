@@ -1473,8 +1473,7 @@ function_argument_storage_for_index(
   const Allocator *allocator,
   const Function_Info *function,
   const Descriptor *arg_descriptor,
-  u64 argument_index,
-  Function_Argument_Mode mode
+  u64 argument_index
 ) {
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
@@ -1497,26 +1496,15 @@ function_argument_storage_for_index(
     if (byte_size <= 8) {
       return storage_register_for_descriptor(reg, arg_descriptor);
     } else {
-      switch(mode) {
-        case Function_Argument_Mode_Call: {
-          // For the caller we pretend that the type is a pointer since we do not have references
-          const Descriptor *pointer_descriptor = descriptor_pointer_to(allocator, arg_descriptor);
-          return storage_register_for_descriptor(reg, pointer_descriptor);
+      // Large arguments are passed "by reference", i.e. their memory location in the register
+      return (Storage) {
+        .tag = Storage_Tag_Memory,
+        .byte_size = byte_size,
+        .Memory.location = {
+          .tag = Memory_Location_Tag_Indirect,
+          .Indirect = { .base_register = reg },
         }
-        case Function_Argument_Mode_Body: {
-          // Large arguments are passed "by reference", i.e. their memory location in the register
-          return (Storage) {
-            .tag = Storage_Tag_Memory,
-            .byte_size = byte_size,
-            .Memory.location = {
-              .tag = Memory_Location_Tag_Indirect,
-              .Indirect = { .base_register = reg },
-            }
-          };
-        }
-      }
-      panic("Unexpected function argument mode");
-      return (Storage){0};
+      };
     }
   } else {
     s32 offset = u64_to_s32(argument_index * 8);
@@ -1527,8 +1515,7 @@ function_argument_storage_for_index(
 static Memory_Layout
 function_arguments_memory_layout(
   const Allocator *allocator,
-  const Function_Info *function,
-  Function_Argument_Mode mode
+  const Function_Info *function
 ) {
   Memory_Layout layout = {
     .base = {0}, // FIXME provide stack location for arguments?
@@ -1543,9 +1530,7 @@ function_arguments_memory_layout(
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .Absolute = {
-        .storage = function_argument_storage_for_index(
-          allocator, function, arg->descriptor, index++, mode
-        ),
+        .storage = function_argument_storage_for_index(allocator, function, arg->descriptor, index++),
       },
       .name = arg->name,
       .descriptor = arg->descriptor,

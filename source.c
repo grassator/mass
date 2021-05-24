@@ -3404,13 +3404,26 @@ call_function_overload(
     source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
 
     const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
-    if (descriptor_byte_size(source_descriptor) <= 8) {
+    if (target_arg->storage.byte_size <= 8) {
       MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     } else {
-      // Large values are copied to the stack and passed by a reference
+      // Large values are copied to the stack and passed by reference
+      assert(target_arg->storage.tag == Storage_Tag_Memory);
+      assert(target_arg->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      Register reg_index = target_arg->storage.Memory.location.Indirect.base_register;
+      Storage reference_storage;
+      if (reg_index == Register_SP) {
+        reference_storage = target_arg->storage;
+      } else {
+        reference_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
+      }
+      Value *reference_pointer = value_init(
+        &(Value){0}, &descriptor_void_pointer, reference_storage, *source_range
+      );
+
       Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
       MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
-      load_address(context, builder, source_range, target_arg, stack_value->storage);
+      load_address(context, builder, source_range, reference_pointer, stack_value->storage);
     }
     Slice name = target_arg_definition->name;
     if (name.length) {
@@ -5114,9 +5127,7 @@ token_parse_function_literal(
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    Memory_Layout arguments_layout = function_arguments_memory_layout(
-      context->allocator, fn_info, Function_Argument_Mode_Call
-    );
+    Memory_Layout arguments_layout = function_arguments_memory_layout(context->allocator, fn_info);
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, arguments_layout);
     return value_init(
@@ -6174,9 +6185,7 @@ scope_define_builtins(
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
-    Memory_Layout arguments_layout = function_arguments_memory_layout(\
-      allocator, function, Function_Argument_Mode_Call\
-    );\
+    Memory_Layout arguments_layout = function_arguments_memory_layout(allocator, function);\
     const Descriptor *instance_descriptor =\
       descriptor_function_instance(allocator, slice_literal(_NAME_), function, arguments_layout);\
     Value *instance_value = value_init(\

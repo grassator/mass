@@ -906,9 +906,7 @@ ensure_function_instance(
   if (cached_instance[0]) return cached_instance[0];
 
   // TODO choose layout based on the target platform
-  Memory_Layout arguments_layout = function_arguments_memory_layout(
-    context->allocator, function, Function_Argument_Mode_Call
-  );
+  Memory_Layout arguments_layout = function_arguments_memory_layout(context->allocator, function);
 
   // TODO provide proper function name here if available
   Slice name = slice_literal("");
@@ -952,9 +950,7 @@ ensure_function_instance(
   body_context.epoch = get_new_epoch();
 
   {
-    Memory_Layout arguments_layout = function_arguments_memory_layout(
-      allocator_default, function, Function_Argument_Mode_Body
-    );
+    Memory_Layout arguments_layout = function_arguments_memory_layout(allocator_default, function);
 
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout.items) {
       assert(item->tag == Memory_Layout_Item_Tag_Absolute);
@@ -1067,10 +1063,11 @@ program_init_startup_code(
   Program *program = context->program;
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, 0 /* scope */);
-  Memory_Layout no_args_layout = {0};
+  Memory_Layout arguments_layout = function_arguments_memory_layout(context->allocator, fn_info);
+  Slice fn_name = slice_literal("__startup");
   Descriptor *descriptor =
-    descriptor_function_instance(context->allocator, slice_literal("__startup"), fn_info, no_args_layout);
-  Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
+    descriptor_function_instance(context->allocator, fn_name, fn_info, arguments_layout);
+  Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
   Storage storage = code_label32(fn_label);
 
   // FIXME Create a special source range for internal values
