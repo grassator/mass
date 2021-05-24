@@ -107,7 +107,7 @@ int main(s32 argc, char **argv) {
     return -1;
   }
   context.program->entry_point = main;
-  ensure_compiled_function_body(&context, main);
+  ensure_function_instance(&context, main);
   if(context.result->tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&context.result->Error.error);
   }

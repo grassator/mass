@@ -92,7 +92,7 @@ test_program_source_base(
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
   if (value && value->descriptor == &descriptor_function_literal) {
-    ensure_compiled_function_body(context, value);
+    ensure_function_instance(context, value);
   }
   return value;
 }
@@ -1711,7 +1711,7 @@ spec("source") {
         "main", &test_context, "..\\compile-time-benchmark\\folding"
       );
       check(test_program->entry_point);
-      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\folding.exe", &test_context, Executable_Type_Cli);
     }
@@ -1722,7 +1722,7 @@ spec("source") {
         "main", &test_context, "..\\compile-time-benchmark\\print"
       );
       check(test_program->entry_point);
-      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
     }
@@ -1743,7 +1743,7 @@ spec("source") {
         "main", &test_context, "fixtures\\relocations"
       );
       check(test_program->entry_point);
-      ensure_compiled_function_body(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\relocations.exe", &test_context, Executable_Type_Cli);
     }

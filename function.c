@@ -883,14 +883,15 @@ load_address(
   );
 }
 
-static Storage
-ensure_compiled_function_body(
+static Value *
+ensure_function_instance(
   Execution_Context *context,
   Value *fn_value
 ) {
   if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
-    return fn_value->storage;
+    return fn_value;
   }
+
   const Descriptor *descriptor = fn_value->descriptor;
   assert(descriptor == &descriptor_function_literal);
   // TODO figure out how to avoid the const cast here
@@ -902,7 +903,7 @@ ensure_compiled_function_body(
     ? &literal->compile_time_instance
     : &literal->runtime_instance;
 
-  if (cached_instance[0]) return cached_instance[0]->storage;
+  if (cached_instance[0]) return cached_instance[0];
 
   // TODO provide proper name here
   const Descriptor *instance_descriptor =
@@ -912,7 +913,7 @@ ensure_compiled_function_body(
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
     Storage storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     *cached_instance = value_make(context, instance_descriptor, storage, fn_value->source_range);
-    return cached_instance[0]->storage;
+    return cached_instance[0];
   }
 
   Program *program = context->program;
@@ -1000,7 +1001,7 @@ ensure_compiled_function_body(
     scope_define_value(body_scope, body_context.epoch, return_value->source_range, function->returns.name, return_value);
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
-  MASS_ON_ERROR(*context->result) return (Storage){0};
+  MASS_ON_ERROR(*context->result) return 0;
 
   value_force_exact(&body_context, builder, return_value, parse_result);
 
@@ -1009,7 +1010,7 @@ ensure_compiled_function_body(
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);
 
-  return code_label32(builder->code_block.start_label);
+  return *cached_instance;
 }
 
 
@@ -1097,16 +1098,16 @@ program_init_startup_code(
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
-    Storage label_storage = ensure_compiled_function_body(context, fn);
+    Value *instance = ensure_function_instance(context, fn);
     push_instruction(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {label_storage, 0, 0}}}
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {instance->storage, 0, 0}}}
     );
   }
-  Storage entry_label_storage = ensure_compiled_function_body(context, program->entry_point);
+  Value *entry_instance = ensure_function_instance(context, program->entry_point);
   push_instruction(
     &builder.code_block.instructions, source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {entry_label_storage, 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {entry_instance->storage, 0, 0}}}
   );
 
   program->entry_point = function;

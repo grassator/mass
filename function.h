@@ -4,8 +4,8 @@
 #include "prelude.h"
 #include "value.h"
 
-static Storage
-ensure_compiled_function_body(
+static Value *
+ensure_function_instance(
   Execution_Context *context,
   Value *fn_value
 );

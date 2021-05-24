@@ -3276,11 +3276,14 @@ call_function_overload(
   Array_Value_Ptr arguments = payload->args;
 
   Array_Instruction *instructions = &builder->code_block.instructions;
-  const Function_Info *descriptor = maybe_function_info_from_value(to_call);
-  Storage call_storage = ensure_compiled_function_body(context, to_call);
+  Value *instance = ensure_function_instance(context, to_call);
+  MASS_ON_ERROR(*context->result) return 0;
+  assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
+  const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
+  const Function_Info *fn_info = instance_descriptor->info;
 
   Value *fn_return_value = function_return_value_for_descriptor(
-    context, descriptor->returns.descriptor, Function_Argument_Mode_Call, *source_range
+    context, fn_info->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
 
   Value *result_value = 0;
@@ -3291,10 +3294,10 @@ call_function_overload(
     }
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
-      if (descriptor->returns.descriptor == &descriptor_void) {
+      if (fn_info->returns.descriptor == &descriptor_void) {
         result_value = value_make(context, &descriptor_void, storage_none, *source_range);
       } else {
-        result_value = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
+        result_value = reserve_stack(context, builder, fn_info->returns.descriptor, *source_range);
       }
       break;
     }
@@ -3350,9 +3353,9 @@ call_function_overload(
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
 
-  Scope *default_arguments_scope = scope_make(context->allocator, descriptor->scope);
-  for (u64 i = 0; i < dyn_array_length(descriptor->arguments_layout.items); ++i) {
-    Memory_Layout_Item *target_arg_definition = dyn_array_get(descriptor->arguments_layout.items, i);
+  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
+  for (u64 i = 0; i < dyn_array_length(fn_info->arguments_layout.items); ++i) {
+    Memory_Layout_Item *target_arg_definition = dyn_array_get(fn_info->arguments_layout.items, i);
     assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
 
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
@@ -3422,14 +3425,14 @@ call_function_overload(
   u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
 
   // :ReturnTypeLargerThanRegister
-  u64 return_size = descriptor_byte_size(descriptor->returns.descriptor);
+  u64 return_size = descriptor_byte_size(fn_info->returns.descriptor);
   if (return_size > 8) {
     Storage result_operand;
     // If we want the result at a memory location can just pass that address to the callee
     if (result_value->storage.tag == Storage_Tag_Memory) {
       result_operand = result_value->storage;
     } else {
-      result_operand = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range)->storage;
+      result_operand = reserve_stack(context, builder, fn_info->returns.descriptor, *source_range)->storage;
     }
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
@@ -3443,13 +3446,22 @@ call_function_overload(
     parameters_stack_size
   ));
 
-  if (call_storage.tag == Storage_Tag_Static) {
+  if (instance->storage.tag == Storage_Tag_Static) {
     // TODO it will not be safe to use this register with other calling conventions
     Storage reg = storage_register_for_descriptor(Register_A, &descriptor_void_pointer);
-    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, call_storage}}});
-    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}});
+    push_instruction(
+      instructions, *source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, instance->storage}}}
+    );
+    push_instruction(
+      instructions, *source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}}
+    );
   } else {
-    push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {call_storage, 0, 0}}});
+    push_instruction(
+      instructions, *source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {instance->storage, 0, 0}}}
+    );
   }
 
   MASS_ON_ERROR(assign(context, builder, result_value, fn_return_value)) return 0;
@@ -4301,7 +4313,7 @@ mass_handle_startup_call_lazy_proc(
   if (dyn_array_length(literal->info->arguments)) goto err;
   if (literal->info->returns.descriptor != &descriptor_void) goto err;
 
-  ensure_compiled_function_body(context, startup_function);
+  ensure_function_instance(context, startup_function);
   dyn_array_push(context->program->startup_functions, startup_function);
 
   return expected_result_validate(expected_result, &void_value);
