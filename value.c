@@ -272,8 +272,8 @@ same_type(
         same_type(b->Pointer_To.descriptor->Fixed_Size_Array.item, a->Pointer_To.descriptor)
       ) return true;
       if (
-        a->Pointer_To.descriptor->tag == Descriptor_Tag_Void ||
-        b->Pointer_To.descriptor->tag == Descriptor_Tag_Void
+        a->Pointer_To.descriptor == &descriptor_void ||
+        b->Pointer_To.descriptor == &descriptor_void
       ) {
         return true;
       }
@@ -283,7 +283,6 @@ same_type(
       return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
         a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
     }
-    case Descriptor_Tag_Void:
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Struct: {
       return a == b;
@@ -565,6 +564,10 @@ storage_static_inline_internal(
     .byte_size = byte_size,
   };
   switch(byte_size) {
+    case 0: {
+      result.Static.memory.tag = Static_Memory_Tag_U64;
+      break;
+    }
     case 1: {
       result.Static.memory.tag = Static_Memory_Tag_U8;
       result.Static.memory.U8.value = *(u8 *)value;
@@ -756,7 +759,6 @@ storage_static_equal_internal(
   }
   u64 byte_size = descriptor_byte_size(a_descriptor);
   switch(a_descriptor->tag) {
-    case Descriptor_Tag_Void: return true;
     // Opaques and pointers can be compared with memcmp
     case Descriptor_Tag_Opaque:
     case Descriptor_Tag_Pointer_To: {

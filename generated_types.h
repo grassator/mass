@@ -984,12 +984,11 @@ typedef struct Function_Info {
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
 typedef enum {
-  Descriptor_Tag_Void = 0,
-  Descriptor_Tag_Opaque = 1,
-  Descriptor_Tag_Function = 2,
-  Descriptor_Tag_Fixed_Size_Array = 3,
-  Descriptor_Tag_Struct = 4,
-  Descriptor_Tag_Pointer_To = 5,
+  Descriptor_Tag_Opaque = 0,
+  Descriptor_Tag_Function = 1,
+  Descriptor_Tag_Fixed_Size_Array = 2,
+  Descriptor_Tag_Struct = 3,
+  Descriptor_Tag_Pointer_To = 4,
 } Descriptor_Tag;
 
 typedef struct Descriptor_Function {
@@ -3175,12 +3174,11 @@ MASS_DEFINE_TYPE_VALUE(function_info);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
-{ .name = slice_literal_fields("Void"), .value = 0 },
-{ .name = slice_literal_fields("Opaque"), .value = 1 },
-{ .name = slice_literal_fields("Function"), .value = 2 },
-{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 3 },
-{ .name = slice_literal_fields("Struct"), .value = 4 },
-{ .name = slice_literal_fields("Pointer_To"), .value = 5 },
+{ .name = slice_literal_fields("Opaque"), .value = 0 },
+{ .name = slice_literal_fields("Function"), .value = 1 },
+{ .name = slice_literal_fields("Fixed_Size_Array"), .value = 2 },
+{ .name = slice_literal_fields("Struct"), .value = 3 },
+{ .name = slice_literal_fields("Pointer_To"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function, Descriptor_Function,
   {

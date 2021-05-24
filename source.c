@@ -471,7 +471,7 @@ assign(
   if (target->storage.tag == Storage_Tag_Eflags) {
     panic("Internal Error: Trying to move into Eflags");
   }
-  if (target->descriptor->tag == Descriptor_Tag_Void) {
+  if (target->descriptor == &descriptor_void) {
     return *context->result;
   }
 
@@ -2880,10 +2880,6 @@ compile_time_eval(
     VALUE_STATIC_EPOCH, out_value->descriptor, storage_none, view.source_range
   );
   switch(out_value->descriptor->tag) {
-    case Descriptor_Tag_Void: {
-      temp_result->storage = storage_none;
-      break;
-    }
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Struct:
     case Descriptor_Tag_Fixed_Size_Array:
@@ -3282,7 +3278,7 @@ call_function_macro(
         return_descriptor = expected_result_descriptor(expected_result);
       }
       // FIXME :ExpectedStack
-      result_value = return_descriptor->tag == Descriptor_Tag_Void
+      result_value = return_descriptor == &descriptor_void
         ? &void_value
         : reserve_stack(context, builder, return_descriptor, fn_value->source_range);
       break;
@@ -3347,7 +3343,7 @@ call_function_overload(
     }
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
-      if (descriptor->returns.descriptor->tag == Descriptor_Tag_Void) {
+      if (descriptor->returns.descriptor == &descriptor_void) {
         result_value = value_make(context, &descriptor_void, storage_none, *source_range);
       } else {
         result_value = reserve_stack(context, builder, descriptor->returns.descriptor, *source_range);
@@ -5637,8 +5633,7 @@ token_parse_explicit_return(
   Value *parse_result = token_parse_expression(context, rest, &(u64){0}, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(parse_result);
 
-  bool is_void = descriptor->tag == Descriptor_Tag_Void;
-  if (!is_void && !has_return_expression) {
+  if (descriptor == &descriptor_void && !has_return_expression) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = parse_result->source_range,

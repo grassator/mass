@@ -115,7 +115,7 @@ typedef struct {
 #include "generated_types.h"
 
 static Descriptor descriptor_void = {
-  .tag = Descriptor_Tag_Void,
+  .tag = Descriptor_Tag_Opaque,
   .name = slice_literal_fields("void"),
 };
 MASS_DEFINE_POINTER_DESCRIPTOR(void);

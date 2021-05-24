@@ -1141,7 +1141,6 @@ main(void) {
   }));
 
   push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
-    struct_empty("Void"),
     struct_empty("Opaque"),
     struct_fields("Function", (Struct_Item[]){
       { "Function_Info", "info" },

@@ -688,7 +688,7 @@ function_return_value_for_descriptor(
   Function_Argument_Mode mode,
   Source_Range source_range
 ) {
-  if (descriptor->tag == Descriptor_Tag_Void) {
+  if (descriptor == &descriptor_void) {
     return &void_value;
   }
   // TODO handle 16 byte non-float return values in XMM0
