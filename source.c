@@ -3438,13 +3438,8 @@ call_function_overload(
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(fn_info->returns.descriptor);
   if (return_size > 8) {
-    Storage result_operand;
-    // If we want the result at a memory location can just pass that address to the callee
-    if (result_value->storage.tag == Storage_Tag_Memory) {
-      result_operand = result_value->storage;
-    } else {
-      result_operand = reserve_stack(context, builder, fn_info->returns.descriptor, *source_range)->storage;
-    }
+    Storage result_operand =
+      reserve_stack(context, builder, fn_info->returns.descriptor, *source_range)->storage;
     Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
     push_instruction(
       instructions, *source_range,
