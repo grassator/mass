@@ -1884,9 +1884,6 @@ token_match_argument(
     descriptor = token_match_type(context, type_expression);
   }
 
-  if (descriptor && descriptor->tag == Descriptor_Tag_Function) {
-    descriptor = descriptor_pointer_to(context->allocator, descriptor);
-  }
   arg = (Function_Argument) {
     .name = value_as_symbol(name_token)->name,
     .descriptor = descriptor,

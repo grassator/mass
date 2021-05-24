@@ -888,7 +888,7 @@ ensure_compiled_function_body(
   Execution_Context *context,
   Value *fn_value
 ) {
-  if (fn_value->descriptor->tag == Descriptor_Tag_Pointer_To) {
+  if (fn_value->descriptor->tag == Descriptor_Tag_Function) {
     return fn_value->storage;
   }
   const Descriptor *descriptor = fn_value->descriptor;
