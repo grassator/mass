@@ -981,7 +981,6 @@ typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
   Array_Function_Argument arguments;
-  Memory_Layout arguments_layout;
   Scope * scope;
   Function_Return returns;
 } Function_Info;
@@ -1005,6 +1004,7 @@ typedef enum {
 
 typedef struct Descriptor_Function_Instance {
   Function_Info * info;
+  Memory_Layout arguments_layout;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
@@ -3165,12 +3165,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("arguments_layout"),
-    .descriptor = &descriptor_memory_layout,
-    .Base_Relative.offset = offsetof(Function_Info, arguments_layout),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("scope"),
     .descriptor = &descriptor_scope_pointer,
     .Base_Relative.offset = offsetof(Function_Info, scope),
@@ -3227,6 +3221,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_
     .name = slice_literal_fields("info"),
     .descriptor = &descriptor_function_info_pointer,
     .Base_Relative.offset = offsetof(Descriptor_Function_Instance, info),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("arguments_layout"),
+    .descriptor = &descriptor_memory_layout,
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, arguments_layout),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);

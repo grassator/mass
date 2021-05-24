@@ -2718,9 +2718,6 @@ token_process_function_literal(
       previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
   }
-  fn_info->arguments_layout = function_arguments_memory_layout(
-    context->allocator, fn_info, Function_Argument_Mode_Call
-  );
 
   return fn_info;
 }
@@ -3354,8 +3351,9 @@ call_function_overload(
   u64 argument_register_bit_set = 0;
 
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
-  for (u64 i = 0; i < dyn_array_length(fn_info->arguments_layout.items); ++i) {
-    Memory_Layout_Item *target_arg_definition = dyn_array_get(fn_info->arguments_layout.items, i);
+  for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
+    Memory_Layout_Item *target_arg_definition =
+      dyn_array_get(instance_descriptor->arguments_layout.items, i);
     assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
 
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
@@ -5116,7 +5114,11 @@ token_parse_function_literal(
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, name, fn_info);
+    Memory_Layout arguments_layout = function_arguments_memory_layout(
+      context->allocator, fn_info, Function_Argument_Mode_Call
+    );
+    Descriptor *fn_descriptor =
+      descriptor_function_instance(context->allocator, name, fn_info, arguments_layout);
     return value_init(
       allocator_allocate(context->allocator, Value),
       &descriptor_type, storage_static(fn_descriptor), view.source_range
@@ -6172,11 +6174,11 @@ scope_define_builtins(
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
-    function->arguments_layout = function_arguments_memory_layout(\
+    Memory_Layout arguments_layout = function_arguments_memory_layout(\
       allocator, function, Function_Argument_Mode_Call\
     );\
     const Descriptor *instance_descriptor =\
-      descriptor_function_instance(allocator, slice_literal(_NAME_), function);\
+      descriptor_function_instance(allocator, slice_literal(_NAME_), function, arguments_layout);\
     Value *instance_value = value_init(\
       allocator_allocate(allocator, Value),\
       instance_descriptor, imm64((u64)_FN_), (Source_Range){0}\

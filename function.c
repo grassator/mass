@@ -905,9 +905,16 @@ ensure_function_instance(
 
   if (cached_instance[0]) return cached_instance[0];
 
-  // TODO provide proper name here
+  // TODO choose layout based on the target platform
+  Memory_Layout arguments_layout = function_arguments_memory_layout(
+    context->allocator, function, Function_Argument_Mode_Call
+  );
+
+  // TODO provide proper function name here if available
+  Slice name = slice_literal("");
+
   const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, slice_literal(""), function);
+    descriptor_function_instance(context->allocator, name, function, arguments_layout);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -1060,8 +1067,9 @@ program_init_startup_code(
   Program *program = context->program;
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, 0 /* scope */);
+  Memory_Layout no_args_layout = {0};
   Descriptor *descriptor =
-    descriptor_function_instance(context->allocator, slice_literal("__startup"), fn_info);
+    descriptor_function_instance(context->allocator, slice_literal("__startup"), fn_info, no_args_layout);
   Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
   Storage storage = code_label32(fn_label);
 

@@ -1135,7 +1135,6 @@ main(void) {
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Function_Argument", "arguments" },
-    { "Memory_Layout", "arguments_layout" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },
   }));
@@ -1151,6 +1150,7 @@ main(void) {
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
+      { "Memory_Layout", "arguments_layout" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },

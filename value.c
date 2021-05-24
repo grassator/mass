@@ -1382,7 +1382,6 @@ function_info_init(
 ) {
   *info = (Function_Info) {
     .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-    .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
     .scope = scope,
     .returns = {.descriptor = &descriptor_void},
   };
@@ -1392,7 +1391,8 @@ static inline Descriptor *
 descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
-  Function_Info *info
+  Function_Info *info,
+  Memory_Layout arguments_layout
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
@@ -1402,6 +1402,7 @@ descriptor_function_instance(
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = {
       .info = info,
+      .arguments_layout = arguments_layout,
     },
   };
   return result;
