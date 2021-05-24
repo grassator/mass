@@ -1468,6 +1468,46 @@ value_as_function(
   return 0;
 }
 
+static Value *
+function_return_value_for_descriptor(
+  Execution_Context *context,
+  const Descriptor *descriptor,
+  Function_Argument_Mode mode,
+  Source_Range source_range
+) {
+  if (descriptor == &descriptor_void) {
+    return &void_value;
+  }
+  // TODO handle 16 byte non-float return values in XMM0
+  if (descriptor_is_float(descriptor)) {
+    Storage storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
+    return value_make(context, descriptor, storage, source_range);
+  }
+  u64 byte_size = descriptor_byte_size(descriptor);
+  if (byte_size <= 8) {
+    Storage storage = storage_register_for_descriptor(Register_A, descriptor);
+    return value_make(context, descriptor, storage, source_range);
+  }
+  // :ReturnTypeLargerThanRegister
+  // Inside the function large returns are pointed to by RCX,
+  // but this pointer is also returned in A
+  Register base_register = Register_A;
+  if (mode == Function_Argument_Mode_Body) {
+    base_register = Register_C;
+  }
+  Storage storage = {
+    .tag = Storage_Tag_Memory,
+    .byte_size = byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Indirect,
+      .Indirect = {
+        .base_register = base_register,
+      }
+    }
+  };
+  return value_make(context, descriptor, storage, source_range);
+}
+
 static Storage
 function_argument_storage_for_index(
   const Allocator *allocator,
