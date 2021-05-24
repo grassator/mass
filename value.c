@@ -1517,14 +1517,6 @@ function_argument_storage_for_index(
 ) {
   u64 byte_size = descriptor_byte_size(arg_descriptor);
 
-  // :ReturnTypeLargerThanRegister
-  // If return type is larger than register, the pointer to stack location
-  // where it needs to be written to is passed as the first argument
-  // shifting registers for actual arguments by one
-  if (descriptor_byte_size(function->returns.descriptor) > 8) {
-    argument_index++;
-  }
-
   Register general_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
   Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
 
@@ -1565,7 +1557,16 @@ function_arguments_memory_layout(
       .capacity = dyn_array_length(function->arguments),
     ),
   };
+
+  // :ReturnTypeLargerThanRegister
+  // If return type is larger than register, the pointer to stack location
+  // where it needs to be written to is passed as the first argument
+  // shifting registers for actual arguments by one
   u64 index = 0;
+  if (descriptor_byte_size(function->returns.descriptor) > 8) {
+    index = 1;
+  }
+
   DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
