@@ -5827,27 +5827,18 @@ token_define_global_variable(
   } else {
     assert(value->storage.tag == Storage_Tag_Static);
 
-    if (value->descriptor->tag == Descriptor_Tag_Function) {
-      global_value = 0;
-      panic("TODO implement when relocations are available");
-      //Descriptor *fn_pointer = descriptor_pointer_to(context->allocator, value->descriptor);
-      //ensure_compiled_function_body(context, value);
-      //global_value = value_global(context, fn_pointer, rhs.source_range);
-      //load_address(context, &view.source_range, on_stack, value);
-    } else {
-      Section *section = &context->program->memory.rw_data;
-      u64 byte_size = descriptor_byte_size(value->descriptor);
-      u64 alignment = descriptor_byte_alignment(value->descriptor);
+    Section *section = &context->program->memory.rw_data;
+    u64 byte_size = descriptor_byte_size(value->descriptor);
+    u64 alignment = descriptor_byte_alignment(value->descriptor);
 
-      // TODO this should also be deduped
-      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-      global_value = value_make(
-        context, value->descriptor, data_label32(label_index, byte_size), value->source_range
-      );
+    // TODO this should also be deduped
+    Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
+    global_value = value_make(
+      context, value->descriptor, data_label32(label_index, byte_size), value->source_range
+    );
 
-      void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-      memcpy(section_memory, storage_static_as_c_type_internal(&value->storage, byte_size), byte_size);
-    }
+    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+    memcpy(section_memory, storage_static_as_c_type_internal(&value->storage, byte_size), byte_size);
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;
@@ -5871,15 +5862,9 @@ mass_handle_assignment_lazy_proc(
   Expected_Result expected_target = expected_result_any(descriptor);
   Value *target = value_force(context, builder, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
-  if (descriptor->tag == Descriptor_Tag_Function) {
-    assert(payload->expression->descriptor != &descriptor_lazy_value);
-    // TODO make sure the function is not overloaded or resolve overload based on the target type
-    Storage fn_storage = ensure_compiled_function_body(context, payload->expression);
-    load_address(context, builder, &payload->source_range, target, fn_storage);
-  } else {
-    Expected_Result expected_assignment = expected_result_from_value(target);
-    target = value_force(context, builder, &expected_assignment, payload->expression);
-  }
+
+  Expected_Result expected_assignment = expected_result_from_value(target);
+  target = value_force(context, builder, &expected_assignment, payload->expression);
   value_release_if_temporary(builder, target);
 
   return expected_result_validate(expected_result, &void_value);
