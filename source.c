@@ -3501,26 +3501,25 @@ token_handle_function_call(
   Value *target_expression = token_parse_single(context, target_token);
   MASS_ON_ERROR(*context->result) return 0;
 
+  // TODO this should probably happen after overload resolution as only some
+  //      of the overloads might be compile-time
+  const Function_Info *info = maybe_function_info_from_value(target_expression);
   if (
     target_expression->descriptor != context->current_compile_time_function_descriptor &&
-    target_expression->descriptor == &descriptor_function_literal
+    info && (info->flags & Descriptor_Function_Flags_Compile_Time)
   ) {
-    const Function_Literal *literal =
-      storage_static_as_c_type(&target_expression->storage, Function_Literal);
-    if (literal->info->flags & Descriptor_Function_Flags_Compile_Time) {
-      // This is necessary to avoid infinite recursion as the compile_time_eval called below
-      // will end up here as well. Indirect calls are allowed so we do not need a full stack
-      const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
-      context->current_compile_time_function_descriptor = target_expression->descriptor;
-      Value_View fake_eval_view = {
-        .values = (Value *[]){target_expression, args_token},
-        .length = 2,
-        .source_range = source_range,
-      };
-      Value *result = compile_time_eval(context, fake_eval_view);
-      context->current_compile_time_function_descriptor = saved_descriptor;
-      return result;
-    }
+    // This is necessary to avoid infinite recursion as the compile_time_eval called below
+    // will end up here as well. Indirect calls are allowed so we do not need a full stack
+    const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
+    context->current_compile_time_function_descriptor = target_expression->descriptor;
+    Value_View fake_eval_view = {
+      .values = (Value *[]){target_expression, args_token},
+      .length = 2,
+      .source_range = source_range,
+    };
+    Value *result = compile_time_eval(context, fake_eval_view);
+    context->current_compile_time_function_descriptor = saved_descriptor;
+    return result;
   }
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -6164,18 +6163,13 @@ scope_define_builtins(
     function->arguments_layout = function_arguments_memory_layout(\
       allocator, function, Function_Argument_Mode_Call\
     );\
-    Function_Literal *literal = allocator_allocate(allocator, Function_Literal);\
-    *literal = (Function_Literal){\
-      .info = function,\
-      .body = 0,\
-      .runtime_storage = {0},\
-      .compile_time_storage = imm64((u64)_FN_),\
-    };\
-    Value *value = value_init(\
+    const Descriptor *instance_descriptor =\
+      descriptor_function_instance(allocator, slice_literal(_NAME_), function);\
+    Value *instance_value = value_init(\
       allocator_allocate(allocator, Value),\
-      &descriptor_function_literal, storage_static(literal), (Source_Range){0}\
+      instance_descriptor, imm64((u64)_FN_), (Source_Range){0}\
     );\
-    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(_NAME_), value);\
+    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(_NAME_), instance_value);\
   }
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
