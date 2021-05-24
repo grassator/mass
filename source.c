@@ -3282,6 +3282,9 @@ call_function_overload(
   Value *fn_return_value = function_return_value_for_descriptor(
     context, fn_info->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
+  Value *fn_return_value_in_body = function_return_value_for_descriptor(
+    context, fn_info->returns.descriptor, Function_Argument_Mode_Body, *source_range
+  );
 
   Value *result_value = 0;
   switch(expected_result->tag) {
@@ -3438,13 +3441,19 @@ call_function_overload(
   // :ReturnTypeLargerThanRegister
   u64 return_size = descriptor_byte_size(fn_info->returns.descriptor);
   if (return_size > 8) {
-    Storage result_operand =
-      reserve_stack(context, builder, fn_info->returns.descriptor, *source_range)->storage;
-    Storage reg_c = storage_register_for_descriptor(Register_C, &descriptor_s64);
-    push_instruction(
-      instructions, *source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_c, result_operand}}}
+    assert(fn_return_value_in_body->storage.tag == Storage_Tag_Memory);
+    assert(fn_return_value_in_body->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+    Register reg_index = fn_return_value_in_body->storage.Memory.location.Indirect.base_register;
+    assert(reg_index != Register_SP);
+
+    Storage reference_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
+    Value *reference_pointer = value_init(
+      &(Value){0}, &descriptor_void_pointer, reference_storage, *source_range
     );
+
+    Value *stack_value =
+      reserve_stack(context, builder, fn_return_value_in_body->descriptor, *source_range);
+    load_address(context, builder, source_range, reference_pointer, stack_value->storage);
   }
 
   builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
