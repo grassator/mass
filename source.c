@@ -3282,9 +3282,6 @@ call_function_overload(
   Value *fn_return_value = function_return_value_for_descriptor(
     context, fn_info->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
-  Value *fn_return_value_in_body = function_return_value_for_descriptor(
-    context, fn_info->returns.descriptor, Function_Argument_Mode_Body, *source_range
-  );
 
   Value *result_value = 0;
   switch(expected_result->tag) {
@@ -3337,7 +3334,7 @@ call_function_overload(
         instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_reg_storage, original_reg_storage}}}
       );
-      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;;
+      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;
     } else {
       panic("Unexpected storage tag for an argument");
     }
@@ -3394,20 +3391,23 @@ call_function_overload(
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
-      Function_Argument *declared_argument = dyn_array_get(fn_info->arguments, i);
-      Value_View default_expression = declared_argument->maybe_default_expression;
-      assert(default_expression.length);
-      Execution_Context arg_context = *context;
-      arg_context.scope = default_arguments_scope;
-      source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-      MASS_ON_ERROR(*arg_context.result) return 0;
+      if (target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized) {
+        source_arg = &void_value;
+      } else {
+        Function_Argument *declared_argument = dyn_array_get(fn_info->arguments, i);
+        Value_View default_expression = declared_argument->maybe_default_expression;
+        assert(default_expression.length);
+        Execution_Context arg_context = *context;
+        arg_context.scope = default_arguments_scope;
+        source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+        MASS_ON_ERROR(*arg_context.result) return 0;
+      }
     } else {
       source_arg = *dyn_array_get(arguments, i);
     }
 
     source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
 
-    const Descriptor *source_descriptor = value_or_lazy_value_descriptor(source_arg);
     if (target_arg->storage.byte_size <= 8) {
       MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     } else {
@@ -3425,8 +3425,10 @@ call_function_overload(
         &(Value){0}, &descriptor_void_pointer, reference_storage, *source_range
       );
 
-      Value *stack_value = reserve_stack(context, builder, source_descriptor, *source_range);
-      MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
+      Value *stack_value = reserve_stack(context, builder, target_arg->descriptor, *source_range);
+      if (!(target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized)) {
+        MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
+      }
       load_address(context, builder, source_range, reference_pointer, stack_value->storage);
     }
     Slice name = target_arg_definition->name;
@@ -3437,27 +3439,7 @@ call_function_overload(
 
   // If we call a function, then we need to reserve space for the home
   // area of at least 4 arguments?
-  u64 parameters_stack_size = u64_max(4, dyn_array_length(arguments)) * 8;
-
-  // :ReturnTypeLargerThanRegister
-  u64 return_size = descriptor_byte_size(fn_info->returns.descriptor);
-  if (return_size > 8) {
-    assert(fn_return_value_in_body->storage.tag == Storage_Tag_Memory);
-    assert(fn_return_value_in_body->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-    Register reg_index = fn_return_value_in_body->storage.Memory.location.Indirect.base_register;
-    assert(reg_index != Register_SP);
-    register_acquire(builder, reg_index);
-    register_bitset_set(&argument_register_bit_set, reg_index);
-
-    Storage reference_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
-    Value *reference_pointer = value_init(
-      &(Value){0}, &descriptor_void_pointer, reference_storage, *source_range
-    );
-
-    Value *stack_value =
-      reserve_stack(context, builder, fn_return_value_in_body->descriptor, *source_range);
-    load_address(context, builder, source_range, reference_pointer, stack_value->storage);
-  }
+  u64 parameters_stack_size = u64_max(4, dyn_array_length(fn_info->arguments)) * 8;
 
   builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
     builder->max_call_parameters_stack_size,

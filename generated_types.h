@@ -185,7 +185,7 @@ typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_
 typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, void * payload);
 
-typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
+typedef enum Memory_Layout_Item_Flags Memory_Layout_Item_Flags;
 
 typedef struct Memory_Layout_Item Memory_Layout_Item;
 typedef dyn_array_type(Memory_Layout_Item *) Array_Memory_Layout_Item_Ptr;
@@ -210,6 +210,8 @@ typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
+
+typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
@@ -918,17 +920,15 @@ typedef struct Lazy_Static_Value {
 } Lazy_Static_Value;
 typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
 
-typedef enum Descriptor_Function_Flags {
-  Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Macro = 1,
-  Descriptor_Function_Flags_Compile_Time = 4,
-} Descriptor_Function_Flags;
+typedef enum Memory_Layout_Item_Flags {
+  Memory_Layout_Item_Flags_None = 0,
+  Memory_Layout_Item_Flags_Uninitialized = 1,
+} Memory_Layout_Item_Flags;
 
-const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
-  if (value == 0) return "Descriptor_Function_Flags_None";
-  if (value == 1) return "Descriptor_Function_Flags_Macro";
-  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
-  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+const char *memory_layout_item_flags_name(Memory_Layout_Item_Flags value) {
+  if (value == 0) return "Memory_Layout_Item_Flags_None";
+  if (value == 1) return "Memory_Layout_Item_Flags_Uninitialized";
+  assert(!"Unexpected value for enum Memory_Layout_Item_Flags");
   return 0;
 };
 
@@ -946,6 +946,8 @@ typedef struct Memory_Layout_Item_Base_Relative {
 typedef struct Memory_Layout_Item {
   Memory_Layout_Item_Tag tag;
   char _tag_padding[4];
+  Memory_Layout_Item_Flags flags;
+  u32 _flags_padding;
   Slice name;
   const Descriptor * descriptor;
   Source_Range source_range;
@@ -992,6 +994,20 @@ typedef struct Function_Literal {
   Value * compile_time_instance;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
+
+typedef enum Descriptor_Function_Flags {
+  Descriptor_Function_Flags_None = 0,
+  Descriptor_Function_Flags_Macro = 1,
+  Descriptor_Function_Flags_Compile_Time = 4,
+} Descriptor_Function_Flags;
+
+const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
+  if (value == 0) return "Descriptor_Function_Flags_None";
+  if (value == 1) return "Descriptor_Function_Flags_Macro";
+  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
+  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+  return 0;
+};
 
 typedef enum {
   Descriptor_Tag_Opaque = 0,
@@ -1438,11 +1454,11 @@ static Descriptor descriptor_array_lazy_static_value_ptr;
 static Descriptor descriptor_lazy_static_value_pointer;
 static Descriptor descriptor_lazy_static_value_pointer_pointer;
 static Descriptor descriptor_mass_handle_operator_proc;
-static Descriptor descriptor_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags_ptr;
-static Descriptor descriptor_descriptor_function_flags_pointer;
-static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
+static Descriptor descriptor_memory_layout_item_flags;
+static Descriptor descriptor_array_memory_layout_item_flags;
+static Descriptor descriptor_array_memory_layout_item_flags_ptr;
+static Descriptor descriptor_memory_layout_item_flags_pointer;
+static Descriptor descriptor_memory_layout_item_flags_pointer_pointer;
 static Descriptor descriptor_memory_layout_item;
 static Descriptor descriptor_array_memory_layout_item;
 static Descriptor descriptor_array_memory_layout_item_ptr;
@@ -1473,6 +1489,11 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
+static Descriptor descriptor_descriptor_function_flags;
+static Descriptor descriptor_array_descriptor_function_flags;
+static Descriptor descriptor_array_descriptor_function_flags_ptr;
+static Descriptor descriptor_descriptor_function_flags_pointer;
+static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -2996,11 +3017,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_static_value);
-MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
-static C_Enum_Item descriptor_function_flags_items[] = {
+MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_flags, Memory_Layout_Item_Flags)
+static C_Enum_Item memory_layout_item_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Macro"), .value = 1 },
-{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
+{ .name = slice_literal_fields("Uninitialized"), .value = 1 },
 };
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_tag, Memory_Layout_Item_Tag)
@@ -3032,6 +3052,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item, Memory_Layout_Item,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_memory_layout_item_tag,
     .Base_Relative.offset = offsetof(Memory_Layout_Item, tag),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("flags"),
+    .descriptor = &descriptor_memory_layout_item_flags,
+    .Base_Relative.offset = offsetof(Memory_Layout_Item, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("_flags_padding"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Memory_Layout_Item, _flags_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3199,6 +3231,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
+MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
+static C_Enum_Item descriptor_function_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Macro"), .value = 1 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
+};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {

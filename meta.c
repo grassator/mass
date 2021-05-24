@@ -1093,10 +1093,9 @@ main(void) {
     { "void *", "payload" },
   }));
 
-  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
+  push_type(type_enum("Memory_Layout_Item_Flags", (Enum_Type_Item[]){
     { "None", 0 },
-    { "Macro", 1 << 0 },
-    { "Compile_Time", 1 << 2 },
+    { "Uninitialized", 1 << 0 },
   }));
 
   push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct_Type[]){
@@ -1107,6 +1106,8 @@ main(void) {
       { "s64", "offset" },
     }),
   }), (Struct_Item[]){
+    { "Memory_Layout_Item_Flags", "flags" },
+    { "u32", "_flags_padding" },
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
     { "Source_Range", "source_range" },
@@ -1143,6 +1144,12 @@ main(void) {
     { "Value *", "body" },
     { "Value *", "runtime_instance"},
     { "Value *", "compile_time_instance"},
+  }));
+
+  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Macro", 1 << 0 },
+    { "Compile_Time", 1 << 2 },
   }));
 
   push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){

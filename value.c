@@ -1554,7 +1554,7 @@ function_arguments_memory_layout(
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
-      .capacity = dyn_array_length(function->arguments),
+      .capacity = dyn_array_length(function->arguments) + 1,
     ),
   };
 
@@ -1562,10 +1562,9 @@ function_arguments_memory_layout(
   // If return type is larger than register, the pointer to stack location
   // where it needs to be written to is passed as the first argument
   // shifting registers for actual arguments by one
-  u64 index = 0;
-  if (descriptor_byte_size(function->returns.descriptor) > 8) {
-    index = 1;
-  }
+  u64 return_byte_size = descriptor_byte_size(function->returns.descriptor);
+  bool is_return_larger_than_register = return_byte_size > 8;
+  u64 index = is_return_larger_than_register ? 1 : 0;
 
   DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
     dyn_array_push(layout.items, (Memory_Layout_Item) {
@@ -1576,6 +1575,25 @@ function_arguments_memory_layout(
       .name = arg->name,
       .descriptor = arg->descriptor,
       .source_range = arg->source_range,
+    });
+  }
+
+  if (is_return_larger_than_register) {
+    Storage storage = {
+      .tag = Storage_Tag_Memory,
+      .byte_size = return_byte_size,
+      .Memory.location = {
+        .tag = Memory_Location_Tag_Indirect,
+        .Indirect = { .base_register = Register_C, }
+      }
+    };
+    dyn_array_push(layout.items, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Absolute,
+      .flags = Memory_Layout_Item_Flags_Uninitialized,
+      .name = function->returns.name,
+      .descriptor = function->returns.descriptor,
+      .source_range = function->returns.source_range,
+      .Absolute = { .storage = storage, },
     });
   }
 
