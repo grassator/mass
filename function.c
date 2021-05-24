@@ -895,19 +895,24 @@ ensure_compiled_function_body(
   assert(descriptor == &descriptor_function_literal);
   // TODO figure out how to avoid the const cast here
   Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
-  const Function_Info *function = literal->info;
+  Function_Info *function = literal->info;
 
   assert(!(function->flags & Descriptor_Function_Flags_Macro));
-  Storage *label_storage = context_is_compile_time_eval(context)
-    ? &literal->compile_time_storage
-    : &literal->runtime_storage;
+  Value **cached_instance = context_is_compile_time_eval(context)
+    ? &literal->compile_time_instance
+    : &literal->runtime_instance;
 
-  if (label_storage->tag != Storage_Tag_None) return *label_storage;
+  if (cached_instance[0]) return cached_instance[0]->storage;
+
+  // TODO provide proper name here
+  const Descriptor *instance_descriptor =
+    descriptor_function_instance(context->allocator, slice_literal(""), function);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
-    *label_storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
-    return *label_storage;
+    Storage storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
+    *cached_instance = value_make(context, instance_descriptor, storage, fn_value->source_range);
+    return cached_instance[0]->storage;
   }
 
   Program *program = context->program;
@@ -918,7 +923,8 @@ ensure_compiled_function_body(
 
   Label_Index call_label = make_label(program, &program->memory.code, fn_name);
   // It is important to cache the label here for recursive calls
-  *label_storage = code_label32(call_label);
+  *cached_instance =
+    value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
 
   Function_Builder *builder = &(Function_Builder){
     .function = function,

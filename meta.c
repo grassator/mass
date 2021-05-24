@@ -1143,8 +1143,8 @@ main(void) {
   push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Info *", "info" },
     { "Value *", "body" },
-    { "Storage", "runtime_storage"},
-    { "Storage", "compile_time_storage"},
+    { "Value *", "runtime_instance"},
+    { "Value *", "compile_time_instance"},
   }));
 
   push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){

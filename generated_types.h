@@ -990,8 +990,8 @@ typedef dyn_array_type(Function_Info) Array_Function_Info;
 typedef struct Function_Literal {
   Function_Info * info;
   Value * body;
-  Storage runtime_storage;
-  Storage compile_time_storage;
+  Value * runtime_instance;
+  Value * compile_time_instance;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
@@ -3200,15 +3200,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("runtime_storage"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Function_Literal, runtime_storage),
+    .name = slice_literal_fields("runtime_instance"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Literal, runtime_instance),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("compile_time_storage"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Function_Literal, compile_time_storage),
+    .name = slice_literal_fields("compile_time_instance"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Literal, compile_time_instance),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
