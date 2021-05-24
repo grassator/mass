@@ -91,7 +91,7 @@ test_program_source_base(
   MASS_ON_ERROR(*context->result) return 0;
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
-  if (value && value->descriptor && value->descriptor->tag == Descriptor_Tag_Function) {
+  if (value && value->descriptor == &descriptor_function_literal) {
     ensure_compiled_function_body(context, value);
   }
   return value;
@@ -377,8 +377,8 @@ spec("source") {
     }
   }
 
+  #ifdef _WIN32
   describe("Raw Machine Code") {
-    #ifdef _WIN32
     // This test relies on Windows calling convention
     it("should be able to include raw machine code bytes") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
@@ -391,7 +391,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-    #endif
 
     it("should be able to reference a declared label in raw machine code bytes") {
       // TODO only run on X64 hosts
@@ -409,8 +408,8 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-
   }
+  #endif
 
   #ifdef _WIN32
   describe("Win32: Structured Exceptions") {
@@ -808,16 +807,6 @@ spec("source") {
       check(actual == 42);
     }
 
-    it("should be able to assign a fn to a variable and call through pointer") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "fn checker() -> (s32) { local := fn() -> (s32) { 42 }; local() }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s32 actual = checker();
-      check(actual == 42);
-    }
-
     it("should be able to parse typed definition and assignment in the same statement") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test_fn", &test_context,
@@ -886,7 +875,7 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Type_Mismatch);
       check(error->Type_Mismatch.expected == &descriptor_type);
-      check(error->Type_Mismatch.actual->tag == Descriptor_Tag_Function);
+      check(error->Type_Mismatch.actual == &descriptor_function_literal);
     }
 
     it("should report an error when encountering an unknown type") {
@@ -1693,7 +1682,6 @@ spec("source") {
         "fn ExitProcess(status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
       check(spec_check_mass_result(test_context.result));
-
       write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
     }
 
@@ -1702,8 +1690,6 @@ spec("source") {
       test_program->entry_point = test_program_external_source_base(
         "main", &test_context, "fixtures\\hello_world"
       );
-      check(test_program->entry_point);
-      ensure_compiled_function_body(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
     }

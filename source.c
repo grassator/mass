@@ -169,6 +169,8 @@ value_view_slice(
   source_range.offsets.from = start_index == end_index
     ? source_range.offsets.to
     : view->values[start_index]->source_range.offsets.from;
+  // FIXME reenable this and make sure it works
+  //assert(source_range.offsets.from <= source_range.offsets.to);
 
   return (Value_View) {
     .values = view->values + start_index,
@@ -2687,10 +2689,9 @@ token_process_c_struct_definition(
   return 0;
 }
 
-static Descriptor *
+static Function_Info *
 token_process_function_literal(
   Execution_Context *context,
-  Slice name,
   Value *args,
   Value *return_types
 ) {
@@ -2698,11 +2699,12 @@ token_process_function_literal(
 
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
-  Descriptor *descriptor = descriptor_function(context->allocator, name, function_scope);
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, function_scope);
 
   Value_View return_types_view = value_as_group(return_types)->children;
   if (return_types_view.length == 0) {
-    descriptor->Function.info.returns = (Function_Return) { .descriptor = &descriptor_void, };
+    fn_info->returns = (Function_Return) { .descriptor = &descriptor_void, };
   } else {
     Value_View_Split_Iterator it = { .view = return_types_view };
 
@@ -2719,15 +2721,15 @@ token_process_function_literal(
 
       Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
-      descriptor->Function.info.returns = token_match_return_type(&arg_context, arg_view);
+      fn_info->returns = token_match_return_type(&arg_context, arg_view);
     }
   }
 
   bool previous_argument_has_default_value = false;
   Value_View args_view = value_as_group(args)->children;
-  if (args_view.length == 0) return descriptor;
+  if (args_view.length == 0) return fn_info;
 
-  descriptor->Function.info.arguments = dyn_array_make(
+  fn_info->arguments = dyn_array_make(
     Array_Function_Argument,
     .allocator = context->allocator,
     .capacity = 4
@@ -2737,9 +2739,9 @@ token_process_function_literal(
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
     Execution_Context arg_context = *context;
     arg_context.scope = function_scope;
-    Function_Argument arg = token_match_argument(&arg_context, arg_view, &descriptor->Function.info);
+    Function_Argument arg = token_match_argument(&arg_context, arg_view, fn_info);
     MASS_ON_ERROR(*context->result) return 0;
-    dyn_array_push(descriptor->Function.info.arguments, arg);
+    dyn_array_push(fn_info->arguments, arg);
     if (previous_argument_has_default_value) {
       if (!arg.maybe_default_expression.length ) {
         context_error(context, (Mass_Error) {
@@ -2752,11 +2754,11 @@ token_process_function_literal(
       previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
   }
-  descriptor->Function.info.arguments_layout = function_arguments_memory_layout(
-    context->allocator, &descriptor->Function.info, Function_Argument_Mode_Call
+  fn_info->arguments_layout = function_arguments_memory_layout(
+    context->allocator, fn_info, Function_Argument_Mode_Call
   );
 
-  return descriptor;
+  return fn_info;
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
@@ -2796,13 +2798,12 @@ compile_time_eval(
   eval_context.scope = scope_make(context->allocator, context->scope);
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
-  Descriptor *descriptor = descriptor_function(context->allocator, eval_name, context->scope);
-  descriptor->Function.info.returns.descriptor = &descriptor_void;
+  Function_Info fn_info;
+  function_info_init(&fn_info, eval_context.scope);
 
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
-  Value *eval_value = value_make(context, descriptor, code_label32(eval_label_index), view.source_range);
   Function_Builder eval_builder = {
-    .function = &descriptor->Function.info,
+    .function = &fn_info,
     .register_volatile_bitset = jit->program->platform_info.register_volatile_bitset,
     .code_block = {
       .start_label = eval_label_index,
@@ -2872,7 +2873,7 @@ compile_time_eval(
 
   program_jit(jit);
 
-  fn_type_opaque jitted_code = value_as_function(jit->program, eval_value);
+  fn_type_opaque jitted_code = c_function_from_label(jit->program, eval_label_index);
   jitted_code();
 
   Value *temp_result = value_init(
@@ -3224,9 +3225,10 @@ call_function_macro(
 ) {
   Value *fn_value = payload->overload;
   Array_Value_Ptr args = payload->args;
-  const Function_Info *function = &fn_value->descriptor->Function.info;
+  assert(fn_value->descriptor == &descriptor_function_literal);
+  const Function_Literal *literal = storage_static_as_c_type(&fn_value->storage, Function_Literal);
+  const Function_Info *function = literal->info;
   assert(function->flags & Descriptor_Function_Flags_Macro);
-  const Function_Body *body = storage_static_as_c_type(&fn_value->storage, Function_Body);
 
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
@@ -3295,7 +3297,7 @@ call_function_macro(
   {
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
-    Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
+    Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
     result_value = value_force(&body_context, builder, expected_result, parse_result);
     MASS_ON_ERROR(*context->result) return 0;
   }
@@ -3325,10 +3327,7 @@ call_function_overload(
   Array_Value_Ptr arguments = payload->args;
 
   Array_Instruction *instructions = &builder->code_block.instructions;
-  const Descriptor *to_call_descriptor = maybe_unwrap_pointer_descriptor(to_call->descriptor);
-  assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-  const Function_Info *descriptor = &to_call_descriptor->Function.info;
-
+  const Function_Info *descriptor = maybe_function_info_from_value(to_call);
   Storage call_storage = ensure_compiled_function_body(context, to_call);
 
   Value *fn_return_value = function_return_value_for_descriptor(
@@ -3497,7 +3496,7 @@ call_function_overload(
 
   if (call_storage.tag == Storage_Tag_Static) {
     // TODO it will not be safe to use this register with other calling conventions
-    Storage reg = storage_register_for_descriptor(Register_A, to_call_descriptor);
+    Storage reg = storage_register_for_descriptor(Register_A, &descriptor_void_pointer);
     push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, call_storage}}});
     push_instruction(instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}});
   } else {
@@ -3543,34 +3542,36 @@ static Value *
 token_handle_function_call(
   Execution_Context *context,
   Value *target_token,
-  Value *args_token
+  Value *args_token,
+  Source_Range source_range
 ) {
 
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   assert(value_match_group(args_token, Group_Tag_Paren));
 
-  Source_Range source_range = target_token->source_range; // TODO add args as well
   Value *target_expression = token_parse_single(context, target_token);
   MASS_ON_ERROR(*context->result) return 0;
-  const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target_expression);
 
   if (
-    target_descriptor->tag == Descriptor_Tag_Function &&
-    (target_descriptor->Function.info.flags & Descriptor_Function_Flags_Compile_Time) &&
-    target_descriptor != context->current_compile_time_function_descriptor
+    target_expression->descriptor != context->current_compile_time_function_descriptor &&
+    target_expression->descriptor == &descriptor_function_literal
   ) {
-    // This is necessary to avoid infinite recursion as the compile_time_eval called below
-    // will end up here as well. Indirect calls are allowed so we do not need a full stack
-    const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
-    context->current_compile_time_function_descriptor = target_descriptor;
-    Value_View fake_eval_view = {
-      .values = (Value *[]){target_expression, args_token},
-      .length = 2,
-      .source_range = source_range,
-    };
-    Value *result = compile_time_eval(context, fake_eval_view);
-    context->current_compile_time_function_descriptor = saved_descriptor;
-    return result;
+    const Function_Literal *literal =
+      storage_static_as_c_type(&target_expression->storage, Function_Literal);
+    if (literal->info->flags & Descriptor_Function_Flags_Compile_Time) {
+      // This is necessary to avoid infinite recursion as the compile_time_eval called below
+      // will end up here as well. Indirect calls are allowed so we do not need a full stack
+      const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
+      context->current_compile_time_function_descriptor = target_expression->descriptor;
+      Value_View fake_eval_view = {
+        .values = (Value *[]){target_expression, args_token},
+        .length = 2,
+        .source_range = source_range,
+      };
+      Value *result = compile_time_eval(context, fake_eval_view);
+      context->current_compile_time_function_descriptor = saved_descriptor;
+      return result;
+    }
   }
 
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
@@ -3608,17 +3609,18 @@ token_handle_function_call(
     return token_parse_block_view(&capture_context, capture->view);
   }
 
-  struct Overload_Match { Value *value; s64 score; } match = { .score = -1 };
+  struct Overload_Match { Value *value; const Function_Info *info; s64 score; } match = { .score = -1 };
   struct Overload_Match best_conflict_match = { .score = -1 };
   for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
-    const Descriptor *to_call_descriptor =
-      maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
-    // TODO figure out a better way to report generic type errors
-    static Descriptor fake_function_descriptor = {
-      .tag = Descriptor_Tag_Function,
-      .name = slice_literal_fields("function"),
-    };
-    if (to_call_descriptor->tag != Descriptor_Tag_Function) {
+    const Function_Info *to_call_info = maybe_function_info_from_value(to_call);
+    if (!to_call_info) {
+      // TODO figure out a better way to report generic type errors
+      static Descriptor fake_function_descriptor = {
+        .tag = Descriptor_Tag_Function,
+        .name = slice_literal_fields("function"),
+      };
+      const Descriptor *to_call_descriptor =
+        maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = to_call->source_range,
@@ -3626,17 +3628,17 @@ token_handle_function_call(
       });
       goto err;
     }
-    assert(to_call_descriptor->tag == Descriptor_Tag_Function);
-    const Function_Info *descriptor = &to_call_descriptor->Function.info;
-    s64 score = calculate_arguments_match_score(descriptor, args);
+    s64 score = calculate_arguments_match_score(to_call_info, args);
     if (score == -1) continue; // no match
     if (score > match.score) {
+      match.info = to_call_info;
       match.value = to_call;
       match.score = score;
     } else {
       if (score == match.score && score > best_conflict_match.score) {
         best_conflict_match = match;
         match.value = to_call;
+        match.info = to_call_info;
       }
     }
   }
@@ -3668,16 +3670,12 @@ token_handle_function_call(
     .args = args,
     .source_range = source_range,
   };
-  const Descriptor *overload_descriptor =
-    maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(overload));
 
-  const Function_Info *function = &overload_descriptor->Function.info;
-
-  Lazy_Value_Proc proc = (function->flags & Descriptor_Function_Flags_Macro)
+  Lazy_Value_Proc proc = (match.info->flags & Descriptor_Function_Flags_Macro)
     ? call_function_macro
     : call_function_overload;
 
-  return mass_make_lazy_value(context, source_range, payload, function->returns.descriptor, proc);
+  return mass_make_lazy_value(context, source_range, payload, match.info->returns.descriptor, proc);
 
   err:
   return 0;
@@ -4346,24 +4344,27 @@ mass_handle_startup_call_lazy_proc(
 ) {
   Value_View expression = value_as_group(args_token)->children;
   Value *startup_function = token_parse_expression(context, expression, &(u64){0}, 0);
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(startup_function);
-  if (
-    !startup_function ||
-    descriptor->tag != Descriptor_Tag_Function ||
-    dyn_array_length(descriptor->Function.info.arguments) ||
-    descriptor->Function.info.returns.descriptor != &descriptor_void
-  ) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
-      .detailed_message = "`startup` expects a () -> () {...} function as an argument"
-    });
-  } else {
-    ensure_compiled_function_body(context, startup_function);
-    dyn_array_push(context->program->startup_functions, startup_function);
-  }
+  MASS_ON_ERROR(*context->result) return 0;
+  const Descriptor *descriptor = startup_function->descriptor;
+  if (descriptor != &descriptor_function_literal) goto err;
+  const Function_Literal *literal =
+    storage_static_as_c_type(&startup_function->storage, Function_Literal);
+
+  if (dyn_array_length(literal->info->arguments)) goto err;
+  if (literal->info->returns.descriptor != &descriptor_void) goto err;
+
+  ensure_compiled_function_body(context, startup_function);
+  dyn_array_push(context->program->startup_functions, startup_function);
 
   return expected_result_validate(expected_result, &void_value);
+
+  err:
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Parse,
+    .source_range = args_token->source_range,
+    .detailed_message = "`startup` expects a () -> () {...} function as an argument"
+  });
+  return 0;
 }
 
 static Value *
@@ -4523,7 +4524,7 @@ mass_handle_paren_operator(
       );
     }
   } else {
-    return token_handle_function_call(context, target, args_token);
+    return token_handle_function_call(context, target, args_token, args_view.source_range);
   }
 }
 
@@ -5150,28 +5151,29 @@ token_parse_function_literal(
 
   *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Descriptor *descriptor = token_process_function_literal(context, name, args, returns);
+  Function_Info *fn_info = token_process_function_literal(context, args, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
-  assert(descriptor->tag == Descriptor_Tag_Function);
   if(is_macro) {
-    descriptor->Function.info.flags |= Descriptor_Function_Flags_Macro;
+    fn_info->flags |= Descriptor_Function_Flags_Macro;
   }
   if (at) {
-    descriptor->Function.info.flags |= Descriptor_Function_Flags_Compile_Time;
+    fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
   }
   if (body_value) {
-    Function_Body *body = allocator_allocate(context->allocator, Function_Body);
-    *body = (Function_Body){
-      .value = body_value,
+    Function_Literal *body = allocator_allocate(context->allocator, Function_Literal);
+    *body = (Function_Literal){
+      .info = fn_info,
+      .body = body_value,
     };
-    Value *literal = value_make(context, descriptor, storage_static(body), view.source_range);
+    Value *literal = value_make(context, &descriptor_function_literal, storage_static(body), view.source_range);
     literal->epoch = VALUE_STATIC_EPOCH;
     return literal;
   } else {
+    Descriptor *fn_descriptor = descriptor_function(context->allocator, name, fn_info);
     return value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_type, storage_static(descriptor), view.source_range
+      VALUE_STATIC_EPOCH, &descriptor_type, storage_static(fn_descriptor), view.source_range
     );
   }
 }
@@ -5928,9 +5930,6 @@ token_define_local_variable(
   if (descriptor == &descriptor_number_literal) {
     // x := 42 should always be initialized to s64 to avoid weird suprises
     variable_descriptor = &descriptor_s64;
-  } else if (descriptor->tag == Descriptor_Tag_Function) {
-    variable_descriptor = descriptor_pointer_to(context->allocator, descriptor);
-    ensure_compiled_function_body(context, value);
   } else {
     variable_descriptor = descriptor;
   }
@@ -6238,23 +6237,24 @@ scope_define_builtins(
     for (u64 i = 0; i < arg_length; ++i) {\
       dyn_array_push(arguments, raw_arguments[i]);\
     }\
-    Descriptor *descriptor = descriptor_function(allocator,  slice_literal(_NAME_), 0);\
-    Function_Info *function = &descriptor->Function.info;\
+    Function_Info *function = allocator_allocate(allocator, Function_Info);\
+    function_info_init(function, 0);\
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
     function->arguments_layout = function_arguments_memory_layout(\
-      allocator, &descriptor->Function.info, Function_Argument_Mode_Call\
+      allocator, function, Function_Argument_Mode_Call\
     );\
-    Function_Body *body = allocator_allocate(allocator, Function_Body);\
-    *body = (Function_Body){\
-      .value = 0,\
+    Function_Literal *literal = allocator_allocate(allocator, Function_Literal);\
+    *literal = (Function_Literal){\
+      .info = function,\
+      .body = 0,\
       .runtime_storage = {0},\
       .compile_time_storage = imm64((u64)_FN_),\
     };\
     Value *value = value_init(\
       allocator_allocate(allocator, Value),\
-      VALUE_STATIC_EPOCH, descriptor, storage_static(body), (Source_Range){0}\
+      VALUE_STATIC_EPOCH, &descriptor_function_literal, storage_static(literal), (Source_Range){0}\
     );\
     scope_define_value(scope, range, slice_literal(_NAME_), value);\
   }

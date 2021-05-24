@@ -1118,12 +1118,6 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Function_Body", (Struct_Item[]){
-    { "Value *", "value" },
-    { "Storage", "runtime_storage"},
-    { "Storage", "compile_time_storage"},
-  }));
-
   push_type(type_struct("Function_Argument", (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
@@ -1140,10 +1134,17 @@ main(void) {
     { "Function_Return", "returns" },
   }));
 
+  push_type(type_struct("Function_Literal", (Struct_Item[]){
+    { "Function_Info *", "info" },
+    { "Value *", "body" },
+    { "Storage", "runtime_storage"},
+    { "Storage", "compile_time_storage"},
+  }));
+
   push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function", (Struct_Item[]){
-      { "Function_Info", "info" },
+      { "Function_Info *", "info" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },

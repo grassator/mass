@@ -892,21 +892,20 @@ ensure_compiled_function_body(
     return fn_value->storage;
   }
   const Descriptor *descriptor = fn_value->descriptor;
-  assert(descriptor->tag == Descriptor_Tag_Function);
-  const Function_Info *function = &descriptor->Function.info;
+  assert(descriptor == &descriptor_function_literal);
+  // TODO figure out how to avoid the const cast here
+  Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
+  const Function_Info *function = literal->info;
 
   assert(!(function->flags & Descriptor_Function_Flags_Macro));
-  // TODO figure out how to avoid the const cast here
-  Function_Body *body = (Function_Body *)storage_static_as_c_type(&fn_value->storage, Function_Body);
-
   Storage *label_storage = context_is_compile_time_eval(context)
-    ? &body->compile_time_storage
-    : &body->runtime_storage;
+    ? &literal->compile_time_storage
+    : &literal->runtime_storage;
 
   if (label_storage->tag != Storage_Tag_None) return *label_storage;
 
-  if (value_is_external_symbol(body->value)) {
-    const External_Symbol *symbol = storage_static_as_c_type(&body->value->storage, External_Symbol);
+  if (value_is_external_symbol(literal->body)) {
+    const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
     *label_storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
     return *label_storage;
   }
@@ -994,7 +993,7 @@ ensure_compiled_function_body(
   if (function->returns.name.length) {
     scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
   }
-  Value *parse_result = token_parse_block_no_scope(&body_context, body->value);
+  Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
   MASS_ON_ERROR(*context->result) return (Storage){0};
 
   value_force_exact(&body_context, builder, return_value, parse_result);
@@ -1052,9 +1051,10 @@ program_init_startup_code(
   Execution_Context *context
 ) {
   Program *program = context->program;
-  assert(program->entry_point->descriptor->tag == Descriptor_Tag_Function);
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, 0 /* scope */);
   Descriptor *descriptor =
-    descriptor_function(context->allocator, slice_literal("__startup"), 0 /* scope */);
+    descriptor_function(context->allocator, slice_literal("__startup"), fn_info);
   Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
   Storage storage = code_label32(fn_label);
 
@@ -1063,7 +1063,7 @@ program_init_startup_code(
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
-    .function = &descriptor->Function.info,
+    .function = fn_info,
     .frozen = true,
     .code_block = {
       .start_label = fn_label,

@@ -195,10 +195,6 @@ typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
 typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
 
-typedef struct Function_Body Function_Body;
-typedef dyn_array_type(Function_Body *) Array_Function_Body_Ptr;
-typedef dyn_array_type(const Function_Body *) Array_Const_Function_Body_Ptr;
-
 typedef struct Function_Argument Function_Argument;
 typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
 typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
@@ -206,6 +202,10 @@ typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_
 typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
+
+typedef struct Function_Literal Function_Literal;
+typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
+typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
@@ -958,13 +958,6 @@ typedef struct Function_Return {
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
-typedef struct Function_Body {
-  Value * value;
-  Storage runtime_storage;
-  Storage compile_time_storage;
-} Function_Body;
-typedef dyn_array_type(Function_Body) Array_Function_Body;
-
 typedef struct Function_Argument {
   Slice name;
   const Descriptor * descriptor;
@@ -983,6 +976,14 @@ typedef struct Function_Info {
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
+typedef struct Function_Literal {
+  Function_Info * info;
+  Value * body;
+  Storage runtime_storage;
+  Storage compile_time_storage;
+} Function_Literal;
+typedef dyn_array_type(Function_Literal) Array_Function_Literal;
+
 typedef enum {
   Descriptor_Tag_Opaque = 0,
   Descriptor_Tag_Function = 1,
@@ -992,7 +993,7 @@ typedef enum {
 } Descriptor_Tag;
 
 typedef struct Descriptor_Function {
-  Function_Info info;
+  Function_Info * info;
 } Descriptor_Function;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
@@ -1447,11 +1448,6 @@ static Descriptor descriptor_array_function_return;
 static Descriptor descriptor_array_function_return_ptr;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
-static Descriptor descriptor_function_body;
-static Descriptor descriptor_array_function_body;
-static Descriptor descriptor_array_function_body_ptr;
-static Descriptor descriptor_function_body_pointer;
-static Descriptor descriptor_function_body_pointer_pointer;
 static Descriptor descriptor_function_argument;
 static Descriptor descriptor_array_function_argument;
 static Descriptor descriptor_array_function_argument_ptr;
@@ -1462,6 +1458,11 @@ static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
 static Descriptor descriptor_function_info_pointer;
 static Descriptor descriptor_function_info_pointer_pointer;
+static Descriptor descriptor_function_literal;
+static Descriptor descriptor_array_function_literal;
+static Descriptor descriptor_array_function_literal_ptr;
+static Descriptor descriptor_function_literal_pointer;
+static Descriptor descriptor_function_literal_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -3078,29 +3079,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_body_ptr, Array_Function_Body_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_body, Array_Function_Body)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_body, Function_Body,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("value"),
-    .descriptor = &descriptor_value_pointer,
-    .Base_Relative.offset = offsetof(Function_Body, value),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("runtime_storage"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Function_Body, runtime_storage),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("compile_time_storage"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Function_Body, compile_time_storage),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(function_body);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument, Function_Argument,
@@ -3171,6 +3149,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("info"),
+    .descriptor = &descriptor_function_info_pointer,
+    .Base_Relative.offset = offsetof(Function_Literal, info),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("body"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Literal, body),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("runtime_storage"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Function_Literal, runtime_storage),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("compile_time_storage"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Function_Literal, compile_time_storage),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_literal);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
@@ -3184,7 +3191,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function, Descriptor_Function,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("info"),
-    .descriptor = &descriptor_function_info,
+    .descriptor = &descriptor_function_info_pointer,
     .Base_Relative.offset = offsetof(Descriptor_Function, info),
   },
 );

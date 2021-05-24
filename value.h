@@ -205,7 +205,7 @@ storage_is_register_index(
   Register reg_index
 );
 
-fn_type_opaque
+static fn_type_opaque
 value_as_function(
   Program *program,
   Value *value

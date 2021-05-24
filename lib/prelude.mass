@@ -82,7 +82,7 @@ macro static_assert(condition : bool, message : String) {
   @{if condition == false { fail(@context, "Static Assert Failed", message) }}
 }
 
-@fn external(library_name : String, symbol_name : String) -> (result : External_Symbol) {
+external :: @fn(library_name : String, symbol_name : String) -> (result : External_Symbol) {
   result.library_name = library_name
   result.symbol_name = symbol_name
   result

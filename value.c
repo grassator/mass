@@ -67,7 +67,7 @@ mass_error_append_function_signature_string(
   APPEND_SLICE(descriptor->name);
   APPEND_LITERAL("(");
   bool first = true;
-  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info.arguments) {
+  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info->arguments) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->name);
@@ -75,7 +75,7 @@ mass_error_append_function_signature_string(
     APPEND_SLICE(arg->descriptor->name);
   }
   APPEND_LITERAL(") -> (");
-  APPEND_SLICE(descriptor->Function.info.returns.descriptor->name);
+  APPEND_SLICE(descriptor->Function.info->returns.descriptor->name);
   APPEND_LITERAL(")");
 }
 
@@ -288,18 +288,18 @@ same_type(
       return a == b;
     }
     case Descriptor_Tag_Function: {
-      if (!same_type(a->Function.info.returns.descriptor, b->Function.info.returns.descriptor)) {
+      if (!same_type(a->Function.info->returns.descriptor, b->Function.info->returns.descriptor)) {
         return false;
       }
       if (
-        dyn_array_length(a->Function.info.arguments) !=
-        dyn_array_length(b->Function.info.arguments)
+        dyn_array_length(a->Function.info->arguments) !=
+        dyn_array_length(b->Function.info->arguments)
       ) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->Function.info.arguments); ++i) {
-        Function_Argument *a_arg = dyn_array_get(a->Function.info.arguments, i);
-        Function_Argument *b_arg = dyn_array_get(b->Function.info.arguments, i);
+      for (u64 i = 0; i < dyn_array_length(a->Function.info->arguments); ++i) {
+        Function_Argument *a_arg = dyn_array_get(a->Function.info->arguments, i);
+        Function_Argument *b_arg = dyn_array_get(b->Function.info->arguments, i);
         if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;
@@ -1377,11 +1377,24 @@ value_global_c_string_from_slice_internal(
 #define value_global_c_string_from_slice(...)\
   value_global_c_string_from_slice_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
+static inline void
+function_info_init(
+  Function_Info *info,
+  Scope *scope
+) {
+  *info = (Function_Info) {
+    .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+    .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
+    .scope = scope,
+    .returns = {.descriptor = &descriptor_void},
+  };
+}
+
 static inline Descriptor *
 descriptor_function(
   const Allocator *allocator,
   Slice name,
-  Scope *scope
+  Function_Info *info
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
@@ -1389,12 +1402,7 @@ descriptor_function(
     .name = name,
     .bit_size = sizeof(void *) * CHAR_BIT,
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function.info = (Function_Info) {
-      .arguments = (Array_Function_Argument){&dyn_array_zero_items},
-      .arguments_layout.items = (Array_Memory_Layout_Item){&dyn_array_zero_items},
-      .scope = scope,
-      .returns = {.descriptor = &descriptor_void},
-    },
+    .Function.info = info,
   };
   return result;
 }
@@ -1414,22 +1422,47 @@ descriptor_pointer_to(
   return result;
 }
 
-fn_type_opaque
+static fn_type_opaque
+c_function_from_label(
+  Program *program,
+  Label_Index label_index
+) {
+  Label *label = program_get_label(program, label_index);
+  Section *section = label->section;
+  assert(section == &program->memory.code);
+  s8 *target = section->buffer.memory + label->offset_in_section;
+  return (fn_type_opaque)target;
+}
+
+static const Function_Info *
+maybe_function_info_from_value(
+  Value *value
+) {
+  if (value->descriptor == &descriptor_function_literal) {
+    const Function_Literal *literal = storage_static_as_c_type(&value->storage, Function_Literal);
+    return literal->info;
+  } else {
+    const Descriptor *descriptor =
+      maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(value));
+    if (descriptor->tag == Descriptor_Tag_Function) {
+      assert(descriptor->tag == Descriptor_Tag_Function);
+      return descriptor->Function.info;
+    }
+  }
+  return 0;
+}
+
+static fn_type_opaque
 value_as_function(
   Program *program,
   Value *value
 ) {
-  assert(value->descriptor->tag == Descriptor_Tag_Function);
+  const Function_Info *info = maybe_function_info_from_value(value);
+  assert(info);
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder->function != &value->descriptor->Function.info) continue;
-
-    Label *label = program_get_label(program, builder->code_block.start_label);
-    Section *section = label->section;
-    assert(section == &program->memory.code);
-    s8 *target = section->buffer.memory + label->offset_in_section;
-
-    return (fn_type_opaque)target;
+    if (builder->function != info) continue;
+    return c_function_from_label(program, builder->code_block.start_label);
   }
   panic("Could not find resolve runtime function for value");
   return 0;

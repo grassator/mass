@@ -208,7 +208,7 @@ encode_text_section(
 
   for (u64 i = 0; i < dyn_array_length(program->functions); ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
-    if (builder->function == &program->entry_point->descriptor->Function.info) {
+    if (builder->function == program->entry_point->descriptor->Function.info) {
       result.entry_point_rva = get_rva();
       found_entry_point = true;
     }
