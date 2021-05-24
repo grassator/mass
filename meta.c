@@ -1033,6 +1033,7 @@ main(void) {
       { "Operator *", "maybe_infix_or_postfix" },
     }),
   }), (Struct_Item[]){
+    { "u64", "epoch" },
     { "Source_Range", "source_range" },
   }));
 
@@ -1040,7 +1041,6 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Value *", "next_overload" },
-    { "u64", "epoch" },
     { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
     { "Compiler_Source_Location", "compiler_source_location" },
@@ -1079,6 +1079,7 @@ main(void) {
     { "const Descriptor *", "descriptor" },
     { "Lazy_Value_Proc", "proc" },
     { "void *", "payload" },
+    { "u64", "epoch" },
   }));
 
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
@@ -1209,10 +1210,7 @@ main(void) {
       { "const Descriptor *", "expected" },
       { "const Descriptor *", "actual" },
     }),
-    struct_fields("Epoch_Mismatch", (Struct_Item[]){
-      { "Value *", "value" },
-      { "u64", "expected_epoch" },
-    }),
+    struct_empty("Epoch_Mismatch"),
     struct_fields("No_Matching_Overload", (Struct_Item[]){
       { "Value *", "target" },
       { "Array_Value_Ptr", "arguments" },

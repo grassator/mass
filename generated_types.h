@@ -842,6 +842,7 @@ typedef struct Scope_Entry_Operator {
 typedef struct Scope_Entry {
   Scope_Entry_Tag tag;
   char _tag_padding[4];
+  u64 epoch;
   Source_Range source_range;
   union {
     Scope_Entry_Value Value;
@@ -853,7 +854,6 @@ typedef struct Value {
   const Descriptor * descriptor;
   Storage storage;
   Value * next_overload;
-  u64 epoch;
   u64 is_temporary;
   Source_Range source_range;
   Compiler_Source_Location compiler_source_location;
@@ -908,6 +908,7 @@ typedef struct Lazy_Value {
   const Descriptor * descriptor;
   Lazy_Value_Proc proc;
   void * payload;
+  u64 epoch;
 } Lazy_Value;
 typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 
@@ -1087,10 +1088,6 @@ typedef struct Mass_Error_Type_Mismatch {
   const Descriptor * expected;
   const Descriptor * actual;
 } Mass_Error_Type_Mismatch;
-typedef struct Mass_Error_Epoch_Mismatch {
-  Value * value;
-  u64 expected_epoch;
-} Mass_Error_Epoch_Mismatch;
 typedef struct Mass_Error_No_Matching_Overload {
   Value * target;
   Array_Value_Ptr arguments;
@@ -1116,7 +1113,6 @@ typedef struct Mass_Error {
     Mass_Error_Unknown_Field Unknown_Field;
     Mass_Error_Invalid_Identifier Invalid_Identifier;
     Mass_Error_Type_Mismatch Type_Mismatch;
-    Mass_Error_Epoch_Mismatch Epoch_Mismatch;
     Mass_Error_No_Matching_Overload No_Matching_Overload;
     Mass_Error_Undecidable_Overload Undecidable_Overload;
   };
@@ -2810,6 +2806,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("epoch"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Scope_Entry, epoch),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
     .Base_Relative.offset = offsetof(Scope_Entry, source_range),
@@ -2849,12 +2851,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
     .name = slice_literal_fields("next_overload"),
     .descriptor = &descriptor_value_pointer,
     .Base_Relative.offset = offsetof(Value, next_overload),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("epoch"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Value, epoch),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2975,6 +2971,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
     .name = slice_literal_fields("payload"),
     .descriptor = &descriptor_void_pointer,
     .Base_Relative.offset = offsetof(Lazy_Value, payload),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("epoch"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Lazy_Value, epoch),
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_value);
@@ -3458,21 +3460,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_type_mismatch, Mass_Error_Type_Mismatch
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_type_mismatch);
-MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_epoch_mismatch, Mass_Error_Epoch_Mismatch,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("value"),
-    .descriptor = &descriptor_value_pointer,
-    .Base_Relative.offset = offsetof(Mass_Error_Epoch_Mismatch, value),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("expected_epoch"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Mass_Error_Epoch_Mismatch, expected_epoch),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(mass_error_epoch_mismatch);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3587,12 +3574,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .name = slice_literal_fields("Type_Mismatch"),
     .descriptor = &descriptor_mass_error_type_mismatch,
     .Base_Relative.offset = offsetof(Mass_Error, Type_Mismatch),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Epoch_Mismatch"),
-    .descriptor = &descriptor_mass_error_epoch_mismatch,
-    .Base_Relative.offset = offsetof(Mass_Error, Epoch_Mismatch),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -119,6 +119,7 @@ scope_make(
 static inline void
 scope_define_value(
   Scope *scope,
+  u64 epoch,
   Source_Range source_range,
   Slice name,
   Value *value

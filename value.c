@@ -83,7 +83,6 @@ static Fixed_Buffer *
 mass_error_to_string(
   Mass_Error const* error
 ) {
-  char number_buffer[128] = {0};
   Fixed_Buffer *result = fixed_buffer_make(.allocator = allocator_system, .capacity = 4000);
   switch(error->tag) {
     case Mass_Error_Tag_Unimplemented: {
@@ -156,14 +155,14 @@ mass_error_to_string(
       APPEND_SLICE(error->Integer_Range.descriptor->name);
     } break;
     case Mass_Error_Tag_Epoch_Mismatch: {
-      Mass_Error_Epoch_Mismatch const *mismatch = &error->Epoch_Mismatch;
-      APPEND_LITERAL("Trying to access a runtime variable with epoch ");
-      snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->value->epoch);
-      APPEND_SLICE(slice_from_c_string(number_buffer));
-      APPEND_LITERAL(" from a different epoch ");
-      snprintf(number_buffer, sizeof(number_buffer), "%"PRIu64, mismatch->expected_epoch);
-      APPEND_SLICE(slice_from_c_string(number_buffer));
-      APPEND_LITERAL(". ");
+      APPEND_LITERAL("Trying to access a value from the wrong execution epoch ");
+      Slice source = source_from_source_range(&error->source_range);
+      APPEND_SLICE(source);
+      APPEND_LITERAL(".\n");
+      APPEND_LITERAL(
+        "This happens when you access value from runtime in compile-time execution "
+        "or a runtime value from a different stack frame than current function call."
+      );
     } break;
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
@@ -972,13 +971,11 @@ static inline Value *
 value_init_internal(
   Compiler_Source_Location compiler_source_location,
   Value *result,
-  u64 epoch,
   const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
   *result = (Value) {
-    .epoch = epoch,
     .descriptor = descriptor,
     .storage = storage,
     .source_range = source_range,
@@ -1002,7 +999,6 @@ value_make_internal(
   return value_init_internal(
     compiler_source_location,
     allocator_allocate(context->allocator, Value),
-    context->epoch,
     descriptor,
     storage,
     source_range
@@ -1038,7 +1034,7 @@ value_number_literal(
   };
   return value_init(
     allocator_allocate(allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(literal), source_range
+    &descriptor_number_literal, storage_static(literal), source_range
   );
 }
 
@@ -1719,6 +1715,7 @@ execution_context_from_compilation(
 ) {
   return (Execution_Context) {
     .flags = Execution_Context_Flags_Global,
+    .epoch = VALUE_STATIC_EPOCH,
     .allocator = compilation->allocator,
     .program = compilation->runtime_program,
     .compilation = compilation,

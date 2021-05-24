@@ -251,7 +251,7 @@ scope_flatten_till_internal(
       scope_entry_count += scope->map->occupied;
     }
   } else {
-    Scope *result = scope_make(allocator, 0);
+    Scope *result = scope_make(allocator, till);
     result->map = hash_map_make(Scope_Map,
       .allocator = result->allocator,
       .initial_capacity = scope_entry_count,
@@ -397,7 +397,6 @@ token_value_force_immediate_integer(
         u64 byte_size = u64_to_u32(bit_size / 8);
         return value_init(
           allocator_allocate(context->allocator, Value),
-          VALUE_STATIC_EPOCH,
           target_descriptor,
           storage_static_internal(&bits, byte_size),
           value->source_range
@@ -600,17 +599,6 @@ assign(
 }
 
 static Value *
-mass_handle_compile_time_eval_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Value_View *view
-) {
-  Value *result = compile_time_eval(context, *view);
-  return expected_result_validate(expected_result, result);
-}
-
-static Value *
 scope_entry_force(
   Scope_Entry *entry
 ) {
@@ -642,15 +630,8 @@ scope_lookup_force(
   const Scope *scope,
   Slice name
 ) {
-  Scope_Entry *entry = 0;
-  s32 hash = Scope_Map__hash(name);
-  for (; scope; scope = scope->parent) {
-    entry = scope_lookup_shallow_hashed(scope, hash, name);
-    if (entry) break;
-  }
-  if (!entry) {
-    return 0;
-  }
+  Scope_Entry *entry = scope_lookup(scope, name);
+  if (!entry) return 0;
 
   if (!scope_entry_force(entry)) return 0;
   assert(entry->tag == Scope_Entry_Tag_Value);
@@ -660,6 +641,7 @@ scope_lookup_force(
 static inline void
 scope_define_value(
   Scope *scope,
+  u64 epoch,
   Source_Range source_range,
   Slice name,
   Value *value
@@ -679,6 +661,7 @@ scope_define_value(
     *allocated = (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
+      .epoch = epoch,
       .source_range = source_range,
     };
     hash_map_set_by_hash(scope->map, hash, name, allocated);
@@ -727,6 +710,7 @@ scope_define_operator(
     Scope_Entry *new_entry = allocator_allocate(scope->allocator, Scope_Entry);
     *new_entry = (Scope_Entry){
       .tag = Scope_Entry_Tag_Operator,
+      .epoch = VALUE_STATIC_EPOCH,
       .source_range = source_range,
     };
     // Flatten parent operator entry into current one to avoid the need for overload iteration
@@ -792,7 +776,7 @@ token_make_symbol(
   };
   return value_init(
     allocator_allocate(allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_symbol, storage_static(symbol), source_range
+    &descriptor_symbol, storage_static(symbol), source_range
   );
 }
 
@@ -1026,7 +1010,7 @@ tokenize(
             Group_Tag_Square;
           Value *value = value_init(
             allocator_allocate(allocator, Value),
-            VALUE_STATIC_EPOCH, &descriptor_group, storage_static(group), current_token_range
+            &descriptor_group, storage_static(group), current_token_range
           );
           dyn_array_push(parent_stack, (Tokenizer_Parent){
             .group = group,
@@ -1155,7 +1139,6 @@ tokenize(
               descriptor_array_of(allocator, &descriptor_u8, u64_to_u32(length));
             value_init(
               hash_map_set(compilation->static_pointer_map, bytes, (Value){0}),
-              VALUE_STATIC_EPOCH,
               bytes_descriptor,
               storage_none,
               current_token_range
@@ -1166,7 +1149,7 @@ tokenize(
           *string = (Slice){bytes, string_buffer->occupied};
           Value *string_value = value_init(
             allocator_allocate(allocator, Value),
-            VALUE_STATIC_EPOCH, &descriptor_slice, storage_static(string), current_token_range
+            &descriptor_slice, storage_static(string), current_token_range
           );
           push(string_value);
         } else {
@@ -1419,15 +1402,14 @@ token_parse_single(
         Descriptor *temp = descriptor_pointer_to(context->allocator, pointee);
         return value_init(
           allocator_allocate(context->allocator, Value),
-          VALUE_STATIC_EPOCH, &descriptor_type, storage_static(temp), *source_range
+          &descriptor_type, storage_static(temp), *source_range
         );
       }
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    value = scope_lookup_force(context->scope, name);
-    MASS_ON_ERROR(*context->result) return 0;
-    if (!value) {
+    Scope_Entry *entry = scope_lookup(context->scope, name);
+    if (!entry) {
       //scope_print_names(context->scope);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Undefined_Variable,
@@ -1436,17 +1418,15 @@ token_parse_single(
       });
       return 0;
     }
-    if (value->epoch != context->epoch && value->epoch != VALUE_STATIC_EPOCH) {
+    if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Epoch_Mismatch,
-        .Epoch_Mismatch = { .value = value, .expected_epoch = context->epoch },
-        .source_range = *source_range,
-        .detailed_message =
-          "This happens when you access value from runtime in compile-time execution "
-          "or a runtime value from a different stack frame than current function call."
+        .source_range = value->source_range,
       });
       return 0;
     }
+    value = scope_entry_force(entry);
+    return value;
   }
   return value;
 }
@@ -1554,9 +1534,9 @@ token_apply_macro_syntax(
     };
     Value *result = value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_macro_capture, storage_static(capture), capture_view.source_range
+      &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
-    scope_define_value(expansion_scope, capture_view.source_range, capture_name, result);
+    scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_name, result);
   }
 
   Execution_Context body_context = *context;
@@ -2022,6 +2002,13 @@ value_force(
 
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
+    if (lazy->epoch != VALUE_STATIC_EPOCH && lazy->epoch != context->epoch) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Epoch_Mismatch,
+        .source_range = value->source_range,
+      });
+      return 0;
+    }
     Value *result = lazy->proc(&lazy->context, builder, expected_result, lazy->payload);
     allocator_deallocate(context->allocator, lazy, sizeof(Lazy_Value));
     MASS_ON_ERROR(*context->result) return 0;
@@ -2097,7 +2084,9 @@ token_handle_user_defined_operator_proc(
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
     Value *arg = token_parse_single(context, value_view_get(args, i));
-    scope_define_value(body_scope, arg->source_range, arg_name, arg);
+
+    // FIXME this should probably use the epoch from the definition, but we do not capture it yet
+    scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_name, arg);
   }
 
   Execution_Context body_context = *context;
@@ -2119,10 +2108,11 @@ mass_make_lazy_value(
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
+    .epoch = context->epoch,
   };
   return value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_lazy_value, storage_static(lazy), source_range
+    &descriptor_lazy_value, storage_static(lazy), source_range
   );
 }
 
@@ -2140,13 +2130,12 @@ scope_define_lazy_compile_time_expression(
   };
   Value *value = value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH,
     &descriptor_lazy_static_value,
     storage_static(lazy_static_value),
     view.source_range
   );
 
-  scope_define_value(scope, view.source_range, name, value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, view.source_range, name, value);
 }
 
 static u64
@@ -2180,8 +2169,10 @@ token_parse_exports(
       return peek_index;
     }
   }
-  context->module->export_scope =
-    scope_make(context->allocator, context->module->own_scope->parent);
+  context->module->export_scope = scope_make(
+    context->allocator,
+    context->module->own_scope->parent
+  );
 
   if (children.length != 0) {
     Value_View_Split_Iterator it = { .view = children };
@@ -2667,6 +2658,7 @@ token_process_function_literal(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  u64 function_epoch = get_new_epoch();
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
@@ -2691,6 +2683,7 @@ token_process_function_literal(
 
       Execution_Context arg_context = *context;
       arg_context.scope = function_scope;
+      arg_context.epoch = function_epoch;
       fn_info->returns = token_match_return_type(&arg_context, arg_view);
     }
   }
@@ -2709,6 +2702,7 @@ token_process_function_literal(
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
     Execution_Context arg_context = *context;
     arg_context.scope = function_scope;
+    arg_context.epoch = function_epoch;
     Function_Argument arg = token_match_argument(&arg_context, arg_view, fn_info);
     MASS_ON_ERROR(*context->result) return 0;
     dyn_array_push(fn_info->arguments, arg);
@@ -2800,11 +2794,7 @@ compile_time_eval(
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
-  if (
-    !dyn_array_length(eval_builder.code_block.instructions) &&
-    (forced_value->epoch == VALUE_STATIC_EPOCH || value_is_non_lazy_static(forced_value))
-  ) {
-    forced_value->epoch = VALUE_STATIC_EPOCH;
+  if (!dyn_array_length(eval_builder.code_block.instructions)) {
     return forced_value;
   }
 
@@ -2848,7 +2838,6 @@ compile_time_eval(
 
   return value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH,
     out_value->descriptor,
     storage_static_internal(result, result_byte_size),
     view.source_range
@@ -3051,7 +3040,7 @@ token_handle_negation(
     negated->negative = !negated->negative;
     negated_value = value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(negated), value->source_range
+      &descriptor_number_literal, storage_static(negated), value->source_range
     );
   } else {
     panic("TODO support general negation");
@@ -3217,7 +3206,8 @@ call_function_macro(
       }
 
       arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
-      scope_define_value(body_scope, arg_value->source_range, arg->name, arg_value);
+      u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
+      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->name, arg_value);
     }
   }
 
@@ -3250,8 +3240,8 @@ call_function_macro(
     .storage = code_label32(fake_return_label_index),
     .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
   };
-  scope_define_value(body_scope, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
-  scope_define_value(body_scope, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
+  scope_define_value(body_scope, context->epoch, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
+  scope_define_value(body_scope, context->epoch, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
 
   {
     Execution_Context body_context = *context;
@@ -3423,7 +3413,7 @@ call_function_overload(
     }
     Slice name = target_arg_definition->name;
     if (name.length) {
-      scope_define_value(default_arguments_scope, target_arg->source_range, name, target_arg);
+      scope_define_value(default_arguments_scope, context->epoch, target_arg->source_range, name, target_arg);
     }
   }
 
@@ -4364,7 +4354,6 @@ token_handle_type_of(
   // TODO consider adding a const static values to avoid the cast
   result = value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH,
     &descriptor_type,
     storage_static((Descriptor *)descriptor),
     args_token->source_range
@@ -4404,7 +4393,7 @@ token_handle_size_of(
 
   result = value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_number_literal, storage_static(literal), args_token->source_range
+    &descriptor_number_literal, storage_static(literal), args_token->source_range
   );
 
   err:
@@ -4455,7 +4444,6 @@ mass_handle_paren_operator(
     dyn_array_destroy(args);
 
     if (context_is_compile_time_eval(context)) { // compile time
-      assert(pointee->epoch == VALUE_STATIC_EPOCH);
       assert(pointee->storage.tag == Storage_Tag_Memory);
       Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
 
@@ -4473,7 +4461,6 @@ mass_handle_paren_operator(
         .patch_at = pointer_storage,
         .address_of = pointee->storage,
       });
-      pointer->epoch = VALUE_STATIC_EPOCH; // TODO should be a better way
       return pointer;
     } else { // run time
       const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
@@ -4497,7 +4484,6 @@ mass_handle_reflect_operator(
   Value *source_value = value_view_get(args_view, 0);
   value_init(
     hash_map_set(context->compilation->static_pointer_map, source_value, (Value){0}),
-    VALUE_STATIC_EPOCH,
     &descriptor_value,
     storage_none,
     source_value->source_range
@@ -4505,7 +4491,6 @@ mass_handle_reflect_operator(
 
   return value_init(
     allocator_allocate(context->allocator, Value),
-    VALUE_STATIC_EPOCH,
     &descriptor_value_pointer,
     storage_static_inline(&source_value),
     args_view.source_range
@@ -4546,7 +4531,7 @@ mass_handle_at_operator(
   if (value_match_symbol(body, slice_literal("scope"))) {
     return value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_scope, storage_static(context->scope), body_range
+      &descriptor_scope, storage_static(context->scope), body_range
     );
   } else if (value_match_symbol(body, slice_literal("context"))) {
     // TODO context is transient, which, combined with lazy evaluation means that
@@ -4555,14 +4540,14 @@ mass_handle_at_operator(
     *copy = *context;
     return value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_execution_context, storage_static(copy), body_range
+      &descriptor_execution_context, storage_static(copy), body_range
     );
   } else if (value_match_symbol(body, slice_literal("source_range"))) {
     Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);
     *source_range = args_view.source_range;
     return value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_source_range, storage_static(source_range), body_range
+      &descriptor_source_range, storage_static(source_range), body_range
     );
   } else if (value_match_group(body, Group_Tag_Paren)) {
     return compile_time_eval(context, value_as_group(body)->children);
@@ -4678,9 +4663,6 @@ mass_handle_field_access_lazy_proc(
   Storage field_storage = storage_field_access(&struct_->storage, field);
   Value *field_value =
     value_make(context, field->descriptor, field_storage, struct_->source_range);
-  if (field_storage.tag == Storage_Tag_Static) {
-    field_value->epoch = VALUE_STATIC_EPOCH;
-  }
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
@@ -4746,10 +4728,6 @@ mass_handle_array_access_lazy_proc(
       // @Volatile :TemporaryRegisterForIndirectMemory
       array_element_value->is_temporary = true;
     }
-  }
-
-  if (array_element_value->storage.tag == Storage_Tag_Static) {
-    array_element_value->epoch = VALUE_STATIC_EPOCH;
   }
 
   return expected_result_ensure_value_or_temp(context, builder, expected_result, array_element_value);
@@ -5069,7 +5047,7 @@ token_parse_function_literal(
     Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);
     returns = value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_group, storage_static(group), keyword->source_range
+      &descriptor_group, storage_static(group), keyword->source_range
     );
   }
 
@@ -5120,19 +5098,17 @@ token_parse_function_literal(
     fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
   }
   if (body_value) {
-    Function_Literal *body = allocator_allocate(context->allocator, Function_Literal);
-    *body = (Function_Literal){
+    Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+    *literal = (Function_Literal){
       .info = fn_info,
       .body = body_value,
     };
-    Value *literal = value_make(context, &descriptor_function_literal, storage_static(body), view.source_range);
-    literal->epoch = VALUE_STATIC_EPOCH;
-    return literal;
+    return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
     Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, name, fn_info);
     return value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_type, storage_static(fn_descriptor), view.source_range
+      &descriptor_type, storage_static(fn_descriptor), view.source_range
     );
   }
 }
@@ -5357,7 +5333,6 @@ token_parse_block_view(
             *lazy_value_storage = lazy_value;
             Value *lazy_statement = value_init(
               allocator_allocate(context->allocator, Value),
-              VALUE_STATIC_EPOCH,
               &descriptor_lazy_value,
               storage_static(lazy_value_storage),
               matched_view.source_range
@@ -5537,9 +5512,9 @@ token_parse_statement_label(
     Label_Index label = make_label(context->program, &context->program->memory.code, name);
     value = value_init(
       allocator_allocate(context->allocator, Value),
-      VALUE_STATIC_EPOCH, &descriptor_label_index, storage_static_inline(&label), source_range
+      &descriptor_label_index, storage_static_inline(&label), source_range
     );
-    scope_define_value(label_scope, source_range, name, value);
+    scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, name, value);
     if (placeholder) {
       return peek_index;
     }
@@ -5787,7 +5762,7 @@ token_parse_definition(
   );
   if (out_definition_value) *out_definition_value = variable_value;
   Slice name = value_as_symbol(name_token)->name;
-  scope_define_value(context->scope, name_token->source_range, name, variable_value);
+  scope_define_value(context->scope, context->epoch, name_token->source_range, name, variable_value);
 
   return peek_index;
 }
@@ -5829,7 +5804,7 @@ token_define_global_variable(
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, symbol->source_range, scope_name, global_value);
+  scope_define_value(context->scope, VALUE_STATIC_EPOCH, symbol->source_range, scope_name, global_value);
 }
 
 typedef struct {
@@ -5893,7 +5868,7 @@ token_define_local_variable(
   const Source_Range *source_range = &symbol->source_range;
 
   Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, *source_range, scope_name, variable_value);
+  scope_define_value(context->scope, context->epoch, *source_range, scope_name, variable_value);
 
   Mass_Assignment_Lazy_Payload *assignment_payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
@@ -6018,18 +5993,18 @@ scope_define_enum(
     const Descriptor *enum_descriptor = storage_static_as_c_type(&enum_type_value->storage, Descriptor);
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
-      VALUE_STATIC_EPOCH, enum_descriptor, storage_static(&it->value), source_range
+      enum_descriptor, storage_static(&it->value), source_range
     );
-    scope_define_value(enum_scope, source_range, it->name, item_value);
+    scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it->name, item_value);
   }
 
   Value *enum_value = value_init(
     allocator_allocate(allocator, Value),
-    VALUE_STATIC_EPOCH, &descriptor_scope, storage_static(enum_scope), source_range
+    &descriptor_scope, storage_static(enum_scope), source_range
   );
-  scope_define_value(scope, source_range, enum_name, enum_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_name, enum_value);
 
-  scope_define_value(enum_scope, source_range, slice_literal("_Type"), enum_type_value);
+  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, slice_literal("_Type"), enum_type_value);
 }
 
 static void
@@ -6073,7 +6048,7 @@ module_compiler_init(
     descriptor_tag_items, countof(descriptor_tag_items)
   );
 
-  scope_define_value(compiler_scope, source_range, slice_literal("Value"), type_value_value);
+  scope_define_value(compiler_scope, VALUE_STATIC_EPOCH, source_range, slice_literal("Value"), type_value_value);
 }
 
 static void
@@ -6153,16 +6128,16 @@ scope_define_builtins(
     ));
   }
 
-  scope_define_value(scope, range, slice_literal("External_Symbol"), type_external_symbol_value);
-  scope_define_value(scope, range, slice_literal("String"), type_slice_value);
-  scope_define_value(scope, range, slice_literal("Scope"), type_scope_value);
-  scope_define_value(scope, range, slice_literal("Execution_Context"), type_execution_context_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("External_Symbol"), type_external_symbol_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("String"), type_slice_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Scope"), type_scope_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Execution_Context"), type_execution_context_value);
 
   // TODO provide a better way to expose tagged unions
-  scope_define_value(scope, range, slice_literal("Mass_Error_User_Defined"), type_mass_error_user_defined_value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Mass_Error_User_Defined"), type_mass_error_user_defined_value);
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, ...)\
-    scope_define_value(scope, range, slice_literal(#_NAME_), type_##_NAME_##_value);
+    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(#_NAME_), type_##_NAME_##_value);
   MASS_ENUMERATE_BUILT_IN_TYPES
   #undef MASS_PROCESS_BUILT_IN_TYPE
 
@@ -6198,9 +6173,9 @@ scope_define_builtins(
     };\
     Value *value = value_init(\
       allocator_allocate(allocator, Value),\
-      VALUE_STATIC_EPOCH, &descriptor_function_literal, storage_static(literal), (Source_Range){0}\
+      &descriptor_function_literal, storage_static(literal), (Source_Range){0}\
     );\
-    scope_define_value(scope, range, slice_literal(_NAME_), value);\
+    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(_NAME_), value);\
   }
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
@@ -6371,6 +6346,7 @@ program_import_module(
   MASS_TRY(*context->result);
   Execution_Context import_context = *context;
   import_context.flags |= Execution_Context_Flags_Global;
+  import_context.epoch = VALUE_STATIC_EPOCH;
   import_context.module = module;
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);

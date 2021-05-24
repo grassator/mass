@@ -947,7 +947,7 @@ ensure_compiled_function_body(
       Value *arg_value = value_make(
         &body_context, item->descriptor, item->Absolute.storage, item->source_range
       );
-      scope_define_value(body_scope, arg_value->source_range, item->name, arg_value);
+      scope_define_value(body_scope, body_context.epoch, arg_value->source_range, item->name, arg_value);
       Register arg_reg = Register_SP;
       if (arg_value->storage.tag == Storage_Tag_Register) {
         arg_reg = arg_value->storage.Register.index;
@@ -970,12 +970,12 @@ ensure_compiled_function_body(
     &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
   );
 
-  scope_define_value(body_scope, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
+  scope_define_value(body_scope, body_context.epoch, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
   Value *return_label_value = value_make(
     context, &descriptor_void, code_label32(builder->code_block.end_label), returns->source_range
   );
-  scope_define_value(body_scope, returns->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
+  scope_define_value(body_scope, body_context.epoch, returns->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
 
   // :ReturnTypeLargerThanRegister
   // Make sure we don't stomp the address of a larger-than-register
@@ -991,7 +991,7 @@ ensure_compiled_function_body(
 
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
-    scope_define_value(body_scope, return_value->source_range, function->returns.name, return_value);
+    scope_define_value(body_scope, body_context.epoch, return_value->source_range, function->returns.name, return_value);
   }
   Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
   MASS_ON_ERROR(*context->result) return (Storage){0};
