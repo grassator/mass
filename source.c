@@ -621,18 +621,10 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Value: {
       for (Value *value = entry->Value.value; value; value = value->next_overload) {
-        // TODO consider creating a separate type for static lazy values where we do not
-        //      know what the result type is and that do not need a builder to resolve
-        if (
-          value->descriptor == &descriptor_lazy_value &&
-          !value_or_lazy_value_descriptor(value) // defined with ::
-        ) {
+        if (value->descriptor == &descriptor_lazy_static_value) {
           Value *next_overload = value->next_overload;
-          Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
-          Execution_Context *context = &lazy->context;
-          Expected_Result expected_result = expected_result_static(lazy->descriptor);
-          assert(lazy->proc == mass_handle_compile_time_eval_lazy_proc);
-          Value *result = lazy->proc(context, 0, &expected_result, lazy->payload);
+          Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
+          Value *result = compile_time_eval(&lazy->context, lazy->expression);
           if (!result) return 0;
           *value = *result;
           value->next_overload = next_overload;
@@ -2141,13 +2133,20 @@ scope_define_lazy_compile_time_expression(
   Slice name,
   Value_View view
 ) {
-  Value_View *payload = allocator_allocate(context->allocator, Value_View);
-  *payload = view;
-  Value *lazy_value = mass_make_lazy_value(
-    context, view.source_range, payload, 0 /*descriptor*/, mass_handle_compile_time_eval_lazy_proc
+  Lazy_Static_Value *lazy_static_value = allocator_allocate(context->allocator, Lazy_Static_Value);
+  *lazy_static_value = (Lazy_Static_Value){
+    .context = *context,
+    .expression = view,
+  };
+  Value *value = value_init(
+    allocator_allocate(context->allocator, Value),
+    VALUE_STATIC_EPOCH,
+    &descriptor_lazy_static_value,
+    storage_static(lazy_static_value),
+    view.source_range
   );
 
-  scope_define_value(scope, view.source_range, name, lazy_value);
+  scope_define_value(scope, view.source_range, name, value);
 }
 
 static u64

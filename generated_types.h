@@ -178,6 +178,10 @@ typedef struct Lazy_Value Lazy_Value;
 typedef dyn_array_type(Lazy_Value *) Array_Lazy_Value_Ptr;
 typedef dyn_array_type(const Lazy_Value *) Array_Const_Lazy_Value_Ptr;
 
+typedef struct Lazy_Static_Value Lazy_Static_Value;
+typedef dyn_array_type(Lazy_Static_Value *) Array_Lazy_Static_Value_Ptr;
+typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_Ptr;
+
 typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, void * payload);
 
@@ -907,6 +911,12 @@ typedef struct Lazy_Value {
 } Lazy_Value;
 typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 
+typedef struct Lazy_Static_Value {
+  Execution_Context context;
+  Value_View expression;
+} Lazy_Static_Value;
+typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
+
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
@@ -1427,6 +1437,11 @@ static Descriptor descriptor_array_lazy_value;
 static Descriptor descriptor_array_lazy_value_ptr;
 static Descriptor descriptor_lazy_value_pointer;
 static Descriptor descriptor_lazy_value_pointer_pointer;
+static Descriptor descriptor_lazy_static_value;
+static Descriptor descriptor_array_lazy_static_value;
+static Descriptor descriptor_array_lazy_static_value_ptr;
+static Descriptor descriptor_lazy_static_value_pointer;
+static Descriptor descriptor_lazy_static_value_pointer_pointer;
 static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags;
@@ -2963,6 +2978,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_value, Lazy_Value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_value);
+MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value_ptr, Array_Lazy_Static_Value_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value, Array_Lazy_Static_Value)
+MASS_DEFINE_STRUCT_DESCRIPTOR(lazy_static_value, Lazy_Static_Value,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("context"),
+    .descriptor = &descriptor_execution_context,
+    .Base_Relative.offset = offsetof(Lazy_Static_Value, context),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("expression"),
+    .descriptor = &descriptor_value_view,
+    .Base_Relative.offset = offsetof(Lazy_Static_Value, expression),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(lazy_static_value);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },

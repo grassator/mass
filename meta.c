@@ -1081,6 +1081,11 @@ main(void) {
     { "void *", "payload" },
   }));
 
+  push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
+    { "Execution_Context", "context" },
+    { "Value_View", "expression" },
+  }));
+
   push_type(type_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
