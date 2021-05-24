@@ -949,7 +949,6 @@ typedef struct Memory_Layout_Item {
   Slice name;
   const Descriptor * descriptor;
   Source_Range source_range;
-  Value_View maybe_default_expression;
   union {
     Memory_Layout_Item_Absolute Absolute;
     Memory_Layout_Item_Base_Relative Base_Relative;
@@ -3051,12 +3050,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout_item, Memory_Layout_Item,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
     .Base_Relative.offset = offsetof(Memory_Layout_Item, source_range),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("maybe_default_expression"),
-    .descriptor = &descriptor_value_view,
-    .Base_Relative.offset = offsetof(Memory_Layout_Item, maybe_default_expression),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

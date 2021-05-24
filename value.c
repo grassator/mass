@@ -1534,7 +1534,6 @@ function_arguments_memory_layout(
       },
       .name = arg->name,
       .descriptor = arg->descriptor,
-      .maybe_default_expression = arg->maybe_default_expression,
       .source_range = arg->source_range,
     });
   }

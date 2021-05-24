@@ -1110,7 +1110,6 @@ main(void) {
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
     { "Source_Range", "source_range" },
-    { "Value_View", "maybe_default_expression" },
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){

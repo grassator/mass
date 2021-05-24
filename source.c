@@ -3394,7 +3394,8 @@ call_function_overload(
     );
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
-      Value_View default_expression = target_arg_definition->maybe_default_expression;
+      Function_Argument *declared_argument = dyn_array_get(fn_info->arguments, i);
+      Value_View default_expression = declared_argument->maybe_default_expression;
       assert(default_expression.length);
       Execution_Context arg_context = *context;
       arg_context.scope = default_arguments_scope;
