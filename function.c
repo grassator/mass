@@ -888,7 +888,7 @@ ensure_compiled_function_body(
   Execution_Context *context,
   Value *fn_value
 ) {
-  if (fn_value->descriptor->tag == Descriptor_Tag_Function) {
+  if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
     return fn_value->storage;
   }
   const Descriptor *descriptor = fn_value->descriptor;
@@ -1054,7 +1054,7 @@ program_init_startup_code(
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, 0 /* scope */);
   Descriptor *descriptor =
-    descriptor_function(context->allocator, slice_literal("__startup"), fn_info);
+    descriptor_function_instance(context->allocator, slice_literal("__startup"), fn_info);
   Label_Index fn_label = make_label(program, &program->memory.code, slice_literal("__startup"));
   Storage storage = code_label32(fn_label);
 

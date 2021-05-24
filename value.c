@@ -67,7 +67,7 @@ mass_error_append_function_signature_string(
   APPEND_SLICE(descriptor->name);
   APPEND_LITERAL("(");
   bool first = true;
-  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function.info->arguments) {
+  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function_Instance.info->arguments) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->name);
@@ -75,7 +75,7 @@ mass_error_append_function_signature_string(
     APPEND_SLICE(arg->descriptor->name);
   }
   APPEND_LITERAL(") -> (");
-  APPEND_SLICE(descriptor->Function.info->returns.descriptor->name);
+  APPEND_SLICE(descriptor->Function_Instance.info->returns.descriptor->name);
   APPEND_LITERAL(")");
 }
 
@@ -287,19 +287,21 @@ same_type(
     case Descriptor_Tag_Struct: {
       return a == b;
     }
-    case Descriptor_Tag_Function: {
-      if (!same_type(a->Function.info->returns.descriptor, b->Function.info->returns.descriptor)) {
+    case Descriptor_Tag_Function_Instance: {
+      const Function_Info *a_info = a->Function_Instance.info;
+      const Function_Info *b_info = b->Function_Instance.info;
+      if (!same_type(a_info->returns.descriptor, b_info->returns.descriptor)) {
         return false;
       }
       if (
-        dyn_array_length(a->Function.info->arguments) !=
-        dyn_array_length(b->Function.info->arguments)
+        dyn_array_length(a_info->arguments) !=
+        dyn_array_length(b_info->arguments)
       ) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a->Function.info->arguments); ++i) {
-        Function_Argument *a_arg = dyn_array_get(a->Function.info->arguments, i);
-        Function_Argument *b_arg = dyn_array_get(b->Function.info->arguments, i);
+      for (u64 i = 0; i < dyn_array_length(a_info->arguments); ++i) {
+        Function_Argument *a_arg = dyn_array_get(a_info->arguments, i);
+        Function_Argument *b_arg = dyn_array_get(b_info->arguments, i);
         if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;
@@ -808,7 +810,7 @@ storage_static_equal_internal(
       }
       break;
     }
-    case Descriptor_Tag_Function: {
+    case Descriptor_Tag_Function_Instance: {
       panic("Unexpected static storage function");
       break;
     }
@@ -1391,18 +1393,20 @@ function_info_init(
 }
 
 static inline Descriptor *
-descriptor_function(
+descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
   Function_Info *info
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
-    .tag = Descriptor_Tag_Function,
+    .tag = Descriptor_Tag_Function_Instance,
     .name = name,
     .bit_size = sizeof(void *) * CHAR_BIT,
     .bit_alignment = sizeof(void *) * CHAR_BIT,
-    .Function.info = info,
+    .Function_Instance = {
+      .info = info,
+    },
   };
   return result;
 }
@@ -1444,9 +1448,8 @@ maybe_function_info_from_value(
   } else {
     const Descriptor *descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(value));
-    if (descriptor->tag == Descriptor_Tag_Function) {
-      assert(descriptor->tag == Descriptor_Tag_Function);
-      return descriptor->Function.info;
+    if (descriptor->tag == Descriptor_Tag_Function_Instance) {
+      return descriptor->Function_Instance.info;
     }
   }
   return 0;

@@ -3576,7 +3576,7 @@ token_handle_function_call(
     if (!to_call_info) {
       // TODO figure out a better way to report generic type errors
       static Descriptor fake_function_descriptor = {
-        .tag = Descriptor_Tag_Function,
+        .tag = Descriptor_Tag_Function_Instance,
         .name = slice_literal_fields("function"),
       };
       const Descriptor *to_call_descriptor =
@@ -5130,7 +5130,7 @@ token_parse_function_literal(
     literal->epoch = VALUE_STATIC_EPOCH;
     return literal;
   } else {
-    Descriptor *fn_descriptor = descriptor_function(context->allocator, name, fn_info);
+    Descriptor *fn_descriptor = descriptor_function_instance(context->allocator, name, fn_info);
     return value_init(
       allocator_allocate(context->allocator, Value),
       VALUE_STATIC_EPOCH, &descriptor_type, storage_static(fn_descriptor), view.source_range

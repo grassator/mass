@@ -986,15 +986,15 @@ typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
 typedef enum {
   Descriptor_Tag_Opaque = 0,
-  Descriptor_Tag_Function = 1,
+  Descriptor_Tag_Function_Instance = 1,
   Descriptor_Tag_Fixed_Size_Array = 2,
   Descriptor_Tag_Struct = 3,
   Descriptor_Tag_Pointer_To = 4,
 } Descriptor_Tag;
 
-typedef struct Descriptor_Function {
+typedef struct Descriptor_Function_Instance {
   Function_Info * info;
-} Descriptor_Function;
+} Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
   u64 length;
@@ -1012,7 +1012,7 @@ typedef struct Descriptor {
   u64 bit_size;
   u64 bit_alignment;
   union {
-    Descriptor_Function Function;
+    Descriptor_Function_Instance Function_Instance;
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
     Descriptor_Struct Struct;
     Descriptor_Pointer_To Pointer_To;
@@ -3182,20 +3182,20 @@ MASS_DEFINE_TYPE_VALUE(function_literal);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Opaque"), .value = 0 },
-{ .name = slice_literal_fields("Function"), .value = 1 },
+{ .name = slice_literal_fields("Function_Instance"), .value = 1 },
 { .name = slice_literal_fields("Fixed_Size_Array"), .value = 2 },
 { .name = slice_literal_fields("Struct"), .value = 3 },
 { .name = slice_literal_fields("Pointer_To"), .value = 4 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function, Descriptor_Function,
+MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_Instance,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("info"),
     .descriptor = &descriptor_function_info_pointer,
-    .Base_Relative.offset = offsetof(Descriptor_Function, info),
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, info),
   },
 );
-MASS_DEFINE_TYPE_VALUE(descriptor_function);
+MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_fixed_size_array, Descriptor_Fixed_Size_Array,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3256,9 +3256,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Function"),
-    .descriptor = &descriptor_descriptor_function,
-    .Base_Relative.offset = offsetof(Descriptor, Function),
+    .name = slice_literal_fields("Function_Instance"),
+    .descriptor = &descriptor_descriptor_function_instance,
+    .Base_Relative.offset = offsetof(Descriptor, Function_Instance),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
