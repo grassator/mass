@@ -661,34 +661,9 @@ scope_lookup_force(
     return 0;
   }
 
-  // Force lazy entries
   if (!scope_entry_force(entry)) return 0;
-
   assert(entry->tag == Scope_Entry_Tag_Value);
-  Value *result = entry->Value.value;
-
-  if (!result) return 0;
-
-  // For functions we need to gather up overloads from all parent scopes
-  if (value_or_lazy_value_descriptor(result)->tag == Descriptor_Tag_Function) {
-    Value *last = result;
-    const Scope *parent = scope;
-    for (;;) {
-      parent = parent->parent;
-      if (!parent) break;
-      Scope_Entry *overload_entry = scope_lookup_shallow_hashed(parent, hash, name);
-      if (!overload_entry) continue;
-      Value *overload = scope_entry_force(overload_entry);
-      if (value_or_lazy_value_descriptor(overload)->tag != Descriptor_Tag_Function) {
-        panic("There should only be function overloads");
-      }
-      while (last->next_overload) {
-        last = last->next_overload;
-      }
-      last->next_overload = overload;
-    };
-  }
-  return result;
+  return entry->Value.value;
 }
 
 static inline void
