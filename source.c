@@ -3445,6 +3445,8 @@ call_function_overload(
     assert(fn_return_value_in_body->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
     Register reg_index = fn_return_value_in_body->storage.Memory.location.Indirect.base_register;
     assert(reg_index != Register_SP);
+    register_acquire(builder, reg_index);
+    register_bitset_set(&argument_register_bit_set, reg_index);
 
     Storage reference_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
     Value *reference_pointer = value_init(
@@ -3462,8 +3464,8 @@ call_function_overload(
   ));
 
   if (instance->storage.tag == Storage_Tag_Static) {
-    // TODO it will not be safe to use this register with other calling conventions
-    Storage reg = storage_register_for_descriptor(Register_A, &descriptor_void_pointer);
+    Register temp_reg = register_acquire_temp(builder);
+    Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
     push_instruction(
       instructions, *source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, instance->storage}}}
@@ -3472,6 +3474,7 @@ call_function_overload(
       instructions, *source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}}
     );
+    register_release(builder, temp_reg);
   } else {
     push_instruction(
       instructions, *source_range,
