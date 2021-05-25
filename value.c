@@ -1512,47 +1512,16 @@ function_return_value_for_descriptor(
   return value_make(context, descriptor, storage, source_range);
 }
 
-static Storage
-function_argument_storage_for_index(
-  const Allocator *allocator,
-  const Function_Info *function,
-  const Descriptor *arg_descriptor,
-  u64 argument_index
-) {
-  u64 byte_size = descriptor_byte_size(arg_descriptor);
-
-  Register general_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
-  Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
-
-  assert(countof(general_registers) == countof(float_registers));
-
-  if (argument_index < countof(general_registers)) {
-    Register *registers = descriptor_is_float(arg_descriptor) ? float_registers : general_registers;
-    Register reg = registers[argument_index];
-    if (byte_size <= 8) {
-      return storage_register_for_descriptor(reg, arg_descriptor);
-    } else {
-      // Large arguments are passed "by reference", i.e. their memory location in the register
-      return (Storage) {
-        .tag = Storage_Tag_Memory,
-        .byte_size = byte_size,
-        .Memory.location = {
-          .tag = Memory_Location_Tag_Indirect,
-          .Indirect = { .base_register = reg },
-        }
-      };
-    }
-  } else {
-    s32 offset = u64_to_s32(argument_index * 8);
-    return stack(offset, byte_size);
-  }
-}
-
 static Memory_Layout
 function_arguments_memory_layout(
   const Allocator *allocator,
   const Function_Info *function
 ) {
+
+  static const Register general_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
+  static const Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
+  assert(countof(general_registers) == countof(float_registers));
+
   Memory_Layout layout = {
     .base = {0}, // FIXME provide stack location for arguments?
     .items = dyn_array_make(
@@ -1571,33 +1540,44 @@ function_arguments_memory_layout(
   u64 index = is_return_larger_than_register ? 1 : 0;
 
   DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
+    Memory_Layout_Item_Flags flags = Memory_Layout_Item_Flags_None;
+
+    u64 byte_size = descriptor_byte_size(arg->descriptor);
+    bool is_large_argument = byte_size > 8;
+    Storage arg_storage;
+    if (index < countof(general_registers)) {
+      Register reg = descriptor_is_float(arg->descriptor)
+        ? float_registers[index]
+        : general_registers[index];
+      if (is_large_argument) {
+        // Large arguments are passed "by reference", i.e. their memory location in the register
+        arg_storage = storage_indirect(byte_size, reg);
+      } else {
+        arg_storage = storage_register_for_descriptor(reg, arg->descriptor);
+      }
+    } else {
+      s32 offset = u64_to_s32(index * 8);
+      arg_storage = stack(offset, byte_size);
+    }
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
-      .Absolute = {
-        .storage = function_argument_storage_for_index(allocator, function, arg->descriptor, index++),
-      },
+      .flags = flags,
+      .Absolute = { .storage = arg_storage, },
       .name = arg->name,
       .descriptor = arg->descriptor,
       .source_range = arg->source_range,
     });
+    index += 1;
   }
 
   if (is_return_larger_than_register) {
-    Storage storage = {
-      .tag = Storage_Tag_Memory,
-      .byte_size = return_byte_size,
-      .Memory.location = {
-        .tag = Memory_Location_Tag_Indirect,
-        .Indirect = { .base_register = Register_C, }
-      }
-    };
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,
-      .Absolute = { .storage = storage, },
+      .Absolute = { .storage = storage_indirect(return_byte_size, Register_C), },
     });
   }
 
