@@ -1594,7 +1594,7 @@ function_arguments_memory_layout(
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
-      .name = function->returns.name,
+      .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,
       .Absolute = { .storage = storage, },
