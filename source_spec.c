@@ -638,6 +638,16 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
+    xit("should correctly work with nested 5 argument calls") {
+      s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
+        "foo", &test_context,
+        "fn foo(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
+        "fn bar(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> () { x5 = 42; }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(1, 2, 3, 4, 5) == 5);
+    }
+
     it("should correctly save volatile registers when calling other functions") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "outer", &test_context,
