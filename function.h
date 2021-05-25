@@ -122,7 +122,7 @@ register_acquire_temp(
   Function_Builder *builder
 );
 
-void
+static void
 fn_encode(
   Program *program,
   Virtual_Memory_Buffer *buffer,

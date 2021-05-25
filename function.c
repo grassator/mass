@@ -549,32 +549,23 @@ typedef struct {
   u8 offset_in_prolog;
 } Function_Pushed_Register;
 
-void
+static void
 fn_encode(
   Program *program,
   Virtual_Memory_Buffer *buffer,
   const Function_Builder *builder,
   Function_Layout *out_layout
 ) {
-  // FIXME move to the callers and turn into an assert
-  if (builder->function->flags & Descriptor_Function_Flags_Macro) {
-    // We should not encode macro functions. And we might not even to be able to anyway
-    // as some of them have Any arguments or returns
-    return;
-  }
-  // Macro functions do not have own stack and do not need freezing
+  assert(!(builder->function->flags & Descriptor_Function_Flags_Macro));
   assert(builder->frozen);
+
+  Label_Index label_index = builder->code_block.start_label;
+  Label *label = program_get_label(program, label_index);
+  assert(!label->resolved);
 
   *out_layout = (Function_Layout) {
     .stack_reserve = builder->stack_reserve,
   };
-
-  Label_Index label_index = builder->code_block.start_label;
-
-  Label *label = program_get_label(program, label_index);
-
-  // Calls to `fn_encode` do not do anything if we already encoded
-  if (label->resolved) return;
 
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
