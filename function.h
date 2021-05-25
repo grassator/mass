@@ -107,7 +107,8 @@ register_release(
 
 static Register
 register_find_available(
-  Function_Builder *builder
+  Function_Builder *builder,
+  u64 register_disallowed_bit_mask
 );
 
 static inline Register

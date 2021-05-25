@@ -1268,7 +1268,7 @@ value_register_for_descriptor_internal(
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
-value_specific_temporary_register_for_descriptor_internal(
+value_temporary_acquire_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
   Function_Builder *builder,
@@ -1287,29 +1287,8 @@ value_specific_temporary_register_for_descriptor_internal(
   return value;
 }
 
-#define value_specific_temporary_register_for_descriptor(...)\
-  value_specific_temporary_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
-static inline Value *
-value_temporary_register_for_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Descriptor *descriptor,
-  Source_Range source_range
-) {
-  return value_specific_temporary_register_for_descriptor_internal(
-    compiler_source_location,
-    context,
-    builder,
-    register_find_available(builder),
-    descriptor,
-    source_range
-  );
-}
-
-#define value_temporary_register_for_descriptor(...)\
-  value_temporary_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+#define value_temporary_acquire_register_for_descriptor(...)\
+  value_temporary_acquire_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline void
 value_release_if_temporary(

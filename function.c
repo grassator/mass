@@ -53,15 +53,17 @@ register_acquire(
 
 static Register
 register_find_available(
-  Function_Builder *builder
+  Function_Builder *builder,
+  u64 register_disallowed_bit_mask
 ) {
-  // FIXME We are skipping Register_A here as it is hardcoded in quite a few places still
+  // FIXME this should be all registers except for RSP
   static const Register temp_registers[] = {
     Register_C, Register_B, Register_D, Register_R8, Register_R9, Register_R10,
-    Register_R11, Register_R12, Register_R13, Register_R14, Register_R15,
+    Register_R11, Register_R12, Register_R13, Register_R14, Register_R15
   };
   for (u32 i = 0; i < countof(temp_registers); ++i) {
     Register reg_index = temp_registers[i];
+    if (register_bitset_get(register_disallowed_bit_mask, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) {
       return reg_index;
     }
@@ -75,7 +77,7 @@ static inline Register
 register_acquire_temp(
   Function_Builder *builder
 ) {
-  return register_acquire(builder, register_find_available(builder));
+  return register_acquire(builder, register_find_available(builder, 0));
 }
 
 static inline void
@@ -109,7 +111,8 @@ register_acquire_maybe_save_if_already_acquired(
   Allocator *allocator,
   Function_Builder *builder,
   const Source_Range *source_range,
-  Register reg_index
+  Register reg_index,
+  u64 register_disallowed_bit_mask
 ) {
   Maybe_Saved_Register result = {
     .saved = false,
@@ -121,7 +124,8 @@ register_acquire_maybe_save_if_already_acquired(
     return result;
   }
 
-  result.saved_index = register_acquire_temp(builder);
+  result.saved_index = register_find_available(builder, register_disallowed_bit_mask);
+  register_acquire(builder, result.saved_index);
   result.saved = true;
 
   push_instruction(
