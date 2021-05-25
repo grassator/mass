@@ -1225,7 +1225,16 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to use if / else statement at top leve") {
+    //it("should have access to the context at compile time") {
+      //void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        //"checker", &test_context,
+        //"fn checker() -> () { @{@context;} }"
+      //);
+      //check(spec_check_mass_result(test_context.result));
+      //checker();
+    //}
+
+    it("should be able to use if / else statement at the top level") {
       test_program_inline_source_base(
         "DUMMY", &test_context,
         "fn do_stuff() -> () {}\n"

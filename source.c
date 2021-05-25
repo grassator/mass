@@ -4507,6 +4507,20 @@ mass_handle_reify_operator(
 }
 
 static Value *
+mass_handle_get_execution_context_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  void *unused_payload
+) {
+  Source_Range source_range = {0}; // FIXME provide proper range
+  return expected_result_ensure_value_or_temp(context, builder, expected_result, value_make(
+    context, &descriptor_execution_context, storage_static(context), source_range
+  ));
+}
+
+
+static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4521,13 +4535,13 @@ mass_handle_at_operator(
       &descriptor_scope, storage_static(context->scope), body_range
     );
   } else if (value_match_symbol(body, slice_literal("context"))) {
-    // TODO context is transient, which, combined with lazy evaluation means that
-    //      we must copy it here. The whole setup is a bit shaky and needs to be re-thought.
-    Execution_Context *copy = allocator_allocate(context->allocator, Execution_Context);
-    *copy = *context;
-    return value_init(
-      allocator_allocate(context->allocator, Value),
-      &descriptor_execution_context, storage_static(copy), body_range
+    void *payload = 0;
+    return mass_make_lazy_value(
+      context,
+      args_view.source_range,
+      payload,
+      &descriptor_execution_context,
+      mass_handle_get_execution_context_lazy_proc
     );
   } else if (value_match_symbol(body, slice_literal("source_range"))) {
     Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);
