@@ -934,10 +934,12 @@ main(void) {
       { "Label_Index", "index" },
     }),
     struct_fields("Bytes", (Struct_Item[]){
-      { "Label_Index", "label_index" },
       { "u8", "memory", 15 },
       { "u8", "length" },
-      { "u64", "label_offset_in_instruction" },
+    }),
+    struct_fields("Label_Patch", (Struct_Item[]){
+      { "u64", "offset" },
+      { "Label_Index", "label_index" },
     }),
   }), (Struct_Item[]){
     { "Compiler_Source_Location", "compiler_source_location" },

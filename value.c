@@ -963,6 +963,12 @@ instruction_equal(
     case Instruction_Tag_Label: {
       return a->Label.index.value == b->Label.index.value;
     }
+    case Instruction_Tag_Label_Patch: {
+      return (
+        a->Label_Patch.label_index.value == b->Label_Patch.label_index.value &&
+        a->Label_Patch.offset == b->Label_Patch.offset
+      );
+    }
     case Instruction_Tag_Bytes: {
       if (a->Bytes.length != b->Bytes.length) return false;
       return !!memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length);

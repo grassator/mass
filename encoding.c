@@ -301,37 +301,41 @@ encode_instruction(
   Virtual_Memory_Buffer *buffer,
   Instruction *instruction
 ) {
-  // TODO turn into a switch statement on type
-  if (instruction->tag == Instruction_Tag_Label) {
-    Label *label = program_get_label(program, instruction->Label.index);
-    assert(!label->resolved);
-    label->section = &program->memory.code;
-    label->offset_in_section = u64_to_u32(buffer->occupied);
-    label->resolved = true;
-    instruction->encoded_byte_size = 0;
-    return;
-  } else if (instruction->tag == Instruction_Tag_Bytes) {
-    u32 instruction_start_offset = u64_to_u32(buffer->occupied);
-    Slice slice = {
-      .bytes = (char *)instruction->Bytes.memory,
-      .length = instruction->Bytes.length,
-    };
-    virtual_memory_buffer_append_slice(buffer, slice);
-
-    if (instruction->Bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
-      u64 patch_offset_in_buffer =
-        instruction_start_offset + instruction->Bytes.label_offset_in_instruction;
+  switch(instruction->tag) {
+    case Instruction_Tag_Label: {
+      Label *label = program_get_label(program, instruction->Label.index);
+      assert(!label->resolved);
+      label->section = &program->memory.code;
+      label->offset_in_section = u64_to_u32(buffer->occupied);
+      label->resolved = true;
+      instruction->encoded_byte_size = 0;
+      return;
+    }
+    case Instruction_Tag_Bytes: {
+      Slice slice = {
+        .bytes = (char *)instruction->Bytes.memory,
+        .length = instruction->Bytes.length,
+      };
+      virtual_memory_buffer_append_slice(buffer, slice);
+      return;
+    }
+    case Instruction_Tag_Label_Patch: {
+      Instruction_Label_Patch *label_patch = &instruction->Label_Patch;
+      u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset;
       dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-        .target_label_index = instruction->Bytes.label_index,
+        .target_label_index = instruction->Label_Patch.label_index,
         .from = {
           .section = &program->memory.code,
           .offset_in_section = u64_to_u32(buffer->occupied),
         },
         .patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer),
       });
+      return;
     }
-
-    return;
+    case Instruction_Tag_Assembly: {
+      // Handled below
+      break;
+    }
   }
 
   u32 storage_count = countof(instruction->Assembly.operands);

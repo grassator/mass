@@ -5636,11 +5636,13 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   const Expected_Result *expected_result,
   Value *args_token
 ) {
-  Instruction_Bytes bytes = {
-    .label_offset_in_instruction = INSTRUCTION_BYTES_NO_LABEL,
-  };
+  Instruction_Bytes bytes = {0};
 
   Value_View_Split_Iterator it = { .view = value_as_group(args_token)->children };
+
+  enum {MAX_PATCH_COUNT = 2};
+  Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
+  s32 patch_count = 0;
 
   for (u64 argument_count = 0; !it.done; argument_count += 1) {
     if (argument_count >= 15) {
@@ -5659,16 +5661,18 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
 
     if (value->descriptor == &descriptor_label_index) {
-      if (bytes.label_offset_in_instruction != INSTRUCTION_BYTES_NO_LABEL) {
+      if (patch_count == MAX_PATCH_COUNT) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = args_token->source_range,
-          .detailed_message = "inline_machine_code_bytes only supports one label"
+          .detailed_message = "inline_machine_code_bytes supports no more than 2 labels"
         });
         return 0;
       }
-      bytes.label_index = *storage_static_as_c_type(&value->storage, Label_Index);
-      bytes.label_offset_in_instruction = u64_to_u8(argument_count);
+      patches[patch_count++] = (Instruction_Label_Patch) {
+        .label_index = *storage_static_as_c_type(&value->storage, Label_Index),
+        .offset = bytes.length
+      };
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
       bytes.memory[bytes.length++] = 0;
@@ -5691,6 +5695,14 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     &builder->code_block.instructions, args_token->source_range,
     (Instruction) { .tag = Instruction_Tag_Bytes, .Bytes = bytes, .scope = context->scope, }
   );
+
+  for (s32 i = 0; i < patch_count; i += 1) {
+    patches[i].offset -= bytes.length;
+    push_instruction(
+      &builder->code_block.instructions, args_token->source_range,
+      (Instruction) { .tag = Instruction_Tag_Label_Patch, .Label_Patch = patches[i] }
+    );
+  }
 
   return expected_result_validate(expected_result, &void_value);
 }
