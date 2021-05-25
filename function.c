@@ -448,29 +448,6 @@ move_value(
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
 }
 
-// FIXME Get rid of this function
-void
-move_to_result_from_temp(
-  Allocator *allocator,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *target,
-  Value *temp_source
-) {
-  if (target->storage.tag == Storage_Tag_Any) {
-    target->storage = temp_source->storage;
-    return;
-  }
-  // Sometimes it is convenient to use result as temp in which case there
-  // is no need for a move or a register release
-  if (!storage_equal(&target->storage, &temp_source->storage)) {
-    move_value(allocator, builder, source_range, &target->storage, &temp_source->storage);
-    if (temp_source->storage.tag == Storage_Tag_Register) {
-      register_release(builder, temp_source->storage.Register.index);
-    }
-  }
-}
-
 // :StackDisplacementEncoding
 s64
 fn_adjust_stack_displacement(
@@ -823,11 +800,10 @@ load_address(
   //assert(result_value->descriptor->tag == Descriptor_Tag_Pointer_To);
   assert(source.tag == Storage_Tag_Memory);
 
-  Value *temp_register = result_value->storage.tag == Storage_Tag_Register
-    ? result_value
-    : value_register_for_descriptor(
-        context, register_acquire_temp(builder), result_value->descriptor, *source_range
-    );
+  bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
+  Storage temp_storage = can_reuse_result_as_temp
+    ? result_value->storage
+    : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
   // TODO rethink operand sizing
   // We need to manually adjust the size here because even if we loading one byte
@@ -837,12 +813,13 @@ load_address(
 
   push_instruction(
     &builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_register->storage, source, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_storage, source, 0}}}
   );
 
-  move_to_result_from_temp(
-    context->allocator, builder, source_range, result_value, temp_register
-  );
+  if (!can_reuse_result_as_temp) {
+    assert(temp_storage.tag == Storage_Tag_Register);
+    register_release(builder, temp_storage.Register.index);
+  }
 }
 
 static Value *
