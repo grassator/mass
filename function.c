@@ -937,8 +937,6 @@ calculate_arguments_match_score(
   Array_Value_Ptr arguments
 ) {
   enum {
-    // TODO consider relationship between casts and literal types
-    Score_Exact_Literal = 1000 * 1000 * 1000,
     Score_Exact_Type = 1000 * 1000,
     Score_Exact_Default = 1000,
     Score_Cast = 1,
