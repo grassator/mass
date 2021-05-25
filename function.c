@@ -350,8 +350,6 @@ move_value(
     return;
   }
 
-  // TODO figure out more type checking
-
   if (target_size != source_size) {
     if (source_size < target_size) {
       // TODO deal with unsigned numbers
@@ -482,7 +480,6 @@ fn_adjust_stack_displacement(
   // Positive values larger than max_call_parameters_stack_size
   // are for arguments to this function on the stack
   if (displacement >= u32_to_s64(builder->max_call_parameters_stack_size)) {
-    panic("here");
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
     s32 return_address_size = 8;
