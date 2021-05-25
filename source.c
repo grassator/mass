@@ -4511,12 +4511,11 @@ mass_handle_get_execution_context_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
-  void *unused_payload
+  Source_Range *source_range
 ) {
-  Source_Range source_range = {0}; // FIXME provide proper range
   Execution_Context **context_pointer = &context;
   return expected_result_ensure_value_or_temp(context, builder, expected_result, value_make(
-    context, &descriptor_execution_context_pointer, storage_static(context_pointer), source_range
+    context, &descriptor_execution_context_pointer, storage_static(context_pointer), *source_range
   ));
 }
 
@@ -4536,7 +4535,8 @@ mass_handle_at_operator(
       &descriptor_scope, storage_static(context->scope), body_range
     );
   } else if (value_match_symbol(body, slice_literal("context"))) {
-    void *payload = 0;
+    Source_Range *payload = allocator_allocate(context->allocator, Source_Range);
+    *payload = args_view.source_range;
     return mass_make_lazy_value(
       context,
       args_view.source_range,
