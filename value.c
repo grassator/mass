@@ -6,6 +6,37 @@
 #include "win32_runtime.h"
 #endif
 
+static inline bool
+value_is_static_number_literal(
+  const Value *value
+) {
+  if (value->descriptor != &descriptor_number_literal) return false;
+  if (value->storage.tag != Storage_Tag_Static) return false;
+  return true;
+}
+
+static inline bool
+value_is_lazy_or_static(
+  const Value *value
+) {
+  if (value->descriptor == &descriptor_lazy_value) return true;
+  if (value->storage.tag == Storage_Tag_Static) return true;
+  if (value->storage.tag == Storage_Tag_None) return true;
+  return false;
+}
+
+static inline bool
+value_is_non_lazy_static(
+  const Value *value
+) {
+  if (!value) return false;
+  if (value->descriptor != &descriptor_lazy_value) {
+    if (value->storage.tag == Storage_Tag_Static) return true;
+    if (value->storage.tag == Storage_Tag_None) return true;
+  }
+  return false;
+}
+
 Slice
 source_from_source_range(
   const Source_Range *source_range
@@ -247,12 +278,6 @@ program_get_label(
 ) {
   return dyn_array_get(program->labels, label.value);
 }
-
-inline bool
-same_value_type(
-  Value *a,
-  Value *b
-);
 
 bool
 same_type(
@@ -1892,7 +1917,7 @@ import_symbol(
   return data_label32(symbol->label32, byte_size);
 }
 
-inline bool
+static inline bool
 same_value_type(
   Value *a,
   Value *b
@@ -1915,8 +1940,7 @@ value_number_literal_cast_to(
   u64 *out_bits,
   u64 *out_bit_size
 ) {
-  assert(value->descriptor == &descriptor_number_literal);
-  assert(value->storage.tag == Storage_Tag_Static);
+  assert(value_is_static_number_literal(value));
 
   if (!descriptor_is_integer(target_descriptor)) {
     return Literal_Cast_Result_Target_Not_An_Integer;
@@ -1981,10 +2005,7 @@ same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
 ) {
-  if (
-    source->descriptor == &descriptor_number_literal &&
-    target != &descriptor_number_literal
-  ) {
+  if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {
       assert(source->storage.tag == Storage_Tag_Static);

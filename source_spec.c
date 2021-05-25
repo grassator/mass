@@ -1038,7 +1038,7 @@ spec("source") {
       check(checker(30, 10, 2) == 42);
     }
 
-    it("should be able to parse and run a subtraction of a negative number") {
+    it("should be able to parse and run a subtraction of a negative literal") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "plus_one", &test_context,
         "fn plus_one(x : s64) -> (s64) { x - -1 }"

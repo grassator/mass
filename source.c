@@ -386,7 +386,7 @@ token_value_force_immediate_integer(
   const Source_Range *source_range = &value->source_range;
 
   assert(descriptor_is_integer(target_descriptor));
-  if (value->descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(value)) {
     u64 bits = 0xCCccCCccCCccCCcc;
     u64 bit_size = 0xCCccCCccCCccCCcc;
     Literal_Cast_Result cast_result =
@@ -482,7 +482,7 @@ assign(
   }
 
   Source_Range source_range = target->source_range;
-  if (source->descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
@@ -1551,28 +1551,6 @@ token_apply_macro_syntax(
   }
 }
 
-static inline bool
-value_is_lazy_or_static(
-  Value *value
-) {
-  if (value->descriptor == &descriptor_lazy_value) return true;
-  if (value->storage.tag == Storage_Tag_Static) return true;
-  if (value->storage.tag == Storage_Tag_None) return true;
-  return false;
-}
-
-static inline bool
-value_is_non_lazy_static(
-  Value *value
-) {
-  if (!value) return false;
-  if (value->descriptor != &descriptor_lazy_value) {
-    if (value->storage.tag == Storage_Tag_Static) return true;
-    if (value->storage.tag == Storage_Tag_None) return true;
-  }
-  return false;
-}
-
 static Value *
 mass_handle_statement_lazy_proc(
   Execution_Context *context,
@@ -1823,7 +1801,7 @@ token_match_argument(
     Value *parsed_default_expression =
       token_parse_expression(context, default_expression, &(u64){0}, 0);
     descriptor = value_or_lazy_value_descriptor(parsed_default_expression);
-    if (descriptor == &descriptor_number_literal) descriptor = &descriptor_s64;
+    if (value_is_static_number_literal(parsed_default_expression)) descriptor = &descriptor_s64;
   } else {
     Value_View type_expression;
     Value_View name_tokens;
@@ -2949,7 +2927,7 @@ mass_handle_cast_lazy_proc(
   u64 original_byte_size = descriptor_byte_size(source_descriptor);
 
   Value *result_value = value;
-  if (source_descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(expression)) {
     result_value = token_value_force_immediate_integer(context, value, target_descriptor);
   } else if (cast_to_byte_size < original_byte_size) {
     result_value = value_make(context, target_descriptor, value->storage, *source_range);
@@ -3673,8 +3651,8 @@ large_enough_common_integer_descriptor_for_values(
   bool left_is_integer = descriptor_is_integer(left);
   bool right_is_integer = descriptor_is_integer(right);
 
-  bool left_is_literal = left == &descriptor_number_literal;
-  bool right_is_literal = right == &descriptor_number_literal;
+  bool left_is_literal = value_is_static_number_literal(left_value);
+  bool right_is_literal = value_is_static_number_literal(right_value);
 
   if (!left_is_integer && !left_is_literal) {
     // TODO :GenericIntegerType
@@ -3756,14 +3734,14 @@ maybe_resize_values_for_integer_math_operation(
   const Descriptor *rd = (*rhs_pointer)->descriptor;
 
   if (ld != result_descriptor) {
-    if (ld == &descriptor_number_literal) {
+    if (value_is_static_number_literal(*lhs_pointer)) {
       *lhs_pointer = maybe_coerce_number_literal_to_integer(context, *lhs_pointer, result_descriptor);
     } else {
       *lhs_pointer = extend_integer_value(context, builder, source_range, *lhs_pointer, result_descriptor);
     }
   }
   if (rd != result_descriptor) {
-    if (rd == &descriptor_number_literal) {
+    if (value_is_static_number_literal(*rhs_pointer)) {
       *rhs_pointer = maybe_coerce_number_literal_to_integer(context, *rhs_pointer, result_descriptor);
     } else {
       *rhs_pointer = extend_integer_value(context, builder, source_range, *rhs_pointer, result_descriptor);
@@ -4906,7 +4884,7 @@ mass_handle_if_expression_lazy_proc(
 
   const Source_Range *dummy_range = &payload->condition->source_range;
 
-  if (condition->descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(condition)) {
     condition = token_value_force_immediate_integer(context, condition, &descriptor_s64);
   } else if (condition->descriptor == &descriptor_lazy_value) {
     // TODO support any If-able descriptors instead of accepting literally anything
@@ -5787,7 +5765,7 @@ token_define_global_variable(
   MASS_ON_ERROR(*context->result) return;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (value->descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(value)) {
     value = token_value_force_immediate_integer(context, value, &descriptor_s64);
   }
 
@@ -5854,7 +5832,7 @@ token_define_local_variable(
   const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
 
   const Descriptor *variable_descriptor;
-  if (descriptor == &descriptor_number_literal) {
+  if (value_is_static_number_literal(value)) {
     // x := 42 should always be initialized to s64 to avoid weird suprises
     variable_descriptor = &descriptor_s64;
   } else {

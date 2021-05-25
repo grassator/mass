@@ -166,13 +166,13 @@ descriptor_array_of(
   u32 length
 );
 
-bool
+static inline bool
 same_type(
   const Descriptor *a,
   const Descriptor *b
 );
 
-bool
+static inline bool
 same_value_type(
   Value *a,
   Value *b
