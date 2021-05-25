@@ -3211,8 +3211,6 @@ call_function_macro(
   // Define a new return target label and value so that explicit return statements
   // jump to correct location and put value in the right place
   Program *program = context->program;
-  Label_Index fake_return_label_index =
-    make_label(program, &program->memory.code, MASS_RETURN_LABEL_NAME);
 
   Value *result_value = 0;
   switch(expected_result->tag) {
@@ -3232,31 +3230,30 @@ call_function_macro(
       break;
     }
   }
-  Value return_label = {
-    .descriptor = &descriptor_void,
-    .storage = code_label32(fake_return_label_index),
-    .compiler_source_location = COMPILER_SOURCE_LOCATION_FIELDS,
-  };
-  scope_define_value(body_scope, context->epoch, result_value->source_range, MASS_RETURN_LABEL_NAME, &return_label);
   scope_define_value(body_scope, context->epoch, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
 
+  Label_Index saved_return_label = builder->code_block.end_label;
   {
+    builder->code_block.end_label =
+      make_label(program, &program->memory.code, slice_literal("macro return"));
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
     Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
     result_value = value_force(&body_context, builder, expected_result, parse_result);
     MASS_ON_ERROR(*context->result) return 0;
-  }
 
-  // @Hack if there are no instructions generated so far there definitely was no jumps
-  //       to return so we can avoid generating this instructions which also can enable
-  //       optimizations in the compile_time_eval that check for the instruction count.
-  if (dyn_array_length(builder->code_block.instructions)) {
-    push_instruction(
-      &builder->code_block.instructions, fn_value->source_range,
-      (Instruction) { .tag = Instruction_Tag_Label, .Label.index = fake_return_label_index }
-    );
+    // @Hack if there are no instructions generated so far there definitely was no jumps
+    //       to return so we can avoid generating this instructions which also can enable
+    //       optimizations in the compile_time_eval that check for the instruction count.
+    if (dyn_array_length(builder->code_block.instructions)) {
+      push_instruction(
+        &builder->code_block.instructions, fn_value->source_range,
+        (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+      );
+    }
   }
+  builder->code_block.end_label = saved_return_label;
+
   dyn_array_destroy(args);
   return result_value;
 }
@@ -5552,15 +5549,12 @@ mass_handle_explicit_return_lazy_proc(
   assert(fn_return);
   MASS_ON_ERROR(assign(context, builder, fn_return, parse_result)) return 0;
 
-  Value *return_label = scope_lookup_force(context->scope, MASS_RETURN_LABEL_NAME);
-  assert(return_label);
-  assert(return_label->descriptor == &descriptor_void);
-  assert(storage_is_label(&return_label->storage));
+  Storage return_label = code_label32(builder->code_block.end_label);
 
   push_instruction(
     &builder->code_block.instructions,
     fn_return->source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label->storage, 0, 0}}}
+    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label, 0, 0}}}
   );
 
   return expected_result_validate(expected_result, &void_value);

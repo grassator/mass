@@ -942,11 +942,6 @@ ensure_function_instance(
 
   scope_define_value(body_scope, body_context.epoch, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
-  Value *return_label_value = value_make(
-    context, &descriptor_void, code_label32(builder->code_block.end_label), returns->source_range
-  );
-  scope_define_value(body_scope, body_context.epoch, returns->source_range, MASS_RETURN_LABEL_NAME, return_label_value);
-
   // :ReturnTypeLargerThanRegister
   // Make sure we don't stomp the address of a larger-than-register
   // return value during the execution of the function
