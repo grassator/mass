@@ -805,12 +805,6 @@ load_address(
     ? result_value->storage
     : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
-  // TODO rethink operand sizing
-  // We need to manually adjust the size here because even if we loading one byte
-  // the right side is treated as an opaque address and does not participate in
-  // instruction encoding.
-  source.byte_size = descriptor_byte_size(result_value->descriptor);
-
   push_instruction(
     &builder->code_block.instructions, *source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_storage, source, 0}}}
