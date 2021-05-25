@@ -1133,6 +1133,12 @@ main(void) {
     { "Value_View", "maybe_default_expression" },
   }));
 
+  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Macro", 1 << 0 },
+    { "Compile_Time", 1 << 2 },
+  }));
+
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
@@ -1146,12 +1152,6 @@ main(void) {
     { "Value *", "body" },
     { "Value *", "runtime_instance"},
     { "Value *", "compile_time_instance"},
-  }));
-
-  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
-    { "None", 0 },
-    { "Macro", 1 << 0 },
-    { "Compile_Time", 1 << 2 },
   }));
 
   push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){

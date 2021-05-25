@@ -203,6 +203,8 @@ typedef struct Function_Argument Function_Argument;
 typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
 typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
 
+typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
+
 typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
@@ -210,8 +212,6 @@ typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
-
-typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
@@ -982,6 +982,20 @@ typedef struct Function_Argument {
 } Function_Argument;
 typedef dyn_array_type(Function_Argument) Array_Function_Argument;
 
+typedef enum Descriptor_Function_Flags {
+  Descriptor_Function_Flags_None = 0,
+  Descriptor_Function_Flags_Macro = 1,
+  Descriptor_Function_Flags_Compile_Time = 4,
+} Descriptor_Function_Flags;
+
+const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
+  if (value == 0) return "Descriptor_Function_Flags_None";
+  if (value == 1) return "Descriptor_Function_Flags_Macro";
+  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
+  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+  return 0;
+};
+
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
@@ -998,20 +1012,6 @@ typedef struct Function_Literal {
   Value * compile_time_instance;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
-
-typedef enum Descriptor_Function_Flags {
-  Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Macro = 1,
-  Descriptor_Function_Flags_Compile_Time = 4,
-} Descriptor_Function_Flags;
-
-const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
-  if (value == 0) return "Descriptor_Function_Flags_None";
-  if (value == 1) return "Descriptor_Function_Flags_Macro";
-  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
-  assert(!"Unexpected value for enum Descriptor_Function_Flags");
-  return 0;
-};
 
 typedef enum {
   Descriptor_Tag_Opaque = 0,
@@ -1483,6 +1483,11 @@ static Descriptor descriptor_array_function_argument;
 static Descriptor descriptor_array_function_argument_ptr;
 static Descriptor descriptor_function_argument_pointer;
 static Descriptor descriptor_function_argument_pointer_pointer;
+static Descriptor descriptor_descriptor_function_flags;
+static Descriptor descriptor_array_descriptor_function_flags;
+static Descriptor descriptor_array_descriptor_function_flags_ptr;
+static Descriptor descriptor_descriptor_function_flags_pointer;
+static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
 static Descriptor descriptor_function_info;
 static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
@@ -1493,11 +1498,6 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
-static Descriptor descriptor_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags_ptr;
-static Descriptor descriptor_descriptor_function_flags_pointer;
-static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -3181,6 +3181,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_argument, Function_Argument,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_argument);
+MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
+static C_Enum_Item descriptor_function_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Macro"), .value = 1 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
@@ -3245,12 +3251,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
-MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
-static C_Enum_Item descriptor_function_flags_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Macro"), .value = 1 },
-{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
-};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
