@@ -942,18 +942,6 @@ ensure_function_instance(
 
   scope_define_value(body_scope, body_context.epoch, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
-  // :ReturnTypeLargerThanRegister
-  // Make sure we don't stomp the address of a larger-than-register
-  // return value during the execution of the function
-  if (
-    return_value->storage.tag == Storage_Tag_Memory &&
-    return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect
-  ) {
-    Register return_reg = return_value->storage.Memory.location.Indirect.base_register;
-    register_bitset_set(&builder->register_occupied_bitset, return_reg);
-    builder->register_occupied_values[return_reg] = return_value;
-  }
-
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {
     scope_define_value(body_scope, body_context.epoch, return_value->source_range, function->returns.name, return_value);
