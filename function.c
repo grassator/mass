@@ -910,8 +910,6 @@ ensure_function_instance(
   body_context.epoch = get_new_epoch();
 
   {
-    Memory_Layout arguments_layout = function_arguments_memory_layout(allocator_default, function);
-
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout.items) {
       assert(item->tag == Memory_Layout_Item_Tag_Absolute);
       Value *arg_value = value_make(
