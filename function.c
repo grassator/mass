@@ -58,8 +58,9 @@ register_find_available(
 ) {
   // FIXME this should be all registers except for RSP
   static const Register temp_registers[] = {
-    Register_C, Register_B, Register_D, Register_R8, Register_R9, Register_R10,
-    Register_R11, Register_R12, Register_R13, Register_R14, Register_R15
+    Register_C, Register_B, Register_D, Register_BP, Register_SI, Register_DI,
+    Register_R8, Register_R9, Register_R10, Register_R11,
+    Register_R12, Register_R13, Register_R14, Register_R15
   };
   for (u32 i = 0; i < countof(temp_registers); ++i) {
     Register reg_index = temp_registers[i];
