@@ -3290,7 +3290,7 @@ call_function_overload(
     case Expected_Result_Tag_Flexible: {
       // FIXME :ExpectedStack
       if (fn_info->returns.descriptor == &descriptor_void) {
-        result_value = value_make(context, &descriptor_void, storage_none, *source_range);
+        result_value = &void_value;
       } else {
         result_value = reserve_stack(context, builder, fn_info->returns.descriptor, *source_range);
       }
