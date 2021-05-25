@@ -37,14 +37,14 @@ value_is_non_lazy_static(
   return false;
 }
 
-Slice
+static inline Slice
 source_from_source_range(
   const Source_Range *source_range
 ) {
   return slice_sub_range(source_range->file->text, source_range->offsets);
 }
 
-Source_Position
+static Source_Position
 source_file_offset_to_position(
   const Source_File *file,
   u64 offset

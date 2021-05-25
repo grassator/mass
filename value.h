@@ -4,6 +4,17 @@
 #include <inttypes.h>
 #include "types.h"
 
+static const Source_File COMPILER_SOURCE_FILE = {
+  .path = slice_literal_fields("__mass_compiler__"),
+  .text = {0},
+  .line_ranges = {&dyn_array_zero_items},
+};
+
+static const Source_Range COMPILER_SOURCE_RANGE = {
+  .file = &COMPILER_SOURCE_FILE,
+  .offsets = {0},
+};
+
 static const Platform_Info platform_info_x86_64_windows = {
   .register_volatile_bitset = (
     // Arguments
@@ -178,17 +189,17 @@ same_value_type(
   Value *b
 );
 
-void
+static void
 source_range_print_start_position(
   const Source_Range *source_range
 );
 
-Slice
+static Slice
 source_from_source_range(
   const Source_Range *source_range
 );
 
-void *
+static void *
 rip_value_pointer(
   Program *program,
   Value *value

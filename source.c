@@ -6196,7 +6196,7 @@ scope_define_builtins(
       descriptor_function_instance(allocator, slice_literal(_NAME_), function, arguments_layout);\
     Value *instance_value = value_init(\
       allocator_allocate(allocator, Value),\
-      instance_descriptor, imm64((u64)_FN_), (Source_Range){0}\
+      instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
     );\
     scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(_NAME_), instance_value);\
   }
@@ -6349,7 +6349,7 @@ program_module_from_file(
   if (!buffer) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Open,
-      .source_range = (Source_Range){0},
+      .source_range = COMPILER_SOURCE_RANGE,
       .detailed_message = "Unable to open the file",
       .File_Open = {.path = file_path},
     });

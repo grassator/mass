@@ -982,8 +982,7 @@ program_init_startup_code(
   Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
   Storage storage = code_label32(fn_label);
 
-  // FIXME Create a special source range for internal values
-  Source_Range source_range = {0};
+  Source_Range source_range = COMPILER_SOURCE_RANGE;
   Value *function = value_make(context, descriptor, storage, source_range);
 
   Function_Builder builder = (Function_Builder){
