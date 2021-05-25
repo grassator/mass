@@ -1513,7 +1513,7 @@ function_arguments_memory_layout(
   assert(countof(general_registers) == countof(float_registers));
 
   Memory_Layout layout = {
-    .base = {0}, // FIXME provide stack location for arguments?
+    .base = storage_indirect(0, Register_SP),
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
@@ -1532,6 +1532,13 @@ function_arguments_memory_layout(
   DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
     Memory_Layout_Item_Flags flags = Memory_Layout_Item_Flags_None;
 
+    Memory_Layout_Item item = {
+      .flags = flags,
+      .name = arg->name,
+      .descriptor = arg->descriptor,
+      .source_range = arg->source_range,
+    };
+
     u64 byte_size = descriptor_byte_size(arg->descriptor);
     bool is_large_argument = byte_size > 8;
     Storage arg_storage;
@@ -1545,18 +1552,13 @@ function_arguments_memory_layout(
       } else {
         arg_storage = storage_register_for_descriptor(reg, arg->descriptor);
       }
+      item.tag = Memory_Layout_Item_Tag_Absolute;
+      item.Absolute.storage = arg_storage;
     } else {
-      s32 offset = u64_to_s32(index * 8);
-      arg_storage = stack(offset, byte_size);
+      item.tag = Memory_Layout_Item_Tag_Base_Relative;
+      item.Base_Relative.offset = index * 8;
     }
-    dyn_array_push(layout.items, (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = flags,
-      .Absolute = { .storage = arg_storage, },
-      .name = arg->name,
-      .descriptor = arg->descriptor,
-      .source_range = arg->source_range,
-    });
+    dyn_array_push(layout.items, item);
     index += 1;
   }
 
@@ -1572,6 +1574,29 @@ function_arguments_memory_layout(
   }
 
   return layout;
+}
+
+static inline Storage
+memory_layout_item_storage_at_index(
+  const Memory_Layout *layout,
+  u64 index
+) {
+  const Memory_Layout_Item *item = dyn_array_get(layout->items, index);
+  switch(item->tag) {
+    case Memory_Layout_Item_Tag_Absolute: {
+      return item->Absolute.storage;
+    }
+    case Memory_Layout_Item_Tag_Base_Relative: {
+      assert(layout->base.tag == Storage_Tag_Memory);
+      assert(layout->base.Memory.location.tag == Memory_Location_Tag_Indirect);
+      Storage result = layout->base;
+      result.byte_size = descriptor_byte_size(item->descriptor);
+      result.Memory.location.Indirect.offset += u64_to_s32(item->Base_Relative.offset);
+      return result;
+    }
+  }
+  panic("Not reached");
+  return storage_none;
 }
 
 const Platform_Info *

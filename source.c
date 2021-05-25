@@ -3383,12 +3383,12 @@ call_function_overload(
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
     Memory_Layout_Item *target_arg_definition =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
-    assert(target_arg_definition->tag == Memory_Layout_Item_Tag_Absolute); // TODO
 
+    Storage target_storage =
+      memory_layout_item_storage_at_index(&instance_descriptor->arguments_layout, i);
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
     // must not be used as a temporary for any other argument loading. So we acquire them
     // here and release after the function call
-    Storage target_storage = target_arg_definition->Absolute.storage;
     register_acquire_from_storage(builder, &argument_register_bit_set, &target_storage);
     Value *target_arg = value_make(
       context,

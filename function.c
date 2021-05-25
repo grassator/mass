@@ -910,11 +910,10 @@ ensure_function_instance(
   body_context.epoch = get_new_epoch();
 
   {
-    DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout.items) {
-      assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-      Value *arg_value = value_make(
-        &body_context, item->descriptor, item->Absolute.storage, item->source_range
-      );
+    for(u64 i = 0; i < dyn_array_length(arguments_layout.items); ++i) {
+      Memory_Layout_Item *item = dyn_array_get(arguments_layout.items, i);
+      Storage storage = memory_layout_item_storage_at_index(&arguments_layout, i);
+      Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
         scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
       }
