@@ -54,6 +54,7 @@ bool :: s8
 true :: 1
 false :: 0
 
+operator 16 (- x) { negate(x) }
 operator 16 (& x) { address_of(x) }
 
 operator 15 (x << y) { logical_shift_left(x, y) }
@@ -86,6 +87,11 @@ external :: @fn(library_name : String, symbol_name : String) -> (result : Extern
   result.library_name = library_name
   result.symbol_name = symbol_name
   result
+}
+
+negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
+  literal.negative = if literal.negative then false else true
+  literal
 }
 
 

@@ -3022,32 +3022,6 @@ token_handle_cast(
   );
 }
 
-static Value *
-token_handle_negation(
-  Execution_Context *context,
-  Value_View args,
-  void *unused_payload
-) {
-  assert(args.length == 1);
-  Value *value = token_parse_single(context, value_view_get(args, 0));
-
-  Value *negated_value = 0;
-  if (value->descriptor == &descriptor_number_literal) {
-    const Number_Literal *original = storage_static_as_c_type(&value->storage, Number_Literal);
-    Number_Literal *negated = allocator_allocate(context->allocator, Number_Literal);
-    *negated = *original;
-    negated->negative = !negated->negative;
-    negated_value = value_init(
-      allocator_allocate(context->allocator, Value),
-      &descriptor_number_literal, storage_static(negated), value->source_range
-    );
-  } else {
-    panic("TODO support general negation");
-  }
-
-  return negated_value;
-}
-
 static void
 token_dispatch_operator(
   Execution_Context *context,
@@ -6125,13 +6099,6 @@ scope_define_builtins(
     .handler = mass_handle_dot_operator,
   ));
 
-  scope_define_operator(0, scope, range, slice_literal("-"), allocator_make(allocator, Operator,
-    .precedence = 17,
-    .handler = token_handle_negation,
-    .argument_count = 1,
-    .fixity = Operator_Fixity_Prefix
-  ));
-
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
     scope_define_operator(0, scope, range, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
       .precedence = (PRECEDENCE),\
@@ -6162,6 +6129,7 @@ scope_define_builtins(
     ));
   }
 
+  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Number_Literal"), type_number_literal_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("External_Symbol"), type_external_symbol_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Scope"), type_scope_value);
