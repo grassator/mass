@@ -3259,6 +3259,40 @@ call_function_macro(
   return result_value;
 }
 
+static void
+register_acquire_from_storage(
+  Function_Builder *builder,
+  u64 *argument_register_bit_set,
+  const Storage *storage
+) {
+  switch(storage->tag) {
+    case Storage_Tag_None: {
+      // Nothing to do
+      break;
+    }
+    default:
+    case Storage_Tag_Any:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Static: {
+      panic("Internal Error: Unexpected storage type for a function argument");
+      break;
+    }
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm: {
+      Register reg_index = storage->Register.index;
+      register_acquire(builder, reg_index);
+      register_bitset_set(argument_register_bit_set, reg_index);
+    } break;
+    case Storage_Tag_Memory: {
+      if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
+        Register reg_index = storage->Memory.location.Indirect.base_register;
+        register_acquire(builder, reg_index);
+        register_bitset_set(argument_register_bit_set, reg_index);
+      }
+    } break;
+  }
+}
+
 static Value *
 call_function_overload(
   Execution_Context *context,
@@ -3280,20 +3314,17 @@ call_function_overload(
   Value *fn_return_value = function_return_value_for_descriptor(
     context, fn_info->returns.descriptor, Function_Argument_Mode_Call, *source_range
   );
+  if (fn_info->returns.descriptor != &descriptor_void) {
+    fn_return_value->is_temporary = true;
+  }
 
-  Value *result_value = 0;
+  const Storage *maybe_expected_storage = 0;
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
+      maybe_expected_storage = &value_from_exact_expected_result(expected_result)->storage;
       break;
     }
     case Expected_Result_Tag_Flexible: {
-      // FIXME :ExpectedStack
-      if (fn_info->returns.descriptor == &descriptor_void) {
-        result_value = &void_value;
-      } else {
-        result_value = reserve_stack(context, builder, fn_info->returns.descriptor, *source_range);
-      }
       break;
     }
   }
@@ -3309,7 +3340,7 @@ call_function_overload(
     // :NoSaveResult
     // We must not save the register that we will overwrite with the result
     // otherwise we will overwrite it with the restored value
-    if (storage_is_register_index(&result_value->storage, reg_index)) continue;
+    if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
 
     Value *occupied_value = builder->register_occupied_values[reg_index];
     assert(occupied_value);
@@ -3358,29 +3389,7 @@ call_function_overload(
     // must not be used as a temporary for any other argument loading. So we acquire them
     // here and release after the function call
     Storage target_storage = target_arg_definition->Absolute.storage;
-    switch(target_storage.tag) {
-      default:
-      case Storage_Tag_Any:
-      case Storage_Tag_Eflags:
-      case Storage_Tag_None:
-      case Storage_Tag_Static: {
-        panic("Internal Error: Unexpected storage type for a function argument");
-        break;
-      }
-      case Storage_Tag_Register:
-      case Storage_Tag_Xmm: {
-        Register reg_index = target_storage.Register.index;
-        register_acquire(builder, reg_index);
-        register_bitset_set(&argument_register_bit_set, reg_index);
-      } break;
-      case Storage_Tag_Memory: {
-        if (target_storage.Memory.location.tag == Memory_Location_Tag_Indirect) {
-          Register reg_index = target_storage.Memory.location.Indirect.base_register;
-          register_acquire(builder, reg_index);
-          register_bitset_set(&argument_register_bit_set, reg_index);
-        }
-      } break;
-    }
+    register_acquire_from_storage(builder, &argument_register_bit_set, &target_storage);
     Value *target_arg = value_make(
       context,
       target_arg_definition->descriptor,
@@ -3463,7 +3472,10 @@ call_function_overload(
     );
   }
 
-  MASS_ON_ERROR(assign(context, builder, result_value, fn_return_value)) return 0;
+
+  register_acquire_from_storage(builder, &argument_register_bit_set, &fn_return_value->storage);
+  Value *expected_value =
+    expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
   // :ArgumentRegisterAcquire
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
@@ -3476,7 +3488,7 @@ call_function_overload(
     register_acquire(builder, reg_index);
 
     // :NoSaveResult
-    if (storage_is_register_index(&result_value->storage, reg_index)) continue;
+    if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
 
     Value *occupied_value = builder->register_occupied_values[reg_index];
     assert(occupied_value->storage.tag == Storage_Tag_Memory);
@@ -3495,7 +3507,7 @@ call_function_overload(
     }
   }
 
-  return result_value;
+  return expected_value;
 }
 
 static Value *
