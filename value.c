@@ -438,6 +438,10 @@ print_operand(
       // TODO print better info
       u64 bits = operand->byte_size * 8;
       printf("m%"PRIu64, bits);
+      if (operand->Memory.location.tag == Memory_Location_Tag_Indirect) {
+        Register reg_index = operand->Memory.location.Indirect.base_register;
+        printf("(r%d)", reg_index);
+      }
       break;
     }
     default: {
