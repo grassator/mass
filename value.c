@@ -1499,17 +1499,7 @@ function_return_value_for_descriptor(
   if (mode == Function_Argument_Mode_Body) {
     base_register = Register_C;
   }
-  Storage storage = {
-    .tag = Storage_Tag_Memory,
-    .byte_size = byte_size,
-    .Memory.location = {
-      .tag = Memory_Location_Tag_Indirect,
-      .Indirect = {
-        .base_register = base_register,
-      }
-    }
-  };
-  return value_make(context, descriptor, storage, source_range);
+  return value_make(context, descriptor, storage_indirect(byte_size, base_register), source_range);
 }
 
 static Memory_Layout
