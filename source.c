@@ -2326,28 +2326,28 @@ mass_normalize_import_path(
 
 static Scope
 mass_import(
-  Execution_Context context,
+  Execution_Context *context,
   Slice file_path
 ) {
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
-    return *context.compilation->compiler_module.export_scope;
+    return *context->compilation->compiler_module.export_scope;
   }
 
-  file_path = mass_normalize_import_path(context.allocator, file_path);
-  Module **module_pointer = hash_map_get(context.compilation->module_map, file_path);
+  file_path = mass_normalize_import_path(context->allocator, file_path);
+  Module **module_pointer = hash_map_get(context->compilation->module_map, file_path);
   if (module_pointer) {
     module = *module_pointer;
   } else {
-    const Scope *root_scope = context.compilation->root_scope;
-    Scope *module_scope = scope_make(context.allocator, root_scope);
-    module = program_module_from_file(&context, file_path, module_scope);
-    Mass_Result module_result = program_import_module(&context, module);
+    const Scope *root_scope = context->compilation->root_scope;
+    Scope *module_scope = scope_make(context->allocator, root_scope);
+    module = program_module_from_file(context, file_path, module_scope);
+    Mass_Result module_result = program_import_module(context, module);
     MASS_ON_ERROR(module_result) {
-      *context.result = module_result;
+      *context->result = module_result;
       return (Scope){0};
     }
-    hash_map_set(context.compilation->module_map, file_path, module);
+    hash_map_set(context->compilation->module_map, file_path, module);
   }
 
   if (!module->export_scope) {
@@ -4514,8 +4514,9 @@ mass_handle_get_execution_context_lazy_proc(
   void *unused_payload
 ) {
   Source_Range source_range = {0}; // FIXME provide proper range
+  Execution_Context **context_pointer = &context;
   return expected_result_ensure_value_or_temp(context, builder, expected_result, value_make(
-    context, &descriptor_execution_context, storage_static(context), source_range
+    context, &descriptor_execution_context_pointer, storage_static(context_pointer), source_range
   ));
 }
 
@@ -4540,7 +4541,7 @@ mass_handle_at_operator(
       context,
       args_view.source_range,
       payload,
-      &descriptor_execution_context,
+      &descriptor_execution_context_pointer,
       mass_handle_get_execution_context_lazy_proc
     );
   } else if (value_match_symbol(body, slice_literal("source_range"))) {
@@ -6197,7 +6198,7 @@ scope_define_builtins(
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
-    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context),
+    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice)
   );
 
