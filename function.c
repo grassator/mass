@@ -315,7 +315,6 @@ move_value(
         break;
       }
       case 8: {
-        // FIXME This does sign extension so will be broken for unsigned
         if (s64_fits_into_s32(immediate)) {
           adjusted_source = imm32(s64_to_s32(immediate));
         } else {

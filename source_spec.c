@@ -629,6 +629,33 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should correctly deal with sign extending negative immediate integers") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "fn foo() -> (s64) { -2147483647  }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == -INT64_C(2147483647));
+    }
+
+    it("should correctly deal with larger than INT32_MAX immediate integers") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "fn foo() -> (u64) { 2147483649  }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 2147483649llu);
+    }
+
+    it("should correctly deal with larger than INT64_MAX immediate integers") {
+      u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "fn foo() -> (u64) { 18446744073709551615 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 18446744073709551615llu);
+    }
+
     it("should be able to parse and run a function with 5 arguments") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,

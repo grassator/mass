@@ -581,6 +581,7 @@ assign(
     }
   }
 
+  MASS_TRY(*context->result);
   if (same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) {
     move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
     return *context->result;
