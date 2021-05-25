@@ -544,11 +544,6 @@ make_trampoline(
   return result;
 }
 
-typedef struct {
-  u8 register_index;
-  u8 offset_in_prolog;
-} Function_Pushed_Register;
-
 static void
 fn_encode(
   Program *program,
