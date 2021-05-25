@@ -646,6 +646,7 @@ scope_define_value(
   Slice name,
   Value *value
 ) {
+  assert(name.length);
   if (!scope->map) {
     scope->map = hash_map_make(Scope_Map, scope->allocator);
   }

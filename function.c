@@ -915,7 +915,9 @@ ensure_function_instance(
       Value *arg_value = value_make(
         &body_context, item->descriptor, item->Absolute.storage, item->source_range
       );
-      scope_define_value(body_scope, body_context.epoch, arg_value->source_range, item->name, arg_value);
+      if (item->name.length) {
+        scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
+      }
       Register arg_reg = Register_SP;
       if (arg_value->storage.tag == Storage_Tag_Register) {
         arg_reg = arg_value->storage.Register.index;
