@@ -2644,29 +2644,44 @@ token_process_function_literal(
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, function_scope);
 
-  Value_View return_types_view = value_as_group(return_types)->children;
-  if (return_types_view.length == 0) {
-    fn_info->returns = (Function_Return) { .descriptor = &descriptor_void, };
-  } else {
-    Value_View_Split_Iterator it = { .view = return_types_view };
+  Execution_Context arg_context = *context;
+  arg_context.scope = function_scope;
+  arg_context.epoch = function_epoch;
 
-    for (u64 i = 0; !it.done; ++i) {
-      if (i > 0) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unimplemented,
-          .detailed_message = "Multiple return types are not supported at the moment",
-          .source_range = return_types->source_range,
-        });
-        return 0;
-      }
-      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-
-      Execution_Context arg_context = *context;
-      arg_context.scope = function_scope;
-      arg_context.epoch = function_epoch;
-      fn_info->returns = token_match_return_type(&arg_context, arg_view);
+  if (value_is_group(return_types)) {
+    const Group *return_types_group = value_as_group(return_types);
+    if (return_types_group->tag != Group_Tag_Paren) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .detailed_message = "Return type can only be a type name or a parenthesized list",
+        .source_range = return_types->source_range,
+      });
+      return 0;
     }
+    Value_View return_types_view = return_types_group->children;
+    if (return_types_view.length == 0) {
+      fn_info->returns = (Function_Return) { .descriptor = &descriptor_void, };
+    } else {
+      Value_View_Split_Iterator it = { .view = return_types_view };
+
+      for (u64 i = 0; !it.done; ++i) {
+        if (i > 0) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unimplemented,
+            .detailed_message = "Multiple return types are not supported at the moment",
+            .source_range = return_types->source_range,
+          });
+          return 0;
+        }
+        Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+
+        fn_info->returns = token_match_return_type(&arg_context, arg_view);
+      }
+    }
+  } else {
+    fn_info->returns = token_match_return_type(&arg_context, value_view_single(&return_types));
   }
+  MASS_ON_ERROR(*context->result) return 0;
 
   bool previous_argument_has_default_value = false;
   Value_View args_view = value_as_group(args)->children;
@@ -2680,9 +2695,6 @@ token_process_function_literal(
 
   for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-    Execution_Context arg_context = *context;
-    arg_context.scope = function_scope;
-    arg_context.epoch = function_epoch;
     Function_Argument arg = token_match_argument(&arg_context, arg_view, fn_info);
     MASS_ON_ERROR(*context->result) return 0;
     dyn_array_push(fn_info->arguments, arg);
@@ -5016,7 +5028,7 @@ token_parse_function_literal(
   Value *returns;
   Token_Maybe_Match(arrow, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("->"));
   if (arrow) {
-    Token_Expect_Match(raw_return, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+    Token_Expect_Match(raw_return, .tag = Token_Pattern_Tag_Any);
     returns = raw_return;
   } else {
     Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);

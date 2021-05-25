@@ -877,11 +877,20 @@ spec("source") {
           "fibonnacci(n - 1) + fibonnacci(n - 2)\n"
         "}"
       );
-      check(fibonnacci);
+      check(spec_check_mass_result(test_context.result));
 
       check(fibonnacci(0) == 0);
       check(fibonnacci(1) == 1);
       check(fibonnacci(10) == 55);
+    }
+
+    it("should allow non-parenthesized return type") {
+      s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
+        "checker", &test_context,
+        "fn checker(x: s32) -> s32 { x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(42) == 42);
     }
 
     it("should report an error when encountering invalid pointer type") {
