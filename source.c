@@ -3825,7 +3825,7 @@ storage_load_index_address(
 
     // Load previous address into a temp register
     Value *temp_value = value_temporary_acquire_register_for_descriptor(
-      context, builder, register_find_available(builder, 0), &descriptor_s64, index_value->source_range
+      context, builder, register_find_available(builder, 0), &descriptor_void_pointer, index_value->source_range
     );
 
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {

@@ -796,8 +796,7 @@ load_address(
   Value *result_value,
   Storage source
 ) {
-  // FIXME enable this check when the reference args are more explicit in the call code
-  //assert(result_value->descriptor->tag == Descriptor_Tag_Pointer_To);
+  assert(result_value->descriptor->tag == Descriptor_Tag_Pointer_To);
   assert(source.tag == Storage_Tag_Memory);
 
   bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
