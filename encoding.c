@@ -442,7 +442,7 @@ encode_instruction(
   for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
     Storage *storage = &instruction->Assembly.operands[storage_index];
     printf(" ");
-    print_operand(storage);
+    print_storage(storage);
   }
   printf("\n");
   assert(!"Did not find acceptable encoding");

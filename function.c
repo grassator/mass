@@ -383,9 +383,9 @@ move_value(
       }
       return;
     } else {
-      print_operand(target);
+      print_storage(target);
       printf(" ");
-      print_operand(source);
+      print_storage(source);
       printf("\nat ");
       source_range_print_start_position(source_range);
       assert(!"Mismatched operand size when moving");
@@ -482,6 +482,7 @@ fn_adjust_stack_displacement(
   // Positive values larger than max_call_parameters_stack_size
   // are for arguments to this function on the stack
   if (displacement >= u32_to_s64(builder->max_call_parameters_stack_size)) {
+    panic("here");
     // Return address will be pushed on the stack by the caller
     // and we need to account for that
     s32 return_address_size = 8;

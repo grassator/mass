@@ -217,8 +217,8 @@ rip_value_pointer_from_label_index(
   Label_Index label_index
 );
 
-void
-print_operand(
+static void
+print_storage(
   const Storage *operand
 );
 

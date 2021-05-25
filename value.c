@@ -382,8 +382,8 @@ storage_static_value_up_to_u64(
   }
 }
 
-void
-print_operand(
+static void
+print_storage(
   const Storage *operand
 ) {
   switch (operand->tag) {
