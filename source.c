@@ -4535,6 +4535,15 @@ mass_handle_at_operator(
       &descriptor_scope, storage_static(context->scope), body_range
     );
   } else if (value_match_symbol(body, slice_literal("context"))) {
+    if (!context_is_compile_time_eval(context)) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Epoch_Mismatch,
+        .source_range = args_view.source_range,
+        .detailed_message =
+          slice_literal("@context can only be used inside of compile time execution"),
+      });
+      return 0;
+    }
     Source_Range *payload = allocator_allocate(context->allocator, Source_Range);
     *payload = args_view.source_range;
     return mass_make_lazy_value(
