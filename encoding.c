@@ -157,6 +157,9 @@ encode_instruction_assembly(
             displacement = s64_to_s32(storage->Memory.location.Indirect.offset);
             break;
           }
+          case Memory_Location_Tag_Stack: {
+            panic("Stack locations must be resolved beforehand");
+          }
         }
         // :RipRelativeEncoding
         if (can_have_zero_displacement && displacement == 0) {
@@ -251,6 +254,9 @@ encode_instruction_assembly(
           assert(mod == MOD_Displacement_0);
         }
         break;
+      }
+      case Memory_Location_Tag_Stack: {
+        panic("Stack locations must be resolved beforehand");
       }
     }
   }

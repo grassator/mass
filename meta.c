@@ -865,6 +865,12 @@ main(void) {
     { "u32", "has_value" },
   }));
 
+  push_type(type_enum("Stack_Area", (Enum_Type_Item[]){
+    { "Local", 0 },
+    { "Received_Argument", 1 },
+    { "Call_Target_Argument", 2 },
+  }));
+
   push_type(type_union("Memory_Location", (Struct_Type[]){
     struct_fields("Instruction_Pointer_Relative", (Struct_Item[]){
       { "Label_Index", "label_index" },
@@ -875,13 +881,13 @@ main(void) {
       { "Maybe_Register", "maybe_index_register" },
       { "s64", "offset" },
     }),
+    struct_fields("Stack", (Struct_Item[]){
+      { "Stack_Area", "area" },
+      { "s32", "offset" },
+    }),
   }));
 
   push_type(type_union("Static_Memory", (Struct_Type[]){
-    //struct_fields("S8", (Struct_Item[]){{ "s8", "value" }}),
-    //struct_fields("S16", (Struct_Item[]){{ "s16", "value" }}),
-    //struct_fields("S32", (Struct_Item[]){{ "s32", "value" }}),
-    //struct_fields("S64", (Struct_Item[]){{ "s64", "value" }}),
     struct_fields("U8", (Struct_Item[]){{ "u8", "value" }}),
     struct_fields("U16", (Struct_Item[]){{ "u16", "value" }}),
     struct_fields("U32", (Struct_Item[]){{ "u32", "value" }}),

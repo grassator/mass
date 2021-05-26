@@ -698,22 +698,65 @@ imm_auto(
 }
 
 static inline Storage
-stack(
+storage_stack_argument(
   s32 offset,
   u64 byte_size
 ) {
   assert(byte_size);
-  return (const Storage) {
+  return (Storage) {
     .tag = Storage_Tag_Memory,
     .byte_size = byte_size,
     .Memory.location = {
-      .tag = Memory_Location_Tag_Indirect,
-      .Indirect = {
-        .base_register = Register_SP,
-        .offset = offset,
-      }
+      .tag = Memory_Location_Tag_Stack,
+      .Stack = {
+        .area = Stack_Area_Received_Argument,
+        .offset = offset
+      },
     }
   };
+}
+
+static inline Storage
+storage_stack_local(
+  s32 offset,
+  u64 byte_size
+) {
+  assert(byte_size);
+  return (Storage) {
+    .tag = Storage_Tag_Memory,
+    .byte_size = byte_size,
+    .Memory.location = {
+      .tag = Memory_Location_Tag_Stack,
+      .Stack = {
+        .area = Stack_Area_Local,
+        .offset = offset
+      },
+    }
+  };
+}
+
+static inline Storage
+storage_adjusted_memory_location(
+  const Storage *original,
+  s32 diff
+) {
+  assert(original->tag == Storage_Tag_Memory);
+  Storage result = *original;
+  switch(result.Memory.location.tag) {
+    case Memory_Location_Tag_Instruction_Pointer_Relative: {
+      panic("TODO support offset for instruction-pointer relative addresses");
+      break;
+    }
+    case Memory_Location_Tag_Indirect: {
+      result.Memory.location.Indirect.offset += diff;
+      break;
+    }
+    case Memory_Location_Tag_Stack: {
+      result.Memory.location.Stack.offset += diff;
+      break;
+    }
+  }
+  return result;
 }
 
 Descriptor *
@@ -917,7 +960,12 @@ storage_equal(
             a_location->Indirect.maybe_index_register.index == b_location->Indirect.maybe_index_register.index &&
             a_location->Indirect.offset == b_location->Indirect.offset
           );
-          break;
+        }
+        case Memory_Location_Tag_Stack: {
+          return (
+            a_location->Stack.area == b_location->Stack.area &&
+            a_location->Stack.offset == b_location->Stack.offset
+          );
         }
       }
       panic("Internal Error: Unexpected Memory_Location_Tag");
@@ -1309,12 +1357,25 @@ value_release_if_temporary(
     case Storage_Tag_Memory: {
       // @Volatile :TemporaryRegisterForIndirectMemory
       Memory_Location *location = &value->storage.Memory.location;
-      assert(location->tag == Memory_Location_Tag_Indirect);
-      Register reg = location->Indirect.base_register;
-      if (reg != Register_SP) {
-        register_release(builder, reg);
+      switch(location->tag) {
+        case Memory_Location_Tag_Indirect: {
+          Register reg = location->Indirect.base_register;
+          if (reg == Register_SP) {
+            panic("Unexpected temporary indirect memory location based on the stack pointer");
+          }
+          register_release(builder, reg);
+          // TODO what about index register
+          break;
+        }
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          panic("Unexpected temporary instruction-relative storage");
+          break;
+        }
+        case Memory_Location_Tag_Stack: {
+          // TODO reuse stack memory
+          break;
+        }
       }
-      // TODO what about index register
       break;
     }
     case Storage_Tag_Any:
@@ -1524,7 +1585,7 @@ function_arguments_memory_layout(
   assert(countof(general_registers) == countof(float_registers));
 
   Memory_Layout layout = {
-    .base = storage_indirect(0, Register_SP),
+    .base = storage_stack_argument(0, 1),
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
@@ -1598,11 +1659,9 @@ memory_layout_item_storage_at_index(
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      assert(layout->base.tag == Storage_Tag_Memory);
-      assert(layout->base.Memory.location.tag == Memory_Location_Tag_Indirect);
-      Storage result = layout->base;
+      Storage result =
+        storage_adjusted_memory_location(&layout->base, u64_to_s32(item->Base_Relative.offset));
       result.byte_size = descriptor_byte_size(item->descriptor);
-      result.Memory.location.Indirect.offset += u64_to_s32(item->Base_Relative.offset);
       return result;
     }
   }

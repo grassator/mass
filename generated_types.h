@@ -103,6 +103,8 @@ typedef struct Maybe_Register Maybe_Register;
 typedef dyn_array_type(Maybe_Register *) Array_Maybe_Register_Ptr;
 typedef dyn_array_type(const Maybe_Register *) Array_Const_Maybe_Register_Ptr;
 
+typedef enum Stack_Area Stack_Area;
+
 typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
 typedef dyn_array_type(const Memory_Location *) Array_Const_Memory_Location_Ptr;
@@ -581,9 +583,24 @@ typedef struct Maybe_Register {
 } Maybe_Register;
 typedef dyn_array_type(Maybe_Register) Array_Maybe_Register;
 
+typedef enum Stack_Area {
+  Stack_Area_Local = 0,
+  Stack_Area_Received_Argument = 1,
+  Stack_Area_Call_Target_Argument = 2,
+} Stack_Area;
+
+const char *stack_area_name(Stack_Area value) {
+  if (value == 0) return "Stack_Area_Local";
+  if (value == 1) return "Stack_Area_Received_Argument";
+  if (value == 2) return "Stack_Area_Call_Target_Argument";
+  assert(!"Unexpected value for enum Stack_Area");
+  return 0;
+};
+
 typedef enum {
   Memory_Location_Tag_Instruction_Pointer_Relative = 0,
   Memory_Location_Tag_Indirect = 1,
+  Memory_Location_Tag_Stack = 2,
 } Memory_Location_Tag;
 
 typedef struct Memory_Location_Instruction_Pointer_Relative {
@@ -595,12 +612,17 @@ typedef struct Memory_Location_Indirect {
   Maybe_Register maybe_index_register;
   s64 offset;
 } Memory_Location_Indirect;
+typedef struct Memory_Location_Stack {
+  Stack_Area area;
+  s32 offset;
+} Memory_Location_Stack;
 typedef struct Memory_Location {
   Memory_Location_Tag tag;
   char _tag_padding[4];
   union {
     Memory_Location_Instruction_Pointer_Relative Instruction_Pointer_Relative;
     Memory_Location_Indirect Indirect;
+    Memory_Location_Stack Stack;
   };
 } Memory_Location;
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
@@ -1351,6 +1373,11 @@ static Descriptor descriptor_array_maybe_register;
 static Descriptor descriptor_array_maybe_register_ptr;
 static Descriptor descriptor_maybe_register_pointer;
 static Descriptor descriptor_maybe_register_pointer_pointer;
+static Descriptor descriptor_stack_area;
+static Descriptor descriptor_array_stack_area;
+static Descriptor descriptor_array_stack_area_ptr;
+static Descriptor descriptor_stack_area_pointer;
+static Descriptor descriptor_stack_area_pointer_pointer;
 static Descriptor descriptor_memory_location;
 static Descriptor descriptor_array_memory_location;
 static Descriptor descriptor_array_memory_location_ptr;
@@ -2119,11 +2146,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register, Maybe_Register,
   },
 );
 MASS_DEFINE_TYPE_VALUE(maybe_register);
+MASS_DEFINE_OPAQUE_C_TYPE(stack_area, Stack_Area)
+static C_Enum_Item stack_area_items[] = {
+{ .name = slice_literal_fields("Local"), .value = 0 },
+{ .name = slice_literal_fields("Received_Argument"), .value = 1 },
+{ .name = slice_literal_fields("Call_Target_Argument"), .value = 2 },
+};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
 static C_Enum_Item memory_location_tag_items[] = {
 { .name = slice_literal_fields("Instruction_Pointer_Relative"), .value = 0 },
 { .name = slice_literal_fields("Indirect"), .value = 1 },
+{ .name = slice_literal_fields("Stack"), .value = 2 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_instruction_pointer_relative, Memory_Location_Instruction_Pointer_Relative,
   {
@@ -2161,6 +2195,21 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_indirect, Memory_Location_Indirect
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_location_indirect);
+MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_stack, Memory_Location_Stack,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("area"),
+    .descriptor = &descriptor_stack_area,
+    .Base_Relative.offset = offsetof(Memory_Location_Stack, area),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("offset"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Memory_Location_Stack, offset),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(memory_location_stack);
 MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location, Memory_Location,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2179,6 +2228,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location, Memory_Location,
     .name = slice_literal_fields("Indirect"),
     .descriptor = &descriptor_memory_location_indirect,
     .Base_Relative.offset = offsetof(Memory_Location, Indirect),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Stack"),
+    .descriptor = &descriptor_memory_location_stack,
+    .Base_Relative.offset = offsetof(Memory_Location, Stack),
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_location);

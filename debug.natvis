@@ -9,6 +9,18 @@
     <Type Name="Storage">
       <DisplayString Condition="tag == Storage_Tag_None">_</DisplayString>
       <DisplayString Condition="tag == Storage_Tag_Register">{Register.index,d}</DisplayString>
+      <DisplayString
+        Condition="tag == Storage_Tag_Memory &amp;&amp;
+                   Memory.location.tag == Memory_Location_Tag_Stack"
+        >{Memory.location.Stack.area,d}[{Memory.location.Stack.offset,d}]</DisplayString>
+      <DisplayString
+        Condition="tag == Storage_Tag_Memory &amp;&amp;
+                   Memory.location.tag == Memory_Location_Tag_Instruction_Pointer_Relative"
+        >rip+label({Memory.location.Instruction_Pointer_Relative.label_index.value})</DisplayString>
+      <DisplayString
+        Condition="tag == Storage_Tag_Memory &amp;&amp;
+                   Memory.location.tag == Memory_Location_Tag_Indirect"
+        >[{Memory.location.Indirect.base_register,d} + {Memory.location.Indirect.offset}]</DisplayString>
     </Type>
     <Type Name="Instruction">
       <DisplayString Condition="type == Instruction_Type_Assembly">

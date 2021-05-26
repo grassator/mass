@@ -3351,6 +3351,13 @@ call_function_overload(
 
     Storage target_storage =
       memory_layout_item_storage_at_index(&instance_descriptor->arguments_layout, i);
+    if (
+      target_storage.tag == Storage_Tag_Memory &&
+      target_storage.Memory.location.tag == Memory_Location_Tag_Stack
+    ) {
+      assert(target_storage.Memory.location.Stack.area == Stack_Area_Received_Argument);
+      target_storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
+    }
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
     // must not be used as a temporary for any other argument loading. So we acquire them
     // here and release after the function call
@@ -3457,12 +3464,13 @@ call_function_overload(
 
     Value *occupied_value = builder->register_occupied_values[reg_index];
     assert(occupied_value->storage.tag == Storage_Tag_Memory);
-    Register temp_reg = occupied_value->storage.Memory.location.Indirect.base_register;
-    if (temp_reg == Register_SP) {
+    if (occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Stack) {
       Storage reg_storage = storage_register_for_descriptor(reg_index, occupied_value->descriptor);
       move_value(context->allocator, builder, source_range, &reg_storage, &occupied_value->storage);
       occupied_value->storage = reg_storage;
     } else {
+      assert(occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      Register temp_reg = occupied_value->storage.Memory.location.Indirect.base_register;
       Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
       Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
       push_instruction(
@@ -4626,10 +4634,9 @@ storage_field_access(
       );
     }
     case Storage_Tag_Memory: {
-      Storage field_storage = *struct_storage;
-      assert(field_storage.Memory.location.tag == Memory_Location_Tag_Indirect);
+      Storage field_storage =
+        storage_adjusted_memory_location(struct_storage, s64_to_s32(field->Base_Relative.offset));
       field_storage.byte_size = descriptor_byte_size(field->descriptor);
-      field_storage.Memory.location.Indirect.offset += field->Base_Relative.offset;
       return field_storage;
     }
   }
@@ -4734,25 +4741,25 @@ mass_handle_array_access_lazy_proc(
   } else {
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
     assert(array->storage.tag == Storage_Tag_Memory);
-    assert(array->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-    assert(!array->storage.Memory.location.Indirect.maybe_index_register.has_value);
 
     const Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
 
     u64 item_byte_size = descriptor_byte_size(item_descriptor);
 
-    array_element_value =
-      value_make(context, item_descriptor, array->storage, array->source_range);
-    array_element_value->storage.byte_size = item_byte_size;
+    Storage element_storage;
     if (index->storage.tag == Storage_Tag_Static) {
       s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
-      array_element_value->storage.Memory.location.Indirect.offset = index_number * item_byte_size;
+      s32 offset = index_number * s64_to_s32(item_byte_size);
+      element_storage = storage_adjusted_memory_location(&array->storage, offset);
     } else {
-      array_element_value->storage =
-        storage_load_index_address(context, builder, array_range, array, item_descriptor, index);
       // @Volatile :TemporaryRegisterForIndirectMemory
-      array_element_value->is_temporary = true;
+      element_storage =
+        storage_load_index_address(context, builder, array_range, array, item_descriptor, index);
     }
+    element_storage.byte_size = item_byte_size;
+
+    array_element_value = value_make(context, item_descriptor, element_storage, array->source_range);
+    array_element_value->is_temporary = true;
   }
 
   return expected_result_ensure_value_or_temp(context, builder, expected_result, array_element_value);
@@ -5280,9 +5287,12 @@ mass_handle_block_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
     u64 registers_before = builder ? builder->register_occupied_bitset : 0;
     Value *lazy_statement = *dyn_array_get(lazy_statements, i);
-    // Saving this source range for debugging because it will get overwritten when lazy is forced
     Source_Range debug_source_range = lazy_statement->source_range;
-    (void)debug_source_range;
+    Slice debug_source = source_from_source_range(&debug_source_range);
+    // This is an easy way to break on the statement based on source text
+    if (slice_starts_with(debug_source, slice_literal("")) && false) {
+      printf("");
+    }
     if (i == statement_count - 1) {
       result_value = value_force(context, builder, expected_result, lazy_statement);
       result_value = expected_result_ensure_value_or_temp(context, builder, expected_result, result_value);
@@ -5861,8 +5871,7 @@ mass_handle_assignment_lazy_proc(
   Value *target = value_force(context, builder, &expected_target, payload->target);
   MASS_ON_ERROR(*context->result) return 0;
 
-  Expected_Result expected_assignment = expected_result_from_value(target);
-  target = value_force(context, builder, &expected_assignment, payload->expression);
+  value_force_exact(context, builder, target, payload->expression);
   value_release_if_temporary(builder, target);
 
   return expected_result_validate(expected_result, &void_value);

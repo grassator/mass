@@ -8,21 +8,10 @@ reserve_stack_storage(
   s32 byte_size = u64_to_s32(raw_byte_size);
   builder->stack_reserve = s32_align(builder->stack_reserve, byte_size);
   builder->stack_reserve += byte_size;
-  return stack(-builder->stack_reserve, byte_size);
+  // The value is negative here because the stack grows down
+  return storage_stack_local(-builder->stack_reserve, raw_byte_size);
 }
 
-// :StackDisplacementEncoding
-// There are three types of values that can be present on the stack in the current setup
-// 1) Parameters to the current function. In Win32 ABI that is every parameter past 4th.
-//    these values are temporarily stored in the Storage as positive integers with values
-//    larger than max_call_parameters_stack_size. Offsets of these are adjusted in
-//    fn_adjust_stack_displacement.
-// 2) Temporary values that are used for stack arguments for function to other functions for
-//    the same cases as above.
-// 3) Locals. They need to physically located in memory after the 2), but untill we know
-//    all the function calls within the body we do not know the max_call_parameters_stack_size
-//    so during initial encoding they are stored as negative numbers and then adjusted in
-//    fn_adjust_stack_displacement.
 Value *
 reserve_stack_internal(
   Compiler_Source_Location compiler_source_location,
@@ -276,18 +265,13 @@ move_value(
     if (source->byte_size > 8) {
       // TODO use XMM or 64 bit registers where appropriate
       // TODO support packed structs
-      static const u64 chunk_size = 4;
+      static const s32 chunk_size = 4;
       assert(source->byte_size % chunk_size == 0);
       // TODO can there be something else?
-      assert(target->tag == Storage_Tag_Memory);
-      Memory_Location location = target->Memory.location;
-      // TODO support other ones
-      assert(location.tag == Memory_Location_Tag_Indirect);
       assert(source->byte_size == target->byte_size);
-      for (u64 offset = 0; offset < source->byte_size; offset += chunk_size) {
-        Storage adjusted_target = *target;
+      for (s32 offset = 0; offset < u64_to_s32(source->byte_size); offset += chunk_size) {
+        Storage adjusted_target = storage_adjusted_memory_location(target, offset);
         adjusted_target.byte_size = chunk_size;
-        adjusted_target.Memory.location.Indirect.offset += offset;
         assert(source->Static.memory.tag == Static_Memory_Tag_Heap);
         void *memory = (s8 *)source->Static.memory.Heap.pointer + offset;
         Storage adjusted_source = storage_static_internal(memory, chunk_size);
@@ -448,64 +432,6 @@ move_value(
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
 }
 
-// :StackDisplacementEncoding
-s64
-fn_adjust_stack_displacement(
-  const Function_Builder *builder,
-  s64 displacement
-) {
-  // Negative diplacement is used to encode local variables
-  if (displacement < 0) {
-    displacement += builder->stack_reserve;
-  } else
-  // Positive values larger than max_call_parameters_stack_size
-  // are for arguments to this function on the stack
-  if (displacement >= u32_to_s64(builder->max_call_parameters_stack_size)) {
-    // Return address will be pushed on the stack by the caller
-    // and we need to account for that
-    s32 return_address_size = 8;
-    displacement += builder->stack_reserve + return_address_size;
-  }
-  return displacement;
-}
-
-void
-fn_normalize_instruction_operands(
-  Program *program,
-  const Function_Builder *builder,
-  Instruction *instruction
-) {
-  // :StorageNormalization
-  // Normalizing operands to simplify future handling in the encoder
-  for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
-    Storage *storage = &instruction->Assembly.operands[storage_index];
-    if (
-      storage->tag == Storage_Tag_Memory &&
-      storage->Memory.location.tag == Memory_Location_Tag_Indirect &&
-      storage->Memory.location.Indirect.base_register == Register_SP
-    ) {
-      storage->Memory.location.Indirect.offset =
-        fn_adjust_stack_displacement(builder, storage->Memory.location.Indirect.offset);
-    }
-  }
-}
-
-// TODO generalize for all jumps to jumps
-void
-fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(
-  Function_Builder *builder
-) {
-  Instruction *last_instruction = dyn_array_last(builder->code_block.instructions);
-  if (!last_instruction) return;
-  if (last_instruction->tag != Instruction_Tag_Assembly) return;
-  if (last_instruction->Assembly.mnemonic != jmp) return;
-  Storage storage = last_instruction->Assembly.operands[0];
-  if (!storage_is_label(&storage)) return;
-  if (storage.Memory.location.Instruction_Pointer_Relative.label_index.value
-    != builder->code_block.end_label.value) return;
-  dyn_array_pop(builder->code_block.instructions);
-}
-
 void
 fn_end(
   Program *program,
@@ -513,15 +439,59 @@ fn_end(
 ) {
   assert(!builder->frozen);
 
-  u8 alignment = 0x8;
+  s32 return_address_size = 8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
-  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + alignment;
+  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
 
-  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    fn_normalize_instruction_operands(program, builder, instruction);
+  s32 argument_stack_base = builder->stack_reserve + return_address_size;
+  // :RegisterPushPop
+  // pushes change the stack pointer so we need to account for that
+  for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
+    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
+        argument_stack_base += 8;
+      }
+    }
   }
-  fn_maybe_remove_unnecessary_jump_from_return_statement_at_the_end_of_function(builder);
+
+  // Adjust stack locations
+  DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
+    for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
+      Storage *storage = &instruction->Assembly.operands[storage_index];
+      if (storage->tag == Storage_Tag_Memory) {
+        Memory_Location *location = &storage->Memory.location;
+        switch(location->tag) {
+          case Memory_Location_Tag_Stack: {
+            Memory_Location_Stack stack = location->Stack;
+            *storage = storage_indirect(storage->byte_size, Register_SP);
+            switch(stack.area) {
+              case Stack_Area_Local: {
+                assert(stack.offset < 0);
+                storage->Memory.location.Indirect.offset = builder->stack_reserve + stack.offset;
+                break;
+              }
+              case Stack_Area_Received_Argument: {
+                assert(stack.offset >= 0);
+                storage->Memory.location.Indirect.offset = argument_stack_base + stack.offset;
+                break;
+              }
+              case Stack_Area_Call_Target_Argument: {
+                assert(stack.offset >= 0);
+                storage->Memory.location.Indirect.offset = stack.offset;
+                break;
+              }
+            }
+            break;
+          }
+          case Memory_Location_Tag_Instruction_Pointer_Relative:
+          case Memory_Location_Tag_Indirect: {
+            // Nothing to do
+            break;
+          }
+        }
+      }
+    }
+  }
 
   builder->frozen = true;
 }
@@ -879,8 +849,20 @@ ensure_function_instance(
       if (arg_value->storage.tag == Storage_Tag_Register) {
         arg_reg = arg_value->storage.Register.index;
       } else if(arg_value->storage.tag == Storage_Tag_Memory) {
-        assert(arg_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-        arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
+        switch(arg_value->storage.Memory.location.tag) {
+          case Memory_Location_Tag_Instruction_Pointer_Relative: {
+            panic("Unsupported argument memory storage");
+            break;
+          }
+          case Memory_Location_Tag_Indirect: {
+            arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
+            break;
+          }
+          case Memory_Location_Tag_Stack: {
+            arg_reg = Register_SP;
+            break;
+          }
+        }
       } else {
         panic("Unexpected storage tag for an argument");
       }

@@ -665,7 +665,7 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
-    xit("should correctly work with nested 5 argument calls") {
+    it("should correctly work with nested 5 argument calls") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
         "fn foo(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
@@ -872,7 +872,7 @@ spec("source") {
     it("should be able to run fibonnacii") {
       s64(*fibonnacci)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "fibonnacci", &test_context,
-        "fn fibonnacci(n : s64) -> (s64) {\n"
+        "fibonnacci :: fn(n : s64) -> (s64) {\n"
           "if (n < 2) { return n }\n"
           "fibonnacci(n - 1) + fibonnacci(n - 2)\n"
         "}"

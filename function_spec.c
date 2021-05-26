@@ -47,19 +47,6 @@ spec("function") {
     bucket_buffer_destroy(temp_buffer);
   }
 
-  describe("stack") {
-    it("should correctly align allocated values") {
-      Value *a = reserve_stack(temp_context, builder, &descriptor_s8, (Source_Range){0});
-      check(a->storage.tag == Storage_Tag_Memory);
-      check(a->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      check(a->storage.Memory.location.Indirect.offset == -1);
-      Value *b = reserve_stack(temp_context, builder, &descriptor_s32, (Source_Range){0});
-      check(b->storage.tag == Storage_Tag_Memory);
-      check(b->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      check(b->storage.Memory.location.Indirect.offset == -8);
-    }
-  }
-
   describe("move_value") {
     it("should not add any instructions when moving value to itself (pointer equality)") {
       Value *reg_a = value_register_for_descriptor(temp_context, Register_A, &descriptor_s8, (Source_Range){0});
@@ -134,7 +121,10 @@ spec("function") {
         value_from_s32(temp_context, 42000, (Source_Range){0}),
       };
       for (u64 i = 0; i < countof(descriptors); ++i) {
-        Value *memory = &(Value){descriptors[i], stack(0, descriptor_byte_size(descriptors[i]))};
+        Value *memory = &(Value){
+          descriptors[i],
+          storage_stack_local(0, descriptor_byte_size(descriptors[i]))
+        };
         // We end at the current descriptor index to make sure we do not
         // try to move larger immediate into a smaller register
         for (u64 j = 0; j <= u64_min(i, countof(immediates) - 1); ++j) {
@@ -151,7 +141,7 @@ spec("function") {
       }
     }
     it("should use a 32bit immediate when the value fits for a move to a 64bit value") {
-      Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
+      Value *memory = &(Value){&descriptor_s64, storage_stack_local(0, 8)};
       Storage immediate = imm64(42000);
       move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate);
       check(dyn_array_length(builder->code_block.instructions) == 1);
@@ -161,7 +151,7 @@ spec("function") {
       check(instruction->Assembly.operands[1].byte_size == 4);
     }
     it("should use a temp register for a imm64 to memory move") {
-      Value *memory = &(Value){&descriptor_s64, stack(0, 8)};
+      Value *memory = &(Value){&descriptor_s64, storage_stack_local(0, 8)};
       Value *immediate = value_from_s64(temp_context, 42ll << 32, (Source_Range){0});
       move_value(temp_allocator, builder, &test_range, &memory->storage, &immediate->storage);
       check(dyn_array_length(builder->code_block.instructions) == 2);
@@ -183,7 +173,7 @@ spec("function") {
       };
       for (u64 i = 0; i < countof(tests); ++i) {
         dyn_array_clear(builder->code_block.instructions);
-        Value *memory = &(Value){&descriptor_s8, stack(0, 1)};
+        Value *memory = &(Value){&descriptor_s8, storage_stack_local(0, 1)};
         Value *eflags = value_from_compare(temp_context, tests[i].compare_type, (Source_Range){0});
         move_value(temp_allocator, builder, &test_range, &memory->storage, &eflags->storage);
         check(dyn_array_length(builder->code_block.instructions) == 1);
@@ -203,7 +193,7 @@ spec("function") {
         dyn_array_clear(builder->code_block.instructions);
         Value *memory = &(Value){
           tests[i].descriptor,
-          stack(0, descriptor_byte_size(tests[i].descriptor))
+          storage_stack_local(0, descriptor_byte_size(tests[i].descriptor))
         };
         Value *temp_reg = value_register_for_descriptor(temp_context, Register_C, &descriptor_s8, (Source_Range){0});
         Value *resized_temp_reg = value_register_for_descriptor(temp_context, Register_C, tests[i].descriptor, (Source_Range){0});
