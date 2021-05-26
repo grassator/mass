@@ -41,6 +41,7 @@ static inline Slice
 source_from_source_range(
   const Source_Range *source_range
 ) {
+  if (!source_range->file) return (Slice){0};
   return slice_sub_range(source_range->file->text, source_range->offsets);
 }
 
