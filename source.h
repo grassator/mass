@@ -230,4 +230,15 @@ context_error(
   *context->result = (Mass_Result) { .tag = Mass_Result_Tag_Error, .Error.error = error };
 }
 
+static void
+scope_define_enum(
+  const Allocator *allocator,
+  Scope *scope,
+  Source_Range source_range,
+  Slice enum_name,
+  Value *enum_type_value,
+  C_Enum_Item *items,
+  u64 item_count
+);
+
 #endif

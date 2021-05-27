@@ -2,6 +2,8 @@
 #include "source.h"
 #include "function.h"
 
+#include "generated_exports.c"
+
 static inline Value *
 value_from_exact_expected_result(
   const Expected_Result *expected_result
@@ -6066,33 +6068,7 @@ module_compiler_init(
     .own_scope = compiler_scope,
     .export_scope = compiler_scope,
   };
-  Source_Range source_range = COMPILER_SOURCE_RANGE;
-
-  scope_define_enum(
-    allocator, compiler_scope, source_range,
-    slice_literal("Operator_Fixity"), type_operator_fixity_value,
-    operator_fixity_items, countof(operator_fixity_items)
-  );
-
-  scope_define_enum(
-    allocator, compiler_scope, source_range,
-    slice_literal("Mass_Result_Tag"), type_mass_result_tag_value,
-    mass_result_tag_items, countof(mass_result_tag_items)
-  );
-
-  scope_define_enum(
-    allocator, compiler_scope, source_range,
-    slice_literal("Mass_Error_Tag"), type_mass_error_tag_value,
-    mass_error_tag_items, countof(mass_error_tag_items)
-  );
-
-  scope_define_enum(
-    allocator, compiler_scope, source_range,
-    slice_literal("Descriptor_Tag"), type_descriptor_tag_value,
-    descriptor_tag_items, countof(descriptor_tag_items)
-  );
-
-  scope_define_value(compiler_scope, VALUE_STATIC_EPOCH, source_range, slice_literal("Value"), type_value_value);
+  compiler_scope_define_exports(compilation, compiler_scope);
 }
 
 static void
@@ -6170,9 +6146,6 @@ scope_define_builtins(
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Scope"), type_scope_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Execution_Context"), type_execution_context_value);
-
-  // TODO provide a better way to expose tagged unions
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Mass_Error_User_Defined"), type_mass_error_user_defined_value);
 
   #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, ...)\
     scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(#_NAME_), type_##_NAME_##_value);

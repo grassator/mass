@@ -76,6 +76,7 @@ typedef enum {
 
 typedef struct {
   Meta_Type_Tag tag;
+  bool exported;
   union {
     Struct_Type struct_;
     Enum_Type enum_;
@@ -255,6 +256,78 @@ print_c_type(
         fprintf(file, "hash_map_template(%s, %s, %s, %s, %s)\n",
           map->name, map->key_type, map->value_type, map->hash_function, map->equal_function);
       }
+      break;
+    }
+  }
+}
+
+static void
+print_scope_define(
+  FILE *file,
+  const char *name
+) {
+  char *lowercase_name = strtolower(name);
+  fprintf(file, "  scope_define_value(\n");
+  fprintf(file, "    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,\n");
+  fprintf(file, "    slice_literal(\"%s\"), type_%s_value\n", name, lowercase_name);
+  fprintf(file, "  );\n");
+}
+
+static void
+print_scope_enum(
+  FILE *file,
+  const char *name
+) {
+  char *lowercase_name = strtolower(name);
+  fprintf(file, "  scope_define_enum(\n");
+  fprintf(file, "    compilation->allocator, scope, COMPILER_SOURCE_RANGE,\n");
+  fprintf(file, "    slice_literal(\"%s\"), type_%s_value,\n", name, lowercase_name);
+  fprintf(file, "    %s_items, countof(%s_items)\n", lowercase_name, lowercase_name);
+  fprintf(file, "  );\n");
+}
+
+static void
+print_scope_export(
+  FILE *file,
+  Meta_Type *type
+) {
+  switch(type->tag) {
+    case Meta_Type_Tag_Enum: {
+      print_scope_enum(file, type->enum_.name);
+      break;
+    }
+    case Meta_Type_Tag_Struct: {
+      print_scope_define(file, type->struct_.name);
+      break;
+    }
+    case Meta_Type_Tag_Tagged_Union: {
+      print_scope_define(file, type->union_.name);
+
+      char buffer[1024];
+      s32 result = snprintf(buffer, countof(buffer), "%s_Tag", type->union_.name);
+      assert(result > 0);
+      print_scope_enum(file, buffer);
+
+      for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+        Struct_Type *struct_ = &type->union_.items[i];
+        if (struct_->item_count) {
+          s32 result = snprintf(buffer, countof(buffer), "%s_%s", type->union_.name, struct_->name);
+          assert(result > 0);
+          print_scope_define(file, buffer);
+        }
+      }
+      break;
+    }
+    case Meta_Type_Tag_Function: {
+      print_scope_define(file, type->function.name);
+      break;
+    }
+    case Meta_Type_Tag_Hash_Map: {
+      print_scope_define(file, type->hash_map.name);
+      break;
+    }
+    case Meta_Type_Tag_Number_Literal: {
+      panic("NOT SUPPORTED");
       break;
     }
   }
@@ -644,6 +717,14 @@ push_type(
   return &types[type_count++];
 }
 
+static inline Meta_Type *
+export(
+  Meta_Type *type
+) {
+  type->exported = true;
+  return type;
+}
+
 int
 main(void) {
 
@@ -984,11 +1065,11 @@ main(void) {
     { "Body", 1 },
   }));
 
-  push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
+  export(push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
     { "Postfix", 1 << 2 },
-  }));
+  })));
 
   push_type(type_enum("Operator_Associativity", (Enum_Type_Item[]){
     { "Left", 0 },
@@ -1045,14 +1126,14 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Value", (Struct_Item[]){
+  export(push_type(type_struct("Value", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Value *", "next_overload" },
     { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
     { "Compiler_Source_Location", "compiler_source_location" },
-  }));
+  })));
 
   push_type(type_enum("Expected_Result_Storage", (Enum_Type_Item[]){
     { "None", 0 },
@@ -1160,7 +1241,7 @@ main(void) {
     { "Value *", "compile_time_instance"},
   }));
 
-  push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
+  export(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
@@ -1180,9 +1261,9 @@ main(void) {
     { "Slice", "name" },
     { "u64", "bit_size" },
     { "u64", "bit_alignment" },
-  }));
+  })));
 
-  push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
+  export(push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
     struct_fields("User_Defined", (Struct_Item[]){
       { "Slice", "name" },
@@ -1236,14 +1317,14 @@ main(void) {
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },
-  }));
+  })));
 
-  push_type(type_union("Mass_Result", (Struct_Type[]){
+  export(push_type(type_union("Mass_Result", (Struct_Type[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
       { "Mass_Error", "error" },
     })
-  }));
+  })));
 
   push_type(type_struct("Platform_Info", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
@@ -1369,6 +1450,32 @@ main(void) {
       print_mass_descriptor_and_type(file, &types[i]);
     }
     fprintf(file, "\n#endif // GENERATED_TYPES_H\n");
+
+    fclose(file);
+    printf("C Types Generated at: %s\n", filename);
+  }
+
+  {
+    const char *filename = "../generated_exports.c";
+    #pragma warning(disable : 4996)
+    FILE *file = fopen(filename, "wb");
+    if (!file) exit(1);
+    fprintf(file, "#include \"source.h\"\n\n");
+
+    fprintf(file,
+      "static void\n"
+      "compiler_scope_define_exports(\n"
+      "  Compilation *compilation,\n"
+      "  Scope *scope\n"
+      ") {\n"
+    );
+    for (uint32_t i = 0; i < type_count; ++i) {
+      Meta_Type *type = &types[i];
+      if (type->exported) {
+        print_scope_export(file, type);
+      }
+    }
+    fprintf(file, "}\n\n" );
 
     fclose(file);
     printf("C Types Generated at: %s\n", filename);
