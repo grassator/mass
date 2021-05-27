@@ -23,9 +23,6 @@ if %errorlevel% neq 0 (goto Fail)
 cl %FLAGS% ..\source_spec.c
 if %errorlevel% neq 0 (goto Fail)
 
-cl %FLAGS% ..\function_spec.c
-if %errorlevel% neq 0 (goto Fail)
-
 cl %FLAGS% ..\mass.c
 if %errorlevel% neq 0 (goto Fail)
 
