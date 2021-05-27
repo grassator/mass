@@ -1,6 +1,6 @@
-fn ExitProcess(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
-fn GetStdHandle(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
-fn WriteFile(
+ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
+GetStdHandle :: fn(handle : s32) -> (s64) external("kernel32.dll", "GetStdHandle")
+WriteFile :: fn(
   status : s64,
   buffer : [u8],
   size : s32,
@@ -15,7 +15,7 @@ global_char_pointer := &global_char
 
 global_static_string :: "b"
 
-fn test() {
+test :: fn() {
   stdout_handle := GetStdHandle(STDOUT_HANDLE)
   WriteFile(stdout_handle, global_char_pointer, 1, 0, 0)
 
@@ -25,7 +25,7 @@ fn test() {
   WriteFile(stdout_handle, "\n".bytes, cast(s32, "\n".length), 0, 0)
 }
 
-fn main() {
+main :: fn() {
   test()
   ExitProcess(0)
 }

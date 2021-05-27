@@ -1,6 +1,6 @@
-fn explode(x : s32) -> (s32) {
+explode :: fn(x : s32) -> (s32) {
   x / x
 }
-fn main() {
+main :: fn() {
   explode(0)
 }

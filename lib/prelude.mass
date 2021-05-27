@@ -61,15 +61,7 @@ operator 15 (x << y) { logical_shift_left(x, y) }
 operator 15 (x | y) { bitwise_or(x, y) }
 operator 15 (x & y) { bitwise_and(x, y) }
 
-syntax statement rewrite("fn" .@name ()@args ..@body) name :: fn name args body
-syntax statement rewrite("@" "fn" .@name ()@args ..@body) name :: @fn name args body
-syntax statement rewrite("macro" .@name ()@args ..@body) name :: macro name args body
-syntax statement rewrite("const" ..@binding "=" ..@expression) binding := expression
-syntax statement rewrite("mut" ..@binding "=" ..@expression) binding := expression
-syntax statement rewrite("stack" .@name ..@type) name : type
-syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expression
-
-@fn fail(context : [Execution_Context], name : String, message : String) {
+fail :: @fn(context : [Execution_Context], name : String, message : String) {
   mass :: import "mass"
   result := context.result
   result.tag = mass.Mass_Result_Tag.Error
@@ -79,7 +71,7 @@ syntax statement rewrite("static" ..@binding "=" ..@expression) binding :: expre
   result.Error.error.source_range = @source_range
 }
 
-macro static_assert(condition : bool, message : String) {
+static_assert :: macro(condition : bool, message : String) {
   @{if condition == false { fail(@context, "Static Assert Failed", message) }}
 }
 

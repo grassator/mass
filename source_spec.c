@@ -340,7 +340,7 @@ spec("source") {
 
     it("should be able to tokenize complex input") {
       Slice source = slice_literal(
-        "fn foo(x: s8) -> {\n"
+        "foo :: fn(x: s8) -> {\n"
         "  return x + 3;\n"
         "}"
       );
@@ -383,7 +383,7 @@ spec("source") {
     it("should be able to include raw machine code bytes") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (result : s64) {"
+        "foo :: fn() -> (result : s64) {"
           "inline_machine_code_bytes(0x48, 0xC7, 0xC0, 0x2A, 0x00, 0x00, 0x00);"
           "result"
         "}"
@@ -396,7 +396,7 @@ spec("source") {
       // TODO only run on X64 hosts
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (s64) {"
+        "foo :: fn() -> (s64) {"
           "label placeholder from_machine_code;"
           // "goto from_machine_code;"
           "inline_machine_code_bytes(0xE9, from_machine_code);"
@@ -435,7 +435,7 @@ spec("source") {
       LEFT_TYPE(*checker)(LEFT_TYPE, RIGHT_TYPE) = \
         (LEFT_TYPE(*)(LEFT_TYPE, RIGHT_TYPE))test_program_inline_source_function(\
           "test", &test_context,\
-          "fn test(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
+          "test :: fn(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
         )
     describe("division") {
       #if 0
@@ -512,7 +512,7 @@ spec("source") {
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { 2 := 42 }"
+        "main :: fn() -> () { 2 := 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -521,7 +521,7 @@ spec("source") {
     it("should report an error for multi-definition assignment") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { foo, bar := 42, 42 }"
+        "main :: fn() -> () { foo, bar := 42, 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -533,7 +533,7 @@ spec("source") {
     it("should be able to parse and run if expression") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
-        "fn is_positive(x : s32) -> (s64) {"
+        "is_positive :: fn(x : s32) -> (s64) {"
           "if x < 0 then 0 else 1"
         "}"
       );
@@ -544,7 +544,7 @@ spec("source") {
     it("should work with a value instead of comparison as a condition") {
       s64(*is_zero)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "is_zero", &test_context,
-        "fn is_zero(x : s32) -> (s64) {"
+        "is_zero :: fn(x : s32) -> (s64) {"
           "if x then false else true"
         "}"
       );
@@ -556,7 +556,7 @@ spec("source") {
     it("should report an error on missing `then` inside of an if expression") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { if true else 42 }"
+        "main :: fn() -> () { if true else 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -565,7 +565,7 @@ spec("source") {
     it("should report an error on double `then` inside of an if expression") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { if true then 0 then 42 }"
+        "main :: fn() -> () { if true then 0 then 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -574,7 +574,7 @@ spec("source") {
     it("should be able to parse and run if statement") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
-        "fn is_positive(x : s32) -> (s8) {\n"
+        "is_positive :: fn(x : s32) -> (s8) {\n"
           "if (x < 10) { return 0 }\n"
           "1\n"
         "}"
@@ -586,7 +586,7 @@ spec("source") {
     it("should be able to parse and run if / else statement ") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
         "is_positive", &test_context,
-        "fn is_positive(x : s32) -> (s8) {\n"
+        "is_positive :: fn(x : s32) -> (s8) {\n"
           // FIXME figure out how to deal with a newline before `else`
           "if (x < 10) { return 0 } else { return 1 }\n"
           "0"
@@ -600,7 +600,7 @@ spec("source") {
     it("should report an error for an `if` statement without a body or a condition") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { if; }"
+        "main :: fn() -> () { if; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -611,7 +611,7 @@ spec("source") {
     it("should report an error for an `if` statement with an incorrect condition") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { if (1 < 0) { 0 } 42; }"
+        "main :: fn() -> () { if (1 < 0) { 0 } 42; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -623,7 +623,7 @@ spec("source") {
     it("should be able to parse and run a void -> s64 function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (s64) { 42 }"
+        "foo :: fn() -> (s64) { 42 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -632,7 +632,7 @@ spec("source") {
     it("should correctly deal with sign extending negative immediate integers") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (s64) { -2147483647  }"
+        "foo :: fn() -> (s64) { -2147483647  }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == -INT64_C(2147483647));
@@ -641,7 +641,7 @@ spec("source") {
     it("should correctly deal with larger than INT32_MAX immediate integers") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (u64) { 2147483649  }"
+        "foo :: fn() -> (u64) { 2147483649  }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 2147483649llu);
@@ -650,7 +650,7 @@ spec("source") {
     it("should correctly deal with larger than INT64_MAX immediate integers") {
       u64(*checker)(void) = (u64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (u64) { 18446744073709551615 }"
+        "foo :: fn() -> (u64) { 18446744073709551615 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 18446744073709551615llu);
@@ -659,7 +659,7 @@ spec("source") {
     it("should be able to parse and run a function with 5 arguments") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }"
+        "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { x5 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(1, 2, 3, 4, 5) == 5);
@@ -668,8 +668,8 @@ spec("source") {
     it("should correctly work with nested 5 argument calls") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
-        "fn bar(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> () { x5 = 42; }"
+        "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
+        "bar :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> () { x5 = 42; }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(1, 2, 3, 4, 5) == 5);
@@ -678,8 +678,8 @@ spec("source") {
     it("should correctly save volatile registers when calling other functions") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "outer", &test_context,
-        "fn inner(x : s64) -> () { x = 21 };"
-        "fn outer(x : s64) -> (s64) { inner(1); x }"
+        "inner :: fn(x : s64) -> () { x = 21 };"
+        "outer :: fn(x : s64) -> (s64) { inner(1); x }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker(42);
@@ -689,7 +689,7 @@ spec("source") {
     it("should be able to parse and run a s64 -> s64 function") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo(x : s64) -> (s64) { x }"
+        "foo :: fn(x : s64) -> (s64) { x }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(42) == 42);
@@ -698,7 +698,7 @@ spec("source") {
     it("should be able to define, assign and lookup an s64 variable on the stack") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
+        "foo :: fn() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -707,7 +707,7 @@ spec("source") {
     it("should be able to assign to a void value") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
-        "fn foo() -> (s64) { () = 10; 42 }"
+        "foo :: fn() -> (s64) { () = 10; 42 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -716,8 +716,8 @@ spec("source") {
     it("should be able to parse and run multiple function definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "proxy", &test_context,
-        "fn proxy() -> (s32) { plus(1, 2); plus(40, 2) }\n"
-        "fn plus(x : s32, y : s32) -> (s32) { x + y }"
+        "proxy :: fn() -> (s32) { plus(1, 2); plus(40, 2) }\n"
+        "plus :: fn(x : s32, y : s32) -> (s32) { x + y }"
       );
       check(spec_check_mass_result(test_context.result));
       s32 answer = checker();
@@ -727,7 +727,7 @@ spec("source") {
     it("should be able to define a local function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() -> (s64) { fn local() -> (s64) { 42 }; local() }"
+        "checker :: fn() -> (s64) { local :: fn() -> (s64) { 42 }; local() }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 answer = checker();
@@ -737,9 +737,9 @@ spec("source") {
     it("should be able to parse and run functions with overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn my_size_of(x : s32) -> (s64) { 4 }\n"
-        "fn my_size_of(x : s64) -> (s64) { 8 }\n"
-        "fn checker(x : s32) -> (s64) { my_size_of(x) }\n"
+        "my_size_of :: fn(x : s32) -> (s64) { 4 }\n"
+        "my_size_of :: fn(x : s64) -> (s64) { 8 }\n"
+        "checker :: fn(x : s32) -> (s64) { my_size_of(x) }\n"
       );
       check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
@@ -749,8 +749,8 @@ spec("source") {
     it("should be able to parse and run functions with local overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn size_of(x : s32) -> (s64) { 4 }\n"
-        "fn checker(x : s32) -> (s64) { fn size_of(x : s64) -> (s64) { 8 }; size_of(x) }"
+        "size_of :: fn(x : s32) -> (s64) { 4 }\n"
+        "checker :: fn(x : s32) -> (s64) { size_of :: fn(x : s64) -> (s64) { 8 }; size_of(x) }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
@@ -760,7 +760,7 @@ spec("source") {
     it("should report type mismatch when assigning") {
       test_program_inline_source_base(
         "test", &test_context,
-        "fn test() -> () { x : s32 = 0; y : s64 = 1; x = y; }"
+        "test :: fn() -> () { x : s32 = 0; y : s64 = 1; x = y; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -772,9 +772,9 @@ spec("source") {
     it("should report an overload overlap") {
       test_program_inline_source_base(
         "test", &test_context,
-        "fn overload(x : s64, y : s32) -> () { }\n"
-        "fn overload(x : s32, y : s64) -> () { }\n"
-        "fn test() -> () { overload(1, 2) }"
+        "overload :: fn(x : s64, y : s32) -> () { }\n"
+        "overload :: fn(x : s32, y : s64) -> () { }\n"
+        "test :: fn() -> () { overload(1, 2) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -784,8 +784,8 @@ spec("source") {
     it("should support default arguments") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test_default(x : s64, y : s64 = 20) -> (s64) { x + y }\n"
-        "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+        "test_default :: fn(x : s64, y : s64 = 20) -> (s64) { x + y }\n"
+        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -795,8 +795,8 @@ spec("source") {
     it("should support default arguments that refer to previous arguments") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test_default(x : s64, y : s64 = x) -> (s64) { x + y }\n"
-        "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+        "test_default :: fn(x : s64, y : s64 = x) -> (s64) { x + y }\n"
+        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -806,8 +806,8 @@ spec("source") {
     it("should support default arguments with inference") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test_default(x : s64, y := 20) -> (s64) { x + y }\n"
-        "fn test() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
+        "test_default :: fn(x : s64, y := 20) -> (s64) { x + y }\n"
+        "test :: fn() -> (s64) { (test_default(20) + \n test_default(0, 2)) }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -817,7 +817,7 @@ spec("source") {
     it("should disallow default arguments coming after non-default ones") {
       test_program_inline_source_function(
         "test", &test_context,
-        "fn test(x : s64, y : s64 = x, z : s32) -> () {}\n"
+        "test :: fn(x : s64, y : s64 = x, z : s32) -> () {}\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -837,7 +837,7 @@ spec("source") {
     it("should be able to have an explicit return") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker(x : s32) -> (s32) { if x > 0 { return x }; 0 }"
+        "checker :: fn(x : s32) -> (s32) { if x > 0 { return x }; 0 }"
       );
       check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
@@ -846,8 +846,8 @@ spec("source") {
 
     it("should be able to parse typed definition and assignment in the same statement") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
-        "fn test_fn() -> (s32) {"
+        "checker", &test_context,
+        "checker :: fn() -> (s32) {"
           "result : s32 = 42;"
           "result"
         "}"
@@ -858,8 +858,8 @@ spec("source") {
 
     it("should be able to refer to the current scope") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
-        "fn test_fn() -> (s32) {"
+        "checker", &test_context,
+        "checker :: fn() -> (s32) {"
           "result : s32 = 42;"
           "this_scope :: @scope;"
           "this_scope.result"
@@ -887,7 +887,7 @@ spec("source") {
     it("should allow non-parenthesized return type") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker(x: s32) -> s32 { x }"
+        "checker :: fn(x: s32) -> s32 { x }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(42) == 42);
@@ -896,7 +896,7 @@ spec("source") {
     it("should report an error when encountering invalid pointer type") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main(arg : [s32 s32]) -> () {}"
+        "main :: fn(arg : [s32 s32]) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
@@ -904,7 +904,7 @@ spec("source") {
     it("should report an error when encountering multiple return types") {
       test_program_inline_source_base(
         "exit", &test_context,
-        "fn exit(status: s32) -> (s32, s32) {}"
+        "exit :: fn(status: s32) -> (s32, s32) {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -914,8 +914,8 @@ spec("source") {
     it("should report an error when non-type id is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn foo() -> () {};"
-        "fn main(arg : foo) -> () {}"
+        "foo :: fn() -> () {};"
+        "main :: fn(arg : foo) -> () {}"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -927,7 +927,7 @@ spec("source") {
     it("should report an error when encountering an unknown type") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main(status : s33) -> () {}"
+        "main :: fn(status : s33) -> () {}"
       );
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Undefined_Variable);
@@ -936,9 +936,9 @@ spec("source") {
 
     it("should be able to get the type_of an expression without evaluating it") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
+        "checker", &test_context,
         "counter := 0\n"
-        "fn test_fn() -> (s64) {"
+        "checker :: fn() -> (s64) {"
           "type_of({ counter = 1; var := 0; var })\n"
           "counter"
         "}"
@@ -949,10 +949,10 @@ spec("source") {
 
     it("should be able to get the fields of the descriptor provided from type_of") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
+        "checker", &test_context,
         "foo := 0\n"
-        "fn id(x : type_of(foo)) -> (type_of(foo)) { x }\n"
-        "fn test_fn() -> (s64) {"
+        "id :: fn(x : type_of(foo)) -> (type_of(foo)) { x }\n"
+        "checker :: fn() -> (s64) {"
           "x : s64 = 42\n"
           "id(x)"
         "}"
@@ -964,7 +964,7 @@ spec("source") {
     it("should report an error when non-type token is being used as a type") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () {"
+        "main :: fn() -> () {"
           "type_of();"
         "}"
       );
@@ -975,8 +975,8 @@ spec("source") {
 
     it("should be able to get the size_of an expression") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
-        "fn test_fn() -> (s64) {"
+        "checker", &test_context,
+        "checker :: fn() -> (s64) {"
           "size_of({ var := 0; var })"
         "}"
       );
@@ -986,9 +986,9 @@ spec("source") {
 
     it("should be able to get the size_of an expression without evaluating it") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test_fn", &test_context,
+        "checker", &test_context,
         "counter := 0\n"
-        "fn test_fn() -> (s64) {"
+        "checker :: fn() -> (s64) {"
           "size_of({ counter = 1; var := 0; var })\n"
           "counter"
         "}"
@@ -1000,8 +1000,8 @@ spec("source") {
     it("should support defining a compile-time function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "@fn compile_time_fn() -> (s64) { 42 }\n"
-        "fn checker() -> (s64) { compile_time_fn() }"
+        "compile_time_fn :: @fn() -> (s64) { 42 }\n"
+        "checker :: fn() -> (s64) { compile_time_fn() }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1011,7 +1011,7 @@ spec("source") {
       s64 (*checker)(Spec_Callback foo) =
         (s64 (*)(Spec_Callback))test_program_inline_source_function(
           "foo", &test_context,
-          "fn foo(callback : fn() -> (s64)) -> (s64) { callback() }"
+          "foo :: fn(callback : fn() -> (s64)) -> (s64) { callback() }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
@@ -1023,7 +1023,7 @@ spec("source") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
         "mass :: import \"mass\"\n"
-        "fn checker() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
+        "checker :: fn() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == Descriptor_Tag_Struct);
@@ -1032,7 +1032,7 @@ spec("source") {
     it("should be able to use postfix backslash operator for reification") {
         s64(*checker)() = (s64(*)())test_program_inline_source_function(
             "checker", &test_context,
-            "fn checker() -> (s64) { \\42\\ }"
+            "checker :: fn() -> (s64) { \\42\\ }"
         );
         check(spec_check_mass_result(test_context.result));
         check(checker() == 42);
@@ -1041,7 +1041,7 @@ spec("source") {
     it("should be able to parse and run a triple plus function") {
       s64(*checker)(s64, s64, s64) = (s64(*)(s64, s64, s64))test_program_inline_source_function(
         "plus", &test_context,
-        "fn plus(x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
+        "plus :: fn(x : s64, y : s64, z : s64) -> (s64) { x + y + z }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(30, 10, 2) == 42);
@@ -1050,7 +1050,7 @@ spec("source") {
     it("should be able to parse and run a subtraction of a negative literal") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "plus_one", &test_context,
-        "fn plus_one(x : s64) -> (s64) { x - -1 }"
+        "plus_one :: fn(x : s64) -> (s64) { x - -1 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(41) == 42);
@@ -1059,8 +1059,8 @@ spec("source") {
     it("should be able to parse and run a sum passed to another function as an argument") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "plus", &test_context,
-        "fn id(ignored : s64, x : s64) -> (s64) { x }\n"
-        "fn plus() -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }"
+        "id :: fn(ignored : s64, x : s64) -> (s64) { x }\n"
+        "plus :: fn() -> (s64) { x : s64 = 40; y : s64 = 2; id(0, x + y) }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1070,7 +1070,7 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
-        "fn test() -> (s64) { y := 41; ++y }"
+        "test :: fn() -> (s64) { y := 41; ++y }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1080,7 +1080,7 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "operator 18 (x ++) { result := x; x = x + 1; result };"
-        "fn test() -> (s64) { y := 42; y++ }"
+        "test :: fn() -> (s64) { y := 42; y++ }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1091,7 +1091,7 @@ spec("source") {
         "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
         "operator 19 (x ++) { result := x; x = x + 1; result };"
-        "fn test() -> (s64) { y := 41; ++y++ }"
+        "test :: fn() -> (s64) { y := 41; ++y++ }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1102,7 +1102,7 @@ spec("source") {
         "test", &test_context,
         "operator 18 (++ x) { x = x + 1; x };"
         "operator 14 (x ++ y) { x + y };"
-        "fn test(x: s64, y: s64) -> (s64) { x ++ ++y }"
+        "test :: fn(x: s64, y: s64) -> (s64) { x ++ ++y }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(40, 1) == 42);
@@ -1112,7 +1112,7 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "operator 15 (x ** y) { x * y };"
-        "fn test() -> (s64) { 21 ** 2 }"
+        "test :: fn() -> (s64) { 21 ** 2 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1123,7 +1123,7 @@ spec("source") {
         "dummy", &test_context,
         "operator 15 (x ** y) { x * y };"
         "operator 15 (x ** y) { x * y };"
-        "fn dummy() -> (s64) { 21 ** 2 }"
+        "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1136,7 +1136,7 @@ spec("source") {
         "dummy", &test_context,
         "operator 15 (x ** y) { x * y };"
         "operator 15 (x **) { x * x };"
-        "fn dummy() -> (s64) { 21 ** 2 }"
+        "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1147,7 +1147,7 @@ spec("source") {
     it("should have a built-in compile-time shift operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s64) { 2 << 1 }"
+        "test :: fn() -> (s64) { 2 << 1 }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -1157,7 +1157,7 @@ spec("source") {
     it("should have a built-in compile-time bitwise and operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s64) { 0b110 & 0b011 }"
+        "test :: fn() -> (s64) { 0b110 & 0b011 }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -1167,7 +1167,7 @@ spec("source") {
     it("should have correctly handle the difference between addressof and bitwise and operators") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> ([s64]) { x := 0 & 1; &x }"
+        "test :: fn() -> ([s64]) { x := 0 & 1; &x }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -1177,7 +1177,7 @@ spec("source") {
     it("should have a built-in compile-time bitwise or operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s64) { 0b110 | 0b011 }"
+        "test :: fn() -> (s64) { 0b110 | 0b011 }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -1190,7 +1190,7 @@ spec("source") {
       Value *status = test_program_inline_source_base(
         "STATUS_CODE", &test_context,
         "STATUS_CODE :: the_answer();"
-        "fn the_answer() -> (s8) { 42 }"
+        "the_answer :: fn() -> (s8) { 42 }"
       );
 
       check(status);
@@ -1205,8 +1205,8 @@ spec("source") {
         "RESULT", &test_context,
         "RESULT :: get_a();"
         "B :: get_b();"
-        "fn get_a() -> (s8) { B };"
-        "fn get_b() -> (s8) { 42 }"
+        "get_a :: fn() -> (s8) { B };"
+        "get_b :: fn() -> (s8) { 42 }"
       );
 
       check(result);
@@ -1219,7 +1219,7 @@ spec("source") {
     it("should support compile time blocks") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() -> (s64) { @{ 20 + 22 } }"
+        "checker :: fn() -> (s64) { @{ 20 + 22 } }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1228,7 +1228,7 @@ spec("source") {
     it("should report an error when trying to access the context at runtime") {
       test_program_inline_source_base(
         "checker", &test_context,
-        "fn checker() -> () { @context; }"
+        "checker :: fn() -> () { @context; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1238,7 +1238,7 @@ spec("source") {
     it("should be able to use if / else statement at the top level") {
       test_program_inline_source_base(
         "DUMMY", &test_context,
-        "fn do_stuff() -> () {}\n"
+        "do_stuff :: fn() -> () {}\n"
         "if 1 { do_stuff() }\n"
         "DUMMY :: 42"
       );
@@ -1278,7 +1278,7 @@ spec("source") {
     it("should not be able to use runtime values in a static context (when not causing force)") {
       test_program_inline_source_base(
         "test", &test_context,
-        "fn test() -> (s64) { foo := 42; bar := foo; @( foo ) }"
+        "test :: fn() -> (s64) { foo := 42; bar := foo; @( foo ) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1288,8 +1288,8 @@ spec("source") {
     it("should not be able to use runtime values in a static context inside a macro") {
       test_program_inline_source_base(
         "test", &test_context,
-        "macro comptime(x : s64) -> (s64) { @( x ) }\n"
-        "fn test() -> (s64) { foo := 42; comptime(foo) }"
+        "comptime :: macro(x : s64) -> (s64) { @( x ) }\n"
+        "test :: fn() -> (s64) { foo := 42; comptime(foo) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1300,7 +1300,7 @@ spec("source") {
       s64 (*checker)() = (s64 (*)())test_program_inline_source_function(
         "checker", &test_context,
         "RESULT :: 40 + 1 + 1\n"
-        "fn checker() -> (s64) { RESULT }"
+        "checker :: fn() -> (s64) { RESULT }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1311,8 +1311,8 @@ spec("source") {
     it("should be able to parse and run macro id function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "macro id(x : s64) -> (s64) { x }\n"
-        "fn test() -> (s64) { id(42) }"
+        "id :: macro(x : s64) -> (s64) { x }\n"
+        "test :: fn() -> (s64) { id(42) }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1321,8 +1321,8 @@ spec("source") {
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "macro id(x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
-        "fn test() -> (s64) { id(42) + 1 }"
+        "id :: macro(x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
+        "test :: fn() -> (s64) { id(42) + 1 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 21);
@@ -1331,8 +1331,8 @@ spec("source") {
     it("should allow changes to the passed arguments to macro function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "macro process(y : s64) -> () { y = 42; }\n"
-        "fn test() -> (s64) { x := 20; process(x); x }"
+        "process :: macro(y : s64) -> () { y = 42; }\n"
+        "test :: fn() -> (s64) { x := 20; process(x); x }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1342,7 +1342,7 @@ spec("source") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "syntax (\"the\" \"answer\") 42;"
-        "fn checker() -> (s32) { the answer }"
+        "checker :: fn() -> (s32) { the answer }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1352,7 +1352,7 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "syntax statement (\"block\" {}@body) body();"
-        "fn checker() -> (s64) { result := 20; block { result = 42 }; result }"
+        "checker :: fn() -> (s64) { result := 20; block { result = 42 }; result }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1362,7 +1362,7 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "syntax statement (\"comment\" ..@ignore);"
-        "fn checker() -> (s64) { x := 42; comment x = x + 1; x }"
+        "checker :: fn() -> (s64) { x := 42; comment x = x + 1; x }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1373,7 +1373,7 @@ spec("source") {
         "checker", &test_context,
         // TODO figure out what should be the rule for subtracting unsigned integers
         "syntax (\"negative\" .@x) (cast(s32, 0) - x());"
-        "fn checker() -> (s32) { negative 42 }"
+        "checker :: fn() -> (s32) { negative 42 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == -42);
@@ -1382,7 +1382,7 @@ spec("source") {
     it("should be able to use a while loop") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,
-        "fn sum_up_to(x : s32) -> (s32) {"
+        "sum_up_to :: fn(x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1402,7 +1402,7 @@ spec("source") {
     it("should be able to use `break` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker(x : s32) -> (s32) {"
+        "checker :: fn(x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1421,7 +1421,7 @@ spec("source") {
     it("should be able to use `continue` statement inside of the while loop") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker(x : s32) -> (s32) {"
+        "checker :: fn(x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
           "while (x >= 0) {"
@@ -1441,8 +1441,8 @@ spec("source") {
     it("should report an error for macro external functions") {
       test_program_inline_source_base(
         "test", &test_context,
-        "macro ExitProcess(x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
-        "fn test() -> (s64) { ExitProcess(42) }"
+        "ExitProcess :: macro(x : s64) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")\n"
+        "test :: fn() -> (s64) { ExitProcess(42) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
@@ -1451,9 +1451,9 @@ spec("source") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "FOO :: 42\n"
-        "macro id(x : s64) -> (s64) { x }\n"
+        "id :: macro(x : s64) -> (s64) { x }\n"
         "BAR :: id(FOO)\n"
-        "fn test() -> (s64) { BAR }"
+        "test :: fn() -> (s64) { BAR }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1464,7 +1464,7 @@ spec("source") {
     it("should be able to parse and run a program with labels and goto") {
       s32(*sum_up_to)(s32) = (s32(*)(s32))test_program_inline_source_function(
         "sum_up_to", &test_context,
-        "fn sum_up_to(x : s32) -> (s32) {"
+        "sum_up_to :: fn(x : s32) -> (s32) {"
           "sum : s32;"
           "sum = 0;"
           "label loop;"
@@ -1487,7 +1487,7 @@ spec("source") {
     it("should be able to goto a label defined after the goto") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s32) {"
+        "test :: fn() -> (s32) {"
           "x : s32 = 42;"
           "label placeholder skip;"
           "goto skip;"
@@ -1503,7 +1503,7 @@ spec("source") {
     it("should report an error when encountering wrong type of label identifier") {
       test_program_inline_source_base(
         "main", &test_context,
-        "fn main(status: s32) -> () { x : s32; goto x; }"
+        "main :: fn(status: s32) -> () { x : s32; goto x; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
@@ -1513,7 +1513,7 @@ spec("source") {
     it("should parse and return C-compatible strings") {
       const char *(*checker)(void) = (const char *(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() -> ([u8]) { c_string(\"test\") }"
+        "checker :: fn() -> ([u8]) { c_string(\"test\") }"
       );
       check(spec_check_mass_result(test_context.result));
       const char *string = checker();
@@ -1526,7 +1526,7 @@ spec("source") {
       test_program_inline_source_base(
         "test", &test_context,
         "BAR :: \"foo\"; "
-        "fn test() -> (s8) {"
+        "test :: fn() -> (s8) {"
           "foo : s8[BAR];"
           "foo.0 = 42;"
           "foo.0"
@@ -1542,7 +1542,7 @@ spec("source") {
     it("should be able to define a variable with a fixed size array type") {
       s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s8) {"
+        "test :: fn() -> (s8) {"
           "foo : s8[64];"
           "foo.0 = 42;"
           "foo.0"
@@ -1559,7 +1559,7 @@ spec("source") {
       fn_type_opaque checker = test_program_inline_source_function(
         "test", &test_context,
         "int8 :: bit_type(8);"
-        "fn test() -> () {"
+        "test :: fn() -> () {"
           "x : int8;"
         "}"
       );
@@ -1571,7 +1571,7 @@ spec("source") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "Point :: c_struct({ x : s32; y : s32; });"
-        "fn test() -> (s32) {"
+        "test :: fn() -> (s32) {"
           "p : Point; p.x = 20; p.y = 22;"
           "p.x + p.y"
         "}"
@@ -1584,7 +1584,7 @@ spec("source") {
       test_program_inline_source_base(
         "main", &test_context,
         "Point :: c_struct({ x : s32; y : s32; });"
-        "fn main() -> () { p : Point; p.(x) }"
+        "main :: fn() -> () { p : Point; p.(x) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1595,7 +1595,7 @@ spec("source") {
       test_program_inline_source_base(
         "main", &test_context,
         "Point :: c_struct({ x : s32; y : s32; });"
-        "fn main() -> () { p : Point; p.foo }"
+        "main :: fn() -> () { p : Point; p.foo }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1607,7 +1607,7 @@ spec("source") {
       s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
         "checker", &test_context,
         "Test_128bit :: c_struct({ x : s64; y : s64 })\n"
-        "fn checker(input : [Test_128bit]) -> (s64) {\n"
+        "checker :: fn(input : [Test_128bit]) -> (s64) {\n"
           "input.y\n"
         "}"
       );
@@ -1621,7 +1621,7 @@ spec("source") {
       Test_128bit(*checker)(s64) = (Test_128bit(*)(s64))test_program_inline_source_function(
         "return_struct", &test_context,
         "Test_128bit :: c_struct({ x : s64; y : s64 });"
-        "fn return_struct(x : s64) -> (Test_128bit) {"
+        "return_struct :: fn(x : s64) -> (Test_128bit) {"
           "result : Test_128bit;"
           "result.x = x;"
           "result.y = x / 2;"
@@ -1639,8 +1639,8 @@ spec("source") {
       s64(*checker)(Test_128bit) = (s64(*)(Test_128bit))test_program_inline_source_function(
         "checker", &test_context,
         "Test_128bit :: c_struct({ x : s64; y : s64 });"
-        "fn test_sum(x : s64, y : s64) -> (s64) { x + y }\n"
-        "fn checker(x : Test_128bit) -> (s64) {"
+        "test_sum :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
+        "checker :: fn(x : Test_128bit) -> (s64) {"
           "test_sum(x.x, x.y)"
         "}"
       );
@@ -1655,7 +1655,7 @@ spec("source") {
     it("should be able to return unsigned integer literals") {
       u8(*checker)(void) = (u8(*)(void))test_program_inline_source_function(
         "return_200", &test_context,
-        "fn return_200() -> (u8) { 200 }"
+        "return_200 :: fn() -> (u8) { 200 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 200);
@@ -1664,7 +1664,7 @@ spec("source") {
     it("should use correct EFLAGS values when dealing with unsigned integers") {
       u8(*checker)(void) = (u8(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "fn test() -> (s8) { x : u8 = 200; x < 0 }"
+        "test :: fn() -> (s8) { x : u8 = 200; x < 0 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == false);
@@ -1674,8 +1674,8 @@ spec("source") {
   describe("Signed Integers") {
     it("should parse and correctly deal with 16 bit values") {
       s16(*checker)(s16) = (s16(*)(s16))test_program_inline_source_function(
-        "add_one", &test_context,
-        "fn add_one(x : s16) -> (s16) { x + 1 }"
+        "checker", &test_context,
+        "checker :: fn(x : s16) -> (s16) { x + 1 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker(8) == 9);
@@ -1688,7 +1688,7 @@ spec("source") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "sample_module :: import(\"fixtures/sample_module\")\n"
-        "fn checker() -> (s32) { sample_module.the_answer }"
+        "checker :: fn() -> (s32) { sample_module.the_answer }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1699,7 +1699,7 @@ spec("source") {
         "checker", &test_context,
         "A :: import(\"fixtures/foo/../sample_module\")\n"
         "B :: import(\"fixtures\\\\sample_module\")\n"
-        "fn checker() -> (s64) { A.the_answer + B.the_answer }"
+        "checker :: fn() -> (s64) { A.the_answer + B.the_answer }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 84);
@@ -1719,7 +1719,7 @@ spec("source") {
     it("should support failing the compilation by calling fail() at compile time") {
      test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() { fail(@context, \"fail()\", \"Oops\") }\n"
+        "checker :: fn() { fail(@context, \"fail()\", \"Oops\") }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1730,7 +1730,7 @@ spec("source") {
     it("should support static_assert") {
       test_program_inline_source_function(
         "checker", &test_context,
-        "fn checker() { static_assert(false, \"Oops\") }\n"
+        "checker :: fn() { static_assert(false, \"Oops\") }\n"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
@@ -1745,8 +1745,8 @@ spec("source") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_inline_source_base(
         "main", &test_context,
-        "fn main() -> () { ExitProcess(42) }\n"
-        "fn ExitProcess(status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
+        "main :: fn() -> () { ExitProcess(42) }\n"
+        "ExitProcess :: fn(status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
