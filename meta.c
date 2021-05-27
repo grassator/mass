@@ -1093,7 +1093,7 @@ main(void) {
 
   push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
-    { "const Value *", "current_compile_time_eval_function" },
+    { "const Value *", "current_compile_time_function_call_target" },
     { "Execution_Context_Flags", "flags" },
     { "s32", "_flags_padding" },
     { "Compilation *", "compilation" },

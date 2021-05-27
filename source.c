@@ -171,8 +171,8 @@ value_view_slice(
   source_range.offsets.from = start_index == end_index
     ? source_range.offsets.to
     : view->values[start_index]->source_range.offsets.from;
-  // FIXME reenable this and make sure it works
-  //assert(source_range.offsets.from <= source_range.offsets.to);
+
+  assert(source_range.offsets.from <= source_range.offsets.to);
 
   return (Value_View) {
     .values = view->values + start_index,
@@ -3520,20 +3520,24 @@ token_handle_function_call(
 
   const Function_Info *info = maybe_function_info_from_value(overload);
   if (
-    overload != context->current_compile_time_eval_function &&
+    overload != context->current_compile_time_function_call_target &&
     info && (info->flags & Descriptor_Function_Flags_Compile_Time)
   ) {
+    // It is important to create a new value with the range of the original expression,
+    // otherwise Value_View slicing will not work correctly
+    Source_Range temp_range = target_token->source_range;
+    Value *temp_overload = value_make(context, overload->descriptor, overload->storage, temp_range);
     // This is necessary to avoid infinite recursion as the compile_time_eval called below
     // will end up here as well. Indirect calls are allowed so we do not need a full stack
-    const Value *saved_function = context->current_compile_time_eval_function;
-    context->current_compile_time_eval_function = overload;
+    const Value *saved_call_target = context->current_compile_time_function_call_target;
+    context->current_compile_time_function_call_target = temp_overload;
     Value_View fake_eval_view = {
-      .values = (Value *[]){overload, args_token},
+      .values = (Value *[]){temp_overload, args_token},
       .length = 2,
       .source_range = source_range,
     };
     Value *result = compile_time_eval(context, fake_eval_view);
-    context->current_compile_time_eval_function = saved_function;
+    context->current_compile_time_function_call_target = saved_call_target;
     return result;
   }
 
