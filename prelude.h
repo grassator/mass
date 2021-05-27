@@ -1702,6 +1702,25 @@ slice_sub(
 }
 
 static inline Slice
+slice_join(
+  const Allocator *allocator,
+  Slice *slices,
+  u64 count
+) {
+  u64 joined_length = 0;
+  for (u64 i = 0; i < count; ++i) {
+    joined_length += slices[i].length;
+  }
+  char *bytes = allocator_allocate_bytes(allocator, joined_length, _Alignof(char));
+  Slice result = {.bytes = bytes, .length = joined_length};
+  for (u64 i = 0; i < count; ++i) {
+    memcpy(bytes, slices[i].bytes, slices[i].length);
+    bytes += slices[i].length;
+  }
+  return result;
+}
+
+static inline Slice
 slice_sub_range(
   const Slice slice,
   Range_u64 range
@@ -3385,12 +3404,29 @@ bucket_buffer_allocator_make(
 // Hash
 //////////////////////////////////////////////////////////////////////////////
 
+static const s32 hash_byte_start = 7;
+
 static inline s32
 hash_u64(
-  u64 value
+  u64 x
 ) {
-  const u64 prime = 6903248743164425207llu;
-  return (s32)(value * prime);
+  x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+  x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+  x = x ^ (x >> 31);
+  return (s32)x;
+}
+
+static inline s32
+hash_s32(
+  s32 value
+) {
+  u32 x = (u32)value;
+  x ^= x >> 16;
+  x *= 0x7feb352d;
+  x ^= x >> 15;
+  x *= 0x846ca68b;
+  x ^= x >> 16;
+  return x;
 }
 
 static inline s32
@@ -3400,16 +3436,6 @@ hash_pointer(
   return hash_u64((u64)address);
 }
 
-static inline bool
-const_void_pointer_equal(
-  void const *a,
-  void const *b
-) {
-  return a == b;
-}
-
-static const s32 hash_byte_start = 7;
-
 static inline s32
 hash_byte(
   s32 previous,
@@ -3418,7 +3444,7 @@ hash_byte(
   return previous * 31 + byte;
 }
 
-s32
+static inline s32
 hash_bytes(
   const void *address,
   u64 size
@@ -3444,6 +3470,14 @@ hash_c_string(
   s32 hash = hash_byte_start;
   while (*string) hash = hash_byte(hash, *string++);
   return hash;
+}
+
+static inline bool
+const_void_pointer_equal(
+  void const *a,
+  void const *b
+) {
+  return a == b;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -3490,21 +3524,19 @@ typedef struct {
 
 hash_map_type_internal(Hash_Map_Internal, void *, void *)
 
-u64
+static inline u64
 hash_map_get_insert_index_internal(
   Hash_Map_Internal *map,
   u64 entry_byte_size,
   s32 hash
 ) {
-  s32 hash_index = hash & map->hash_mask;
-  for (u64 i = 0; i < map->capacity; ++i) {
-    // Using hash_mask to wrap around in a cheap way
-    u64 effective_index = (i + hash_index) & map->hash_mask;
+  for (;;) {
+    s32 hash_index = hash & map->hash_mask;
     Hash_Map_Entry_Bookkeeping *bookkeeping =
-      (void *)((s8 *)map->entries + effective_index * entry_byte_size);
-    if (!bookkeeping->occupied) return effective_index;
+      (void *)((s8 *)map->entries + hash_index * entry_byte_size);
+    if (!bookkeeping->occupied) return hash_index;
+    hash = hash_s32(hash);
   }
-  return 0;
 }
 
 static void
@@ -3581,17 +3613,13 @@ struct Hash_Map_Make_Options {
     s32 hash,\
     _key_type_ key\
   ) {\
-    s32 hash_index = hash & map->hash_mask;\
-    for (u64 i = 0; i < map->capacity; ++i) {\
-      /* Using hash_mask to wrap around in a cheap way */\
-      u64 effective_index = (i + hash_index) & map->hash_mask;\
-      _hash_map_type_##__Entry *entry = &map->entries[effective_index];\
-      /* We are past hash collisions - entry not found */\
-      if (!entry->bookkeeping.occupied) break;\
-      if (entry->bookkeeping.hash != hash) continue;\
+    for (;;) {\
+      s32 hash_index = hash & map->hash_mask;\
+      _hash_map_type_##__Entry *entry = &map->entries[hash_index];\
+      if (!entry->occupied) return 0;\
       if (_key_equality_fn_(key, entry->key)) return entry;\
+      hash = hash_s32(hash);\
     }\
-    return 0;\
   }\
   static s32 (*_hash_map_type_##__hash)(_key_type_ key) = _key_hash_fn_;\
   \
@@ -3678,9 +3706,6 @@ struct Hash_Map_Make_Options {
 
 #define hash_map_slice_template(_hash_map_type_, _value_type_)\
   hash_map_template(_hash_map_type_, Slice, _value_type_, hash_slice, slice_equal)
-
-#define hash_map_pointer_template(_hash_map_type_, _key_type_, _value_type_)\
-  hash_map_template(_hash_map_type_, _key_type_, _value_type_, hash_pointer, const_void_pointer_equal)
 
 #define hash_map_make(_hash_map_type_, ...)\
   _hash_map_type_##__make(\
