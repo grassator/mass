@@ -3,8 +3,6 @@
 #include "prelude.h"
 #include "value.h"
 
-#define MASS_RETURN_VALUE_NAME slice_literal("@return_value")
-
 #define PACK_AS_VOID_POINTER(_TARGET_, _SOURCE_)\
   do {\
     static_assert(sizeof(_SOURCE_) <= sizeof(_TARGET_), "Value too large to pack into a pointer");\

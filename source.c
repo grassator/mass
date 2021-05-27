@@ -3128,12 +3128,13 @@ call_function_macro(
       break;
     }
   }
-  scope_define_value(body_scope, context->epoch, result_value->source_range, MASS_RETURN_VALUE_NAME, result_value);
 
   Label_Index saved_return_label = builder->code_block.end_label;
+  Value *saved_return_value = builder->return_value;
   {
     builder->code_block.end_label =
       make_label(program, &program->memory.code, slice_literal("macro return"));
+    builder->return_value = result_value;
     Execution_Context body_context = *context;
     body_context.scope = body_scope;
     Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
@@ -3151,6 +3152,7 @@ call_function_macro(
     }
   }
   builder->code_block.end_label = saved_return_label;
+  builder->return_value = saved_return_value;
 
   dyn_array_destroy(args);
   return result_value;
@@ -5504,15 +5506,12 @@ mass_handle_explicit_return_lazy_proc(
   const Expected_Result *expected_result,
   Value *parse_result
 ) {
-  Value *fn_return = scope_lookup_force(context->scope, MASS_RETURN_VALUE_NAME);
-  assert(fn_return);
-  MASS_ON_ERROR(assign(context, builder, fn_return, parse_result)) return 0;
-
+  MASS_ON_ERROR(assign(context, builder, builder->return_value, parse_result)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 
   push_instruction(
     &builder->code_block.instructions,
-    fn_return->source_range,
+    builder->return_value->source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label, 0, 0}}}
   );
 

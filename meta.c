@@ -1051,6 +1051,7 @@ main(void) {
     { "u64", "frozen" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
+    { "Value *", "return_value" },
     { "Code_Block", "code_block" },
     { "u64", "used_register_bitset" },
     { "u64", "register_volatile_bitset" },

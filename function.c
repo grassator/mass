@@ -820,9 +820,21 @@ ensure_function_instance(
   *cached_instance =
     value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
 
+  Execution_Context body_context = *context;
+  Scope *body_scope = scope_make(context->allocator, function->scope);
+  body_context.flags &= ~Execution_Context_Flags_Global;
+  body_context.scope = body_scope;
+  body_context.epoch = get_new_epoch();
+
+  const Function_Return *returns = &function->returns;
+  Value *return_value = function_return_value_for_descriptor(
+    &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
+  );
+
   Function_Builder *builder = &(Function_Builder){
     .function = function,
     .register_volatile_bitset = program->default_calling_convention->register_volatile_bitset,
+    .return_value = return_value,
     .code_block = {
       .start_label = call_label,
       // FIXME use fn_value->descriptor->name
@@ -830,12 +842,6 @@ ensure_function_instance(
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
-
-  Execution_Context body_context = *context;
-  Scope *body_scope = scope_make(context->allocator, function->scope);
-  body_context.flags &= ~Execution_Context_Flags_Global;
-  body_context.scope = body_scope;
-  body_context.epoch = get_new_epoch();
 
   {
     for(u64 i = 0; i < dyn_array_length(arguments_layout.items); ++i) {
@@ -873,13 +879,6 @@ ensure_function_instance(
     }
     dyn_array_destroy(arguments_layout.items);
   }
-
-  const Function_Return *returns = &function->returns;
-  Value *return_value = function_return_value_for_descriptor(
-    &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
-  );
-
-  scope_define_value(body_scope, body_context.epoch, return_value->source_range, MASS_RETURN_VALUE_NAME, return_value);
 
   // Return value can be named in which case it should be accessible in the fn body
   if (function->returns.name.length) {

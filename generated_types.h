@@ -760,6 +760,7 @@ typedef struct Function_Builder {
   u64 frozen;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
+  Value * return_value;
   Code_Block code_block;
   u64 used_register_bitset;
   u64 register_volatile_bitset;
@@ -2637,6 +2638,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .name = slice_literal_fields("max_call_parameters_stack_size"),
     .descriptor = &descriptor_u32,
     .Base_Relative.offset = offsetof(Function_Builder, max_call_parameters_stack_size),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("return_value"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Builder, return_value),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
