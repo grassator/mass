@@ -831,14 +831,16 @@ ensure_function_instance(
     &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
   );
 
+  Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
+  Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
+
   Function_Builder *builder = &(Function_Builder){
     .function = function,
     .register_volatile_bitset = program->default_calling_convention->register_volatile_bitset,
     .return_value = return_value,
     .code_block = {
       .start_label = call_label,
-      // FIXME use fn_value->descriptor->name
-      .end_label = make_label(program, &program->memory.code, slice_literal("fn end")),
+      .end_label = make_label(program, &program->memory.code, end_label_name),
       .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
