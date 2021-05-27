@@ -1721,7 +1721,6 @@ spec("source") {
         "checker", &test_context,
         "fn checker() { fail(@context, \"fail()\", \"Oops\") }\n"
       );
-      //check(spec_check_mass_result(test_context.result));
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_User_Defined);

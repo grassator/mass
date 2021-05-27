@@ -833,7 +833,7 @@ const char *execution_context_flags_name(Execution_Context_Flags value) {
 
 typedef struct Execution_Context {
   Allocator * allocator;
-  const Descriptor * current_compile_time_function_descriptor;
+  const Value * current_compile_time_eval_function;
   Execution_Context_Flags flags;
   s32 _flags_padding;
   Compilation * compilation;
@@ -2761,9 +2761,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(execution_context, Execution_Context,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("current_compile_time_function_descriptor"),
-    .descriptor = &descriptor_descriptor_pointer,
-    .Base_Relative.offset = offsetof(Execution_Context, current_compile_time_function_descriptor),
+    .name = slice_literal_fields("current_compile_time_eval_function"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Execution_Context, current_compile_time_eval_function),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

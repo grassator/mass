@@ -3499,27 +3499,6 @@ token_handle_function_call(
   Value *target_expression = token_parse_single(context, target_token);
   MASS_ON_ERROR(*context->result) return 0;
 
-  // TODO this should probably happen after overload resolution as only some
-  //      of the overloads might be compile-time
-  const Function_Info *info = maybe_function_info_from_value(target_expression);
-  if (
-    target_expression->descriptor != context->current_compile_time_function_descriptor &&
-    info && (info->flags & Descriptor_Function_Flags_Compile_Time)
-  ) {
-    // This is necessary to avoid infinite recursion as the compile_time_eval called below
-    // will end up here as well. Indirect calls are allowed so we do not need a full stack
-    const Descriptor *saved_descriptor = context->current_compile_time_function_descriptor;
-    context->current_compile_time_function_descriptor = target_expression->descriptor;
-    Value_View fake_eval_view = {
-      .values = (Value *[]){target_expression, args_token},
-      .length = 2,
-      .source_range = source_range,
-    };
-    Value *result = compile_time_eval(context, fake_eval_view);
-    context->current_compile_time_function_descriptor = saved_descriptor;
-    return result;
-  }
-
   Array_Value_Ptr args = token_match_call_arguments(context, args_token);
   MASS_ON_ERROR(*context->result) goto err;
 
@@ -3608,6 +3587,25 @@ token_handle_function_call(
 
   Value *overload = match.value;
   assert(overload);
+
+  const Function_Info *info = maybe_function_info_from_value(overload);
+  if (
+    overload != context->current_compile_time_eval_function &&
+    info && (info->flags & Descriptor_Function_Flags_Compile_Time)
+  ) {
+    // This is necessary to avoid infinite recursion as the compile_time_eval called below
+    // will end up here as well. Indirect calls are allowed so we do not need a full stack
+    const Value *saved_function = context->current_compile_time_eval_function;
+    context->current_compile_time_eval_function = overload;
+    Value_View fake_eval_view = {
+      .values = (Value *[]){overload, args_token},
+      .length = 2,
+      .source_range = source_range,
+    };
+    Value *result = compile_time_eval(context, fake_eval_view);
+    context->current_compile_time_eval_function = saved_function;
+    return result;
+  }
 
   Mass_Function_Call_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
@@ -4537,6 +4535,14 @@ mass_handle_get_execution_context_lazy_proc(
   const Expected_Result *expected_result,
   Source_Range *source_range
 ) {
+  if (!context_is_compile_time_eval(context)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Epoch_Mismatch,
+      .source_range = *source_range,
+      .detailed_message = slice_literal("@context can only be used inside of compile time eval"),
+    });
+    return 0;
+  }
   Execution_Context **context_pointer = &context;
   return expected_result_ensure_value_or_temp(context, builder, expected_result, value_make(
     context, &descriptor_execution_context_pointer, storage_static(context_pointer), *source_range
@@ -4559,15 +4565,6 @@ mass_handle_at_operator(
       &descriptor_scope, storage_static(context->scope), body_range
     );
   } else if (value_match_symbol(body, slice_literal("context"))) {
-    if (!context_is_compile_time_eval(context)) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Epoch_Mismatch,
-        .source_range = args_view.source_range,
-        .detailed_message =
-          slice_literal("@context can only be used inside of compile time execution"),
-      });
-      return 0;
-    }
     Source_Range *payload = allocator_allocate(context->allocator, Source_Range);
     *payload = args_view.source_range;
     return mass_make_lazy_value(
