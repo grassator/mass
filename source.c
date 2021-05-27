@@ -6066,8 +6066,7 @@ module_compiler_init(
     .own_scope = compiler_scope,
     .export_scope = compiler_scope,
   };
-  // TODO figure this out for compiler-generated values
-  Source_Range source_range = {0};
+  Source_Range source_range = COMPILER_SOURCE_RANGE;
 
   scope_define_enum(
     allocator, compiler_scope, source_range,
