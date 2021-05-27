@@ -2689,7 +2689,7 @@ compile_time_eval(
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
   Function_Builder eval_builder = {
     .function = &fn_info,
-    .register_volatile_bitset = jit->program->platform_info.register_volatile_bitset,
+    .register_volatile_bitset = jit->program->default_calling_convention->register_volatile_bitset,
     .code_block = {
       .start_label = eval_label_index,
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),

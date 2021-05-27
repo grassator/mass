@@ -1669,14 +1669,14 @@ memory_layout_item_storage_at_index(
   return storage_none;
 }
 
-const Platform_Info *
-program_host_platform_info() {
+const Calling_Convention *
+host_calling_convention() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
-  return &platform_info_x86_64_windows;
+  return &calling_convention_x86_64_windows;
   #elif defined(__linux__) && defined(__x86_64__)
-  return &platform_info_x86_64_linux;
+  return &calling_convention_x86_64_linux;
   #elif defined(__MACH__) && defined(__x86_64__)
-  return &platform_info_x86_64_darwin;
+  return &calling_convention_x86_64_darwin;
   #else
   static_assert(false, "TODO add Platform_Info for this host system");
   #endif
@@ -1686,7 +1686,7 @@ void
 program_init(
   Allocator *allocator,
   Program *program,
-  const Platform_Info *platform_info
+  const Calling_Convention *default_calling_convention
 ) {
   *program = (Program) {
     .labels = dyn_array_make(Array_Label, .capacity = 128, .allocator = allocator),
@@ -1695,7 +1695,7 @@ program_init(
     .startup_functions = dyn_array_make(Array_Value_Ptr, .capacity = 16, .allocator = allocator),
     .relocations = dyn_array_make(Array_Relocation, .capacity = 16, .allocator = allocator),
     .functions = dyn_array_make(Array_Function_Builder, .capacity = 16, .allocator = allocator),
-    .platform_info = *platform_info,
+    .default_calling_convention = default_calling_convention,
   };
 
   #define MAX_CODE_SIZE (640llu * 1024llu * 1024llu) // 640Mb
@@ -1792,7 +1792,7 @@ compilation_init(
 
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
   // TODO Allow for a different target platform
-  program_init(compilation->allocator, compilation->runtime_program, program_host_platform_info());
+  program_init(compilation->allocator, compilation->runtime_program, host_calling_convention());
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
   scope_define_builtins(compilation->allocator, compilation->root_scope);
@@ -1800,7 +1800,7 @@ compilation_init(
   module_compiler_init(compilation, &compilation->compiler_module);
 
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
-  program_init(compilation->allocator, jit_program, program_host_platform_info());
+  program_init(compilation->allocator, jit_program, host_calling_convention());
   jit_init(&compilation->jit, jit_program);
 }
 

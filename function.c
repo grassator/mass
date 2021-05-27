@@ -822,7 +822,7 @@ ensure_function_instance(
 
   Function_Builder *builder = &(Function_Builder){
     .function = function,
-    .register_volatile_bitset = program->platform_info.register_volatile_bitset,
+    .register_volatile_bitset = program->default_calling_convention->register_volatile_bitset,
     .code_block = {
       .start_label = call_label,
       // FIXME use fn_value->descriptor->name

@@ -1326,7 +1326,7 @@ main(void) {
     })
   })));
 
-  push_type(type_struct("Platform_Info", (Struct_Item[]){
+  push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
   }));
 
@@ -1339,7 +1339,7 @@ main(void) {
     { "Value *", "entry_point" },
     { "Array_Function_Builder", "functions" },
     { "Program_Memory", "memory" },
-    { "Platform_Info", "platform_info"},
+    { "const Calling_Convention *", "default_calling_convention"},
   }));
 
   push_type(type_hash_map({

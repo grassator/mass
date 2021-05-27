@@ -15,7 +15,7 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
   .offsets = {0},
 };
 
-static const Platform_Info platform_info_x86_64_windows = {
+static const Calling_Convention calling_convention_x86_64_windows = {
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |
@@ -38,11 +38,11 @@ static const Platform_Info platform_info_x86_64_windows = {
   (1llu << Register_R10) | (1llu << Register_R11)\
 )
 
-static const Platform_Info platform_info_x86_64_linux = {
+static const Calling_Convention calling_convention_x86_64_linux = {
   .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
 };
 
-static const Platform_Info platform_info_x86_64_darwin = {
+static const Calling_Convention calling_convention_x86_64_darwin = {
   .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
 };
 
