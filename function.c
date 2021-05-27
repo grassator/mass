@@ -796,11 +796,12 @@ ensure_function_instance(
   // TODO choose layout based on the target platform
   Memory_Layout arguments_layout = function_arguments_memory_layout(context->allocator, function);
 
-  // TODO provide proper function name here if available
-  Slice name = slice_literal("");
+  Slice fn_name = fn_value->descriptor->name.length
+    ? fn_value->descriptor->name
+    : slice_literal("__anonymous__");
 
   const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, name, function, arguments_layout);
+    descriptor_function_instance(context->allocator, fn_name, function, arguments_layout);
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -810,10 +811,6 @@ ensure_function_instance(
   }
 
   Program *program = context->program;
-
-  Slice fn_name = fn_value->descriptor->name.length
-    ? fn_value->descriptor->name
-    : slice_literal("anonymous_function");
 
   Label_Index call_label = make_label(program, &program->memory.code, fn_name);
   // It is important to cache the label here for recursive calls
