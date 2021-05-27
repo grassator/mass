@@ -1608,68 +1608,6 @@ token_parse_block_view(
   Value_View children_view
 );
 
-static u64
-token_parse_macro_rewrite(
-  Execution_Context *context,
-  Value_View value_view,
-  Lazy_Value *out_lazy_value,
-  void *payload
-) {
-  assert(payload);
-  if (!value_view.length) return 0;
-  Macro *macro = payload;
-  u64 match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Statement);
-  if (!match_length) return 0;
-
-  Value_View rest = value_view_rest(&value_view, match_length);
-  if (rest.length) {
-    if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
-      match_length += 1;
-    } else {
-      return 0;
-    }
-  }
-  Array_Value_View match = dyn_array_make(Array_Value_View);
-  token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
-
-  // TODO precalculate required capacity
-  Array_Value_Ptr result_tokens = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
-
-  for (u64 i = 0; i < macro->replacement.length; ++i) {
-    Value *value = value_view_get(macro->replacement, i);
-    if (value_is_symbol(value)) {
-      Slice name = value_as_symbol(value)->name;
-      Value_View *maybe_replacement = 0;
-      for (u64 i = 0; i < dyn_array_length(macro->pattern); ++i) {
-        Macro_Pattern *item = dyn_array_get(macro->pattern, i);
-        if (slice_equal(item->capture_name, name)) {
-          maybe_replacement = dyn_array_get(match, i);
-          break;
-        }
-      }
-      if (maybe_replacement) {
-        for (u64 splice_index = 0; splice_index < maybe_replacement->length; ++splice_index) {
-          dyn_array_push(result_tokens, value_view_get(*maybe_replacement, splice_index));
-        }
-        continue;
-      }
-    }
-    dyn_array_push(result_tokens, value);
-  }
-
-  Value_View match_view = value_view_slice(&value_view, 0, match_length);
-  Value_View block_tokens = value_view_from_value_array(result_tokens, &match_view.source_range);
-  Value *block_result = token_parse_block_view(context, block_tokens);
-  if (block_result) {
-    assert(value_is_lazy_or_static(block_result));
-    out_lazy_value->payload = block_result;
-    out_lazy_value->proc = mass_handle_statement_lazy_proc;
-  }
-
-  dyn_array_destroy(match);
-  return match_length;
-}
-
 static Value *
 token_parse_macros(
   Execution_Context *context,
@@ -2371,7 +2309,6 @@ token_parse_syntax_definition(
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("syntax"));
   Token_Maybe_Match(statement, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("statement"));
-  Token_Maybe_Match(rewrite, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("rewrite"));
 
   Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
@@ -2479,17 +2416,10 @@ token_parse_syntax_definition(
       context->scope->statement_matchers =
         dyn_array_make(Array_Token_Statement_Matcher, .allocator = context->allocator);
     }
-    if (rewrite) {
-      dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
-        .proc = token_parse_macro_rewrite,
-        .payload = macro,
-      });
-    } else {
-      dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
-        .proc = token_parse_macro_statement,
-        .payload = macro,
-      });
-    }
+    dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
+      .proc = token_parse_macro_statement,
+      .payload = macro,
+    });
   } else {
     scope_add_macro(context->scope, macro);
   }
