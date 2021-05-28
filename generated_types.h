@@ -248,6 +248,10 @@ typedef struct Jit_Import_Library_Handle_Map Jit_Import_Library_Handle_Map;
 
 typedef struct Imported_Module_Map Imported_Module_Map;
 
+typedef struct Jit_Counters Jit_Counters;
+typedef dyn_array_type(Jit_Counters *) Array_Jit_Counters_Ptr;
+typedef dyn_array_type(const Jit_Counters *) Array_Const_Jit_Counters_Ptr;
+
 typedef struct Jit Jit;
 typedef dyn_array_type(Jit *) Array_Jit_Ptr;
 typedef dyn_array_type(const Jit *) Array_Const_Jit_Ptr;
@@ -1209,10 +1213,19 @@ typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
+typedef struct Jit_Counters {
+  u64 functions;
+  u64 imports;
+  u64 startup;
+  u64 relocations;
+} Jit_Counters;
+typedef dyn_array_type(Jit_Counters) Array_Jit_Counters;
+
 typedef struct Jit {
   u64 is_stack_unwinding_in_progress;
   Program * program;
   Jit_Import_Library_Handle_Map * import_library_handles;
+  Jit_Counters previous_counts;
   void * platform_specific_payload;
 } Jit;
 typedef dyn_array_type(Jit) Array_Jit;
@@ -1569,6 +1582,11 @@ static Descriptor descriptor_calling_convention_pointer;
 static Descriptor descriptor_calling_convention_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(imported_module_map, Imported_Module_Map);
+static Descriptor descriptor_jit_counters;
+static Descriptor descriptor_array_jit_counters;
+static Descriptor descriptor_array_jit_counters_ptr;
+static Descriptor descriptor_jit_counters_pointer;
+static Descriptor descriptor_jit_counters_pointer_pointer;
 static Descriptor descriptor_jit;
 static Descriptor descriptor_array_jit;
 static Descriptor descriptor_array_jit_ptr;
@@ -3838,6 +3856,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);
+MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters_ptr, Array_Jit_Counters_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters, Array_Jit_Counters)
+MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("functions"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit_Counters, functions),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("imports"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit_Counters, imports),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("startup"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit_Counters, startup),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("relocations"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit_Counters, relocations),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(jit_counters);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
 MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
@@ -3858,6 +3905,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
     .name = slice_literal_fields("import_library_handles"),
     .descriptor = &descriptor_jit_import_library_handle_map_pointer,
     .Base_Relative.offset = offsetof(Jit, import_library_handles),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("previous_counts"),
+    .descriptor = &descriptor_jit_counters,
+    .Base_Relative.offset = offsetof(Jit, previous_counts),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

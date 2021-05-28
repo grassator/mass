@@ -1374,10 +1374,18 @@ main(void) {
     .value_type = "Module *",
   }));
 
+  push_type(type_struct("Jit_Counters", (Struct_Item[]){
+    { "u64", "functions" },
+    { "u64", "imports" },
+    { "u64", "startup" },
+    { "u64", "relocations" },
+  }));
+
   push_type(type_struct("Jit", (Struct_Item[]){
     { "u64", "is_stack_unwinding_in_progress" },
     { "Program *", "program" },
     { "Jit_Import_Library_Handle_Map *", "import_library_handles" },
+    { "Jit_Counters", "previous_counts" },
     { "void *", "platform_specific_payload" },
   }));
 

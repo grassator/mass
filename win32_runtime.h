@@ -95,13 +95,6 @@ win32_print_register_state(
   printf("\n");
 }
 
-typedef struct {
-  u64 functions;
-  u64 imports;
-  u64 startup;
-  u64 relocations;
-} Win32_Jit_Counters;
-
 typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
 
 typedef struct {
@@ -109,8 +102,6 @@ typedef struct {
   Fixed_Buffer *temp_buffer;
   Allocator temp_allocator;
   u32 trampoline_rva;
-
-  Win32_Jit_Counters previous_counts;
 } Win32_Jit_Info;
 
 s64
@@ -537,7 +528,6 @@ win32_program_jit(
       .function_table = dyn_array_make(
         Array_RUNTIME_FUNCTION, .allocator = allocator_system, .capacity = 128,
       ),
-      .previous_counts = {0},
     };
     jit->platform_specific_payload = info;
     // https://docs.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-rtlinstallfunctiontablecallback
@@ -561,7 +551,7 @@ win32_program_jit(
   }
 
   u64 import_count = dyn_array_length(program->import_libraries);
-  for (u64 i = info->previous_counts.imports; i < import_count; ++i) {
+  for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
     Import_Library *lib = dyn_array_get(program->import_libraries, i);
     void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
     void *handle;
@@ -589,11 +579,11 @@ win32_program_jit(
   }
   u64 function_count = dyn_array_length(program->functions);
 
-  assert(dyn_array_length(info->function_table) == info->previous_counts.functions);
+  assert(dyn_array_length(info->function_table) == jit->previous_counts.functions);
   dyn_array_reserve_uninitialized(info->function_table, function_count);
 
   // Encode newly added functions
-  for (u64 i = info->previous_counts.functions; i < function_count; ++i) {
+  for (u64 i = jit->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout layout;
 
@@ -652,7 +642,7 @@ win32_program_jit(
 
   // Resolve relocations
   u64 relocation_count = dyn_array_length(program->relocations);
-  for (u64 i = info->previous_counts.relocations; i < relocation_count; ++i) {
+  for (u64 i = jit->previous_counts.relocations; i < relocation_count; ++i) {
     Relocation *relocation = dyn_array_get(program->relocations, i);
     assert(storage_is_label(&relocation->patch_at));
     assert(storage_is_label(&relocation->address_of));
@@ -667,16 +657,16 @@ win32_program_jit(
 
   // Call new startup functions
   u64 startup_count = dyn_array_length(program->startup_functions);
-  for (u64 i = info->previous_counts.startup; i < startup_count; ++i) {
+  for (u64 i = jit->previous_counts.startup; i < startup_count; ++i) {
     Value *value = *dyn_array_get(program->startup_functions, i);
     fn_type_opaque fn = value_as_function(program, value);
     fn();
   }
 
-  info->previous_counts.relocations = relocation_count;
-  info->previous_counts.functions = function_count;
-  info->previous_counts.imports = import_count;
-  info->previous_counts.startup = startup_count;
+  jit->previous_counts.relocations = relocation_count;
+  jit->previous_counts.functions = function_count;
+  jit->previous_counts.imports = import_count;
+  jit->previous_counts.startup = startup_count;
 }
 
 
