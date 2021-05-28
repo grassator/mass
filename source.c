@@ -5073,7 +5073,11 @@ token_parse_function_literal(
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    Memory_Layout arguments_layout = function_arguments_memory_layout(context->allocator, fn_info);
+    // TODO It might be better to just store Function_Info here and not the instance
+    const Calling_Convention *calling_convention =
+      context->compilation->runtime_program->default_calling_convention;
+    Memory_Layout arguments_layout =
+      calling_convention->arguments_layout_proc(context->allocator, fn_info);
     Descriptor *fn_descriptor =
       descriptor_function_instance(context->allocator, name, fn_info, arguments_layout);
     return value_init(
@@ -6005,7 +6009,8 @@ module_compiler_init(
 static void
 scope_define_builtins(
   const Allocator *allocator,
-  Scope *scope
+  Scope *scope,
+  const Calling_Convention *calling_convention
 ) {
   Source_Range range = {0};
   scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
@@ -6103,7 +6108,7 @@ scope_define_builtins(
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
-    Memory_Layout arguments_layout = function_arguments_memory_layout(allocator, function);\
+    Memory_Layout arguments_layout = calling_convention->arguments_layout_proc(allocator, function);\
     const Descriptor *instance_descriptor =\
       descriptor_function_instance(allocator, slice_literal(_NAME_), function, arguments_layout);\
     Value *instance_value = value_init(\

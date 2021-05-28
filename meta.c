@@ -1326,11 +1326,6 @@ main(void) {
     })
   })));
 
-  push_type(type_struct("Calling_Convention", (Struct_Item[]){
-    { "u64", "register_volatile_bitset" },
-    { "Calling_Convention_Body_End_Proc", "body_end_proc" },
-  }));
-
   push_type(type_struct("Program", (Struct_Item[]){
     { "Array_Import_Library", "import_libraries" },
     { "Array_Label", "labels" },
@@ -1346,6 +1341,17 @@ main(void) {
   push_type(type_function("Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
     { "Program *", "program" },
     { "Function_Builder *", "builder" },
+  }));
+
+  push_type(type_function("Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
+    { "const Allocator *", "allocator" },
+    { "const Function_Info *", "function_info" },
+  }));
+
+  push_type(type_struct("Calling_Convention", (Struct_Item[]){
+    { "u64", "register_volatile_bitset" },
+    { "Calling_Convention_Body_End_Proc", "body_end_proc" },
+    { "Calling_Convention_Arguments_Layout_Proc", "arguments_layout_proc"},
   }));
 
   push_type(type_hash_map({

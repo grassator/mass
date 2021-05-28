@@ -146,8 +146,15 @@ calling_convention_x86_64_windows_body_end_proc(
   Function_Builder *builder
 );
 
+static Memory_Layout
+calling_convention_x86_64_windows_arguments_layout_proc(
+  const Allocator *allocator,
+  const Function_Info *function
+);
+
 static const Calling_Convention calling_convention_x86_64_windows = {
   .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
+  .arguments_layout_proc = calling_convention_x86_64_windows_arguments_layout_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |

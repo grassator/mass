@@ -227,16 +227,19 @@ typedef struct Mass_Result Mass_Result;
 typedef dyn_array_type(Mass_Result *) Array_Mass_Result_Ptr;
 typedef dyn_array_type(const Mass_Result *) Array_Const_Mass_Result_Ptr;
 
-typedef struct Calling_Convention Calling_Convention;
-typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
-typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
-
 typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
 typedef void (*Calling_Convention_Body_End_Proc)
   (Program * program, Function_Builder * builder);
+
+typedef Memory_Layout (*Calling_Convention_Arguments_Layout_Proc)
+  (const Allocator * allocator, const Function_Info * function_info);
+
+typedef struct Calling_Convention Calling_Convention;
+typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
+typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
 
 typedef struct Jit_Import_Library_Handle_Map Jit_Import_Library_Handle_Map;
 
@@ -1178,12 +1181,6 @@ typedef struct Mass_Result {
   };
 } Mass_Result;
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
-typedef struct Calling_Convention {
-  u64 register_volatile_bitset;
-  Calling_Convention_Body_End_Proc body_end_proc;
-} Calling_Convention;
-typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
-
 typedef struct Program {
   Array_Import_Library import_libraries;
   Array_Label labels;
@@ -1196,6 +1193,13 @@ typedef struct Program {
   const Calling_Convention * default_calling_convention;
 } Program;
 typedef dyn_array_type(Program) Array_Program;
+
+typedef struct Calling_Convention {
+  u64 register_volatile_bitset;
+  Calling_Convention_Body_End_Proc body_end_proc;
+  Calling_Convention_Arguments_Layout_Proc arguments_layout_proc;
+} Calling_Convention;
+typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
@@ -1544,17 +1548,18 @@ static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
-static Descriptor descriptor_calling_convention;
-static Descriptor descriptor_array_calling_convention;
-static Descriptor descriptor_array_calling_convention_ptr;
-static Descriptor descriptor_calling_convention_pointer;
-static Descriptor descriptor_calling_convention_pointer_pointer;
 static Descriptor descriptor_program;
 static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
 static Descriptor descriptor_calling_convention_body_end_proc;
+static Descriptor descriptor_calling_convention_arguments_layout_proc;
+static Descriptor descriptor_calling_convention;
+static Descriptor descriptor_array_calling_convention;
+static Descriptor descriptor_array_calling_convention_ptr;
+static Descriptor descriptor_calling_convention_pointer;
+static Descriptor descriptor_calling_convention_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(imported_module_map, Imported_Module_Map);
 static Descriptor descriptor_jit;
@@ -3726,23 +3731,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_result, Mass_Result,
 );
 MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
-MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_volatile_bitset"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Calling_Convention, register_volatile_bitset),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("body_end_proc"),
-    .descriptor = &descriptor_calling_convention_body_end_proc,
-    .Base_Relative.offset = offsetof(Calling_Convention, body_end_proc),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(calling_convention);
 MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
 MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
@@ -3802,6 +3790,29 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(program, Program,
   },
 );
 MASS_DEFINE_TYPE_VALUE(program);
+MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
+MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("register_volatile_bitset"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Calling_Convention, register_volatile_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("body_end_proc"),
+    .descriptor = &descriptor_calling_convention_body_end_proc,
+    .Base_Relative.offset = offsetof(Calling_Convention, body_end_proc),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("arguments_layout_proc"),
+    .descriptor = &descriptor_calling_convention_arguments_layout_proc,
+    .Base_Relative.offset = offsetof(Calling_Convention, arguments_layout_proc),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(calling_convention);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
 MASS_DEFINE_STRUCT_DESCRIPTOR(jit, Jit,
