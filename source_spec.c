@@ -73,7 +73,7 @@ test_program_source_base(
   Test_Program_Source source
 ) {
   Module *prelude_module = program_module_from_file(
-    &test_context, slice_literal("lib\\prelude"), test_context.scope
+    &test_context, slice_literal("lib/prelude"), test_context.scope
   );
   test_context.module = prelude_module;
   Mass_Result result = program_import_module(&test_context, prelude_module);
