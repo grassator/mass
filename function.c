@@ -753,25 +753,22 @@ load_address(
   }
 }
 
-static Value *
-function_return_value_for_descriptor(
-  Execution_Context *context,
-  const Descriptor *descriptor,
-  Function_Argument_Mode mode,
-  Source_Range source_range
+static Storage
+function_return_storage(
+  const Function_Info *function,
+  Function_Argument_Mode mode
 ) {
+  const Descriptor *descriptor = function->returns.descriptor;
   if (descriptor == &descriptor_void) {
-    return &void_value;
+    return storage_none;
   }
   // TODO handle 16 byte non-float return values in XMM0
   if (descriptor_is_float(descriptor)) {
-    Storage storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
-    return value_make(context, descriptor, storage, source_range);
+    return storage_register_for_descriptor(Register_Xmm0, descriptor);
   }
   u64 byte_size = descriptor_byte_size(descriptor);
   if (byte_size <= 8) {
-    Storage storage = storage_register_for_descriptor(Register_A, descriptor);
-    return value_make(context, descriptor, storage, source_range);
+    return storage_register_for_descriptor(Register_A, descriptor);
   }
   // :ReturnTypeLargerThanRegister
   // Inside the function large returns are pointed to by RCX,
@@ -780,7 +777,7 @@ function_return_value_for_descriptor(
   if (mode == Function_Argument_Mode_Body) {
     base_register = Register_C;
   }
-  return value_make(context, descriptor, storage_indirect(byte_size, base_register), source_range);
+  return storage_indirect(byte_size, base_register);
 }
 
 static Memory_Layout
@@ -910,9 +907,8 @@ ensure_function_instance(
   body_context.epoch = get_new_epoch();
 
   const Function_Return *returns = &function->returns;
-  Value *return_value = function_return_value_for_descriptor(
-    &body_context, returns->descriptor, Function_Argument_Mode_Body, returns->source_range
-  );
+  Storage return_storage = function_return_storage(function, Function_Argument_Mode_Body);
+  Value *return_value = value_make(context, returns->descriptor, return_storage, returns->source_range);
 
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));

@@ -1950,7 +1950,8 @@ value_force_exact(
   Expected_Result expected_result = expected_result_from_value(target);
   Value *forced = value_force(context, builder, &expected_result, source);
   MASS_ON_ERROR(*context->result) return;
-  assert(forced == target);
+  assert(forced->descriptor == target->descriptor);
+  if (target->descriptor != &descriptor_void) assert(forced == target);
 }
 
 static Array_Value_Ptr
@@ -3211,8 +3212,9 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  Value *fn_return_value = function_return_value_for_descriptor(
-    context, fn_info->returns.descriptor, Function_Argument_Mode_Call, *source_range
+  Storage return_storage = function_return_storage(fn_info, Function_Argument_Mode_Call);
+  Value *fn_return_value = value_make(
+    context, fn_info->returns.descriptor, return_storage, fn_info->returns.source_range
   );
   if (fn_info->returns.descriptor != &descriptor_void) {
     fn_return_value->is_temporary = true;
