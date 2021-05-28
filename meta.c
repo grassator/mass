@@ -1246,6 +1246,7 @@ main(void) {
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
       { "Memory_Layout", "arguments_layout" },
+      { "const Calling_Convention *", "calling_convention" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },
@@ -1348,10 +1349,16 @@ main(void) {
     { "const Function_Info *", "function_info" },
   }));
 
+  push_type(type_function("Calling_Convention_Return_Storage_Proc", "Storage", (Argument_Type[]){
+    { "const Function_Info *", "function_info" },
+    { "Function_Argument_Mode", "mode" },
+  }));
+
   push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
     { "Calling_Convention_Body_End_Proc", "body_end_proc" },
     { "Calling_Convention_Arguments_Layout_Proc", "arguments_layout_proc"},
+    { "Calling_Convention_Return_Storage_Proc", "return_storage_proc"},
   }));
 
   push_type(type_hash_map({

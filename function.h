@@ -152,9 +152,16 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   const Function_Info *function
 );
 
+static Storage
+calling_convention_x86_64_windows_return_storage_proc(
+  const Function_Info *function,
+  Function_Argument_Mode mode
+);
+
 static const Calling_Convention calling_convention_x86_64_windows = {
   .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
   .arguments_layout_proc = calling_convention_x86_64_windows_arguments_layout_proc,
+  .return_storage_proc = calling_convention_x86_64_windows_return_storage_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |

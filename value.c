@@ -1468,7 +1468,8 @@ descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
   Function_Info *info,
-  Memory_Layout arguments_layout
+  Memory_Layout arguments_layout,
+  const Calling_Convention *calling_convention
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (Descriptor) {
@@ -1479,6 +1480,7 @@ descriptor_function_instance(
     .Function_Instance = {
       .info = info,
       .arguments_layout = arguments_layout,
+      .calling_convention = calling_convention,
     },
   };
   return result;

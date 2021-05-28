@@ -3212,7 +3212,9 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  Storage return_storage = function_return_storage(fn_info, Function_Argument_Mode_Call);
+  const Calling_Convention *calling_convention = instance_descriptor->calling_convention;
+  Storage return_storage =
+    calling_convention->return_storage_proc(fn_info, Function_Argument_Mode_Call);
   Value *fn_return_value = value_make(
     context, fn_info->returns.descriptor, return_storage, fn_info->returns.source_range
   );
@@ -5080,8 +5082,9 @@ token_parse_function_literal(
       context->compilation->runtime_program->default_calling_convention;
     Memory_Layout arguments_layout =
       calling_convention->arguments_layout_proc(context->allocator, fn_info);
-    Descriptor *fn_descriptor =
-      descriptor_function_instance(context->allocator, name, fn_info, arguments_layout);
+    Descriptor *fn_descriptor = descriptor_function_instance(
+      context->allocator, name, fn_info, arguments_layout, calling_convention
+    );
     return value_init(
       allocator_allocate(context->allocator, Value),
       &descriptor_type, storage_static(fn_descriptor), view.source_range
@@ -6111,8 +6114,9 @@ scope_define_builtins(
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
     Memory_Layout arguments_layout = calling_convention->arguments_layout_proc(allocator, function);\
-    const Descriptor *instance_descriptor =\
-      descriptor_function_instance(allocator, slice_literal(_NAME_), function, arguments_layout);\
+    const Descriptor *instance_descriptor = descriptor_function_instance(\
+      allocator, slice_literal(_NAME_), function, arguments_layout, calling_convention\
+    );\
     Value *instance_value = value_init(\
       allocator_allocate(allocator, Value),\
       instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\

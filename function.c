@@ -754,7 +754,7 @@ load_address(
 }
 
 static Storage
-function_return_storage(
+calling_convention_x86_64_windows_return_storage_proc(
   const Function_Info *function,
   Function_Argument_Mode mode
 ) {
@@ -881,12 +881,17 @@ ensure_function_instance(
   Memory_Layout arguments_layout =
     calling_convention->arguments_layout_proc(context->allocator, function);
 
+  const Function_Return *returns = &function->returns;
+  Storage return_storage = calling_convention->return_storage_proc(function, Function_Argument_Mode_Body);
+  Value *return_value = value_make(context, returns->descriptor, return_storage, returns->source_range);
+
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
-  const Descriptor *instance_descriptor =
-    descriptor_function_instance(context->allocator, fn_name, function, arguments_layout);
+  const Descriptor *instance_descriptor = descriptor_function_instance(
+    context->allocator, fn_name, function, arguments_layout, calling_convention
+  );
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -905,10 +910,6 @@ ensure_function_instance(
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.epoch = get_new_epoch();
-
-  const Function_Return *returns = &function->returns;
-  Storage return_storage = function_return_storage(function, Function_Argument_Mode_Body);
-  Value *return_value = value_make(context, returns->descriptor, return_storage, returns->source_range);
 
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
@@ -1033,8 +1034,9 @@ program_init_startup_code(
   Memory_Layout arguments_layout =
     calling_convention->arguments_layout_proc(context->allocator, fn_info);
   Slice fn_name = slice_literal("__startup");
-  Descriptor *descriptor =
-    descriptor_function_instance(context->allocator, fn_name, fn_info, arguments_layout);
+  Descriptor *descriptor = descriptor_function_instance(
+    context->allocator, fn_name, fn_info, arguments_layout, calling_convention
+  );
   Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
   Storage storage = code_label32(fn_label);
 
