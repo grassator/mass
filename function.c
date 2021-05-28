@@ -439,6 +439,12 @@ fn_end(
 ) {
   assert(!builder->frozen);
 
+  // :ReturnTypeLargerThanRegister
+  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
+    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}});
+  }
+
   s32 return_address_size = 8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
@@ -572,22 +578,6 @@ fn_encode(
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
     encode_instruction(program, buffer, instruction);
-  }
-
-  encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {
-      .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label
-    }
-  );
-
-  // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
-    // FIXME :RegisterAllocation
-    //       make sure that return value is always available in RCX at this point
-    encode_instruction_with_compiler_location(
-      program, buffer,
-      &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}}
-    );
   }
 
   encode_instruction_with_compiler_location(
@@ -884,6 +874,11 @@ ensure_function_instance(
   MASS_ON_ERROR(*context->result) return 0;
 
   value_force_exact(&body_context, builder, return_value, parse_result);
+
+  push_instruction(
+    &builder->code_block.instructions, return_value->source_range,
+    (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+  );
 
   fn_end(program, builder);
 
