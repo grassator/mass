@@ -149,24 +149,6 @@ load_address(
   Storage storage
 );
 
-Value *
-make_and(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *a,
-  Value *b
-);
-
-Value *
-make_or(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *a,
-  Value *b
-);
-
 static const Calling_Convention calling_convention_x86_64_windows = {
   .register_volatile_bitset = (
     // Arguments
