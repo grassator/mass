@@ -130,16 +130,6 @@ fn_encode(
   Function_Layout *out_layout
 );
 
-Value *
-compare(
-  Execution_Context *context,
-  Compare_Type operation,
-  const Source_Range *source_range,
-  Value *result_value,
-  Value *a,
-  Value *b
-);
-
 static void
 load_address(
   Execution_Context *context,
