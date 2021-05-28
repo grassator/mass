@@ -15,41 +15,6 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
   .offsets = {0},
 };
 
-static const Calling_Convention calling_convention_x86_64_windows = {
-  .register_volatile_bitset = (
-    // Arguments
-    (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |
-
-    // Return
-    (1llu << Register_A) |
-
-    // Other
-    (1llu << Register_R10) | (1llu << Register_R11)
-  ),
-};
-
-#define X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET (\
-  /* Arguments */\
-  (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |\
-  (1llu << Register_C) | (1llu << Register_R8) | (1llu << Register_R9) |\
-  /* Varargs / Return */\
-  (1llu << Register_A) |\
-  /* Other */\
-  (1llu << Register_R10) | (1llu << Register_R11)\
-)
-
-static const Calling_Convention calling_convention_x86_64_linux = {
-  .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
-};
-
-static const Calling_Convention calling_convention_x86_64_darwin = {
-  .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
-};
-
-static Array_Value_Ptr empty_value_array = {
-  .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
-};
-
 static inline bool
 register_is_xmm(
   Register reg
