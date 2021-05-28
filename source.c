@@ -3233,10 +3233,11 @@ call_function_overload(
     }
   }
 
+  u64 target_volatile_registers_bitset =
+    instance_descriptor->calling_convention->register_volatile_bitset;
   u64 saved_registers_bit_set = 0;
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    // FIXME this should use *target* volatile registers *NOT* the current builder
-    if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) continue;
+    if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
 
     register_bitset_set(&saved_registers_bit_set, reg_index);
