@@ -1471,7 +1471,6 @@ descriptor_function_instance(
   const Calling_Convention *calling_convention
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
-  Memory_Layout arguments_layout = calling_convention->arguments_layout_proc(allocator, info);
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Function_Instance,
     .name = name,
@@ -1479,7 +1478,8 @@ descriptor_function_instance(
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = {
       .info = info,
-      .arguments_layout = arguments_layout,
+      .arguments_layout = calling_convention->arguments_layout_proc(allocator, info),
+      .return_storage = calling_convention->return_storage_proc(info, Function_Argument_Mode_Call),
       .calling_convention = calling_convention,
     },
   };

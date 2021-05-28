@@ -1054,8 +1054,9 @@ typedef enum {
 
 typedef struct Descriptor_Function_Instance {
   Function_Info * info;
-  Memory_Layout arguments_layout;
   const Calling_Convention * calling_convention;
+  Memory_Layout arguments_layout;
+  Storage return_storage;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
@@ -3340,15 +3341,21 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("calling_convention"),
+    .descriptor = &descriptor_calling_convention_pointer,
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, calling_convention),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("arguments_layout"),
     .descriptor = &descriptor_memory_layout,
     .Base_Relative.offset = offsetof(Descriptor_Function_Instance, arguments_layout),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("calling_convention"),
-    .descriptor = &descriptor_calling_convention_pointer,
-    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, calling_convention),
+    .name = slice_literal_fields("return_storage"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, return_storage),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);

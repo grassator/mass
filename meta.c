@@ -1245,8 +1245,9 @@ main(void) {
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
-      { "Memory_Layout", "arguments_layout" },
       { "const Calling_Convention *", "calling_convention" },
+      { "Memory_Layout", "arguments_layout" },
+      { "Storage", "return_storage" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },
