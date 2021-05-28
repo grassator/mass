@@ -611,9 +611,6 @@ fn_encode(
   encode_instruction_with_compiler_location(program, buffer,
     &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ret, {0}}});
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
-
-  encode_instruction_with_compiler_location(program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {int3, {0}}});
 }
 
 Label_Index
