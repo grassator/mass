@@ -542,6 +542,15 @@ spec("source") {
   }
 
   describe("Functions") {
+    it("should be able to parse and run a void -> void function") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> () { }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+
     it("should be able to parse and run a void -> s64 function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
