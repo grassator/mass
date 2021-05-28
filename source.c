@@ -3356,8 +3356,8 @@ call_function_overload(
     }
   }
 
-  // If we call a function, then we need to reserve space for the home
-  // area of at least 4 arguments?
+  // If we call a function, then we need to reserve space for the home area of at least 4 arguments
+  // TODO move this calculation to the calling convention somehow?
   u64 parameters_stack_size = u64_max(4, dyn_array_length(fn_info->arguments)) * 8;
 
   builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
