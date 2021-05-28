@@ -430,84 +430,6 @@ spec("source") {
   }
   #endif
 
-  describe("Math") {
-    #define MATH_CHECKER_FN(LEFT_TYPE, RIGHT_TYPE, OPERATOR)\
-      LEFT_TYPE(*checker)(LEFT_TYPE, RIGHT_TYPE) = \
-        (LEFT_TYPE(*)(LEFT_TYPE, RIGHT_TYPE))test_program_inline_source_function(\
-          "test", &test_context,\
-          "test :: fn(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
-        )
-    describe("division") {
-      #if 0
-      it("debug math witout a macro") {
-        MATH_CHECKER_FN(u8, u8, /);
-        check(spec_check_mass_result(test_context.result));
-        check(checker(10u, 3u) == 10u / 3u);
-        check(checker(UINT8_MAX, 3u) == UINT8_MAX / 3u);
-      }
-      #endif
-
-      #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
-        it("should correctly handle u"#BITS" divide") {\
-          MATH_CHECKER_FN(u##BITS, u##BITS, /);\
-          check(spec_check_mass_result(test_context.result));\
-          check(checker(10u, 3u) == 10u / 3u);\
-          check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX / 3u);\
-        }\
-        it("should correctly handle u"#BITS" remainder") {\
-          MATH_CHECKER_FN(u##BITS, u##BITS, %);\
-          check(spec_check_mass_result(test_context.result));\
-          check(checker(10u, 3u) == 10u % 3u);\
-          check(checker(13u, 10u) == 13u % 10u);\
-          check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX % 3u);\
-          check(checker(3u, UINT##BITS##_MAX) == 3u % UINT##BITS##_MAX);\
-        }
-
-      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(8)
-      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(16)
-      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(32)
-      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(64)
-
-      #define MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(BITS)\
-        it("should correctly handle s"#BITS" divide") {\
-          MATH_CHECKER_FN(s##BITS, s##BITS, /);\
-          check(spec_check_mass_result(test_context.result));\
-          check(checker(10, 3) == 10 / 3);\
-          check(checker(10, -3) == 10 / -3);\
-          check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX / 3);\
-          check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN / -3);\
-        }\
-        it("should correctly handle s"#BITS" remainder") {\
-          MATH_CHECKER_FN(s##BITS, s##BITS, %);\
-          check(spec_check_mass_result(test_context.result));\
-          check(checker(10, 3) == 10 % 3);\
-          check(checker(10, -3) == 10 % -3);\
-          check(checker(13, 10) == 13 % 10);\
-          check(checker(-13, 10) == -13 % 10);\
-          check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX % 3);\
-          check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN % -3);\
-        }
-
-      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(8)
-      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(16)
-      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(32)
-      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(64)
-    }
-
-    describe("multiplication") {
-      it("should correctly handle s8 multiplication") {\
-        MATH_CHECKER_FN(s8, s8, *);
-        check(spec_check_mass_result(test_context.result));
-        check(checker(-30, 3) == -30 * 3);
-      }
-      it("should correctly handle u8 multiplication") {\
-        MATH_CHECKER_FN(u8, u8, *);
-        check(spec_check_mass_result(test_context.result));
-        check(checker(128u, 3u) == 128u);
-      }
-    }
-  }
-
   describe("Type Inference") {
     it("should report an error when LHS of the := is not a symbol") {
       test_program_inline_source_base(
@@ -1015,6 +937,84 @@ spec("source") {
         );
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
+    }
+  }
+
+  describe("Math") {
+    #define MATH_CHECKER_FN(LEFT_TYPE, RIGHT_TYPE, OPERATOR)\
+      LEFT_TYPE(*checker)(LEFT_TYPE, RIGHT_TYPE) = \
+        (LEFT_TYPE(*)(LEFT_TYPE, RIGHT_TYPE))test_program_inline_source_function(\
+          "test", &test_context,\
+          "test :: fn(x : " #LEFT_TYPE ", y : " #RIGHT_TYPE ") -> ("#LEFT_TYPE") { x " #OPERATOR " y }"\
+        )
+    describe("division") {
+      #if 0
+      it("debug math witout a macro") {
+        MATH_CHECKER_FN(u8, u8, /);
+        check(spec_check_mass_result(test_context.result));
+        check(checker(10u, 3u) == 10u / 3u);
+        check(checker(UINT8_MAX, 3u) == UINT8_MAX / 3u);
+      }
+      #endif
+
+      #define MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(BITS)\
+        it("should correctly handle u"#BITS" divide") {\
+          MATH_CHECKER_FN(u##BITS, u##BITS, /);\
+          check(spec_check_mass_result(test_context.result));\
+          check(checker(10u, 3u) == 10u / 3u);\
+          check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX / 3u);\
+        }\
+        it("should correctly handle u"#BITS" remainder") {\
+          MATH_CHECKER_FN(u##BITS, u##BITS, %);\
+          check(spec_check_mass_result(test_context.result));\
+          check(checker(10u, 3u) == 10u % 3u);\
+          check(checker(13u, 10u) == 13u % 10u);\
+          check(checker(UINT##BITS##_MAX, 3u) == UINT##BITS##_MAX % 3u);\
+          check(checker(3u, UINT##BITS##_MAX) == 3u % UINT##BITS##_MAX);\
+        }
+
+      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(8)
+      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(16)
+      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(32)
+      MATCH_CHECK_UNSIGNED_DIVIDE_AND_REMAINDER(64)
+
+      #define MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(BITS)\
+        it("should correctly handle s"#BITS" divide") {\
+          MATH_CHECKER_FN(s##BITS, s##BITS, /);\
+          check(spec_check_mass_result(test_context.result));\
+          check(checker(10, 3) == 10 / 3);\
+          check(checker(10, -3) == 10 / -3);\
+          check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX / 3);\
+          check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN / -3);\
+        }\
+        it("should correctly handle s"#BITS" remainder") {\
+          MATH_CHECKER_FN(s##BITS, s##BITS, %);\
+          check(spec_check_mass_result(test_context.result));\
+          check(checker(10, 3) == 10 % 3);\
+          check(checker(10, -3) == 10 % -3);\
+          check(checker(13, 10) == 13 % 10);\
+          check(checker(-13, 10) == -13 % 10);\
+          check(checker(INT##BITS##_MAX, 3) == INT##BITS##_MAX % 3);\
+          check(checker(INT##BITS##_MIN, -3) == INT##BITS##_MIN % -3);\
+        }
+
+      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(8)
+      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(16)
+      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(32)
+      MATCH_CHECK_SIGNED_DIVIDE_AND_REMAINDER(64)
+    }
+
+    describe("multiplication") {
+      it("should correctly handle s8 multiplication") {\
+        MATH_CHECKER_FN(s8, s8, *);
+        check(spec_check_mass_result(test_context.result));
+        check(checker(-30, 3) == -30 * 3);
+      }
+      it("should correctly handle u8 multiplication") {\
+        MATH_CHECKER_FN(u8, u8, *);
+        check(spec_check_mass_result(test_context.result));
+        check(checker(128u, 3u) == 128u);
+      }
     }
   }
 
