@@ -83,14 +83,15 @@ instruction_add_source_location_internal(
   } while(0)
 
 #define MAX_ESTIMATED_TRAMPOLINE_SIZE 32
-u32
+
+static u32
 make_trampoline(
   Program *program,
   Virtual_Memory_Buffer *buffer,
   s64 address
 );
 
-void
+static void
 move_value(
   Allocator *allocator,
   Function_Builder *builder,
@@ -139,7 +140,14 @@ load_address(
   Storage storage
 );
 
+static void
+calling_convention_x86_64_windows_body_end_proc(
+  Program *program,
+  Function_Builder *builder
+);
+
 static const Calling_Convention calling_convention_x86_64_windows = {
+  .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |

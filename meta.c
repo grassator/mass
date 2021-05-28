@@ -1048,7 +1048,6 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Builder", (Struct_Item[]){
-    { "u64", "frozen" },
     { "s32", "stack_reserve" },
     { "u32", "max_call_parameters_stack_size" },
     { "Value *", "return_value" },
@@ -1329,6 +1328,7 @@ main(void) {
 
   push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
+    { "Calling_Convention_Body_End_Proc", "body_end_proc" },
   }));
 
   push_type(type_struct("Program", (Struct_Item[]){
@@ -1341,6 +1341,11 @@ main(void) {
     { "Array_Function_Builder", "functions" },
     { "Program_Memory", "memory" },
     { "const Calling_Convention *", "default_calling_convention"},
+  }));
+
+  push_type(type_function("Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
+    { "Program *", "program" },
+    { "Function_Builder *", "builder" },
   }));
 
   push_type(type_hash_map({

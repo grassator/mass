@@ -235,6 +235,9 @@ typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
+typedef void (*Calling_Convention_Body_End_Proc)
+  (Program * program, Function_Builder * builder);
+
 typedef struct Jit_Import_Library_Handle_Map Jit_Import_Library_Handle_Map;
 
 typedef struct Imported_Module_Map Imported_Module_Map;
@@ -757,7 +760,6 @@ typedef struct Code_Block {
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
 typedef struct Function_Builder {
-  u64 frozen;
   s32 stack_reserve;
   u32 max_call_parameters_stack_size;
   Value * return_value;
@@ -1178,6 +1180,7 @@ typedef struct Mass_Result {
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
 typedef struct Calling_Convention {
   u64 register_volatile_bitset;
+  Calling_Convention_Body_End_Proc body_end_proc;
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
@@ -1551,6 +1554,7 @@ static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
+static Descriptor descriptor_calling_convention_body_end_proc;
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(imported_module_map, Imported_Module_Map);
 static Descriptor descriptor_jit;
@@ -2621,12 +2625,6 @@ MASS_DEFINE_TYPE_VALUE(code_block);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder_ptr, Array_Function_Builder_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_builder, Array_Function_Builder)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("frozen"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Function_Builder, frozen),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("stack_reserve"),
@@ -3736,6 +3734,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
     .name = slice_literal_fields("register_volatile_bitset"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Calling_Convention, register_volatile_bitset),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("body_end_proc"),
+    .descriptor = &descriptor_calling_convention_body_end_proc,
+    .Base_Relative.offset = offsetof(Calling_Convention, body_end_proc),
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);

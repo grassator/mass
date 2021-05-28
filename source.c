@@ -2686,10 +2686,11 @@ compile_time_eval(
   Function_Info fn_info;
   function_info_init(&fn_info, eval_context.scope);
 
+  const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
   Function_Builder eval_builder = {
     .function = &fn_info,
-    .register_volatile_bitset = jit->program->default_calling_convention->register_volatile_bitset,
+    .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {
       .start_label = eval_label_index,
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
@@ -2749,7 +2750,7 @@ compile_time_eval(
     context->result = eval_context.result;
     return 0;
   }
-  fn_end(jit->program, &eval_builder);
+  calling_convention->body_end_proc(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
   program_jit(jit);

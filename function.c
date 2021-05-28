@@ -432,13 +432,11 @@ move_value(
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
 }
 
-void
-fn_end(
+static void
+calling_convention_x86_64_windows_body_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
-  assert(!builder->frozen);
-
   // :ReturnTypeLargerThanRegister
   if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
     push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
@@ -498,8 +496,6 @@ fn_end(
       }
     }
   }
-
-  builder->frozen = true;
 }
 
 u32
@@ -528,7 +524,6 @@ fn_encode(
   Function_Layout *out_layout
 ) {
   assert(!(builder->function->flags & Descriptor_Function_Flags_Macro));
-  assert(builder->frozen);
 
   Label_Index label_index = builder->code_block.start_label;
   Label *label = program_get_label(program, label_index);
@@ -818,9 +813,11 @@ ensure_function_instance(
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
 
+  const Calling_Convention *calling_convention = program->default_calling_convention;
+
   Function_Builder *builder = &(Function_Builder){
     .function = function,
-    .register_volatile_bitset = program->default_calling_convention->register_volatile_bitset,
+    .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
     .code_block = {
       .start_label = call_label,
@@ -880,7 +877,7 @@ ensure_function_instance(
     (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
   );
 
-  fn_end(program, builder);
+  calling_convention->body_end_proc(program, builder);
 
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);
@@ -945,7 +942,6 @@ program_init_startup_code(
 
   Function_Builder builder = (Function_Builder){
     .function = fn_info,
-    .frozen = true,
     .code_block = {
       .start_label = fn_label,
       .end_label = make_label(program, &program->memory.code, slice_literal("__startup end")),
