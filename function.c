@@ -878,9 +878,6 @@ ensure_function_instance(
   Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  Memory_Layout arguments_layout =
-    calling_convention->arguments_layout_proc(context->allocator, function);
-
   const Function_Return *returns = &function->returns;
   Storage return_storage = calling_convention->return_storage_proc(function, Function_Argument_Mode_Body);
   Value *return_value = value_make(context, returns->descriptor, return_storage, returns->source_range);
@@ -890,8 +887,10 @@ ensure_function_instance(
     : slice_literal("__anonymous__");
 
   const Descriptor *instance_descriptor = descriptor_function_instance(
-    context->allocator, fn_name, function, arguments_layout, calling_convention
+    context->allocator, fn_name, function, calling_convention
   );
+
+  const Memory_Layout *arguments_layout = &instance_descriptor->Function_Instance.arguments_layout;
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -926,9 +925,9 @@ ensure_function_instance(
   };
 
   {
-    for(u64 i = 0; i < dyn_array_length(arguments_layout.items); ++i) {
-      Memory_Layout_Item *item = dyn_array_get(arguments_layout.items, i);
-      Storage storage = memory_layout_item_storage_at_index(&arguments_layout, i);
+    for(u64 i = 0; i < dyn_array_length(arguments_layout->items); ++i) {
+      Memory_Layout_Item *item = dyn_array_get(arguments_layout->items, i);
+      Storage storage = memory_layout_item_storage_at_index(arguments_layout, i);
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
         scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
@@ -959,7 +958,6 @@ ensure_function_instance(
         builder->register_occupied_values[arg_reg] = arg_value;
       }
     }
-    dyn_array_destroy(arguments_layout.items);
   }
 
   // Return value can be named in which case it should be accessible in the fn body
@@ -1031,11 +1029,9 @@ program_init_startup_code(
   function_info_init(fn_info, 0 /* scope */);
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
-  Memory_Layout arguments_layout =
-    calling_convention->arguments_layout_proc(context->allocator, fn_info);
   Slice fn_name = slice_literal("__startup");
   Descriptor *descriptor = descriptor_function_instance(
-    context->allocator, fn_name, fn_info, arguments_layout, calling_convention
+    context->allocator, fn_name, fn_info, calling_convention
   );
   Label_Index fn_label = make_label(program, &program->memory.code, fn_name);
   Storage storage = code_label32(fn_label);

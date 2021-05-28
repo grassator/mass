@@ -1468,10 +1468,10 @@ descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
   Function_Info *info,
-  Memory_Layout arguments_layout,
   const Calling_Convention *calling_convention
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
+  Memory_Layout arguments_layout = calling_convention->arguments_layout_proc(allocator, info);
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Function_Instance,
     .name = name,

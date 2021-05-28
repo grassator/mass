@@ -5080,10 +5080,8 @@ token_parse_function_literal(
     // TODO It might be better to just store Function_Info here and not the instance
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
-    Memory_Layout arguments_layout =
-      calling_convention->arguments_layout_proc(context->allocator, fn_info);
     Descriptor *fn_descriptor = descriptor_function_instance(
-      context->allocator, name, fn_info, arguments_layout, calling_convention
+      context->allocator, name, fn_info, calling_convention
     );
     return value_init(
       allocator_allocate(context->allocator, Value),
@@ -6113,9 +6111,8 @@ scope_define_builtins(
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
-    Memory_Layout arguments_layout = calling_convention->arguments_layout_proc(allocator, function);\
     const Descriptor *instance_descriptor = descriptor_function_instance(\
-      allocator, slice_literal(_NAME_), function, arguments_layout, calling_convention\
+      allocator, slice_literal(_NAME_), function, calling_convention\
     );\
     Value *instance_value = value_init(\
       allocator_allocate(allocator, Value),\
