@@ -542,12 +542,7 @@ spec("source") {
   }
 
   describe("Functions") {
-    #if defined(__linux__)
-    fit("should be able to parse and run a void -> void function")
-    #else
-    it("should be able to parse and run a void -> void function")
-    #endif
-    {
+    it("should be able to parse and run a void -> void function") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "foo", &test_context,
         "foo :: fn() -> () { }"
@@ -805,6 +800,7 @@ spec("source") {
       check(checker() == 42);
     }
 
+    #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fibonnacii") {
       s64(*fibonnacci)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "fibonnacci", &test_context,
@@ -819,6 +815,7 @@ spec("source") {
       check(fibonnacci(1) == 1);
       check(fibonnacci(10) == 55);
     }
+    #endif
 
     it("should allow non-parenthesized return type") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
@@ -1033,6 +1030,7 @@ spec("source") {
   }
 
   describe("Operators") {
+    #if defined(_WIN32) // TODO support on Linux
     it("should be able to use prefix backslash operator for reflection") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1051,6 +1049,7 @@ spec("source") {
         check(spec_check_mass_result(test_context.result));
         check(checker() == 42);
     }
+    #endif
 
     it("should be able to parse and run a triple plus function") {
       s64(*checker)(s64, s64, s64) = (s64(*)(s64, s64, s64))test_program_inline_source_function(
@@ -1631,6 +1630,7 @@ spec("source") {
       check(checker(&test_128bit));
     }
 
+    #if defined(_WIN32) // TODO support on Linux
     it("should be able to return structs while accepting other arguments") {
       Test_128bit(*checker)(s64) = (Test_128bit(*)(s64))test_program_inline_source_function(
         "return_struct", &test_context,
@@ -1663,6 +1663,7 @@ spec("source") {
       Test_128bit test_128bit = { .x = 20, .y = 22 };
       check(checker(test_128bit) == 42);
     }
+    #endif
   }
 
   describe("Unsigned Integers") {
@@ -1698,6 +1699,7 @@ spec("source") {
 
 
   describe("Modules") {
+    #if defined(_WIN32) // TODO support on Linux
     it("should support importing modules") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -1752,6 +1754,7 @@ spec("source") {
       spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
       spec_check_slice(error->detailed_message, slice_literal("Oops"));
     }
+    #endif
   }
 
   describe("PE32 Executables") {
@@ -1763,16 +1766,16 @@ spec("source") {
         "ExitProcess :: fn(status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
       check(spec_check_mass_result(test_context.result));
-      write_executable("build\\test_parsed.exe", &test_context, Executable_Type_Cli);
+      write_executable("build/test_parsed.exe", &test_context, Executable_Type_Cli);
     }
 
     it("should parse and write an executable that prints Hello, world!") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "fixtures\\hello_world"
+        "main", &test_context, "fixtures/hello_world"
       );
       check(spec_check_mass_result(test_context.result));
-      write_executable("build\\hello_world.exe", &test_context, Executable_Type_Cli);
+      write_executable("build/hello_world.exe", &test_context, Executable_Type_Cli);
     }
 
     xit("should parse and write an executable with a lot of constant folding") {
@@ -1799,9 +1802,10 @@ spec("source") {
   }
 
   describe("Relocations") {
+    #if defined(_WIN32) // TODO support on Linux
     it("should work in JIT code") {
       fn_type_opaque checker = test_program_external_source_function(
-        "test", &test_context, "fixtures\\relocations"
+        "test", &test_context, "fixtures/relocations"
       );
       check(spec_check_mass_result(test_context.result));
       checker();
@@ -1810,22 +1814,25 @@ spec("source") {
     it("should work in an executable") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "fixtures\\relocations"
+        "main", &test_context, "fixtures/relocations"
       );
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build\\relocations.exe", &test_context, Executable_Type_Cli);
+      write_executable("build/relocations.exe", &test_context, Executable_Type_Cli);
     }
+    #endif
   }
 
   describe("Complex Examples") {
+    #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz = test_program_external_source_function(
-        "fizz_buzz", &test_context, "fixtures\\fizz_buzz"
+        "fizz_buzz", &test_context, "fixtures/fizz_buzz"
       );
       check(fizz_buzz);
       fizz_buzz();
     }
+    #endif
   }
 }

@@ -692,12 +692,12 @@ calling_convention_x86_64_linux_body_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
-  //// :ReturnTypeLargerThanRegister
-  //if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
-    //push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
-      //(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}});
-  //}
-//
+  // :ReturnTypeLargerThanRegister
+  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
+    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
+  }
+
   s32 return_address_size = 8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
@@ -770,13 +770,13 @@ calling_convention_x86_64_linux_return_storage_proc(
   if (byte_size <= 8) {
     return storage_register_for_descriptor(Register_A, descriptor);
   }
-  //// :ReturnTypeLargerThanRegister
-  //// Inside the function large returns are pointed to by RCX,
-  //// but this pointer is also returned in A
+  // :ReturnTypeLargerThanRegister
+  // Inside the function large returns are pointed to by RCX,
+  // but this pointer is also returned in A
   Register base_register = Register_A;
-  //if (mode == Function_Argument_Mode_Body) {
-    //base_register = Register_C;
-  //}
+  if (mode == Function_Argument_Mode_Body) {
+    base_register = Register_DI;
+  }
   return storage_indirect(byte_size, base_register);
 }
 
@@ -831,7 +831,6 @@ calling_convention_x86_64_linux_arguments_layout_proc(
       if (is_large_argument) {
         // Large arguments are passed "by reference", i.e. their memory location in the register
         arg_storage = storage_indirect(byte_size, reg);
-        //panic("TODO support large arguments on Linux");
       } else {
         arg_storage = storage_register_for_descriptor(reg, arg->descriptor);
       }
@@ -845,16 +844,16 @@ calling_convention_x86_64_linux_arguments_layout_proc(
     index += 1;
   }
 
-  //if (is_return_larger_than_register) {
-    //dyn_array_push(layout.items, (Memory_Layout_Item) {
-      //.tag = Memory_Layout_Item_Tag_Absolute,
-      //.flags = Memory_Layout_Item_Flags_Uninitialized,
-      //.name = {0}, // Defining return value name happens separately
-      //.descriptor = function->returns.descriptor,
-      //.source_range = function->returns.source_range,
-      //.Absolute = { .storage = storage_indirect(return_byte_size, Register_C), },
-    //});
-  //}
+  if (is_return_larger_than_register) {
+    dyn_array_push(layout.items, (Memory_Layout_Item) {
+      .tag = Memory_Layout_Item_Tag_Absolute,
+      .flags = Memory_Layout_Item_Flags_Uninitialized,
+      .name = {0}, // Defining return value name happens separately
+      .descriptor = function->returns.descriptor,
+      .source_range = function->returns.source_range,
+      .Absolute = { .storage = storage_indirect(return_byte_size, Register_DI), },
+    });
+  }
 
   return layout;
 }
