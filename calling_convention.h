@@ -74,16 +74,10 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
 #ifdef CALLING_CONVENTION_IMPLEMENTATION
 
 static void
-calling_convention_x86_64_system_v_body_end_proc(
+calling_convention_x86_64_common_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
-  // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
-    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
-  }
-
   s32 return_address_size = 8;
   builder->stack_reserve += builder->max_call_parameters_stack_size;
   builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
@@ -103,40 +97,52 @@ calling_convention_x86_64_system_v_body_end_proc(
   DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
     for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
       Storage *storage = &instruction->Assembly.operands[storage_index];
-      if (storage->tag == Storage_Tag_Memory) {
-        Memory_Location *location = &storage->Memory.location;
-        switch(location->tag) {
-          case Memory_Location_Tag_Stack: {
-            Memory_Location_Stack stack = location->Stack;
-            *storage = storage_indirect(storage->byte_size, Register_SP);
-            switch(stack.area) {
-              case Stack_Area_Local: {
-                assert(stack.offset < 0);
-                storage->Memory.location.Indirect.offset = builder->stack_reserve + stack.offset;
-                break;
-              }
-              case Stack_Area_Received_Argument: {
-                assert(stack.offset >= 0);
-                storage->Memory.location.Indirect.offset = argument_stack_base + stack.offset;
-                break;
-              }
-              case Stack_Area_Call_Target_Argument: {
-                assert(stack.offset >= 0);
-                storage->Memory.location.Indirect.offset = stack.offset;
-                break;
-              }
+      if (storage->tag != Storage_Tag_Memory) continue;
+      Memory_Location *location = &storage->Memory.location;
+      switch(location->tag) {
+        case Memory_Location_Tag_Stack: {
+          Memory_Location_Stack stack = location->Stack;
+          *storage = storage_indirect(storage->byte_size, Register_SP);
+          switch(stack.area) {
+            case Stack_Area_Local: {
+              assert(stack.offset < 0);
+              storage->Memory.location.Indirect.offset = builder->stack_reserve + stack.offset;
+              break;
             }
-            break;
+            case Stack_Area_Received_Argument: {
+              assert(stack.offset >= 0);
+              storage->Memory.location.Indirect.offset = argument_stack_base + stack.offset;
+              break;
+            }
+            case Stack_Area_Call_Target_Argument: {
+              assert(stack.offset >= 0);
+              storage->Memory.location.Indirect.offset = stack.offset;
+              break;
+            }
           }
-          case Memory_Location_Tag_Instruction_Pointer_Relative:
-          case Memory_Location_Tag_Indirect: {
-            // Nothing to do
-            break;
-          }
+          break;
+        }
+        case Memory_Location_Tag_Instruction_Pointer_Relative:
+        case Memory_Location_Tag_Indirect: {
+          // Nothing to do
+          break;
         }
       }
     }
   }
+}
+
+static void
+calling_convention_x86_64_system_v_body_end_proc(
+  Program *program,
+  Function_Builder *builder
+) {
+  // :ReturnTypeLargerThanRegister
+  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
+    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
+      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
+  }
+  calling_convention_x86_64_common_end_proc(program, builder);
 }
 
 static Storage
@@ -157,7 +163,7 @@ calling_convention_x86_64_system_v_return_storage_proc(
     return storage_register_for_descriptor(Register_A, descriptor);
   }
   // :ReturnTypeLargerThanRegister
-  // Inside the function large returns are pointed to by RCX,
+  // Inside the function large returns are pointed to by RDI,
   // but this pointer is also returned in A
   Register base_register = Register_A;
   if (mode == Function_Argument_Mode_Body) {
@@ -254,60 +260,7 @@ calling_convention_x86_64_windows_body_end_proc(
     push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}});
   }
-
-  s32 return_address_size = 8;
-  builder->stack_reserve += builder->max_call_parameters_stack_size;
-  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
-
-  s32 argument_stack_base = builder->stack_reserve + return_address_size;
-  // :RegisterPushPop
-  // pushes change the stack pointer so we need to account for that
-  for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
-      if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
-        argument_stack_base += 8;
-      }
-    }
-  }
-
-  // Adjust stack locations
-  DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
-    for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
-      Storage *storage = &instruction->Assembly.operands[storage_index];
-      if (storage->tag == Storage_Tag_Memory) {
-        Memory_Location *location = &storage->Memory.location;
-        switch(location->tag) {
-          case Memory_Location_Tag_Stack: {
-            Memory_Location_Stack stack = location->Stack;
-            *storage = storage_indirect(storage->byte_size, Register_SP);
-            switch(stack.area) {
-              case Stack_Area_Local: {
-                assert(stack.offset < 0);
-                storage->Memory.location.Indirect.offset = builder->stack_reserve + stack.offset;
-                break;
-              }
-              case Stack_Area_Received_Argument: {
-                assert(stack.offset >= 0);
-                storage->Memory.location.Indirect.offset = argument_stack_base + stack.offset;
-                break;
-              }
-              case Stack_Area_Call_Target_Argument: {
-                assert(stack.offset >= 0);
-                storage->Memory.location.Indirect.offset = stack.offset;
-                break;
-              }
-            }
-            break;
-          }
-          case Memory_Location_Tag_Instruction_Pointer_Relative:
-          case Memory_Location_Tag_Indirect: {
-            // Nothing to do
-            break;
-          }
-        }
-      }
-    }
-  }
+  calling_convention_x86_64_common_end_proc(program, builder);
 }
 
 static Storage
