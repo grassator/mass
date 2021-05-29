@@ -1,5 +1,6 @@
 .idea/
 .vs/
+.gdb_history
 temp/
 build/
 cmake-build-debug/
