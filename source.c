@@ -4009,12 +4009,16 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
         if (byte_size == 1) {
-          // It is not possible to access AH and an extended register like R15
-          // in the same operation. To avoid this problem we just mov AH to AL
-          // This is not optimal but will do for now.
-          Storage reg_ah = storage_register_for_descriptor(Register_AH, &descriptor_s8);
-          Storage reg_al = storage_register_for_descriptor(Register_A, &descriptor_s8);
-          push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_al, reg_ah}}});
+          // :64bitMode8BitOperations
+          // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
+          // This is not optimal, but it should do for now.
+          push_instruction(
+            instructions, result_range,
+            (Instruction) {
+              .tag = Instruction_Tag_Bytes,
+              .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
+            }
+          );
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
           move_value(context->allocator, builder, &result_range, &temp_dividend->storage, &reg_d);
