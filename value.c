@@ -1673,9 +1673,10 @@ jit_deinit(
   if (jit->import_library_handles) hash_map_destroy(jit->import_library_handles);
 }
 
-void
+static void
 compilation_init(
-  Compilation *compilation
+  Compilation *compilation,
+  const Calling_Convention *target_calling_convention
 ) {
   *compilation = (Compilation) {
     .module_map = hash_map_make(Imported_Module_Map),
@@ -1690,8 +1691,7 @@ compilation_init(
   compilation->result = allocator_allocate(compilation->allocator, Mass_Result);
 
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
-  // TODO Allow for a different target platform
-  program_init(compilation->allocator, compilation->runtime_program, host_calling_convention());
+  program_init(compilation->allocator, compilation->runtime_program, target_calling_convention);
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
   scope_define_builtins(compilation->allocator, compilation->root_scope, host_calling_convention());

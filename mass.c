@@ -79,8 +79,20 @@ int main(s32 argc, char **argv) {
   }
   Slice file_path = slice_from_c_string(raw_file_path);
 
+  const Calling_Convention *calling_convention = 0;
+  switch(mode) {
+    case Mass_Cli_Mode_Compile: {
+      calling_convention = &calling_convention_x86_64_windows;
+      break;
+    }
+    case Mass_Cli_Mode_Run: {
+      calling_convention = host_calling_convention();
+      break;
+    }
+  }
+
   Compilation compilation;
-  compilation_init(&compilation);
+  compilation_init(&compilation, calling_convention);
   Execution_Context context = execution_context_from_compilation(&compilation);
 
   Scope *module_scope = scope_make(context.allocator, context.scope);

@@ -164,9 +164,8 @@ test_program_external_source_function(
 
 
 spec("source") {
-
   before_each() {
-    compilation_init(&test_compilation);
+    compilation_init(&test_compilation, host_calling_convention());
     test_context = execution_context_from_compilation(&test_compilation);
   }
 
@@ -1762,6 +1761,7 @@ spec("source") {
   describe("PE32 Executables") {
     it("should parse and write out an executable that exits with status code 42") {
       Program *test_program = test_context.program;
+      test_program->default_calling_convention = &calling_convention_x86_64_windows;
       test_program->entry_point = test_program_inline_source_base(
         "main", &test_context,
         "main :: fn() -> () { ExitProcess(42) }\n"
@@ -1773,6 +1773,7 @@ spec("source") {
 
     it("should parse and write an executable that prints Hello, world!") {
       Program *test_program = test_context.program;
+      test_program->default_calling_convention = &calling_convention_x86_64_windows;
       test_program->entry_point = test_program_external_source_base(
         "main", &test_context, "fixtures/hello_world"
       );
