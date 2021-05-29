@@ -2,10 +2,11 @@
 
 cls
 call build.bat
+if %errorlevel% neq 0 (exit /b 1)
 
 for %%f in (build\*_spec.exe) do (
   %%f
-  if errorlevel 1 (exit /b 1)
+  if %errorlevel% neq 0 (exit /b 1)
 )
 
 build\test_parsed.exe
