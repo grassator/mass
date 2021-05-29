@@ -688,7 +688,7 @@ load_address(
 }
 
 static void
-calling_convention_x86_64_linux_body_end_proc(
+calling_convention_x86_64_system_v_body_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
@@ -754,7 +754,7 @@ calling_convention_x86_64_linux_body_end_proc(
 }
 
 static Storage
-calling_convention_x86_64_linux_return_storage_proc(
+calling_convention_x86_64_system_v_return_storage_proc(
   const Function_Info *function,
   Function_Argument_Mode mode
 ) {
@@ -781,7 +781,7 @@ calling_convention_x86_64_linux_return_storage_proc(
 }
 
 static Memory_Layout
-calling_convention_x86_64_linux_arguments_layout_proc(
+calling_convention_x86_64_system_v_arguments_layout_proc(
   const Allocator *allocator,
   const Function_Info *function
 ) {

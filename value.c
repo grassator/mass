@@ -1573,12 +1573,10 @@ const Calling_Convention *
 host_calling_convention() {
   #if defined(_WIN32) && (defined(_M_AMD64) || defined(__x86_64__))
   return &calling_convention_x86_64_windows;
-  #elif defined(__linux__) && defined(__x86_64__)
-  return &calling_convention_x86_64_linux;
-  #elif defined(__MACH__) && defined(__x86_64__)
-  return &calling_convention_x86_64_darwin;
+  #elif (defined(__linux__) && defined(__x86_64__)) || (defined(__MACH__) && defined(__x86_64__))
+  return &calling_convention_x86_64_system_v;
   #else
-  static_assert(false, "TODO add Platform_Info for this host system");
+  static_assert(false, "TODO add Calling_Convention for this host system");
   #endif
 }
 
