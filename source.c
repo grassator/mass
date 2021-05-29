@@ -5239,7 +5239,7 @@ mass_handle_block_lazy_proc(
     Slice debug_source = source_from_source_range(&debug_source_range);
     // This is an easy way to break on the statement based on source text
     if (slice_starts_with(debug_source, slice_literal("")) && false) {
-      print("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
+      printf("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
     }
     if (i == statement_count - 1) {
       result_value = value_force(context, builder, expected_result, lazy_statement);
