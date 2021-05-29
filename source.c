@@ -1560,8 +1560,8 @@ mass_handle_statement_lazy_proc(
   const Expected_Result *expected_result,
   Value *lazy_value
 ) {
-  (void)value_force(context, builder, expected_result, lazy_value);
-  return &void_value;
+  assert(expected_result_descriptor(expected_result) == &descriptor_void);
+  return value_force(context, builder, expected_result, lazy_value);
 }
 
 static u64
@@ -5239,7 +5239,7 @@ mass_handle_block_lazy_proc(
     Slice debug_source = source_from_source_range(&debug_source_range);
     // This is an easy way to break on the statement based on source text
     if (slice_starts_with(debug_source, slice_literal("")) && false) {
-      printf("");
+      print("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
     }
     if (i == statement_count - 1) {
       result_value = value_force(context, builder, expected_result, lazy_statement);
@@ -6184,8 +6184,7 @@ program_parse(
 
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
   Value *block_result = token_parse_block_view(context, tokens);
-  Expected_Result expected_target = expected_result_from_value(&void_value);
-  (void)value_force(context, 0, &expected_target, block_result);
+  value_force_exact(context, 0, &void_value, block_result);
   return *context->result;
 }
 
