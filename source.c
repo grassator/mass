@@ -4906,7 +4906,7 @@ mass_handle_if_expression_lazy_proc(
   if (result_value->storage.tag == Storage_Tag_Static) {
     Value *stack_result =
       reserve_stack(context, builder, result_value->descriptor, result_value->source_range);
-    MASS_ON_ERROR(assign(context, builder, stack_result, result_value));
+    MASS_ON_ERROR(assign(context, builder, stack_result, result_value)) return 0;
     result_value = stack_result;
   }
 

@@ -2189,10 +2189,10 @@ code_point_is_ascii_space(
 /// Returns new buffer_pointer
 /// NULL return value indicates an invalid code point
 /// If the buffer does not have enough space, the result is the same as the input
-static inline u8 *
+static inline char *
 utf8_encode(
   u32 code_point,
-  u8 *buffer,
+  char *buffer,
   u64 buffer_size
 ) {
   if (code_point <= 0x007F) {
