@@ -62,6 +62,20 @@ encode_instruction_assembly(
     }
 
     if (storage->tag == Storage_Tag_Register) {
+      if (storage->byte_size == 1) {
+        // :64bitMode8BitOperations
+        // These registers are inaccessible in 32bit mode and AH, BH, CH, and DH
+        // are targeted instead. To solve this we force REX prefix.
+        if (
+          storage->Register.index == Register_SI ||
+          storage->Register.index == Register_DI ||
+          storage->Register.index == Register_SP ||
+          storage->Register.index == Register_BP
+        ) {
+          rex_byte |= REX;
+        }
+      }
+
       if (operand_encoding->type == Operand_Encoding_Type_Register) {
         if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
           op_code[3] += storage->Register.index & 0b111;
