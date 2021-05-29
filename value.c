@@ -5,8 +5,8 @@
 
 #if defined(_WIN32)
 #include "win32_runtime.h"
-#elif defined(__linux__)
-#include "linux_runtime.h"
+#elif defined(__linux__) || defined(__MACH__)
+#include "posix_runtime.h"
 #endif
 
 static inline bool
@@ -1782,8 +1782,8 @@ program_jit(
 ) {
   #if defined(_WIN32)
   win32_program_jit(jit);
-  #elif defined(__linux__)
-  linux_program_jit(jit);
+  #elif defined(__linux__) || defined(__MACH__)
+  posix_program_jit(jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif

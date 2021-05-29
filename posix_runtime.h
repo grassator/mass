@@ -1,10 +1,10 @@
-#ifndef LINUX_RUNTIME_H
-#define LINUX_RUNTIME_H
+#ifndef POSIX_RUNTIME_H
+#define POSIX_RUNTIME_H
 
 #include <sys/mman.h>
 
 static int
-linux_section_permissions_to_mprotect_flags(
+posix_section_permissions_to_mprotect_flags(
   Section_Permissions permissions
 ) {
   int protect_flags = PROT_NONE;
@@ -21,7 +21,7 @@ linux_section_permissions_to_mprotect_flags(
 }
 
 static u64
-linux_buffer_ensure_last_page_is_writable(
+posix_buffer_ensure_last_page_is_writable(
   Virtual_Memory_Buffer *buffer
 ) {
   const s32 page_size = memory_page_size();
@@ -37,11 +37,11 @@ linux_buffer_ensure_last_page_is_writable(
 }
 
 static void
-linux_section_protect_from(
+posix_section_protect_from(
   Section *section,
   u64 from
 ) {
-  int protect_flags = linux_section_permissions_to_mprotect_flags(section->permissions);
+  int protect_flags = posix_section_permissions_to_mprotect_flags(section->permissions);
   u64 size_to_protect = section->buffer.occupied - from;
   if (size_to_protect) {
     void *address = section->buffer.memory + from;
@@ -53,7 +53,7 @@ linux_section_protect_from(
 
 // TODO make this return MASS_RESULT
 void
-linux_program_jit(
+posix_program_jit(
   Jit *jit
 ) {
   Program *program = jit->program;
@@ -66,8 +66,8 @@ linux_program_jit(
   // 2. Switch memory back to writable before new writes.
   // On Windows options 2 is preferable, however some unix-like system disallow multiple
   // transitions between writable and executable so might have to resort to 1 there.
-  u64 code_protected_size = linux_buffer_ensure_last_page_is_writable(code_buffer);
-  u64 ro_data_protected_size = linux_buffer_ensure_last_page_is_writable(ro_data_buffer);
+  u64 code_protected_size = posix_buffer_ensure_last_page_is_writable(code_buffer);
+  u64 ro_data_protected_size = posix_buffer_ensure_last_page_is_writable(ro_data_buffer);
 
   u64 import_count = dyn_array_length(program->import_libraries);
   for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
@@ -113,10 +113,10 @@ linux_program_jit(
   program_patch_labels(program);
 
   // Setup permissions for read-only data segment
-  linux_section_protect_from(&memory->ro_data, ro_data_protected_size);
+  posix_section_protect_from(&memory->ro_data, ro_data_protected_size);
 
   // Setup permissions for the code segment
-  linux_section_protect_from(&memory->code, code_protected_size);
+  posix_section_protect_from(&memory->code, code_protected_size);
 
   // Resolve relocations
   u64 relocation_count = dyn_array_length(program->relocations);
@@ -148,4 +148,4 @@ linux_program_jit(
 }
 
 
-#endif
+#endif // POSIX_RUNTIME_H
