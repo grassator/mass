@@ -15,6 +15,24 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
   .offsets = {0},
 };
 
+static inline Storage
+storage_register_for_descriptor(
+  Register reg,
+  const Descriptor *descriptor
+);
+
+static inline Storage
+storage_stack_argument(
+  s32 offset,
+  u64 byte_size
+);
+
+static inline Storage
+storage_register(
+  Register reg,
+  u64 byte_size
+);
+
 static inline bool
 register_is_xmm(
   Register reg

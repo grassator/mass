@@ -1287,11 +1287,10 @@ value_from_unsigned_immediate_internal(
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Storage
-storage_register_for_descriptor(
+storage_register(
   Register reg,
-  const Descriptor *descriptor
+  u64 byte_size
 ) {
-  u64 byte_size = descriptor_byte_size(descriptor);
   assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
 
   Storage result = {
@@ -1300,6 +1299,14 @@ storage_register_for_descriptor(
     .byte_size = byte_size,
   };
   return result;
+}
+
+static inline Storage
+storage_register_for_descriptor(
+  Register reg,
+  const Descriptor *descriptor
+) {
+  return storage_register(reg, descriptor_byte_size(descriptor));
 }
 
 static inline Value *
