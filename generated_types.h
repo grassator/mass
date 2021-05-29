@@ -421,13 +421,9 @@ typedef enum Register {
   Register_D = 2,
   Register_B = 3,
   Register_SP = 4,
-  Register_AH = 4,
   Register_BP = 5,
-  Register_CH = 4,
   Register_SI = 6,
-  Register_DH = 4,
   Register_DI = 7,
-  Register_BH = 4,
   Register_R8 = 8,
   Register_R9 = 9,
   Register_R10 = 10,
@@ -460,13 +456,9 @@ const char *register_name(Register value) {
   if (value == 2) return "Register_D";
   if (value == 3) return "Register_B";
   if (value == 4) return "Register_SP";
-  if (value == 4) return "Register_AH";
   if (value == 5) return "Register_BP";
-  if (value == 4) return "Register_CH";
   if (value == 6) return "Register_SI";
-  if (value == 4) return "Register_DH";
   if (value == 7) return "Register_DI";
-  if (value == 4) return "Register_BH";
   if (value == 8) return "Register_R8";
   if (value == 9) return "Register_R9";
   if (value == 10) return "Register_R10";
@@ -777,7 +769,7 @@ typedef struct Function_Builder {
   u64 used_register_bitset;
   u64 register_volatile_bitset;
   u64 register_occupied_bitset;
-  Value * register_occupied_values[36];
+  Value * register_occupied_values[32];
   Slice source;
   const Function_Info * function;
 } Function_Builder;
@@ -1605,7 +1597,7 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
-static Descriptor descriptor_value_pointer_36 = MASS_DESCRIPTOR_STATIC_ARRAY(Value *, 36, &descriptor_value_pointer);
+static Descriptor descriptor_value_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Value *, 32, &descriptor_value_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
@@ -1947,13 +1939,9 @@ static C_Enum_Item register_items[] = {
 { .name = slice_literal_fields("D"), .value = 2 },
 { .name = slice_literal_fields("B"), .value = 3 },
 { .name = slice_literal_fields("SP"), .value = 4 },
-{ .name = slice_literal_fields("AH"), .value = 4 },
 { .name = slice_literal_fields("BP"), .value = 5 },
-{ .name = slice_literal_fields("CH"), .value = 4 },
 { .name = slice_literal_fields("SI"), .value = 6 },
-{ .name = slice_literal_fields("DH"), .value = 4 },
 { .name = slice_literal_fields("DI"), .value = 7 },
-{ .name = slice_literal_fields("BH"), .value = 4 },
 { .name = slice_literal_fields("R8"), .value = 8 },
 { .name = slice_literal_fields("R9"), .value = 9 },
 { .name = slice_literal_fields("R10"), .value = 10 },
@@ -2700,7 +2688,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("register_occupied_values"),
-    .descriptor = &descriptor_value_pointer_36,
+    .descriptor = &descriptor_value_pointer_32,
     .Base_Relative.offset = offsetof(Function_Builder, register_occupied_values),
   },
   {
