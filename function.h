@@ -184,7 +184,29 @@ static const Calling_Convention calling_convention_x86_64_windows = {
   (1llu << Register_R10) | (1llu << Register_R11)\
 )
 
+
+static void
+calling_convention_x86_64_linux_body_end_proc(
+  Program *program,
+  Function_Builder *builder
+);
+
+static Memory_Layout
+calling_convention_x86_64_linux_arguments_layout_proc(
+  const Allocator *allocator,
+  const Function_Info *function
+);
+
+static Storage
+calling_convention_x86_64_linux_return_storage_proc(
+  const Function_Info *function,
+  Function_Argument_Mode mode
+);
+
 static const Calling_Convention calling_convention_x86_64_linux = {
+  .body_end_proc = calling_convention_x86_64_linux_body_end_proc,
+  .arguments_layout_proc = calling_convention_x86_64_linux_arguments_layout_proc,
+  .return_storage_proc = calling_convention_x86_64_linux_return_storage_proc,
   .register_volatile_bitset = X86_64_SYSTEM_V_REGISTER_VOLATILE_BIT_SET,
 };
 

@@ -542,7 +542,12 @@ spec("source") {
   }
 
   describe("Functions") {
-    it("should be able to parse and run a void -> void function") {
+    #if defined(__linux__)
+    fit("should be able to parse and run a void -> void function")
+    #else
+    it("should be able to parse and run a void -> void function")
+    #endif
+    {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
         "foo", &test_context,
         "foo :: fn() -> () { }"

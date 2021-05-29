@@ -23,5 +23,4 @@ cd ..
 
 $CC $FLAGS mass.c -o build/mass -lm
 
-# We can compile but not yet run source_spec so adding a suffix _norun to the binary
-$CC $FLAGS source_spec.c -o build/source_spec_norun -lm
+$CC $FLAGS source_spec.c -o build/source_spec -lm

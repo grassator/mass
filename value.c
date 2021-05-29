@@ -2,8 +2,10 @@
 #include "function.h"
 #include "source.h"
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include "win32_runtime.h"
+#elif defined(__linux__)
+#include "linux_runtime.h"
 #endif
 
 static inline bool
@@ -1779,8 +1781,10 @@ void
 program_jit(
   Jit *jit
 ) {
-  #ifdef _WIN32
+  #if defined(_WIN32)
   win32_program_jit(jit);
+  #elif defined(__linux__)
+  linux_program_jit(jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif
