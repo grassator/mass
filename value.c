@@ -1,6 +1,7 @@
 #include "value.h"
 #include "function.h"
 #include "source.h"
+#include "calling_convention.h"
 
 #if defined(_WIN32)
 #include "win32_runtime.h"
