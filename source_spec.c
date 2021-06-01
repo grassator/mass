@@ -1539,7 +1539,6 @@ spec("source") {
       const char *string = checker();
       check(strcmp(string, "test") == 0);
     }
-    #if defined(_WIN32) // TODO support on Linux
     it("should accept string arguments") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
@@ -1552,6 +1551,7 @@ spec("source") {
       const char *result = checker(input);
       check(result == input.bytes);
     }
+    #if defined(_WIN32) // TODO support on Linux
     xit("should be able to return a string") {
       Slice(*checker)(void) = (Slice(*)(void))test_program_inline_source_function(
         "checker", &test_context,

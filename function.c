@@ -692,29 +692,61 @@ load_address(
 static void
 mark_occupied_registers(
   Function_Builder *builder,
+  const Storage *stack_argument_base,
   const Descriptor *descriptor,
   Storage *storage
 ) {
   Register arg_reg = Register_SP;
-  if (storage->tag == Storage_Tag_Register) {
-    arg_reg = storage->Register.index;
-  } else if(storage->tag == Storage_Tag_Memory) {
-    switch(storage->Memory.location.tag) {
-      case Memory_Location_Tag_Instruction_Pointer_Relative: {
-        panic("Unsupported argument memory storage");
-        break;
+  switch(storage->tag) {
+    case Storage_Tag_None: {
+      if (descriptor->tag == Descriptor_Tag_Struct) {
+        DYN_ARRAY_FOREACH(Memory_Layout_Item, item, descriptor->Struct.memory_layout.items) {
+          switch(item->tag) {
+            case Memory_Layout_Item_Tag_Absolute: {
+              break;
+            }
+            case Memory_Layout_Item_Tag_Base_Relative: {
+              item->tag = Memory_Layout_Item_Tag_Absolute;
+              item->Absolute.storage = memory_layout_item_storage(
+                stack_argument_base, &descriptor->Struct.memory_layout, item
+              );
+              break;
+            }
+          }
+          assert(item->tag == Memory_Layout_Item_Tag_Absolute);
+          mark_occupied_registers(builder, stack_argument_base, item->descriptor, &item->Absolute.storage);
+        }
       }
-      case Memory_Location_Tag_Indirect: {
-        arg_reg = storage->Memory.location.Indirect.base_register;
-        break;
-      }
-      case Memory_Location_Tag_Stack: {
-        arg_reg = Register_SP;
-        break;
-      }
+      break;
     }
-  } else {
-    panic("Unexpected storage tag for an argument");
+    case Storage_Tag_Register:
+    case Storage_Tag_Xmm: {
+      arg_reg = storage->Register.index;
+      break;
+    }
+    case Storage_Tag_Memory: {
+      switch(storage->Memory.location.tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          panic("Unsupported argument memory storage");
+          break;
+        }
+        case Memory_Location_Tag_Indirect: {
+          arg_reg = storage->Memory.location.Indirect.base_register;
+          break;
+        }
+        case Memory_Location_Tag_Stack: {
+          arg_reg = Register_SP;
+          break;
+        }
+      }
+      break;
+    }
+    case Storage_Tag_Any:
+    case Storage_Tag_Static:
+    case Storage_Tag_Eflags: {
+      panic("Unexpected storage tag for an argument");
+      break;
+    }
   }
   if (arg_reg != Register_SP) {
     register_bitset_set(&builder->register_occupied_bitset, arg_reg);
@@ -795,14 +827,13 @@ ensure_function_instance(
 
   {
     Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Received_Argument);
-    for(u64 i = 0; i < dyn_array_length(arguments_layout->items); ++i) {
-      Memory_Layout_Item *item = dyn_array_get(arguments_layout->items, i);
-      Storage storage = memory_layout_item_storage_at_index(&stack_argument_base, arguments_layout, i);
+    DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
+      Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
         scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
       }
-      mark_occupied_registers(builder, arg_value->descriptor, &arg_value->storage);
+      mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
     }
   }
 
