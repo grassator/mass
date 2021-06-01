@@ -1098,6 +1098,14 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  push_type(type_struct("User_Defined_Operator", (Struct_Item[]){
+    { "Operator_Fixity", "fixity" },
+    { "u32", "argument_count" },
+    { "Slice", "argument_names", 2 },
+    { "Value *", "body" },
+    { "Scope *", "scope" },
+  }));
+
   push_type(type_struct("Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
     { "Operator_Associativity", "associativity" },
@@ -1105,6 +1113,26 @@ main(void) {
     { "u64", "argument_count" },
     { "Mass_Handle_Operator_Proc", "handler" },
     { "void *", "handler_payload" },
+  }));
+
+  push_type(add_common_fields(type_union("Macro_Pattern", (Struct_Type[]){
+    struct_empty("Any_Token_Sequence"),
+    struct_fields("Single_Token", (Struct_Item[]){
+      { "Token_Pattern", "token_pattern" },
+    }),
+  }), (Struct_Item[]){
+    { "Slice", "capture_name" },
+  }));
+
+  push_type(type_struct("Macro", (Struct_Item[]){
+    { "Array_Macro_Pattern", "pattern" },
+    { "Value_View", "replacement" },
+    { "Scope *", "scope" },
+  }));
+
+  push_type(type_struct("Token_Statement_Matcher", (Struct_Item[]){
+    { "Token_Statement_Matcher_Proc", "proc" },
+    { "void *", "payload" },
   }));
 
   push_type(add_common_fields(type_union("Scope_Entry", (Struct_Type[]){
@@ -1118,6 +1146,15 @@ main(void) {
   }), (Struct_Item[]){
     { "u64", "epoch" },
     { "Source_Range", "source_range" },
+  }));
+
+  push_type(type_struct("Scope", (Struct_Item[]){
+    { "const Allocator *", "allocator" },
+    { "u64", "id" },
+    { "const Scope *", "parent" },
+    { "Scope_Map *", "map" },
+    { "Array_Macro_Ptr", "macros" },
+    { "Array_Token_Statement_Matcher", "statement_matchers" },
   }));
 
   export(push_type(type_struct("Value", (Struct_Item[]){
@@ -1356,6 +1393,25 @@ main(void) {
     { "Calling_Convention_Return_Storage_Proc", "return_storage_proc"},
   }));
 
+  push_type(type_function("Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
+    { "Execution_Context *", "context" },
+    { "Value_View", "view" },
+    { "Lazy_Value *", "out_lazy_value" },
+    { "void *", "payload" },
+  }));
+
+  push_type(type_hash_map({
+    .name = "Scope_Map",
+    .key_type = "Slice",
+    .value_type = "Scope_Entry *",
+  }));
+
+  push_type(type_hash_map({
+    .name = "Macro_Replacement_Map",
+    .key_type = "Slice",
+    .value_type = "Value_View",
+  }));
+
   push_type(type_hash_map({
     .name = "Jit_Import_Library_Handle_Map",
     .key_type = "Slice",
@@ -1420,7 +1476,6 @@ main(void) {
     // Custom forward declarations
     {
       fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
-      fprintf(file, "typedef struct Scope Scope;\n\n");
       fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
     }
 

@@ -5,8 +5,6 @@ static Atomic_u64 next_struct_id = {65537};
 _Pragma("warning (push)") _Pragma("warning (default: 4820)")
 typedef void(*fn_type_opaque)();
 
-typedef struct Scope Scope;
-
 typedef struct X64_Mnemonic X64_Mnemonic;
 
 // Forward declarations
@@ -153,13 +151,33 @@ typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
 typedef dyn_array_type(const Execution_Context *) Array_Const_Execution_Context_Ptr;
 
+typedef struct User_Defined_Operator User_Defined_Operator;
+typedef dyn_array_type(User_Defined_Operator *) Array_User_Defined_Operator_Ptr;
+typedef dyn_array_type(const User_Defined_Operator *) Array_Const_User_Defined_Operator_Ptr;
+
 typedef struct Operator Operator;
 typedef dyn_array_type(Operator *) Array_Operator_Ptr;
 typedef dyn_array_type(const Operator *) Array_Const_Operator_Ptr;
 
+typedef struct Macro_Pattern Macro_Pattern;
+typedef dyn_array_type(Macro_Pattern *) Array_Macro_Pattern_Ptr;
+typedef dyn_array_type(const Macro_Pattern *) Array_Const_Macro_Pattern_Ptr;
+
+typedef struct Macro Macro;
+typedef dyn_array_type(Macro *) Array_Macro_Ptr;
+typedef dyn_array_type(const Macro *) Array_Const_Macro_Ptr;
+
+typedef struct Token_Statement_Matcher Token_Statement_Matcher;
+typedef dyn_array_type(Token_Statement_Matcher *) Array_Token_Statement_Matcher_Ptr;
+typedef dyn_array_type(const Token_Statement_Matcher *) Array_Const_Token_Statement_Matcher_Ptr;
+
 typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
 typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
+
+typedef struct Scope Scope;
+typedef dyn_array_type(Scope *) Array_Scope_Ptr;
+typedef dyn_array_type(const Scope *) Array_Const_Scope_Ptr;
 
 typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
@@ -241,6 +259,13 @@ typedef Storage (*Calling_Convention_Return_Storage_Proc)
 typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
 typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Convention_Ptr;
+
+typedef u64 (*Token_Statement_Matcher_Proc)
+  (Execution_Context * context, Value_View view, Lazy_Value * out_lazy_value, void * payload);
+
+typedef struct Scope_Map Scope_Map;
+
+typedef struct Macro_Replacement_Map Macro_Replacement_Map;
 
 typedef struct Jit_Import_Library_Handle_Map Jit_Import_Library_Handle_Map;
 
@@ -841,6 +866,15 @@ typedef struct Execution_Context {
 } Execution_Context;
 typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 
+typedef struct User_Defined_Operator {
+  Operator_Fixity fixity;
+  u32 argument_count;
+  Slice argument_names[2];
+  Value * body;
+  Scope * scope;
+} User_Defined_Operator;
+typedef dyn_array_type(User_Defined_Operator) Array_User_Defined_Operator;
+
 typedef struct Operator {
   Operator_Fixity fixity;
   Operator_Associativity associativity;
@@ -850,6 +884,36 @@ typedef struct Operator {
   void * handler_payload;
 } Operator;
 typedef dyn_array_type(Operator) Array_Operator;
+
+typedef enum {
+  Macro_Pattern_Tag_Any_Token_Sequence = 0,
+  Macro_Pattern_Tag_Single_Token = 1,
+} Macro_Pattern_Tag;
+
+typedef struct Macro_Pattern_Single_Token {
+  Token_Pattern token_pattern;
+} Macro_Pattern_Single_Token;
+typedef struct Macro_Pattern {
+  Macro_Pattern_Tag tag;
+  char _tag_padding[4];
+  Slice capture_name;
+  union {
+    Macro_Pattern_Single_Token Single_Token;
+  };
+} Macro_Pattern;
+typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
+typedef struct Macro {
+  Array_Macro_Pattern pattern;
+  Value_View replacement;
+  Scope * scope;
+} Macro;
+typedef dyn_array_type(Macro) Array_Macro;
+
+typedef struct Token_Statement_Matcher {
+  Token_Statement_Matcher_Proc proc;
+  void * payload;
+} Token_Statement_Matcher;
+typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
 typedef enum {
   Scope_Entry_Tag_Value = 0,
@@ -874,6 +938,16 @@ typedef struct Scope_Entry {
   };
 } Scope_Entry;
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
+typedef struct Scope {
+  const Allocator * allocator;
+  u64 id;
+  const Scope * parent;
+  Scope_Map * map;
+  Array_Macro_Ptr macros;
+  Array_Token_Statement_Matcher statement_matchers;
+} Scope;
+typedef dyn_array_type(Scope) Array_Scope;
+
 typedef struct Value {
   const Descriptor * descriptor;
   Storage storage;
@@ -1194,6 +1268,8 @@ typedef struct Calling_Convention {
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
+hash_map_slice_template(Scope_Map, Scope_Entry *)
+hash_map_slice_template(Macro_Replacement_Map, Value_View)
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
 typedef struct Jit_Counters {
@@ -1453,16 +1529,41 @@ static Descriptor descriptor_array_execution_context;
 static Descriptor descriptor_array_execution_context_ptr;
 static Descriptor descriptor_execution_context_pointer;
 static Descriptor descriptor_execution_context_pointer_pointer;
+static Descriptor descriptor_user_defined_operator;
+static Descriptor descriptor_array_user_defined_operator;
+static Descriptor descriptor_array_user_defined_operator_ptr;
+static Descriptor descriptor_user_defined_operator_pointer;
+static Descriptor descriptor_user_defined_operator_pointer_pointer;
 static Descriptor descriptor_operator;
 static Descriptor descriptor_array_operator;
 static Descriptor descriptor_array_operator_ptr;
 static Descriptor descriptor_operator_pointer;
 static Descriptor descriptor_operator_pointer_pointer;
+static Descriptor descriptor_macro_pattern;
+static Descriptor descriptor_array_macro_pattern;
+static Descriptor descriptor_array_macro_pattern_ptr;
+static Descriptor descriptor_macro_pattern_pointer;
+static Descriptor descriptor_macro_pattern_pointer_pointer;
+static Descriptor descriptor_macro;
+static Descriptor descriptor_array_macro;
+static Descriptor descriptor_array_macro_ptr;
+static Descriptor descriptor_macro_pointer;
+static Descriptor descriptor_macro_pointer_pointer;
+static Descriptor descriptor_token_statement_matcher;
+static Descriptor descriptor_array_token_statement_matcher;
+static Descriptor descriptor_array_token_statement_matcher_ptr;
+static Descriptor descriptor_token_statement_matcher_pointer;
+static Descriptor descriptor_token_statement_matcher_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
+static Descriptor descriptor_scope;
+static Descriptor descriptor_array_scope;
+static Descriptor descriptor_array_scope_ptr;
+static Descriptor descriptor_scope_pointer;
+static Descriptor descriptor_scope_pointer_pointer;
 static Descriptor descriptor_value;
 static Descriptor descriptor_array_value;
 static Descriptor descriptor_array_value_ptr;
@@ -1558,6 +1659,9 @@ static Descriptor descriptor_array_calling_convention;
 static Descriptor descriptor_array_calling_convention_ptr;
 static Descriptor descriptor_calling_convention_pointer;
 static Descriptor descriptor_calling_convention_pointer_pointer;
+static Descriptor descriptor_token_statement_matcher_proc;
+MASS_DEFINE_OPAQUE_C_TYPE(scope_map, Scope_Map);
+MASS_DEFINE_OPAQUE_C_TYPE(macro_replacement_map, Macro_Replacement_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(imported_module_map, Imported_Module_Map);
 static Descriptor descriptor_jit_counters;
@@ -1585,6 +1689,7 @@ static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
 static Descriptor descriptor_storage_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage *, 32, &descriptor_storage_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
+static Descriptor descriptor_slice_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Slice, 2, &descriptor_slice);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(1, source_position, Source_Position,
@@ -2801,9 +2906,44 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(49, execution_context, Execution_Context,
   },
 );
 MASS_DEFINE_TYPE_VALUE(execution_context);
+MASS_DEFINE_OPAQUE_C_TYPE(array_user_defined_operator_ptr, Array_User_Defined_Operator_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_user_defined_operator, Array_User_Defined_Operator)
+MASS_DEFINE_STRUCT_DESCRIPTOR(50, user_defined_operator, User_Defined_Operator,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("fixity"),
+    .descriptor = &descriptor_operator_fixity,
+    .Base_Relative.offset = offsetof(User_Defined_Operator, fixity),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("argument_count"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(User_Defined_Operator, argument_count),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("argument_names"),
+    .descriptor = &descriptor_slice_2,
+    .Base_Relative.offset = offsetof(User_Defined_Operator, argument_names),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("body"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(User_Defined_Operator, body),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .Base_Relative.offset = offsetof(User_Defined_Operator, scope),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(user_defined_operator);
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator_ptr, Array_Operator_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operator, Array_Operator)
-MASS_DEFINE_STRUCT_DESCRIPTOR(50, operator, Operator,
+MASS_DEFINE_STRUCT_DESCRIPTOR(51, operator, Operator,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("fixity"),
@@ -2843,12 +2983,89 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(50, operator, Operator,
 );
 MASS_DEFINE_TYPE_VALUE(operator);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(macro_pattern_tag, Macro_Pattern_Tag)
+static C_Enum_Item macro_pattern_tag_items[] = {
+{ .name = slice_literal_fields("Any_Token_Sequence"), .value = 0 },
+{ .name = slice_literal_fields("Single_Token"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(52, macro_pattern_single_token, Macro_Pattern_Single_Token,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("token_pattern"),
+    .descriptor = &descriptor_token_pattern,
+    .Base_Relative.offset = offsetof(Macro_Pattern_Single_Token, token_pattern),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(macro_pattern_single_token);
+MASS_DEFINE_STRUCT_DESCRIPTOR(53, macro_pattern, Macro_Pattern,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_macro_pattern_tag,
+    .Base_Relative.offset = offsetof(Macro_Pattern, tag),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("capture_name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Macro_Pattern, capture_name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Single_Token"),
+    .descriptor = &descriptor_macro_pattern_single_token,
+    .Base_Relative.offset = offsetof(Macro_Pattern, Single_Token),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(macro_pattern);
+/*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro_ptr, Array_Macro_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro, Array_Macro)
+MASS_DEFINE_STRUCT_DESCRIPTOR(54, macro, Macro,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("pattern"),
+    .descriptor = &descriptor_array_macro_pattern,
+    .Base_Relative.offset = offsetof(Macro, pattern),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("replacement"),
+    .descriptor = &descriptor_value_view,
+    .Base_Relative.offset = offsetof(Macro, replacement),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("scope"),
+    .descriptor = &descriptor_scope_pointer,
+    .Base_Relative.offset = offsetof(Macro, scope),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(macro);
+MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher_ptr, Array_Token_Statement_Matcher_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher, Array_Token_Statement_Matcher)
+MASS_DEFINE_STRUCT_DESCRIPTOR(55, token_statement_matcher, Token_Statement_Matcher,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("proc"),
+    .descriptor = &descriptor_token_statement_matcher_proc,
+    .Base_Relative.offset = offsetof(Token_Statement_Matcher, proc),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("payload"),
+    .descriptor = &descriptor_void_pointer,
+    .Base_Relative.offset = offsetof(Token_Statement_Matcher, payload),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(scope_entry_tag, Scope_Entry_Tag)
 static C_Enum_Item scope_entry_tag_items[] = {
 { .name = slice_literal_fields("Value"), .value = 0 },
 { .name = slice_literal_fields("Operator"), .value = 1 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(51, scope_entry_value, Scope_Entry_Value,
+MASS_DEFINE_STRUCT_DESCRIPTOR(56, scope_entry_value, Scope_Entry_Value,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("value"),
@@ -2857,7 +3074,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(51, scope_entry_value, Scope_Entry_Value,
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry_value);
-MASS_DEFINE_STRUCT_DESCRIPTOR(52, scope_entry_operator, Scope_Entry_Operator,
+MASS_DEFINE_STRUCT_DESCRIPTOR(57, scope_entry_operator, Scope_Entry_Operator,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("maybe_prefix"),
@@ -2872,7 +3089,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(52, scope_entry_operator, Scope_Entry_Operator,
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry_operator);
-MASS_DEFINE_STRUCT_DESCRIPTOR(53, scope_entry, Scope_Entry,
+MASS_DEFINE_STRUCT_DESCRIPTOR(58, scope_entry, Scope_Entry,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -2906,9 +3123,50 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(53, scope_entry, Scope_Entry,
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_scope, Array_Scope)
+MASS_DEFINE_STRUCT_DESCRIPTOR(59, scope, Scope,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .Base_Relative.offset = offsetof(Scope, allocator),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("id"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Scope, id),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("parent"),
+    .descriptor = &descriptor_scope_pointer,
+    .Base_Relative.offset = offsetof(Scope, parent),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("map"),
+    .descriptor = &descriptor_scope_map_pointer,
+    .Base_Relative.offset = offsetof(Scope, map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("macros"),
+    .descriptor = &descriptor_array_macro_ptr,
+    .Base_Relative.offset = offsetof(Scope, macros),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("statement_matchers"),
+    .descriptor = &descriptor_array_token_statement_matcher,
+    .Base_Relative.offset = offsetof(Scope, statement_matchers),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(scope);
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_ptr, Array_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value, Array_Value)
-MASS_DEFINE_STRUCT_DESCRIPTOR(54, value, Value,
+MASS_DEFINE_STRUCT_DESCRIPTOR(60, value, Value,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
@@ -2962,7 +3220,7 @@ static C_Enum_Item expected_result_tag_items[] = {
 { .name = slice_literal_fields("Exact"), .value = 0 },
 { .name = slice_literal_fields("Flexible"), .value = 1 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(55, expected_result_exact, Expected_Result_Exact,
+MASS_DEFINE_STRUCT_DESCRIPTOR(61, expected_result_exact, Expected_Result_Exact,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("value"),
@@ -2971,7 +3229,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(55, expected_result_exact, Expected_Result_Exact,
   },
 );
 MASS_DEFINE_TYPE_VALUE(expected_result_exact);
-MASS_DEFINE_STRUCT_DESCRIPTOR(56, expected_result_flexible, Expected_Result_Flexible,
+MASS_DEFINE_STRUCT_DESCRIPTOR(62, expected_result_flexible, Expected_Result_Flexible,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
@@ -2998,7 +3256,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(56, expected_result_flexible, Expected_Result_Flex
   },
 );
 MASS_DEFINE_TYPE_VALUE(expected_result_flexible);
-MASS_DEFINE_STRUCT_DESCRIPTOR(57, expected_result, Expected_Result,
+MASS_DEFINE_STRUCT_DESCRIPTOR(63, expected_result, Expected_Result,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -3022,7 +3280,7 @@ MASS_DEFINE_TYPE_VALUE(expected_result);
 /*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value_ptr, Array_Lazy_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_value, Array_Lazy_Value)
-MASS_DEFINE_STRUCT_DESCRIPTOR(58, lazy_value, Lazy_Value,
+MASS_DEFINE_STRUCT_DESCRIPTOR(64, lazy_value, Lazy_Value,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("context"),
@@ -3057,7 +3315,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(58, lazy_value, Lazy_Value,
 MASS_DEFINE_TYPE_VALUE(lazy_value);
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value_ptr, Array_Lazy_Static_Value_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_lazy_static_value, Array_Lazy_Static_Value)
-MASS_DEFINE_STRUCT_DESCRIPTOR(59, lazy_static_value, Lazy_Static_Value,
+MASS_DEFINE_STRUCT_DESCRIPTOR(65, lazy_static_value, Lazy_Static_Value,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("context"),
@@ -3083,7 +3341,7 @@ static C_Enum_Item memory_layout_item_tag_items[] = {
 { .name = slice_literal_fields("Absolute"), .value = 0 },
 { .name = slice_literal_fields("Base_Relative"), .value = 1 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(60, memory_layout_item_absolute, Memory_Layout_Item_Absolute,
+MASS_DEFINE_STRUCT_DESCRIPTOR(66, memory_layout_item_absolute, Memory_Layout_Item_Absolute,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("storage"),
@@ -3092,7 +3350,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(60, memory_layout_item_absolute, Memory_Layout_Ite
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_layout_item_absolute);
-MASS_DEFINE_STRUCT_DESCRIPTOR(61, memory_layout_item_base_relative, Memory_Layout_Item_Base_Relative,
+MASS_DEFINE_STRUCT_DESCRIPTOR(67, memory_layout_item_base_relative, Memory_Layout_Item_Base_Relative,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("offset"),
@@ -3101,7 +3359,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(61, memory_layout_item_base_relative, Memory_Layou
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_layout_item_base_relative);
-MASS_DEFINE_STRUCT_DESCRIPTOR(62, memory_layout_item, Memory_Layout_Item,
+MASS_DEFINE_STRUCT_DESCRIPTOR(68, memory_layout_item, Memory_Layout_Item,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -3155,7 +3413,7 @@ MASS_DEFINE_TYPE_VALUE(memory_layout_item);
 /*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_ptr, Array_Memory_Layout_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)
-MASS_DEFINE_STRUCT_DESCRIPTOR(63, memory_layout, Memory_Layout,
+MASS_DEFINE_STRUCT_DESCRIPTOR(69, memory_layout, Memory_Layout,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("items"),
@@ -3166,7 +3424,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(63, memory_layout, Memory_Layout,
 MASS_DEFINE_TYPE_VALUE(memory_layout);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
-MASS_DEFINE_STRUCT_DESCRIPTOR(64, function_return, Function_Return,
+MASS_DEFINE_STRUCT_DESCRIPTOR(70, function_return, Function_Return,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -3189,7 +3447,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(64, function_return, Function_Return,
 MASS_DEFINE_TYPE_VALUE(function_return);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
-MASS_DEFINE_STRUCT_DESCRIPTOR(65, function_argument, Function_Argument,
+MASS_DEFINE_STRUCT_DESCRIPTOR(71, function_argument, Function_Argument,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -3224,7 +3482,7 @@ static C_Enum_Item descriptor_function_flags_items[] = {
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
-MASS_DEFINE_STRUCT_DESCRIPTOR(66, function_info, Function_Info,
+MASS_DEFINE_STRUCT_DESCRIPTOR(72, function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("flags"),
@@ -3259,7 +3517,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(66, function_info, Function_Info,
 MASS_DEFINE_TYPE_VALUE(function_info);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
-MASS_DEFINE_STRUCT_DESCRIPTOR(67, function_literal, Function_Literal,
+MASS_DEFINE_STRUCT_DESCRIPTOR(73, function_literal, Function_Literal,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("info"),
@@ -3295,7 +3553,7 @@ static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Struct"), .value = 3 },
 { .name = slice_literal_fields("Pointer_To"), .value = 4 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(68, descriptor_function_instance, Descriptor_Function_Instance,
+MASS_DEFINE_STRUCT_DESCRIPTOR(74, descriptor_function_instance, Descriptor_Function_Instance,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("info"),
@@ -3322,7 +3580,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(68, descriptor_function_instance, Descriptor_Funct
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);
-MASS_DEFINE_STRUCT_DESCRIPTOR(69, descriptor_fixed_size_array, Descriptor_Fixed_Size_Array,
+MASS_DEFINE_STRUCT_DESCRIPTOR(75, descriptor_fixed_size_array, Descriptor_Fixed_Size_Array,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("item"),
@@ -3337,7 +3595,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(69, descriptor_fixed_size_array, Descriptor_Fixed_
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_fixed_size_array);
-MASS_DEFINE_STRUCT_DESCRIPTOR(70, descriptor_struct, Descriptor_Struct,
+MASS_DEFINE_STRUCT_DESCRIPTOR(76, descriptor_struct, Descriptor_Struct,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("id"),
@@ -3352,7 +3610,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(70, descriptor_struct, Descriptor_Struct,
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_struct);
-MASS_DEFINE_STRUCT_DESCRIPTOR(71, descriptor_pointer_to, Descriptor_Pointer_To,
+MASS_DEFINE_STRUCT_DESCRIPTOR(77, descriptor_pointer_to, Descriptor_Pointer_To,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
@@ -3361,7 +3619,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(71, descriptor_pointer_to, Descriptor_Pointer_To,
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_pointer_to);
-MASS_DEFINE_STRUCT_DESCRIPTOR(72, descriptor, Descriptor,
+MASS_DEFINE_STRUCT_DESCRIPTOR(78, descriptor, Descriptor,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -3435,7 +3693,7 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("No_Matching_Overload"), .value = 16 },
 { .name = slice_literal_fields("Undecidable_Overload"), .value = 17 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(73, mass_error_user_defined, Mass_Error_User_Defined,
+MASS_DEFINE_STRUCT_DESCRIPTOR(79, mass_error_user_defined, Mass_Error_User_Defined,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -3444,7 +3702,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(73, mass_error_user_defined, Mass_Error_User_Defin
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_user_defined);
-MASS_DEFINE_STRUCT_DESCRIPTOR(74, mass_error_integer_range, Mass_Error_Integer_Range,
+MASS_DEFINE_STRUCT_DESCRIPTOR(80, mass_error_integer_range, Mass_Error_Integer_Range,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
@@ -3453,7 +3711,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(74, mass_error_integer_range, Mass_Error_Integer_R
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_integer_range);
-MASS_DEFINE_STRUCT_DESCRIPTOR(75, mass_error_file_open, Mass_Error_File_Open,
+MASS_DEFINE_STRUCT_DESCRIPTOR(81, mass_error_file_open, Mass_Error_File_Open,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("path"),
@@ -3462,7 +3720,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(75, mass_error_file_open, Mass_Error_File_Open,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_file_open);
-MASS_DEFINE_STRUCT_DESCRIPTOR(76, mass_error_unexpected_token, Mass_Error_Unexpected_Token,
+MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_unexpected_token, Mass_Error_Unexpected_Token,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("expected"),
@@ -3471,7 +3729,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(76, mass_error_unexpected_token, Mass_Error_Unexpe
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_unexpected_token);
-MASS_DEFINE_STRUCT_DESCRIPTOR(77, mass_error_operator_infix_suffix_conflict, Mass_Error_Operator_Infix_Suffix_Conflict,
+MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_operator_infix_suffix_conflict, Mass_Error_Operator_Infix_Suffix_Conflict,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("symbol"),
@@ -3480,7 +3738,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(77, mass_error_operator_infix_suffix_conflict, Mas
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_operator_infix_suffix_conflict);
-MASS_DEFINE_STRUCT_DESCRIPTOR(78, mass_error_operator_prefix_conflict, Mass_Error_Operator_Prefix_Conflict,
+MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_operator_prefix_conflict, Mass_Error_Operator_Prefix_Conflict,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("symbol"),
@@ -3489,7 +3747,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(78, mass_error_operator_prefix_conflict, Mass_Erro
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_operator_prefix_conflict);
-MASS_DEFINE_STRUCT_DESCRIPTOR(79, mass_error_undefined_variable, Mass_Error_Undefined_Variable,
+MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_undefined_variable, Mass_Error_Undefined_Variable,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -3504,7 +3762,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(79, mass_error_undefined_variable, Mass_Error_Unde
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undefined_variable);
-MASS_DEFINE_STRUCT_DESCRIPTOR(80, mass_error_redifinition, Mass_Error_Redifinition,
+MASS_DEFINE_STRUCT_DESCRIPTOR(86, mass_error_redifinition, Mass_Error_Redifinition,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -3519,7 +3777,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(80, mass_error_redifinition, Mass_Error_Redifiniti
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_redifinition);
-MASS_DEFINE_STRUCT_DESCRIPTOR(81, mass_error_unknown_field, Mass_Error_Unknown_Field,
+MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_error_unknown_field, Mass_Error_Unknown_Field,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("type"),
@@ -3534,7 +3792,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(81, mass_error_unknown_field, Mass_Error_Unknown_F
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_unknown_field);
-MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_invalid_identifier, Mass_Error_Invalid_Identifier,
+MASS_DEFINE_STRUCT_DESCRIPTOR(88, mass_error_invalid_identifier, Mass_Error_Invalid_Identifier,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("id"),
@@ -3543,7 +3801,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_invalid_identifier, Mass_Error_Inva
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_invalid_identifier);
-MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_type_mismatch, Mass_Error_Type_Mismatch,
+MASS_DEFINE_STRUCT_DESCRIPTOR(89, mass_error_type_mismatch, Mass_Error_Type_Mismatch,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("expected"),
@@ -3558,7 +3816,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_type_mismatch, Mass_Error_Type_Mism
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_type_mismatch);
-MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
+MASS_DEFINE_STRUCT_DESCRIPTOR(90, mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("target"),
@@ -3573,7 +3831,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_no_matching_overload, Mass_Error_No
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_no_matching_overload);
-MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
+MASS_DEFINE_STRUCT_DESCRIPTOR(91, mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("a"),
@@ -3588,7 +3846,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_undecidable_overload, Mass_Error_Un
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undecidable_overload);
-MASS_DEFINE_STRUCT_DESCRIPTOR(86, mass_error, Mass_Error,
+MASS_DEFINE_STRUCT_DESCRIPTOR(92, mass_error, Mass_Error,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -3694,7 +3952,7 @@ static C_Enum_Item mass_result_tag_items[] = {
 { .name = slice_literal_fields("Success"), .value = 0 },
 { .name = slice_literal_fields("Error"), .value = 1 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_result_error, Mass_Result_Error,
+MASS_DEFINE_STRUCT_DESCRIPTOR(93, mass_result_error, Mass_Result_Error,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("error"),
@@ -3703,7 +3961,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_result_error, Mass_Result_Error,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_result_error);
-MASS_DEFINE_STRUCT_DESCRIPTOR(88, mass_result, Mass_Result,
+MASS_DEFINE_STRUCT_DESCRIPTOR(94, mass_result, Mass_Result,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -3721,7 +3979,7 @@ MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
-MASS_DEFINE_STRUCT_DESCRIPTOR(89, program, Program,
+MASS_DEFINE_STRUCT_DESCRIPTOR(95, program, Program,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("import_libraries"),
@@ -3780,7 +4038,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(89, program, Program,
 MASS_DEFINE_TYPE_VALUE(program);
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
-MASS_DEFINE_STRUCT_DESCRIPTOR(90, calling_convention, Calling_Convention,
+MASS_DEFINE_STRUCT_DESCRIPTOR(96, calling_convention, Calling_Convention,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("register_volatile_bitset"),
@@ -3809,7 +4067,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(90, calling_convention, Calling_Convention,
 MASS_DEFINE_TYPE_VALUE(calling_convention);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters_ptr, Array_Jit_Counters_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters, Array_Jit_Counters)
-MASS_DEFINE_STRUCT_DESCRIPTOR(91, jit_counters, Jit_Counters,
+MASS_DEFINE_STRUCT_DESCRIPTOR(97, jit_counters, Jit_Counters,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("functions"),
@@ -3838,7 +4096,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(91, jit_counters, Jit_Counters,
 MASS_DEFINE_TYPE_VALUE(jit_counters);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
-MASS_DEFINE_STRUCT_DESCRIPTOR(92, jit, Jit,
+MASS_DEFINE_STRUCT_DESCRIPTOR(98, jit, Jit,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("is_stack_unwinding_in_progress"),
@@ -3873,7 +4131,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(92, jit, Jit,
 MASS_DEFINE_TYPE_VALUE(jit);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
-MASS_DEFINE_STRUCT_DESCRIPTOR(93, compilation, Compilation,
+MASS_DEFINE_STRUCT_DESCRIPTOR(99, compilation, Compilation,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("allocation_buffer"),
@@ -3932,7 +4190,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(93, compilation, Compilation,
 MASS_DEFINE_TYPE_VALUE(compilation);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
-MASS_DEFINE_STRUCT_DESCRIPTOR(94, slice, Slice,
+MASS_DEFINE_STRUCT_DESCRIPTOR(100, slice, Slice,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("bytes"),

@@ -15,67 +15,6 @@
     memcpy(&(_TARGET_), &(_SOURCE_), sizeof(_TARGET_));\
   } while(0)
 
-typedef struct {
-  Operator_Fixity fixity;
-  u8 argument_count;
-  Slice argument_names[2];
-  Value *body;
-  Scope *scope;
-} User_Defined_Operator;
-
-hash_map_slice_template(Scope_Map, Scope_Entry *)
-hash_map_slice_template(Macro_Replacement_Map, Value_View)
-
-typedef enum {
-  Macro_Pattern_Tag_Single_Token,
-  Macro_Pattern_Tag_Any_Token_Sequence,
-} Macro_Pattern_Tag;
-
-typedef struct {
-  Token_Pattern token_pattern;
-} Macro_Pattern_Single_Token;
-
-typedef struct {
-  Macro_Pattern_Tag tag;
-  Slice capture_name;
-  union {
-    Macro_Pattern_Single_Token Single_Token;
-  };
-} Macro_Pattern;
-typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
-
-typedef struct {
-  Array_Macro_Pattern pattern;
-  Value_View replacement;
-  Scope *scope;
-} Macro;
-typedef dyn_array_type(Macro *) Array_Macro_Ptr;
-
-typedef u64 (*Token_Statement_Matcher_Proc)
-(Execution_Context *context, Value_View, Lazy_Value *out_lazy_value, void *payload);
-typedef struct {
-  Token_Statement_Matcher_Proc proc;
-  void *payload;
-} Token_Statement_Matcher;
-
-typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
-
-typedef enum {
-  Scope_Flags_None = 0,
-} Scope_Flags;
-
-typedef struct Scope {
-  const Allocator *allocator;
-  u64 id;
-  Scope_Flags flags;
-  const struct Scope *parent;
-  Scope_Map *map;
-  Array_Macro_Ptr macros;
-  Array_Token_Statement_Matcher statement_matchers;
-} Scope;
-
-MASS_DEFINE_OPAQUE_C_TYPE(scope, Scope);
-
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
