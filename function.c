@@ -685,6 +685,7 @@ load_address(
 
   if (!can_reuse_result_as_temp) {
     assert(temp_storage.tag == Storage_Tag_Register);
+    move_value(context->allocator, builder, source_range, &result_value->storage, &temp_storage);
     register_release(builder, temp_storage.Register.index);
   }
 }
