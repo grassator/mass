@@ -9,6 +9,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include "prelude.h"
 
+#define MAX_META_STRUCT_ID (1 << 16)
+static s32 next_struct_id = 1;
+
 typedef struct {
   const char *name;
   int32_t value;
@@ -86,6 +89,12 @@ typedef struct {
     Meta_Number_Literal number_literal;
   };
 } Meta_Type;
+
+static s32
+generate_struct_id() {
+  assert(next_struct_id <= MAX_META_STRUCT_ID);
+  return next_struct_id++;
+}
 
 void
 print_c_type_forward_declaration(
@@ -503,7 +512,7 @@ print_mass_struct(
   Struct_Type *struct_
 ) {
   char *lowercase_name = strtolower(struct_name);
-  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, struct_name);
+  fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%d, %s, %s,\n", generate_struct_id(), lowercase_name, struct_name);
   for (uint64_t i = 0; i < struct_->item_count; ++i) {
     Struct_Item *item = &struct_->items[i];
     print_mass_struct_item(file, struct_name, item);
@@ -574,7 +583,7 @@ print_mass_descriptor_and_type(
 
       // Write out the tagged union struct
       {
-        fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%s, %s,\n", lowercase_name, type->union_.name);
+        fprintf(file, "MASS_DEFINE_STRUCT_DESCRIPTOR(%d, %s, %s,\n", generate_struct_id(), lowercase_name, type->union_.name);
 
         fprintf(file, "  {\n");
         fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
@@ -1238,6 +1247,7 @@ main(void) {
       { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
+      { "u64", "id" },
       { "Memory_Layout", "memory_layout" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
@@ -1401,6 +1411,8 @@ main(void) {
 
     fprintf(file, "#ifndef GENERATED_TYPES_H\n");
     fprintf(file, "#define GENERATED_TYPES_H\n");
+
+    fprintf(file, "static Atomic_u64 next_struct_id = {%d};\n\n", MAX_META_STRUCT_ID + 1);
 
     // Make sure our generated structs have explicit padding
     fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");

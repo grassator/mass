@@ -2550,6 +2550,7 @@ token_process_c_struct_definition(
     .bit_size = struct_bit_size,
     .bit_alignment = struct_bit_alignment,
     .Struct = {
+      .id = atomic_u64_increment(&next_struct_id),
       .memory_layout = {
         .items = fields,
       }

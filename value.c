@@ -311,9 +311,11 @@ same_type(
       return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
         a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
     }
-    case Descriptor_Tag_Opaque:
-    case Descriptor_Tag_Struct: {
+    case Descriptor_Tag_Opaque: {
       return a == b;
+    }
+    case Descriptor_Tag_Struct: {
+      return a->Struct.id == b->Struct.id;
     }
     case Descriptor_Tag_Function_Instance: {
       const Function_Info *a_info = a->Function_Instance.info;
@@ -765,20 +767,6 @@ storage_with_offset_and_byte_size(
     }
   }
   return result;
-}
-
-Descriptor *
-descriptor_struct_make(
-  Allocator *allocator
-) {
-  Descriptor *descriptor = allocator_allocate(allocator, Descriptor);
-  *descriptor = (Descriptor) {
-    .tag = Descriptor_Tag_Struct,
-    .Struct = {
-      .memory_layout.items = dyn_array_make(Array_Memory_Layout_Item),
-    }
-  };
-  return descriptor;
 }
 
 static inline void

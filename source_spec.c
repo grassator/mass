@@ -1550,7 +1550,8 @@ spec("source") {
         "}"
       );
       check(spec_check_mass_result(test_context.result));
-      Slice input = slice_literal("bb");
+      char bytes[] = {'b', 'b'};
+      Slice input = {.bytes = bytes, .length = countof(bytes)};
       Slice result = checker(input);
       check(result.bytes[0] == 'a');
       check(result.length == 1);
