@@ -5242,6 +5242,22 @@ mass_handle_block_lazy_proc(
       printf("%"PRIslice"\n", SLICE_EXPAND_PRINTF(debug_source));
     }
     if (i == statement_count - 1) {
+      // TODO extract this into a helper and use for any "return" scenarios
+      const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
+      if (
+        expected_descriptor &&
+        !same_value_type_or_can_implicitly_move_cast(expected_descriptor, lazy_statement)
+      ) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = lazy_statement->source_range,
+          .Type_Mismatch = {
+            .expected = expected_descriptor,
+            .actual = value_or_lazy_value_descriptor(lazy_statement),
+          },
+        });
+        return 0;
+      }
       result_value = value_force(context, builder, expected_result, lazy_statement);
       result_value = expected_result_ensure_value_or_temp(context, builder, expected_result, result_value);
     } else {
