@@ -1540,21 +1540,28 @@ spec("source") {
       check(strcmp(string, "test") == 0);
     }
     #if defined(_WIN32) // TODO support on Linux
-    it("should accept and return String arguments") {
-      Slice(*checker)(Slice) = (Slice(*)(Slice))test_program_inline_source_function(
+    it("should accept string arguments") {
+      const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(string : String) -> String {\n"
-          "string.bytes.0 = \"a\".bytes.0\n"
-          "string.length = 1\n"
-          "string"
+        "checker :: fn(string : String) -> ([u8]) {\n"
+          "string.bytes\n"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
-      char bytes[] = {'b', 'b'};
-      Slice input = {.bytes = bytes, .length = countof(bytes)};
-      Slice result = checker(input);
-      check(result.bytes[0] == 'a');
-      check(result.length == 1);
+      Slice input = slice_literal("foo");
+      const char *result = checker(input);
+      check(result == input.bytes);
+    }
+    xit("should be able to return a string") {
+      Slice(*checker)(void) = (Slice(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (String) {\n"
+          "\"foo\""
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      Slice result = checker();
+      check(slice_equal(result, slice_literal("foo")));
     }
     #endif
   }
