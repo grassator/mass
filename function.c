@@ -12,7 +12,7 @@ reserve_stack_storage(
   builder->stack_reserve = s32_align(builder->stack_reserve, byte_size);
   builder->stack_reserve += byte_size;
   // The value is negative here because the stack grows down
-  return storage_stack_local(-builder->stack_reserve, raw_byte_size);
+  return storage_stack(-builder->stack_reserve, raw_byte_size, Stack_Area_Local);
 }
 
 Value *
@@ -761,9 +761,10 @@ ensure_function_instance(
   };
 
   {
+    Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Received_Argument);
     for(u64 i = 0; i < dyn_array_length(arguments_layout->items); ++i) {
       Memory_Layout_Item *item = dyn_array_get(arguments_layout->items, i);
-      Storage storage = memory_layout_item_storage_at_index(arguments_layout, i);
+      Storage storage = memory_layout_item_storage_at_index(&stack_argument_base, arguments_layout, i);
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
         scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);

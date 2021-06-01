@@ -1188,7 +1188,6 @@ main(void) {
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){
-    { "Storage", "base" },
     { "Array_Memory_Layout_Item", "items" },
   }));
 

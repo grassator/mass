@@ -701,9 +701,10 @@ imm_auto(
 }
 
 static inline Storage
-storage_stack_argument(
+storage_stack(
   s32 offset,
-  u64 byte_size
+  u64 byte_size,
+  Stack_Area area
 ) {
   assert(byte_size);
   return (Storage) {
@@ -712,26 +713,7 @@ storage_stack_argument(
     .Memory.location = {
       .tag = Memory_Location_Tag_Stack,
       .Stack = {
-        .area = Stack_Area_Received_Argument,
-        .offset = offset
-      },
-    }
-  };
-}
-
-static inline Storage
-storage_stack_local(
-  s32 offset,
-  u64 byte_size
-) {
-  assert(byte_size);
-  return (Storage) {
-    .tag = Storage_Tag_Memory,
-    .byte_size = byte_size,
-    .Memory.location = {
-      .tag = Memory_Location_Tag_Stack,
-      .Stack = {
-        .area = Stack_Area_Local,
+        .area = area,
         .offset = offset
       },
     }
@@ -1579,6 +1561,7 @@ value_as_function(
 
 static inline Storage
 memory_layout_item_storage(
+  const Storage *base,
   const Memory_Layout *layout,
   const Memory_Layout_Item *item
 ) {
@@ -1589,10 +1572,9 @@ memory_layout_item_storage(
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      Storage result = storage_with_offset_and_byte_size(
-        &layout->base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
+      return storage_with_offset_and_byte_size(
+        base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
       );
-      return result;
     }
   }
   panic("Not reached");
@@ -1601,11 +1583,11 @@ memory_layout_item_storage(
 
 static inline Storage
 memory_layout_item_storage_at_index(
+  const Storage *base,
   const Memory_Layout *layout,
   u64 index
 ) {
-  const Memory_Layout_Item *item = dyn_array_get(layout->items, index);
-  return memory_layout_item_storage(layout, item);
+  return memory_layout_item_storage(base, layout, dyn_array_get(layout->items, index));
 }
 
 const Calling_Convention *

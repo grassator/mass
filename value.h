@@ -22,9 +22,10 @@ storage_register_for_descriptor(
 );
 
 static inline Storage
-storage_stack_argument(
+storage_stack(
   s32 offset,
-  u64 byte_size
+  u64 byte_size,
+  Stack_Area area
 );
 
 static inline Storage

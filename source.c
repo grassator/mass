@@ -3285,17 +3285,19 @@ call_function_overload(
   u64 argument_register_bit_set = 0;
 
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
+  Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
     Memory_Layout_Item *target_arg_definition =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
 
-    Storage target_storage =
-      memory_layout_item_storage_at_index(&instance_descriptor->arguments_layout, i);
+    Storage target_storage = memory_layout_item_storage_at_index(
+      &stack_argument_base, &instance_descriptor->arguments_layout, i
+    );
     if (
       target_storage.tag == Storage_Tag_Memory &&
       target_storage.Memory.location.tag == Memory_Location_Tag_Stack
     ) {
-      assert(target_storage.Memory.location.Stack.area == Stack_Area_Received_Argument);
+      assert(target_storage.Memory.location.Stack.area != Stack_Area_Local);
       target_storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
     }
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register

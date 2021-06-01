@@ -978,7 +978,6 @@ typedef struct Memory_Layout_Item {
 } Memory_Layout_Item;
 typedef dyn_array_type(Memory_Layout_Item) Array_Memory_Layout_Item;
 typedef struct Memory_Layout {
-  Storage base;
   Array_Memory_Layout_Item items;
 } Memory_Layout;
 typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
@@ -3154,12 +3153,6 @@ MASS_DEFINE_TYPE_VALUE(memory_layout_item);
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_ptr, Array_Memory_Layout_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout, Array_Memory_Layout)
 MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout, Memory_Layout,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("base"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Memory_Layout, base),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("items"),

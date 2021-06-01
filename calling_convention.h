@@ -176,7 +176,8 @@ x86_64_system_v_storage_for_class(
         Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
         return storage_register(reg, 8);
       } else {
-        Storage result = storage_stack_argument(u64_to_s32(state->stack_offset), 8);
+        Storage result =
+          storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
         state->stack_offset += 8;
         return result;
       }
@@ -186,14 +187,16 @@ x86_64_system_v_storage_for_class(
         Register reg = state->vector_registers.items[state->vector_registers.index++];
         return storage_register(reg, 8);
       } else {
-        Storage result = storage_stack_argument(u64_to_s32(state->stack_offset), 8);
+        Storage result =
+          storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
         state->stack_offset += 8;
         return result;
       }
       break;
     }
     case SYSTEM_V_MEMORY: {
-      Storage result = storage_stack_argument(u64_to_s32(state->stack_offset), 8);
+      Storage result =
+        storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
       state->stack_offset += 8;
       return result;
     }
@@ -374,7 +377,6 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   };
 
   Memory_Layout layout = {
-    .base = storage_stack_argument(0, 1),
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
@@ -476,7 +478,6 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   assert(countof(general_registers) == countof(float_registers));
 
   Memory_Layout layout = {
-    .base = storage_stack_argument(0, 1),
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
