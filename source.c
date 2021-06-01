@@ -456,12 +456,6 @@ maybe_coerce_number_literal_to_integer(
   return token_value_force_immediate_integer(context, value, target_descriptor);
 }
 
-static Storage
-storage_field_access(
-  const Storage *struct_storage,
-  const Memory_Layout_Item *field
-);
-
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
@@ -519,12 +513,16 @@ assign(
       Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);
       Value source_field = {
         .descriptor = field->descriptor,
-        .storage = storage_field_access(&source->storage, field),
+        .storage = memory_layout_item_storage_at_index(
+          &source->storage, &source->descriptor->Struct.memory_layout, i
+        ),
         .source_range = source->source_range,
       };
       Value target_field = {
         .descriptor = field->descriptor,
-        .storage = storage_field_access(&target->storage, field),
+        .storage = memory_layout_item_storage_at_index(
+          &target->storage, &target->descriptor->Struct.memory_layout, i
+        ),
         .source_range = target->source_range,
       };
       MASS_TRY(assign(context, builder, &target_field, &source_field));
@@ -4568,45 +4566,6 @@ struct_find_field_by_name(
   return 0;
 }
 
-static Storage
-storage_field_access(
-  const Storage *struct_storage,
-  const Memory_Layout_Item *field
-) {
-  switch(struct_storage->tag) {
-    default:
-    case Storage_Tag_Any:
-    case Storage_Tag_Eflags:
-    case Storage_Tag_Xmm:
-    case Storage_Tag_None: {
-      panic("Internal Error: Unexpected storage type for structs");
-      break;
-    }
-    case Storage_Tag_Register: {
-      assert(field->tag == Memory_Layout_Item_Tag_Base_Relative); // FIXME
-      assert(field->Base_Relative.offset == 0); // FIXME
-      Storage field_storage = *struct_storage;
-      field_storage.byte_size = descriptor_byte_size(field->descriptor);
-      return field_storage;
-    }
-    case Storage_Tag_Static: {
-      assert(field->tag == Memory_Layout_Item_Tag_Base_Relative); // FIXME
-      return storage_static_internal(
-        (s8 *)storage_static_as_c_type_internal(struct_storage, struct_storage->byte_size) + field->Base_Relative.offset,
-        descriptor_byte_size(field->descriptor)
-      );
-    }
-    case Storage_Tag_Memory: {
-      Storage field_storage = storage_with_offset_and_byte_size(
-        struct_storage, s64_to_s32(field->Base_Relative.offset), descriptor_byte_size(field->descriptor)
-      );
-      return field_storage;
-    }
-  }
-
-  return (Storage){0};
-}
-
 typedef struct {
   Value *struct_;
   Memory_Layout_Item *field;
@@ -4626,10 +4585,12 @@ mass_handle_field_access_lazy_proc(
     expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
 
+  const Descriptor *struct_descriptor = struct_->descriptor;
+
   // Auto dereference pointers to structs
-  if (struct_->descriptor->tag == Descriptor_Tag_Pointer_To) {
-    const Descriptor* pointee_descriptor = struct_->descriptor->Pointer_To.descriptor;
-    assert(pointee_descriptor->tag == Descriptor_Tag_Struct);
+  if (struct_descriptor->tag == Descriptor_Tag_Pointer_To) {
+    struct_descriptor = struct_->descriptor->Pointer_To.descriptor;
+    assert(struct_descriptor->tag == Descriptor_Tag_Struct);
     Storage base_storage;
     bool is_temporary;
     if (struct_->storage.tag == Storage_Tag_Register) {
@@ -4650,12 +4611,15 @@ mass_handle_field_access_lazy_proc(
     }
 
     Storage pointee_storage =
-      storage_indirect(descriptor_byte_size(pointee_descriptor), base_storage.Register.index);
-    struct_ = value_make(context, pointee_descriptor, pointee_storage, struct_->source_range);
+      storage_indirect(descriptor_byte_size(struct_descriptor), base_storage.Register.index);
+    struct_ = value_make(context, struct_descriptor, pointee_storage, struct_->source_range);
     struct_->is_temporary = is_temporary;
   }
 
-  Storage field_storage = storage_field_access(&struct_->storage, field);
+  assert(struct_descriptor->tag == Descriptor_Tag_Struct);
+  Storage field_storage = memory_layout_item_storage(
+    &struct_->storage, &struct_->descriptor->Struct.memory_layout, field
+  );
   Value *field_value =
     value_make(context, field->descriptor, field_storage, struct_->source_range);
   // Since storage_field_access reuses indirect memory storage of the struct
