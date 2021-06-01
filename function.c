@@ -273,8 +273,7 @@ move_value(
       // TODO can there be something else?
       assert(source->byte_size == target->byte_size);
       for (s32 offset = 0; offset < u64_to_s32(source->byte_size); offset += chunk_size) {
-        Storage adjusted_target = storage_adjusted_memory_location(target, offset);
-        adjusted_target.byte_size = chunk_size;
+        Storage adjusted_target = storage_with_offset_and_byte_size(target, offset, chunk_size);
         assert(source->Static.memory.tag == Static_Memory_Tag_Heap);
         void *memory = (s8 *)source->Static.memory.Heap.pointer + offset;
         Storage adjusted_source = storage_static_internal(memory, chunk_size);

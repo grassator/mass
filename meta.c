@@ -959,7 +959,7 @@ main(void) {
     struct_fields("U32", (Struct_Item[]){{ "u32", "value" }}),
     struct_fields("U64", (Struct_Item[]){{ "u64", "value" }}),
     struct_fields("Heap", (Struct_Item[]){
-      { "void *", "pointer" },
+      { "const void *", "pointer" },
     }),
   }));
 

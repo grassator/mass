@@ -641,7 +641,7 @@ typedef struct Static_Memory_U64 {
   u64 value;
 } Static_Memory_U64;
 typedef struct Static_Memory_Heap {
-  void * pointer;
+  const void * pointer;
 } Static_Memory_Heap;
 typedef struct Static_Memory {
   Static_Memory_Tag tag;

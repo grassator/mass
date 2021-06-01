@@ -590,7 +590,7 @@ code_label32(
 
 static inline Storage
 storage_static_inline_internal(
-  void *value,
+  const void *value,
   u64 byte_size
 ) {
   Storage result = {
@@ -635,7 +635,7 @@ storage_static_inline_internal(
 
 static inline Storage
 storage_static_internal(
-  void *value,
+  const void *value,
   u64 byte_size
 ) {
   if (byte_size <= 8) {
@@ -739,23 +739,46 @@ storage_stack_local(
 }
 
 static inline Storage
-storage_adjusted_memory_location(
-  const Storage *original,
-  s32 diff
+storage_with_offset_and_byte_size(
+  const Storage *base,
+  s32 diff,
+  u64 byte_size
 ) {
-  assert(original->tag == Storage_Tag_Memory);
-  Storage result = *original;
-  switch(result.Memory.location.tag) {
-    case Memory_Location_Tag_Instruction_Pointer_Relative: {
-      panic("TODO support offset for instruction-pointer relative addresses");
+  Storage result = *base;
+  result.byte_size = byte_size;
+  switch(base->tag) {
+    default:
+    case Storage_Tag_Any:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Xmm:
+    case Storage_Tag_None: {
+      panic("Internal Error: Unexpected storage type for structs");
       break;
     }
-    case Memory_Location_Tag_Indirect: {
-      result.Memory.location.Indirect.offset += diff;
+    case Storage_Tag_Register: {
+      assert(diff == 0); // FIXME
       break;
     }
-    case Memory_Location_Tag_Stack: {
-      result.Memory.location.Stack.offset += diff;
+    case Storage_Tag_Static: {
+      const s8 *pointer = storage_static_as_c_type_internal(base, base->byte_size);
+      result = storage_static_internal(pointer + diff, byte_size);
+      break;
+    }
+    case Storage_Tag_Memory: {
+      switch(result.Memory.location.tag) {
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          panic("TODO support offset for instruction-pointer relative addresses");
+          break;
+        }
+        case Memory_Location_Tag_Indirect: {
+          result.Memory.location.Indirect.offset += diff;
+          break;
+        }
+        case Memory_Location_Tag_Stack: {
+          result.Memory.location.Stack.offset += diff;
+          break;
+        }
+      }
       break;
     }
   }
@@ -826,9 +849,9 @@ storage_is_register_index(
 bool
 storage_static_equal_internal(
   const Descriptor *a_descriptor,
-  void *a_memory,
+  const void *a_memory,
   const Descriptor *b_descriptor,
-  void *b_memory
+  const void *b_memory
 ) {
   if (!same_type(a_descriptor, b_descriptor)) return false;
   if (a_descriptor == &descriptor_slice) {
@@ -1555,24 +1578,34 @@ value_as_function(
 }
 
 static inline Storage
-memory_layout_item_storage_at_index(
+memory_layout_item_storage(
   const Memory_Layout *layout,
-  u64 index
+  const Memory_Layout_Item *item
 ) {
-  const Memory_Layout_Item *item = dyn_array_get(layout->items, index);
+  assert(item >= dyn_array_get(layout->items, 0));
+  assert(item <= dyn_array_last(layout->items));
   switch(item->tag) {
     case Memory_Layout_Item_Tag_Absolute: {
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      Storage result =
-        storage_adjusted_memory_location(&layout->base, u64_to_s32(item->Base_Relative.offset));
-      result.byte_size = descriptor_byte_size(item->descriptor);
+      Storage result = storage_with_offset_and_byte_size(
+        &layout->base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
+      );
       return result;
     }
   }
   panic("Not reached");
   return storage_none;
+}
+
+static inline Storage
+memory_layout_item_storage_at_index(
+  const Memory_Layout *layout,
+  u64 index
+) {
+  const Memory_Layout_Item *item = dyn_array_get(layout->items, index);
+  return memory_layout_item_storage(layout, item);
 }
 
 const Calling_Convention *
@@ -1891,8 +1924,7 @@ value_number_literal_cast_to(
     return Literal_Cast_Result_Target_Not_An_Integer;
   }
 
-  assert(value->storage.Static.memory.tag == Static_Memory_Tag_Heap);
-  Number_Literal *literal = value->storage.Static.memory.Heap.pointer;
+  const Number_Literal *literal = storage_static_as_c_type(&value->storage, Number_Literal);
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
@@ -1954,9 +1986,7 @@ same_value_type_or_can_implicitly_move_cast(
   if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {
-      assert(source->storage.tag == Storage_Tag_Static);
-      assert(source->storage.Static.memory.tag == Static_Memory_Tag_Heap);
-      Number_Literal *literal = source->storage.Static.memory.Heap.pointer;
+      const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       return literal->bits == 0;
     } else {
       Literal_Cast_Result cast_result =

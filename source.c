@@ -4589,9 +4589,9 @@ storage_field_access(
       );
     }
     case Storage_Tag_Memory: {
-      Storage field_storage =
-        storage_adjusted_memory_location(struct_storage, s64_to_s32(field->Base_Relative.offset));
-      field_storage.byte_size = descriptor_byte_size(field->descriptor);
+      Storage field_storage = storage_with_offset_and_byte_size(
+        struct_storage, s64_to_s32(field->Base_Relative.offset), descriptor_byte_size(field->descriptor)
+      );
       return field_storage;
     }
   }
@@ -4705,13 +4705,12 @@ mass_handle_array_access_lazy_proc(
     if (index->storage.tag == Storage_Tag_Static) {
       s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
       s32 offset = index_number * s64_to_s32(item_byte_size);
-      element_storage = storage_adjusted_memory_location(&array->storage, offset);
+      element_storage = storage_with_offset_and_byte_size(&array->storage, offset, item_byte_size);
     } else {
       // @Volatile :TemporaryRegisterForIndirectMemory
       element_storage =
         storage_load_index_address(context, builder, array_range, array, item_descriptor, index);
     }
-    element_storage.byte_size = item_byte_size;
 
     array_element_value = value_make(context, item_descriptor, element_storage, array->source_range);
     array_element_value->is_temporary = true;
