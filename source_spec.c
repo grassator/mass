@@ -1550,7 +1550,8 @@ spec("source") {
         "}"
       );
       check(spec_check_mass_result(test_context.result));
-      Slice result = checker(slice_literal("bb"));
+      Slice input = slice_literal("bb");
+      Slice result = checker(input);
       check(result.bytes[0] == 'a');
       check(result.length == 1);
     }
