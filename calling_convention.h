@@ -265,8 +265,9 @@ x86_64_system_v_classify(
         SYSTEM_V_ARGUMENT_CLASS class =
           descriptor_is_float(descriptor) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
         return x86_64_system_v_push_memory_layout_item_for_class(state, class, name, descriptor);
+      } else {
+        return SYSTEM_V_MEMORY;
       }
-      panic("TODO support large opaque descriptors");
       break;
     }
     case Descriptor_Tag_Struct: {
@@ -372,26 +373,43 @@ calling_convention_x86_64_system_v_return_storage_proc(
   const Function_Info *function,
   Function_Argument_Mode mode
 ) {
-  const Descriptor *descriptor = function->returns.descriptor;
-  if (descriptor == &descriptor_void) {
+  if (function->returns.descriptor == &descriptor_void) {
     return storage_none;
   }
-  // TODO handle 16 byte non-float return values in XMM0
-  if (descriptor_is_float(descriptor)) {
-    return storage_register_for_descriptor(Register_Xmm0, descriptor);
+  static const Register general_registers[] = { Register_A, Register_D };
+  static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
+
+  System_V_Classification_State state = {
+    .general_purpose_registers = {
+      .items = general_registers,
+      .count = countof(general_registers),
+      .index = 0,
+    },
+    .vector_registers = {
+      .items = vector_registers,
+      .count = countof(vector_registers),
+      .index = 0,
+    },
+    .memory_layout = {
+      .items = dyn_array_make(
+        Array_Memory_Layout_Item,
+        .allocator = allocator_default,
+        .capacity = 1,
+      ),
+    },
+  };
+
+  SYSTEM_V_ARGUMENT_CLASS class = x86_64_system_v_classify(
+    allocator_default, &state, function->returns.name, function->returns.descriptor
+  );
+  if (class == SYSTEM_V_MEMORY) {
+    Register base_register = mode == Function_Argument_Mode_Call ? Register_A : Register_DI;
+    return storage_indirect(descriptor_byte_size(function->returns.descriptor), base_register);
   }
-  u64 byte_size = descriptor_byte_size(descriptor);
-  if (byte_size <= 8) {
-    return storage_register_for_descriptor(Register_A, descriptor);
-  }
-  // :ReturnTypeLargerThanRegister
-  // Inside the function large returns are pointed to by RDI,
-  // but this pointer is also returned in A
-  Register base_register = Register_A;
-  if (mode == Function_Argument_Mode_Body) {
-    base_register = Register_DI;
-  }
-  return storage_indirect(byte_size, base_register);
+  assert(dyn_array_length(state.memory_layout.items) == 1);
+  Storage result = memory_layout_item_storage_at_index(&storage_none, &state.memory_layout, 0);
+  dyn_array_destroy(state.memory_layout.items);
+  return result;
 }
 
 static Memory_Layout
@@ -407,18 +425,21 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     Register_Xmm4, Register_Xmm5, Register_Xmm6, Register_Xmm7,
   };
 
-  // :ReturnTypeLargerThanRegister
-  // If return type is larger than register, the pointer to stack location
-  // where it needs to be written to is passed as the first argument
-  // shifting registers for actual arguments by one
-  u64 return_byte_size = descriptor_byte_size(function->returns.descriptor);
-  bool is_return_larger_than_register = return_byte_size > 8;
+  Storage return_storage = calling_convention_x86_64_system_v_return_storage_proc(
+    function, Function_Argument_Mode_Body
+  );
+
+  bool is_indirect_return = (
+    return_storage.tag == Storage_Tag_Memory &&
+    return_storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
+    return_storage.Memory.location.Indirect.base_register == Register_DI
+  );
 
   System_V_Classification_State state = {
     .general_purpose_registers = {
       .items = general_registers,
       .count = countof(general_registers),
-      .index = is_return_larger_than_register ? 1 : 0,
+      .index = is_indirect_return ? 1 : 0,
     },
     .vector_registers = {
       .items = vector_registers,
@@ -438,14 +459,14 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     x86_64_system_v_classify(allocator, &state, arg->name, arg->descriptor);
   }
 
-  if (is_return_larger_than_register) {
+  if (is_indirect_return) {
     dyn_array_push(state.memory_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,
-      .Absolute = { .storage = storage_indirect(return_byte_size, Register_DI), },
+      .Absolute = { .storage = return_storage, },
     });
   }
 

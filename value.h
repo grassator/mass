@@ -22,6 +22,13 @@ storage_register_for_descriptor(
 );
 
 static inline Storage
+memory_layout_item_storage_at_index(
+  const Storage *base,
+  const Memory_Layout *layout,
+  u64 index
+);
+
+static inline Storage
 storage_stack(
   s32 offset,
   u64 byte_size,

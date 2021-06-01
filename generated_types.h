@@ -1308,7 +1308,6 @@ _Pragma("warning (pop)")
 // Mass Type Reflection
 
 static Descriptor descriptor_x64_mnemonic_pointer;
-static Descriptor descriptor_scope_pointer;
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_char;

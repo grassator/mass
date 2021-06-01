@@ -1494,7 +1494,6 @@ main(void) {
     fprintf(file, "\n// Mass Type Reflection\n\n");
 
     fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
-    fprintf(file, "static Descriptor descriptor_scope_pointer;\n");
     fprintf(file, "static Descriptor descriptor_void;\n");
     fprintf(file, "static Descriptor descriptor_void_pointer;\n");
     fprintf(file, "static Descriptor descriptor_char;\n");
