@@ -959,8 +959,6 @@ storage_equal(
         case Memory_Location_Tag_Indirect: {
           return (
             a_location->Indirect.base_register == b_location->Indirect.base_register &&
-            a_location->Indirect.maybe_index_register.has_value == b_location->Indirect.maybe_index_register.has_value &&
-            a_location->Indirect.maybe_index_register.index == b_location->Indirect.maybe_index_register.index &&
             a_location->Indirect.offset == b_location->Indirect.offset
           );
         }

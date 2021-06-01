@@ -932,11 +932,6 @@ main(void) {
     { "Signed_Greater_Equal", 10 },
   }));
 
-  push_type(type_struct("Maybe_Register", (Struct_Item[]){
-    { "Register", "index" },
-    { "u32", "has_value" },
-  }));
-
   push_type(type_enum("Stack_Area", (Enum_Type_Item[]){
     { "Local", 0 },
     { "Received_Argument", 1 },
@@ -950,7 +945,6 @@ main(void) {
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },
       { "u32", "_base_register_padding" },
-      { "Maybe_Register", "maybe_index_register" },
       { "s64", "offset" },
     }),
     struct_fields("Stack", (Struct_Item[]){

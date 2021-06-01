@@ -99,10 +99,6 @@ typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
 typedef enum Compare_Type Compare_Type;
 
-typedef struct Maybe_Register Maybe_Register;
-typedef dyn_array_type(Maybe_Register *) Array_Maybe_Register_Ptr;
-typedef dyn_array_type(const Maybe_Register *) Array_Const_Maybe_Register_Ptr;
-
 typedef enum Stack_Area Stack_Area;
 
 typedef struct Memory_Location Memory_Location;
@@ -582,12 +578,6 @@ const char *compare_type_name(Compare_Type value) {
   return 0;
 };
 
-typedef struct Maybe_Register {
-  Register index;
-  u32 has_value;
-} Maybe_Register;
-typedef dyn_array_type(Maybe_Register) Array_Maybe_Register;
-
 typedef enum Stack_Area {
   Stack_Area_Local = 0,
   Stack_Area_Received_Argument = 1,
@@ -614,7 +604,6 @@ typedef struct Memory_Location_Instruction_Pointer_Relative {
 typedef struct Memory_Location_Indirect {
   Register base_register;
   u32 _base_register_padding;
-  Maybe_Register maybe_index_register;
   s64 offset;
 } Memory_Location_Indirect;
 typedef struct Memory_Location_Stack {
@@ -1387,11 +1376,6 @@ static Descriptor descriptor_array_compare_type;
 static Descriptor descriptor_array_compare_type_ptr;
 static Descriptor descriptor_compare_type_pointer;
 static Descriptor descriptor_compare_type_pointer_pointer;
-static Descriptor descriptor_maybe_register;
-static Descriptor descriptor_array_maybe_register;
-static Descriptor descriptor_array_maybe_register_ptr;
-static Descriptor descriptor_maybe_register_pointer;
-static Descriptor descriptor_maybe_register_pointer_pointer;
 static Descriptor descriptor_stack_area;
 static Descriptor descriptor_array_stack_area;
 static Descriptor descriptor_array_stack_area_ptr;
@@ -2152,23 +2136,6 @@ static C_Enum_Item compare_type_items[] = {
 { .name = slice_literal_fields("Signed_Greater"), .value = 9 },
 { .name = slice_literal_fields("Signed_Greater_Equal"), .value = 10 },
 };
-MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register_ptr, Array_Maybe_Register_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_maybe_register, Array_Maybe_Register)
-MASS_DEFINE_STRUCT_DESCRIPTOR(maybe_register, Maybe_Register,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("index"),
-    .descriptor = &descriptor_register,
-    .Base_Relative.offset = offsetof(Maybe_Register, index),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("has_value"),
-    .descriptor = &descriptor_u32,
-    .Base_Relative.offset = offsetof(Maybe_Register, has_value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(maybe_register);
 MASS_DEFINE_OPAQUE_C_TYPE(stack_area, Stack_Area)
 static C_Enum_Item stack_area_items[] = {
 { .name = slice_literal_fields("Local"), .value = 0 },
@@ -2203,12 +2170,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_indirect, Memory_Location_Indirect
     .name = slice_literal_fields("_base_register_padding"),
     .descriptor = &descriptor_u32,
     .Base_Relative.offset = offsetof(Memory_Location_Indirect, _base_register_padding),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("maybe_index_register"),
-    .descriptor = &descriptor_maybe_register,
-    .Base_Relative.offset = offsetof(Memory_Location_Indirect, maybe_index_register),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

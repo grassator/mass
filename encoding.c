@@ -137,6 +137,8 @@ encode_instruction_assembly(
             enum { Sib_Index_None = 0b100,};
             u8 sib_scale_bits = Sib_Scale_1;
             Register base = storage->Memory.location.Indirect.base_register;
+            // TODO enable this when the compiler makes use of indexed access
+            /*
             if (storage->Memory.location.Indirect.maybe_index_register.has_value) {
               needs_sib = true;
               r_m = 0b0100; // SIB
@@ -149,7 +151,9 @@ encode_instruction_assembly(
               if (sib_index & 0b1000) {
                 rex_byte |= REX_X;
               }
-            } else if (base == Register_SP || base == Register_R12) {
+            } else
+            */
+            if (base == Register_SP || base == Register_R12) {
               // [RSP + X] and [R12 + X] always needs to be encoded as SIB because
               // 0b100 register index in MOD R/M is occupied by SIB byte indicator
               needs_sib = true;
