@@ -1923,13 +1923,14 @@ value_number_literal_cast_to(
   return Literal_Cast_Result_Success;
 }
 
-bool
+static bool
 same_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   const Descriptor *source
 ) {
   if (same_type(target, source)) return true;
   if (target == source) return true;
+  if (target == &descriptor_void) return true;
   if (target->tag != source->tag) return false;
   if (descriptor_is_integer(source) && descriptor_is_integer(target)) {
     if (
@@ -1947,7 +1948,7 @@ same_type_or_can_implicitly_move_cast(
   return false;
 }
 
-bool
+static bool
 same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
