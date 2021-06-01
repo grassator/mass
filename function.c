@@ -689,6 +689,39 @@ load_address(
   }
 }
 
+static void
+mark_occupied_registers(
+  Function_Builder *builder,
+  const Descriptor *descriptor,
+  Storage *storage
+) {
+  Register arg_reg = Register_SP;
+  if (storage->tag == Storage_Tag_Register) {
+    arg_reg = storage->Register.index;
+  } else if(storage->tag == Storage_Tag_Memory) {
+    switch(storage->Memory.location.tag) {
+      case Memory_Location_Tag_Instruction_Pointer_Relative: {
+        panic("Unsupported argument memory storage");
+        break;
+      }
+      case Memory_Location_Tag_Indirect: {
+        arg_reg = storage->Memory.location.Indirect.base_register;
+        break;
+      }
+      case Memory_Location_Tag_Stack: {
+        arg_reg = Register_SP;
+        break;
+      }
+    }
+  } else {
+    panic("Unexpected storage tag for an argument");
+  }
+  if (arg_reg != Register_SP) {
+    register_bitset_set(&builder->register_occupied_bitset, arg_reg);
+    builder->register_occupied_storage[arg_reg] = storage;
+  }
+}
+
 static Value *
 ensure_function_instance(
   Execution_Context *context,
@@ -769,31 +802,7 @@ ensure_function_instance(
       if (item->name.length) {
         scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
       }
-      Register arg_reg = Register_SP;
-      if (arg_value->storage.tag == Storage_Tag_Register) {
-        arg_reg = arg_value->storage.Register.index;
-      } else if(arg_value->storage.tag == Storage_Tag_Memory) {
-        switch(arg_value->storage.Memory.location.tag) {
-          case Memory_Location_Tag_Instruction_Pointer_Relative: {
-            panic("Unsupported argument memory storage");
-            break;
-          }
-          case Memory_Location_Tag_Indirect: {
-            arg_reg = arg_value->storage.Memory.location.Indirect.base_register;
-            break;
-          }
-          case Memory_Location_Tag_Stack: {
-            arg_reg = Register_SP;
-            break;
-          }
-        }
-      } else {
-        panic("Unexpected storage tag for an argument");
-      }
-      if (arg_reg != Register_SP) {
-        register_bitset_set(&builder->register_occupied_bitset, arg_reg);
-        builder->register_occupied_storage[arg_reg] = &arg_value->storage;
-      }
+      mark_occupied_registers(builder, arg_value->descriptor, &arg_value->storage);
     }
   }
 
