@@ -3749,24 +3749,29 @@ storage_load_index_address(
   // Move the index into the register
   move_value(context->allocator, builder, source_range, &new_base->storage, &index_value->storage);
 
-  Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
+  // Multiplication by 1
+  if (item_byte_size != 1) {
+    Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
 
-  // Multiply index by the item byte size
-  Value *reg_byte_size_value = value_temporary_acquire_register_for_descriptor(
-    context, builder, register_find_available(builder, 0), &descriptor_s64, index_value->source_range
-  );
-  move_value(
-    context->allocator, builder, source_range,
-    &reg_byte_size_value->storage, &byte_size_value->storage
-  );
+    // Multiply index by the item byte size
+    Value *reg_byte_size_value = value_temporary_acquire_register_for_descriptor(
+      context, builder, register_find_available(builder, 0), &descriptor_s64, index_value->source_range
+    );
 
-  push_instruction(
-    &builder->code_block.instructions, *source_range,
-    (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {imul, {new_base->storage, reg_byte_size_value->storage}}
-    }
-  );
+    move_value(
+      context->allocator, builder, source_range,
+      &reg_byte_size_value->storage, &byte_size_value->storage
+    );
+
+    push_instruction(
+      &builder->code_block.instructions, *source_range,
+      (Instruction) {
+        .tag = Instruction_Tag_Assembly,
+        .Assembly = {imul, {new_base->storage, reg_byte_size_value->storage}}
+      }
+    );
+    value_release_if_temporary(builder, reg_byte_size_value);
+  }
 
   {
     // @InstructionQuality
@@ -3790,7 +3795,6 @@ storage_load_index_address(
     );
     value_release_if_temporary(builder, temp_value);
   }
-  value_release_if_temporary(builder, reg_byte_size_value);
 
   return storage_indirect(item_byte_size, new_base->storage.Register.index);
 }
