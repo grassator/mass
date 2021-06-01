@@ -458,8 +458,8 @@ maybe_coerce_number_literal_to_integer(
 
 static Storage
 storage_field_access(
-  Storage *struct_storage,
-  Memory_Layout_Item *field
+  const Storage *struct_storage,
+  const Memory_Layout_Item *field
 );
 
 static PRELUDE_NO_DISCARD Mass_Result
@@ -4558,18 +4558,24 @@ struct_find_field_by_name(
 
 static Storage
 storage_field_access(
-  Storage *struct_storage,
-  Memory_Layout_Item *field
+  const Storage *struct_storage,
+  const Memory_Layout_Item *field
 ) {
   switch(struct_storage->tag) {
     default:
     case Storage_Tag_Any:
     case Storage_Tag_Eflags:
-    case Storage_Tag_Register:
     case Storage_Tag_Xmm:
     case Storage_Tag_None: {
       panic("Internal Error: Unexpected storage type for structs");
       break;
+    }
+    case Storage_Tag_Register: {
+      assert(field->tag == Memory_Layout_Item_Tag_Base_Relative); // FIXME
+      assert(field->Base_Relative.offset == 0); // FIXME
+      Storage field_storage = *struct_storage;
+      field_storage.byte_size = descriptor_byte_size(field->descriptor);
+      return field_storage;
     }
     case Storage_Tag_Static: {
       assert(field->tag == Memory_Layout_Item_Tag_Base_Relative); // FIXME
