@@ -1552,7 +1552,7 @@ spec("source") {
       check(result == input.bytes);
     }
     #if defined(_WIN32) // TODO support on Linux
-    xit("should be able to return a string") {
+    it("should be able to return a string") {
       Slice(*checker)(void) = (Slice(*)(void))test_program_inline_source_function(
         "checker", &test_context,
         "checker :: fn() -> (String) {\n"

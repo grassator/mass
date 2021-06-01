@@ -552,7 +552,7 @@ assign(
 
         Value static_source_value = {
           .descriptor = static_pointer->descriptor,
-          .storage = storage_static_internal(source_memory, byte_size),
+          .storage = storage_static_heap(source_memory, byte_size),
           .source_range = source->source_range,
         };
 

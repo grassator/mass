@@ -226,28 +226,25 @@ storage_static_as_c_type_internal(
   assert(storage->byte_size == byte_size);
   assert(storage->tag == Storage_Tag_Static);
 
-  switch(byte_size) {
-    case 1: {
-      assert(storage->Static.memory.tag == Static_Memory_Tag_U8);
+  switch(storage->Static.memory.tag) {
+    case Static_Memory_Tag_U8: {
       return &storage->Static.memory.U8.value;
     }
-    case 2: {
-      assert(storage->Static.memory.tag == Static_Memory_Tag_U16);
+    case Static_Memory_Tag_U16: {
       return &storage->Static.memory.U16.value;
     }
-    case 4: {
-      assert(storage->Static.memory.tag == Static_Memory_Tag_U32);
+    case Static_Memory_Tag_U32: {
       return &storage->Static.memory.U32.value;
     }
-    case 8: {
-      assert(storage->Static.memory.tag == Static_Memory_Tag_U64);
+    case Static_Memory_Tag_U64: {
       return &storage->Static.memory.U64.value;
     }
-    default: {
-      assert(storage->Static.memory.tag == Static_Memory_Tag_Heap);
+    case Static_Memory_Tag_Heap: {
       return storage->Static.memory.Heap.pointer;
     }
   }
+  panic("UNREACHED");
+  return 0;
 }
 
 #define storage_static_as_c_type(_OPERAND_, _TYPE_)\
@@ -636,14 +633,10 @@ storage_static_inline_internal(
   storage_static_inline_internal((_VALUE_), sizeof(*(_VALUE_)))
 
 static inline Storage
-storage_static_internal(
+storage_static_heap(
   const void *value,
   u64 byte_size
 ) {
-  if (byte_size <= 8) {
-    return storage_static_inline_internal(value, byte_size);
-  }
-
   return (Storage){
     .tag = Storage_Tag_Static,
     .byte_size = byte_size,
@@ -654,6 +647,18 @@ storage_static_internal(
       },
     },
   };
+}
+
+static inline Storage
+storage_static_internal(
+  const void *value,
+  u64 byte_size
+) {
+  if (byte_size <= 8) {
+    return storage_static_inline_internal(value, byte_size);
+  }
+
+  return storage_static_heap(value, byte_size);
 }
 
 #define storage_static(_VALUE_)\
