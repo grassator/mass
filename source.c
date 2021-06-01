@@ -3248,20 +3248,20 @@ call_function_overload(
     // otherwise we will overwrite it with the restored value
     if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
 
-    Value *occupied_value = builder->register_occupied_values[reg_index];
-    assert(occupied_value);
-    if (occupied_value->storage.tag == Storage_Tag_Register) {
-      assert(occupied_value->storage.tag == Storage_Tag_Register);
-      assert(occupied_value->storage.Register.index == reg_index);
-      Storage stack_storage = reserve_stack_storage(builder, occupied_value->storage.byte_size);
+    Storage *occupied_storage = builder->register_occupied_storage[reg_index];
+    assert(occupied_storage);
+    if (occupied_storage->tag == Storage_Tag_Register) {
+      assert(occupied_storage->tag == Storage_Tag_Register);
+      assert(occupied_storage->Register.index == reg_index);
+      Storage stack_storage = reserve_stack_storage(builder, occupied_storage->byte_size);
       push_instruction(
         instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {stack_storage, occupied_value->storage}}}
+        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {stack_storage, *occupied_storage}}}
       );
-      occupied_value->storage = stack_storage;
-    } else if (occupied_value->storage.tag == Storage_Tag_Memory) {
-      assert(occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      assert(occupied_value->storage.Memory.location.Indirect.base_register == reg_index);
+      *occupied_storage = stack_storage;
+    } else if (occupied_storage->tag == Storage_Tag_Memory) {
+      assert(occupied_storage->Memory.location.tag == Memory_Location_Tag_Indirect);
+      assert(occupied_storage->Memory.location.Indirect.base_register == reg_index);
       Register temp_reg = register_acquire_temp(builder);
       Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
       Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
@@ -3269,7 +3269,7 @@ call_function_overload(
         instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_reg_storage, original_reg_storage}}}
       );
-      occupied_value->storage.Memory.location.Indirect.base_register = temp_reg;
+      occupied_storage->Memory.location.Indirect.base_register = temp_reg;
     } else {
       panic("Unexpected storage tag for an argument");
     }
@@ -3405,21 +3405,26 @@ call_function_overload(
     // :NoSaveResult
     if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
 
-    Value *occupied_value = builder->register_occupied_values[reg_index];
-    assert(occupied_value->storage.tag == Storage_Tag_Memory);
-    if (occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Stack) {
-      Storage reg_storage = storage_register_for_descriptor(reg_index, occupied_value->descriptor);
-      move_value(context->allocator, builder, source_range, &reg_storage, &occupied_value->storage);
-      occupied_value->storage = reg_storage;
+    Storage *occupied_storage = builder->register_occupied_storage[reg_index];
+    assert(occupied_storage->tag == Storage_Tag_Memory);
+    if (occupied_storage->Memory.location.tag == Memory_Location_Tag_Stack) {
+      Storage reg_storage = (Storage) {
+        .tag = Storage_Tag_Register,
+        .byte_size = occupied_storage->byte_size,
+        .Register.index = reg_index,
+      };
+      move_value(context->allocator, builder, source_range, &reg_storage, occupied_storage);
+      *occupied_storage = reg_storage;
     } else {
-      assert(occupied_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      Register temp_reg = occupied_value->storage.Memory.location.Indirect.base_register;
+      assert(occupied_storage->Memory.location.tag == Memory_Location_Tag_Indirect);
+      Register temp_reg = occupied_storage->Memory.location.Indirect.base_register;
       Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
       Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
       push_instruction(
         instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {original_reg_storage, temp_reg_storage}}}
       );
+      occupied_storage->Register.index = reg_index;
     }
   }
 

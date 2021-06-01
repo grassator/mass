@@ -1333,7 +1333,7 @@ value_temporary_acquire_register_for_descriptor_internal(
     source_range
   );
   value->is_temporary = true;
-  builder->register_occupied_values[reg] = value;
+  builder->register_occupied_storage[reg] = &value->storage;
   return value;
 }
 

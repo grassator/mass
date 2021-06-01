@@ -1049,7 +1049,7 @@ main(void) {
     { "u64", "used_register_bitset" },
     { "u64", "register_volatile_bitset" },
     { "u64", "register_occupied_bitset" },
-    { "Value *", "register_occupied_values", u64_to_u32(Register_Type->enum_.item_count) },
+    { "Storage *", "register_occupied_storage", u64_to_u32(Register_Type->enum_.item_count) },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
   }));

@@ -79,7 +79,7 @@ ensure_register_released(
   Register reg_index
 ) {
   register_bitset_unset(&builder->register_occupied_bitset, reg_index);
-  builder->register_occupied_values[reg_index] = 0;
+  builder->register_occupied_storage[reg_index] = 0;
 }
 
 void
@@ -792,7 +792,7 @@ ensure_function_instance(
       }
       if (arg_reg != Register_SP) {
         register_bitset_set(&builder->register_occupied_bitset, arg_reg);
-        builder->register_occupied_values[arg_reg] = arg_value;
+        builder->register_occupied_storage[arg_reg] = &arg_value->storage;
       }
     }
   }

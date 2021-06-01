@@ -760,7 +760,7 @@ typedef struct Function_Builder {
   u64 used_register_bitset;
   u64 register_volatile_bitset;
   u64 register_occupied_bitset;
-  Value * register_occupied_values[32];
+  Storage * register_occupied_storage[32];
   Slice source;
   const Function_Info * function;
 } Function_Builder;
@@ -1583,7 +1583,7 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
-static Descriptor descriptor_value_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Value *, 32, &descriptor_value_pointer);
+static Descriptor descriptor_storage_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage *, 32, &descriptor_storage_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
@@ -2650,9 +2650,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(47, function_builder, Function_Builder,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_occupied_values"),
-    .descriptor = &descriptor_value_pointer_32,
-    .Base_Relative.offset = offsetof(Function_Builder, register_occupied_values),
+    .name = slice_literal_fields("register_occupied_storage"),
+    .descriptor = &descriptor_storage_pointer_32,
+    .Base_Relative.offset = offsetof(Function_Builder, register_occupied_storage),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
