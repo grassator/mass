@@ -1539,6 +1539,22 @@ spec("source") {
       const char *string = checker();
       check(strcmp(string, "test") == 0);
     }
+    #if defined(_WIN32) // TODO support on Linux
+    it("should accept and return String arguments") {
+      Slice(*checker)(Slice) = (Slice(*)(Slice))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(string : String) -> String {\n"
+          "string.bytes.0 = \"a\".bytes.0\n"
+          "string.length = 1\n"
+          "string"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      Slice result = checker(slice_literal("bb"));
+      check(result.bytes[0] == 'a');
+      check(result.length == 1);
+    }
+    #endif
   }
 
   describe("Fixed Size Arrays") {
