@@ -156,49 +156,59 @@ typedef struct {
 } System_V_Registers;
 
 typedef struct {
-  Array_System_V_Class_Entry class_entry_stack;
+  Memory_Layout memory_layout;
   System_V_Registers general_purpose_registers;
   System_V_Registers vector_registers;
   u64 stack_offset;
 } System_V_Classification_State;
 
-static Storage
-x86_64_system_v_storage_for_class(
+static Memory_Layout_Item
+x86_64_system_v_memory_layout_item_for_class(
   System_V_Classification_State *state,
-  SYSTEM_V_ARGUMENT_CLASS class
+  SYSTEM_V_ARGUMENT_CLASS class,
+  Slice name,
+  const Descriptor *descriptor
 ) {
+  u64 byte_size = descriptor_byte_size(descriptor);
   switch(class) {
     case SYSTEM_V_NO_CLASS: {
-      return storage_none;
+      return (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Absolute,
+        .name = name,
+        .descriptor = descriptor,
+        .Absolute = {.storage = storage_none},
+      };
     }
     case SYSTEM_V_INTEGER: {
       if (state->general_purpose_registers.index < state->general_purpose_registers.count) {
         Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
-        return storage_register(reg, 8);
+        return (Memory_Layout_Item) {
+          .tag = Memory_Layout_Item_Tag_Absolute,
+          .name = name,
+          .descriptor = descriptor,
+          .Absolute = {.storage = storage_register(reg, byte_size)},
+        };
       } else {
-        Storage result =
-          storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
-        state->stack_offset += 8;
-        return result;
+        goto relative;
       }
+      break;
     }
     case SYSTEM_V_SSE: {
       if (state->vector_registers.index < state->vector_registers.count) {
         Register reg = state->vector_registers.items[state->vector_registers.index++];
-        return storage_register(reg, 8);
+        return (Memory_Layout_Item) {
+          .tag = Memory_Layout_Item_Tag_Absolute,
+          .name = name,
+          .descriptor = descriptor,
+          .Absolute = {.storage = storage_register(reg, byte_size)},
+        };
       } else {
-        Storage result =
-          storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
-        state->stack_offset += 8;
-        return result;
+        goto relative;
       }
       break;
     }
     case SYSTEM_V_MEMORY: {
-      Storage result =
-        storage_stack(u64_to_s32(state->stack_offset), 8, Stack_Area_Received_Argument);
-      state->stack_offset += 8;
-      return result;
+      goto relative;
     }
     case SYSTEM_V_SSEUP:
     case SYSTEM_V_X87:
@@ -208,12 +218,38 @@ x86_64_system_v_storage_for_class(
       break;
     }
   }
-  return storage_none;
+
+  relative: {
+    Memory_Layout_Item result = {
+      .tag = Memory_Layout_Item_Tag_Base_Relative,
+      .name = name,
+      .descriptor = descriptor,
+      .Base_Relative = {.offset = state->stack_offset},
+    };
+    state->stack_offset += u64_align(byte_size, 8);
+    return result;
+  }
+}
+
+static inline SYSTEM_V_ARGUMENT_CLASS
+x86_64_system_v_push_memory_layout_item_for_class(
+  System_V_Classification_State *state,
+  SYSTEM_V_ARGUMENT_CLASS class,
+  Slice name,
+  const Descriptor *descriptor
+) {
+  dyn_array_push(
+    state->memory_layout.items,
+    x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor)
+  );
+  return class;
 }
 
 static SYSTEM_V_ARGUMENT_CLASS
 x86_64_system_v_classify(
+  const Allocator *allocator,
   System_V_Classification_State *state,
+  Slice name,
   const Descriptor *descriptor
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
@@ -226,11 +262,9 @@ x86_64_system_v_classify(
     case Descriptor_Tag_Pointer_To:
     case Descriptor_Tag_Opaque: {
       if (byte_size <= eightbyte) {
-        if (descriptor_is_float(descriptor)) {
-          return SYSTEM_V_SSE;
-        } else {
-          return SYSTEM_V_INTEGER;
-        }
+        SYSTEM_V_ARGUMENT_CLASS class =
+          descriptor_is_float(descriptor) ? SYSTEM_V_SSE : SYSTEM_V_INTEGER;
+        return x86_64_system_v_push_memory_layout_item_for_class(state, class, name, descriptor);
       }
       panic("TODO support large opaque descriptors");
       break;
@@ -240,14 +274,14 @@ x86_64_system_v_classify(
       // 1. If the size of an object is larger than eight eightbytes,
       // or it contains unaligned fields, it has class MEMORY
       if (byte_size > 8 * eightbyte || has_unaligned) {
-        return SYSTEM_V_MEMORY;
+        return x86_64_system_v_push_memory_layout_item_for_class(state, SYSTEM_V_MEMORY, name, descriptor);
       }
       // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
       // C++ ABI 13, it is passed by invisible reference (the object is replaced in the
       // parameter list by a pointer that has class INTEGER)
       bool is_c_plus_plus_non_trivial = false; // TODO allow to specify this
       if (is_c_plus_plus_non_trivial) {
-        return SYSTEM_V_INTEGER;
+        return x86_64_system_v_push_memory_layout_item_for_class(state, SYSTEM_V_INTEGER, name, descriptor);
       }
 
       // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
@@ -255,22 +289,26 @@ x86_64_system_v_classify(
       SYSTEM_V_ARGUMENT_CLASS result = SYSTEM_V_NO_CLASS;
       u64 current_eightbyte_offset = 0;
 
-      const Memory_Layout *layout = &descriptor->Struct.memory_layout;
+      Memory_Layout saved_state_layout = state->memory_layout;
+      state->memory_layout = (Memory_Layout) {
+        .items = dyn_array_make(
+          Array_Memory_Layout_Item,
+          .allocator = allocator,
+          .capacity = dyn_array_length(descriptor->Struct.memory_layout.items),
+        ),
+      };
 
-      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, layout->items) {
+      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, descriptor->Struct.memory_layout.items) {
         const Descriptor *item_descriptor = item->descriptor;
         assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
         u64 offset = item->Base_Relative.offset;
         if (offset - current_eightbyte_offset >= eightbyte) {
-          dyn_array_push(state->class_entry_stack, (System_V_Class_Entry) {
-            .storage = x86_64_system_v_storage_for_class(state, result),
-            .class = result,
-          });
           result = SYSTEM_V_NO_CLASS;
           current_eightbyte_offset = offset;
           assert(current_eightbyte_offset % 8 == 0);
         }
-        SYSTEM_V_ARGUMENT_CLASS current = x86_64_system_v_classify(state, item_descriptor);
+        SYSTEM_V_ARGUMENT_CLASS current =
+          x86_64_system_v_classify(allocator, state, item->name, item_descriptor);
         if (result == current) {
           continue;
         } else if (current == SYSTEM_V_NO_CLASS) {
@@ -279,6 +317,7 @@ x86_64_system_v_classify(
           result = current;
         } else if (result == SYSTEM_V_MEMORY || current == SYSTEM_V_MEMORY) {
           result = SYSTEM_V_MEMORY;
+          break;
         } else if (result == SYSTEM_V_INTEGER || current == SYSTEM_V_INTEGER) {
           result = SYSTEM_V_INTEGER;
         } else if (
@@ -286,12 +325,25 @@ x86_64_system_v_classify(
           current == SYSTEM_V_X87 || current == SYSTEM_V_X87UP || current == SYSTEM_V_COMPLEX_X87
         ) {
           result = SYSTEM_V_MEMORY;
+          break;
         } else {
           result = SYSTEM_V_SSE;
         }
       }
-      return result;
+
       // TODO implement post-merger cleanup
+      if (result != SYSTEM_V_MEMORY) {
+        // FIXME this will cause type mismatches unless struct are not compared by pointer
+        Descriptor *updated_descriptor = allocator_allocate(allocator, Descriptor);
+        *updated_descriptor = *descriptor;
+        updated_descriptor->Struct.memory_layout = state->memory_layout;
+        descriptor = updated_descriptor;
+
+        // FIXME this is probably incorrect in nested scenarios
+        result = SYSTEM_V_NO_CLASS;
+      }
+      state->memory_layout = saved_state_layout;
+      return x86_64_system_v_push_memory_layout_item_for_class(state, result, name, descriptor);
     }
     case Descriptor_Tag_Fixed_Size_Array: {
       panic("TODO implement array classification");
@@ -373,48 +425,21 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
       .count = countof(vector_registers),
       .index = 0,
     },
-    .class_entry_stack = dyn_array_make(Array_System_V_Class_Entry),
-  };
-
-  Memory_Layout layout = {
-    .items = dyn_array_make(
-      Array_Memory_Layout_Item,
-      .allocator = allocator,
-      .capacity = dyn_array_length(function->arguments) + 1,
-    ),
+    .memory_layout = {
+      .items = dyn_array_make(
+        Array_Memory_Layout_Item,
+        .allocator = allocator,
+        .capacity = dyn_array_length(function->arguments) + 1,
+      ),
+    },
   };
 
   DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
-    dyn_array_clear(state.class_entry_stack);
-    SYSTEM_V_ARGUMENT_CLASS class = x86_64_system_v_classify(&state, arg->descriptor);
-    dyn_array_push(state.class_entry_stack, (System_V_Class_Entry) {
-      .storage = x86_64_system_v_storage_for_class(&state, class),
-      .class = class,
-    });
-    DYN_ARRAY_FOREACH(System_V_Class_Entry, entry, state.class_entry_stack) {
-      Memory_Layout_Item item = {
-        .flags = Memory_Layout_Item_Flags_None,
-        .name = arg->name,
-        .descriptor = arg->descriptor,
-        .source_range = arg->source_range,
-      };
-
-      Storage arg_storage = dyn_array_get(state.class_entry_stack, 0)->storage;
-      arg_storage.byte_size = descriptor_byte_size(arg->descriptor); // FIXME this is wrong
-      if (arg_storage.tag == Storage_Tag_Memory) {
-        assert(arg_storage.Memory.location.tag == Memory_Location_Tag_Stack);
-        item.tag = Memory_Layout_Item_Tag_Base_Relative;
-        item.Base_Relative.offset = arg_storage.Memory.location.Stack.offset;
-      } else {
-        item.tag = Memory_Layout_Item_Tag_Absolute;
-        item.Absolute.storage = arg_storage;
-      }
-      dyn_array_push(layout.items, item);
-    }
+    x86_64_system_v_classify(allocator, &state, arg->name, arg->descriptor);
   }
 
   if (is_return_larger_than_register) {
-    dyn_array_push(layout.items, (Memory_Layout_Item) {
+    dyn_array_push(state.memory_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
@@ -423,9 +448,8 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
       .Absolute = { .storage = storage_indirect(return_byte_size, Register_DI), },
     });
   }
-  dyn_array_destroy(state.class_entry_stack);
 
-  return layout;
+  return state.memory_layout;
 }
 
 static void
