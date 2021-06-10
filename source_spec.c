@@ -1551,7 +1551,6 @@ spec("source") {
       const char *result = checker(input);
       check(result == input.bytes);
     }
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to return a string") {
       Slice(*checker)(void) = (Slice(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -1563,7 +1562,6 @@ spec("source") {
       Slice result = checker();
       check(slice_equal(result, slice_literal("foo")));
     }
-    #endif
   }
 
   describe("Fixed Size Arrays") {

@@ -506,8 +506,6 @@ assign(
     }
   } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
-    assert(target->storage.tag == Storage_Tag_Memory);
-    //assert(target->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
 
     for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
       Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);

@@ -362,8 +362,21 @@ calling_convention_x86_64_system_v_body_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
+
+  // FIXME avoid doing this
+  Value *return_value = calling_convention_x86_64_system_v_return_proc(
+    allocator_default, builder->function, Function_Argument_Mode_Body
+  );
+
+  bool is_indirect_return = (
+    return_value->storage.tag == Storage_Tag_Memory &&
+    return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
+    return_value->storage.Memory.location.Indirect.base_register == Register_DI
+  );
+  allocator_deallocate(allocator_default, return_value, sizeof(return_value));
+
   // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
+  if(is_indirect_return) {
     push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
   }
@@ -377,7 +390,12 @@ calling_convention_x86_64_system_v_return_proc(
   Function_Argument_Mode mode
 ) {
   if (function->returns.descriptor == &descriptor_void) {
-    return &void_value;
+    return value_init(
+      allocator_allocate(allocator, Value),
+      &descriptor_void,
+      storage_none,
+      function->returns.source_range
+    );
   }
   static const Register general_registers[] = { Register_A, Register_D };
   static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
@@ -406,20 +424,25 @@ calling_convention_x86_64_system_v_return_proc(
     allocator_default, &state, function->returns.name, function->returns.descriptor
   );
   Storage return_storage;
+  const Descriptor *return_descriptor;
   if (class == SYSTEM_V_MEMORY) {
     Register base_register = mode == Function_Argument_Mode_Call ? Register_A : Register_DI;
-    return_storage = storage_indirect(descriptor_byte_size(function->returns.descriptor), base_register);
+    return_descriptor = function->returns.descriptor;
+    return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
   } else {
     assert(dyn_array_length(state.memory_layout.items) == 1);
-    return_storage = memory_layout_item_storage_at_index(&storage_none, &state.memory_layout, 0);
+    Memory_Layout_Item *item = dyn_array_get(state.memory_layout.items, 0);
+    assert(item->tag == Memory_Layout_Item_Tag_Absolute);
+    return_descriptor = item->descriptor;
+    return_storage = item->Absolute.storage;
     dyn_array_destroy(state.memory_layout.items);
   }
 
   return value_init(
     allocator_allocate(allocator, Value),
-    function->returns.descriptor,
+    return_descriptor,
     return_storage,
-    COMPILER_SOURCE_RANGE
+    function->returns.source_range
   );
 }
 
@@ -436,6 +459,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     Register_Xmm4, Register_Xmm5, Register_Xmm6, Register_Xmm7,
   };
 
+  // FIXME avoid doing this
   Value *return_value = calling_convention_x86_64_system_v_return_proc(
     allocator, function, Function_Argument_Mode_Body
   );
