@@ -1485,7 +1485,7 @@ descriptor_function_instance(
     .Function_Instance = {
       .info = info,
       .arguments_layout = calling_convention->arguments_layout_proc(allocator, info),
-      .return_storage = calling_convention->return_storage_proc(info, Function_Argument_Mode_Call),
+      .return_value = calling_convention->return_proc(allocator, info, Function_Argument_Mode_Call),
       .calling_convention = calling_convention,
     },
   };

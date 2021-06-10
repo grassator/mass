@@ -253,8 +253,8 @@ typedef void (*Calling_Convention_Body_End_Proc)
 typedef Memory_Layout (*Calling_Convention_Arguments_Layout_Proc)
   (const Allocator * allocator, const Function_Info * function_info);
 
-typedef Storage (*Calling_Convention_Return_Storage_Proc)
-  (const Function_Info * function_info, Function_Argument_Mode mode);
+typedef Value * (*Calling_Convention_Return_Proc)
+  (const Allocator * allocator, const Function_Info * function_info, Function_Argument_Mode mode);
 
 typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
@@ -1116,7 +1116,7 @@ typedef struct Descriptor_Function_Instance {
   Function_Info * info;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
-  Storage return_storage;
+  Value * return_value;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
@@ -1264,7 +1264,7 @@ typedef struct Calling_Convention {
   u64 register_volatile_bitset;
   Calling_Convention_Body_End_Proc body_end_proc;
   Calling_Convention_Arguments_Layout_Proc arguments_layout_proc;
-  Calling_Convention_Return_Storage_Proc return_storage_proc;
+  Calling_Convention_Return_Proc return_proc;
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
@@ -1652,7 +1652,7 @@ static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
 static Descriptor descriptor_calling_convention_body_end_proc;
 static Descriptor descriptor_calling_convention_arguments_layout_proc;
-static Descriptor descriptor_calling_convention_return_storage_proc;
+static Descriptor descriptor_calling_convention_return_proc;
 static Descriptor descriptor_calling_convention;
 static Descriptor descriptor_array_calling_convention;
 static Descriptor descriptor_array_calling_convention_ptr;
@@ -3573,9 +3573,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(74, descriptor_function_instance, Descriptor_Funct
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("return_storage"),
-    .descriptor = &descriptor_storage,
-    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, return_storage),
+    .name = slice_literal_fields("return_value"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, return_value),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);
@@ -4058,9 +4058,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(96, calling_convention, Calling_Convention,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("return_storage_proc"),
-    .descriptor = &descriptor_calling_convention_return_storage_proc,
-    .Base_Relative.offset = offsetof(Calling_Convention, return_storage_proc),
+    .name = slice_literal_fields("return_proc"),
+    .descriptor = &descriptor_calling_convention_return_proc,
+    .Base_Relative.offset = offsetof(Calling_Convention, return_proc),
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);

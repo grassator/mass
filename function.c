@@ -780,9 +780,8 @@ ensure_function_instance(
   Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  const Function_Return *returns = &function->returns;
-  Storage return_storage = calling_convention->return_storage_proc(function, Function_Argument_Mode_Body);
-  Value *return_value = value_make(context, returns->descriptor, return_storage, returns->source_range);
+  Value *return_value =
+    calling_convention->return_proc(context->allocator, function, Function_Argument_Mode_Body);
 
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name

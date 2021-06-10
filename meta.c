@@ -1277,7 +1277,7 @@ main(void) {
       { "Function_Info *", "info" },
       { "const Calling_Convention *", "calling_convention" },
       { "Memory_Layout", "arguments_layout" },
-      { "Storage", "return_storage" },
+      { "Value *", "return_value" },
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },
@@ -1381,7 +1381,8 @@ main(void) {
     { "const Function_Info *", "function_info" },
   }));
 
-  push_type(type_function("Calling_Convention_Return_Storage_Proc", "Storage", (Argument_Type[]){
+  push_type(type_function("Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
+    { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
     { "Function_Argument_Mode", "mode" },
   }));
@@ -1390,7 +1391,7 @@ main(void) {
     { "u64", "register_volatile_bitset" },
     { "Calling_Convention_Body_End_Proc", "body_end_proc" },
     { "Calling_Convention_Arguments_Layout_Proc", "arguments_layout_proc"},
-    { "Calling_Convention_Return_Storage_Proc", "return_storage_proc"},
+    { "Calling_Convention_Return_Proc", "return_proc"},
   }));
 
   push_type(type_function("Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){

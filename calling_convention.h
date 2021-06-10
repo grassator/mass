@@ -16,8 +16,9 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   const Function_Info *function
 );
 
-static Storage
-calling_convention_x86_64_windows_return_storage_proc(
+static Value *
+calling_convention_x86_64_windows_return_proc(
+  const Allocator *allocator,
   const Function_Info *function,
   Function_Argument_Mode mode
 );
@@ -25,7 +26,7 @@ calling_convention_x86_64_windows_return_storage_proc(
 static const Calling_Convention calling_convention_x86_64_windows = {
   .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
   .arguments_layout_proc = calling_convention_x86_64_windows_arguments_layout_proc,
-  .return_storage_proc = calling_convention_x86_64_windows_return_storage_proc,
+  .return_proc = calling_convention_x86_64_windows_return_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |
@@ -48,8 +49,9 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   const Function_Info *function
 );
 
-static Storage
-calling_convention_x86_64_system_v_return_storage_proc(
+static Value *
+calling_convention_x86_64_system_v_return_proc(
+  const Allocator *allocator,
   const Function_Info *function,
   Function_Argument_Mode mode
 );
@@ -57,7 +59,7 @@ calling_convention_x86_64_system_v_return_storage_proc(
 static const Calling_Convention calling_convention_x86_64_system_v = {
   .body_end_proc = calling_convention_x86_64_system_v_body_end_proc,
   .arguments_layout_proc = calling_convention_x86_64_system_v_arguments_layout_proc,
-  .return_storage_proc = calling_convention_x86_64_system_v_return_storage_proc,
+  .return_proc = calling_convention_x86_64_system_v_return_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
@@ -368,13 +370,14 @@ calling_convention_x86_64_system_v_body_end_proc(
   calling_convention_x86_64_common_end_proc(program, builder);
 }
 
-static Storage
-calling_convention_x86_64_system_v_return_storage_proc(
+static Value *
+calling_convention_x86_64_system_v_return_proc(
+  const Allocator *allocator,
   const Function_Info *function,
   Function_Argument_Mode mode
 ) {
   if (function->returns.descriptor == &descriptor_void) {
-    return storage_none;
+    return &void_value;
   }
   static const Register general_registers[] = { Register_A, Register_D };
   static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
@@ -402,14 +405,22 @@ calling_convention_x86_64_system_v_return_storage_proc(
   SYSTEM_V_ARGUMENT_CLASS class = x86_64_system_v_classify(
     allocator_default, &state, function->returns.name, function->returns.descriptor
   );
+  Storage return_storage;
   if (class == SYSTEM_V_MEMORY) {
     Register base_register = mode == Function_Argument_Mode_Call ? Register_A : Register_DI;
-    return storage_indirect(descriptor_byte_size(function->returns.descriptor), base_register);
+    return_storage = storage_indirect(descriptor_byte_size(function->returns.descriptor), base_register);
+  } else {
+    assert(dyn_array_length(state.memory_layout.items) == 1);
+    return_storage = memory_layout_item_storage_at_index(&storage_none, &state.memory_layout, 0);
+    dyn_array_destroy(state.memory_layout.items);
   }
-  assert(dyn_array_length(state.memory_layout.items) == 1);
-  Storage result = memory_layout_item_storage_at_index(&storage_none, &state.memory_layout, 0);
-  dyn_array_destroy(state.memory_layout.items);
-  return result;
+
+  return value_init(
+    allocator_allocate(allocator, Value),
+    function->returns.descriptor,
+    return_storage,
+    COMPILER_SOURCE_RANGE
+  );
 }
 
 static Memory_Layout
@@ -425,14 +436,14 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     Register_Xmm4, Register_Xmm5, Register_Xmm6, Register_Xmm7,
   };
 
-  Storage return_storage = calling_convention_x86_64_system_v_return_storage_proc(
-    function, Function_Argument_Mode_Body
+  Value *return_value = calling_convention_x86_64_system_v_return_proc(
+    allocator, function, Function_Argument_Mode_Body
   );
 
   bool is_indirect_return = (
-    return_storage.tag == Storage_Tag_Memory &&
-    return_storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
-    return_storage.Memory.location.Indirect.base_register == Register_DI
+    return_value->storage.tag == Storage_Tag_Memory &&
+    return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
+    return_value->storage.Memory.location.Indirect.base_register == Register_DI
   );
 
   System_V_Classification_State state = {
@@ -466,7 +477,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
       .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,
-      .Absolute = { .storage = return_storage, },
+      .Absolute = { .storage = return_value->storage, },
     });
   }
 
@@ -486,31 +497,38 @@ calling_convention_x86_64_windows_body_end_proc(
   calling_convention_x86_64_common_end_proc(program, builder);
 }
 
-static Storage
-calling_convention_x86_64_windows_return_storage_proc(
+static Value *
+calling_convention_x86_64_windows_return_proc(
+  const Allocator *allocator,
   const Function_Info *function,
   Function_Argument_Mode mode
 ) {
   const Descriptor *descriptor = function->returns.descriptor;
   if (descriptor == &descriptor_void) {
-    return storage_none;
+    return &void_value;
   }
+  Storage storage;
   // TODO handle 16 byte non-float return values in XMM0
   if (descriptor_is_float(descriptor)) {
-    return storage_register_for_descriptor(Register_Xmm0, descriptor);
+    storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
+  } else {
+    u64 byte_size = descriptor_byte_size(descriptor);
+    if (byte_size <= 8) {
+      storage = storage_register_for_descriptor(Register_A, descriptor);
+    } else {
+      // :ReturnTypeLargerThanRegister
+      // Inside the function large returns are pointed to by RCX,
+      // but this pointer is also returned in A
+      Register base_register = Register_A;
+      if (mode == Function_Argument_Mode_Body) {
+        base_register = Register_C;
+      }
+      storage = storage_indirect(byte_size, base_register);
+    }
   }
-  u64 byte_size = descriptor_byte_size(descriptor);
-  if (byte_size <= 8) {
-    return storage_register_for_descriptor(Register_A, descriptor);
-  }
-  // :ReturnTypeLargerThanRegister
-  // Inside the function large returns are pointed to by RCX,
-  // but this pointer is also returned in A
-  Register base_register = Register_A;
-  if (mode == Function_Argument_Mode_Body) {
-    base_register = Register_C;
-  }
-  return storage_indirect(byte_size, base_register);
+  return value_init(
+    allocator_allocate(allocator, Value), descriptor, storage, COMPILER_SOURCE_RANGE
+  );
 }
 
 static Memory_Layout
