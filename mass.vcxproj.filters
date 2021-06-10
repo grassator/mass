@@ -21,5 +21,6 @@
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="debug.natvis" />
+    <Natvis Include="prelude.natvis" />
   </ItemGroup>
 </Project>
