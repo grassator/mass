@@ -1660,7 +1660,6 @@ spec("source") {
       check(checker(&test_128bit));
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to return structs while accepting other arguments") {
       Test_128bit(*checker)(s64) = (Test_128bit(*)(s64))test_program_inline_source_function(
         "return_struct", &test_context,
@@ -1693,7 +1692,6 @@ spec("source") {
       Test_128bit test_128bit = { .x = 20, .y = 22 };
       check(checker(test_128bit) == 42);
     }
-    #endif
   }
 
   describe("Unsigned Integers") {
