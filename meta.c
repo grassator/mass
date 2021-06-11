@@ -343,6 +343,95 @@ print_scope_export(
 }
 
 static void
+print_natvis_array(
+  FILE *file,
+  const char *name
+) {
+  fprintf(file, "<Type Name=\"Array_%s\">\n", name);
+  fprintf(file, "  <Expand>\n");
+  fprintf(file, "    <Item Name=\"[length]\">data->length</Item>\n");
+  fprintf(file, "    <ArrayItems>\n");
+  fprintf(file, "      <Size>data->length</Size>\n");
+  fprintf(file, "      <ValuePointer>data->items</ValuePointer>\n");
+  fprintf(file, "    </ArrayItems>\n");
+  fprintf(file, "  </Expand>\n");
+  fprintf(file, "</Type>\n");
+}
+
+static void
+print_natvis_array_types(
+  FILE *file,
+  const char *name
+) {
+  print_natvis_array(file, name);
+
+  char name_buffer[1024];
+
+  s32 result = snprintf(name_buffer, countof(name_buffer), "%s_Ptr", name);
+  assert(result > 0);
+  print_natvis_array(file, name_buffer);
+
+  result = snprintf(name_buffer, countof(name_buffer), "Const_%s_Ptr", name);
+  assert(result > 0);
+  print_natvis_array(file, name_buffer);
+}
+
+static void
+print_natvis(
+  FILE *file,
+  Meta_Type *type
+) {
+  switch(type->tag) {
+    case Meta_Type_Tag_Struct: {
+      print_natvis_array_types(file, type->struct_.name);
+      break;
+    }
+    case Meta_Type_Tag_Tagged_Union: {
+      print_natvis_array_types(file, type->union_.name);
+
+      fprintf(file, "<Type Name=\"%s\">\n", type->union_.name);
+      for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+        Struct_Type *struct_ = &type->union_.items[i];
+        fprintf(file, "  <DisplayString Condition=\"tag == %s_Tag_%s\">\n", type->union_.name, struct_->name);
+        if (struct_->item_count) {
+          fprintf(file, "    %s { %s }\n", struct_->name, struct_->name);
+        } else {
+          fprintf(file, "    %s\n", struct_->name);
+        }
+        fprintf(file, "  </DisplayString>\n");
+      }
+
+      fprintf(file, "  <Expand>\n");
+      fprintf(file, "    <Item Name=\"tag\">tag</Item>\n");
+      for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
+        Struct_Item *item = &type->union_.common.items[i];
+        fprintf(file, "    <Item Name=\"%s\">%s</Item>\n", item->name, item->name);
+      }
+      for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+        Struct_Type *struct_ = &type->union_.items[i];
+        if (struct_->item_count) {
+          fprintf(file, "    <Item Name=\"%s\" Condition=\"tag == %s_Tag_%s\">%s</Item>\n",
+            struct_->name, type->union_.name, struct_->name, struct_->name);
+        }
+      }
+      fprintf(file, "  </Expand>\n");
+      fprintf(file, "</Type>\n");
+      break;
+    }
+    case Meta_Type_Tag_Hash_Map: {
+      // TODO
+      break;
+    }
+    case Meta_Type_Tag_Enum:
+    case Meta_Type_Tag_Function:
+    case Meta_Type_Tag_Number_Literal: {
+      // Nothing to do
+      break;
+    }
+  }
+}
+
+static void
 print_mass_struct_item_type(
   FILE *file,
   Struct_Item *item
@@ -1558,6 +1647,24 @@ main(void) {
 
     fclose(file);
     printf("C Types Generated at: %s\n", filename);
+  }
+
+  {
+    const char *filename = "../generated.natvis";
+    #pragma warning(disable : 4996)
+    FILE *file = fopen(filename, "wb");
+    if (!file) exit(1);
+    fprintf(file, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+    fprintf(file, "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n");
+
+    for (uint32_t i = 0; i < type_count; ++i) {
+      Meta_Type *type = &types[i];
+      print_natvis(file, type);
+    }
+    fprintf(file, "</AutoVisualizer>\n");
+
+    fclose(file);
+    printf("MSVC Native Visualizers Generated at: %s\n", filename);
   }
   return 0;
 }

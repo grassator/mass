@@ -1,0 +1,1783 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+<Type Name="Array_Source_Position">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Source_Position_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Source_Position_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Source_File">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Source_File_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Source_File_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Source_Range">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Source_Range_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Source_Range_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Module">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Module_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Module_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Parse_Error">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Parse_Error_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Parse_Error_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Value_View">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Value_View_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Value_View_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Symbol">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Group">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Group_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Group_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Token_Pattern">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Token_Pattern_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Token_Pattern_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Token_Pattern">
+  <DisplayString Condition="tag == Token_Pattern_Tag_Invalid">
+    Invalid
+  </DisplayString>
+  <DisplayString Condition="tag == Token_Pattern_Tag_Any">
+    Any
+  </DisplayString>
+  <DisplayString Condition="tag == Token_Pattern_Tag_Symbol">
+    Symbol { Symbol }
+  </DisplayString>
+  <DisplayString Condition="tag == Token_Pattern_Tag_Group">
+    Group { Group }
+  </DisplayString>
+  <DisplayString Condition="tag == Token_Pattern_Tag_String">
+    String { String }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="or">or</Item>
+    <Item Name="Symbol" Condition="tag == Token_Pattern_Tag_Symbol">Symbol</Item>
+    <Item Name="Group" Condition="tag == Token_Pattern_Tag_Group">Group</Item>
+    <Item Name="String" Condition="tag == Token_Pattern_Tag_String">String</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Section">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Section_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Section_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Program_Memory">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Program_Memory_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Program_Memory_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label_Index">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label_Index_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Label_Index_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Label_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label_Location_Diff_Patch_Info">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Label_Location_Diff_Patch_Info_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Label_Location_Diff_Patch_Info_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Number_Literal">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Number_Literal_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Number_Literal_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Macro_Capture">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Macro_Capture_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Macro_Capture_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_External_Symbol">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_External_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_External_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Import_Symbol">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Import_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Import_Symbol_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Import_Library">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Import_Library_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Import_Library_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Location">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Location_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Memory_Location_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Memory_Location">
+  <DisplayString Condition="tag == Memory_Location_Tag_Instruction_Pointer_Relative">
+    Instruction_Pointer_Relative { Instruction_Pointer_Relative }
+  </DisplayString>
+  <DisplayString Condition="tag == Memory_Location_Tag_Indirect">
+    Indirect { Indirect }
+  </DisplayString>
+  <DisplayString Condition="tag == Memory_Location_Tag_Stack">
+    Stack { Stack }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="Instruction_Pointer_Relative" Condition="tag == Memory_Location_Tag_Instruction_Pointer_Relative">Instruction_Pointer_Relative</Item>
+    <Item Name="Indirect" Condition="tag == Memory_Location_Tag_Indirect">Indirect</Item>
+    <Item Name="Stack" Condition="tag == Memory_Location_Tag_Stack">Stack</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Static_Memory">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Static_Memory_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Static_Memory_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Static_Memory">
+  <DisplayString Condition="tag == Static_Memory_Tag_U8">
+    U8 { U8 }
+  </DisplayString>
+  <DisplayString Condition="tag == Static_Memory_Tag_U16">
+    U16 { U16 }
+  </DisplayString>
+  <DisplayString Condition="tag == Static_Memory_Tag_U32">
+    U32 { U32 }
+  </DisplayString>
+  <DisplayString Condition="tag == Static_Memory_Tag_U64">
+    U64 { U64 }
+  </DisplayString>
+  <DisplayString Condition="tag == Static_Memory_Tag_Heap">
+    Heap { Heap }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="U8" Condition="tag == Static_Memory_Tag_U8">U8</Item>
+    <Item Name="U16" Condition="tag == Static_Memory_Tag_U16">U16</Item>
+    <Item Name="U32" Condition="tag == Static_Memory_Tag_U32">U32</Item>
+    <Item Name="U64" Condition="tag == Static_Memory_Tag_U64">U64</Item>
+    <Item Name="Heap" Condition="tag == Static_Memory_Tag_Heap">Heap</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Storage">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Storage_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Storage_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Storage">
+  <DisplayString Condition="tag == Storage_Tag_None">
+    None
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Any">
+    Any
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Eflags">
+    Eflags { Eflags }
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Register">
+    Register { Register }
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Xmm">
+    Xmm { Xmm }
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Static">
+    Static { Static }
+  </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Memory">
+    Memory { Memory }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="byte_size">byte_size</Item>
+    <Item Name="Eflags" Condition="tag == Storage_Tag_Eflags">Eflags</Item>
+    <Item Name="Register" Condition="tag == Storage_Tag_Register">Register</Item>
+    <Item Name="Xmm" Condition="tag == Storage_Tag_Xmm">Xmm</Item>
+    <Item Name="Static" Condition="tag == Storage_Tag_Static">Static</Item>
+    <Item Name="Memory" Condition="tag == Storage_Tag_Memory">Memory</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Relocation">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Relocation_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Relocation_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Compiler_Source_Location">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Compiler_Source_Location_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Compiler_Source_Location_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Instruction">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Instruction_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Instruction_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Instruction">
+  <DisplayString Condition="tag == Instruction_Tag_Assembly">
+    Assembly { Assembly }
+  </DisplayString>
+  <DisplayString Condition="tag == Instruction_Tag_Label">
+    Label { Label }
+  </DisplayString>
+  <DisplayString Condition="tag == Instruction_Tag_Bytes">
+    Bytes { Bytes }
+  </DisplayString>
+  <DisplayString Condition="tag == Instruction_Tag_Label_Patch">
+    Label_Patch { Label_Patch }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="compiler_source_location">compiler_source_location</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="scope">scope</Item>
+    <Item Name="encoded_byte_size">encoded_byte_size</Item>
+    <Item Name="Assembly" Condition="tag == Instruction_Tag_Assembly">Assembly</Item>
+    <Item Name="Label" Condition="tag == Instruction_Tag_Label">Label</Item>
+    <Item Name="Bytes" Condition="tag == Instruction_Tag_Bytes">Bytes</Item>
+    <Item Name="Label_Patch" Condition="tag == Instruction_Tag_Label_Patch">Label_Patch</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Code_Block">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Code_Block_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Code_Block_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Builder">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Builder_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Builder_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Layout">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Layout_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Layout_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Execution_Context">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Execution_Context_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Execution_Context_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_User_Defined_Operator">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_User_Defined_Operator_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_User_Defined_Operator_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Operator">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Operator_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Operator_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Macro_Pattern">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Macro_Pattern_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Macro_Pattern_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Macro_Pattern">
+  <DisplayString Condition="tag == Macro_Pattern_Tag_Any_Token_Sequence">
+    Any_Token_Sequence
+  </DisplayString>
+  <DisplayString Condition="tag == Macro_Pattern_Tag_Single_Token">
+    Single_Token { Single_Token }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="capture_name">capture_name</Item>
+    <Item Name="Single_Token" Condition="tag == Macro_Pattern_Tag_Single_Token">Single_Token</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Macro">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Macro_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Macro_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Token_Statement_Matcher">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Token_Statement_Matcher_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Token_Statement_Matcher_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Scope_Entry">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Scope_Entry_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Scope_Entry_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Scope_Entry">
+  <DisplayString Condition="tag == Scope_Entry_Tag_Value">
+    Value { Value }
+  </DisplayString>
+  <DisplayString Condition="tag == Scope_Entry_Tag_Operator">
+    Operator { Operator }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="epoch">epoch</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="Value" Condition="tag == Scope_Entry_Tag_Value">Value</Item>
+    <Item Name="Operator" Condition="tag == Scope_Entry_Tag_Operator">Operator</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Scope">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Scope_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Scope_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Value">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Expected_Result">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Expected_Result_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Expected_Result_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Expected_Result">
+  <DisplayString Condition="tag == Expected_Result_Tag_Exact">
+    Exact { Exact }
+  </DisplayString>
+  <DisplayString Condition="tag == Expected_Result_Tag_Flexible">
+    Flexible { Flexible }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="Exact" Condition="tag == Expected_Result_Tag_Exact">Exact</Item>
+    <Item Name="Flexible" Condition="tag == Expected_Result_Tag_Flexible">Flexible</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Lazy_Value">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Lazy_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Lazy_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Lazy_Static_Value">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Lazy_Static_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Lazy_Static_Value_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Layout_Item">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Layout_Item_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Memory_Layout_Item_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Memory_Layout_Item">
+  <DisplayString Condition="tag == Memory_Layout_Item_Tag_Absolute">
+    Absolute { Absolute }
+  </DisplayString>
+  <DisplayString Condition="tag == Memory_Layout_Item_Tag_Base_Relative">
+    Base_Relative { Base_Relative }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="flags">flags</Item>
+    <Item Name="_flags_padding">_flags_padding</Item>
+    <Item Name="name">name</Item>
+    <Item Name="descriptor">descriptor</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="Absolute" Condition="tag == Memory_Layout_Item_Tag_Absolute">Absolute</Item>
+    <Item Name="Base_Relative" Condition="tag == Memory_Layout_Item_Tag_Base_Relative">Base_Relative</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Layout">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Memory_Layout_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Memory_Layout_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Return">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Return_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Return_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Argument">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Argument_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Argument_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Info">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Info_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Info_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Literal">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Function_Literal_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Function_Literal_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Descriptor">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Descriptor_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Descriptor_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Descriptor">
+  <DisplayString Condition="tag == Descriptor_Tag_Opaque">
+    Opaque
+  </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Function_Instance">
+    Function_Instance { Function_Instance }
+  </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Fixed_Size_Array">
+    Fixed_Size_Array { Fixed_Size_Array }
+  </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Struct">
+    Struct { Struct }
+  </DisplayString>
+  <DisplayString Condition="tag == Descriptor_Tag_Pointer_To">
+    Pointer_To { Pointer_To }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="name">name</Item>
+    <Item Name="bit_size">bit_size</Item>
+    <Item Name="bit_alignment">bit_alignment</Item>
+    <Item Name="Function_Instance" Condition="tag == Descriptor_Tag_Function_Instance">Function_Instance</Item>
+    <Item Name="Fixed_Size_Array" Condition="tag == Descriptor_Tag_Fixed_Size_Array">Fixed_Size_Array</Item>
+    <Item Name="Struct" Condition="tag == Descriptor_Tag_Struct">Struct</Item>
+    <Item Name="Pointer_To" Condition="tag == Descriptor_Tag_Pointer_To">Pointer_To</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Mass_Error">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Mass_Error_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Mass_Error_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Mass_Error">
+  <DisplayString Condition="tag == Mass_Error_Tag_Unimplemented">
+    Unimplemented
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_User_Defined">
+    User_Defined { User_Defined }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Parse">
+    Parse
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Non_Trailing_Default_Argument">
+    Non_Trailing_Default_Argument
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Expected_Static">
+    Expected_Static
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Integer_Range">
+    Integer_Range { Integer_Range }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_File_Open">
+    File_Open { File_Open }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Unexpected_Token">
+    Unexpected_Token { Unexpected_Token }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict">
+    Operator_Infix_Suffix_Conflict { Operator_Infix_Suffix_Conflict }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Operator_Prefix_Conflict">
+    Operator_Prefix_Conflict { Operator_Prefix_Conflict }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Undefined_Variable">
+    Undefined_Variable { Undefined_Variable }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Redifinition">
+    Redifinition { Redifinition }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Unknown_Field">
+    Unknown_Field { Unknown_Field }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Invalid_Identifier">
+    Invalid_Identifier { Invalid_Identifier }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Type_Mismatch">
+    Type_Mismatch { Type_Mismatch }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Epoch_Mismatch">
+    Epoch_Mismatch
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_No_Matching_Overload">
+    No_Matching_Overload { No_Matching_Overload }
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Undecidable_Overload">
+    Undecidable_Overload { Undecidable_Overload }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="detailed_message">detailed_message</Item>
+    <Item Name="source_range">source_range</Item>
+    <Item Name="User_Defined" Condition="tag == Mass_Error_Tag_User_Defined">User_Defined</Item>
+    <Item Name="Integer_Range" Condition="tag == Mass_Error_Tag_Integer_Range">Integer_Range</Item>
+    <Item Name="File_Open" Condition="tag == Mass_Error_Tag_File_Open">File_Open</Item>
+    <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>
+    <Item Name="Operator_Infix_Suffix_Conflict" Condition="tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict">Operator_Infix_Suffix_Conflict</Item>
+    <Item Name="Operator_Prefix_Conflict" Condition="tag == Mass_Error_Tag_Operator_Prefix_Conflict">Operator_Prefix_Conflict</Item>
+    <Item Name="Undefined_Variable" Condition="tag == Mass_Error_Tag_Undefined_Variable">Undefined_Variable</Item>
+    <Item Name="Redifinition" Condition="tag == Mass_Error_Tag_Redifinition">Redifinition</Item>
+    <Item Name="Unknown_Field" Condition="tag == Mass_Error_Tag_Unknown_Field">Unknown_Field</Item>
+    <Item Name="Invalid_Identifier" Condition="tag == Mass_Error_Tag_Invalid_Identifier">Invalid_Identifier</Item>
+    <Item Name="Type_Mismatch" Condition="tag == Mass_Error_Tag_Type_Mismatch">Type_Mismatch</Item>
+    <Item Name="No_Matching_Overload" Condition="tag == Mass_Error_Tag_No_Matching_Overload">No_Matching_Overload</Item>
+    <Item Name="Undecidable_Overload" Condition="tag == Mass_Error_Tag_Undecidable_Overload">Undecidable_Overload</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Mass_Result">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Mass_Result_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Mass_Result_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Mass_Result">
+  <DisplayString Condition="tag == Mass_Result_Tag_Success">
+    Success
+  </DisplayString>
+  <DisplayString Condition="tag == Mass_Result_Tag_Error">
+    Error { Error }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="Error" Condition="tag == Mass_Result_Tag_Error">Error</Item>
+  </Expand>
+</Type>
+<Type Name="Array_Program">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Program_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Program_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Calling_Convention">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Calling_Convention_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Calling_Convention_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Jit_Counters">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Jit_Counters_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Jit_Counters_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Jit">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Jit_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Jit_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Compilation">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Compilation_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Compilation_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Slice">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Slice_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Slice_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+</AutoVisualizer>

@@ -3,55 +3,6 @@
     <Type Name="Source_Range">
         <DisplayString>{file->text.bytes + offsets.from,[offsets.to - offsets.from]}[{offsets.to - offsets.from}]</DisplayString>
     </Type>
-    <Type Name="Storage">
-      <DisplayString Condition="tag == Storage_Tag_None">_</DisplayString>
-      <DisplayString Condition="tag == Storage_Tag_Register">{Register.index,d}</DisplayString>
-      <DisplayString
-        Condition="tag == Storage_Tag_Memory &amp;&amp;
-                   Memory.location.tag == Memory_Location_Tag_Stack"
-        >{Memory.location.Stack.area,d}[{Memory.location.Stack.offset,d}]</DisplayString>
-      <DisplayString
-        Condition="tag == Storage_Tag_Memory &amp;&amp;
-                   Memory.location.tag == Memory_Location_Tag_Instruction_Pointer_Relative"
-        >rip+label({Memory.location.Instruction_Pointer_Relative.label_index.value})</DisplayString>
-      <DisplayString
-        Condition="tag == Storage_Tag_Memory &amp;&amp;
-                   Memory.location.tag == Memory_Location_Tag_Indirect"
-        >[{Memory.location.Indirect.base_register,d} + {Memory.location.Indirect.offset}]</DisplayString>
-    </Type>
-    <Type Name="Instruction">
-      <DisplayString Condition="type == Instruction_Type_Assembly">
-        {assembly.mnemonic->name} {assembly.operands[0]} {assembly.operands[1]} {assembly.operands[2
-        ]}
-      </DisplayString>
-    </Type>
-    <Type Name="Array_Value_Ptr">
-        <Expand>
-            <Item Name="[length]">data->length</Item>
-            <ArrayItems>
-                <Size>data->length</Size>
-                <ValuePointer>data->items</ValuePointer>
-            </ArrayItems>
-        </Expand>
-    </Type>
-    <Type Name="Array_Function_Argument">
-      <Expand>
-        <Item Name="[length]">data->length</Item>
-        <ArrayItems>
-          <Size>data->length</Size>
-          <ValuePointer>data->items</ValuePointer>
-        </ArrayItems>
-      </Expand>
-    </Type>
-    <Type Name="Array_Instruction">
-      <Expand>
-        <Item Name="[length]">data->length</Item>
-        <ArrayItems>
-          <Size>data->length</Size>
-          <ValuePointer>data->items</ValuePointer>
-        </ArrayItems>
-      </Expand>
-    </Type>
     <Type Name="Value_View">
         <Expand>
             <Item Name="[source]">source_range</Item>
