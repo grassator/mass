@@ -2134,6 +2134,69 @@ c_string_split_by_callback_indexed(
   return c_string_split_by_callback_internal(allocator, string, callback, true);
 }
 
+static inline char *
+c_string_from_slice(
+  const Allocator *allocator,
+  Slice source
+) {
+  u64 buffer_size = source.length + 1;
+  char *result = allocator_allocate_bytes(allocator, buffer_size, 1);
+  memcpy(result, source.bytes, source.length);
+  result[source.length] = 0;
+  return result;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// File
+//////////////////////////////////////////////////////////////////////////////
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+typedef struct {
+  u64 byte_size;
+  u64 last_access_time;
+  u64 last_modified_time;
+} File_Info;
+
+static inline bool
+file_info_c_string(
+  const char *path,
+  File_Info *out_info
+) {
+
+  #ifdef _WIN32
+  struct _stat64 raw;
+  if (0 != _stat64(path, &raw)) goto err;
+
+  #else
+  struct stat raw;
+  if (0 != stat(path, &raw)) goto err;
+  #endif
+  *out_info = (File_Info){
+    .byte_size = raw.st_size,
+    .last_access_time = raw.st_atime,
+    .last_modified_time = raw.st_mtime,
+  };
+
+  return true;
+
+  err:
+  *out_info = (File_Info){0};
+  return false;
+}
+
+static inline bool
+file_info(
+  Slice path,
+  File_Info *out_info
+) {
+  char *c_string_path = c_string_from_slice(allocator_default, path);
+  bool result = file_info_c_string(c_string_path, out_info);
+  allocator_deallocate(allocator_default, c_string_path, path.length + 1);
+  return result;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Unicode
 //////////////////////////////////////////////////////////////////////////////
@@ -3044,12 +3107,6 @@ struct Fixed_Buffer_From_File_Options {
   File_Read_Error *error;
   bool null_terminate;
 };
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <sys/stat.h>
-#endif
 
 static Fixed_Buffer *
 fixed_buffer_from_file_internal(
