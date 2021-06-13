@@ -1549,122 +1549,156 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  const char *this_filename = __FILE__;
+  File_Info this_file_info;
+  assert(file_info_c_string(this_filename, &this_file_info));
+
   {
     const char *filename = "../generated_types.h";
-    #pragma warning(disable : 4996)
-    FILE *file = fopen(filename, "wb");
-    if (!file) exit(1);
 
-    fprintf(file, "#ifndef GENERATED_TYPES_H\n");
-    fprintf(file, "#define GENERATED_TYPES_H\n");
+    File_Info generated_file_info;
+    bool info_success = file_info_c_string(filename, &generated_file_info);
+    if (
+      !info_success ||
+      generated_file_info.last_modified_time < this_file_info.last_modified_time
+    ) {
+      #pragma warning(disable : 4996)
+      FILE *file = fopen(filename, "wb");
+      if (!file) exit(1);
 
-    fprintf(file, "static Atomic_u64 next_struct_id = {%d};\n\n", MAX_META_STRUCT_ID + 1);
+      fprintf(file, "#ifndef GENERATED_TYPES_H\n");
+      fprintf(file, "#define GENERATED_TYPES_H\n");
 
-    // Make sure our generated structs have explicit padding
-    fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");
+      fprintf(file, "static Atomic_u64 next_struct_id = {%d};\n\n", MAX_META_STRUCT_ID + 1);
 
-    // Custom forward declarations
-    {
-      fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
-      fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
+      // Make sure our generated structs have explicit padding
+      fprintf(file, "_Pragma(\"warning (push)\") _Pragma(\"warning (default: 4820)\")\n");
+
+      // Custom forward declarations
+      {
+        fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
+        fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
+      }
+
+      fprintf(file, "// Forward declarations\n\n");
+      for (uint32_t i = 0; i < type_count; ++i) {
+        print_c_type_forward_declaration(file, &types[i]);
+      }
+
+      fprintf(file, "\n// Type Definitions\n\n");
+
+      for (uint32_t i = 0; i < type_count; ++i) {
+        print_c_type(file, &types[i]);
+      }
+      fprintf(file, "_Pragma(\"warning (pop)\")\n");
+
+      fprintf(file, "\n// Mass Type Reflection\n\n");
+
+      fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
+      fprintf(file, "static Descriptor descriptor_void;\n");
+      fprintf(file, "static Descriptor descriptor_void_pointer;\n");
+      fprintf(file, "static Descriptor descriptor_char;\n");
+      fprintf(file, "static Descriptor descriptor_char_pointer;\n");
+
+      // The type of type needs to be defined manually
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);\n");
+
+      // Also need to define built-in types
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
+      fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(...)\\\n");
+      fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)\n");
+      fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");
+      fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
+
+      push_type(type_struct("Slice", (Struct_Item[]){
+        { "u8 *", "bytes" },
+        { "u64", "length" },
+      }));
+      fprintf(file, "typedef dyn_array_type(Slice *) Array_Slice_Ptr;\n");
+
+      for (uint32_t i = 0; i < type_count; ++i) {
+        print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
+      }
+      for (uint32_t i = 0; i < type_count; ++i) {
+        print_mass_descriptor_fixed_array_types(file, &types[i]);
+      }
+      for (uint32_t i = 0; i < type_count; ++i) {
+        print_mass_descriptor_and_type(file, &types[i]);
+      }
+      fprintf(file, "\n#endif // GENERATED_TYPES_H\n");
+
+      fclose(file);
+      printf("C types generated at: %s\n", filename);
+    } else {
+      printf("C types up to date at: %s (skipped)\n", filename);
     }
-
-    fprintf(file, "// Forward declarations\n\n");
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_c_type_forward_declaration(file, &types[i]);
-    }
-
-    fprintf(file, "\n// Type Definitions\n\n");
-
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_c_type(file, &types[i]);
-    }
-    fprintf(file, "_Pragma(\"warning (pop)\")\n");
-
-    fprintf(file, "\n// Mass Type Reflection\n\n");
-
-    fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
-    fprintf(file, "static Descriptor descriptor_void;\n");
-    fprintf(file, "static Descriptor descriptor_void_pointer;\n");
-    fprintf(file, "static Descriptor descriptor_char;\n");
-    fprintf(file, "static Descriptor descriptor_char_pointer;\n");
-
-    // The type of type needs to be defined manually
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);\n");
-
-    // Also need to define built-in types
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
-    fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
-    fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(...)\\\n");
-    fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)\n");
-    fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");
-    fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
-
-    push_type(type_struct("Slice", (Struct_Item[]){
-      { "u8 *", "bytes" },
-      { "u64", "length" },
-    }));
-    fprintf(file, "typedef dyn_array_type(Slice *) Array_Slice_Ptr;\n");
-
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
-    }
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_mass_descriptor_fixed_array_types(file, &types[i]);
-    }
-    for (uint32_t i = 0; i < type_count; ++i) {
-      print_mass_descriptor_and_type(file, &types[i]);
-    }
-    fprintf(file, "\n#endif // GENERATED_TYPES_H\n");
-
-    fclose(file);
-    printf("C Types Generated at: %s\n", filename);
   }
 
   {
     const char *filename = "../generated_exports.c";
-    #pragma warning(disable : 4996)
-    FILE *file = fopen(filename, "wb");
-    if (!file) exit(1);
-    fprintf(file, "#include \"source.h\"\n\n");
 
-    fprintf(file,
-      "static void\n"
-      "compiler_scope_define_exports(\n"
-      "  Compilation *compilation,\n"
-      "  Scope *scope\n"
-      ") {\n"
-    );
-    for (uint32_t i = 0; i < type_count; ++i) {
-      Meta_Type *type = &types[i];
-      if (type->exported) {
-        print_scope_export(file, type);
+    File_Info generated_file_info;
+    bool info_success = file_info_c_string(filename, &generated_file_info);
+    if (
+      !info_success ||
+      generated_file_info.last_modified_time < this_file_info.last_modified_time
+    ) {
+      #pragma warning(disable : 4996)
+      FILE *file = fopen(filename, "wb");
+      if (!file) exit(1);
+      fprintf(file, "#include \"source.h\"\n\n");
+
+      fprintf(file,
+        "static void\n"
+        "compiler_scope_define_exports(\n"
+        "  Compilation *compilation,\n"
+        "  Scope *scope\n"
+        ") {\n"
+      );
+      for (uint32_t i = 0; i < type_count; ++i) {
+        Meta_Type *type = &types[i];
+        if (type->exported) {
+          print_scope_export(file, type);
+        }
       }
-    }
-    fprintf(file, "}\n\n" );
+      fprintf(file, "}\n\n" );
 
-    fclose(file);
-    printf("C Types Generated at: %s\n", filename);
+      fclose(file);
+      printf("Mass exports generated at: %s\n", filename);
+    } else {
+      printf("Mass exports up to date at: %s (skipped)\n", filename);
+    }
   }
 
   {
     const char *filename = "../generated.natvis";
-    #pragma warning(disable : 4996)
-    FILE *file = fopen(filename, "wb");
-    if (!file) exit(1);
-    fprintf(file, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
-    fprintf(file, "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n");
 
-    for (uint32_t i = 0; i < type_count; ++i) {
-      Meta_Type *type = &types[i];
-      print_natvis(file, type);
+    File_Info generated_file_info;
+    bool info_success = file_info_c_string(filename, &generated_file_info);
+    if (
+      !info_success ||
+      generated_file_info.last_modified_time < this_file_info.last_modified_time
+    ) {
+      #pragma warning(disable : 4996)
+      FILE *file = fopen(filename, "wb");
+      if (!file) exit(1);
+      fprintf(file, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
+      fprintf(file, "<AutoVisualizer xmlns=\"http://schemas.microsoft.com/vstudio/debugger/natvis/2010\">\n");
+
+      for (uint32_t i = 0; i < type_count; ++i) {
+        Meta_Type *type = &types[i];
+        print_natvis(file, type);
+      }
+      fprintf(file, "</AutoVisualizer>\n");
+
+      fclose(file);
+      printf("MSVC native visualizers generated at: %s\n", filename);
+    } else {
+      printf("MSVC native visualizers up to date at: %s (skipped)\n", filename);
     }
-    fprintf(file, "</AutoVisualizer>\n");
-
-    fclose(file);
-    printf("MSVC Native Visualizers Generated at: %s\n", filename);
   }
   return 0;
 }
