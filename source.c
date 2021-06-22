@@ -5146,8 +5146,18 @@ token_parse_expression(
   if(!view.length) return &void_value;
   Value *result = 0;
 
-  Array_Value_Ptr value_stack = dyn_array_make(Array_Value_Ptr);
-  Array_Operator_Stack_Entry operator_stack = dyn_array_make(Array_Operator_Stack_Entry);
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+  Array_Value_Ptr value_stack = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = view.length,
+  );
+  Array_Operator_Stack_Entry operator_stack = dyn_array_make(
+    Array_Operator_Stack_Entry,
+    .allocator = context->temp_allocator,
+    .capacity = view.length,
+  );
 
   bool is_previous_an_operator = true;
   u64 matched_length = view.length;
@@ -5167,7 +5177,7 @@ token_parse_expression(
       Expression_Matcher_Proc matcher = expression_matchers[matcher_index];
       u64 match_length = 0;
       Value *match_result = matcher(context, rest, &match_length);
-      MASS_ON_ERROR(*context->result) goto err;
+      MASS_ON_ERROR(*context->result) goto defer;
       if (match_length) {
         assert(match_result);
         dyn_array_push(value_stack, match_result);
@@ -5191,7 +5201,7 @@ token_parse_expression(
             if (!token_handle_operator(
               context, view, &value_stack, &operator_stack, slice_literal("()"),
               value->source_range, Operator_Fixity_Postfix
-            )) goto err;
+            )) goto defer;
           }
           break;
         }
@@ -5214,7 +5224,7 @@ token_parse_expression(
         if (!token_handle_operator(
           context, view, &value_stack, &operator_stack,
           symbol_name, value->source_range, fixity_mask
-        )) goto err;
+        )) goto defer;
         is_previous_an_operator = true;
       } else {
         is_previous_an_operator = false;
@@ -5244,9 +5254,8 @@ token_parse_expression(
     }
   }
 
-  err:
-  dyn_array_destroy(value_stack);
-  dyn_array_destroy(operator_stack);
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
 
   *out_match_length = matched_length;
   return result;
