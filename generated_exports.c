@@ -5,10 +5,18 @@ compiler_scope_define_exports(
   Compilation *compilation,
   Scope *scope
 ) {
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("External_Symbol"), type_external_symbol_value
+  );
   scope_define_enum(
     compilation->allocator, scope, COMPILER_SOURCE_RANGE,
     slice_literal("Operator_Fixity"), type_operator_fixity_value,
     operator_fixity_items, countof(operator_fixity_items)
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Execution_Context"), type_execution_context_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
@@ -121,6 +129,10 @@ global_scope_define_exports(
 ) {
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Number_Literal"), type_number_literal_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("u8"), type_u8_value
   );
   scope_define_value(
@@ -158,6 +170,10 @@ global_scope_define_exports(
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("f64"), type_f64_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Slice"), type_slice_value
   );
 }
 

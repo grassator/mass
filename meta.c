@@ -1040,11 +1040,11 @@ main(void) {
     { "16", 16 },
   }));
 
-  push_type(type_struct("Number_Literal", (Struct_Item[]){
+  export_global(push_type(type_struct("Number_Literal", (Struct_Item[]){
     { "Number_Base", "base" },
     { "u32", "negative" },
     { "u64", "bits" },
-  }));
+  })));
 
   push_type(type_struct("Macro_Capture", (Struct_Item[]){
     { "Scope *", "scope" },
@@ -1053,10 +1053,10 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("External_Symbol", (Struct_Item[]){
+  export_compiler(push_type(type_struct("External_Symbol", (Struct_Item[]){
     { "Slice", "library_name" },
     { "Slice", "symbol_name" },
-  }));
+  })));
 
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
@@ -1229,7 +1229,7 @@ main(void) {
     { "Global", 1 << 0 },
   }));
 
-  push_type(type_struct("Execution_Context", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
     { "const Value *", "current_compile_time_function_call_target" },
     { "Execution_Context_Flags", "flags" },
@@ -1240,7 +1240,7 @@ main(void) {
     { "Scope *", "scope" },
     { "Module *", "module" },
     { "Mass_Result *", "result" },
-  }));
+  })));
 
   push_type(type_struct("User_Defined_Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
@@ -1673,10 +1673,10 @@ main(void) {
         export_global(push_type(type_c_opaque(c_primitive_types[i])));
       }
 
-      push_type(type_struct("Slice", (Struct_Item[]){
+      export_global(push_type(type_struct("Slice", (Struct_Item[]){
         { "u8 *", "bytes" },
         { "u64", "length" },
-      }));
+      })));
       fprintf(file, "typedef dyn_array_type(Slice *) Array_Slice_Ptr;\n");
 
       for (uint32_t i = 0; i < type_count; ++i) {

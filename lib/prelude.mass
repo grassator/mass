@@ -59,24 +59,31 @@ operator 15 (x << y) { logical_shift_left(x, y) }
 operator 15 (x | y) { bitwise_or(x, y) }
 operator 15 (x & y) { bitwise_and(x, y) }
 
-fail :: @fn(context : [Execution_Context], name : String, message : String) {
+String :: Slice
+
+fail :: {
   mass :: import "mass"
-  result := context.result
-  result.tag = mass.Mass_Result_Tag.Error
-  result.Error.error.tag = mass.Mass_Error_Tag.User_Defined
-  result.Error.error.User_Defined.name = name
-  result.Error.error.detailed_message = message
-  result.Error.error.source_range = @source_range
+  @fn(context : [mass.Execution_Context], name : String, message : String) {
+    result := context.result
+    result.tag = mass.Mass_Result_Tag.Error
+    result.Error.error.tag = mass.Mass_Error_Tag.User_Defined
+    result.Error.error.User_Defined.name = name
+    result.Error.error.detailed_message = message
+    result.Error.error.source_range = @source_range
+  }
 }
 
 static_assert :: macro(condition : bool, message : String) {
   @{if condition == false { fail(@context, "Static Assert Failed", message) }}
 }
 
-external :: @fn(library_name : String, symbol_name : String) -> (result : External_Symbol) {
-  result.library_name = library_name
-  result.symbol_name = symbol_name
-  result
+external :: {
+  mass :: import "mass"
+  @fn(library_name : String, symbol_name : String) -> (result : mass.External_Symbol) {
+    result.library_name = library_name
+    result.symbol_name = symbol_name
+    result
+  }
 }
 
 negate :: @fn(literal : Number_Literal) -> (Number_Literal) {

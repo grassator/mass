@@ -6011,6 +6011,7 @@ scope_define_builtins(
   const Calling_Convention *calling_convention
 ) {
   global_scope_define_exports(scope);
+
   Source_Range range = {0};
   scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
@@ -6075,12 +6076,6 @@ scope_define_builtins(
       .handler_payload = (void*)(s64)comparisons[i].type,
     ));
   }
-
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Number_Literal"), type_number_literal_value);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("External_Symbol"), type_external_symbol_value);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("String"), type_slice_value);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Scope"), type_scope_value);
-  scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Execution_Context"), type_execution_context_value);
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\
