@@ -3446,9 +3446,16 @@ token_handle_function_call(
   Value *args_token,
   Source_Range source_range
 ) {
-
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  assert(value_match_group(args_token, Group_Tag_Paren));
+
+  if(!value_match_group(args_token, Group_Tag_Paren)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "Expected a list of arguments in ()",
+    });
+    goto err;
+  }
 
   Value *target_expression = token_parse_single(context, target_token);
   MASS_ON_ERROR(*context->result) return 0;
