@@ -15,9 +15,9 @@ fi
 rm -rf build
 mkdir -p build
 
-$CC $FLAGS meta.c -o build/meta -lm
 
 cd build
+$CC $FLAGS ../meta.c -o meta -lm
 ./meta
 cd ..
 
