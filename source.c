@@ -6353,9 +6353,7 @@ program_import_module(
   Module *module
 ) {
   MASS_TRY(*context->result);
-  Execution_Context import_context = *context;
-  import_context.flags |= Execution_Context_Flags_Global;
-  import_context.epoch = VALUE_STATIC_EPOCH;
+  Execution_Context import_context = execution_context_from_compilation(context->compilation);
   import_context.module = module;
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);
