@@ -46,8 +46,6 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 }
 
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
-
-
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
 bool :: s8

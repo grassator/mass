@@ -6010,6 +6010,7 @@ scope_define_builtins(
   Scope *scope,
   const Calling_Convention *calling_convention
 ) {
+  global_scope_define_exports(scope);
   Source_Range range = {0};
   scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
@@ -6080,11 +6081,6 @@ scope_define_builtins(
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("String"), type_slice_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Scope"), type_scope_value);
   scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal("Execution_Context"), type_execution_context_value);
-
-  #define MASS_PROCESS_BUILT_IN_TYPE(_NAME_, ...)\
-    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(#_NAME_), type_##_NAME_##_value);
-  MASS_ENUMERATE_BUILT_IN_TYPES
-  #undef MASS_PROCESS_BUILT_IN_TYPE
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
     {\

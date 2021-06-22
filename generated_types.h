@@ -1317,9 +1317,6 @@ MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
-#define MASS_PROCESS_BUILT_IN_TYPE(...)\
-  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)
-MASS_ENUMERATE_BUILT_IN_TYPES
 #undef MASS_PROCESS_BUILT_IN_TYPE
 
 typedef dyn_array_type(Slice *) Array_Slice_Ptr;
@@ -1679,6 +1676,46 @@ static Descriptor descriptor_array_compilation;
 static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
+static Descriptor descriptor_u8;
+static Descriptor descriptor_array_u8;
+static Descriptor descriptor_u8_pointer;
+static Descriptor descriptor_u8_pointer_pointer;
+static Descriptor descriptor_u16;
+static Descriptor descriptor_array_u16;
+static Descriptor descriptor_u16_pointer;
+static Descriptor descriptor_u16_pointer_pointer;
+static Descriptor descriptor_u32;
+static Descriptor descriptor_array_u32;
+static Descriptor descriptor_u32_pointer;
+static Descriptor descriptor_u32_pointer_pointer;
+static Descriptor descriptor_u64;
+static Descriptor descriptor_array_u64;
+static Descriptor descriptor_u64_pointer;
+static Descriptor descriptor_u64_pointer_pointer;
+static Descriptor descriptor_s8;
+static Descriptor descriptor_array_s8;
+static Descriptor descriptor_s8_pointer;
+static Descriptor descriptor_s8_pointer_pointer;
+static Descriptor descriptor_s16;
+static Descriptor descriptor_array_s16;
+static Descriptor descriptor_s16_pointer;
+static Descriptor descriptor_s16_pointer_pointer;
+static Descriptor descriptor_s32;
+static Descriptor descriptor_array_s32;
+static Descriptor descriptor_s32_pointer;
+static Descriptor descriptor_s32_pointer_pointer;
+static Descriptor descriptor_s64;
+static Descriptor descriptor_array_s64;
+static Descriptor descriptor_s64_pointer;
+static Descriptor descriptor_s64_pointer_pointer;
+static Descriptor descriptor_f32;
+static Descriptor descriptor_array_f32;
+static Descriptor descriptor_f32_pointer;
+static Descriptor descriptor_f32_pointer_pointer;
+static Descriptor descriptor_f64;
+static Descriptor descriptor_array_f64;
+static Descriptor descriptor_f64_pointer;
+static Descriptor descriptor_f64_pointer_pointer;
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
@@ -4211,6 +4248,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(99, compilation, Compilation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);
+MASS_DEFINE_OPAQUE_C_TYPE(u8, u8)
+MASS_DEFINE_OPAQUE_C_TYPE(array_u8, Array_u8)
+MASS_DEFINE_OPAQUE_C_TYPE(u16, u16)
+MASS_DEFINE_OPAQUE_C_TYPE(array_u16, Array_u16)
+MASS_DEFINE_OPAQUE_C_TYPE(u32, u32)
+MASS_DEFINE_OPAQUE_C_TYPE(array_u32, Array_u32)
+MASS_DEFINE_OPAQUE_C_TYPE(u64, u64)
+MASS_DEFINE_OPAQUE_C_TYPE(array_u64, Array_u64)
+MASS_DEFINE_OPAQUE_C_TYPE(s8, s8)
+MASS_DEFINE_OPAQUE_C_TYPE(array_s8, Array_s8)
+MASS_DEFINE_OPAQUE_C_TYPE(s16, s16)
+MASS_DEFINE_OPAQUE_C_TYPE(array_s16, Array_s16)
+MASS_DEFINE_OPAQUE_C_TYPE(s32, s32)
+MASS_DEFINE_OPAQUE_C_TYPE(array_s32, Array_s32)
+MASS_DEFINE_OPAQUE_C_TYPE(s64, s64)
+MASS_DEFINE_OPAQUE_C_TYPE(array_s64, Array_s64)
+MASS_DEFINE_OPAQUE_C_TYPE(f32, f32)
+MASS_DEFINE_OPAQUE_C_TYPE(array_f32, Array_f32)
+MASS_DEFINE_OPAQUE_C_TYPE(f64, f64)
+MASS_DEFINE_OPAQUE_C_TYPE(array_f64, Array_f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
 MASS_DEFINE_STRUCT_DESCRIPTOR(100, slice, Slice,

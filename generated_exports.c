@@ -115,3 +115,49 @@ compiler_scope_define_exports(
   );
 }
 
+static void
+global_scope_define_exports(
+  Scope *scope
+) {
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("u8"), type_u8_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("u16"), type_u16_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("u32"), type_u32_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("u64"), type_u64_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("s8"), type_s8_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("s16"), type_s16_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("s32"), type_s32_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("s64"), type_s64_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("f32"), type_f32_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("f64"), type_f64_value
+  );
+}
+

@@ -69,6 +69,7 @@ typedef struct {
 } Meta_Number_Literal;
 
 typedef enum {
+  Meta_Type_Tag_C_Opaque,
   Meta_Type_Tag_Struct,
   Meta_Type_Tag_Tagged_Union,
   Meta_Type_Tag_Enum,
@@ -78,9 +79,20 @@ typedef enum {
 } Meta_Type_Tag;
 
 typedef struct {
+  const char *name;
+} C_Opaque;
+
+typedef enum {
+  Export_Target_None = 0,
+  Export_Target_Global          = 1 << 0,
+  Export_Target_Compiler_Module = 1 << 1,
+} Export_Target;
+
+typedef struct {
   Meta_Type_Tag tag;
-  bool exported;
+  Export_Target export_target;
   union {
+    C_Opaque c_opaque;
     Struct_Type struct_;
     Enum_Type enum_;
     Tagged_Union_Type union_;
@@ -139,6 +151,10 @@ print_c_type_forward_declaration(
     case Meta_Type_Tag_Number_Literal: {
       fprintf(file, "#define %s (%s%"PRIu64")\n", type->number_literal.name,
         type->number_literal.negative ? "-" : "", type->number_literal.bits);
+      break;
+    }
+    case Meta_Type_Tag_C_Opaque: {
+      // Nothing to do?
       break;
     }
   }
@@ -250,6 +266,7 @@ print_c_type(
       }
       break;
     }
+    case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Number_Literal:
     case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
@@ -301,6 +318,10 @@ print_scope_export(
   Meta_Type *type
 ) {
   switch(type->tag) {
+    case Meta_Type_Tag_C_Opaque: {
+      print_scope_define(file, type->c_opaque.name);
+      break;
+    }
     case Meta_Type_Tag_Enum: {
       print_scope_enum(file, type->enum_.name);
       break;
@@ -422,6 +443,7 @@ print_natvis(
       // TODO
       break;
     }
+    case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
     case Meta_Type_Tag_Number_Literal: {
@@ -503,6 +525,7 @@ print_mass_descriptor_fixed_array_types(
       }
       break;
     }
+    case Meta_Type_Tag_C_Opaque:
     case Meta_Type_Tag_Enum:
     case Meta_Type_Tag_Function:
     case Meta_Type_Tag_Number_Literal:
@@ -541,6 +564,14 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
+      break;
+    }
+    case Meta_Type_Tag_C_Opaque: {
+      char *lowercase_name = strtolower(type->c_opaque.name);
+      fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -621,6 +652,12 @@ print_mass_descriptor_and_type(
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->struct_.name);
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->struct_.name);
       print_mass_struct(file, type->struct_.name, &type->struct_);
+      break;
+    }
+    case Meta_Type_Tag_C_Opaque: {
+      char *lowercase_name = strtolower(type->c_opaque.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(%s, %s)\n", lowercase_name, type->c_opaque.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->c_opaque.name);
       break;
     }
     case Meta_Type_Tag_Enum: {
@@ -731,16 +768,24 @@ print_mass_descriptor_and_type(
 
 #define struct_fields(_NAME_STRING_, ...)\
   {\
-    .name = _NAME_STRING_,\
+    .name = (_NAME_STRING_),\
     .items = (__VA_ARGS__),\
     .item_count = countof(__VA_ARGS__),\
+  }
+
+#define type_c_opaque(_NAME_STRING_, ...)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_C_Opaque,\
+    .c_opaque = {\
+      .name = (_NAME_STRING_),\
+    }\
   }
 
 #define type_enum(_NAME_STRING_, ...)\
   (Meta_Type){\
     .tag = Meta_Type_Tag_Enum,\
     .enum_ = {\
-      .name = _NAME_STRING_,\
+      .name = (_NAME_STRING_),\
       .items = (__VA_ARGS__),\
       .item_count = countof(__VA_ARGS__),\
     }\
@@ -818,10 +863,18 @@ push_type(
 }
 
 static inline Meta_Type *
-export(
+export_global(
   Meta_Type *type
 ) {
-  type->exported = true;
+  type->export_target |= Export_Target_Global;
+  return type;
+}
+
+static inline Meta_Type *
+export_compiler(
+  Meta_Type *type
+) {
+  type->export_target |= Export_Target_Compiler_Module;
   return type;
 }
 
@@ -1150,7 +1203,7 @@ main(void) {
     { "Body", 1 },
   }));
 
-  export(push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
+  export_compiler(push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
     { "Postfix", 1 << 2 },
@@ -1248,7 +1301,7 @@ main(void) {
     { "Array_Token_Statement_Matcher", "statement_matchers" },
   }));
 
-  export(push_type(type_struct("Value", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Value", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
     { "Value *", "next_overload" },
@@ -1362,7 +1415,7 @@ main(void) {
     { "Value *", "compile_time_instance"},
   }));
 
-  export(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
@@ -1387,7 +1440,7 @@ main(void) {
     { "u64", "bit_alignment" },
   })));
 
-  export(push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
+  export_compiler(push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
     struct_fields("User_Defined", (Struct_Item[]){
       { "Slice", "name" },
@@ -1443,7 +1496,7 @@ main(void) {
     { "Source_Range", "source_range" },
   })));
 
-  export(push_type(type_union("Mass_Result", (Struct_Type[]){
+  export_compiler(push_type(type_union("Mass_Result", (Struct_Type[]){
     struct_empty("Success"),
     struct_fields("Error", (Struct_Item[]){
       { "Mass_Error", "error" },
@@ -1610,10 +1663,15 @@ main(void) {
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
-      fprintf(file, "#define MASS_PROCESS_BUILT_IN_TYPE(...)\\\n");
-      fprintf(file, "  MASS_DEFINE_OPAQUE_TYPE(__VA_ARGS__)\n");
-      fprintf(file, "MASS_ENUMERATE_BUILT_IN_TYPES\n");
       fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
+
+      const char *c_primitive_types[] = {
+        "u8", "u16", "u32", "u64", "s8", "s16", "s32", "s64", "f32", "f64",
+      };
+
+      for (u64 i = 0; i < countof(c_primitive_types); ++i) {
+        export_global(push_type(type_c_opaque(c_primitive_types[i])));
+      }
 
       push_type(type_struct("Slice", (Struct_Item[]){
         { "u8 *", "bytes" },
@@ -1662,7 +1720,21 @@ main(void) {
       );
       for (uint32_t i = 0; i < type_count; ++i) {
         Meta_Type *type = &types[i];
-        if (type->exported) {
+        if (type->export_target & Export_Target_Compiler_Module) {
+          print_scope_export(file, type);
+        }
+      }
+      fprintf(file, "}\n\n" );
+
+      fprintf(file,
+        "static void\n"
+        "global_scope_define_exports(\n"
+        "  Scope *scope\n"
+        ") {\n"
+      );
+      for (uint32_t i = 0; i < type_count; ++i) {
+        Meta_Type *type = &types[i];
+        if (type->export_target & Export_Target_Global) {
           print_scope_export(file, type);
         }
       }
