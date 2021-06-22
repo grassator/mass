@@ -112,6 +112,8 @@ typedef struct {
   s32 value;
 } C_Enum_Item;
 
+#define descriptor_type descriptor_descriptor
+
 #include "generated_types.h"
 
 static Descriptor descriptor_void = {

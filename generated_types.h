@@ -1312,7 +1312,7 @@ static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_char;
 static Descriptor descriptor_char_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);
+static Descriptor descriptor_descriptor;
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
@@ -1889,6 +1889,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(8, group, Group,
 );
 MASS_DEFINE_TYPE_VALUE(group);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern_ptr, Array_Token_Pattern_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern, Array_Token_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(token_pattern_tag, Token_Pattern_Tag)
 static C_Enum_Item token_pattern_tag_items[] = {
 { .name = slice_literal_fields("Invalid"), .value = 0 },
@@ -2249,6 +2251,8 @@ static C_Enum_Item stack_area_items[] = {
 { .name = slice_literal_fields("Call_Target_Argument"), .value = 2 },
 };
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_location_ptr, Array_Memory_Location_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_location, Array_Memory_Location)
 MASS_DEFINE_OPAQUE_C_TYPE(memory_location_tag, Memory_Location_Tag)
 static C_Enum_Item memory_location_tag_items[] = {
 { .name = slice_literal_fields("Instruction_Pointer_Relative"), .value = 0 },
@@ -2329,6 +2333,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(26, memory_location, Memory_Location,
 MASS_DEFINE_TYPE_VALUE(memory_location);
 /*union struct end*/
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_static_memory_ptr, Array_Static_Memory_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_static_memory, Array_Static_Memory)
 MASS_DEFINE_OPAQUE_C_TYPE(static_memory_tag, Static_Memory_Tag)
 static C_Enum_Item static_memory_tag_items[] = {
 { .name = slice_literal_fields("U8"), .value = 0 },
@@ -2423,6 +2429,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(32, static_memory, Static_Memory,
 MASS_DEFINE_TYPE_VALUE(static_memory);
 /*union struct end*/
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_storage_ptr, Array_Storage_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_storage, Array_Storage)
 MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static C_Enum_Item storage_tag_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -2565,6 +2573,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(40, compiler_source_location, Compiler_Source_Loca
 );
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_ptr, Array_Instruction_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction, Array_Instruction)
 MASS_DEFINE_OPAQUE_C_TYPE(instruction_tag, Instruction_Tag)
 static C_Enum_Item instruction_tag_items[] = {
 { .name = slice_literal_fields("Assembly"), .value = 0 },
@@ -2982,6 +2992,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(51, operator, Operator,
 );
 MASS_DEFINE_TYPE_VALUE(operator);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern_ptr, Array_Macro_Pattern_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern, Array_Macro_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(macro_pattern_tag, Macro_Pattern_Tag)
 static C_Enum_Item macro_pattern_tag_items[] = {
 { .name = slice_literal_fields("Any_Token_Sequence"), .value = 0 },
@@ -3059,6 +3071,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(55, token_statement_matcher, Token_Statement_Match
 );
 MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry_ptr, Array_Scope_Entry_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry, Array_Scope_Entry)
 MASS_DEFINE_OPAQUE_C_TYPE(scope_entry_tag, Scope_Entry_Tag)
 static C_Enum_Item scope_entry_tag_items[] = {
 { .name = slice_literal_fields("Value"), .value = 0 },
@@ -3214,6 +3228,8 @@ static C_Enum_Item expected_result_storage_items[] = {
 { .name = slice_literal_fields("Eflags"), .value = 16 },
 };
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result_ptr, Array_Expected_Result_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_expected_result, Array_Expected_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(expected_result_tag, Expected_Result_Tag)
 static C_Enum_Item expected_result_tag_items[] = {
 { .name = slice_literal_fields("Exact"), .value = 0 },
@@ -3335,6 +3351,8 @@ static C_Enum_Item memory_layout_item_flags_items[] = {
 { .name = slice_literal_fields("Uninitialized"), .value = 1 },
 };
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_item_ptr, Array_Memory_Layout_Item_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_item, Array_Memory_Layout_Item)
 MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_tag, Memory_Layout_Item_Tag)
 static C_Enum_Item memory_layout_item_tag_items[] = {
 { .name = slice_literal_fields("Absolute"), .value = 0 },
@@ -3544,6 +3562,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(73, function_literal, Function_Literal,
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_tag, Descriptor_Tag)
 static C_Enum_Item descriptor_tag_items[] = {
 { .name = slice_literal_fields("Opaque"), .value = 0 },
@@ -3671,6 +3691,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(78, descriptor, Descriptor,
 MASS_DEFINE_TYPE_VALUE(descriptor);
 /*union struct end*/
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error_ptr, Array_Mass_Error_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error, Array_Mass_Error)
 MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unimplemented"), .value = 0 },
@@ -3946,6 +3968,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(92, mass_error, Mass_Error,
 MASS_DEFINE_TYPE_VALUE(mass_error);
 /*union struct end*/
 /*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_result_ptr, Array_Mass_Result_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_mass_result, Array_Mass_Result)
 MASS_DEFINE_OPAQUE_C_TYPE(mass_result_tag, Mass_Result_Tag)
 static C_Enum_Item mass_result_tag_items[] = {
 { .name = slice_literal_fields("Success"), .value = 0 },

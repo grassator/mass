@@ -1602,8 +1602,8 @@ main(void) {
       fprintf(file, "static Descriptor descriptor_char;\n");
       fprintf(file, "static Descriptor descriptor_char_pointer;\n");
 
-      // The type of type needs to be defined manually
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(type, Descriptor);\n");
+      // The descriptor of descriptors needs to be forward declared
+      fprintf(file, "static Descriptor descriptor_descriptor;\n");
 
       // Also need to define built-in types
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
