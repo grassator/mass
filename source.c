@@ -6012,35 +6012,34 @@ scope_define_builtins(
 ) {
   global_scope_define_exports(scope);
 
-  Source_Range range = {0};
-  scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
+  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_reflect_operator,
   ));
-  scope_define_operator(0, scope, range, slice_literal("\\"), allocator_make(allocator, Operator,
+  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 29,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 1,
     .handler = mass_handle_reify_operator,
   ));
-  scope_define_operator(0, scope, range, slice_literal("()"), allocator_make(allocator, Operator,
+  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .argument_count = 2,
     .handler = mass_handle_paren_operator,
   ));
-  scope_define_operator(0, scope, range, slice_literal("@"), allocator_make(allocator, Operator,
+  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("@"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_at_operator,
   ));
-  scope_define_operator(0, scope, range, slice_literal("."), allocator_make(allocator, Operator,
+  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 19,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
@@ -6048,7 +6047,7 @@ scope_define_builtins(
   ));
 
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
-    scope_define_operator(0, scope, range, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
+    scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
       .precedence = (PRECEDENCE),\
       .fixity = Operator_Fixity_Infix,\
       .argument_count = 2,\
@@ -6068,7 +6067,7 @@ scope_define_builtins(
   };
 
   for (u64 i = 0; i < countof(comparisons); ++i) {
-    scope_define_operator(0, scope, range, comparisons[i].symbol, allocator_make(allocator, Operator,
+    scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, comparisons[i].symbol, allocator_make(allocator, Operator,
       .precedence = comparisons[i].precedence,
       .fixity = Operator_Fixity_Infix,
       .argument_count = 2,
@@ -6104,7 +6103,7 @@ scope_define_builtins(
       allocator_allocate(allocator, Value),\
       instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
     );\
-    scope_define_value(scope, VALUE_STATIC_EPOCH, range, slice_literal(_NAME_), instance_value);\
+    scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
   }
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
