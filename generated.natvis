@@ -81,6 +81,49 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Array_Module_Export">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Module_Export_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Module_Export_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Module_Export">
+  <DisplayString Condition="tag == Module_Export_Tag_None">
+    None
+  </DisplayString>
+  <DisplayString Condition="tag == Module_Export_Tag_All">
+    All
+  </DisplayString>
+  <DisplayString Condition="tag == Module_Export_Tag_Selective">
+    Selective { Selective }
+  </DisplayString>
+  <Expand>
+    <Item Name="tag">tag</Item>
+    <Item Name="scope">scope</Item>
+    <Item Name="Selective" Condition="tag == Module_Export_Tag_Selective">Selective</Item>
+  </Expand>
+</Type>
 <Type Name="Array_Module">
   <Expand>
     <Item Name="[length]">data->length</Item>

@@ -2091,14 +2091,17 @@ token_parse_exports(
   Value_View children = value_as_group(block)->children;
   if (children.length == 1) {
     if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
-      context->module->export_scope = context->module->own_scope;
+      context->module->export.tag = Module_Export_Tag_All;
       return peek_index;
     }
   }
-  context->module->export_scope = scope_make(
-    context->allocator,
-    context->module->own_scope->parent
-  );
+
+  context->module->export = (Module_Export) {
+    .tag = Module_Export_Tag_Selective,
+    .Selective = {
+      .names = dyn_array_make(Array_Slice, .capacity = children.length / 2 + 1 ),
+    },
+  };
 
   if (children.length != 0) {
     Value_View_Split_Iterator it = { .view = children };
@@ -2116,7 +2119,7 @@ token_parse_exports(
       }
       Value *symbol_token = value_view_get(item, 0);
       Slice name = value_as_symbol(symbol_token)->name;
-      scope_define_lazy_compile_time_expression(context, context->module->export_scope, name, item);
+      dyn_array_push(context->module->export.Selective.names, name);
     }
   }
 
@@ -2278,7 +2281,7 @@ mass_import(
 ) {
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
-    return *context->compilation->compiler_module.export_scope;
+    return *context->compilation->compiler_module.export.scope;
   }
 
   file_path = mass_normalize_import_path(context->allocator, file_path);
@@ -2297,11 +2300,11 @@ mass_import(
     hash_map_set(context->compilation->module_map, file_path, module);
   }
 
-  if (!module->export_scope) {
+  if (!module->export.scope) {
     return (Scope){0};
   }
 
-  return *module->export_scope;
+  return *module->export.scope;
 }
 
 static u64
@@ -6075,7 +6078,10 @@ module_compiler_init(
       .path = slice_literal("__mass_internal__"),
     },
     .own_scope = compiler_scope,
-    .export_scope = compiler_scope,
+    .export = {
+      .tag = Module_Export_Tag_All,
+      .scope = compiler_scope,
+    },
   };
   compiler_scope_define_exports(compilation, compiler_scope);
 }
@@ -6354,18 +6360,23 @@ program_import_module(
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);
   MASS_TRY(parse_result);
-  if (module->export_scope && module->export_scope->map) {
-    for (u64 i = 0; i < module->export_scope->map->capacity; ++i) {
-      Scope_Map__Entry *entry = &module->export_scope->map->entries[i];
-      if (!entry->occupied) continue;
-      if (!module->own_scope->map || !hash_map_has(module->own_scope->map, entry->key)) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Undefined_Variable,
-          .source_range = entry->value->source_range,
-          .Undefined_Variable = { .name = entry->key },
-        });
-        break;
+  switch(module->export.tag) {
+    case Module_Export_Tag_None: {
+      module->export.scope = scope_make(context->allocator, module->own_scope->parent);
+      break;
+    }
+    case Module_Export_Tag_All: {
+      module->export.scope = module->own_scope;
+      break;
+    }
+    case Module_Export_Tag_Selective: {
+      module->export.scope = scope_make(context->allocator, module->own_scope->parent);
+      DYN_ARRAY_FOREACH(Slice, name, module->export.Selective.names) {
+        Value *value = scope_lookup_force(module->own_scope, *name);
+        MASS_TRY(*context->result);
+        scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, *name, value);
       }
+      break;
     }
   }
   return *context->result;

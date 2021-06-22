@@ -901,13 +901,24 @@ main(void) {
     { "Has_Exports", 1 << 0 },
   }));
 
+  push_type(add_common_fields(type_union("Module_Export", (Struct_Type[]){
+    struct_empty("None"),
+    struct_empty("All"),
+    struct_fields("Selective", (Struct_Item[]){
+      { "Array_Slice", "names" },
+    }),
+  }), (Struct_Item[]){
+    { "Scope *", "scope" },
+  }));
+
+
   push_type(type_struct("Module", (Struct_Item[]){
     { "Module_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Source_File", "source_file" },
     { "Source_Range", "exports_source_range" },
     { "Scope *", "own_scope" },
-    { "Scope *", "export_scope" },
+    { "Module_Export", "export" },
   }));
 
   push_type(type_struct("Parse_Error", (Struct_Item[]){
