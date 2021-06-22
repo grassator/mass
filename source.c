@@ -1467,15 +1467,16 @@ token_match_pattern(
           ? dyn_array_get(macro_pattern, pattern_index + 1)
           : 0;
         assert(!peek || peek->tag == Macro_Pattern_Tag_Single_Token);
+        const Token_Pattern *end_pattern = 0;
+        if (peek) {
+          end_pattern = &peek->Single_Token.token_pattern;
+        } else if (mode == Macro_Match_Mode_Statement) {
+          end_pattern = &token_pattern_semicolon;
+        }
+
         for (; view_index < view.length; ++view_index) {
           Value *token = value_view_get(view, view_index);
-          if (
-            !peek &&
-            mode == Macro_Match_Mode_Statement &&
-            value_match(token, &token_pattern_semicolon)) {
-            break;
-          }
-          if (peek && value_match(token, &peek->Single_Token.token_pattern)) {
+          if (end_pattern && value_match(token, end_pattern)) {
             break;
           }
         }
