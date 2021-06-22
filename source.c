@@ -1595,8 +1595,6 @@ token_parse_macro_statement(
   return match_length;
 }
 
-hash_map_slice_template(Raw_Macro_Map, Value_View)
-
 static Value *
 token_parse_block_view(
   Execution_Context *context,
