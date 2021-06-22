@@ -1455,9 +1455,7 @@ token_match_pattern(
         if (!token) {
           return 0;
         }
-        if (out_match) {
-          dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
-        }
+        dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
         view_index++;
         break;
       }
@@ -1480,9 +1478,7 @@ token_match_pattern(
             break;
           }
         }
-        if (out_match) {
-          dyn_array_push(*out_match, value_view_slice(&view, any_token_start_view_index, view_index));
-        }
+        dyn_array_push(*out_match, value_view_slice(&view, any_token_start_view_index, view_index));
         break;
       }
     }
@@ -1616,23 +1612,33 @@ token_parse_macros(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  Value *replacement = 0;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_View match = dyn_array_make(
+    Array_Value_View,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
+
   const Scope *scope = context->scope;
   for (;scope; scope = scope->parent) {
     if (!dyn_array_is_initialized(scope->macros)) continue;
     for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
       Macro *macro = *dyn_array_get(scope->macros, macro_index);
 
-      *match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Expression);
+      dyn_array_clear(match);
+      *match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
-      Array_Value_View match = dyn_array_make(Array_Value_View);
-      token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
-
-      Value *replacement = token_apply_macro_syntax(context, match, macro);
-      dyn_array_destroy(match);
-      return replacement;
+      replacement = token_apply_macro_syntax(context, match, macro);
+      goto defer;
     }
   }
-  return 0;
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+
+  return replacement;
 }
 
 static Descriptor *
