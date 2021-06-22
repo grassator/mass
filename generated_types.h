@@ -511,6 +511,7 @@ const char *register_name(Register value) {
 };
 
 typedef struct Label_Index {
+  const Program * program;
   u64 value;
 } Label_Index;
 typedef dyn_array_type(Label_Index) Array_Label_Index;
@@ -2102,6 +2103,12 @@ static C_Enum_Item register_items[] = {
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_index_ptr, Array_Label_Index_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_label_index, Array_Label_Index)
 MASS_DEFINE_STRUCT_DESCRIPTOR(15, label_index, Label_Index,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("program"),
+    .descriptor = &descriptor_program_pointer,
+    .Base_Relative.offset = offsetof(Label_Index, program),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("value"),

@@ -1018,6 +1018,7 @@ main(void) {
   }));
 
   push_type(type_struct("Label_Index", (Struct_Item[]){
+    { "const Program *", "program" },
     { "u64", "value" },
   }));
 

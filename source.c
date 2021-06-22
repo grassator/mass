@@ -5559,10 +5559,11 @@ token_parse_statement_label(
     Scope *label_scope = context->scope;
 
     Source_Range source_range = symbol->source_range;
-    Label_Index label = make_label(context->program, &context->program->memory.code, name);
+    Label_Index *label = allocator_allocate(context->allocator, Label_Index);
+    *label = make_label(context->program, &context->program->memory.code, name);
     value = value_init(
       allocator_allocate(context->allocator, Value),
-      &descriptor_label_index, storage_static_inline(&label), source_range
+      &descriptor_label_index, storage_static(label), source_range
     );
     scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, name, value);
     if (placeholder) {

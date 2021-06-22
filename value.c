@@ -277,6 +277,7 @@ program_get_label(
   Program *program,
   Label_Index label
 ) {
+  assert(label.program == program);
   return dyn_array_get(program->labels, label.value);
 }
 
@@ -551,7 +552,7 @@ make_label(
   Section *section,
   Slice name
 ) {
-  Label_Index index = {dyn_array_length(program->labels)};
+  Label_Index index = {program, dyn_array_length(program->labels)};
   dyn_array_push(program->labels, (Label) {.section = section, .name = name});
   return index;
 }
