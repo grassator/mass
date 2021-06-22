@@ -4396,6 +4396,66 @@ token_handle_size_of(
 }
 
 static Value *
+token_handle_address_of(
+  Execution_Context *context,
+  Value *args_token
+) {
+  Source_Range args_range = args_token->source_range;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_Ptr args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 16,
+  );
+  token_match_call_arguments(context, args_token, &args);
+
+  Value *pointer;
+
+  if (dyn_array_length(args) != 1) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_range,
+      .detailed_message = "address_of expects a single argument"
+    });
+    pointer = 0;
+    goto defer;
+  }
+  Value *pointee = *dyn_array_get(args, 0);
+
+  if (context_is_compile_time_eval(context)) { // compile time
+    assert(pointee->storage.tag == Storage_Tag_Memory);
+    Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
+
+    // TODO put this into a separate section and make readonly after relocations are done
+    //      this section can probably be zero-initialized
+    Program *runtime_program = context->compilation->runtime_program;
+    Section *section = &runtime_program->memory.rw_data;
+    u64 byte_size = descriptor_byte_size(descriptor);
+    u64 alignment = descriptor_byte_alignment(descriptor);
+
+    Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
+    Storage pointer_storage = data_label32(label_index, byte_size);
+    pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
+    dyn_array_push(runtime_program->relocations, (Relocation) {
+      .patch_at = pointer_storage,
+      .address_of = pointee->storage,
+    });
+  } else { // run time
+    const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
+    const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
+    pointer = mass_make_lazy_value(
+      context, args_range, pointee, descriptor, mass_handle_address_of_lazy_proc
+    );
+  }
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+
+  return pointer;
+}
+
+static Value *
 mass_handle_paren_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4425,57 +4485,7 @@ mass_handle_paren_operator(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
   } else if (slice_equal(target_name, slice_literal("address_of"))) {
-    Temp_Mark temp_mark = context_temp_mark(context);
-    Array_Value_Ptr args = dyn_array_make(
-      Array_Value_Ptr,
-      .allocator = context->temp_allocator,
-      .capacity = 16,
-    );
-    token_match_call_arguments(context, args_token, &args);
-
-    Value *pointer;
-
-    if (dyn_array_length(args) != 1) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = args_range,
-        .detailed_message = "address_of expects a single argument"
-      });
-      pointer = 0;
-      goto defer;
-    }
-    Value *pointee = *dyn_array_get(args, 0);
-
-    if (context_is_compile_time_eval(context)) { // compile time
-      assert(pointee->storage.tag == Storage_Tag_Memory);
-      Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
-
-      // TODO put this into a separate section and make readonly after relocations are done
-      //      this section can probably be zero-initialized
-      Program *runtime_program = context->compilation->runtime_program;
-      Section *section = &runtime_program->memory.rw_data;
-      u64 byte_size = descriptor_byte_size(descriptor);
-      u64 alignment = descriptor_byte_alignment(descriptor);
-
-      Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
-      Storage pointer_storage = data_label32(label_index, byte_size);
-      pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
-      dyn_array_push(runtime_program->relocations, (Relocation) {
-        .patch_at = pointer_storage,
-        .address_of = pointee->storage,
-      });
-    } else { // run time
-      const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
-      const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
-      pointer = mass_make_lazy_value(
-        context, args_range, pointee, descriptor, mass_handle_address_of_lazy_proc
-      );
-    }
-
-    defer:
-    context_temp_reset_to_mark(context, temp_mark);
-
-    return pointer;
+    return token_handle_address_of(context, args_token);
   } else {
     return token_handle_function_call(context, target, args_token, args_view.source_range);
   }
