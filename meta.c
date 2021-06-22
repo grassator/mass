@@ -1231,6 +1231,7 @@ main(void) {
 
   export_compiler(push_type(type_struct("Execution_Context", (Struct_Item[]){
     { "Allocator *", "allocator" },
+    { "Allocator *", "temp_allocator" },
     { "const Value *", "current_compile_time_function_call_target" },
     { "Execution_Context_Flags", "flags" },
     { "s32", "_flags_padding" },
@@ -1593,6 +1594,8 @@ main(void) {
   }));
 
   push_type(type_struct("Compilation", (Struct_Item[]){
+    { "Virtual_Memory_Buffer", "temp_buffer" },
+    { "Allocator *", "temp_allocator" },
     { "Virtual_Memory_Buffer", "allocation_buffer" },
     { "Allocator *", "allocator" },
     { "Jit", "jit" },

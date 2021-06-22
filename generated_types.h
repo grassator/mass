@@ -854,6 +854,7 @@ const char *execution_context_flags_name(Execution_Context_Flags value) {
 
 typedef struct Execution_Context {
   Allocator * allocator;
+  Allocator * temp_allocator;
   const Value * current_compile_time_function_call_target;
   Execution_Context_Flags flags;
   s32 _flags_padding;
@@ -1291,6 +1292,8 @@ typedef dyn_array_type(Jit) Array_Jit;
 
 hash_map_template(Static_Pointer_Map, const void *, Value, hash_pointer, const_void_pointer_equal)
 typedef struct Compilation {
+  Virtual_Memory_Buffer temp_buffer;
+  Allocator * temp_allocator;
   Virtual_Memory_Buffer allocation_buffer;
   Allocator * allocator;
   Jit jit;
@@ -2898,6 +2901,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(49, execution_context, Execution_Context,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("temp_allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .Base_Relative.offset = offsetof(Execution_Context, temp_allocator),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("current_compile_time_function_call_target"),
     .descriptor = &descriptor_value_pointer,
     .Base_Relative.offset = offsetof(Execution_Context, current_compile_time_function_call_target),
@@ -4192,6 +4201,18 @@ MASS_DEFINE_TYPE_VALUE(jit);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
 MASS_DEFINE_STRUCT_DESCRIPTOR(99, compilation, Compilation,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("temp_buffer"),
+    .descriptor = &descriptor_virtual_memory_buffer,
+    .Base_Relative.offset = offsetof(Compilation, temp_buffer),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("temp_allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .Base_Relative.offset = offsetof(Compilation, temp_allocator),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("allocation_buffer"),

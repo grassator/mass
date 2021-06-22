@@ -15,6 +15,32 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
   .offsets = {0},
 };
 
+typedef struct {
+  u64 occupied;
+} Temp_Mark;
+
+static inline Temp_Mark
+context_temp_mark(
+  Execution_Context *context
+) {
+  return (Temp_Mark){context->compilation->temp_buffer.occupied};
+}
+
+static inline void
+context_temp_reset_to_mark(
+  Execution_Context *context,
+  Temp_Mark mark
+) {
+  context->compilation->temp_buffer.occupied = mark.occupied;
+}
+
+static inline void
+context_temp_reset(
+  Execution_Context *context
+) {
+  context->compilation->temp_buffer.occupied = 0;
+}
+
 static inline Storage
 storage_register_for_descriptor(
   Register reg,

@@ -1697,9 +1697,13 @@ compilation_init(
     .jit = {0},
   };
 
-  // Get 16 gigabytes of virtual space
+  // Get 16 gigabytes of virtual permanent space
   virtual_memory_buffer_init(&compilation->allocation_buffer, 16llu * 1024 * 1024 * 1024);
   compilation->allocator = virtual_memory_buffer_allocator_make(&compilation->allocation_buffer);
+
+  // Get 1 gigabyte of temp space
+  virtual_memory_buffer_init(&compilation->temp_buffer, 1llu * 1024 * 1024 * 1024);
+  compilation->temp_allocator = virtual_memory_buffer_allocator_make(&compilation->temp_buffer);
 
   compilation->result = allocator_allocate(compilation->allocator, Mass_Result);
 
@@ -1716,7 +1720,7 @@ compilation_init(
   jit_init(&compilation->jit, jit_program);
 }
 
-void
+static void
 compilation_deinit(
   Compilation *compilation
 ) {
@@ -1725,6 +1729,7 @@ compilation_deinit(
   program_deinit(compilation->runtime_program);
   jit_deinit(&compilation->jit);
   virtual_memory_buffer_deinit(&compilation->allocation_buffer);
+  virtual_memory_buffer_deinit(&compilation->temp_buffer);
 }
 
 static inline bool
@@ -1742,6 +1747,7 @@ execution_context_from_compilation(
     .flags = Execution_Context_Flags_Global,
     .epoch = VALUE_STATIC_EPOCH,
     .allocator = compilation->allocator,
+    .temp_allocator = compilation->temp_allocator,
     .program = compilation->runtime_program,
     .compilation = compilation,
     .scope = compilation->root_scope,
