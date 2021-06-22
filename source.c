@@ -1564,25 +1564,30 @@ token_parse_macro_statement(
   Execution_Context *context,
   Value_View value_view,
   Lazy_Value *out_lazy_value,
-  void *payload
+  Macro *macro
 ) {
-  assert(payload);
+  assert(macro);
   if (!value_view.length) return 0;
-  Macro *macro = payload;
-  u64 match_length = token_match_pattern(value_view, macro->pattern, 0, Macro_Match_Mode_Statement);
-  if (!match_length) return 0;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_View match = dyn_array_make(
+    Array_Value_View,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
+
+  u64 match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
+  if (!match_length) goto defer;
 
   Value_View rest = value_view_rest(&value_view, match_length);
   if (rest.length) {
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
       match_length += 1;
     } else {
-      return 0;
+      match_length = 0;
+      goto defer;
     }
   }
-
-  Array_Value_View match = dyn_array_make(Array_Value_View);
-  token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Statement);
 
   Value *expansion_value = token_apply_macro_syntax(context, match, macro);
   if (expansion_value) {
@@ -1591,7 +1596,9 @@ token_parse_macro_statement(
     out_lazy_value->payload = expansion_value;
     out_lazy_value->proc = mass_handle_statement_lazy_proc;
   }
-  dyn_array_destroy(match);
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
   return match_length;
 }
 
