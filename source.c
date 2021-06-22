@@ -1960,28 +1960,27 @@ value_force_exact(
   if (target->descriptor != &descriptor_void) assert(forced == target);
 }
 
-static Array_Value_Ptr
+static void
 token_match_call_arguments(
   Execution_Context *context,
-  Value *token
+  Value *token,
+  Array_Value_Ptr *out_args
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return empty_value_array;
+  if (context->result->tag != Mass_Result_Tag_Success) return;
+
+  dyn_array_clear(*out_args);
+
   const Group *group = value_as_group(token);
+  if (group->children.length == 0) return;
 
-  if (group->children.length == 0) {
-    return empty_value_array;
-  }
-
-  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr);
   Value_View_Split_Iterator it = { .view = group->children };
 
   while (!it.done) {
-    if (context->result->tag != Mass_Result_Tag_Success) return result;
+    if (context->result->tag != Mass_Result_Tag_Success) return;
     Value_View view = token_split_next(&it, &token_pattern_comma_operator);
     Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
-    dyn_array_push(result, parse_result);
+    dyn_array_push(*out_args, parse_result);
   }
-  return result;
 }
 
 static inline void
@@ -2789,7 +2788,14 @@ token_handle_c_string(
   const Expected_Result *expected_result,
   Value *args_token
 ) {
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_Ptr args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 16,
+  );
+
+  token_match_call_arguments(context, args_token, &args);
   Value *result_value = 0;
   if (dyn_array_length(args) != 1) {
     context_error(context, (Mass_Error) {
@@ -2816,7 +2822,7 @@ token_handle_c_string(
   load_address(context, builder, &arg_value->source_range, result_value, c_string_bytes->storage);
 
   defer:
-  dyn_array_destroy(args);
+  context_temp_reset_to_mark(context, temp_mark);
 
   return result_value;
 }
@@ -3447,7 +3453,8 @@ token_handle_function_call(
   Value *target_expression = token_parse_single(context, target_token);
   MASS_ON_ERROR(*context->result) return 0;
 
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+  Array_Value_Ptr args = dyn_array_make(Array_Value_Ptr);
+  token_match_call_arguments(context, args_token, &args);
   MASS_ON_ERROR(*context->result) goto err;
 
   if (target_expression->descriptor == &descriptor_macro_capture) {
@@ -4304,8 +4311,16 @@ token_handle_type_of(
   Value *args_token
 ) {
   Value *result = 0;
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-  MASS_ON_ERROR(*context->result) goto err;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_Ptr args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 16,
+  );
+  token_match_call_arguments(context, args_token, &args);
+
+  MASS_ON_ERROR(*context->result) goto defer;
   if (dyn_array_length(args) != 1) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_No_Matching_Overload,
@@ -4315,7 +4330,7 @@ token_handle_type_of(
         .arguments = args,
       },
     });
-    return 0;
+    goto defer;
   }
   Value *expression = *dyn_array_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
@@ -4328,8 +4343,9 @@ token_handle_type_of(
     args_token->source_range
   );
 
-  err:
-  dyn_array_destroy(args);
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+
   return result;
 }
 
@@ -4339,15 +4355,23 @@ token_handle_size_of(
   Value *args_token
 ) {
   Value *result = 0;
-  Array_Value_Ptr args = token_match_call_arguments(context, args_token);
-  MASS_ON_ERROR(*context->result) goto err;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_Ptr args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 16,
+  );
+  token_match_call_arguments(context, args_token, &args);
+
+  MASS_ON_ERROR(*context->result) goto defer;
   if (dyn_array_length(args) != 1) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_token->source_range,
       .detailed_message = "size_of() expects a single argument"
     });
-    goto err;
+    goto defer;
   }
   Value *expression = *dyn_array_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
@@ -4365,8 +4389,9 @@ token_handle_size_of(
     &descriptor_number_literal, storage_static(literal), args_token->source_range
   );
 
-  err:
-  dyn_array_destroy(args);
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+
   return result;
 }
 
@@ -4400,17 +4425,26 @@ mass_handle_paren_operator(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
   } else if (slice_equal(target_name, slice_literal("address_of"))) {
-    Array_Value_Ptr args = token_match_call_arguments(context, args_token);
+    Temp_Mark temp_mark = context_temp_mark(context);
+    Array_Value_Ptr args = dyn_array_make(
+      Array_Value_Ptr,
+      .allocator = context->temp_allocator,
+      .capacity = 16,
+    );
+    token_match_call_arguments(context, args_token, &args);
+
+    Value *pointer;
+
     if (dyn_array_length(args) != 1) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = args_range,
         .detailed_message = "address_of expects a single argument"
       });
-      return 0;
+      pointer = 0;
+      goto defer;
     }
     Value *pointee = *dyn_array_get(args, 0);
-    dyn_array_destroy(args);
 
     if (context_is_compile_time_eval(context)) { // compile time
       assert(pointee->storage.tag == Storage_Tag_Memory);
@@ -4425,19 +4459,23 @@ mass_handle_paren_operator(
 
       Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
       Storage pointer_storage = data_label32(label_index, byte_size);
-      Value *pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
+      pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
       dyn_array_push(runtime_program->relocations, (Relocation) {
         .patch_at = pointer_storage,
         .address_of = pointee->storage,
       });
-      return pointer;
     } else { // run time
       const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
       const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
-      return mass_make_lazy_value(
+      pointer = mass_make_lazy_value(
         context, args_range, pointee, descriptor, mass_handle_address_of_lazy_proc
       );
     }
+
+    defer:
+    context_temp_reset_to_mark(context, temp_mark);
+
+    return pointer;
   } else {
     return token_handle_function_call(context, target, args_token, args_view.source_range);
   }
