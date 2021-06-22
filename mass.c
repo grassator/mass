@@ -97,7 +97,7 @@ int main(s32 argc, char **argv) {
 
   Scope *module_scope = scope_make(context.allocator, context.scope);
   Module *prelude_module = program_module_from_file(
-    &context, slice_literal("lib/prelude"), module_scope
+    &context, slice_literal("std/prelude"), module_scope
   );
 
   Mass_Result result = program_import_module(&context, prelude_module);
