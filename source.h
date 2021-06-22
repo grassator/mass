@@ -61,9 +61,8 @@ scope_define_value(
   Value *value
 );
 
-static inline void
+PRELUDE_NO_DISCARD static inline Mass_Result
 scope_define_operator(
-  Execution_Context *context,
   Scope *scope,
   Source_Range source_range,
   Slice name,
@@ -159,13 +158,25 @@ program_import_module(
   Module *module
 );
 
+static inline Mass_Result
+mass_error(
+  Mass_Error error
+) {
+  return (Mass_Result){ .tag = Mass_Result_Tag_Error, .Error.error = error };
+}
+
+static inline Mass_Result
+mass_success() {
+  return (Mass_Result){ .tag = Mass_Result_Tag_Success };
+}
+
 static inline void
 context_error(
   Execution_Context *context,
   Mass_Error error
 ) {
   assert(context->result->tag != Mass_Result_Tag_Error);
-  *context->result = (Mass_Result) { .tag = Mass_Result_Tag_Error, .Error.error = error };
+  *context->result = mass_error(error);
 }
 
 static void

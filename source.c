@@ -668,9 +668,8 @@ scope_define_value(
   }
 }
 
-static inline void
+PRELUDE_NO_DISCARD static inline Mass_Result
 scope_define_operator(
-  Execution_Context *context,
   Scope *scope,
   Source_Range source_range,
   Slice name,
@@ -685,23 +684,21 @@ scope_define_operator(
     Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
     if (operator->fixity == Operator_Fixity_Prefix) {
       if (operator_entry->maybe_prefix) {
-        context_error(context, (Mass_Error) {
+        return mass_error((Mass_Error) {
           .tag = Mass_Error_Tag_Operator_Prefix_Conflict,
           .source_range = source_range,
           .Operator_Prefix_Conflict = {.symbol = name},
         });
-        return;
       } else {
         operator_entry->maybe_prefix = operator;
       }
     } else {
       if (operator_entry->maybe_infix_or_postfix) {
-        context_error(context, (Mass_Error) {
+        return mass_error((Mass_Error) {
           .tag = Mass_Error_Tag_Operator_Infix_Suffix_Conflict,
           .source_range = source_range,
           .Operator_Infix_Suffix_Conflict = {.symbol = name},
         });
-        return;
       } else {
         operator_entry->maybe_infix_or_postfix = operator;
       }
@@ -728,6 +725,7 @@ scope_define_operator(
     }
     hash_map_set(scope->map, name, new_entry);
   }
+  return mass_success();
 }
 
 bool
@@ -2232,7 +2230,8 @@ token_parse_operator_definition(
   };
 
   Slice operator_name = value_as_symbol(operator_token)->name;
-  scope_define_operator(context, context->scope, keyword_token->source_range, operator_name, operator);
+  *context->result =
+    scope_define_operator(context->scope, keyword_token->source_range, operator_name, operator);
 
   return peek_index;
 
@@ -6012,48 +6011,48 @@ scope_define_builtins(
 ) {
   global_scope_define_exports(scope);
 
-  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_reflect_operator,
-  ));
-  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 29,
     .fixity = Operator_Fixity_Postfix,
     .associativity = Operator_Associativity_Left,
     .argument_count = 1,
     .handler = mass_handle_reify_operator,
-  ));
-  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Postfix,
     .argument_count = 2,
     .handler = mass_handle_paren_operator,
-  ));
-  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("@"), allocator_make(allocator, Operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("@"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Prefix,
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_at_operator,
-  ));
-  scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 19,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
-  ));
+  )));
 
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
-    scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
+    MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal(#SYMBOL), allocator_make(allocator, Operator, \
       .precedence = (PRECEDENCE),\
       .fixity = Operator_Fixity_Infix,\
       .argument_count = 2,\
       .handler = mass_handle_arithmetic_operation,\
       .handler_payload = (void*)Mass_Arithmetic_Operator_##NAME\
-    ));
+    )));
   MASS_ARITHMETIC_OPERATOR(MASS_DEFINE_ARITHMETIC)
   #undef MASS_DEFINE_ARITHMETIC
 
@@ -6067,13 +6066,13 @@ scope_define_builtins(
   };
 
   for (u64 i = 0; i < countof(comparisons); ++i) {
-    scope_define_operator(0, scope, COMPILER_SOURCE_RANGE, comparisons[i].symbol, allocator_make(allocator, Operator,
+    MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, comparisons[i].symbol, allocator_make(allocator, Operator,
       .precedence = comparisons[i].precedence,
       .fixity = Operator_Fixity_Infix,
       .argument_count = 2,
       .handler = mass_handle_comparison_operation,
       .handler_payload = (void*)(s64)comparisons[i].type,
-    ));
+    )));
   }
 
   #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\

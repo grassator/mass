@@ -80,6 +80,12 @@ register_bitset_get(
 #define MASS_TRY(...)\
   for (Mass_Result _result = (__VA_ARGS__); _result.tag != Mass_Result_Tag_Success;) return _result;
 
+#define MASS_MUST_SUCCEED(...)\
+  do {\
+    Mass_Result __result = (__VA_ARGS__);\
+    assert(__result.tag == Mass_Result_Tag_Success);\
+  } while (0)\
+
 PRELUDE_NO_DISCARD static inline Mass_Result
 MASS_SUCCESS() {
   return (Mass_Result){.tag = Mass_Result_Tag_Success};
