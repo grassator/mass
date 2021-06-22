@@ -641,6 +641,8 @@ print_mass_descriptor_and_type(
     case Meta_Type_Tag_Tagged_Union: {
       fprintf(file, "/*union struct start */\n");
       char *lowercase_name = strtolower(type->union_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s_ptr, Array_%s_Ptr)\n", lowercase_name, type->union_.name);
+      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_%s, Array_%s)\n", lowercase_name, type->union_.name);
 
       // Write out the enum
       {
