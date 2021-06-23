@@ -1456,6 +1456,19 @@ spec("source") {
       check(checker(2) == 3);
     }
 
+    it("should be able to run a long compile-time loop") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn(x : s64) -> (s64) {\n"
+          "i := 0\n"
+          "while i < 1000000 { i = i + 1 }\n"
+          "i\n"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 1000000);
+    }
+
     #if defined(_WIN32) // TODO support on Linux
     it("should report an error for macro external functions") {
       test_program_inline_source_base(
@@ -1858,14 +1871,6 @@ spec("source") {
 
   describe("Complex Examples") {
     #if defined(_WIN32) // TODO support on Linux
-    it("should be able to run a long compile-time loop") {
-      fn_type_opaque loop =
-        test_program_external_source_function("loop", &test_context, "fixtures/loop");
-      check(spec_check_mass_result(test_context.result));
-      check(loop);
-      loop();
-    }
-
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =
         test_program_external_source_function("fizz_buzz", &test_context, "fixtures/fizz_buzz");
