@@ -2276,8 +2276,8 @@ mass_normalize_import_path(
 
 static Scope
 mass_import(
-  Execution_Context *context,
-  Slice file_path
+  Slice file_path,
+  Execution_Context *context
 ) {
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
@@ -6208,8 +6208,8 @@ scope_define_builtins(
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
-    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice)
+    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice),
+    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context_pointer)
   );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
