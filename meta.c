@@ -905,12 +905,12 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Scope *", "scope" },
+    { "Source_Range", "source_range" },
   }));
 
 
   push_type(type_struct("Module", (Struct_Item[]){
     { "Source_File", "source_file" },
-    { "Source_Range", "exports_source_range" },
     { "Scope *", "own_scope" },
     { "Module_Export", "export" },
   }));

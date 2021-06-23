@@ -121,6 +121,7 @@
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="scope">scope</Item>
+    <Item Name="source_range">source_range</Item>
     <Item Name="Selective" Condition="tag == Module_Export_Tag_Selective">Selective</Item>
   </Expand>
 </Type>

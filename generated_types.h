@@ -322,6 +322,7 @@ typedef struct Module_Export {
   Module_Export_Tag tag;
   char _tag_padding[4];
   Scope * scope;
+  Source_Range source_range;
   union {
     Module_Export_Selective Selective;
   };
@@ -329,7 +330,6 @@ typedef struct Module_Export {
 typedef dyn_array_type(Module_Export) Array_Module_Export;
 typedef struct Module {
   Source_File source_file;
-  Source_Range exports_source_range;
   Scope * own_scope;
   Module_Export export;
 } Module;
@@ -1828,6 +1828,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(5, module_export, Module_Export,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Module_Export, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("Selective"),
     .descriptor = &descriptor_module_export_selective,
     .Base_Relative.offset = offsetof(Module_Export, Selective),
@@ -1843,12 +1849,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(6, module, Module,
     .name = slice_literal_fields("source_file"),
     .descriptor = &descriptor_source_file,
     .Base_Relative.offset = offsetof(Module, source_file),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("exports_source_range"),
-    .descriptor = &descriptor_source_range,
-    .Base_Relative.offset = offsetof(Module, exports_source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

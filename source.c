@@ -2077,7 +2077,7 @@ token_parse_exports(
   Token_Expect_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (context->module->export.tag != Module_Export_Tag_None) {
-    // TODO support printing second range context->module->exports_source_range
+    // TODO support printing second range context->module->export.source_range
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword_token->source_range,
@@ -2086,7 +2086,7 @@ token_parse_exports(
     goto err;
   }
 
-  context->module->exports_source_range = keyword_token->source_range;
+  context->module->export.source_range = keyword_token->source_range;
 
   Value_View children = value_as_group(block)->children;
   if (children.length == 1) {
