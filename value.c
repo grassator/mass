@@ -1712,7 +1712,7 @@ compilation_init(
   program_init(compilation->allocator, compilation->runtime_program, target_calling_convention);
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
-  scope_define_builtins(compilation->allocator, compilation->root_scope, host_calling_convention());
+  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
 
   module_compiler_init(compilation, &compilation->compiler_module);
 

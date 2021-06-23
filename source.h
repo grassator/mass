@@ -77,7 +77,7 @@ module_compiler_init(
 
 static void
 scope_define_builtins(
-  const Allocator *allocator,
+  Compilation *compilation,
   Scope *scope,
   const Calling_Convention *calling_convention
 );

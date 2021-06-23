@@ -6088,10 +6088,11 @@ module_compiler_init(
 
 static void
 scope_define_builtins(
-  const Allocator *allocator,
+  Compilation *compilation,
   Scope *scope,
   const Calling_Convention *calling_convention
 ) {
+  const Allocator *allocator = compilation->allocator;
   global_scope_define_exports(scope);
 
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
@@ -6162,6 +6163,15 @@ scope_define_builtins(
     {\
       .name = slice_literal_fields(_NAME_),\
       .descriptor = (_DESCRIPTOR_),\
+      .source_range = COMPILER_SOURCE_RANGE,\
+    }
+
+  #define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _DESCRIPTOR_, _VIEW_)\
+    {\
+      .name = slice_literal_fields(_NAME_),\
+      .descriptor = (_DESCRIPTOR_),\
+      .maybe_default_expression = (_VIEW_),\
+      .source_range = COMPILER_SOURCE_RANGE,\
     }
 
   #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
@@ -6178,6 +6188,7 @@ scope_define_builtins(
     function->flags = Descriptor_Function_Flags_Compile_Time;\
     function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
     function->arguments = arguments;\
+    function->scope = scope_make(allocator, scope);\
     const Descriptor *instance_descriptor = descriptor_function_instance(\
       allocator, slice_literal(_NAME_), function, calling_convention\
     );\
@@ -6206,11 +6217,21 @@ scope_define_builtins(
     MASS_FN_ARG("b", &descriptor_number_literal)
   )
 
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_import, "mass_import", &descriptor_scope,
-    MASS_FN_ARG("module_path", &descriptor_slice),
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer)
-  );
+  {
+    Value_View tokens;
+    Source_File *fake_file = allocator_allocate(allocator, Source_File);
+    *fake_file = (Source_File){
+      .path = COMPILER_SOURCE_FILE.path,
+      .text = slice_literal("@context"),
+    };
+    MASS_ON_ERROR(tokenize(compilation, fake_file, &tokens)) panic("unreached");
+
+    MASS_DEFINE_COMPILE_TIME_FUNCTION(
+      mass_import, "mass_import", &descriptor_scope,
+      MASS_FN_ARG("module_path", &descriptor_slice),
+      MASS_FN_ARG_WITH_DEFAULT("context", &descriptor_execution_context_pointer, tokens)
+    );
+  }
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_bit_type, "bit_type", &descriptor_type,

@@ -29,7 +29,7 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end
 }
 
-syntax("import" .@file_path) (mass_import(file_path(), @context))
+syntax("import" .@file_path) (mass_import(file_path()))
 
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre();
