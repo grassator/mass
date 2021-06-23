@@ -897,10 +897,6 @@ main(void) {
     { "Range_u64", "offsets" },
   }));
 
-  push_type(type_enum("Module_Flags", (Enum_Type_Item[]){
-    { "Has_Exports", 1 << 0 },
-  }));
-
   push_type(add_common_fields(type_union("Module_Export", (Struct_Type[]){
     struct_empty("None"),
     struct_empty("All"),
@@ -913,8 +909,6 @@ main(void) {
 
 
   push_type(type_struct("Module", (Struct_Item[]){
-    { "Module_Flags", "flags" },
-    { "u32", "_flags_padding" },
     { "Source_File", "source_file" },
     { "Source_Range", "exports_source_range" },
     { "Scope *", "own_scope" },

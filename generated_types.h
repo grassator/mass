@@ -21,8 +21,6 @@ typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
 
-typedef enum Module_Flags Module_Flags;
-
 typedef struct Module_Export Module_Export;
 typedef dyn_array_type(Module_Export *) Array_Module_Export_Ptr;
 typedef dyn_array_type(const Module_Export *) Array_Const_Module_Export_Ptr;
@@ -311,16 +309,6 @@ typedef struct Source_Range {
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
 
-typedef enum Module_Flags {
-  Module_Flags_Has_Exports = 1,
-} Module_Flags;
-
-const char *module_flags_name(Module_Flags value) {
-  if (value == 1) return "Module_Flags_Has_Exports";
-  assert(!"Unexpected value for enum Module_Flags");
-  return 0;
-};
-
 typedef enum {
   Module_Export_Tag_None = 0,
   Module_Export_Tag_All = 1,
@@ -340,8 +328,6 @@ typedef struct Module_Export {
 } Module_Export;
 typedef dyn_array_type(Module_Export) Array_Module_Export;
 typedef struct Module {
-  Module_Flags flags;
-  u32 _flags_padding;
   Source_File source_file;
   Source_Range exports_source_range;
   Scope * own_scope;
@@ -1361,11 +1347,6 @@ static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
 static Descriptor descriptor_source_range_pointer;
 static Descriptor descriptor_source_range_pointer_pointer;
-static Descriptor descriptor_module_flags;
-static Descriptor descriptor_array_module_flags;
-static Descriptor descriptor_array_module_flags_ptr;
-static Descriptor descriptor_module_flags_pointer;
-static Descriptor descriptor_module_flags_pointer_pointer;
 static Descriptor descriptor_module_export;
 static Descriptor descriptor_array_module_export;
 static Descriptor descriptor_array_module_export_ptr;
@@ -1814,10 +1795,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(3, source_range, Source_Range,
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_range);
-MASS_DEFINE_OPAQUE_C_TYPE(module_flags, Module_Flags)
-static C_Enum_Item module_flags_items[] = {
-{ .name = slice_literal_fields("Has_Exports"), .value = 1 },
-};
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_export_ptr, Array_Module_Export_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_export, Array_Module_Export)
@@ -1861,18 +1838,6 @@ MASS_DEFINE_TYPE_VALUE(module_export);
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_ptr, Array_Module_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
 MASS_DEFINE_STRUCT_DESCRIPTOR(6, module, Module,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("flags"),
-    .descriptor = &descriptor_module_flags,
-    .Base_Relative.offset = offsetof(Module, flags),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("_flags_padding"),
-    .descriptor = &descriptor_u32,
-    .Base_Relative.offset = offsetof(Module, _flags_padding),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("source_file"),

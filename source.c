@@ -2076,7 +2076,7 @@ token_parse_exports(
   Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("exports"));
   Token_Expect_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
-  if (context->module->flags & Module_Flags_Has_Exports) {
+  if (context->module->export.tag != Module_Export_Tag_None) {
     // TODO support printing second range context->module->exports_source_range
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
