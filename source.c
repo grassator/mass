@@ -2099,7 +2099,7 @@ token_parse_exports(
   context->module->export = (Module_Export) {
     .tag = Module_Export_Tag_Selective,
     .Selective = {
-      .names = dyn_array_make(Array_Slice, .capacity = children.length / 2 + 1 ),
+      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = children.length / 2 + 1 ),
     },
   };
 
@@ -2117,9 +2117,7 @@ token_parse_exports(
         });
         goto err;
       }
-      Value *symbol_token = value_view_get(item, 0);
-      Slice name = value_as_symbol(symbol_token)->name;
-      dyn_array_push(context->module->export.Selective.names, name);
+      dyn_array_push(context->module->export.Selective.symbols, value_view_get(item, 0));
     }
   }
 
@@ -6390,10 +6388,21 @@ program_import_module(
     }
     case Module_Export_Tag_Selective: {
       module->export.scope = scope_make(context->allocator, module->own_scope->parent);
-      DYN_ARRAY_FOREACH(Slice, name, module->export.Selective.names) {
-        Value *value = scope_lookup_force(module->own_scope, *name);
-        MASS_TRY(*context->result);
-        scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, *name, value);
+      Array_Value_Ptr symbols = module->export.Selective.symbols;
+      for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
+        Value **symbol_pointer = dyn_array_get(symbols, i);
+        Value *symbol = *symbol_pointer;
+        assert(value_is_symbol(symbol));
+        Slice name = value_as_symbol(symbol)->name;
+        {
+          Value *value = scope_lookup_force(module->own_scope, name);
+          MASS_TRY(*context->result);
+          scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, name, value);
+        }
+
+        // FIXME check for existence
+        //Value_View expr = value_view_single(symbol_pointer);
+        //scope_define_lazy_compile_time_expression(&import_context, module->export.scope, name, expr);
       }
       break;
     }

@@ -1874,6 +1874,7 @@ spec("source") {
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =
         test_program_external_source_function("fizz_buzz", &test_context, "fixtures/fizz_buzz");
+      check(spec_check_mass_result(test_context.result));
       check(fizz_buzz);
       fizz_buzz();
     }

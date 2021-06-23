@@ -328,7 +328,7 @@ typedef enum {
 } Module_Export_Tag;
 
 typedef struct Module_Export_Selective {
-  Array_Slice names;
+  Array_Value_Ptr symbols;
 } Module_Export_Selective;
 typedef struct Module_Export {
   Module_Export_Tag tag;
@@ -1830,9 +1830,9 @@ static C_Enum_Item module_export_tag_items[] = {
 MASS_DEFINE_STRUCT_DESCRIPTOR(4, module_export_selective, Module_Export_Selective,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("names"),
-    .descriptor = &descriptor_array_slice,
-    .Base_Relative.offset = offsetof(Module_Export_Selective, names),
+    .name = slice_literal_fields("symbols"),
+    .descriptor = &descriptor_array_value_ptr,
+    .Base_Relative.offset = offsetof(Module_Export_Selective, symbols),
   },
 );
 MASS_DEFINE_TYPE_VALUE(module_export_selective);

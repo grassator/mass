@@ -905,7 +905,7 @@ main(void) {
     struct_empty("None"),
     struct_empty("All"),
     struct_fields("Selective", (Struct_Item[]){
-      { "Array_Slice", "names" },
+      { "Array_Value_Ptr", "symbols" },
     }),
   }), (Struct_Item[]){
     { "Scope *", "scope" },
