@@ -1,11 +1,10 @@
 ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
 
 main :: fn() {
-  io :: import "std/io"
-  print :: io.print
+  io :: import("std/io")
 
   message :: "Hello, World!"
 
-  print(message)
+  io.print(message)
   ExitProcess(0)
 }

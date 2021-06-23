@@ -5203,14 +5203,13 @@ token_parse_expression(
 
     Value *value = value_view_get(view, i);
     if (value_is_group(value)) {
-      dyn_array_push(value_stack, value);
       const Group *group = value_as_group(value);
       switch (group->tag) {
         case Group_Tag_Paren: {
           if (!is_previous_an_operator) {
             if (!token_handle_operator(
               context, view, &value_stack, &operator_stack, slice_literal("()"),
-              value->source_range, Operator_Fixity_Postfix
+              value->source_range, Operator_Fixity_Infix
             )) goto defer;
           }
           break;
@@ -5221,6 +5220,7 @@ token_parse_expression(
           break;
         }
       }
+      dyn_array_push(value_stack, value);
       is_previous_an_operator = false;
     } else if (value_is_symbol(value)) {
       Slice symbol_name = value_as_symbol(value)->name;
@@ -6108,9 +6108,15 @@ scope_define_builtins(
     .argument_count = 1,
     .handler = mass_handle_reify_operator,
   )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
+    .precedence = 21,
+    .fixity = Operator_Fixity_Infix,
+    .argument_count = 2,
+    .handler = mass_handle_dot_operator,
+  )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,
-    .fixity = Operator_Fixity_Postfix,
+    .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
     .handler = mass_handle_paren_operator,
   )));
@@ -6120,12 +6126,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_at_operator,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
-    .precedence = 19,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_handle_dot_operator,
   )));
 
   #define MASS_DEFINE_ARITHMETIC(NAME, VALUE, SYMBOL, PRECEDENCE)\
