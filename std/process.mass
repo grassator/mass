@@ -1,0 +1,5 @@
+exports {exit}
+
+ExitProcess :: fn(status : s32) -> (s64) external("kernel32.dll", "ExitProcess")
+
+exit :: fn(status : s32) -> () { ExitProcess(status) }
