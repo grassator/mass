@@ -29,8 +29,6 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_end
 }
 
-syntax("import" .@file_path) (mass_import(file_path()))
-
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre();
   label _loop_start;
@@ -62,7 +60,7 @@ operator 15 (x & y) { bitwise_and(x, y) }
 String :: Slice
 
 fail :: {
-  mass :: import "mass"
+  mass :: import("mass")
   @fn(context : [mass.Execution_Context], name : String, message : String) {
     result := context.result
     result.tag = mass.Mass_Result_Tag.Error
@@ -78,7 +76,7 @@ static_assert :: macro(condition : bool, message : String) {
 }
 
 external :: {
-  mass :: import "mass"
+  mass :: import("mass")
   @fn(library_name : String, symbol_name : String) -> (result : mass.External_Symbol) {
     result.library_name = library_name
     result.symbol_name = symbol_name

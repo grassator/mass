@@ -1035,7 +1035,7 @@ spec("source") {
     it("should be able to use prefix backslash operator for reflection") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "mass :: import \"mass\"\n"
+        "mass :: import(\"mass\")\n"
         "checker :: fn() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
       );
       check(spec_check_mass_result(test_context.result));

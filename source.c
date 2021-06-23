@@ -6227,7 +6227,7 @@ scope_define_builtins(
     MASS_ON_ERROR(tokenize(compilation, fake_file, &tokens)) panic("unreached");
 
     MASS_DEFINE_COMPILE_TIME_FUNCTION(
-      mass_import, "mass_import", &descriptor_scope,
+      mass_import, "import", &descriptor_scope,
       MASS_FN_ARG("module_path", &descriptor_slice),
       MASS_FN_ARG_WITH_DEFAULT("context", &descriptor_execution_context_pointer, tokens)
     );
