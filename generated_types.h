@@ -1224,6 +1224,7 @@ typedef struct Mass_Error {
   char _tag_padding[4];
   Slice detailed_message;
   Source_Range source_range;
+  Source_Range other_source_range;
   union {
     Mass_Error_User_Defined User_Defined;
     Mass_Error_Integer_Range Integer_Range;
@@ -3970,6 +3971,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(94, mass_error, Mass_Error,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
     .Base_Relative.offset = offsetof(Mass_Error, source_range),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("other_source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Mass_Error, other_source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -2077,11 +2077,11 @@ token_parse_exports(
   Token_Expect_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (context->module->export.tag != Module_Export_Tag_None) {
-    // TODO support printing second range context->module->export.source_range
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword_token->source_range,
-      .detailed_message = "A module can not have multiple exports statements",
+      .detailed_message = "A module can not have multiple exports statements. Original declaration at:",
+      .other_source_range = context->module->export.source_range,
     });
     goto err;
   }

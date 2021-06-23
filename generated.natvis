@@ -1608,6 +1608,7 @@
     <Item Name="tag">tag</Item>
     <Item Name="detailed_message">detailed_message</Item>
     <Item Name="source_range">source_range</Item>
+    <Item Name="other_source_range">other_source_range</Item>
     <Item Name="User_Defined" Condition="tag == Mass_Error_Tag_User_Defined">User_Defined</Item>
     <Item Name="Integer_Range" Condition="tag == Mass_Error_Tag_Integer_Range">Integer_Range</Item>
     <Item Name="File_Open" Condition="tag == Mass_Error_Tag_File_Open">File_Open</Item>

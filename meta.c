@@ -1501,6 +1501,7 @@ main(void) {
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },
+    { "Source_Range", "other_source_range" },
   })));
 
   export_compiler(push_type(type_union("Mass_Result", (Struct_Type[]){
