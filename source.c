@@ -6158,7 +6158,7 @@ scope_define_builtins(
     )));
   }
 
-  #define MASS_FN_ARG_ANY_OF_TYPE(_NAME_, _DESCRIPTOR_)\
+  #define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
     {\
       .name = slice_literal_fields(_NAME_),\
       .descriptor = (_DESCRIPTOR_),\
@@ -6190,31 +6190,31 @@ scope_define_builtins(
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_number_literal_logical_shift_left, "logical_shift_left", &descriptor_number_literal,
-    MASS_FN_ARG_ANY_OF_TYPE("number", &descriptor_number_literal),
-    MASS_FN_ARG_ANY_OF_TYPE("shift", &descriptor_number_literal)
+    MASS_FN_ARG("number", &descriptor_number_literal),
+    MASS_FN_ARG("shift", &descriptor_number_literal)
   )
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_number_literal_bitwise_and, "bitwise_and", &descriptor_number_literal,
-    MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_number_literal),
-    MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_number_literal)
+    MASS_FN_ARG("a", &descriptor_number_literal),
+    MASS_FN_ARG("b", &descriptor_number_literal)
   )
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_number_literal_bitwise_or, "bitwise_or", &descriptor_number_literal,
-    MASS_FN_ARG_ANY_OF_TYPE("a", &descriptor_number_literal),
-    MASS_FN_ARG_ANY_OF_TYPE("b", &descriptor_number_literal)
+    MASS_FN_ARG("a", &descriptor_number_literal),
+    MASS_FN_ARG("b", &descriptor_number_literal)
   )
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_import, "mass_import", &descriptor_scope,
-    MASS_FN_ARG_ANY_OF_TYPE("module_path", &descriptor_slice),
-    MASS_FN_ARG_ANY_OF_TYPE("context", &descriptor_execution_context_pointer)
+    MASS_FN_ARG("module_path", &descriptor_slice),
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer)
   );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_bit_type, "bit_type", &descriptor_type,
-    MASS_FN_ARG_ANY_OF_TYPE("bit_size", &descriptor_u64),
+    MASS_FN_ARG("bit_size", &descriptor_u64),
   );
 
   {
