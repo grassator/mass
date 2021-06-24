@@ -31,8 +31,8 @@ jobs:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: List working directory
-        run: ls -l
+      - name: GCC Version
+        run: gcc -v
       - name: Test
         run: CC=gcc ./test.sh
 
@@ -46,8 +46,8 @@ jobs:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: List working directory
-        run: ls -l
+      - name: Clang Version
+        run: clang -v
       - name: Test
         run: CC=clang ./test.sh
 
@@ -61,7 +61,7 @@ jobs:
       # Checks out a copy of your repository on the ubuntu-latest machine
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: List working directory
-        run: ls -l
+      - name: Compiler Version
+        run: cc -v
       - name: Test
         run: ./test.sh
