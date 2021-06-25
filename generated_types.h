@@ -303,6 +303,9 @@ typedef struct X64_Mnemonic X64_Mnemonic;
 typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
+static Value * mass_handle_arithmetic_operation
+  (Execution_Context * context, Value_View arguments, void * payload);
+
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
 
@@ -1884,6 +1887,7 @@ static Descriptor descriptor_array_x64_mnemonic;
 static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
+static Descriptor descriptor_mass_handle_arithmetic_operation;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_char_pointer;

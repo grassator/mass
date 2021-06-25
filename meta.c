@@ -147,7 +147,11 @@ print_c_type_forward_declaration(
     case Meta_Type_Tag_Function: {
       name = 0;
       if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
-        fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
+        if (type->function.is_typedef) {
+          fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
+        } else {
+          fprintf(file, "static %s %s\n  (", type->function.returns, type->function.name);
+        }
         for (uint64_t i = 0; i < type->function.argument_count; ++i) {
           Argument_Type *arg = &type->function.arguments[i];
           if (i != 0) fprintf(file, ", ");
@@ -1762,6 +1766,12 @@ main(void) {
     { "const Instruction_Encoding *", "encoding_list" },
     { "u64", "encoding_count" },
   }));
+
+  export_compiler(push_type(type_function("mass_handle_arithmetic_operation", "Value *", (Argument_Type[]){
+    { "Execution_Context *", "context" },
+    { "Value_View", "arguments" },
+    { "void *", "payload" },
+  })));
 
   // Standard C types
   set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);
