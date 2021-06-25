@@ -1405,6 +1405,7 @@ main(void) {
     { "None", 0 },
     { "Macro", 1 << 0 },
     { "Compile_Time", 1 << 2 },
+    { "Intrinsic", 1 << 3},
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){

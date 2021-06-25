@@ -1087,12 +1087,14 @@ typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
   Descriptor_Function_Flags_Compile_Time = 4,
+  Descriptor_Function_Flags_Intrinsic = 8,
 } Descriptor_Function_Flags;
 
 const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   if (value == 0) return "Descriptor_Function_Flags_None";
   if (value == 1) return "Descriptor_Function_Flags_Macro";
   if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
+  if (value == 8) return "Descriptor_Function_Flags_Intrinsic";
   assert(!"Unexpected value for enum Descriptor_Function_Flags");
   return 0;
 };
@@ -3582,6 +3584,7 @@ static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Macro"), .value = 1 },
 { .name = slice_literal_fields("Compile_Time"), .value = 4 },
+{ .name = slice_literal_fields("Intrinsic"), .value = 8 },
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)

@@ -83,7 +83,8 @@
   }
 
 #define MASS_DEFINE_TYPE_VALUE(_NAME_)\
-  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_)
+  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);\
+  static Value *type_##_NAME_##_pointer_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_##_pointer)
 
 #define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_)\
   MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_);\

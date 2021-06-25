@@ -2574,7 +2574,7 @@ token_process_c_struct_definition(
 static Function_Info *
 token_process_function_literal(
   Execution_Context *context,
-  Value *args,
+  Value_View args_view,
   Value *return_types
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
@@ -2625,7 +2625,6 @@ token_process_function_literal(
   MASS_ON_ERROR(*context->result) return 0;
 
   bool previous_argument_has_default_value = false;
-  Value_View args_view = value_as_group(args)->children;
   if (args_view.length == 0) return fn_info;
 
   fn_info->arguments = dyn_array_make(
@@ -3516,7 +3515,9 @@ token_handle_function_call(
       });
       goto err;
     }
-    s64 score = calculate_arguments_match_score(to_call_info, args);
+    s64 score = (to_call_info->flags & Descriptor_Function_Flags_Intrinsic)
+      ? 0
+      : calculate_arguments_match_score(to_call_info, args);
     if (score == -1) continue; // no match
     if (score > match.score) {
       match.info = to_call_info;
@@ -3564,12 +3565,35 @@ token_handle_function_call(
     // will end up here as well. Indirect calls are allowed so we do not need a full stack
     const Value *saved_call_target = context->current_compile_time_function_call_target;
     context->current_compile_time_function_call_target = temp_overload;
-    Value_View fake_eval_view = {
-      .values = (Value *[]){temp_overload, args_token},
-      .length = 2,
-      .source_range = source_range,
-    };
-    Value *result = compile_time_eval(context, fake_eval_view);
+    Value *result;
+    if (info->flags & Descriptor_Function_Flags_Intrinsic) {
+      Jit *jit = &context->compilation->jit;
+      Execution_Context eval_context = *context;
+      eval_context.flags &= ~Execution_Context_Flags_Global;
+      eval_context.epoch = get_new_epoch();
+      eval_context.program = jit->program;
+      eval_context.scope = context->scope;
+
+      Value *instance = ensure_function_instance(&eval_context, overload);
+      MASS_ON_ERROR(*eval_context.result) return 0;
+
+      program_jit(jit);
+      assert(storage_is_label(&instance->storage));
+      Label_Index jit_label_index =
+        instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+      fn_type_opaque jitted_code = c_function_from_label(jit->program, jit_label_index);
+
+      Value *(*jitted_intrinsic)(Value_View) = (Value *(*)(Value_View))jitted_code;
+      Value_View args_view = value_view_from_value_array(args, &args_token->source_range);
+      result = jitted_intrinsic(args_view);
+    } else {
+      Value_View fake_eval_view = {
+        .values = (Value *[]){temp_overload, args_token},
+        .length = 2,
+        .source_range = source_range,
+      };
+      result = compile_time_eval(context, fake_eval_view);
+    }
     context->current_compile_time_function_call_target = saved_call_target;
     return result;
   }
@@ -5035,6 +5059,46 @@ token_parse_if_expression(
 }
 
 static Value *
+token_parse_intrinsic_literal(
+  Execution_Context *context,
+  Value_View view,
+  u64 *matched_length
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 peek_index = 0;
+  Token_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
+  Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+
+  Value *name_symbol = token_make_symbol(
+    context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, keyword->source_range
+  );
+  Value *colon_symbol = token_make_symbol(
+    context->allocator, slice_literal(":"), Symbol_Type_Operator_Like, keyword->source_range
+  );
+  Value *args_tokens[] = {name_symbol, colon_symbol, type_value_view_value};
+
+  Value_View args_view = {
+    .values = args_tokens,
+    .length = countof(args_tokens),
+    .source_range = keyword->source_range,
+  };
+
+  Function_Info *fn_info = token_process_function_literal(context, args_view, type_value_pointer_value);
+  MASS_ON_ERROR(*context->result) return 0;
+  fn_info->flags |= Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic;
+
+  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+  *literal = (Function_Literal){
+    .info = fn_info,
+    .body = body,
+  };
+  *matched_length = peek_index;
+  return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+}
+
+static Value *
 token_parse_function_literal(
   Execution_Context *context,
   Value_View view,
@@ -5106,7 +5170,8 @@ token_parse_function_literal(
 
   *matched_length = view.length;
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Function_Info *fn_info = token_process_function_literal(context, args, returns);
+  Value_View args_view = value_as_group(args)->children;
+  Function_Info *fn_info = token_process_function_literal(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
   if(is_macro) {
@@ -5173,7 +5238,8 @@ token_parse_expression(
   static Expression_Matcher_Proc expression_matchers[] = {
     token_parse_macros,
     token_parse_if_expression,
-    token_parse_function_literal
+    token_parse_function_literal,
+    token_parse_intrinsic_literal
   };
 
   for (u64 i = 0; ; ++i) {

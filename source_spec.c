@@ -950,6 +950,19 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
     }
+
+    it("should be able to have user-defined intrinsics") {
+      s64 (*checker)(Spec_Callback foo) =
+        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+          "checker", &test_context,
+          // TODO check overload "power"
+          //"my_intrinsic :: fn (x : s64, y : s64) -> Value { \\2 }\n"
+          "my_intrinsic :: @intrinsic { \\2 }\n"
+          "checker :: fn() -> (s64) { my_intrinsic(1, 2) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(spec_callback) == 2);
+    }
   }
 
   describe("Math") {
