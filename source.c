@@ -4064,7 +4064,7 @@ mass_handle_arithmetic_operation_lazy_proc(
   }
 }
 
-static inline Value *
+static Value *
 mass_handle_arithmetic_operation(
   Execution_Context *context,
   Value_View arguments,
@@ -4140,6 +4140,22 @@ mass_handle_arithmetic_operation(
       context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
     );
   }
+}
+
+static inline Value *mass_add(Execution_Context *context, Value_View arguments, void *unused_payload) {
+  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Add);
+}
+static inline Value *mass_subtract(Execution_Context *context, Value_View arguments, void *unused_payload) {
+  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Subtract);
+}
+static inline Value *mass_multiply(Execution_Context *context, Value_View arguments, void *unused_payload) {
+  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Multiply);
+}
+static inline Value *mass_divide(Execution_Context *context, Value_View arguments, void *unused_payload) {
+  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Divide);
+}
+static inline Value *mass_remainder(Execution_Context *context, Value_View arguments, void *unused_payload) {
+  return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Remainder);
 }
 
 typedef struct {
@@ -6210,36 +6226,31 @@ scope_define_builtins(
     .precedence = 10,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
-    .handler = mass_handle_arithmetic_operation,
-    .handler_payload = (void*)Mass_Arithmetic_Operator_Add,
+    .handler = mass_add,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("-"), allocator_make(allocator, Operator,
     .precedence = 10,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
-    .handler = mass_handle_arithmetic_operation,
-    .handler_payload = (void*)Mass_Arithmetic_Operator_Subtract,
+    .handler = mass_subtract,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("*"), allocator_make(allocator, Operator,
     .precedence = 15,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
-    .handler = mass_handle_arithmetic_operation,
-    .handler_payload = (void*)Mass_Arithmetic_Operator_Multiply,
+    .handler = mass_multiply,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("/"), allocator_make(allocator, Operator,
     .precedence = 15,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
-    .handler = mass_handle_arithmetic_operation,
-    .handler_payload = (void*)Mass_Arithmetic_Operator_Divide,
+    .handler = mass_divide,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("%"), allocator_make(allocator, Operator,
     .precedence = 15,
     .fixity = Operator_Fixity_Infix,
     .argument_count = 2,
-    .handler = mass_handle_arithmetic_operation,
-    .handler_payload = (void*)Mass_Arithmetic_Operator_Remainder,
+    .handler = mass_remainder,
   )));
 
   struct { Slice symbol; u32 precedence; Compare_Type type; } comparisons[] = {
