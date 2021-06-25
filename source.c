@@ -1650,9 +1650,6 @@ token_match_type(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Descriptor *descriptor = token_match_fixed_array_type(context, view);
-  MASS_ON_ERROR(*context->result) return 0;
-  if (descriptor) return descriptor;
   Value *type_value = compile_time_eval(context, view);
   return value_ensure_type(context, type_value, view.source_range);
 }
@@ -5745,29 +5742,6 @@ token_parse_explicit_return(
   out_lazy_value->payload = parse_result;
 
   return peek_index;
-}
-
-static Descriptor *
-token_match_fixed_array_type(
-  Execution_Context *context,
-  Value_View view
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  Token_Match(type, .tag = Token_Pattern_Tag_Any);
-  Token_Match(square_brace, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Square);
-  Value *type_value = compile_time_eval(context, value_view_single(&type));
-  const Descriptor *descriptor = value_ensure_type(context, type_value, view.source_range);
-
-  Value_View size_view = value_as_group(square_brace)->children;
-  Value *size_value = compile_time_eval(context, size_view);
-  size_value = token_value_force_immediate_integer(context, size_value, &descriptor_u32);
-  MASS_ON_ERROR(*context->result) return 0;
-  u32 length = u64_to_u32(storage_static_value_up_to_u64(&size_value->storage));
-
-  Descriptor *array_descriptor = descriptor_array_of(context->allocator, descriptor, length);
-  return array_descriptor;
 }
 
 static Value *
