@@ -302,7 +302,12 @@ print_c_type(
       }
       break;
     }
-    case Meta_Type_Tag_C_Opaque:
+    case Meta_Type_Tag_C_Opaque: {
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->c_opaque.name, type->c_opaque.name);
+      }
+      break;
+    }
     case Meta_Type_Tag_Number_Literal:
     case Meta_Type_Tag_Function: {
       // We only need a forward declaration so nothing to do here
@@ -1700,6 +1705,10 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  // Standard C types
+  set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);
+  set_flags(push_type(type_c_opaque("int")), Meta_Type_Flags_No_C_Type);
+
   // Prelude Types
   const char *c_primitive_types[] = {
     "u8", "u16", "u32", "u64",
@@ -1778,8 +1787,6 @@ main(void) {
       fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
       fprintf(file, "static Descriptor descriptor_void;\n");
       fprintf(file, "static Descriptor descriptor_void_pointer;\n");
-      fprintf(file, "static Descriptor descriptor_char;\n");
-      fprintf(file, "static Descriptor descriptor_char_pointer;\n");
 
       // The descriptor of descriptors needs to be forward declared
       fprintf(file, "static Descriptor descriptor_descriptor;\n");

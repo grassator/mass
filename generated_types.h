@@ -287,6 +287,12 @@ typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
+typedef dyn_array_type(char *) Array_char_Ptr;
+typedef dyn_array_type(const char *) Array_Const_char_Ptr;
+
+typedef dyn_array_type(int *) Array_int_Ptr;
+typedef dyn_array_type(const int *) Array_Const_int_Ptr;
+
 typedef dyn_array_type(u8 *) Array_u8_Ptr;
 typedef dyn_array_type(const u8 *) Array_Const_u8_Ptr;
 
@@ -1381,6 +1387,10 @@ typedef struct Compilation {
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
+typedef dyn_array_type(char) Array_char;
+
+typedef dyn_array_type(int) Array_int;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -1388,8 +1398,6 @@ _Pragma("warning (pop)")
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
-static Descriptor descriptor_char;
-static Descriptor descriptor_char_pointer;
 static Descriptor descriptor_descriptor;
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
@@ -1749,6 +1757,14 @@ static Descriptor descriptor_array_compilation;
 static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
+static Descriptor descriptor_char;
+static Descriptor descriptor_array_char;
+static Descriptor descriptor_char_pointer;
+static Descriptor descriptor_char_pointer_pointer;
+static Descriptor descriptor_int;
+static Descriptor descriptor_array_int;
+static Descriptor descriptor_int_pointer;
+static Descriptor descriptor_int_pointer_pointer;
 static Descriptor descriptor_u8;
 static Descriptor descriptor_array_u8;
 static Descriptor descriptor_u8_pointer;
@@ -4426,6 +4442,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(101, compilation, Compilation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);
+MASS_DEFINE_OPAQUE_C_TYPE(char, char)
+MASS_DEFINE_OPAQUE_C_TYPE(array_char, Array_char)
+MASS_DEFINE_OPAQUE_C_TYPE(int, int)
+MASS_DEFINE_OPAQUE_C_TYPE(array_int, Array_int)
 MASS_DEFINE_OPAQUE_C_TYPE(u8, u8)
 MASS_DEFINE_OPAQUE_C_TYPE(array_u8, Array_u8)
 MASS_DEFINE_OPAQUE_C_TYPE(u16, u16)
