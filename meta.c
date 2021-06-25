@@ -1713,9 +1713,6 @@ main(void) {
       // Also need to define built-in types
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);\n");
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);\n");
-      fprintf(file, "#undef MASS_PROCESS_BUILT_IN_TYPE\n\n");
 
       const char *c_primitive_types[] = {
         "u8", "u16", "u32", "u64", "s8", "s16", "s32", "s64", "f32", "f64",
@@ -1723,6 +1720,18 @@ main(void) {
 
       for (u64 i = 0; i < countof(c_primitive_types); ++i) {
         export_global(push_type(type_c_opaque(c_primitive_types[i])));
+      }
+
+      Fixed_Buffer *range_names_buffer = fixed_buffer_make(.capacity = 1024 * 1024);
+      for (u64 i = 0; i < countof(c_primitive_types); ++i) {
+        const char *string_name =
+          fixed_buffer_sprintf(range_names_buffer, "Range_%s", c_primitive_types[i]).bytes;
+        fixed_buffer_append_s8(range_names_buffer, 0);
+        push_type(type_struct(string_name, (Struct_Item[]){
+          { c_primitive_types[i], "from" },
+          { c_primitive_types[i], "to" },
+        }));
+        fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n", string_name, string_name);
       }
 
       export_global(push_type(type_struct("Slice", (Struct_Item[]){

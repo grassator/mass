@@ -1330,10 +1330,16 @@ static Descriptor descriptor_char_pointer;
 static Descriptor descriptor_descriptor;
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
-MASS_DEFINE_OPAQUE_C_TYPE(range_u64, Range_u64);
-MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64);
-#undef MASS_PROCESS_BUILT_IN_TYPE
-
+typedef dyn_array_type(Range_u8 *) Array_Range_u8_Ptr;
+typedef dyn_array_type(Range_u16 *) Array_Range_u16_Ptr;
+typedef dyn_array_type(Range_u32 *) Array_Range_u32_Ptr;
+typedef dyn_array_type(Range_u64 *) Array_Range_u64_Ptr;
+typedef dyn_array_type(Range_s8 *) Array_Range_s8_Ptr;
+typedef dyn_array_type(Range_s16 *) Array_Range_s16_Ptr;
+typedef dyn_array_type(Range_s32 *) Array_Range_s32_Ptr;
+typedef dyn_array_type(Range_s64 *) Array_Range_s64_Ptr;
+typedef dyn_array_type(Range_f32 *) Array_Range_f32_Ptr;
+typedef dyn_array_type(Range_f64 *) Array_Range_f64_Ptr;
 typedef dyn_array_type(Slice *) Array_Slice_Ptr;
 static Descriptor descriptor_source_position;
 static Descriptor descriptor_array_source_position;
@@ -1731,6 +1737,56 @@ static Descriptor descriptor_f64;
 static Descriptor descriptor_array_f64;
 static Descriptor descriptor_f64_pointer;
 static Descriptor descriptor_f64_pointer_pointer;
+static Descriptor descriptor_range_u8;
+static Descriptor descriptor_array_range_u8;
+static Descriptor descriptor_array_range_u8_ptr;
+static Descriptor descriptor_range_u8_pointer;
+static Descriptor descriptor_range_u8_pointer_pointer;
+static Descriptor descriptor_range_u16;
+static Descriptor descriptor_array_range_u16;
+static Descriptor descriptor_array_range_u16_ptr;
+static Descriptor descriptor_range_u16_pointer;
+static Descriptor descriptor_range_u16_pointer_pointer;
+static Descriptor descriptor_range_u32;
+static Descriptor descriptor_array_range_u32;
+static Descriptor descriptor_array_range_u32_ptr;
+static Descriptor descriptor_range_u32_pointer;
+static Descriptor descriptor_range_u32_pointer_pointer;
+static Descriptor descriptor_range_u64;
+static Descriptor descriptor_array_range_u64;
+static Descriptor descriptor_array_range_u64_ptr;
+static Descriptor descriptor_range_u64_pointer;
+static Descriptor descriptor_range_u64_pointer_pointer;
+static Descriptor descriptor_range_s8;
+static Descriptor descriptor_array_range_s8;
+static Descriptor descriptor_array_range_s8_ptr;
+static Descriptor descriptor_range_s8_pointer;
+static Descriptor descriptor_range_s8_pointer_pointer;
+static Descriptor descriptor_range_s16;
+static Descriptor descriptor_array_range_s16;
+static Descriptor descriptor_array_range_s16_ptr;
+static Descriptor descriptor_range_s16_pointer;
+static Descriptor descriptor_range_s16_pointer_pointer;
+static Descriptor descriptor_range_s32;
+static Descriptor descriptor_array_range_s32;
+static Descriptor descriptor_array_range_s32_ptr;
+static Descriptor descriptor_range_s32_pointer;
+static Descriptor descriptor_range_s32_pointer_pointer;
+static Descriptor descriptor_range_s64;
+static Descriptor descriptor_array_range_s64;
+static Descriptor descriptor_array_range_s64_ptr;
+static Descriptor descriptor_range_s64_pointer;
+static Descriptor descriptor_range_s64_pointer_pointer;
+static Descriptor descriptor_range_f32;
+static Descriptor descriptor_array_range_f32;
+static Descriptor descriptor_array_range_f32_ptr;
+static Descriptor descriptor_range_f32_pointer;
+static Descriptor descriptor_range_f32_pointer_pointer;
+static Descriptor descriptor_range_f64;
+static Descriptor descriptor_array_range_f64;
+static Descriptor descriptor_array_range_f64_ptr;
+static Descriptor descriptor_range_f64_pointer;
+static Descriptor descriptor_range_f64_pointer_pointer;
 static Descriptor descriptor_slice;
 static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
@@ -4338,9 +4394,179 @@ MASS_DEFINE_OPAQUE_C_TYPE(f32, f32)
 MASS_DEFINE_OPAQUE_C_TYPE(array_f32, Array_f32)
 MASS_DEFINE_OPAQUE_C_TYPE(f64, f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_f64, Array_f64)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8, Array_Range_u8)
+MASS_DEFINE_STRUCT_DESCRIPTOR(102, range_u8, Range_u8,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u8, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u8, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_u8);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16_ptr, Array_Range_u16_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16, Array_Range_u16)
+MASS_DEFINE_STRUCT_DESCRIPTOR(103, range_u16, Range_u16,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u16, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u16, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_u16);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32_ptr, Array_Range_u32_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32, Array_Range_u32)
+MASS_DEFINE_STRUCT_DESCRIPTOR(104, range_u32, Range_u32,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u32, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u32, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_u32);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64_ptr, Array_Range_u64_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64)
+MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u64, Range_u64,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u64, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_u64, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_u64);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8_ptr, Array_Range_s8_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8, Array_Range_s8)
+MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_s8, Range_s8,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s8, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s8, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_s8);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16_ptr, Array_Range_s16_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16, Array_Range_s16)
+MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_s16, Range_s16,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s16, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s16, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_s16);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32_ptr, Array_Range_s32_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32, Array_Range_s32)
+MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_s32, Range_s32,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s32, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s32, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_s32);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64_ptr, Array_Range_s64_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64, Array_Range_s64)
+MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s64, Range_s64,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s64, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_s64, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_s64);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32_ptr, Array_Range_f32_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32, Array_Range_f32)
+MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_f32, Range_f32,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_f32, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_f32, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_f32);
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64_ptr, Array_Range_f64_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64, Array_Range_f64)
+MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_f64, Range_f64,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("from"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_f64, from),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("to"),
+    .descriptor = &descriptor_f64,
+    .Base_Relative.offset = offsetof(Range_f64, to),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(range_f64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
-MASS_DEFINE_STRUCT_DESCRIPTOR(102, slice, Slice,
+MASS_DEFINE_STRUCT_DESCRIPTOR(112, slice, Slice,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("bytes"),
