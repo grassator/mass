@@ -93,6 +93,46 @@
 #define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT)
 
+#define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
+  {\
+    .name = slice_literal_fields(_NAME_),\
+    .descriptor = (_DESCRIPTOR_),\
+    .source_range = COMPILER_SOURCE_RANGE,\
+  }
+
+#define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _DESCRIPTOR_, _VIEW_)\
+  {\
+    .name = slice_literal_fields(_NAME_),\
+    .descriptor = (_DESCRIPTOR_),\
+    .maybe_default_expression = (_VIEW_),\
+    .source_range = COMPILER_SOURCE_RANGE,\
+  }
+
+#define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+{\
+  Function_Argument raw_arguments[] = {__VA_ARGS__};\
+  u64 arg_length = countof(raw_arguments);\
+  Array_Function_Argument arguments = \
+    dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
+  for (u64 i = 0; i < arg_length; ++i) {\
+    dyn_array_push(arguments, raw_arguments[i]);\
+  }\
+  Function_Info *function = allocator_allocate(allocator, Function_Info);\
+  function_info_init(function, 0);\
+  function->flags = Descriptor_Function_Flags_Compile_Time;\
+  function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
+  function->arguments = arguments;\
+  function->scope = scope_make(allocator, scope);\
+  const Descriptor *instance_descriptor = descriptor_function_instance(\
+    allocator, slice_literal(_NAME_), function, calling_convention\
+  );\
+  Value *instance_value = value_init(\
+    allocator_allocate(allocator, Value),\
+    instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
+  );\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
+}
+
 typedef struct {
   Slice name;
   s32 value;
