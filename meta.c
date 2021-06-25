@@ -89,8 +89,15 @@ typedef enum {
   Export_Target_Compiler_Module = 1 << 1,
 } Export_Target;
 
+typedef enum {
+  Meta_Type_Flags_None           = 0,
+  Meta_Type_Flags_No_C_Type      = 1 << 0,
+  Meta_Type_Flags_No_Value_Array = 1 << 1,
+} Meta_Type_Flags;
+
 typedef struct {
   Meta_Type_Tag tag;
+  Meta_Type_Flags flags;
   Export_Target export_target;
   union {
     C_Opaque c_opaque;
@@ -114,50 +121,68 @@ print_c_type_forward_declaration(
   FILE *file,
   Meta_Type *type
 ) {
+  const char *name;
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
-      fprintf(file, "typedef struct %s %s;\n", type->struct_.name, type->struct_.name);
-      fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n",
-        type->struct_.name, type->struct_.name);
-      fprintf(file, "typedef dyn_array_type(const %s *) Array_Const_%s_Ptr;\n",
-        type->struct_.name, type->struct_.name);
+      name = type->struct_.name;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef struct %s %s;\n", type->struct_.name, type->struct_.name);
+      }
       break;
     }
     case Meta_Type_Tag_Enum: {
-      fprintf(file, "typedef enum %s %s;\n", type->enum_.name, type->enum_.name);
+      name = 0;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef enum %s %s;\n", type->enum_.name, type->enum_.name);
+      }
       break;
     }
     case Meta_Type_Tag_Tagged_Union: {
-      fprintf(file, "typedef struct %s %s;\n", type->union_.name, type->union_.name);
-      fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n",
-        type->union_.name, type->union_.name);
-      fprintf(file, "typedef dyn_array_type(const %s *) Array_Const_%s_Ptr;\n",
-        type->union_.name, type->union_.name);
+      name = type->union_.name;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef struct %s %s;\n", type->union_.name, type->union_.name);
+      }
       break;
     }
     case Meta_Type_Tag_Function: {
-      fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
-      for (uint64_t i = 0; i < type->function.argument_count; ++i) {
-        Argument_Type *arg = &type->function.arguments[i];
-        if (i != 0) fprintf(file, ", ");
-        fprintf(file, "%s %s", arg->type, arg->name);
+      name = 0;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->function.name);
+        for (uint64_t i = 0; i < type->function.argument_count; ++i) {
+          Argument_Type *arg = &type->function.arguments[i];
+          if (i != 0) fprintf(file, ", ");
+          fprintf(file, "%s %s", arg->type, arg->name);
+        }
+        fprintf(file, ");\n");
       }
-      fprintf(file, ");\n");
       break;
     }
     case Meta_Type_Tag_Hash_Map: {
-      fprintf(file, "typedef struct %s %s;\n", type->hash_map.name, type->hash_map.name);
+      name = 0;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef struct %s %s;\n", type->hash_map.name, type->hash_map.name);
+      }
       break;
     }
     case Meta_Type_Tag_Number_Literal: {
-      fprintf(file, "#define %s (%s%"PRIu64")\n", type->number_literal.name,
-        type->number_literal.negative ? "-" : "", type->number_literal.bits);
+      name = 0;
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "#define %s (%s%"PRIu64")\n", type->number_literal.name,
+          type->number_literal.negative ? "-" : "", type->number_literal.bits);
+      }
       break;
     }
     case Meta_Type_Tag_C_Opaque: {
-      // Nothing to do?
+      name = type->c_opaque.name;
       break;
     }
+    default: {
+      name = 0;
+    }
+  }
+  if (name) {
+    fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n", name, name);
+    fprintf(file, "typedef dyn_array_type(const %s *) Array_Const_%s_Ptr;\n", name, name);
   }
   fprintf(file, "\n");
 }
@@ -197,71 +222,81 @@ print_c_type(
 ) {
   switch(type->tag) {
     case Meta_Type_Tag_Struct: {
-      print_c_struct(file, &type->struct_, type->struct_.name);
-      fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->struct_.name, type->struct_.name);
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        print_c_struct(file, &type->struct_, type->struct_.name);
+      }
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
+        fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n\n", type->struct_.name, type->struct_.name);
+      }
       break;
     }
     case Meta_Type_Tag_Enum: {
-      fprintf(file, "typedef enum %s {\n", type->enum_.name);
-      for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Type_Item *item = &type->enum_.items[i];
-        fprintf(file, "  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
-      }
-      fprintf(file, "} %s;\n\n", type->enum_.name);
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        fprintf(file, "typedef enum %s {\n", type->enum_.name);
+        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
+          Enum_Type_Item *item = &type->enum_.items[i];
+          fprintf(file, "  %s_%s = %d,\n", type->enum_.name, item->name, item->value);
+        }
+        fprintf(file, "} %s;\n\n", type->enum_.name);
 
-      char *lowercase_name = strtolower(type->enum_.name);
-      fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->enum_.name);
-      for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-        Enum_Type_Item *item = &type->enum_.items[i];
-        fprintf(file, "  if (value == %d) return \"%s_%s\";\n", item->value, type->enum_.name, item->name);
+        char *lowercase_name = strtolower(type->enum_.name);
+        fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->enum_.name);
+        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
+          Enum_Type_Item *item = &type->enum_.items[i];
+          fprintf(file, "  if (value == %d) return \"%s_%s\";\n", item->value, type->enum_.name, item->name);
+        }
+        fprintf(file, "  assert(!\"Unexpected value for enum %s\");\n", type->enum_.name);
+        fprintf(file, "  return 0;\n");
+        fprintf(file, "};\n\n");
       }
-      fprintf(file, "  assert(!\"Unexpected value for enum %s\");\n", type->enum_.name);
-      fprintf(file, "  return 0;\n");
-      fprintf(file, "};\n\n");
       break;
     }
     case Meta_Type_Tag_Tagged_Union: {
-      // Write out the enum
-      {
-        fprintf(file, "typedef enum {\n");
-        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct_Type *item = &type->union_.items[i];
-          fprintf(file, "  %s_Tag_%s = %" PRIu64  ",\n", type->union_.name, item->name, i);
+      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
+        // Write out the enum
+        {
+          fprintf(file, "typedef enum {\n");
+          for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+            Struct_Type *item = &type->union_.items[i];
+            fprintf(file, "  %s_Tag_%s = %" PRIu64  ",\n", type->union_.name, item->name, i);
+          }
+          fprintf(file, "} %s_Tag;\n\n", type->union_.name);
         }
-        fprintf(file, "} %s_Tag;\n\n", type->union_.name);
-      }
 
-      // Write out individual structs
-      {
-        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct_Type *struct_ = &type->union_.items[i];
-          if (struct_->item_count) {
-            char name_buffer[1024];
-            assert(snprintf(name_buffer, countof(name_buffer), "%s_%s", type->union_.name, struct_->name) > 0);
-            print_c_struct(file, struct_, name_buffer);
+        // Write out individual structs
+        {
+          for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+            Struct_Type *struct_ = &type->union_.items[i];
+            if (struct_->item_count) {
+              char name_buffer[1024];
+              assert(snprintf(name_buffer, countof(name_buffer), "%s_%s", type->union_.name, struct_->name) > 0);
+              print_c_struct(file, struct_, name_buffer);
+            }
           }
         }
-      }
 
-      // Write out the tagged union struct
-      {
-        fprintf(file, "typedef struct %s {\n", type->union_.name);
-        fprintf(file, "  %s_Tag tag;\n", type->union_.name);
-        fprintf(file, "  char _tag_padding[4];\n");
-        for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
-          Struct_Item *item = &type->union_.common.items[i];
-          fprintf(file, "  %s %s;\n", item->type, item->name);
-        }
-        fprintf(file, "  union {\n");
-        for (uint64_t i = 0; i < type->union_.item_count; ++i) {
-          Struct_Type *struct_ = &type->union_.items[i];
-          if (struct_->item_count) {
-            fprintf(file, "    %s_%s %s;\n",
-              type->union_.name, struct_->name, struct_->name);
+        // Write out the tagged union struct
+        {
+          fprintf(file, "typedef struct %s {\n", type->union_.name);
+          fprintf(file, "  %s_Tag tag;\n", type->union_.name);
+          fprintf(file, "  char _tag_padding[4];\n");
+          for (uint64_t i = 0; i < type->union_.common.item_count; ++i) {
+            Struct_Item *item = &type->union_.common.items[i];
+            fprintf(file, "  %s %s;\n", item->type, item->name);
           }
+          fprintf(file, "  union {\n");
+          for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+            Struct_Type *struct_ = &type->union_.items[i];
+            if (struct_->item_count) {
+              fprintf(file, "    %s_%s %s;\n",
+                type->union_.name, struct_->name, struct_->name);
+            }
+          }
+          fprintf(file, "  };\n");
+          fprintf(file, "} %s;\n", type->union_.name);
         }
-        fprintf(file, "  };\n");
-        fprintf(file, "} %s;\n", type->union_.name);
+      }
+      if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
         fprintf(file, "typedef dyn_array_type(%s) Array_%s;\n",
           type->union_.name, type->union_.name);
       }
@@ -908,6 +943,15 @@ export_global(
   Meta_Type *type
 ) {
   type->export_target |= Export_Target_Global;
+  return type;
+}
+
+static inline Meta_Type *
+set_flags(
+  Meta_Type *type,
+  Meta_Type_Flags flags
+) {
+  type->flags |= flags;
   return type;
 }
 
@@ -1656,6 +1700,36 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  // Prelude Types
+  const char *c_primitive_types[] = {
+    "u8", "u16", "u32", "u64",
+    "s8", "s16", "s32", "s64",
+    "f32", "f64",
+  };
+
+  {
+    Meta_Type_Flags flags = Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array;
+    for (u64 i = 0; i < countof(c_primitive_types); ++i) {
+      export_global(set_flags(push_type(type_c_opaque(c_primitive_types[i])), flags));
+    }
+
+    Fixed_Buffer *range_names_buffer = fixed_buffer_make(.capacity = 1024 * 1024);
+    for (u64 i = 0; i < countof(c_primitive_types); ++i) {
+      const char *string_name =
+        fixed_buffer_sprintf(range_names_buffer, "Range_%s", c_primitive_types[i]).bytes;
+      fixed_buffer_append_s8(range_names_buffer, 0);
+      set_flags(push_type(type_struct(string_name, (Struct_Item[]){
+        { c_primitive_types[i], "from" },
+        { c_primitive_types[i], "to" },
+      })), flags);
+    }
+
+    export_global(set_flags(push_type(type_struct("Slice", (Struct_Item[]){
+      { "u8 *", "bytes" },
+      { "u64", "length" },
+    })), flags));
+  }
+
   const char *this_filename = __FILE__;
   File_Info this_file_info;
   assert(file_info_c_string(this_filename, &this_file_info));
@@ -1713,32 +1787,6 @@ main(void) {
       // Also need to define built-in types
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
       fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
-
-      const char *c_primitive_types[] = {
-        "u8", "u16", "u32", "u64", "s8", "s16", "s32", "s64", "f32", "f64",
-      };
-
-      for (u64 i = 0; i < countof(c_primitive_types); ++i) {
-        export_global(push_type(type_c_opaque(c_primitive_types[i])));
-      }
-
-      Fixed_Buffer *range_names_buffer = fixed_buffer_make(.capacity = 1024 * 1024);
-      for (u64 i = 0; i < countof(c_primitive_types); ++i) {
-        const char *string_name =
-          fixed_buffer_sprintf(range_names_buffer, "Range_%s", c_primitive_types[i]).bytes;
-        fixed_buffer_append_s8(range_names_buffer, 0);
-        push_type(type_struct(string_name, (Struct_Item[]){
-          { c_primitive_types[i], "from" },
-          { c_primitive_types[i], "to" },
-        }));
-        fprintf(file, "typedef dyn_array_type(%s *) Array_%s_Ptr;\n", string_name, string_name);
-      }
-
-      export_global(push_type(type_struct("Slice", (Struct_Item[]){
-        { "u8 *", "bytes" },
-        { "u64", "length" },
-      })));
-      fprintf(file, "typedef dyn_array_type(Slice *) Array_Slice_Ptr;\n");
 
       for (uint32_t i = 0; i < type_count; ++i) {
         print_mass_descriptor_and_type_forward_declaration(file, &types[i]);

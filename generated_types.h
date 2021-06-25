@@ -287,6 +287,69 @@ typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
+typedef dyn_array_type(u8 *) Array_u8_Ptr;
+typedef dyn_array_type(const u8 *) Array_Const_u8_Ptr;
+
+typedef dyn_array_type(u16 *) Array_u16_Ptr;
+typedef dyn_array_type(const u16 *) Array_Const_u16_Ptr;
+
+typedef dyn_array_type(u32 *) Array_u32_Ptr;
+typedef dyn_array_type(const u32 *) Array_Const_u32_Ptr;
+
+typedef dyn_array_type(u64 *) Array_u64_Ptr;
+typedef dyn_array_type(const u64 *) Array_Const_u64_Ptr;
+
+typedef dyn_array_type(s8 *) Array_s8_Ptr;
+typedef dyn_array_type(const s8 *) Array_Const_s8_Ptr;
+
+typedef dyn_array_type(s16 *) Array_s16_Ptr;
+typedef dyn_array_type(const s16 *) Array_Const_s16_Ptr;
+
+typedef dyn_array_type(s32 *) Array_s32_Ptr;
+typedef dyn_array_type(const s32 *) Array_Const_s32_Ptr;
+
+typedef dyn_array_type(s64 *) Array_s64_Ptr;
+typedef dyn_array_type(const s64 *) Array_Const_s64_Ptr;
+
+typedef dyn_array_type(f32 *) Array_f32_Ptr;
+typedef dyn_array_type(const f32 *) Array_Const_f32_Ptr;
+
+typedef dyn_array_type(f64 *) Array_f64_Ptr;
+typedef dyn_array_type(const f64 *) Array_Const_f64_Ptr;
+
+typedef dyn_array_type(Range_u8 *) Array_Range_u8_Ptr;
+typedef dyn_array_type(const Range_u8 *) Array_Const_Range_u8_Ptr;
+
+typedef dyn_array_type(Range_u16 *) Array_Range_u16_Ptr;
+typedef dyn_array_type(const Range_u16 *) Array_Const_Range_u16_Ptr;
+
+typedef dyn_array_type(Range_u32 *) Array_Range_u32_Ptr;
+typedef dyn_array_type(const Range_u32 *) Array_Const_Range_u32_Ptr;
+
+typedef dyn_array_type(Range_u64 *) Array_Range_u64_Ptr;
+typedef dyn_array_type(const Range_u64 *) Array_Const_Range_u64_Ptr;
+
+typedef dyn_array_type(Range_s8 *) Array_Range_s8_Ptr;
+typedef dyn_array_type(const Range_s8 *) Array_Const_Range_s8_Ptr;
+
+typedef dyn_array_type(Range_s16 *) Array_Range_s16_Ptr;
+typedef dyn_array_type(const Range_s16 *) Array_Const_Range_s16_Ptr;
+
+typedef dyn_array_type(Range_s32 *) Array_Range_s32_Ptr;
+typedef dyn_array_type(const Range_s32 *) Array_Const_Range_s32_Ptr;
+
+typedef dyn_array_type(Range_s64 *) Array_Range_s64_Ptr;
+typedef dyn_array_type(const Range_s64 *) Array_Const_Range_s64_Ptr;
+
+typedef dyn_array_type(Range_f32 *) Array_Range_f32_Ptr;
+typedef dyn_array_type(const Range_f32 *) Array_Const_Range_f32_Ptr;
+
+typedef dyn_array_type(Range_f64 *) Array_Range_f64_Ptr;
+typedef dyn_array_type(const Range_f64 *) Array_Const_Range_f64_Ptr;
+
+typedef dyn_array_type(Slice *) Array_Slice_Ptr;
+typedef dyn_array_type(const Slice *) Array_Const_Slice_Ptr;
+
 
 // Type Definitions
 
@@ -1330,17 +1393,6 @@ static Descriptor descriptor_char_pointer;
 static Descriptor descriptor_descriptor;
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
-typedef dyn_array_type(Range_u8 *) Array_Range_u8_Ptr;
-typedef dyn_array_type(Range_u16 *) Array_Range_u16_Ptr;
-typedef dyn_array_type(Range_u32 *) Array_Range_u32_Ptr;
-typedef dyn_array_type(Range_u64 *) Array_Range_u64_Ptr;
-typedef dyn_array_type(Range_s8 *) Array_Range_s8_Ptr;
-typedef dyn_array_type(Range_s16 *) Array_Range_s16_Ptr;
-typedef dyn_array_type(Range_s32 *) Array_Range_s32_Ptr;
-typedef dyn_array_type(Range_s64 *) Array_Range_s64_Ptr;
-typedef dyn_array_type(Range_f32 *) Array_Range_f32_Ptr;
-typedef dyn_array_type(Range_f64 *) Array_Range_f64_Ptr;
-typedef dyn_array_type(Slice *) Array_Slice_Ptr;
 static Descriptor descriptor_source_position;
 static Descriptor descriptor_array_source_position;
 static Descriptor descriptor_array_source_position_ptr;
