@@ -1705,6 +1705,52 @@ main(void) {
     { "Mass_Result *", "result" },
   }));
 
+  push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Register", 1 },
+    { "Op_Code", 2 },
+    { "Plus_Register", 3},
+  }));
+
+  push_type(type_enum("Operand_Encoding_Type", (Enum_Type_Item[]){
+    { "None", 0},
+    { "Eflags", 1},
+    { "Register", 2},
+    { "Register_A", 3},
+    { "Register_Memory", 4},
+    { "Xmm", 5},
+    { "Xmm_Memory", 6},
+    { "Memory", 7},
+    { "Immediate", 8},
+  }));
+
+  push_type(type_enum("Operand_Size", (Enum_Type_Item[]){
+    { "Any", 0 },
+    { "8", 1 },
+    { "16", 2 },
+    { "32", 4 },
+    { "64", 8 },
+  }));
+
+  push_type(type_struct("Operand_Encoding", (Struct_Item[]){
+    { "Operand_Encoding_Type", "type" },
+    { "Operand_Size", "size" },
+  }));
+
+  push_type(type_struct("Instruction_Encoding", (Struct_Item[]){
+    { "u8", "op_code", 4 },
+    { "Instruction_Extension_Type", "extension_type" },
+    { "u8", "op_code_extension" },
+    { "u8", "_op_code_extension_padding", 3 },
+    { "Operand_Encoding", "operands", 3 },
+  }));
+
+  push_type(type_struct("X64_Mnemonic", (Struct_Item[]){
+    { "const char *", "name" },
+    { "const Instruction_Encoding *", "encoding_list" },
+    { "u64", "encoding_count" },
+  }));
+
   // Standard C types
   set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);
   set_flags(push_type(type_c_opaque("int")), Meta_Type_Flags_No_C_Type);
@@ -1767,7 +1813,6 @@ main(void) {
       // Custom forward declarations
       {
         fprintf(file, "typedef void(*fn_type_opaque)();\n\n");
-        fprintf(file, "typedef struct X64_Mnemonic X64_Mnemonic;\n\n");
       }
 
       fprintf(file, "// Forward declarations\n\n");
@@ -1784,7 +1829,6 @@ main(void) {
 
       fprintf(file, "\n// Mass Type Reflection\n\n");
 
-      fprintf(file, "static Descriptor descriptor_x64_mnemonic_pointer;\n");
       fprintf(file, "static Descriptor descriptor_void;\n");
       fprintf(file, "static Descriptor descriptor_void_pointer;\n");
 

@@ -5,8 +5,6 @@ static Atomic_u64 next_struct_id = {65537};
 _Pragma("warning (push)") _Pragma("warning (default: 4820)")
 typedef void(*fn_type_opaque)();
 
-typedef struct X64_Mnemonic X64_Mnemonic;
-
 // Forward declarations
 
 typedef struct Source_Position Source_Position;
@@ -286,6 +284,24 @@ typedef struct Static_Pointer_Map Static_Pointer_Map;
 typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
+
+typedef enum Instruction_Extension_Type Instruction_Extension_Type;
+
+typedef enum Operand_Encoding_Type Operand_Encoding_Type;
+
+typedef enum Operand_Size Operand_Size;
+
+typedef struct Operand_Encoding Operand_Encoding;
+typedef dyn_array_type(Operand_Encoding *) Array_Operand_Encoding_Ptr;
+typedef dyn_array_type(const Operand_Encoding *) Array_Const_Operand_Encoding_Ptr;
+
+typedef struct Instruction_Encoding Instruction_Encoding;
+typedef dyn_array_type(Instruction_Encoding *) Array_Instruction_Encoding_Ptr;
+typedef dyn_array_type(const Instruction_Encoding *) Array_Const_Instruction_Encoding_Ptr;
+
+typedef struct X64_Mnemonic X64_Mnemonic;
+typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
+typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
@@ -1387,6 +1403,88 @@ typedef struct Compilation {
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
+typedef enum Instruction_Extension_Type {
+  Instruction_Extension_Type_None = 0,
+  Instruction_Extension_Type_Register = 1,
+  Instruction_Extension_Type_Op_Code = 2,
+  Instruction_Extension_Type_Plus_Register = 3,
+} Instruction_Extension_Type;
+
+const char *instruction_extension_type_name(Instruction_Extension_Type value) {
+  if (value == 0) return "Instruction_Extension_Type_None";
+  if (value == 1) return "Instruction_Extension_Type_Register";
+  if (value == 2) return "Instruction_Extension_Type_Op_Code";
+  if (value == 3) return "Instruction_Extension_Type_Plus_Register";
+  assert(!"Unexpected value for enum Instruction_Extension_Type");
+  return 0;
+};
+
+typedef enum Operand_Encoding_Type {
+  Operand_Encoding_Type_None = 0,
+  Operand_Encoding_Type_Eflags = 1,
+  Operand_Encoding_Type_Register = 2,
+  Operand_Encoding_Type_Register_A = 3,
+  Operand_Encoding_Type_Register_Memory = 4,
+  Operand_Encoding_Type_Xmm = 5,
+  Operand_Encoding_Type_Xmm_Memory = 6,
+  Operand_Encoding_Type_Memory = 7,
+  Operand_Encoding_Type_Immediate = 8,
+} Operand_Encoding_Type;
+
+const char *operand_encoding_type_name(Operand_Encoding_Type value) {
+  if (value == 0) return "Operand_Encoding_Type_None";
+  if (value == 1) return "Operand_Encoding_Type_Eflags";
+  if (value == 2) return "Operand_Encoding_Type_Register";
+  if (value == 3) return "Operand_Encoding_Type_Register_A";
+  if (value == 4) return "Operand_Encoding_Type_Register_Memory";
+  if (value == 5) return "Operand_Encoding_Type_Xmm";
+  if (value == 6) return "Operand_Encoding_Type_Xmm_Memory";
+  if (value == 7) return "Operand_Encoding_Type_Memory";
+  if (value == 8) return "Operand_Encoding_Type_Immediate";
+  assert(!"Unexpected value for enum Operand_Encoding_Type");
+  return 0;
+};
+
+typedef enum Operand_Size {
+  Operand_Size_Any = 0,
+  Operand_Size_8 = 1,
+  Operand_Size_16 = 2,
+  Operand_Size_32 = 4,
+  Operand_Size_64 = 8,
+} Operand_Size;
+
+const char *operand_size_name(Operand_Size value) {
+  if (value == 0) return "Operand_Size_Any";
+  if (value == 1) return "Operand_Size_8";
+  if (value == 2) return "Operand_Size_16";
+  if (value == 4) return "Operand_Size_32";
+  if (value == 8) return "Operand_Size_64";
+  assert(!"Unexpected value for enum Operand_Size");
+  return 0;
+};
+
+typedef struct Operand_Encoding {
+  Operand_Encoding_Type type;
+  Operand_Size size;
+} Operand_Encoding;
+typedef dyn_array_type(Operand_Encoding) Array_Operand_Encoding;
+
+typedef struct Instruction_Encoding {
+  u8 op_code[4];
+  Instruction_Extension_Type extension_type;
+  u8 op_code_extension;
+  u8 _op_code_extension_padding[3];
+  Operand_Encoding operands[3];
+} Instruction_Encoding;
+typedef dyn_array_type(Instruction_Encoding) Array_Instruction_Encoding;
+
+typedef struct X64_Mnemonic {
+  const char * name;
+  const Instruction_Encoding * encoding_list;
+  u64 encoding_count;
+} X64_Mnemonic;
+typedef dyn_array_type(X64_Mnemonic) Array_X64_Mnemonic;
+
 typedef dyn_array_type(char) Array_char;
 
 typedef dyn_array_type(int) Array_int;
@@ -1395,7 +1493,6 @@ _Pragma("warning (pop)")
 
 // Mass Type Reflection
 
-static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_descriptor;
@@ -1757,6 +1854,36 @@ static Descriptor descriptor_array_compilation;
 static Descriptor descriptor_array_compilation_ptr;
 static Descriptor descriptor_compilation_pointer;
 static Descriptor descriptor_compilation_pointer_pointer;
+static Descriptor descriptor_instruction_extension_type;
+static Descriptor descriptor_array_instruction_extension_type;
+static Descriptor descriptor_array_instruction_extension_type_ptr;
+static Descriptor descriptor_instruction_extension_type_pointer;
+static Descriptor descriptor_instruction_extension_type_pointer_pointer;
+static Descriptor descriptor_operand_encoding_type;
+static Descriptor descriptor_array_operand_encoding_type;
+static Descriptor descriptor_array_operand_encoding_type_ptr;
+static Descriptor descriptor_operand_encoding_type_pointer;
+static Descriptor descriptor_operand_encoding_type_pointer_pointer;
+static Descriptor descriptor_operand_size;
+static Descriptor descriptor_array_operand_size;
+static Descriptor descriptor_array_operand_size_ptr;
+static Descriptor descriptor_operand_size_pointer;
+static Descriptor descriptor_operand_size_pointer_pointer;
+static Descriptor descriptor_operand_encoding;
+static Descriptor descriptor_array_operand_encoding;
+static Descriptor descriptor_array_operand_encoding_ptr;
+static Descriptor descriptor_operand_encoding_pointer;
+static Descriptor descriptor_operand_encoding_pointer_pointer;
+static Descriptor descriptor_instruction_encoding;
+static Descriptor descriptor_array_instruction_encoding;
+static Descriptor descriptor_array_instruction_encoding_ptr;
+static Descriptor descriptor_instruction_encoding_pointer;
+static Descriptor descriptor_instruction_encoding_pointer_pointer;
+static Descriptor descriptor_x64_mnemonic;
+static Descriptor descriptor_array_x64_mnemonic;
+static Descriptor descriptor_array_x64_mnemonic_ptr;
+static Descriptor descriptor_x64_mnemonic_pointer;
+static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_char_pointer;
@@ -1865,6 +1992,9 @@ static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descr
 static Descriptor descriptor_storage_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage *, 32, &descriptor_storage_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 static Descriptor descriptor_slice_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Slice, 2, &descriptor_slice);
+static Descriptor descriptor_u8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_u8);
+static Descriptor descriptor_u8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_u8);
+static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(1, source_position, Source_Position,
@@ -4442,6 +4572,108 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(101, compilation, Compilation,
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);
+MASS_DEFINE_OPAQUE_C_TYPE(instruction_extension_type, Instruction_Extension_Type)
+static C_Enum_Item instruction_extension_type_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Register"), .value = 1 },
+{ .name = slice_literal_fields("Op_Code"), .value = 2 },
+{ .name = slice_literal_fields("Plus_Register"), .value = 3 },
+};
+MASS_DEFINE_OPAQUE_C_TYPE(operand_encoding_type, Operand_Encoding_Type)
+static C_Enum_Item operand_encoding_type_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Eflags"), .value = 1 },
+{ .name = slice_literal_fields("Register"), .value = 2 },
+{ .name = slice_literal_fields("Register_A"), .value = 3 },
+{ .name = slice_literal_fields("Register_Memory"), .value = 4 },
+{ .name = slice_literal_fields("Xmm"), .value = 5 },
+{ .name = slice_literal_fields("Xmm_Memory"), .value = 6 },
+{ .name = slice_literal_fields("Memory"), .value = 7 },
+{ .name = slice_literal_fields("Immediate"), .value = 8 },
+};
+MASS_DEFINE_OPAQUE_C_TYPE(operand_size, Operand_Size)
+static C_Enum_Item operand_size_items[] = {
+{ .name = slice_literal_fields("Any"), .value = 0 },
+{ .name = slice_literal_fields("8"), .value = 1 },
+{ .name = slice_literal_fields("16"), .value = 2 },
+{ .name = slice_literal_fields("32"), .value = 4 },
+{ .name = slice_literal_fields("64"), .value = 8 },
+};
+MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding_ptr, Array_Operand_Encoding_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding, Array_Operand_Encoding)
+MASS_DEFINE_STRUCT_DESCRIPTOR(102, operand_encoding, Operand_Encoding,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("type"),
+    .descriptor = &descriptor_operand_encoding_type,
+    .Base_Relative.offset = offsetof(Operand_Encoding, type),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("size"),
+    .descriptor = &descriptor_operand_size,
+    .Base_Relative.offset = offsetof(Operand_Encoding, size),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(operand_encoding);
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding_ptr, Array_Instruction_Encoding_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding, Array_Instruction_Encoding)
+MASS_DEFINE_STRUCT_DESCRIPTOR(103, instruction_encoding, Instruction_Encoding,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("op_code"),
+    .descriptor = &descriptor_u8_4,
+    .Base_Relative.offset = offsetof(Instruction_Encoding, op_code),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("extension_type"),
+    .descriptor = &descriptor_instruction_extension_type,
+    .Base_Relative.offset = offsetof(Instruction_Encoding, extension_type),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("op_code_extension"),
+    .descriptor = &descriptor_u8,
+    .Base_Relative.offset = offsetof(Instruction_Encoding, op_code_extension),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("_op_code_extension_padding"),
+    .descriptor = &descriptor_u8_3,
+    .Base_Relative.offset = offsetof(Instruction_Encoding, _op_code_extension_padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("operands"),
+    .descriptor = &descriptor_operand_encoding_3,
+    .Base_Relative.offset = offsetof(Instruction_Encoding, operands),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_encoding);
+MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic_ptr, Array_X64_Mnemonic_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic, Array_X64_Mnemonic)
+MASS_DEFINE_STRUCT_DESCRIPTOR(104, x64_mnemonic, X64_Mnemonic,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_char_pointer,
+    .Base_Relative.offset = offsetof(X64_Mnemonic, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("encoding_list"),
+    .descriptor = &descriptor_instruction_encoding_pointer,
+    .Base_Relative.offset = offsetof(X64_Mnemonic, encoding_list),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("encoding_count"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(X64_Mnemonic, encoding_count),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(x64_mnemonic);
 MASS_DEFINE_OPAQUE_C_TYPE(char, char)
 MASS_DEFINE_OPAQUE_C_TYPE(array_char, Array_char)
 MASS_DEFINE_OPAQUE_C_TYPE(int, int)
@@ -4468,7 +4700,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(f64, f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_f64, Array_f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8, Array_Range_u8)
-MASS_DEFINE_STRUCT_DESCRIPTOR(102, range_u8, Range_u8,
+MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u8, Range_u8,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4485,7 +4717,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(102, range_u8, Range_u8,
 MASS_DEFINE_TYPE_VALUE(range_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16_ptr, Array_Range_u16_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16, Array_Range_u16)
-MASS_DEFINE_STRUCT_DESCRIPTOR(103, range_u16, Range_u16,
+MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_u16, Range_u16,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4502,7 +4734,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(103, range_u16, Range_u16,
 MASS_DEFINE_TYPE_VALUE(range_u16);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32_ptr, Array_Range_u32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32, Array_Range_u32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(104, range_u32, Range_u32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_u32, Range_u32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4519,7 +4751,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(104, range_u32, Range_u32,
 MASS_DEFINE_TYPE_VALUE(range_u32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64_ptr, Array_Range_u64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u64, Range_u64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_u64, Range_u64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4536,7 +4768,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u64, Range_u64,
 MASS_DEFINE_TYPE_VALUE(range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8_ptr, Array_Range_s8_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8, Array_Range_s8)
-MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_s8, Range_s8,
+MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s8, Range_s8,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4553,7 +4785,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_s8, Range_s8,
 MASS_DEFINE_TYPE_VALUE(range_s8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16_ptr, Array_Range_s16_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16, Array_Range_s16)
-MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_s16, Range_s16,
+MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_s16, Range_s16,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4570,7 +4802,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_s16, Range_s16,
 MASS_DEFINE_TYPE_VALUE(range_s16);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32_ptr, Array_Range_s32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32, Array_Range_s32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_s32, Range_s32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_s32, Range_s32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4587,7 +4819,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_s32, Range_s32,
 MASS_DEFINE_TYPE_VALUE(range_s32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64_ptr, Array_Range_s64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64, Array_Range_s64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s64, Range_s64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(112, range_s64, Range_s64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4604,7 +4836,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s64, Range_s64,
 MASS_DEFINE_TYPE_VALUE(range_s64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32_ptr, Array_Range_f32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32, Array_Range_f32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_f32, Range_f32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(113, range_f32, Range_f32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4621,7 +4853,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_f32, Range_f32,
 MASS_DEFINE_TYPE_VALUE(range_f32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64_ptr, Array_Range_f64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64, Array_Range_f64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_f64, Range_f64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(114, range_f64, Range_f64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4638,7 +4870,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_f64, Range_f64,
 MASS_DEFINE_TYPE_VALUE(range_f64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
-MASS_DEFINE_STRUCT_DESCRIPTOR(112, slice, Slice,
+MASS_DEFINE_STRUCT_DESCRIPTOR(115, slice, Slice,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("bytes"),

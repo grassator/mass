@@ -1,5 +1,4 @@
 #include "value.h"
-#include "encoding.h"
 
 typedef enum {
   MOD_Displacement_0   = 0b00,

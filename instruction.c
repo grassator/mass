@@ -1,4 +1,4 @@
-#include "encoding.h"
+#include "types.h"
 
 #define none .extension_type = Instruction_Extension_Type_None,
 #define _r .extension_type = Instruction_Extension_Type_Register,
