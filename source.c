@@ -1396,12 +1396,8 @@ token_parse_single(
         return token_parse_block(context, value);
       }
       case Group_Tag_Square: {
-        const Descriptor *pointee = token_match_type(context, group->children);
-        Descriptor *temp = descriptor_pointer_to(context->allocator, pointee);
-        return value_init(
-          allocator_allocate(context->allocator, Value),
-          &descriptor_type, storage_static(temp), *source_range
-        );
+        panic("TODO support tuples / struct literals");
+        break;
       }
     }
   } else if(value_is_symbol(value)) {

@@ -827,14 +827,6 @@ spec("source") {
       check(checker(42) == 42);
     }
 
-    it("should report an error when encountering invalid pointer type") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn(arg : [s32 s32]) -> () {}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-    }
-
     it("should report an error when encountering multiple return types") {
       test_program_inline_source_base(
         "exit", &test_context,
@@ -1207,7 +1199,7 @@ spec("source") {
     it("should have correctly handle the difference between addressof and bitwise and operators") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
-        "test :: fn() -> ([s64]) { x := 0 & 1; &x }"
+        "test :: fn() -> (&s64) { x := 0 & 1; &x }"
       );
       check(spec_check_mass_result(test_context.result));
       s64 actual = checker();
@@ -1569,7 +1561,7 @@ spec("source") {
     it("should parse and return C-compatible strings") {
       const char *(*checker)(void) = (const char *(*)(void))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> ([u8]) { c_string(\"test\") }"
+        "checker :: fn() -> (&u8) { c_string(\"test\") }"
       );
       check(spec_check_mass_result(test_context.result));
       const char *string = checker();
@@ -1578,7 +1570,7 @@ spec("source") {
     it("should accept string arguments") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn(string : String) -> ([u8]) {\n"
+        "checker :: fn(string : String) -> (&u8) {\n"
           "string.bytes\n"
         "}"
       );
@@ -1686,7 +1678,7 @@ spec("source") {
       s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
         "checker", &test_context,
         "Test_128bit :: c_struct({ x : s64; y : s64 })\n"
-        "checker :: fn(input : [Test_128bit]) -> (s64) {\n"
+        "checker :: fn(input : &Test_128bit) -> (s64) {\n"
           "input.y\n"
         "}"
       );
