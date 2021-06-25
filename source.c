@@ -6238,19 +6238,19 @@ scope_define_builtins(
     mass_number_literal_logical_shift_left, "logical_shift_left", &descriptor_number_literal,
     MASS_FN_ARG("number", &descriptor_number_literal),
     MASS_FN_ARG("shift", &descriptor_number_literal)
-  )
+  );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_number_literal_bitwise_and, "bitwise_and", &descriptor_number_literal,
     MASS_FN_ARG("a", &descriptor_number_literal),
     MASS_FN_ARG("b", &descriptor_number_literal)
-  )
+  );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_number_literal_bitwise_or, "bitwise_or", &descriptor_number_literal,
     MASS_FN_ARG("a", &descriptor_number_literal),
     MASS_FN_ARG("b", &descriptor_number_literal)
-  )
+  );
 
   {
     Value_View tokens;

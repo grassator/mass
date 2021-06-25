@@ -5,6 +5,11 @@ compiler_scope_define_exports(
   Compilation *compilation,
   Scope *scope
 ) {
+  const Allocator *allocator = compilation->allocator;
+  (void)allocator;
+  const Calling_Convention *calling_convention =
+    compilation->jit.program->default_calling_convention;
+  (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("External_Symbol"), type_external_symbol_value
@@ -21,6 +26,13 @@ compiler_scope_define_exports(
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Value"), type_value_value
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(
+    lazy_value_proc, "Lazy_Value_Proc", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("builder", &descriptor_function_builder_pointer),
+    MASS_FN_ARG("expected_result", &descriptor_expected_result_pointer),
+    MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

@@ -60,6 +60,7 @@ typedef struct {
   const char *returns;
   Argument_Type *arguments;
   uint64_t argument_count;
+  bool is_typedef;
 } Function_Type;
 
 typedef struct {
@@ -313,6 +314,57 @@ print_scope_enum(
 }
 
 static void
+print_mass_struct_descriptor_type(
+  FILE *file,
+  const char *type
+) {
+  Slice const_prefix = slice_literal("const ");
+  Slice lowercase_type = slice_from_c_string(strtolower(type));
+  if (slice_starts_with(lowercase_type, const_prefix)) {
+    lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
+  }
+  Slice original_lowercase_type = lowercase_type;
+  Slice pointer_suffix = slice_literal(" *");
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+  fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+  lowercase_type = original_lowercase_type;
+  while (slice_ends_with(lowercase_type, pointer_suffix)) {
+    fprintf(file, "_pointer");
+    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
+  }
+}
+
+static void
+print_scope_define_function(
+  FILE *file,
+  Function_Type *function
+) {
+  const char *lowercase_name = strtolower(function->name);
+  if (function->is_typedef) {
+    fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(\n");
+  } else {
+    fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION(\n");
+  }
+  fprintf(file, "    %s,", lowercase_name);
+  fprintf(file, " \"%s\",", function->name);
+  {
+    fprintf(file, " &");
+    print_mass_struct_descriptor_type(file, function->returns);
+    fprintf(file, ",\n");
+  }
+  for (uint64_t i = 0; i < function->argument_count; ++i) {
+    Argument_Type *arg = &function->arguments[i];
+    if (i != 0) fprintf(file, ",\n");
+    fprintf(file, "    MASS_FN_ARG(\"%s\", &", arg->name);
+    print_mass_struct_descriptor_type(file, arg->type);
+    fprintf(file, ")");
+  }
+  fprintf(file, "\n  );\n");
+}
+
+static void
 print_scope_export(
   FILE *file,
   Meta_Type *type
@@ -349,7 +401,7 @@ print_scope_export(
       break;
     }
     case Meta_Type_Tag_Function: {
-      print_scope_define(file, type->function.name);
+      print_scope_define_function(file, &type->function);
       break;
     }
     case Meta_Type_Tag_Hash_Map: {
@@ -453,29 +505,6 @@ print_natvis(
   }
 }
 
-static void
-print_mass_struct_item_type(
-  FILE *file,
-  Struct_Item *item
-) {
-  Slice const_prefix = slice_literal("const ");
-  Slice lowercase_type = slice_from_c_string(strtolower(item->type));
-  if (slice_starts_with(lowercase_type, const_prefix)) {
-    lowercase_type = slice_sub(lowercase_type, const_prefix.length, lowercase_type.length);
-  }
-  Slice original_lowercase_type = lowercase_type;
-  Slice pointer_suffix = slice_literal(" *");
-  while (slice_ends_with(lowercase_type, pointer_suffix)) {
-    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-  }
-  fprintf(file, "descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
-  lowercase_type = original_lowercase_type;
-  while (slice_ends_with(lowercase_type, pointer_suffix)) {
-    fprintf(file, "_pointer");
-    lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
-  }
-}
-
 hash_map_slice_template(Fixed_Array_Descriptor_Set, bool)
 
 void
@@ -500,10 +529,10 @@ print_mass_array_descriptors_for_struct(
     Slice type_slice = bucket_buffer_append_slice(names_buffer, fixed_buffer_as_slice(temp));
     hash_map_set(already_defined_set, type_slice, true);
     fprintf(file, "static Descriptor ");
-    print_mass_struct_item_type(file, item);
+    print_mass_struct_descriptor_type(file, item->type);
     fprintf(file, "_%u = MASS_DESCRIPTOR_STATIC_ARRAY(%s, %u, &",
       item->array_length, item->type, item->array_length);
-    print_mass_struct_item_type(file, item);
+    print_mass_struct_descriptor_type(file, item->type);
     fprintf(file, ");\n");
   }
 }
@@ -745,7 +774,7 @@ print_mass_descriptor_and_type(
       break;
     }
     case Meta_Type_Tag_Function: {
-      // TODO
+      // Exported functions are handled separately
       break;
     }
     case Meta_Type_Tag_Hash_Map: {
@@ -833,6 +862,18 @@ add_common_fields_internal(
   (Meta_Type){\
     .tag = Meta_Type_Tag_Number_Literal,\
     .number_literal = __VA_ARGS__\
+  }
+
+#define typedef_function(_NAME_STRING_, _RETURNS_, ...)\
+  (Meta_Type){\
+    .tag = Meta_Type_Tag_Function,\
+    .function = {\
+      .name = (_NAME_STRING_),\
+      .returns = (_RETURNS_),\
+      .arguments = (__VA_ARGS__),\
+      .argument_count = countof(__VA_ARGS__),\
+      .is_typedef = true,\
+    }\
   }
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
@@ -1338,12 +1379,12 @@ main(void) {
     }),
   }));
 
-  push_type(type_function("Lazy_Value_Proc", "Value *", (Argument_Type[]){
+  export_compiler(push_type(typedef_function("Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
     { "void *", "payload" },
-  }));
+  })));
 
   push_type(type_struct("Lazy_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
@@ -1358,7 +1399,7 @@ main(void) {
     { "Value_View", "expression" },
   }));
 
-  push_type(type_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
+  push_type(typedef_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "void *", "payload" },
@@ -1524,17 +1565,17 @@ main(void) {
     { "const Calling_Convention *", "default_calling_convention"},
   }));
 
-  push_type(type_function("Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
+  push_type(typedef_function("Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
     { "Program *", "program" },
     { "Function_Builder *", "builder" },
   }));
 
-  push_type(type_function("Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
+  push_type(typedef_function("Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
   }));
 
-  push_type(type_function("Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
+  push_type(typedef_function("Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
     { "Function_Argument_Mode", "mode" },
@@ -1547,7 +1588,7 @@ main(void) {
     { "Calling_Convention_Return_Proc", "return_proc"},
   }));
 
-  push_type(type_function("Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
+  push_type(typedef_function("Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },
@@ -1728,6 +1769,11 @@ main(void) {
         "  Compilation *compilation,\n"
         "  Scope *scope\n"
         ") {\n"
+        "  const Allocator *allocator = compilation->allocator;\n"
+        "  (void)allocator;\n"
+        "  const Calling_Convention *calling_convention =\n"
+        "    compilation->jit.program->default_calling_convention;\n"
+        "  (void)calling_convention;\n"
       );
       for (uint32_t i = 0; i < type_count; ++i) {
         Meta_Type *type = &types[i];

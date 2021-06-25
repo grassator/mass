@@ -108,8 +108,7 @@
     .source_range = COMPILER_SOURCE_RANGE,\
   }
 
-#define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
-{\
+#define MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER(_RETURN_DESCRIPTOR_, ...)\
   Function_Argument raw_arguments[] = {__VA_ARGS__};\
   u64 arg_length = countof(raw_arguments);\
   Array_Function_Argument arguments = \
@@ -118,11 +117,26 @@
     dyn_array_push(arguments, raw_arguments[i]);\
   }\
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
-  function_info_init(function, 0);\
-  function->flags = Descriptor_Function_Flags_Compile_Time;\
-  function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
-  function->arguments = arguments;\
-  function->scope = scope_make(allocator, scope);\
+  *function = (Function_Info){\
+    .flags = Descriptor_Function_Flags_Compile_Time,\
+    .returns.descriptor = (_RETURN_DESCRIPTOR_),\
+    .arguments = arguments,\
+    .scope = scope,\
+  };
+
+#define MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+do {\
+  MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER((_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  Value *info_value = value_init(\
+    allocator_allocate(allocator, Value),\
+    &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
+  );\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), info_value);\
+} while(0)
+
+#define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+do {\
+  MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER((_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
     allocator, slice_literal(_NAME_), function, calling_convention\
   );\
@@ -131,7 +145,7 @@
     instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
   );\
   scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
-}
+} while(0)
 
 typedef struct {
   Slice name;
