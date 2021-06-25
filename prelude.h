@@ -641,23 +641,8 @@ allocator_allocate_bytes_internal(
   return allocator->allocate(allocator->handle, size_in_bytes, alignment);
 }
 
-#ifdef PRELUDE_TRACK_ALLOCATION
-  inline void *
-  allocator_debug_allocate_bytes(
-    const Allocator *allocator,
-    u64 size_in_bytes,
-    u64 alignment,
-    const char *function,
-    const char *file,
-    u64 line
-  );
-
-  #define allocator_allocate_bytes(...)\
-    allocator_debug_allocate_bytes(__VA_ARGS__, __func__, __FILE__, __LINE__)
-#else
-  #define allocator_allocate_bytes(...)\
-    allocator_allocate_bytes_internal(__VA_ARGS__)
-#endif
+#define allocator_allocate_bytes(...)\
+  allocator_allocate_bytes_internal(__VA_ARGS__)
 
 #define allocator_allocate(_allocator_, _type_)\
   (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_), _Alignof(_type_))
@@ -2155,8 +2140,8 @@ c_string_from_slice(
 
 typedef struct {
   u64 byte_size;
-  u64 last_access_time;
-  u64 last_modified_time;
+  s64 last_access_time;
+  s64 last_modified_time;
 } File_Info;
 
 static inline bool
@@ -2285,69 +2270,28 @@ utf8_encode(
   return buffer;
 }
 
-// The `utf8_decode` function has following copyright and license
-//
-// Copyright (c) 2008-2009 Bjoern Hoehrmann <bjoern@hoehrmann.de>
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation
-// files (the "Software"), to deal in the Software without restriction,
-// including without limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of the Software,
-// and to permit persons to whom the Software is furnished to do so,
-// subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-// TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
-// OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
-// See http://bjoern.hoehrmann.de/utf-8/decoder/dfa/ for details.
-//
-
-#define UTF8_ACCEPT 0
-#define UTF8_REJECT 12
-
-static const u8 utf8_dfa_decode_table[] = {
-  // The first part of the table maps bytes to character classes that
-  // to reduce the size of the transition table and create bitmasks.
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,  9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-   7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,  7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
-   8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-  10,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3, 11,6,6,6,5,8,8,8,8,8,8,8,8,8,8,8,
-
-  // The second part is a transition table that maps a combination
-  // of a state of the automaton and a character class to a state.
-   0,12,24,36,60,96,84,12,12,12,48,72, 12,12,12,12,12,12,12,12,12,12,12,12,
-  12, 0,12,12,12,12,12, 0,12, 0,12,12, 12,24,12,12,12,12,12,24,12,24,12,12,
-  12,12,12,12,12,12,12,24,12,12,12,12, 12,24,12,12,12,12,12,12,12,24,12,12,
-  12,12,12,12,12,12,12,36,12,36,12,12, 12,36,12,12,12,12,12,36,12,36,12,12,
-  12,36,12,12,12,12,12,12,12,12,12,12,
-};
-
-static inline u32
-utf8_decode(
-  u32* state,
-  u32* code_point,
-  u8 byte
+static inline u8
+utf8_internal_expected_byte_count(
+  u8 start_byte
 ) {
-  u32 type = utf8_dfa_decode_table[byte];
+  static u8 lookup[32] = {
+    1,1,1,1,1,1,1,1,
+    1,1,1,1,1,1,1,1,
+    0,0,0,0,0,0,0,0,
+    2,2,2,2,3,3,4,0,
+  };
+  return lookup[start_byte >> 3];
+}
 
-  *code_point = (*state != UTF8_ACCEPT) ?
-    (byte & 0x3fu) | (*code_point << 6) :
-    (0xff >> type) & (byte);
-
-  *state = utf8_dfa_decode_table[256 + *state + type];
-  return *state;
+static inline s32
+utf8_internal_masked_first_byte(
+  u8 start_byte,
+  u8 expected_byte_count
+) {
+  static const u8 first_byte_mask_lookup[] = {
+    0, 0b01111111, 0b00011111, 0b00001111, 0b00000111,
+  };
+  return start_byte & first_byte_mask_lookup[expected_byte_count];
 }
 
 static inline s32
@@ -2355,46 +2299,85 @@ utf8_next_or_fffd(
   Slice utf8,
   u64 *index
 ) {
-  u32 state = 0;
-  u32 code_point = 0;
-  for (; *index < utf8.length; (*index) += 1) {
-    if (utf8_decode(&state, &code_point, utf8.bytes[*index])) {
-      if (state == UTF8_REJECT) {
-        code_point = 0xfffd;
-        state = UTF8_ACCEPT;
-      } else {
-        continue;
-      }
-    }
-    (*index) += 1;
-    return code_point;
+  const u8 *start_byte = &utf8.bytes[*index];
+  u8 expected_byte_count = utf8_internal_expected_byte_count(*start_byte);
+  if (expected_byte_count) {
+    *index += expected_byte_count;
+    if (*index > utf8.length) return 0xfffd;
+  } else {
+    *index += 1;
+    return 0xfffd;
   }
-  return -1;
+
+  s32 result = utf8_internal_masked_first_byte(start_byte[0], expected_byte_count);
+
+  u8 shift = 0;
+  s32 buffer = 0;
+  bool valid = true;
+  switch(expected_byte_count) {
+    case 4: {
+      buffer |= (start_byte[3] & 0x3F);
+      shift += 6;
+      valid |= (start_byte[3] & 0xC0) == 0x80;
+    }
+    case 3: {
+      buffer |= (start_byte[2] & 0x3F) << shift;
+      shift += 6;
+      valid |= (start_byte[2] & 0xC0) == 0x80;
+    }
+    case 2: {
+      buffer |= (start_byte[1] & 0x3F) << shift;
+      shift += 6;
+      valid |= (start_byte[1] & 0xC0) == 0x80;
+      break;
+    }
+    case 1: {
+      return result;
+    }
+  }
+
+  if (!valid) return 0xfffd;
+
+  return (result << shift) | buffer;
 }
 
 /// Returns count of code_points in the string.
 /// -1 return value indicates invalid UTF-8 sequence.
 static inline s64
 utf8_code_point_length(
-  Slice slice
+  Slice utf8
 ) {
-  u32 code_point = 0;
-  s64 count = 0;
-  u32 state = 0;
+  s64 length = 0;
 
-  for (u64 index = 0; index < slice.length; ++index) {
-    if (!utf8_decode(&state, &code_point, slice.bytes[index])) ++count;
+  for(u64 i = 0; i < utf8.length; length += 1) {
+    const u8 *start_byte = &utf8.bytes[i];
+    u8 expected_byte_count = utf8_internal_expected_byte_count(*start_byte);
+    if (expected_byte_count > utf8.length) return -1;
+    i += expected_byte_count;
+
+    bool valid = true;
+    switch(expected_byte_count) {
+      case 4: valid |= (start_byte[3] & 0xC0) == 0x80;
+      case 3: valid |= (start_byte[2] & 0xC0) == 0x80;
+      case 2: valid |= (start_byte[1] & 0xC0) == 0x80;
+        break;
+      case 0: {
+        valid = 0xFFFFFFFF;
+        break;
+      }
+    }
+
+    if (!valid) return -1;
   }
 
-  if (state != UTF8_ACCEPT) return -1;
-  return count;
+  return length;
 }
 
 static inline bool
-utf8_is_ascii_byte(
-  s8 byte
+utf8_validate(
+  Slice utf8
 ) {
-  return byte > 0;
+  return utf8_code_point_length(utf8) != -1;
 }
 
 static inline u64
@@ -2439,9 +2422,8 @@ utf8_to_utf16_raw(
   u64 target_index = 0;
 
   u64 index = 0;
-  for (;;) {
+  while (index < utf8.length) {
     s32 code_point = utf8_next_or_fffd(utf8, &index);
-    if (code_point == -1) break;
 
     if (code_point <= 0xFFFF) {
       if (target_index >= target_wide_length) return target_wide_length * 2;
@@ -3246,10 +3228,10 @@ struct Bucket_Buffer_Make_Options {
 };
 
 static inline Bucket_Buffer *
-bucket_buffer_make_internal(
+bucket_buffer_init_internal(
+  Bucket_Buffer *internal,
   struct Bucket_Buffer_Make_Options *options
 ) {
-  Bucket_Buffer *internal = allocator_allocate(options->allocator, Bucket_Buffer);
   *internal = (Bucket_Buffer) {
     .allocator = options->allocator,
     .occupied = 0,
@@ -3260,16 +3242,30 @@ bucket_buffer_make_internal(
   return internal;
 }
 
-#define bucket_buffer_make(...)\
-  bucket_buffer_make_internal(&(struct Bucket_Buffer_Make_Options) {\
+static inline Bucket_Buffer *
+bucket_buffer_make_internal(
+  struct Bucket_Buffer_Make_Options *options
+) {
+  Bucket_Buffer *internal = allocator_allocate(options->allocator, Bucket_Buffer);
+  return bucket_buffer_init_internal(internal, options);
+}
+
+#define bucket_buffer_options(...)\
+  &(struct Bucket_Buffer_Make_Options) {\
     .allocator = allocator_default,\
     .bucket_capacity = 4096,\
     ._count_reset = 0,\
     __VA_ARGS__\
-  })
+  }
+
+#define bucket_buffer_init(_BUFFER_POINTER_, ...)\
+  bucket_buffer_init_internal((_BUFFER_POINTER_), bucket_buffer_options(__VA_ARGS__))
+
+#define bucket_buffer_make(...)\
+  bucket_buffer_make_internal(bucket_buffer_options(__VA_ARGS__))
 
 static inline void
-bucket_buffer_destroy(
+bucket_buffer_deinit(
   Bucket_Buffer *buffer
 ) {
   for (u64 i = 0; i < dyn_array_length(buffer->buckets); ++i) {
@@ -3279,6 +3275,13 @@ bucket_buffer_destroy(
       dyn_array_get(buffer->buckets, i)->capacity
     );
   }
+}
+
+static inline void
+bucket_buffer_destroy(
+  Bucket_Buffer *buffer
+) {
+  bucket_buffer_deinit(buffer);
   allocator_deallocate(buffer->allocator, buffer, sizeof(*buffer));
 }
 
@@ -3455,7 +3458,6 @@ bucket_buffer_allocator_make(
     vsnprintf(vsprintf_bytes, vsprintf_size, (_format_), vsprintf_va);\
     *(_out_slice_) = (Slice) { .bytes = vsprintf_bytes, .length = vsprintf_size };\
   } while(0);
-
 
 //////////////////////////////////////////////////////////////////////////////
 // Hash
@@ -3952,45 +3954,5 @@ pointer_print(
     (print_4((x1), (x2), (x3), (x4)), print_4((x5), (x6), (x7), (x8)))
 
 #define print(...) PRELUDE_VA_MACRO(print_, ##__VA_ARGS__)
-
-////////////////////////////////////////////////////////////////////
-// Debug
-////////////////////////////////////////////////////////////////////
-
-typedef struct {
-  const Allocator *allocator;
-  u64 size_in_bytes;
-  u64 alignment;
-  const char *function;
-  const char *file;
-  u64 line;
-  void *result;
-} Prelude_Allocation_Info;
-typedef dyn_array_type(Prelude_Allocation_Info) Array_Prelude_Allocation_Info;
-
-#ifdef PRELUDE_TRACK_ALLOCATION
-  inline void *
-  allocator_debug_allocate_bytes(
-    const Allocator *allocator,
-    u64 size_in_bytes,
-    u64 alignment,
-    const char *function,
-    const char *file,
-    u64 line
-  ) {
-    void *result = allocator_allocate_bytes_internal(allocator, size_in_bytes, alignment);
-    Prelude_Allocation_Info *info = &(Prelude_Allocation_Info) {
-      .allocator = allocator,
-      .size_in_bytes = size_in_bytes,
-      .alignment = alignment,
-      .function = function,
-      .file = file,
-      .line = line,
-      .result = result,
-    };
-    PRELUDE_TRACK_ALLOCATION(info);
-    return result;
-  }
-#endif
 
 #endif
