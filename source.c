@@ -3583,6 +3583,7 @@ token_handle_function_call(
         instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
       fn_type_opaque jitted_code = c_function_from_label(jit->program, jit_label_index);
 
+      // @Volatile :IntrinsicFunctionSignature
       Value *(*jitted_intrinsic)(Value_View) = (Value *(*)(Value_View))jitted_code;
       Value_View args_view = value_view_from_value_array(args, &args_token->source_range);
       result = jitted_intrinsic(args_view);
@@ -5071,6 +5072,8 @@ token_parse_intrinsic_literal(
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
   Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
+  // @Volatile :IntrinsicFunctionSignature
+  // These arguments must match how we call it.
   Value *name_symbol = token_make_symbol(
     context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, keyword->source_range
   );
