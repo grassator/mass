@@ -1593,28 +1593,11 @@ spec("source") {
   }
 
   describe("Fixed Size Arrays") {
-    it("should report an error when fixed size array size does not resolve to an integer") {
-      test_program_inline_source_base(
-        "test", &test_context,
-        "BAR :: \"foo\"; "
-        "test :: fn() -> (s8) {"
-          "foo : s8[BAR];"
-          "foo.0 = 42;"
-          "foo.0"
-        "}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_u32);
-      check(error->Type_Mismatch.actual == &descriptor_slice);
-    }
-
     it("should be able to define a variable with a fixed size array type") {
       s8(*checker)(void) = (s8(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (s8) {"
-          "foo : s8[64];"
+          "foo : s8 * 64;"
           "foo.0 = 42;"
           "foo.0"
         "}"
@@ -1622,6 +1605,32 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       u8 actual = checker();
       check(actual == 42);
+    }
+
+    it("should report an error when fixed size array size does not resolve to an integer") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "BAR :: \"foo\"; "
+        "test :: fn() -> () {"
+          "foo : s8 * BAR"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.actual == &descriptor_slice);
+    }
+
+    it("should report an error when fixed size array size is negative") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: fn() -> () {"
+          "foo : s8 * -42"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Parse);
     }
   }
 

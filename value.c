@@ -1421,7 +1421,7 @@ static inline Descriptor *
 descriptor_array_of(
   const Allocator *allocator,
   const Descriptor *item_descriptor,
-  u32 length
+  u64 length
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   u64 item_bit_alignment = descriptor_bit_alignment(item_descriptor);

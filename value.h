@@ -197,7 +197,7 @@ static inline Descriptor *
 descriptor_array_of(
   const Allocator *allocator,
   const Descriptor *item_descriptor,
-  u32 length
+  u64 length
 );
 
 static inline bool
