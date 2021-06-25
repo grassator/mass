@@ -6133,24 +6133,72 @@ scope_define_enum(
   scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, slice_literal("_Type"), enum_type_value);
 }
 
+#define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
+  {\
+    .name = slice_literal_fields(_NAME_),\
+    .descriptor = (_DESCRIPTOR_),\
+    .source_range = COMPILER_SOURCE_RANGE,\
+  }
+
+#define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _DESCRIPTOR_, _VIEW_)\
+  {\
+    .name = slice_literal_fields(_NAME_),\
+    .descriptor = (_DESCRIPTOR_),\
+    .maybe_default_expression = (_VIEW_),\
+    .source_range = COMPILER_SOURCE_RANGE,\
+  }
+
+#define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+{\
+  Function_Argument raw_arguments[] = {__VA_ARGS__};\
+  u64 arg_length = countof(raw_arguments);\
+  Array_Function_Argument arguments = \
+    dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
+  for (u64 i = 0; i < arg_length; ++i) {\
+    dyn_array_push(arguments, raw_arguments[i]);\
+  }\
+  Function_Info *function = allocator_allocate(allocator, Function_Info);\
+  function_info_init(function, 0);\
+  function->flags = Descriptor_Function_Flags_Compile_Time;\
+  function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
+  function->arguments = arguments;\
+  function->scope = scope_make(allocator, scope);\
+  const Descriptor *instance_descriptor = descriptor_function_instance(\
+    allocator, slice_literal(_NAME_), function, calling_convention\
+  );\
+  Value *instance_value = value_init(\
+    allocator_allocate(allocator, Value),\
+    instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
+  );\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
+}
+
 static void
 module_compiler_init(
   Compilation *compilation,
   Module *out_module
 ) {
+  const Calling_Convention *calling_convention =
+    compilation->jit.program->default_calling_convention;
   const Allocator *allocator = compilation->allocator;
-  Scope *compiler_scope = scope_make(allocator, compilation->root_scope);
+  Scope *scope = scope_make(allocator, compilation->root_scope);
   *out_module = (Module) {
     .source_file = {
       .path = slice_literal("__mass_internal__"),
     },
-    .own_scope = compiler_scope,
+    .own_scope = scope,
     .export = {
       .tag = Module_Export_Tag_All,
-      .scope = compiler_scope,
+      .scope = scope,
     },
   };
-  compiler_scope_define_exports(compilation, compiler_scope);
+  compiler_scope_define_exports(compilation, scope);
+
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("view", &descriptor_value_view),
+  );
 }
 
 static void
@@ -6224,46 +6272,6 @@ scope_define_builtins(
       .handler = mass_handle_comparison_operation,
       .handler_payload = (void*)(s64)comparisons[i].type,
     )));
-  }
-
-  #define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
-    {\
-      .name = slice_literal_fields(_NAME_),\
-      .descriptor = (_DESCRIPTOR_),\
-      .source_range = COMPILER_SOURCE_RANGE,\
-    }
-
-  #define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _DESCRIPTOR_, _VIEW_)\
-    {\
-      .name = slice_literal_fields(_NAME_),\
-      .descriptor = (_DESCRIPTOR_),\
-      .maybe_default_expression = (_VIEW_),\
-      .source_range = COMPILER_SOURCE_RANGE,\
-    }
-
-  #define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
-  {\
-    Function_Argument raw_arguments[] = {__VA_ARGS__};\
-    u64 arg_length = countof(raw_arguments);\
-    Array_Function_Argument arguments = \
-      dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
-    for (u64 i = 0; i < arg_length; ++i) {\
-      dyn_array_push(arguments, raw_arguments[i]);\
-    }\
-    Function_Info *function = allocator_allocate(allocator, Function_Info);\
-    function_info_init(function, 0);\
-    function->flags = Descriptor_Function_Flags_Compile_Time;\
-    function->returns.descriptor = (_RETURN_DESCRIPTOR_);\
-    function->arguments = arguments;\
-    function->scope = scope_make(allocator, scope);\
-    const Descriptor *instance_descriptor = descriptor_function_instance(\
-      allocator, slice_literal(_NAME_), function, calling_convention\
-    );\
-    Value *instance_value = value_init(\
-      allocator_allocate(allocator, Value),\
-      instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
-    );\
-    scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
   }
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(

@@ -1714,11 +1714,11 @@ compilation_init(
   compilation->root_scope = scope_make(compilation->allocator, 0);
   scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
 
-  module_compiler_init(compilation, &compilation->compiler_module);
-
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
   program_init(compilation->allocator, jit_program, host_calling_convention());
   jit_init(&compilation->jit, jit_program);
+
+  module_compiler_init(compilation, &compilation->compiler_module);
 }
 
 static void
