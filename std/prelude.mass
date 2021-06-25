@@ -46,6 +46,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
+String :: Slice
 bool :: s8
 true :: 1
 false :: 0
@@ -57,14 +58,14 @@ operator 15 (x << y) { logical_shift_left(x, y) }
 operator 15 (x | y) { bitwise_or(x, y) }
 operator 15 (x & y) { bitwise_and(x, y) }
 
-String :: Slice
+
 
 fail :: {
   mass :: import("mass")
   @fn(context : &mass.Execution_Context, name : String, message : String) {
     result := context.result
-    result.tag = mass.Mass_Result_Tag.Error
-    result.Error.error.tag = mass.Mass_Error_Tag.User_Defined
+    result.tag = mass.Result_Tag.Error
+    result.Error.error.tag = mass.Error_Tag.User_Defined
     result.Error.error.User_Defined.name = name
     result.Error.error.detailed_message = message
     result.Error.error.source_range = @source_range

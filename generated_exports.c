@@ -61,77 +61,77 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error"), type_mass_error_value
+    slice_literal("Error"), type_mass_error_value
   );
   scope_define_enum(
     compilation->allocator, scope, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Tag"), type_mass_error_tag_value,
+    slice_literal("Error_Tag"), type_mass_error_tag_value,
     mass_error_tag_items, countof(mass_error_tag_items)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_User_Defined"), type_mass_error_user_defined_value
+    slice_literal("Error_User_Defined"), type_mass_error_user_defined_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Integer_Range"), type_mass_error_integer_range_value
+    slice_literal("Error_Integer_Range"), type_mass_error_integer_range_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_File_Open"), type_mass_error_file_open_value
+    slice_literal("Error_File_Open"), type_mass_error_file_open_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Unexpected_Token"), type_mass_error_unexpected_token_value
+    slice_literal("Error_Unexpected_Token"), type_mass_error_unexpected_token_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Operator_Infix_Suffix_Conflict"), type_mass_error_operator_infix_suffix_conflict_value
+    slice_literal("Error_Operator_Infix_Suffix_Conflict"), type_mass_error_operator_infix_suffix_conflict_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Operator_Prefix_Conflict"), type_mass_error_operator_prefix_conflict_value
+    slice_literal("Error_Operator_Prefix_Conflict"), type_mass_error_operator_prefix_conflict_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Undefined_Variable"), type_mass_error_undefined_variable_value
+    slice_literal("Error_Undefined_Variable"), type_mass_error_undefined_variable_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Redifinition"), type_mass_error_redifinition_value
+    slice_literal("Error_Redifinition"), type_mass_error_redifinition_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Unknown_Field"), type_mass_error_unknown_field_value
+    slice_literal("Error_Unknown_Field"), type_mass_error_unknown_field_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Invalid_Identifier"), type_mass_error_invalid_identifier_value
+    slice_literal("Error_Invalid_Identifier"), type_mass_error_invalid_identifier_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Type_Mismatch"), type_mass_error_type_mismatch_value
+    slice_literal("Error_Type_Mismatch"), type_mass_error_type_mismatch_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_No_Matching_Overload"), type_mass_error_no_matching_overload_value
+    slice_literal("Error_No_Matching_Overload"), type_mass_error_no_matching_overload_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Error_Undecidable_Overload"), type_mass_error_undecidable_overload_value
+    slice_literal("Error_Undecidable_Overload"), type_mass_error_undecidable_overload_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Result"), type_mass_result_value
+    slice_literal("Result"), type_mass_result_value
   );
   scope_define_enum(
     compilation->allocator, scope, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Result_Tag"), type_mass_result_tag_value,
+    slice_literal("Result_Tag"), type_mass_result_tag_value,
     mass_result_tag_items, countof(mass_result_tag_items)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Mass_Result_Error"), type_mass_result_error_value
+    slice_literal("Result_Error"), type_mass_result_error_value
   );
 }
 

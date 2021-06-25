@@ -328,12 +328,22 @@ print_c_type(
   }
 }
 
+static const char *
+strip_mass_prexix(
+  const char *name
+) {
+  const char* substr = strstr(name, "Mass_");
+  if (!substr) substr = strstr(name, "mass_");
+  return substr == name ? name + strlen("Mass_") : name;
+}
+
 static void
 print_scope_define(
   FILE *file,
   const char *name
 ) {
   char *lowercase_name = strtolower(name);
+  name = strip_mass_prexix(name);
   fprintf(file, "  scope_define_value(\n");
   fprintf(file, "    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,\n");
   fprintf(file, "    slice_literal(\"%s\"), type_%s_value\n", name, lowercase_name);
@@ -346,6 +356,7 @@ print_scope_enum(
   const char *name
 ) {
   char *lowercase_name = strtolower(name);
+  name = strip_mass_prexix(name);
   fprintf(file, "  scope_define_enum(\n");
   fprintf(file, "    compilation->allocator, scope, COMPILER_SOURCE_RANGE,\n");
   fprintf(file, "    slice_literal(\"%s\"), type_%s_value,\n", name, lowercase_name);
@@ -382,13 +393,14 @@ print_scope_define_function(
   Function_Type *function
 ) {
   const char *lowercase_name = strtolower(function->name);
+  const char *name = strip_mass_prexix(function->name);
   if (function->is_typedef) {
     fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(\n");
   } else {
     fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION(\n");
   }
   fprintf(file, "    %s,", lowercase_name);
-  fprintf(file, " \"%s\",", function->name);
+  fprintf(file, " \"%s\",", name);
   {
     fprintf(file, " &");
     print_mass_struct_descriptor_type(file, function->returns);
