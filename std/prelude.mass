@@ -61,7 +61,7 @@ String :: Slice
 
 fail :: {
   mass :: import("mass")
-  @fn(context : [mass.Execution_Context], name : String, message : String) {
+  @fn(context : &mass.Execution_Context, name : String, message : String) {
     result := context.result
     result.tag = mass.Mass_Result_Tag.Error
     result.Error.error.tag = mass.Mass_Error_Tag.User_Defined

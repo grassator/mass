@@ -4457,23 +4457,29 @@ token_handle_address_of(
   Value *pointee = *dyn_array_get(args, 0);
 
   if (context_is_compile_time_eval(context)) { // compile time
-    assert(pointee->storage.tag == Storage_Tag_Memory);
-    Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
+    if (pointee->descriptor == &descriptor_type) {
+      const Descriptor *type = storage_static_as_c_type(&pointee->storage, Descriptor);
+      Descriptor *descriptor = descriptor_pointer_to(context->allocator, type);
+      pointer = value_make(context, &descriptor_type, storage_static(descriptor), pointee->source_range);
+    } else {
+      assert(pointee->storage.tag == Storage_Tag_Memory);
+      Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
 
-    // TODO put this into a separate section and make readonly after relocations are done
-    //      this section can probably be zero-initialized
-    Program *runtime_program = context->compilation->runtime_program;
-    Section *section = &runtime_program->memory.rw_data;
-    u64 byte_size = descriptor_byte_size(descriptor);
-    u64 alignment = descriptor_byte_alignment(descriptor);
+      // TODO put this into a separate section and make readonly after relocations are done
+      //      this section can probably be zero-initialized
+      Program *runtime_program = context->compilation->runtime_program;
+      Section *section = &runtime_program->memory.rw_data;
+      u64 byte_size = descriptor_byte_size(descriptor);
+      u64 alignment = descriptor_byte_alignment(descriptor);
 
-    Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
-    Storage pointer_storage = data_label32(label_index, byte_size);
-    pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
-    dyn_array_push(runtime_program->relocations, (Relocation) {
-      .patch_at = pointer_storage,
-      .address_of = pointee->storage,
-    });
+      Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
+      Storage pointer_storage = data_label32(label_index, byte_size);
+      pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
+      dyn_array_push(runtime_program->relocations, (Relocation) {
+        .patch_at = pointer_storage,
+        .address_of = pointee->storage,
+      });
+    }
   } else { // run time
     const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
     const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
