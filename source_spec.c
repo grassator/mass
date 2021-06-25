@@ -955,13 +955,23 @@ spec("source") {
       s64 (*checker)(Spec_Callback foo) =
         (s64 (*)(Spec_Callback))test_program_inline_source_function(
           "checker", &test_context,
-          // TODO check overload "power"
-          //"my_intrinsic :: fn (x : s64, y : s64) -> Value { \\2 }\n"
           "my_intrinsic :: @intrinsic { \\2 }\n"
           "checker :: fn() -> (s64) { my_intrinsic(1, 2) }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 2);
+    }
+
+    it("should choose non-intrinsic overload if one is available") {
+      s64 (*checker)(Spec_Callback foo) =
+        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+          "checker", &test_context,
+          "foo :: fn (x : s64, y : s64) -> s64 { 42 }\n"
+          "foo :: @intrinsic { \\2 }\n"
+          "checker :: fn() -> (s64) { foo(1, 2) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(spec_callback) == 42);
     }
   }
 
