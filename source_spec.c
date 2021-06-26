@@ -429,27 +429,6 @@ spec("source") {
   }
   #endif
 
-  describe("Type Inference") {
-    it("should report an error when LHS of the := is not a symbol") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn() -> () { 2 := 42 }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Invalid_Identifier);
-    }
-    it("should report an error for multi-definition assignment") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn() -> () { foo, bar := 42, 42 }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Unimplemented);
-    }
-  }
-
   describe("if / else") {
     it("should be able to parse and run if expression") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
@@ -627,24 +606,6 @@ spec("source") {
       check(checker(42) == 42);
     }
 
-    it("should be able to define, assign and lookup an s64 variable on the stack") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "foo", &test_context,
-        "foo :: fn() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be able to assign to a void value") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "foo", &test_context,
-        "foo :: fn() -> (s64) { () = 10; 42 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should be able to parse and run multiple function definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "proxy", &test_context,
@@ -687,18 +648,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
       check(size == 4);
-    }
-
-    it("should report type mismatch when assigning") {
-      test_program_inline_source_base(
-        "test", &test_context,
-        "test :: fn() -> () { x : s32 = 0; y : s64 = 1; x = y; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_s32);
-      check(error->Type_Mismatch.actual == &descriptor_s64);
     }
 
     it("should report an overload overlap") {
@@ -774,18 +723,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       s32 actual = checker(42);
       check(actual == 42);
-    }
-
-    it("should be able to parse typed definition and assignment in the same statement") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s32) {"
-          "result : s32 = 42;"
-          "result"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
     }
 
     it("should be able to refer to the current scope") {
@@ -964,6 +901,65 @@ spec("source") {
         );
       check(spec_check_mass_result(test_context.result));
       check(checker(spec_callback) == 42);
+    }
+  }
+
+  describe("Assignment") {
+    it("should report type mismatch when assigning") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: fn() -> () { x : s32 = 0; y : s64 = 1; x = y; }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_s32);
+      check(error->Type_Mismatch.actual == &descriptor_s64);
+    }
+    it("should report an error when LHS of the := is not a symbol") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: fn() -> () { 2 := 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Invalid_Identifier);
+    }
+    it("should report an error for multi-definition assignment") {
+      test_program_inline_source_base(
+        "main", &test_context,
+        "main :: fn() -> () { foo, bar := 42, 42 }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Unimplemented);
+    }
+    it("should be able to define, assign and lookup an s64 variable on the stack") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> (s64) { y : s8; y = 10; x := 21; x = 32; x + y }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+    it("should be able to assign to a void value") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> (s64) { () = 10; 42 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+    it("should be able to parse typed definition and assignment in the same statement") {
+      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s32) {"
+          "result : s32 = 42;"
+          "result"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
     }
   }
 
