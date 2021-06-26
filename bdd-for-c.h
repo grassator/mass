@@ -304,6 +304,8 @@ bool __bdd_enter_node__(__bdd_node_flags__ node_flags, __bdd_config_type__ *conf
         int id = config->id++;
         __bdd_node__ *node = __bdd_node_create__(id, name, type, node_flags);
         if (node_flags & __bdd_node_flags_focus__) {
+            // Propagate focus to group nodes up the tree to print inly them
+            top->flags |= node_flags & __bdd_node_flags_focus__;
             config->has_focus_nodes = true;
         }
         __bdd_array_push__(list, node);
@@ -361,6 +363,9 @@ void __bdd_run__(__bdd_config_type__ *config) {
     __bdd_test_step__ *step = config->current_test;
 
     if (step->type == __BDD_NODE_GROUP__ && !config->use_tap) {
+        if (config->has_focus_nodes && !(step->flags & __bdd_node_flags_focus__)) {
+            return;
+        }
         __bdd_indent__(stdout, step->level);
         printf(
             "%s%s%s\n",
@@ -392,18 +397,20 @@ void __bdd_run__(__bdd_config_type__ *config) {
 
     if (skipped) {
         if (config->run == __BDD_TEST_RUN__) {
-            if (config->use_tap) {
-                // We only to report tests and not setup / teardown success
-                if (config->test_tap_index) {
-                    printf("skipped %zu - %s\n", config->test_tap_index, step->name);
-                }
-            } else {
-                __bdd_indent__(stdout, step->level);
-                printf(
-                    "%s %s(SKIP)%s\n", step->name,
-                    config->use_color ? __BDD_COLOR_YELLOW__ : "",
-                    config->use_color ? __BDD_COLOR_RESET__ : ""
-                );
+            if (!config->has_focus_nodes) {
+              if (config->use_tap) {
+                  // We only to report tests and not setup / teardown success
+                  if (config->test_tap_index) {
+                      printf("skipped %zu - %s\n", config->test_tap_index, step->name);
+                  }
+              } else {
+                  __bdd_indent__(stdout, step->level);
+                  printf(
+                      "%s %s(SKIP)%s\n", step->name,
+                      config->use_color ? __BDD_COLOR_YELLOW__ : "",
+                      config->use_color ? __BDD_COLOR_RESET__ : ""
+                  );
+              }
             }
         }
     } else if (config->error == NULL) {
