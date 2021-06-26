@@ -410,7 +410,7 @@ spec("source") {
   }
   #endif
 
-  #ifdef _WIN32
+  #if defined(_WIN32)
   describe("Win32: Structured Exceptions") {
     it("should be unwind stack on hardware exception on Windows") {
       fn_type_opaque checker = test_program_external_source_function(
@@ -1031,12 +1031,12 @@ spec("source") {
     }
 
     describe("multiplication") {
-      it("should correctly handle s8 multiplication") {\
+      it("should correctly handle s8 multiplication") {
         MATH_CHECKER_FN(s8, s8, *);
         check(spec_check_mass_result(test_context.result));
         check(checker(-30, 3) == -30 * 3);
       }
-      it("should correctly handle u8 multiplication") {\
+      it("should correctly handle u8 multiplication") {
         MATH_CHECKER_FN(u8, u8, *);
         check(spec_check_mass_result(test_context.result));
         check(checker(128u, 3u) == 128u);
@@ -1102,7 +1102,6 @@ spec("source") {
       check(checker() == Descriptor_Tag_Struct);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to use postfix backslash operator for reification") {
         s64(*checker)() = (s64(*)())test_program_inline_source_function(
             "checker", &test_context,
@@ -1111,7 +1110,6 @@ spec("source") {
         check(spec_check_mass_result(test_context.result));
         check(checker() == 42);
     }
-    #endif
 
     it("should be able to parse and run a triple plus function") {
       s64(*checker)(s64, s64, s64) = (s64(*)(s64, s64, s64))test_program_inline_source_function(
@@ -1549,7 +1547,6 @@ spec("source") {
       check(checker() == 1000000);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should report an error for macro external functions") {
       test_program_inline_source_base(
         "test", &test_context,
@@ -1558,7 +1555,6 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
     }
-    #endif
 
     it("should be able to parse and run macro id function at compile time") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
@@ -1831,7 +1827,6 @@ spec("source") {
 
 
   describe("Modules") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should support importing modules") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -1886,7 +1881,6 @@ spec("source") {
       spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
       spec_check_slice(error->detailed_message, slice_literal("Oops"));
     }
-    #endif
   }
 
   describe("PE32 Executables") {
