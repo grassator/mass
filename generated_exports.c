@@ -12,6 +12,10 @@ compiler_scope_define_exports(
   (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Value_View"), type_value_view_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("External_Symbol"), type_external_symbol_value
   );
   scope_define_enum(

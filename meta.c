@@ -1032,11 +1032,11 @@ main(void) {
     { "Curly", 3 },
   }));
 
-  push_type(type_struct("Value_View", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Value_View", (Struct_Item[]){
     { "Value * *", "values" },
     { "u64", "length" },
     { "Source_Range", "source_range" },
-  }));
+  })));
 
   push_type(type_enum("Symbol_Type", (Enum_Type_Item[]){
     { "Id_Like", 1 },

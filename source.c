@@ -2003,6 +2003,7 @@ token_handle_user_defined_operator_proc(
   for (u8 i = 0; i < operator->argument_count; ++i) {
     Slice arg_name = operator->argument_names[i];
     Value *arg = token_parse_single(context, value_view_get(args, i));
+    MASS_ON_ERROR(*context->result) return 0;
 
     // FIXME this should probably use the epoch from the definition, but we do not capture it yet
     scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_name, arg);
@@ -6187,6 +6188,10 @@ scope_define_builtins(
 ) {
   const Allocator *allocator = compilation->allocator;
   global_scope_define_exports(scope);
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("void"), type_void_value
+  );
 
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,

@@ -1044,6 +1044,7 @@ spec("source") {
       }
     }
 
+    #if defined(_WIN32) // TODO support on Linux
     it("should have an add function") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1052,6 +1053,43 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should have a subtract function") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) { subtract(44, 2) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should have a multiply function") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) { multiply(21, 2) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should have a divide function") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) { divide(84, 2) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should have a remainder function") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) { remainder(142, 100) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+    #endif
   }
 
   describe("Operators") {
@@ -1630,6 +1668,7 @@ spec("source") {
       check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
+    #if defined(_WIN32) // TODO support on Linux
     it("should report an error when fixed size array size is negative") {
       test_program_inline_source_base(
         "test", &test_context,
@@ -1641,6 +1680,7 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Parse);
     }
+    #endif
   }
 
   describe("User-defined Types") {

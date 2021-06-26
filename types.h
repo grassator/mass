@@ -160,6 +160,7 @@ static Descriptor descriptor_void = {
   .tag = Descriptor_Tag_Opaque,
   .name = slice_literal_fields("void"),
 };
+MASS_DEFINE_TYPE_VALUE(void);
 MASS_DEFINE_POINTER_DESCRIPTOR(void);
 
 #endif // C_MACRO_H

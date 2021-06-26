@@ -51,14 +51,40 @@ bool :: s8
 true :: 1
 false :: 0
 
-add :: {
-  mass :: import("mass")
+mass :: import("mass")
+
+Arithmetic_Proc :: fn(
+  ctx : &mass.Execution_Context,
+  view : mass.Value_View,
+  payload : &void
+) -> (&mass.Value)
+
+arithmetic_overloads :: macro(impl : Arithmetic_Proc) {
+  Type :: mass.Descriptor
   intrinsic :: @intrinsic {
-    mass.add(@context, arguments, 0)
+    impl(@context, arguments, 0)
   }
-  f :: macro(x : s64, y : s64) -> (s64) { intrinsic(x, y) }
+  template :: macro(type : Type) {
+    macro add(x : type, y : type) -> (type) { intrinsic(x, y) }
+  }
+  expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
+    f :: template(t64)
+    f :: template(t32)
+    f :: template(t16)
+    f :: template(t8)
+    f
+  }
+
+  f :: expand(s64, s32, s16, s8)
+  f :: expand(u64, u32, u16, u8)
   f
 }
+
+add :: arithmetic_overloads(mass.add)
+subtract :: arithmetic_overloads(mass.subtract)
+multiply :: arithmetic_overloads(mass.multiply)
+divide :: arithmetic_overloads(mass.divide)
+remainder :: arithmetic_overloads(mass.remainder)
 
 operator 16 (- x) { negate(x) }
 operator 16 (& x) { address_of(x) }
