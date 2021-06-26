@@ -1043,6 +1043,15 @@ spec("source") {
         check(checker(128u, 3u) == 128u);
       }
     }
+
+    it("should have an add function") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (s64) { add(40, 2) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Operators") {

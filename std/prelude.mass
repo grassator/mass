@@ -51,6 +51,15 @@ bool :: s8
 true :: 1
 false :: 0
 
+add :: {
+  mass :: import("mass")
+  intrinsic :: @intrinsic {
+    mass.add(@context, arguments, 0)
+  }
+  f :: macro(x : s64, y : s64) -> (s64) { intrinsic(x, y) }
+  f
+}
+
 operator 16 (- x) { negate(x) }
 operator 16 (& x) { address_of(x) }
 
