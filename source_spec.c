@@ -1176,7 +1176,7 @@ spec("source") {
     }
 
     #if defined(_WIN32) // TODO support on Linux
-    it("should have a built-in compile-time shift operator") {
+    xit("should have a built-in compile-time shift operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (s64) { 2 << 1 }"
@@ -1186,7 +1186,7 @@ spec("source") {
       check(actual == 4);
     }
 
-    it("should have a built-in compile-time bitwise and operator") {
+    xit("should have a built-in compile-time bitwise and operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (s64) { 0b110 & 0b011 }"
@@ -1196,7 +1196,7 @@ spec("source") {
       check(actual == 0b10);
     }
 
-    it("should have correctly handle the difference between addressof and bitwise and operators") {
+    xit("should have correctly handle the difference between addressof and bitwise and operators") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (&s64) { x := 0 & 1; &x }"
@@ -1206,7 +1206,7 @@ spec("source") {
       check(actual);
     }
 
-    it("should have a built-in compile-time bitwise or operator") {
+    xit("should have a built-in compile-time bitwise or operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
         "test :: fn() -> (s64) { 0b110 | 0b011 }"

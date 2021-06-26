@@ -134,7 +134,31 @@ compiler_scope_define_exports(
     slice_literal("Result_Error"), type_mass_result_error_value
   );
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_handle_arithmetic_operation, "handle_arithmetic_operation", &descriptor_value_pointer,
+    mass_add, "add", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("arguments", &descriptor_value_view),
+    MASS_FN_ARG("payload", &descriptor_void_pointer)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_subtract, "subtract", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("arguments", &descriptor_value_view),
+    MASS_FN_ARG("payload", &descriptor_void_pointer)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_multiply, "multiply", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("arguments", &descriptor_value_view),
+    MASS_FN_ARG("payload", &descriptor_void_pointer)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_divide, "divide", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("arguments", &descriptor_value_view),
+    MASS_FN_ARG("payload", &descriptor_void_pointer)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_remainder, "remainder", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
     MASS_FN_ARG("payload", &descriptor_void_pointer)

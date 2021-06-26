@@ -118,7 +118,7 @@
   }\
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
-    .flags = Descriptor_Function_Flags_Compile_Time,\
+    .flags = Descriptor_Function_Flags_None,\
     .returns.descriptor = (_RETURN_DESCRIPTOR_),\
     .arguments = arguments,\
     .scope = scope,\

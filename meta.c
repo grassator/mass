@@ -1767,11 +1767,16 @@ main(void) {
     { "u64", "encoding_count" },
   }));
 
-  export_compiler(push_type(type_function("mass_handle_arithmetic_operation", "Value *", (Argument_Type[]){
-    { "Execution_Context *", "context" },
-    { "Value_View", "arguments" },
-    { "void *", "payload" },
-  })));
+  const char *arithmetic_fns[] = {
+    "mass_add", "mass_subtract", "mass_multiply", "mass_divide", "mass_remainder",
+  };
+  for (u64 i = 0; i < countof(arithmetic_fns); ++i) {
+    export_compiler(push_type(type_function(arithmetic_fns[i], "Value *", (Argument_Type[]){
+      { "Execution_Context *", "context" },
+      { "Value_View", "arguments" },
+      { "void *", "payload" },
+    })));
+  }
 
   // Standard C types
   set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);
