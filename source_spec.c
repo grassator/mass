@@ -738,13 +738,17 @@ spec("source") {
       check(checker() == 42);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fibonnacii") {
       s64(*fibonnacci)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "fibonnacci", &test_context,
         "fibonnacci :: fn(n : s64) -> (s64) {\n"
           "if (n < 2) { return n }\n"
-          "fibonnacci(n - 1) + fibonnacci(n - 2)\n"
+          // FIXME Inline sum does not work on Linux because of some problem
+          //       with register release
+          // "fibonnacci(n - 1) + fibonnacci(n - 2)"
+          "n1 := fibonnacci(n - 1)\n"
+          "n2 := fibonnacci(n - 2)\n"
+          "n1 + n2"
         "}"
       );
       check(spec_check_mass_result(test_context.result));
@@ -753,7 +757,6 @@ spec("source") {
       check(fibonnacci(1) == 1);
       check(fibonnacci(10) == 55);
     }
-    #endif
 
     it("should allow non-parenthesized return type") {
       s32(*checker)(s32) = (s32(*)(s32))test_program_inline_source_function(
