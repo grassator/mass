@@ -149,6 +149,10 @@ mass_error_to_string(
       APPEND_LITERAL("Redefinition of binding ");
       APPEND_SLICE(error->Redifinition.name);
     } break;
+    case Mass_Error_Tag_Circular_Dependency: {
+      APPEND_LITERAL("Circular dependency when resolving ");
+      APPEND_SLICE(error->Circular_Dependency.name);
+    } break;
     case Mass_Error_Tag_Unknown_Field: {
       APPEND_LITERAL("Field ");
       APPEND_SLICE(error->Unknown_Field.name);

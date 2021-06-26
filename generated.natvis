@@ -1134,6 +1134,7 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
+    <Item Name="name">name</Item>
     <Item Name="epoch">epoch</Item>
     <Item Name="source_range">source_range</Item>
     <Item Name="Value" Condition="tag == Scope_Entry_Tag_Value">Value</Item>
@@ -1553,11 +1554,14 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Unimplemented">
     Unimplemented
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_Parse">
+    Parse
+  </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_User_Defined">
     User_Defined { User_Defined }
   </DisplayString>
-  <DisplayString Condition="tag == Mass_Error_Tag_Parse">
-    Parse
+  <DisplayString Condition="tag == Mass_Error_Tag_Circular_Dependency">
+    Circular_Dependency { Circular_Dependency }
   </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Non_Trailing_Default_Argument">
     Non_Trailing_Default_Argument
@@ -1610,6 +1614,7 @@
     <Item Name="source_range">source_range</Item>
     <Item Name="other_source_range">other_source_range</Item>
     <Item Name="User_Defined" Condition="tag == Mass_Error_Tag_User_Defined">User_Defined</Item>
+    <Item Name="Circular_Dependency" Condition="tag == Mass_Error_Tag_Circular_Dependency">Circular_Dependency</Item>
     <Item Name="Integer_Range" Condition="tag == Mass_Error_Tag_Integer_Range">Integer_Range</Item>
     <Item Name="File_Open" Condition="tag == Mass_Error_Tag_File_Open">File_Open</Item>
     <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>

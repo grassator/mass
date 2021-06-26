@@ -1266,6 +1266,25 @@ spec("source") {
   }
 
   describe("Compile Time Execution") {
+    it("should correctly detect direct circular dependency in static declarations") {
+      test_program_inline_source_base(
+        "LOOP", &test_context,
+        "LOOP :: LOOP"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Circular_Dependency);
+    }
+    it("should correctly detect indirect circular dependency in static declarations") {
+      test_program_inline_source_base(
+        "FOO", &test_context,
+        "FOO :: BAR\n"
+        "BAR :: FOO"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Circular_Dependency);
+    }
     it("should be able to call a function at compile time") {
       Value *status = test_program_inline_source_base(
         "STATUS_CODE", &test_context,

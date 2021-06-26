@@ -608,14 +608,23 @@ scope_entry_force(
     }
     case Scope_Entry_Tag_Value: {
       for (Value *value = entry->Value.value; value; value = value->next_overload) {
-        if (value->descriptor == &descriptor_lazy_static_value) {
-          Value *next_overload = value->next_overload;
-          Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
-          Value *result = compile_time_eval(&lazy->context, lazy->expression);
-          if (!result) return 0;
-          *value = *result;
-          value->next_overload = next_overload;
+        if (value->descriptor != &descriptor_lazy_static_value) continue;
+        Value *next_overload = value->next_overload;
+        Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
+        if (lazy->resolving) {
+          context_error(&lazy->context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Circular_Dependency,
+            .source_range = entry->source_range,
+            .Circular_Dependency = { .name = entry->name },
+          });
+          return 0;
         }
+        lazy->resolving = true;
+        Value *result = compile_time_eval(&lazy->context, lazy->expression);
+        lazy->resolving = false;
+        if (!result) return 0;
+        *value = *result;
+        value->next_overload = next_overload;
       }
       return entry->Value.value;
     }
@@ -661,6 +670,7 @@ scope_define_value(
     *allocated = (Scope_Entry) {
       .tag = Scope_Entry_Tag_Value,
       .Value.value = value,
+      .name = name,
       .epoch = epoch,
       .source_range = source_range,
     };
@@ -708,6 +718,7 @@ scope_define_operator(
     *new_entry = (Scope_Entry){
       .tag = Scope_Entry_Tag_Operator,
       .epoch = VALUE_STATIC_EPOCH,
+      .name = name,
       .source_range = source_range,
     };
     // Flatten parent operator entry into current one to avoid the need for overload iteration

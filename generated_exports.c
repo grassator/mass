@@ -78,6 +78,10 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Error_Circular_Dependency"), type_mass_error_circular_dependency_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Error_Integer_Range"), type_mass_error_integer_range_value
   );
   scope_define_value(

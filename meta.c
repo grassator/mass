@@ -1401,6 +1401,7 @@ main(void) {
       { "Operator *", "maybe_infix_or_postfix" },
     }),
   }), (Struct_Item[]){
+    { "Slice", "name" },
     { "u64", "epoch" },
     { "Source_Range", "source_range" },
   }));
@@ -1462,6 +1463,7 @@ main(void) {
   push_type(type_struct("Lazy_Static_Value", (Struct_Item[]){
     { "Execution_Context", "context" },
     { "Value_View", "expression" },
+    { "u64", "resolving" },
   }));
 
   push_type(typedef_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
@@ -1556,10 +1558,14 @@ main(void) {
 
   export_compiler(push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){
     struct_empty("Unimplemented"),
+    struct_empty("Parse"),
     struct_fields("User_Defined", (Struct_Item[]){
       { "Slice", "name" },
     }),
-    struct_empty("Parse"),
+    struct_fields("Circular_Dependency", (Struct_Item[]){
+      { "Slice", "name" },
+      { "Source_Range", "previous_source_range" },
+    }),
     struct_empty("Non_Trailing_Default_Argument"),
     struct_empty("Expected_Static"),
     struct_fields("Integer_Range", (Struct_Item[]){

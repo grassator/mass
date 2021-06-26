@@ -1040,6 +1040,7 @@ typedef struct Scope_Entry_Operator {
 typedef struct Scope_Entry {
   Scope_Entry_Tag tag;
   char _tag_padding[4];
+  Slice name;
   u64 epoch;
   Source_Range source_range;
   union {
@@ -1123,6 +1124,7 @@ typedef dyn_array_type(Lazy_Value) Array_Lazy_Value;
 typedef struct Lazy_Static_Value {
   Execution_Context context;
   Value_View expression;
+  u64 resolving;
 } Lazy_Static_Value;
 typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
 
@@ -1257,28 +1259,33 @@ typedef struct Descriptor {
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unimplemented = 0,
-  Mass_Error_Tag_User_Defined = 1,
-  Mass_Error_Tag_Parse = 2,
-  Mass_Error_Tag_Non_Trailing_Default_Argument = 3,
-  Mass_Error_Tag_Expected_Static = 4,
-  Mass_Error_Tag_Integer_Range = 5,
-  Mass_Error_Tag_File_Open = 6,
-  Mass_Error_Tag_Unexpected_Token = 7,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 8,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 9,
-  Mass_Error_Tag_Undefined_Variable = 10,
-  Mass_Error_Tag_Redifinition = 11,
-  Mass_Error_Tag_Unknown_Field = 12,
-  Mass_Error_Tag_Invalid_Identifier = 13,
-  Mass_Error_Tag_Type_Mismatch = 14,
-  Mass_Error_Tag_Epoch_Mismatch = 15,
-  Mass_Error_Tag_No_Matching_Overload = 16,
-  Mass_Error_Tag_Undecidable_Overload = 17,
+  Mass_Error_Tag_Parse = 1,
+  Mass_Error_Tag_User_Defined = 2,
+  Mass_Error_Tag_Circular_Dependency = 3,
+  Mass_Error_Tag_Non_Trailing_Default_Argument = 4,
+  Mass_Error_Tag_Expected_Static = 5,
+  Mass_Error_Tag_Integer_Range = 6,
+  Mass_Error_Tag_File_Open = 7,
+  Mass_Error_Tag_Unexpected_Token = 8,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 9,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 10,
+  Mass_Error_Tag_Undefined_Variable = 11,
+  Mass_Error_Tag_Redifinition = 12,
+  Mass_Error_Tag_Unknown_Field = 13,
+  Mass_Error_Tag_Invalid_Identifier = 14,
+  Mass_Error_Tag_Type_Mismatch = 15,
+  Mass_Error_Tag_Epoch_Mismatch = 16,
+  Mass_Error_Tag_No_Matching_Overload = 17,
+  Mass_Error_Tag_Undecidable_Overload = 18,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
   Slice name;
 } Mass_Error_User_Defined;
+typedef struct Mass_Error_Circular_Dependency {
+  Slice name;
+  Source_Range previous_source_range;
+} Mass_Error_Circular_Dependency;
 typedef struct Mass_Error_Integer_Range {
   const Descriptor * descriptor;
 } Mass_Error_Integer_Range;
@@ -1329,6 +1336,7 @@ typedef struct Mass_Error {
   Source_Range other_source_range;
   union {
     Mass_Error_User_Defined User_Defined;
+    Mass_Error_Circular_Dependency Circular_Dependency;
     Mass_Error_Integer_Range Integer_Range;
     Mass_Error_File_Open File_Open;
     Mass_Error_Unexpected_Token Unexpected_Token;
@@ -3473,6 +3481,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(60, scope_entry, Scope_Entry,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Scope_Entry, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("epoch"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Scope_Entry, epoch),
@@ -3704,6 +3718,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(67, lazy_static_value, Lazy_Static_Value,
     .name = slice_literal_fields("expression"),
     .descriptor = &descriptor_value_view,
     .Base_Relative.offset = offsetof(Lazy_Static_Value, expression),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("resolving"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Lazy_Static_Value, resolving),
   },
 );
 MASS_DEFINE_TYPE_VALUE(lazy_static_value);
@@ -4059,23 +4079,24 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_mass_error, Array_Mass_Error)
 MASS_DEFINE_OPAQUE_C_TYPE(mass_error_tag, Mass_Error_Tag)
 static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Unimplemented"), .value = 0 },
-{ .name = slice_literal_fields("User_Defined"), .value = 1 },
-{ .name = slice_literal_fields("Parse"), .value = 2 },
-{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 3 },
-{ .name = slice_literal_fields("Expected_Static"), .value = 4 },
-{ .name = slice_literal_fields("Integer_Range"), .value = 5 },
-{ .name = slice_literal_fields("File_Open"), .value = 6 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 7 },
-{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 8 },
-{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 9 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 10 },
-{ .name = slice_literal_fields("Redifinition"), .value = 11 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 12 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 13 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 14 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 15 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 16 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 17 },
+{ .name = slice_literal_fields("Parse"), .value = 1 },
+{ .name = slice_literal_fields("User_Defined"), .value = 2 },
+{ .name = slice_literal_fields("Circular_Dependency"), .value = 3 },
+{ .name = slice_literal_fields("Non_Trailing_Default_Argument"), .value = 4 },
+{ .name = slice_literal_fields("Expected_Static"), .value = 5 },
+{ .name = slice_literal_fields("Integer_Range"), .value = 6 },
+{ .name = slice_literal_fields("File_Open"), .value = 7 },
+{ .name = slice_literal_fields("Unexpected_Token"), .value = 8 },
+{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 9 },
+{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 10 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 11 },
+{ .name = slice_literal_fields("Redifinition"), .value = 12 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 13 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 14 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 15 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 16 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 17 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 18 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(81, mass_error_user_defined, Mass_Error_User_Defined,
   {
@@ -4086,7 +4107,22 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(81, mass_error_user_defined, Mass_Error_User_Defin
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_user_defined);
-MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_integer_range, Mass_Error_Integer_Range,
+MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_circular_dependency, Mass_Error_Circular_Dependency,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_Circular_Dependency, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("previous_source_range"),
+    .descriptor = &descriptor_source_range,
+    .Base_Relative.offset = offsetof(Mass_Error_Circular_Dependency, previous_source_range),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_error_circular_dependency);
+MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_integer_range, Mass_Error_Integer_Range,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
@@ -4095,7 +4131,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(82, mass_error_integer_range, Mass_Error_Integer_R
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_integer_range);
-MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_file_open, Mass_Error_File_Open,
+MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_file_open, Mass_Error_File_Open,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("path"),
@@ -4104,7 +4140,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(83, mass_error_file_open, Mass_Error_File_Open,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_file_open);
-MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_unexpected_token, Mass_Error_Unexpected_Token,
+MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_unexpected_token, Mass_Error_Unexpected_Token,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("expected"),
@@ -4113,7 +4149,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(84, mass_error_unexpected_token, Mass_Error_Unexpe
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_unexpected_token);
-MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_operator_infix_suffix_conflict, Mass_Error_Operator_Infix_Suffix_Conflict,
+MASS_DEFINE_STRUCT_DESCRIPTOR(86, mass_error_operator_infix_suffix_conflict, Mass_Error_Operator_Infix_Suffix_Conflict,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("symbol"),
@@ -4122,7 +4158,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(85, mass_error_operator_infix_suffix_conflict, Mas
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_operator_infix_suffix_conflict);
-MASS_DEFINE_STRUCT_DESCRIPTOR(86, mass_error_operator_prefix_conflict, Mass_Error_Operator_Prefix_Conflict,
+MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_error_operator_prefix_conflict, Mass_Error_Operator_Prefix_Conflict,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("symbol"),
@@ -4131,7 +4167,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(86, mass_error_operator_prefix_conflict, Mass_Erro
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_operator_prefix_conflict);
-MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_error_undefined_variable, Mass_Error_Undefined_Variable,
+MASS_DEFINE_STRUCT_DESCRIPTOR(88, mass_error_undefined_variable, Mass_Error_Undefined_Variable,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -4146,7 +4182,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(87, mass_error_undefined_variable, Mass_Error_Unde
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undefined_variable);
-MASS_DEFINE_STRUCT_DESCRIPTOR(88, mass_error_redifinition, Mass_Error_Redifinition,
+MASS_DEFINE_STRUCT_DESCRIPTOR(89, mass_error_redifinition, Mass_Error_Redifinition,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -4161,7 +4197,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(88, mass_error_redifinition, Mass_Error_Redifiniti
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_redifinition);
-MASS_DEFINE_STRUCT_DESCRIPTOR(89, mass_error_unknown_field, Mass_Error_Unknown_Field,
+MASS_DEFINE_STRUCT_DESCRIPTOR(90, mass_error_unknown_field, Mass_Error_Unknown_Field,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("type"),
@@ -4176,7 +4212,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(89, mass_error_unknown_field, Mass_Error_Unknown_F
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_unknown_field);
-MASS_DEFINE_STRUCT_DESCRIPTOR(90, mass_error_invalid_identifier, Mass_Error_Invalid_Identifier,
+MASS_DEFINE_STRUCT_DESCRIPTOR(91, mass_error_invalid_identifier, Mass_Error_Invalid_Identifier,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("id"),
@@ -4185,7 +4221,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(90, mass_error_invalid_identifier, Mass_Error_Inva
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_invalid_identifier);
-MASS_DEFINE_STRUCT_DESCRIPTOR(91, mass_error_type_mismatch, Mass_Error_Type_Mismatch,
+MASS_DEFINE_STRUCT_DESCRIPTOR(92, mass_error_type_mismatch, Mass_Error_Type_Mismatch,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("expected"),
@@ -4200,7 +4236,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(91, mass_error_type_mismatch, Mass_Error_Type_Mism
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_type_mismatch);
-MASS_DEFINE_STRUCT_DESCRIPTOR(92, mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
+MASS_DEFINE_STRUCT_DESCRIPTOR(93, mass_error_no_matching_overload, Mass_Error_No_Matching_Overload,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("target"),
@@ -4215,7 +4251,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(92, mass_error_no_matching_overload, Mass_Error_No
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_no_matching_overload);
-MASS_DEFINE_STRUCT_DESCRIPTOR(93, mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
+MASS_DEFINE_STRUCT_DESCRIPTOR(94, mass_error_undecidable_overload, Mass_Error_Undecidable_Overload,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("a"),
@@ -4230,7 +4266,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(93, mass_error_undecidable_overload, Mass_Error_Un
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_undecidable_overload);
-MASS_DEFINE_STRUCT_DESCRIPTOR(94, mass_error, Mass_Error,
+MASS_DEFINE_STRUCT_DESCRIPTOR(95, mass_error, Mass_Error,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -4260,6 +4296,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(94, mass_error, Mass_Error,
     .name = slice_literal_fields("User_Defined"),
     .descriptor = &descriptor_mass_error_user_defined,
     .Base_Relative.offset = offsetof(Mass_Error, User_Defined),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Circular_Dependency"),
+    .descriptor = &descriptor_mass_error_circular_dependency,
+    .Base_Relative.offset = offsetof(Mass_Error, Circular_Dependency),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4344,7 +4386,7 @@ static C_Enum_Item mass_result_tag_items[] = {
 { .name = slice_literal_fields("Success"), .value = 0 },
 { .name = slice_literal_fields("Error"), .value = 1 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(95, mass_result_error, Mass_Result_Error,
+MASS_DEFINE_STRUCT_DESCRIPTOR(96, mass_result_error, Mass_Result_Error,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("error"),
@@ -4353,7 +4395,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(95, mass_result_error, Mass_Result_Error,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_result_error);
-MASS_DEFINE_STRUCT_DESCRIPTOR(96, mass_result, Mass_Result,
+MASS_DEFINE_STRUCT_DESCRIPTOR(97, mass_result, Mass_Result,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
@@ -4371,7 +4413,7 @@ MASS_DEFINE_TYPE_VALUE(mass_result);
 /*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_program_ptr, Array_Program_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_program, Array_Program)
-MASS_DEFINE_STRUCT_DESCRIPTOR(97, program, Program,
+MASS_DEFINE_STRUCT_DESCRIPTOR(98, program, Program,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("import_libraries"),
@@ -4430,7 +4472,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(97, program, Program,
 MASS_DEFINE_TYPE_VALUE(program);
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention_ptr, Array_Calling_Convention_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_calling_convention, Array_Calling_Convention)
-MASS_DEFINE_STRUCT_DESCRIPTOR(98, calling_convention, Calling_Convention,
+MASS_DEFINE_STRUCT_DESCRIPTOR(99, calling_convention, Calling_Convention,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("register_volatile_bitset"),
@@ -4459,7 +4501,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(98, calling_convention, Calling_Convention,
 MASS_DEFINE_TYPE_VALUE(calling_convention);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters_ptr, Array_Jit_Counters_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_counters, Array_Jit_Counters)
-MASS_DEFINE_STRUCT_DESCRIPTOR(99, jit_counters, Jit_Counters,
+MASS_DEFINE_STRUCT_DESCRIPTOR(100, jit_counters, Jit_Counters,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("functions"),
@@ -4488,7 +4530,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(99, jit_counters, Jit_Counters,
 MASS_DEFINE_TYPE_VALUE(jit_counters);
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit_ptr, Array_Jit_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_jit, Array_Jit)
-MASS_DEFINE_STRUCT_DESCRIPTOR(100, jit, Jit,
+MASS_DEFINE_STRUCT_DESCRIPTOR(101, jit, Jit,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("is_stack_unwinding_in_progress"),
@@ -4523,7 +4565,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(100, jit, Jit,
 MASS_DEFINE_TYPE_VALUE(jit);
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation_ptr, Array_Compilation_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_compilation, Array_Compilation)
-MASS_DEFINE_STRUCT_DESCRIPTOR(101, compilation, Compilation,
+MASS_DEFINE_STRUCT_DESCRIPTOR(102, compilation, Compilation,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("temp_buffer"),
@@ -4621,7 +4663,7 @@ static C_Enum_Item operand_size_items[] = {
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding_ptr, Array_Operand_Encoding_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding, Array_Operand_Encoding)
-MASS_DEFINE_STRUCT_DESCRIPTOR(102, operand_encoding, Operand_Encoding,
+MASS_DEFINE_STRUCT_DESCRIPTOR(103, operand_encoding, Operand_Encoding,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("type"),
@@ -4638,7 +4680,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(102, operand_encoding, Operand_Encoding,
 MASS_DEFINE_TYPE_VALUE(operand_encoding);
 MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding_ptr, Array_Instruction_Encoding_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_encoding, Array_Instruction_Encoding)
-MASS_DEFINE_STRUCT_DESCRIPTOR(103, instruction_encoding, Instruction_Encoding,
+MASS_DEFINE_STRUCT_DESCRIPTOR(104, instruction_encoding, Instruction_Encoding,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("op_code"),
@@ -4673,7 +4715,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(103, instruction_encoding, Instruction_Encoding,
 MASS_DEFINE_TYPE_VALUE(instruction_encoding);
 MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic_ptr, Array_X64_Mnemonic_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_x64_mnemonic, Array_X64_Mnemonic)
-MASS_DEFINE_STRUCT_DESCRIPTOR(104, x64_mnemonic, X64_Mnemonic,
+MASS_DEFINE_STRUCT_DESCRIPTOR(105, x64_mnemonic, X64_Mnemonic,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -4720,7 +4762,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(f64, f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_f64, Array_f64)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8_ptr, Array_Range_u8_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u8, Array_Range_u8)
-MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u8, Range_u8,
+MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_u8, Range_u8,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4737,7 +4779,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(105, range_u8, Range_u8,
 MASS_DEFINE_TYPE_VALUE(range_u8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16_ptr, Array_Range_u16_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u16, Array_Range_u16)
-MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_u16, Range_u16,
+MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_u16, Range_u16,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4754,7 +4796,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(106, range_u16, Range_u16,
 MASS_DEFINE_TYPE_VALUE(range_u16);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32_ptr, Array_Range_u32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u32, Array_Range_u32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_u32, Range_u32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_u32, Range_u32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4771,7 +4813,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(107, range_u32, Range_u32,
 MASS_DEFINE_TYPE_VALUE(range_u32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64_ptr, Array_Range_u64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_u64, Array_Range_u64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_u64, Range_u64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_u64, Range_u64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4788,7 +4830,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(108, range_u64, Range_u64,
 MASS_DEFINE_TYPE_VALUE(range_u64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8_ptr, Array_Range_s8_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s8, Array_Range_s8)
-MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s8, Range_s8,
+MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_s8, Range_s8,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4805,7 +4847,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(109, range_s8, Range_s8,
 MASS_DEFINE_TYPE_VALUE(range_s8);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16_ptr, Array_Range_s16_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s16, Array_Range_s16)
-MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_s16, Range_s16,
+MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_s16, Range_s16,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4822,7 +4864,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(110, range_s16, Range_s16,
 MASS_DEFINE_TYPE_VALUE(range_s16);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32_ptr, Array_Range_s32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s32, Array_Range_s32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_s32, Range_s32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(112, range_s32, Range_s32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4839,7 +4881,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(111, range_s32, Range_s32,
 MASS_DEFINE_TYPE_VALUE(range_s32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64_ptr, Array_Range_s64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_s64, Array_Range_s64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(112, range_s64, Range_s64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(113, range_s64, Range_s64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4856,7 +4898,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(112, range_s64, Range_s64,
 MASS_DEFINE_TYPE_VALUE(range_s64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32_ptr, Array_Range_f32_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f32, Array_Range_f32)
-MASS_DEFINE_STRUCT_DESCRIPTOR(113, range_f32, Range_f32,
+MASS_DEFINE_STRUCT_DESCRIPTOR(114, range_f32, Range_f32,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4873,7 +4915,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(113, range_f32, Range_f32,
 MASS_DEFINE_TYPE_VALUE(range_f32);
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64_ptr, Array_Range_f64_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_range_f64, Array_Range_f64)
-MASS_DEFINE_STRUCT_DESCRIPTOR(114, range_f64, Range_f64,
+MASS_DEFINE_STRUCT_DESCRIPTOR(115, range_f64, Range_f64,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("from"),
@@ -4890,7 +4932,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(114, range_f64, Range_f64,
 MASS_DEFINE_TYPE_VALUE(range_f64);
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice_ptr, Array_Slice_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_slice, Array_Slice)
-MASS_DEFINE_STRUCT_DESCRIPTOR(115, slice, Slice,
+MASS_DEFINE_STRUCT_DESCRIPTOR(116, slice, Slice,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("bytes"),
