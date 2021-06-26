@@ -1498,7 +1498,8 @@ static Value *
 token_apply_macro_syntax(
   Execution_Context *context,
   Array_Value_View match,
-  Macro *macro
+  Macro *macro,
+  Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -1533,11 +1534,15 @@ token_apply_macro_syntax(
   Execution_Context body_context = *context;
   body_context.scope = expansion_scope;
 
+  Value *result;
   if (body_context.flags & Execution_Context_Flags_Global) {
-    return compile_time_eval(&body_context, macro->replacement);
+    result = compile_time_eval(&body_context, macro->replacement);
   } else {
-    return token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
+    result = token_parse_expression(&body_context, macro->replacement, &(u64){0}, 0);
   }
+  // The result of the expansion should map to the source range of the match
+  if (result) result->source_range = source_range;
+  return result;
 }
 
 static Value *
@@ -1581,7 +1586,8 @@ token_parse_macro_statement(
     }
   }
 
-  Value *expansion_value = token_apply_macro_syntax(context, match, macro);
+  Value_View match_view = value_view_slice(&value_view, 0, match_length);
+  Value *expansion_value = token_apply_macro_syntax(context, match, macro, match_view.source_range);
   if (expansion_value) {
     assert(value_is_lazy_or_static(expansion_value));
 
@@ -1626,7 +1632,8 @@ token_parse_macros(
       dyn_array_clear(match);
       *match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
       if (!*match_length) continue;
-      replacement = token_apply_macro_syntax(context, match, macro);
+      Value_View match_view = value_view_slice(&value_view, 0, *match_length);
+      replacement = token_apply_macro_syntax(context, match, macro, match_view.source_range);
       goto defer;
     }
   }
