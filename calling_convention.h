@@ -162,34 +162,38 @@ typedef struct {
   System_V_Registers general_purpose_registers;
   System_V_Registers vector_registers;
   u64 stack_offset;
+  u64 offset_in_classified_eightbyte;
 } System_V_Classification_State;
 
-static Memory_Layout_Item
+static SYSTEM_V_ARGUMENT_CLASS
 x86_64_system_v_memory_layout_item_for_class(
   System_V_Classification_State *state,
   SYSTEM_V_ARGUMENT_CLASS class,
   Slice name,
-  const Descriptor *descriptor
+  const Descriptor *descriptor,
+  Memory_Layout_Item *out_result
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
   switch(class) {
     case SYSTEM_V_NO_CLASS: {
-      return (Memory_Layout_Item) {
+      *out_result = (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Absolute,
         .name = name,
         .descriptor = descriptor,
         .Absolute = {.storage = storage_none},
       };
+      return SYSTEM_V_NO_CLASS;
     }
     case SYSTEM_V_INTEGER: {
       if (state->general_purpose_registers.index < state->general_purpose_registers.count) {
         Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
-        return (Memory_Layout_Item) {
+        *out_result = (Memory_Layout_Item) {
           .tag = Memory_Layout_Item_Tag_Absolute,
           .name = name,
           .descriptor = descriptor,
           .Absolute = {.storage = storage_register(reg, byte_size)},
         };
+        return SYSTEM_V_INTEGER;
       } else {
         goto relative;
       }
@@ -198,12 +202,13 @@ x86_64_system_v_memory_layout_item_for_class(
     case SYSTEM_V_SSE: {
       if (state->vector_registers.index < state->vector_registers.count) {
         Register reg = state->vector_registers.items[state->vector_registers.index++];
-        return (Memory_Layout_Item) {
+        *out_result = (Memory_Layout_Item) {
           .tag = Memory_Layout_Item_Tag_Absolute,
           .name = name,
           .descriptor = descriptor,
           .Absolute = {.storage = storage_register(reg, byte_size)},
         };
+        return SYSTEM_V_SSE;
       } else {
         goto relative;
       }
@@ -222,14 +227,14 @@ x86_64_system_v_memory_layout_item_for_class(
   }
 
   relative: {
-    Memory_Layout_Item result = {
+    *out_result = (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
       .name = name,
       .descriptor = descriptor,
       .Base_Relative = {.offset = state->stack_offset},
     };
     state->stack_offset += u64_align(byte_size, 8);
-    return result;
+    return SYSTEM_V_MEMORY;
   }
 }
 
@@ -240,10 +245,9 @@ x86_64_system_v_push_memory_layout_item_for_class(
   Slice name,
   const Descriptor *descriptor
 ) {
-  dyn_array_push(
-    state->memory_layout.items,
-    x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor)
-  );
+  Memory_Layout_Item item;
+  class = x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor, &item);
+  dyn_array_push(state->memory_layout.items, item);
   return class;
 }
 
@@ -282,17 +286,22 @@ x86_64_system_v_classify(
       // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
       // C++ ABI 13, it is passed by invisible reference (the object is replaced in the
       // parameter list by a pointer that has class INTEGER)
-      bool is_c_plus_plus_non_trivial = false; // TODO allow to specify this
+      bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
       if (is_c_plus_plus_non_trivial) {
         return x86_64_system_v_push_memory_layout_item_for_class(state, SYSTEM_V_INTEGER, name, descriptor);
       }
 
       // 3. If the size of the aggregate exceeds a single eightbyte, each is classified
       // separately. Each eightbyte gets initialized to class NO_CLASS.
-      SYSTEM_V_ARGUMENT_CLASS result = SYSTEM_V_NO_CLASS;
-      u64 current_eightbyte_offset = 0;
+      SYSTEM_V_ARGUMENT_CLASS eightbyte_class = SYSTEM_V_NO_CLASS;
 
-      Memory_Layout saved_state_layout = state->memory_layout;
+      // @Hack We need to somehow say that the struct has no Storage in Mass terms so
+      //       if struct fields are unpacked to registers, SYSTEM_V_NO_CLASS is used
+      //       for the struct as a whole and then its fields have register storages.
+      //       This might cause problems down the line.
+      SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
+
+      System_V_Classification_State saved_state = *state;
       state->memory_layout = (Memory_Layout) {
         .items = dyn_array_make(
           Array_Memory_Layout_Item,
@@ -301,52 +310,98 @@ x86_64_system_v_classify(
         ),
       };
 
+      u64 last_offset = 0;
+
+      // 4. Each field of an object is classified recursively so that always two fields are
+      // considered. The resulting class is calculated according to the classes of the
+      // fields in the eightbyte:
       DYN_ARRAY_FOREACH(Memory_Layout_Item, item, descriptor->Struct.memory_layout.items) {
         const Descriptor *item_descriptor = item->descriptor;
         assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
         u64 offset = item->Base_Relative.offset;
-        if (offset - current_eightbyte_offset >= eightbyte) {
-          result = SYSTEM_V_NO_CLASS;
-          current_eightbyte_offset = offset;
-          assert(current_eightbyte_offset % 8 == 0);
-        }
-        SYSTEM_V_ARGUMENT_CLASS current =
-          x86_64_system_v_classify(allocator, state, item->name, item_descriptor);
-        if (result == current) {
-          continue;
-        } else if (current == SYSTEM_V_NO_CLASS) {
-          continue;
-        } else if (result == SYSTEM_V_NO_CLASS) {
-          result = current;
-        } else if (result == SYSTEM_V_MEMORY || current == SYSTEM_V_MEMORY) {
-          result = SYSTEM_V_MEMORY;
-          break;
-        } else if (result == SYSTEM_V_INTEGER || current == SYSTEM_V_INTEGER) {
-          result = SYSTEM_V_INTEGER;
-        } else if (
-          result == SYSTEM_V_X87 || result == SYSTEM_V_X87UP || result == SYSTEM_V_COMPLEX_X87 ||
-          current == SYSTEM_V_X87 || current == SYSTEM_V_X87UP || current == SYSTEM_V_COMPLEX_X87
-        ) {
-          result = SYSTEM_V_MEMORY;
-          break;
+
+        // FIXME this algorithm is designed to operate on C-style aggregates
+        //       which unlike the Memory_Layout can not specify arbitrary offsets
+        //       and overlaps. So we might have to convert to that representation
+        //       or do some really fancy tracking of overlaps (unions).
+        if (offset < last_offset) {
+          panic("FIXME support unions");
         } else {
-          result = SYSTEM_V_SSE;
+          last_offset = offset;
+        }
+
+        if (offset - state->offset_in_classified_eightbyte >= eightbyte) {
+          eightbyte_class = SYSTEM_V_NO_CLASS;
+          state->offset_in_classified_eightbyte = offset;
+          assert(state->offset_in_classified_eightbyte % 8 == 0);
+        }
+        SYSTEM_V_ARGUMENT_CLASS field_class =
+          x86_64_system_v_classify(allocator, state, item->name, item_descriptor);
+        // 4(a) If both classes are equal, this is the resulting class.
+        if (eightbyte_class == field_class) {
+          continue;
+        } else
+        // 4(b) If one of the classes is NO_CLASS, the resulting class is the other class.
+        if (field_class == SYSTEM_V_NO_CLASS) {
+          continue;
+        } else if (eightbyte_class == SYSTEM_V_NO_CLASS) {
+          eightbyte_class = field_class;
+        } else
+        // 4(c) If one of the classes is MEMORY, the result is the MEMORY class.
+        if (field_class == SYSTEM_V_MEMORY) {
+          eightbyte_class = SYSTEM_V_MEMORY;
+        } else
+        // 4(d) If one of the classes is INTEGER, the result is the INTEGER class.
+        if (eightbyte_class == SYSTEM_V_INTEGER || field_class == SYSTEM_V_INTEGER) {
+          eightbyte_class = SYSTEM_V_INTEGER;
+        } else
+        // 4(e) If one of the classes is X87, X87UP, COMPLEX_X87 class, MEMORY is used as class.
+        if (
+          eightbyte_class == SYSTEM_V_X87 ||
+          eightbyte_class == SYSTEM_V_X87UP ||
+          eightbyte_class == SYSTEM_V_COMPLEX_X87 ||
+          field_class == SYSTEM_V_X87 ||
+          field_class == SYSTEM_V_X87UP ||
+          field_class == SYSTEM_V_COMPLEX_X87
+        ) {
+          eightbyte_class = SYSTEM_V_MEMORY;
+        }
+        // 4(f) Otherwise class SSE is used.
+        else {
+          eightbyte_class = SYSTEM_V_SSE;
+        }
+        if (eightbyte_class == SYSTEM_V_MEMORY) {
+          struct_class = SYSTEM_V_MEMORY;
+          break;
         }
       }
 
-      // TODO implement post-merger cleanup
-      if (result != SYSTEM_V_MEMORY) {
-        // FIXME this will cause type mismatches unless struct are not compared by pointer
+      // FIXME 5. Then a post merger cleanup is done:
+
+      if (struct_class == SYSTEM_V_MEMORY) {
+        dyn_array_destroy(state->memory_layout.items);
+        // Restore both the memory layout and the available registers info
+        *state = saved_state;
+      } else {
+        // :StructIds
+        // Because we have to allocate a distinct Descriptor here
+        // structs are not longer comparable by pointer.
         Descriptor *updated_descriptor = allocator_allocate(allocator, Descriptor);
         *updated_descriptor = *descriptor;
         updated_descriptor->Struct.memory_layout = state->memory_layout;
         descriptor = updated_descriptor;
 
-        // FIXME this is probably incorrect in nested scenarios
-        result = SYSTEM_V_NO_CLASS;
+        // Restore the memory layout, keep available registers info
+        state->memory_layout = saved_state.memory_layout;
+
+        // This is required to correctly propagate up the recursive call that a field
+        // that is itself a struct is packed inside a single register.
+        if (byte_size <= eightbyte) {
+          assert(struct_class == SYSTEM_V_NO_CLASS);
+          struct_class = eightbyte;
+        }
       }
-      state->memory_layout = saved_state_layout;
-      return x86_64_system_v_push_memory_layout_item_for_class(state, result, name, descriptor);
+      return x86_64_system_v_push_memory_layout_item_for_class(state, struct_class, name, descriptor);
     }
     case Descriptor_Tag_Fixed_Size_Array: {
       panic("TODO implement array classification");

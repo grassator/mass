@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include "prelude.h"
 
+// :StructIds
 #define MAX_META_STRUCT_ID (1 << 16)
 static s32 next_struct_id = 1;
 

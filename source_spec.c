@@ -1092,7 +1092,6 @@ spec("source") {
   }
 
   describe("Operators") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to use prefix backslash operator for reflection") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1103,6 +1102,7 @@ spec("source") {
       check(checker() == Descriptor_Tag_Struct);
     }
 
+    #if defined(_WIN32) // TODO support on Linux
     it("should be able to use postfix backslash operator for reification") {
         s64(*checker)() = (s64(*)())test_program_inline_source_function(
             "checker", &test_context,
