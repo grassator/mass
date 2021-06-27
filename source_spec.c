@@ -644,8 +644,11 @@ spec("source") {
     it("should be able to parse and run functions with local overloads") {
       s64(*checker)(s32) = (s64(*)(s32))test_program_inline_source_function(
         "checker", &test_context,
-        "size_of :: fn(x : s32) -> (s64) { 4 }\n"
-        "checker :: fn(x : s32) -> (s64) { size_of :: fn(x : s64) -> (s64) { 8 }; size_of(x) }"
+        "my_size_of :: fn(x : s32) -> (s64) { 4 }\n"
+        "checker :: fn(x : s32) -> (s64) {\n"
+          "my_size_of :: fn(x : s64) -> (s64) { 8 }\n"
+          "my_size_of(x)\n"
+        "}"
       );
       check(spec_check_mass_result(test_context.result));
       s64 size = checker(0);
