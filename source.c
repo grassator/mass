@@ -6476,13 +6476,21 @@ program_import_module(
         Value *symbol = *symbol_pointer;
         assert(value_is_symbol(symbol));
         Slice name = value_as_symbol(symbol)->name;
+        Scope_Entry *entry = scope_lookup_shallow(module->own_scope, name);
+        if (!entry) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Undefined_Variable,
+            .source_range = symbol->source_range,
+            .Undefined_Variable = {.name = name},
+          });
+          return *context->result;
+        }
         {
           Value *value = scope_lookup_force(module->own_scope, name);
           MASS_TRY(*context->result);
           scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, name, value);
         }
 
-        // FIXME check for existence
         //Value_View expr = value_view_single(symbol_pointer);
         //scope_define_lazy_compile_time_expression(&import_context, module->export.scope, name, expr);
       }
