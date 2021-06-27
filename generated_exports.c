@@ -142,6 +142,12 @@ compiler_scope_define_exports(
     slice_literal("Result_Error"), type_mass_result_error_value
   );
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    tokenize, "tokenize", &descriptor_mass_result,
+    MASS_FN_ARG("compilation", &descriptor_compilation_pointer),
+    MASS_FN_ARG("file", &descriptor_source_file_pointer),
+    MASS_FN_ARG("out_tokens", &descriptor_value_view_pointer)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_add, "add", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
@@ -175,11 +181,23 @@ compiler_scope_define_exports(
 
 static void
 global_scope_define_exports(
+  Compilation *compilation,
   Scope *scope
 ) {
+  const Allocator *allocator = compilation->allocator;
+  (void)allocator;
+  const Calling_Convention *calling_convention =
+    compilation->jit.program->default_calling_convention;
+  (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Number_Literal"), type_number_literal_value
+  );
+  MASS_FN_ARG_DEFAULT_EXPRESSION(mass_import_context__default_expression, "@context")
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_import, "import", &descriptor_scope,
+    MASS_FN_ARG("name", &descriptor_slice),
+    MASS_FN_ARG_WITH_DEFAULT("context", mass_import_context__default_expression, &descriptor_execution_context_pointer)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

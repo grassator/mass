@@ -54,6 +54,7 @@ typedef struct {
 typedef struct {
   const char *type;
   const char *name;
+  const char *maybe_default_expression;
 } Argument_Type;
 
 typedef struct {
@@ -399,6 +400,16 @@ print_scope_define_function(
 ) {
   const char *lowercase_name = strtolower(function->name);
   const char *name = strip_mass_prexix(function->name);
+
+  #define DEFAULT_EXPR_FORMAT "%s_%s__default_expression"
+  for (uint64_t i = 0; i < function->argument_count; ++i) {
+    Argument_Type *arg = &function->arguments[i];
+    if (!arg->maybe_default_expression) continue;
+    // TODO escape default expression
+    fprintf(file, "  MASS_FN_ARG_DEFAULT_EXPRESSION("DEFAULT_EXPR_FORMAT", \"%s\")\n",
+      function->name, arg->name, arg->maybe_default_expression);
+  }
+
   if (function->is_typedef) {
     fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(\n");
   } else {
@@ -414,7 +425,12 @@ print_scope_define_function(
   for (uint64_t i = 0; i < function->argument_count; ++i) {
     Argument_Type *arg = &function->arguments[i];
     if (i != 0) fprintf(file, ",\n");
-    fprintf(file, "    MASS_FN_ARG(\"%s\", &", arg->name);
+    if (arg->maybe_default_expression) {
+      fprintf(file, "    MASS_FN_ARG_WITH_DEFAULT(\"%s\", "DEFAULT_EXPR_FORMAT", &",
+        arg->name, function->name, arg->name);
+    } else {
+      fprintf(file, "    MASS_FN_ARG(\"%s\", &", arg->name);
+    }
     print_mass_struct_descriptor_type(file, arg->type);
     fprintf(file, ")");
   }
@@ -1775,6 +1791,17 @@ main(void) {
     { "u64", "encoding_count" },
   }));
 
+  export_compiler(push_type(type_function("tokenize", "Mass_Result", (Argument_Type[]){
+    { "Compilation *", "compilation" },
+    { "Source_File *", "file" },
+    { "Value_View *", "out_tokens" },
+  })));
+
+  export_global(push_type(type_function("mass_import", "Scope", (Argument_Type[]){
+    { "Slice", "name" },
+    { "Execution_Context *", "context", "@context" },
+  })));
+
   const char *arithmetic_fns[] = {
     "mass_add", "mass_subtract", "mass_multiply", "mass_divide", "mass_remainder",
   };
@@ -1929,8 +1956,14 @@ main(void) {
       fprintf(file,
         "static void\n"
         "global_scope_define_exports(\n"
+        "  Compilation *compilation,\n"
         "  Scope *scope\n"
         ") {\n"
+        "  const Allocator *allocator = compilation->allocator;\n"
+        "  (void)allocator;\n"
+        "  const Calling_Convention *calling_convention =\n"
+        "    compilation->jit.program->default_calling_convention;\n"
+        "  (void)calling_convention;\n"
       );
       for (uint32_t i = 0; i < type_count; ++i) {
         Meta_Type *type = &types[i];

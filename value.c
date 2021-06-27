@@ -1715,13 +1715,12 @@ compilation_init(
   compilation->runtime_program = allocator_allocate(compilation->allocator, Program);
   program_init(compilation->allocator, compilation->runtime_program, target_calling_convention);
 
-  compilation->root_scope = scope_make(compilation->allocator, 0);
-  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
-
   Program *jit_program = allocator_allocate(compilation->allocator, Program);
   program_init(compilation->allocator, jit_program, host_calling_convention());
   jit_init(&compilation->jit, jit_program);
 
+  compilation->root_scope = scope_make(compilation->allocator, 0);
+  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
   module_compiler_init(compilation, &compilation->compiler_module);
 }
 

@@ -303,6 +303,12 @@ typedef struct X64_Mnemonic X64_Mnemonic;
 typedef dyn_array_type(X64_Mnemonic *) Array_X64_Mnemonic_Ptr;
 typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 
+static Mass_Result tokenize
+  (Compilation * compilation, Source_File * file, Value_View * out_tokens);
+
+static Scope mass_import
+  (Slice name, Execution_Context * context);
+
 static Value * mass_add
   (Execution_Context * context, Value_View arguments, void * payload);
 
@@ -1909,6 +1915,8 @@ static Descriptor descriptor_array_x64_mnemonic;
 static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
+static Descriptor descriptor_tokenize;
+static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_add;
 static Descriptor descriptor_mass_subtract;
 static Descriptor descriptor_mass_multiply;

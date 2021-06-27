@@ -100,7 +100,18 @@
     .source_range = COMPILER_SOURCE_RANGE,\
   }
 
-#define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _DESCRIPTOR_, _VIEW_)\
+#define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
+  Value_View _VAR_NAME_;\
+  {\
+    Source_File *fake_file = allocator_allocate(allocator, Source_File);\
+    *fake_file = (Source_File){\
+      .path = COMPILER_SOURCE_FILE.path,\
+      .text = slice_literal(_EXPR_),\
+    };\
+    MASS_ON_ERROR(tokenize(compilation, fake_file, &_VAR_NAME_)) panic("unreached");\
+  }
+
+#define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _VIEW_, _DESCRIPTOR_)\
   {\
     .name = slice_literal_fields(_NAME_),\
     .descriptor = (_DESCRIPTOR_),\
