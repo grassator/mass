@@ -1975,6 +1975,45 @@ same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
 ) {
+  if (
+    source->descriptor == &descriptor_overload_set &&
+    target->tag == Descriptor_Tag_Function_Instance
+  ) {
+    const Function_Info *info = target->Function_Instance.info;
+
+    // @Hack :ScoreMemoryLayout
+    Bucket_Buffer *temp_buffer = bucket_buffer_make();
+    Allocator *temp_allocator = bucket_buffer_allocator_init(temp_buffer, &(Allocator){0});
+    Array_Value_Ptr temp_args = dyn_array_make(
+      Array_Value_Ptr,
+      .capacity = dyn_array_length(info->arguments),
+      .allocator = temp_allocator,
+    );
+
+    for (u64 arg_index = 0; arg_index < dyn_array_length(info->arguments); ++arg_index) {
+      const Function_Argument *param = dyn_array_get(info->arguments, 0);
+      Value *arg = allocator_allocate(temp_allocator, Value);
+      value_init(arg, param->descriptor, storage_none, COMPILER_SOURCE_RANGE);
+      dyn_array_push(temp_args, arg);
+    }
+    Overload_Match match = mass_match_overload(source, temp_args);
+
+    bool result;
+    switch(match.tag) {
+      default:
+      case Overload_Match_Tag_No_Match:
+      case Overload_Match_Tag_Undecidable: {
+        result = false;
+      }
+      case Overload_Match_Tag_Found: {
+        result = true;
+        break;
+      }
+    }
+
+    bucket_buffer_destroy(temp_buffer);
+    return result;
+  }
   if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer
     if (target->tag == Descriptor_Tag_Pointer_To) {

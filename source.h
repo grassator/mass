@@ -46,6 +46,12 @@ maybe_coerce_number_literal_to_integer(
   const Descriptor *target_descriptor
 );
 
+static Overload_Match
+mass_match_overload(
+  Value *value,
+  Array_Value_Ptr args
+);
+
 static inline Scope *
 scope_make(
   const Allocator *allocator,

@@ -1432,10 +1432,31 @@ main(void) {
     { "Array_Token_Statement_Matcher", "statement_matchers" },
   }));
 
+  push_type(type_struct("Overload_Set", (Struct_Item[]){
+    { "Array_Value_Ptr", "items" },
+  }));
+
+  push_type(type_struct("Overload_Set_Iterator", (Struct_Item[]){
+    { "const Overload_Set *", "set_stack", 16 },
+    { "s64", "last_stack_index" },
+    { "u64", "index_in_set" },
+    //{ "Source_Range", "source_range" },
+  }));
+
+  push_type(type_union("Overload_Match", (Struct_Type[]){
+    struct_empty("No_Match"),
+    struct_fields("Undecidable", (Struct_Item[]){
+      { "Value *", "a" },
+      { "Value *", "b" },
+    }),
+    struct_fields("Found", (Struct_Item[]){
+      { "Value *", "value" },
+    }),
+  }));
+
   export_compiler(push_type(type_struct("Value", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
     { "Storage", "storage" },
-    { "Value *", "next_overload" },
     { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
     { "Compiler_Source_Location", "compiler_source_location" },

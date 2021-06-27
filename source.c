@@ -598,51 +598,103 @@ assign(
 }
 
 static Value *
-scope_entry_force(
+scope_entry_force_value(
   Scope_Entry *entry
+);
+
+static inline Value *
+value_wrap_in_overload_set(
+  Scope *scope,
+  Value *value,
+  Slice name,
+  const Source_Range *lookup_range
 ) {
-  switch(entry->tag) {
-    case Scope_Entry_Tag_Operator: {
-      panic("Internal Error: Operators are not allowed in this context");
-      return 0;
-    }
-    case Scope_Entry_Tag_Value: {
-      for (Value *value = entry->Value.value; value; value = value->next_overload) {
-        if (value->descriptor != &descriptor_lazy_static_value) continue;
-        Value *next_overload = value->next_overload;
-        Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
-        if (lazy->resolving) {
-          context_error(&lazy->context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Circular_Dependency,
-            .source_range = entry->source_range,
-            .Circular_Dependency = { .name = entry->name },
-          });
-          return 0;
-        }
-        lazy->resolving = true;
-        Value *result = compile_time_eval(&lazy->context, lazy->expression);
-        lazy->resolving = false;
-        if (!result) return 0;
-        *value = *result;
-        value->next_overload = next_overload;
-      }
-      return entry->Value.value;
-    }
+  Overload_Set *set = allocator_allocate(scope->allocator, Overload_Set);
+  *set = (Overload_Set) {
+    .items = dyn_array_make(Array_Value_Ptr), // @Leak should use proper allocator
+  };
+  dyn_array_push(set->items, value);
+  Value *overload_set_value = allocator_allocate(scope->allocator, Value);
+  value_init(overload_set_value, &descriptor_overload_set, storage_static(set), value->source_range);
+  return overload_set_value;
+}
+
+static inline Value *
+value_force_lazy_static(
+  Value *value,
+  Slice name
+) {
+  assert(value->descriptor == &descriptor_lazy_static_value);
+  Lazy_Static_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Static_Value);
+  if (lazy->resolving) {
+    context_error(&lazy->context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Circular_Dependency,
+      .source_range = value->source_range,
+      .Circular_Dependency = { .name = name },
+    });
+    return 0;
   }
-  panic("Internal Error: Unexpected scope entry type");
-  return 0;
+  lazy->resolving = true;
+  Value *result = compile_time_eval(&lazy->context, lazy->expression);
+  if (!result) return 0;
+  lazy->resolving = false;
+  *value = *result;
+  return value;
 }
 
 static Value *
+scope_entry_force_value(
+  Scope_Entry *entry
+) {
+  assert(entry->tag == Scope_Entry_Tag_Value);
+
+  if (entry->Value.value->descriptor == &descriptor_lazy_static_value) {
+    entry->Value.value = value_force_lazy_static(entry->Value.value, entry->name);
+  }
+
+  if (!entry->Value.value) return 0;
+
+  if (entry->Value.value->descriptor == &descriptor_overload_set) {
+    // TODO mark the set as "forced" and avoid the iteration in subsequent lookups
+
+    // TODO figure out how to avoid this cast
+    Overload_Set *set = (Overload_Set *)storage_static_as_c_type(&entry->Value.value->storage, Overload_Set);
+    for (u64 i = 0; i < dyn_array_length(set->items); ++i) {
+      Value **overload_pointer = dyn_array_get(set->items, i);
+      Value *overload = *overload_pointer;
+      if (overload->descriptor == &descriptor_lazy_static_value) {
+        overload = value_force_lazy_static(overload, entry->name);
+        *overload_pointer = overload;
+      }
+      if (!overload) return 0;
+      if (
+        overload->descriptor->tag != Descriptor_Tag_Function_Instance &&
+        overload->descriptor != &descriptor_function_literal &&
+        overload->descriptor != &descriptor_overload_set
+      ) {
+        panic("TODO user error for trying to overload something strange");
+      }
+    }
+  }
+
+  return entry->Value.value;
+}
+
+static inline Value *
 scope_lookup_force(
   Execution_Context *context,
   const Scope *scope,
   Slice name,
   const Source_Range *lookup_range
 ) {
-  Scope_Entry *entry = scope_lookup(scope, name);
+  s32 hash = Scope_Map__hash(name);
+  Scope_Entry *entry = 0;
+  for (; scope; scope = scope->parent) {
+    entry = scope_lookup_shallow_hashed(scope, hash, name);
+    if (entry) break;
+  }
+
   if (!entry) {
-    //scope_print_names(context->scope);
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Undefined_Variable,
       .Undefined_Variable = { .name = name },
@@ -653,14 +705,11 @@ scope_lookup_force(
   if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Epoch_Mismatch,
-      .source_range = entry->source_range,
+      .source_range = *lookup_range,
     });
     return 0;
   }
-
-  if (!scope_entry_force(entry)) return 0;
-  assert(entry->tag == Scope_Entry_Tag_Value);
-  return entry->Value.value;
+  return scope_entry_force_value(entry);
 }
 
 static inline void
@@ -679,9 +728,11 @@ scope_define_value(
   Scope_Entry *it = scope_lookup_shallow_hashed(scope, hash, name);
   if (it) {
     assert(it->tag == Scope_Entry_Tag_Value);
-    Value *existing = it->Value.value;
-    while (existing->next_overload) existing = existing->next_overload;
-    existing->next_overload = value;
+    if (it->Value.value->descriptor != &descriptor_overload_set) {
+      it->Value.value = value_wrap_in_overload_set(scope, it->Value.value, name, &source_range);
+    }
+    Overload_Set *set = storage_static_as_c_type(&it->Value.value->storage, Overload_Set);
+    dyn_array_push(set->items, value);
   } else {
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
     *allocated = (Scope_Entry) {
@@ -3157,7 +3208,7 @@ call_function_macro(
       // FIXME :ExpectedStack
       result_value = return_descriptor == &descriptor_void
         ? &void_value
-        : reserve_stack(context, builder, return_descriptor, fn_value->source_range);
+        : reserve_stack(context, builder, return_descriptor, payload->source_range);
       break;
     }
   }
@@ -3456,6 +3507,70 @@ call_function_overload(
   return expected_value;
 }
 
+struct Overload_Match_State {
+  Value *value;
+  s64 score;
+};
+
+static void
+mass_match_overload_candidate(
+  Value *candidate,
+  Array_Value_Ptr args,
+  struct Overload_Match_State *match,
+  struct Overload_Match_State *best_conflict_match
+) {
+  if (candidate->descriptor == &descriptor_overload_set) {
+    const Overload_Set *set = storage_static_as_c_type(&candidate->storage, Overload_Set);
+    for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
+      Value *overload = *dyn_array_get(set->items, i);
+      mass_match_overload_candidate(overload, args, match, best_conflict_match);
+    }
+  } else {
+    const Function_Info *overload_info = maybe_function_info_from_value(candidate);
+    s64 score = -1;
+    if (overload_info) {
+      if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
+        score = 0;
+      } else {
+        score = calculate_arguments_match_score(overload_info, args);
+      }
+    }
+    if (score > match->score) {
+      match->value = candidate;
+      match->score = score;
+    } else {
+      if (score == match->score && score > best_conflict_match->score) {
+        *best_conflict_match = *match;
+        match->value = candidate;
+      }
+    }
+  }
+}
+
+static Overload_Match
+mass_match_overload(
+  Value *value,
+  Array_Value_Ptr args
+) {
+  struct Overload_Match_State match = { .score = -1 };
+  struct Overload_Match_State best_conflict_match = match;
+  mass_match_overload_candidate(value, args, &match, &best_conflict_match);
+
+  if (match.score == -1) {
+    return (Overload_Match){.tag = Overload_Match_Tag_No_Match};
+  }
+  if (match.score == best_conflict_match.score) {
+    return (Overload_Match){
+      .tag = Overload_Match_Tag_Undecidable,
+      .Undecidable = { match.value, best_conflict_match.value },
+    };
+  }
+  return (Overload_Match){
+    .tag = Overload_Match_Tag_Found,
+    .Found = {match.value},
+  };
+}
+
 static Value *
 token_handle_function_call(
   Execution_Context *context,
@@ -3471,7 +3586,7 @@ token_handle_function_call(
       .source_range = args_token->source_range,
       .detailed_message = "Expected a list of arguments in ()",
     });
-    goto err;
+    return 0;
   }
 
   Value *target_expression = token_parse_single(context, target_token);
@@ -3479,7 +3594,7 @@ token_handle_function_call(
 
   Array_Value_Ptr args = dyn_array_make(Array_Value_Ptr);
   token_match_call_arguments(context, args_token, &args);
-  MASS_ON_ERROR(*context->result) goto err;
+  MASS_ON_ERROR(*context->result) return 0;
 
   if (target_expression->descriptor == &descriptor_macro_capture) {
     u64 arg_count = dyn_array_length(args);
@@ -3497,7 +3612,7 @@ token_handle_function_call(
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
           .detailed_message = "Macro capture can only accept an optional Scope argument",
         });
-        goto err;
+        return 0;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
       context_merge_in_scope(&capture_context, argument_scope);
@@ -3508,65 +3623,43 @@ token_handle_function_call(
         .No_Matching_Overload = { .target = target_expression, .arguments = args },
         .detailed_message = "Macro capture can only accept an optional Scope argument"
       });
-      goto err;
+      return 0;
     }
     return token_parse_block_view(&capture_context, capture->view);
   }
 
-  struct Overload_Match { Value *value; const Function_Info *info; s64 score; } match = { .score = -1 };
-  struct Overload_Match best_conflict_match = { .score = -1 };
-  for (Value *to_call = target_expression; to_call; to_call = to_call->next_overload) {
-    const Function_Info *to_call_info = maybe_function_info_from_value(to_call);
-    if (!to_call_info) {
-      // TODO figure out a better way to report generic type errors
-      static Descriptor fake_function_descriptor = {
-        .tag = Descriptor_Tag_Function_Instance,
-        .name = slice_literal_fields("function"),
-      };
-      const Descriptor *to_call_descriptor =
-        maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(to_call));
+  Overload_Match match = mass_match_overload(target_expression, args);
+
+  Value *overload;
+  switch(match.tag) {
+    case Overload_Match_Tag_No_Match: {
       context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Type_Mismatch,
-        .source_range = to_call->source_range,
-        .Type_Mismatch = { .expected = &fake_function_descriptor, .actual = to_call_descriptor },
+        .tag = Mass_Error_Tag_No_Matching_Overload,
+        .source_range = source_range,
+        .No_Matching_Overload = { .target = target_expression, .arguments = args },
       });
-      goto err;
+      return 0;
     }
-    s64 score = (to_call_info->flags & Descriptor_Function_Flags_Intrinsic)
-      ? 0
-      : calculate_arguments_match_score(to_call_info, args);
-    if (score == -1) continue; // no match
-    if (score > match.score) {
-      match.info = to_call_info;
-      match.value = to_call;
-      match.score = score;
-    } else {
-      if (score == match.score && score > best_conflict_match.score) {
-        best_conflict_match = match;
-        match.value = to_call;
-        match.info = to_call_info;
-      }
+    case Overload_Match_Tag_Undecidable: {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Undecidable_Overload,
+        .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
+        .source_range = source_range,
+      });
+      return 0;
+    }
+    case Overload_Match_Tag_Found: {
+      overload = match.Found.value;
+      break;
+    }
+    default: {
+      overload = 0;
+      panic("Unexpected Overload_Match_Tag");
+      break;
     }
   }
 
-  if (match.score == -1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_No_Matching_Overload,
-      .source_range = source_range,
-      .No_Matching_Overload = { .target = target_expression, .arguments = args },
-    });
-    goto err;
-  }
-  if (match.score == best_conflict_match.score) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Undecidable_Overload,
-      .Undecidable_Overload = { match.value, best_conflict_match.value },
-      .source_range = source_range,
-    });
-    goto err;
-  }
-
-  Value *overload = match.value;
+  MASS_ON_ERROR(*context->result) return 0;
   assert(overload);
 
   const Function_Info *info = maybe_function_info_from_value(overload);
@@ -3624,14 +3717,11 @@ token_handle_function_call(
     .source_range = source_range,
   };
 
-  Lazy_Value_Proc proc = (match.info->flags & Descriptor_Function_Flags_Macro)
+  Lazy_Value_Proc proc = (info->flags & Descriptor_Function_Flags_Macro)
     ? call_function_macro
     : call_function_overload;
 
-  return mass_make_lazy_value(context, source_range, payload, match.info->returns.descriptor, proc);
-
-  err:
-  return 0;
+  return mass_make_lazy_value(context, source_range, payload, info->returns.descriptor, proc);
 }
 
 static inline Value *
@@ -4874,7 +4964,8 @@ mass_handle_dot_operator(
     }
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs->descriptor == &descriptor_scope) {
-      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
+      // FIXME Figure out how to avoid this cast
+      Scope *module_scope = (Scope *)storage_static_as_c_type(&lhs->storage, Scope);
       Value *lookup = scope_lookup_force(context, module_scope, field_name, &args_view.source_range);
       if (!lookup) {
         //scope_print_names(module_scope);
@@ -5686,10 +5777,9 @@ token_parse_statement_label(
 
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
-  Scope_Entry *scope_entry = scope_lookup(context->scope, name);
   Value *value;
-  if (scope_entry) {
-    value = scope_entry_force(scope_entry);
+  if (scope_lookup(context->scope, name)) {
+    value = scope_lookup_force(context, context->scope, name, &symbol->source_range);
   } else {
     Scope *label_scope = context->scope;
 
@@ -6194,6 +6284,7 @@ module_compiler_init(
       .scope = scope,
     },
   };
+
   compiler_scope_define_exports(compilation, scope);
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
@@ -6209,7 +6300,10 @@ scope_define_builtins(
   Scope *scope,
   const Calling_Convention *calling_convention
 ) {
-  const Allocator *allocator = compilation->allocator;
+  Execution_Context *context = &(Execution_Context){0};
+  *context = execution_context_from_compilation(compilation);
+  const Allocator *allocator = context->allocator;
+
   global_scope_define_exports(compilation, scope);
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
