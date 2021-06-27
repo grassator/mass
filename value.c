@@ -94,15 +94,22 @@ source_range_print_start_position(
 #define APPEND_LITERAL(_STRING_)\
   APPEND_SLICE(slice_literal(_STRING_))
 
+static const Function_Info *
+maybe_function_info_from_value(
+  Value *value
+);
+
 static void
 mass_error_append_function_signature_string(
   Fixed_Buffer *result,
-  const Descriptor *descriptor
+  Value *value
 ) {
-  APPEND_SLICE(descriptor->name);
+  const Function_Info *info = maybe_function_info_from_value(value);
+
+  APPEND_SLICE(value->descriptor->name);
   APPEND_LITERAL("(");
   bool first = true;
-  DYN_ARRAY_FOREACH(Function_Argument, arg, descriptor->Function_Instance.info->arguments) {
+  DYN_ARRAY_FOREACH(Function_Argument, arg, info->arguments) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->name);
@@ -110,7 +117,7 @@ mass_error_append_function_signature_string(
     APPEND_SLICE(arg->descriptor->name);
   }
   APPEND_LITERAL(") -> (");
-  APPEND_SLICE(descriptor->Function_Instance.info->returns.descriptor->name);
+  APPEND_SLICE(info->returns.descriptor->name);
   APPEND_LITERAL(")");
 }
 
@@ -206,9 +213,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Undecidable_Overload: {
       Mass_Error_Undecidable_Overload const *overloads = &error->Undecidable_Overload;
       APPEND_LITERAL("Could not decide which overload is better: \n  ");
-      mass_error_append_function_signature_string(result, overloads->a->descriptor);
+      mass_error_append_function_signature_string(result, overloads->a);
       APPEND_LITERAL("\n  ");
-      mass_error_append_function_signature_string(result, overloads->b->descriptor);
+      mass_error_append_function_signature_string(result, overloads->b);
     } break;
     case Mass_Error_Tag_No_Matching_Overload: {
       // TODO provide better error message with argument types
