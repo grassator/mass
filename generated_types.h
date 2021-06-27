@@ -1049,6 +1049,7 @@ typedef enum {
 } Scope_Entry_Tag;
 
 typedef struct Scope_Entry_Value {
+  u64 forced;
   Value * value;
 } Scope_Entry_Value;
 typedef struct Scope_Entry_Operator {
@@ -3520,6 +3521,12 @@ static C_Enum_Item scope_entry_tag_items[] = {
 { .name = slice_literal_fields("Operator"), .value = 1 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(58, scope_entry_value, Scope_Entry_Value,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("forced"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Scope_Entry_Value, forced),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("value"),

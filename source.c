@@ -647,15 +647,20 @@ scope_entry_force_value(
   Scope_Entry *entry
 ) {
   assert(entry->tag == Scope_Entry_Tag_Value);
+  if (entry->Value.forced) {
+    return entry->Value.value;
+  }
 
   if (entry->Value.value->descriptor == &descriptor_lazy_static_value) {
     entry->Value.value = value_force_lazy_static(entry->Value.value, entry->name);
   }
 
+  // mark the entry as "forced" and avoid extra checks and overload set iteration on each lookup
+  entry->Value.forced = true;
+
   if (!entry->Value.value) return 0;
 
   if (entry->Value.value->descriptor == &descriptor_overload_set) {
-    // TODO mark the set as "forced" and avoid the iteration in subsequent lookups
 
     const Overload_Set *set = storage_static_as_c_type(&entry->Value.value->storage, Overload_Set);
     for (u64 i = 0; i < dyn_array_length(set->items); ++i) {

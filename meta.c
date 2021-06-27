@@ -1411,6 +1411,7 @@ main(void) {
 
   push_type(add_common_fields(type_union("Scope_Entry", (Struct_Type[]){
     struct_fields("Value", (Struct_Item[]){
+      { "u64", "forced" },
       { "Value *", "value" },
     }),
     struct_fields("Operator", (Struct_Item[]){
@@ -1440,7 +1441,6 @@ main(void) {
     { "const Overload_Set *", "set_stack", 16 },
     { "s64", "last_stack_index" },
     { "u64", "index_in_set" },
-    //{ "Source_Range", "source_range" },
   }));
 
   push_type(type_union("Overload_Match", (Struct_Type[]){
