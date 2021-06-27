@@ -33,8 +33,10 @@ s32
 mass_cli_print_error(
   Mass_Error *error
 ) {
-  slice_print(error->detailed_message);
-  printf("  at ");
+  Fixed_Buffer *error_buffer = mass_error_to_string(error);
+  slice_print(fixed_buffer_as_slice(error_buffer));
+  fixed_buffer_destroy(error_buffer);
+  printf("\n  at ");
   source_range_print_start_position(&error->source_range);
   return -1;
 }
