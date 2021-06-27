@@ -6584,14 +6584,9 @@ program_import_module(
           });
           return *context->result;
         }
-        {
-          Value *value = scope_lookup_force(context, module->own_scope, name, &symbol->source_range);
-          MASS_TRY(*context->result);
-          scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, name, value);
-        }
 
-        //Value_View expr = value_view_single(symbol_pointer);
-        //scope_define_lazy_compile_time_expression(&import_context, module->export.scope, name, expr);
+        Value_View expr = value_view_single(symbol_pointer);
+        scope_define_lazy_compile_time_expression(&import_context, module->export.scope, name, expr);
       }
       break;
     }
