@@ -657,8 +657,7 @@ scope_entry_force_value(
   if (entry->Value.value->descriptor == &descriptor_overload_set) {
     // TODO mark the set as "forced" and avoid the iteration in subsequent lookups
 
-    // TODO figure out how to avoid this cast
-    Overload_Set *set = (Overload_Set *)storage_static_as_c_type(&entry->Value.value->storage, Overload_Set);
+    const Overload_Set *set = storage_static_as_c_type(&entry->Value.value->storage, Overload_Set);
     for (u64 i = 0; i < dyn_array_length(set->items); ++i) {
       Value **overload_pointer = dyn_array_get(set->items, i);
       Value *overload = *overload_pointer;
