@@ -80,19 +80,34 @@ calling_convention_x86_64_common_end_proc(
   Program *program,
   Function_Builder *builder
 ) {
-  s32 return_address_size = 8;
-  builder->stack_reserve += builder->max_call_parameters_stack_size;
-  builder->stack_reserve = s32_align(builder->stack_reserve, 16) + return_address_size;
+  const s32 register_size = 8;
 
-  s32 argument_stack_base = builder->stack_reserve + return_address_size;
+  s32 push_size = 0;
   // :RegisterPushPop
   // pushes change the stack pointer so we need to account for that
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
     if (register_bitset_get(builder->used_register_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
-        argument_stack_base += 8;
+        push_size += register_size;
       }
     }
+  }
+
+  builder->stack_reserve += builder->max_call_parameters_stack_size;
+
+  // Here is how stack looks at this point
+  //   > return address
+  //   > some number of pushes
+  //   > locals
+  // first we make all of them 8-byte aligned - return address and pushes are
+  // naturally register-sized and locals are aligned here:
+  builder->stack_reserve = s32_align(builder->stack_reserve, register_size);
+  // their sum must then be 16-byte aligned as per ABI
+  s32 return_address_size = register_size;
+  s32 argument_stack_base = builder->stack_reserve + push_size + return_address_size;
+  if (argument_stack_base % 16) {
+    argument_stack_base += register_size;
+    builder->stack_reserve += register_size;
   }
 
   // Adjust stack locations
