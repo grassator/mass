@@ -229,6 +229,7 @@ x86_64_system_v_memory_layout_item_for_class(
   relative: {
     *out_result = (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
+      .flags = Memory_Layout_Item_Flags_Implicit_Pointer,
       .name = name,
       .descriptor = descriptor,
       .Base_Relative = {.offset = state->stack_offset},
@@ -552,7 +553,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   if (is_indirect_return) {
     dyn_array_push(state.memory_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized,
+      .flags = Memory_Layout_Item_Flags_Uninitialized | Memory_Layout_Item_Flags_Implicit_Pointer,
       .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,
@@ -653,6 +654,7 @@ calling_convention_x86_64_windows_arguments_layout_proc(
       if (is_large_argument) {
         // Large arguments are passed "by reference", i.e. their memory location in the register
         arg_storage = storage_indirect(byte_size, reg);
+        item.flags |= Memory_Layout_Item_Flags_Implicit_Pointer;
       } else {
         arg_storage = storage_register_for_descriptor(reg, arg->descriptor);
       }
@@ -669,7 +671,7 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   if (is_return_larger_than_register) {
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized,
+      .flags = Memory_Layout_Item_Flags_Uninitialized | Memory_Layout_Item_Flags_Implicit_Pointer,
       .name = {0}, // Defining return value name happens separately
       .descriptor = function->returns.descriptor,
       .source_range = function->returns.source_range,

@@ -1476,6 +1476,7 @@ main(void) {
   push_type(type_enum("Memory_Layout_Item_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Uninitialized", 1 << 0 },
+    { "Implicit_Pointer", 1 << 1 },
   }));
 
   push_type(add_common_fields(type_union("Memory_Layout_Item", (Struct_Type[]){

@@ -3350,9 +3350,7 @@ call_function_overload(
 
     source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
 
-    if (target_arg->storage.byte_size <= 8) {
-      MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
-    } else {
+    if (target_arg_definition->flags & Memory_Layout_Item_Flags_Implicit_Pointer) {
       // Large values are copied to the stack and passed by reference
       assert(target_arg->storage.tag == Storage_Tag_Memory);
       assert(target_arg->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
@@ -3372,6 +3370,8 @@ call_function_overload(
         MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
       }
       load_address(context, builder, source_range, reference_pointer, stack_value->storage);
+    } else {
+      MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     }
     Slice name = target_arg_definition->name;
     if (name.length) {

@@ -1131,11 +1131,13 @@ typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
 typedef enum Memory_Layout_Item_Flags {
   Memory_Layout_Item_Flags_None = 0,
   Memory_Layout_Item_Flags_Uninitialized = 1,
+  Memory_Layout_Item_Flags_Implicit_Pointer = 2,
 } Memory_Layout_Item_Flags;
 
 const char *memory_layout_item_flags_name(Memory_Layout_Item_Flags value) {
   if (value == 0) return "Memory_Layout_Item_Flags_None";
   if (value == 1) return "Memory_Layout_Item_Flags_Uninitialized";
+  if (value == 2) return "Memory_Layout_Item_Flags_Implicit_Pointer";
   assert(!"Unexpected value for enum Memory_Layout_Item_Flags");
   return 0;
 };
@@ -3731,6 +3733,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(memory_layout_item_flags, Memory_Layout_Item_Flags)
 static C_Enum_Item memory_layout_item_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Uninitialized"), .value = 1 },
+{ .name = slice_literal_fields("Implicit_Pointer"), .value = 2 },
 };
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_memory_layout_item_ptr, Array_Memory_Layout_Item_Ptr)
