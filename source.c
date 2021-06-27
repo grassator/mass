@@ -635,11 +635,28 @@ scope_entry_force(
 
 static Value *
 scope_lookup_force(
+  Execution_Context *context,
   const Scope *scope,
-  Slice name
+  Slice name,
+  const Source_Range *lookup_range
 ) {
   Scope_Entry *entry = scope_lookup(scope, name);
-  if (!entry) return 0;
+  if (!entry) {
+    //scope_print_names(context->scope);
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Undefined_Variable,
+      .Undefined_Variable = { .name = name },
+      .source_range = *lookup_range,
+    });
+    return 0;
+  }
+  if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Epoch_Mismatch,
+      .source_range = entry->source_range,
+    });
+    return 0;
+  }
 
   if (!scope_entry_force(entry)) return 0;
   assert(entry->tag == Scope_Entry_Tag_Value);
@@ -1396,7 +1413,6 @@ token_parse_single(
   Execution_Context *context,
   Value *value
 ) {
-  const Source_Range *source_range = &value->source_range;
   if (value_is_group(value)) {
     const Group *group = value_as_group(value);
     switch(group->tag) {
@@ -1413,25 +1429,7 @@ token_parse_single(
     }
   } else if(value_is_symbol(value)) {
     Slice name = value_as_symbol(value)->name;
-    Scope_Entry *entry = scope_lookup(context->scope, name);
-    if (!entry) {
-      //scope_print_names(context->scope);
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Undefined_Variable,
-        .Undefined_Variable = { .name = name },
-        .source_range = *source_range,
-      });
-      return 0;
-    }
-    if (entry->epoch != VALUE_STATIC_EPOCH && entry->epoch != context->epoch) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Epoch_Mismatch,
-        .source_range = value->source_range,
-      });
-      return 0;
-    }
-    value = scope_entry_force(entry);
-    return value;
+    return scope_lookup_force(context, context->scope, name, &value->source_range);
   }
   return value;
 }
@@ -4870,7 +4868,7 @@ mass_handle_dot_operator(
     Slice field_name = value_as_symbol(rhs)->name;
     if (lhs->descriptor == &descriptor_scope) {
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(module_scope, field_name);
+      Value *lookup = scope_lookup_force(context, module_scope, field_name, &args_view.source_range);
       if (!lookup) {
         //scope_print_names(module_scope);
         context_error(context, (Mass_Error) {
@@ -6486,7 +6484,7 @@ program_import_module(
           return *context->result;
         }
         {
-          Value *value = scope_lookup_force(module->own_scope, name);
+          Value *value = scope_lookup_force(context, module->own_scope, name, &symbol->source_range);
           MASS_TRY(*context->result);
           scope_define_value(module->export.scope, VALUE_STATIC_EPOCH, value->source_range, name, value);
         }

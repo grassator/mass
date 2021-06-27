@@ -90,7 +90,9 @@ test_program_source_base(
   }
   MASS_ON_ERROR(*context->result) return 0;
   // FIXME lookup main in exported scope
-  Value *value = scope_lookup_force(test_context.module->own_scope, slice_from_c_string(id));
+  Value *value = scope_lookup_force(
+    &test_context,test_context.module->own_scope, slice_from_c_string(id), &COMPILER_SOURCE_RANGE
+  );
   if (value && value->descriptor == &descriptor_function_literal) {
     ensure_function_instance(context, value);
   }
