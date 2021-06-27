@@ -24,3 +24,4 @@ cd ..
 $CC $FLAGS mass.c -o build/mass -lm
 
 $CC $FLAGS source_spec.c -o build/source_spec -lm
+objdump -d build/source_spec -l > build/source_spec.S
