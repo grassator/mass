@@ -2959,15 +2959,22 @@ token_handle_cast(
     return 0;
   }
 
-  Mass_Cast_Lazy_Payload *payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
-  *payload = (Mass_Cast_Lazy_Payload) {
+  Mass_Cast_Lazy_Payload lazy_payload = {
     .target = target_descriptor,
     .expression = expression,
   };
 
-  return mass_make_lazy_value(
-    context, it.view.source_range, payload, target_descriptor, mass_handle_cast_lazy_proc
-  );
+  if (value_is_non_lazy_static(expression)) {
+    Expected_Result expected_result = expected_result_static(target_descriptor);
+    return mass_handle_cast_lazy_proc(context, 0, &expected_result, &lazy_payload);
+  } else {
+    Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+    *heap_payload = lazy_payload;
+
+    return mass_make_lazy_value(
+      context, it.view.source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+    );
+  }
 }
 
 static void
