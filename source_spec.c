@@ -1063,7 +1063,7 @@ spec("source") {
     it("should have an add function") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "checker", &test_context,
-        "checker :: fn() -> (s64) { add(cast(s64, 40), 2) }"
+        "checker :: fn() -> (s64) { x := 40; add(x, 2) }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);

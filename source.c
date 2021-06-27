@@ -3684,7 +3684,6 @@ token_handle_function_call(
       Jit *jit = &context->compilation->jit;
       Execution_Context eval_context = *context;
       eval_context.flags &= ~Execution_Context_Flags_Global;
-      eval_context.epoch = get_new_epoch();
       eval_context.program = jit->program;
       eval_context.scope = context->scope;
 
@@ -3701,6 +3700,14 @@ token_handle_function_call(
       Value *(*jitted_intrinsic)(Value_View) = (Value *(*)(Value_View))jitted_code;
       Value_View args_view = value_view_from_value_array(args, &args_token->source_range);
       result = jitted_intrinsic(args_view);
+
+      // The value that comes out of an intrinsic is consider to originate in the same
+      // epoch as the function, which is true since we evaluate right at this point.
+      if (result && result->descriptor == &descriptor_lazy_value) {
+        // TODO get rid of this cast somehow
+        Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
+        lazy->epoch = context->epoch;
+      }
     } else {
       Value_View fake_eval_view = {
         .values = (Value *[]){temp_overload, args_token},
