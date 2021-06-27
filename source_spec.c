@@ -1098,7 +1098,10 @@ spec("source") {
       Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
         "checker", &test_context,
         "mass :: import(\"mass\")\n"
-        "checker :: fn() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }"
+        "checker :: {\n"
+          "mass :: import(\"mass\")\n"
+          "fn() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }\n"
+        "}"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == Descriptor_Tag_Struct);
@@ -1865,8 +1868,7 @@ spec("source") {
     it("should support importing compiler functionality through `mass` module") {
       Value *value = test_program_inline_source_base(
         "Infix", &test_context,
-        "mass :: import(\"mass\")\n"
-        "Infix :: mass.Operator_Fixity.Infix\n"
+        "Infix :: { mass :: import(\"mass\") ; mass.Operator_Fixity.Infix }"
       );
       check(value);
       check(value->descriptor == &descriptor_operator_fixity);
