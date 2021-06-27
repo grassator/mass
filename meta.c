@@ -1327,7 +1327,7 @@ main(void) {
     { "const Function_Info *", "function" },
   }));
 
-  push_type(type_enum("Function_Argument_Mode", (Enum_Type_Item[]){
+  push_type(type_enum("Function_Parameter_Mode", (Enum_Type_Item[]){
     { "Call", 0 },
     { "Body", 1 },
   }));
@@ -1541,7 +1541,7 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Function_Argument", (Struct_Item[]){
+  push_type(type_struct("Function_Parameter", (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
     { "Source_Range", "source_range" },
@@ -1558,7 +1558,7 @@ main(void) {
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Array_Function_Argument", "arguments" },
+    { "Array_Function_Parameter", "parameters" },
     { "Scope *", "scope" },
     { "Function_Return", "returns" },
   }));
@@ -1688,7 +1688,7 @@ main(void) {
   push_type(typedef_function("Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
-    { "Function_Argument_Mode", "mode" },
+    { "Function_Parameter_Mode", "mode" },
   }));
 
   push_type(type_struct("Calling_Convention", (Struct_Item[]){

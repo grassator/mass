@@ -20,7 +20,7 @@ static Value *
 calling_convention_x86_64_windows_return_proc(
   const Allocator *allocator,
   const Function_Info *function,
-  Function_Argument_Mode mode
+  Function_Parameter_Mode mode
 );
 
 static const Calling_Convention calling_convention_x86_64_windows = {
@@ -53,7 +53,7 @@ static Value *
 calling_convention_x86_64_system_v_return_proc(
   const Allocator *allocator,
   const Function_Info *function,
-  Function_Argument_Mode mode
+  Function_Parameter_Mode mode
 );
 
 static const Calling_Convention calling_convention_x86_64_system_v = {
@@ -436,7 +436,7 @@ calling_convention_x86_64_system_v_body_end_proc(
 
   // FIXME avoid doing this
   Value *return_value = calling_convention_x86_64_system_v_return_proc(
-    allocator_default, builder->function, Function_Argument_Mode_Body
+    allocator_default, builder->function, Function_Parameter_Mode_Body
   );
 
   bool is_indirect_return = (
@@ -458,7 +458,7 @@ static Value *
 calling_convention_x86_64_system_v_return_proc(
   const Allocator *allocator,
   const Function_Info *function,
-  Function_Argument_Mode mode
+  Function_Parameter_Mode mode
 ) {
   if (function->returns.descriptor == &descriptor_void) {
     return value_init(
@@ -497,7 +497,7 @@ calling_convention_x86_64_system_v_return_proc(
   Storage return_storage;
   const Descriptor *return_descriptor;
   if (class == SYSTEM_V_MEMORY) {
-    Register base_register = mode == Function_Argument_Mode_Call ? Register_A : Register_DI;
+    Register base_register = mode == Function_Parameter_Mode_Call ? Register_A : Register_DI;
     return_descriptor = function->returns.descriptor;
     return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
   } else {
@@ -532,7 +532,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
 
   // FIXME avoid doing this
   Value *return_value = calling_convention_x86_64_system_v_return_proc(
-    allocator, function, Function_Argument_Mode_Body
+    allocator, function, Function_Parameter_Mode_Body
   );
 
   bool is_indirect_return = (
@@ -556,12 +556,12 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
       .items = dyn_array_make(
         Array_Memory_Layout_Item,
         .allocator = allocator,
-        .capacity = dyn_array_length(function->arguments) + 1,
+        .capacity = dyn_array_length(function->parameters) + 1,
       ),
     },
   };
 
-  DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
+  DYN_ARRAY_FOREACH(Function_Parameter, arg, function->parameters) {
     x86_64_system_v_classify(allocator, &state, arg->name, arg->descriptor);
   }
 
@@ -596,7 +596,7 @@ static Value *
 calling_convention_x86_64_windows_return_proc(
   const Allocator *allocator,
   const Function_Info *function,
-  Function_Argument_Mode mode
+  Function_Parameter_Mode mode
 ) {
   const Descriptor *descriptor = function->returns.descriptor;
   if (descriptor == &descriptor_void) {
@@ -615,7 +615,7 @@ calling_convention_x86_64_windows_return_proc(
       // Inside the function large returns are pointed to by RCX,
       // but this pointer is also returned in A
       Register base_register = Register_A;
-      if (mode == Function_Argument_Mode_Body) {
+      if (mode == Function_Parameter_Mode_Body) {
         base_register = Register_C;
       }
       storage = storage_indirect(byte_size, base_register);
@@ -639,7 +639,7 @@ calling_convention_x86_64_windows_arguments_layout_proc(
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
-      .capacity = dyn_array_length(function->arguments) + 1,
+      .capacity = dyn_array_length(function->parameters) + 1,
     ),
   };
 
@@ -651,19 +651,19 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   bool is_return_larger_than_register = return_byte_size > 8;
   u64 index = is_return_larger_than_register ? 1 : 0;
 
-  DYN_ARRAY_FOREACH(Function_Argument, arg, function->arguments) {
+  DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     Memory_Layout_Item item = {
       .flags = Memory_Layout_Item_Flags_None,
-      .name = arg->name,
-      .descriptor = arg->descriptor,
-      .source_range = arg->source_range,
+      .name = param->name,
+      .descriptor = param->descriptor,
+      .source_range = param->source_range,
     };
 
-    u64 byte_size = descriptor_byte_size(arg->descriptor);
+    u64 byte_size = descriptor_byte_size(param->descriptor);
     bool is_large_argument = byte_size > 8;
     Storage arg_storage;
     if (index < countof(general_registers)) {
-      Register reg = descriptor_is_float(arg->descriptor)
+      Register reg = descriptor_is_float(param->descriptor)
         ? float_registers[index]
         : general_registers[index];
       if (is_large_argument) {
@@ -671,7 +671,7 @@ calling_convention_x86_64_windows_arguments_layout_proc(
         arg_storage = storage_indirect(byte_size, reg);
         item.flags |= Memory_Layout_Item_Flags_Implicit_Pointer;
       } else {
-        arg_storage = storage_register_for_descriptor(reg, arg->descriptor);
+        arg_storage = storage_register_for_descriptor(reg, param->descriptor);
       }
       item.tag = Memory_Layout_Item_Tag_Absolute;
       item.Absolute.storage = arg_storage;

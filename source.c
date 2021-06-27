@@ -1754,13 +1754,13 @@ token_maybe_split_on_operator(
   return true;
 }
 
-static Function_Argument
+static Function_Parameter
 token_match_argument(
   Execution_Context *context,
   Value_View view,
   Function_Info *function
 ) {
-  Function_Argument arg = {0};
+  Function_Parameter arg = {0};
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Value_View default_expression;
@@ -1845,7 +1845,7 @@ token_match_argument(
     descriptor = token_match_type(context, type_expression);
   }
 
-  arg = (Function_Argument) {
+  arg = (Function_Parameter) {
     .name = value_as_symbol(name_token)->name,
     .descriptor = descriptor,
     .maybe_default_expression = default_expression,
@@ -2692,17 +2692,17 @@ token_process_function_literal(
   bool previous_argument_has_default_value = false;
   if (args_view.length == 0) return fn_info;
 
-  fn_info->arguments = dyn_array_make(
-    Array_Function_Argument,
+  fn_info->parameters = dyn_array_make(
+    Array_Function_Parameter,
     .allocator = context->allocator,
     .capacity = 4
   );
 
   for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-    Function_Argument arg = token_match_argument(&arg_context, arg_view, fn_info);
+    Function_Parameter arg = token_match_argument(&arg_context, arg_view, fn_info);
     MASS_ON_ERROR(*context->result) return 0;
-    dyn_array_push(fn_info->arguments, arg);
+    dyn_array_push(fn_info->parameters, arg);
     if (previous_argument_has_default_value) {
       if (!arg.maybe_default_expression.length ) {
         context_error(context, (Mass_Error) {
@@ -3166,9 +3166,9 @@ call_function_macro(
   // should not have access to locals inside the call scope.
   Scope *body_scope = scope_make(context->allocator, function->scope);
 
-  for(u64 i = 0; i < dyn_array_length(function->arguments); ++i) {
+  for(u64 i = 0; i < dyn_array_length(function->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
-    Function_Argument *arg = dyn_array_get(function->arguments, i);
+    Function_Parameter *arg = dyn_array_get(function->parameters, i);
     if (arg->name.length) {
       Value *arg_value;
       if (i >= dyn_array_length(args)) {
@@ -3396,7 +3396,7 @@ call_function_overload(
       if (target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized) {
         source_arg = &void_value;
       } else {
-        Function_Argument *declared_argument = dyn_array_get(fn_info->arguments, i);
+        Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
         Value_View default_expression = declared_argument->maybe_default_expression;
         assert(default_expression.length);
         Execution_Context arg_context = *context;
@@ -3441,7 +3441,7 @@ call_function_overload(
 
   // If we call a function, then we need to reserve space for the home area of at least 4 arguments
   // TODO move this calculation to the calling convention somehow?
-  u64 parameters_stack_size = u64_max(4, dyn_array_length(fn_info->arguments)) * 8;
+  u64 parameters_stack_size = u64_max(4, dyn_array_length(fn_info->parameters)) * 8;
 
   builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
     builder->max_call_parameters_stack_size,
@@ -4461,7 +4461,7 @@ mass_handle_startup_call_lazy_proc(
   const Function_Literal *literal =
     storage_static_as_c_type(&startup_function->storage, Function_Literal);
 
-  if (dyn_array_length(literal->info->arguments)) goto err;
+  if (dyn_array_length(literal->info->parameters)) goto err;
   if (literal->info->returns.descriptor != &descriptor_void) goto err;
 
   ensure_function_instance(context, startup_function);

@@ -781,7 +781,7 @@ ensure_function_instance(
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
   Value *return_value =
-    calling_convention->return_proc(context->allocator, function, Function_Argument_Mode_Body);
+    calling_convention->return_proc(context->allocator, function, Function_Parameter_Mode_Body);
 
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
@@ -874,8 +874,8 @@ calculate_arguments_match_score(
   };
   assert(dyn_array_length(arguments) < 1000);
   s64 score = 0;
-  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->arguments); ++arg_index) {
-    Function_Argument *target_arg = dyn_array_get(descriptor->arguments, arg_index);
+  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
+    Function_Parameter *target_arg = dyn_array_get(descriptor->parameters, arg_index);
     Value *source_arg = 0;
     const Descriptor *source_descriptor;
     if (arg_index >= dyn_array_length(arguments)) {

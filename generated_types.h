@@ -135,7 +135,7 @@ typedef struct Function_Builder Function_Builder;
 typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
 
-typedef enum Function_Argument_Mode Function_Argument_Mode;
+typedef enum Function_Parameter_Mode Function_Parameter_Mode;
 
 typedef enum Operator_Fixity Operator_Fixity;
 
@@ -229,9 +229,9 @@ typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
 typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
 
-typedef struct Function_Argument Function_Argument;
-typedef dyn_array_type(Function_Argument *) Array_Function_Argument_Ptr;
-typedef dyn_array_type(const Function_Argument *) Array_Const_Function_Argument_Ptr;
+typedef struct Function_Parameter Function_Parameter;
+typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
+typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
 
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
@@ -266,7 +266,7 @@ typedef Memory_Layout (*Calling_Convention_Arguments_Layout_Proc)
   (const Allocator * allocator, const Function_Info * function_info);
 
 typedef Value * (*Calling_Convention_Return_Proc)
-  (const Allocator * allocator, const Function_Info * function_info, Function_Argument_Mode mode);
+  (const Allocator * allocator, const Function_Info * function_info, Function_Parameter_Mode mode);
 
 typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
@@ -918,15 +918,15 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
-typedef enum Function_Argument_Mode {
-  Function_Argument_Mode_Call = 0,
-  Function_Argument_Mode_Body = 1,
-} Function_Argument_Mode;
+typedef enum Function_Parameter_Mode {
+  Function_Parameter_Mode_Call = 0,
+  Function_Parameter_Mode_Body = 1,
+} Function_Parameter_Mode;
 
-const char *function_argument_mode_name(Function_Argument_Mode value) {
-  if (value == 0) return "Function_Argument_Mode_Call";
-  if (value == 1) return "Function_Argument_Mode_Body";
-  assert(!"Unexpected value for enum Function_Argument_Mode");
+const char *function_parameter_mode_name(Function_Parameter_Mode value) {
+  if (value == 0) return "Function_Parameter_Mode_Call";
+  if (value == 1) return "Function_Parameter_Mode_Body";
+  assert(!"Unexpected value for enum Function_Parameter_Mode");
   return 0;
 };
 
@@ -1231,13 +1231,13 @@ typedef struct Function_Return {
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
-typedef struct Function_Argument {
+typedef struct Function_Parameter {
   Slice name;
   const Descriptor * descriptor;
   Source_Range source_range;
   Value_View maybe_default_expression;
-} Function_Argument;
-typedef dyn_array_type(Function_Argument) Array_Function_Argument;
+} Function_Parameter;
+typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
 
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
@@ -1258,7 +1258,7 @@ const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
-  Array_Function_Argument arguments;
+  Array_Function_Parameter parameters;
   Scope * scope;
   Function_Return returns;
 } Function_Info;
@@ -1750,11 +1750,11 @@ static Descriptor descriptor_array_function_builder;
 static Descriptor descriptor_array_function_builder_ptr;
 static Descriptor descriptor_function_builder_pointer;
 static Descriptor descriptor_function_builder_pointer_pointer;
-static Descriptor descriptor_function_argument_mode;
-static Descriptor descriptor_array_function_argument_mode;
-static Descriptor descriptor_array_function_argument_mode_ptr;
-static Descriptor descriptor_function_argument_mode_pointer;
-static Descriptor descriptor_function_argument_mode_pointer_pointer;
+static Descriptor descriptor_function_parameter_mode;
+static Descriptor descriptor_array_function_parameter_mode;
+static Descriptor descriptor_array_function_parameter_mode_ptr;
+static Descriptor descriptor_function_parameter_mode_pointer;
+static Descriptor descriptor_function_parameter_mode_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
@@ -1877,11 +1877,11 @@ static Descriptor descriptor_array_function_return;
 static Descriptor descriptor_array_function_return_ptr;
 static Descriptor descriptor_function_return_pointer;
 static Descriptor descriptor_function_return_pointer_pointer;
-static Descriptor descriptor_function_argument;
-static Descriptor descriptor_array_function_argument;
-static Descriptor descriptor_array_function_argument_ptr;
-static Descriptor descriptor_function_argument_pointer;
-static Descriptor descriptor_function_argument_pointer_pointer;
+static Descriptor descriptor_function_parameter;
+static Descriptor descriptor_array_function_parameter;
+static Descriptor descriptor_array_function_parameter_ptr;
+static Descriptor descriptor_function_parameter_pointer;
+static Descriptor descriptor_function_parameter_pointer_pointer;
 static Descriptor descriptor_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
@@ -3218,8 +3218,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(49, function_builder, Function_Builder,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_builder);
-MASS_DEFINE_OPAQUE_C_TYPE(function_argument_mode, Function_Argument_Mode)
-static C_Enum_Item function_argument_mode_items[] = {
+MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_mode, Function_Parameter_Mode)
+static C_Enum_Item function_parameter_mode_items[] = {
 { .name = slice_literal_fields("Call"), .value = 0 },
 { .name = slice_literal_fields("Body"), .value = 1 },
 };
@@ -4006,35 +4006,35 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(77, function_return, Function_Return,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument_ptr, Array_Function_Argument_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_argument, Array_Function_Argument)
-MASS_DEFINE_STRUCT_DESCRIPTOR(78, function_argument, Function_Argument,
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter_ptr, Array_Function_Parameter_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
+MASS_DEFINE_STRUCT_DESCRIPTOR(78, function_parameter, Function_Parameter,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
     .descriptor = &descriptor_slice,
-    .Base_Relative.offset = offsetof(Function_Argument, name),
+    .Base_Relative.offset = offsetof(Function_Parameter, name),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("descriptor"),
     .descriptor = &descriptor_descriptor_pointer,
-    .Base_Relative.offset = offsetof(Function_Argument, descriptor),
+    .Base_Relative.offset = offsetof(Function_Parameter, descriptor),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
-    .Base_Relative.offset = offsetof(Function_Argument, source_range),
+    .Base_Relative.offset = offsetof(Function_Parameter, source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("maybe_default_expression"),
     .descriptor = &descriptor_value_view,
-    .Base_Relative.offset = offsetof(Function_Argument, maybe_default_expression),
+    .Base_Relative.offset = offsetof(Function_Parameter, maybe_default_expression),
   },
 );
-MASS_DEFINE_TYPE_VALUE(function_argument);
+MASS_DEFINE_TYPE_VALUE(function_parameter);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
@@ -4059,9 +4059,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(79, function_info, Function_Info,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("arguments"),
-    .descriptor = &descriptor_array_function_argument,
-    .Base_Relative.offset = offsetof(Function_Info, arguments),
+    .name = slice_literal_fields("parameters"),
+    .descriptor = &descriptor_array_function_parameter,
+    .Base_Relative.offset = offsetof(Function_Info, parameters),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

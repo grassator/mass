@@ -109,7 +109,7 @@ mass_error_append_function_signature_string(
   APPEND_SLICE(value->descriptor->name);
   APPEND_LITERAL("(");
   bool first = true;
-  DYN_ARRAY_FOREACH(Function_Argument, arg, info->arguments) {
+  DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->name);
@@ -333,14 +333,14 @@ same_type(
         return false;
       }
       if (
-        dyn_array_length(a_info->arguments) !=
-        dyn_array_length(b_info->arguments)
+        dyn_array_length(a_info->parameters) !=
+        dyn_array_length(b_info->parameters)
       ) {
         return false;
       }
-      for (u64 i = 0; i < dyn_array_length(a_info->arguments); ++i) {
-        Function_Argument *a_arg = dyn_array_get(a_info->arguments, i);
-        Function_Argument *b_arg = dyn_array_get(b_info->arguments, i);
+      for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
+        Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
+        Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
         if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
       }
       return true;
@@ -1475,7 +1475,7 @@ function_info_init(
   Scope *scope
 ) {
   *info = (Function_Info) {
-    .arguments = (Array_Function_Argument){&dyn_array_zero_items},
+    .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
     .scope = scope,
     .returns = {.descriptor = &descriptor_void},
   };
@@ -1497,7 +1497,7 @@ descriptor_function_instance(
     .Function_Instance = {
       .info = info,
       .arguments_layout = calling_convention->arguments_layout_proc(allocator, info),
-      .return_value = calling_convention->return_proc(allocator, info, Function_Argument_Mode_Call),
+      .return_value = calling_convention->return_proc(allocator, info, Function_Parameter_Mode_Call),
       .calling_convention = calling_convention,
     },
   };
@@ -1986,12 +1986,12 @@ same_value_type_or_can_implicitly_move_cast(
     Allocator *temp_allocator = bucket_buffer_allocator_init(temp_buffer, &(Allocator){0});
     Array_Value_Ptr temp_args = dyn_array_make(
       Array_Value_Ptr,
-      .capacity = dyn_array_length(info->arguments),
+      .capacity = dyn_array_length(info->parameters),
       .allocator = temp_allocator,
     );
 
-    for (u64 arg_index = 0; arg_index < dyn_array_length(info->arguments); ++arg_index) {
-      const Function_Argument *param = dyn_array_get(info->arguments, 0);
+    for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
+      const Function_Parameter *param = dyn_array_get(info->parameters, 0);
       Value *arg = allocator_allocate(temp_allocator, Value);
       value_init(arg, param->descriptor, storage_none, COMPILER_SOURCE_RANGE);
       dyn_array_push(temp_args, arg);

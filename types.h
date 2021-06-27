@@ -120,18 +120,18 @@
   }
 
 #define MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER(_RETURN_DESCRIPTOR_, ...)\
-  Function_Argument raw_arguments[] = {__VA_ARGS__};\
-  u64 arg_length = countof(raw_arguments);\
-  Array_Function_Argument arguments = \
-    dyn_array_make(Array_Function_Argument, .allocator = allocator, .capacity = arg_length);\
+  Function_Parameter raw_parameters[] = {__VA_ARGS__};\
+  u64 arg_length = countof(raw_parameters);\
+  Array_Function_Parameter parameters = \
+    dyn_array_make(Array_Function_Parameter, .allocator = allocator, .capacity = arg_length);\
   for (u64 i = 0; i < arg_length; ++i) {\
-    dyn_array_push(arguments, raw_arguments[i]);\
+    dyn_array_push(parameters, raw_parameters[i]);\
   }\
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
     .flags = Descriptor_Function_Flags_None,\
     .returns.descriptor = (_RETURN_DESCRIPTOR_),\
-    .arguments = arguments,\
+    .parameters = parameters,\
     .scope = scope,\
   };
 
