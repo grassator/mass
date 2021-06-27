@@ -1792,6 +1792,19 @@ spec("source") {
       Test_128bit test_128bit = { .x = 20, .y = 22 };
       check(checker(test_128bit) == 42);
     }
+
+    // Both System_V and win64 will pass 7th argument on the stack
+    xit("should be able to use a larger-than-register struct passed as the 7th arguments") {
+      s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
+        (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
+          "foo", &test_context,
+          "Test_128bit :: c_struct({ x : s64; y : s64 })\n"
+          "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8, x6 : s8, x7 : Test_128bit ) -> (s64) { x7.x }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      Test_128bit test_128bit = { .x = 42, .y = 20 };
+      check(checker(1, 2, 3, 4, 5, 6, test_128bit) == 42);
+    }
   }
 
   describe("Unsigned Integers") {
