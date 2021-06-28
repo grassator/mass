@@ -3532,6 +3532,10 @@ call_function_overload(
   u64 target_volatile_registers_bitset =
     instance_descriptor->calling_convention->register_volatile_bitset;
   u64 saved_registers_bit_set = 0;
+  u64 expected_result_bit_set = maybe_expected_storage
+    ? register_bit_set_from_storage(maybe_expected_storage)
+    : 0;
+
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
@@ -3541,7 +3545,7 @@ call_function_overload(
     // :NoSaveResult
     // We must not save the register that we will overwrite with the result
     // otherwise we will overwrite it with the restored value
-    if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
+    if (register_bitset_get(expected_result_bit_set, reg_index)) continue;
 
     Storage *occupied_storage = builder->register_occupied_storage[reg_index];
     assert(occupied_storage);
