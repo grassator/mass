@@ -915,7 +915,6 @@ typedef struct Function_Builder {
   u64 used_register_bitset;
   u64 register_volatile_bitset;
   u64 register_occupied_bitset;
-  Storage * register_occupied_storage[32];
   Slice source;
   const Function_Info * function;
 } Function_Builder;
@@ -2095,7 +2094,6 @@ static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
-static Descriptor descriptor_storage_pointer_32 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage *, 32, &descriptor_storage_pointer);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 static Descriptor descriptor_slice_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Slice, 2, &descriptor_slice);
 static Descriptor descriptor_overload_set_pointer_16 = MASS_DESCRIPTOR_STATIC_ARRAY(const Overload_Set *, 16, &descriptor_overload_set_pointer);
@@ -3220,12 +3218,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_builder, Function_Builder,
     .name = slice_literal_fields("register_occupied_bitset"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Function_Builder, register_occupied_bitset),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("register_occupied_storage"),
-    .descriptor = &descriptor_storage_pointer_32,
-    .Base_Relative.offset = offsetof(Function_Builder, register_occupied_storage),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

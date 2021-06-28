@@ -73,22 +73,13 @@ register_acquire_temp(
   return register_acquire(builder, register_find_available(builder, 0));
 }
 
-static inline void
-ensure_register_released(
-  Function_Builder *builder,
-  Register reg_index
-) {
-  register_bitset_unset(&builder->register_occupied_bitset, reg_index);
-  builder->register_occupied_storage[reg_index] = 0;
-}
-
 void
 register_release(
   Function_Builder *builder,
   Register reg_index
 ) {
   assert(register_bitset_get(builder->register_occupied_bitset, reg_index));
-  ensure_register_released(builder, reg_index);
+  register_bitset_unset(&builder->register_occupied_bitset, reg_index);
 }
 
 
@@ -738,7 +729,6 @@ mark_occupied_registers(
   }
   if (arg_reg != Register_SP) {
     register_bitset_set(&builder->register_occupied_bitset, arg_reg);
-    builder->register_occupied_storage[arg_reg] = storage;
   }
 }
 

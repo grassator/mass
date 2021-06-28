@@ -1098,7 +1098,7 @@ main(void) {
     { "Section", "ro_data" },
   }));
 
-  Meta_Type *Register_Type = push_type(type_enum("Register", (Enum_Type_Item[]){
+  push_type(type_enum("Register", (Enum_Type_Item[]){
     { "A", 0b0000 },
     { "C", 0b0001 },
     { "D", 0b0010 },
@@ -1315,7 +1315,6 @@ main(void) {
     { "u64", "used_register_bitset" },
     { "u64", "register_volatile_bitset" },
     { "u64", "register_occupied_bitset" },
-    { "Storage *", "register_occupied_storage", u64_to_u32(Register_Type->enum_.item_count) },
     { "Slice", "source" },
     { "const Function_Info *", "function" },
   }));
