@@ -3438,11 +3438,9 @@ call_function_overload(
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
-  for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
-    Memory_Layout_Item *target_item =
-      dyn_array_get(instance_descriptor->arguments_layout.items, i);
-    Storage storage = memory_layout_item_storage_at_index(
-      &stack_argument_base, &instance_descriptor->arguments_layout, i
+  DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, instance_descriptor->arguments_layout.items) {
+    Storage storage = memory_layout_item_storage(
+      &stack_argument_base, &instance_descriptor->arguments_layout, target_item
     );
     if (storage_is_stack(&storage)) {
       assert(storage.Memory.location.Stack.area != Stack_Area_Local);
@@ -3454,7 +3452,7 @@ call_function_overload(
 
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
-  for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
+  for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
     Value *target_arg = dyn_array_get(target_params, i);
