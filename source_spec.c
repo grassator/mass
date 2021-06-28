@@ -1813,7 +1813,7 @@ spec("source") {
     }
 
     // Both System_V and win64 will pass 7th argument on the stack
-    xit("should be able to use a larger-than-register struct passed as the 7th arguments") {
+    it("should be able to use a larger-than-register struct passed as the 7th arguments") {
       s8(*checker)(s8, s8, s8, s8, s8, s8, Test_128bit) =
         (s8(*)(s8, s8, s8, s8, s8, s8, Test_128bit))test_program_inline_source_function(
           "foo", &test_context,

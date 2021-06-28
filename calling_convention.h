@@ -662,14 +662,13 @@ calling_convention_x86_64_windows_arguments_layout_proc(
     u64 byte_size = descriptor_byte_size(item.descriptor);
     bool is_large_argument = byte_size > 8;
     Storage arg_storage;
+    if (is_large_argument) {
+      item.descriptor = descriptor_reference_to(allocator, item.descriptor);
+    }
     if (index < countof(general_registers)) {
       Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[index]
         : general_registers[index];
-      if (is_large_argument) {
-        // Large arguments are passed "by reference", i.e. their memory location in the register
-        item.descriptor = descriptor_reference_to(allocator, item.descriptor);
-      }
       arg_storage = storage_register_for_descriptor(reg, item.descriptor);
       item.tag = Memory_Layout_Item_Tag_Absolute;
       item.Absolute.storage = arg_storage;
