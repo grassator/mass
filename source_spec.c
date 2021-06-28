@@ -583,7 +583,7 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
-    xit("should correctly work with nested 5 argument calls") {
+    it("should correctly work with nested 5 argument calls") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
         "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
@@ -1943,23 +1943,23 @@ spec("source") {
     xit("should parse and write an executable with a lot of constant folding") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "..\\compile-time-benchmark\\folding"
+        "main", &test_context, "../compile-time-benchmark/folding"
       );
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build\\folding.exe", &test_context, Executable_Type_Cli);
+      write_executable("build/folding.exe", &test_context, Executable_Type_Cli);
     }
 
     xit("should parse and write an executable with a lot of print statements") {
       Program *test_program = test_context.program;
       test_program->entry_point = test_program_external_source_base(
-        "main", &test_context, "..\\compile-time-benchmark\\print"
+        "main", &test_context, "../compile-time-benchmark/print"
       );
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
+      write_executable("build/print.exe", &test_context, Executable_Type_Cli);
     }
   }
 
