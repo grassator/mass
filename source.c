@@ -3429,8 +3429,8 @@ call_function_overload(
     .allocator = context->temp_allocator,
     .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
   );
-  Array_Storage target_storages = dyn_array_make(
-    Array_Storage,
+  Array_Value target_params = dyn_array_make(
+    Array_Value,
     .allocator = context->temp_allocator,
     .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
   );
@@ -3439,19 +3439,23 @@ call_function_overload(
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
-    Storage *storage = dyn_array_push(target_storages, memory_layout_item_storage_at_index(
+    Memory_Layout_Item *target_item =
+      dyn_array_get(instance_descriptor->arguments_layout.items, i);
+    Storage storage = memory_layout_item_storage_at_index(
       &stack_argument_base, &instance_descriptor->arguments_layout, i
-    ));
-    if (storage_is_stack(storage)) {
-      assert(storage->Memory.location.Stack.area != Stack_Area_Local);
-      storage->Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
+    );
+    if (storage_is_stack(&storage)) {
+      assert(storage.Memory.location.Stack.area != Stack_Area_Local);
+      storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
     }
+    Value *param = dyn_array_push_uninitialized(target_params);
+    value_init(param, target_item->descriptor, storage, target_item->source_range);
   }
 
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
-    const Storage *target_storage = dyn_array_get(target_storages, i);
+    const Storage *target_storage = &dyn_array_get(target_params, i)->storage;
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
@@ -3559,22 +3563,17 @@ call_function_overload(
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
 
-  for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
-    Memory_Layout_Item *target_item =
-      dyn_array_get(instance_descriptor->arguments_layout.items, i);
+  for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
+    Value *param = dyn_array_get(target_params, i);
 
-    const Storage *target_storage = dyn_array_get(target_storages, i);
-    if (storage_is_stack(target_storage)) {
-      continue;
-    }
+    if (storage_is_stack(&param->storage)) continue;
+
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
     // must not be used as a temporary for any other argument loading. So we acquire them
     // here and release after the function call
-    register_acquire_from_storage(builder, &argument_register_bit_set, target_storage);
-    Value *target_arg =
-      value_make(context, target_item->descriptor, *target_storage, target_item->source_range);
+    register_acquire_from_storage(builder, &argument_register_bit_set, &param->storage);
     Value *source_arg = *dyn_array_get(temp_arguments_on_the_stack, i);
-    MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
+    MASS_ON_ERROR(assign(context, builder, param, source_arg)) return 0;
   }
 
   // If we call a function, then we need to reserve space for the home area of at least 4 arguments
