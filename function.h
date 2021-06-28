@@ -154,6 +154,17 @@ register_bitset_get(
   return !!(bitset & (1llu << reg));
 }
 
+static inline u64
+register_bitset_occupied_count(
+  u64 bitset
+) {
+  #ifdef _MSC_VER
+  return __popcnt64(bitset);
+  #else
+  return __builtin_popcount(bitset);
+  #endif
+}
+
 static inline void
 register_acquire_bitset(
   Function_Builder *builder,
@@ -196,7 +207,6 @@ register_release(
 ) {
   register_release_bitset(builder, 1llu << reg_index);
 }
-
 
 #endif
 
