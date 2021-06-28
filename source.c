@@ -3463,6 +3463,7 @@ call_function_overload(
 
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
+  u64 copied_straight_to_param_bit_set = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
@@ -3498,6 +3499,12 @@ call_function_overload(
 
     u64 target_arg_register_bit_set = register_bit_set_from_storage(&target_arg->storage);
     argument_register_bit_set |= target_arg_register_bit_set;
+    bool target_arg_registers_are_free =
+      !(builder->register_occupied_bitset & target_arg_register_bit_set);
+    bool can_assign_straight_to_target = (
+      target_arg_registers_are_free &&
+      target_item->descriptor->tag != Descriptor_Tag_Reference_To
+    );
 
     Value *arg_value;
     if (storage_is_stack(&target_arg->storage)) {
@@ -3511,7 +3518,15 @@ call_function_overload(
     ) {
       arg_value = source_arg;
       should_assign = false;
+    } else if (can_assign_straight_to_target) {
+      arg_value = target_arg;
+      copied_straight_to_param_bit_set |= target_arg_register_bit_set;
+      builder->register_occupied_bitset |= target_arg_register_bit_set;
+      builder->used_register_bitset |= target_arg_register_bit_set;
     } else {
+      // The code below is useful to check how many spills to stack happen
+      //static int stack_counter = 0;
+      //printf(" > stack %i\n", stack_counter++);
       arg_value = reserve_stack(context, builder, stack_descriptor, *source_range);
       arg_value->is_temporary = true;
     };
@@ -3535,6 +3550,7 @@ call_function_overload(
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
+    if (register_bitset_get(copied_straight_to_param_bit_set, reg_index)) continue;
 
     register_bitset_set(&saved_registers_bit_set, reg_index);
 
@@ -3554,7 +3570,9 @@ call_function_overload(
   }
 
   builder->register_occupied_bitset &= ~saved_registers_bit_set;
-  assert(!(builder->register_occupied_bitset & argument_register_bit_set));
+  u64 occupied_registers_before_call =
+    builder->register_occupied_bitset & ~copied_straight_to_param_bit_set;
+  assert(!(occupied_registers_before_call & argument_register_bit_set));
   builder->register_occupied_bitset |= argument_register_bit_set;
   builder->used_register_bitset |= argument_register_bit_set;
 
