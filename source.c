@@ -3612,13 +3612,14 @@ call_function_overload(
     );
   }
 
+  register_release_bitset(builder, argument_register_bitset);
+
   u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
   register_acquire_bitset(builder, return_value_bitset);
 
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
-  register_release_bitset(builder, argument_register_bitset);
 
   // This is awkward that we need to manually clear return bitset because
   // it *might* be set depending on whether the expected result it a temp.
