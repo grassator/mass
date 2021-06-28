@@ -3389,6 +3389,12 @@ register_bit_set_from_storage(
   return result;
 }
 
+typedef struct {
+  Storage reg;
+  Storage stack;
+} Saved_Register;
+typedef dyn_array_type(Saved_Register) Array_Saved_Register;
+
 static Value *
 call_function_overload(
   Execution_Context *context,
@@ -3433,6 +3439,11 @@ call_function_overload(
     Array_Value,
     .allocator = context->temp_allocator,
     .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
+  );
+  Array_Saved_Register stack_saved_registers = dyn_array_make(
+    Array_Saved_Register,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
   );
 
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
@@ -3527,36 +3538,19 @@ call_function_overload(
 
     register_bitset_set(&saved_registers_bit_set, reg_index);
 
-    // :NoSaveResult
     // We must not save the register that we will overwrite with the result
     // otherwise we will overwrite it with the restored value
     if (register_bitset_get(expected_result_bit_set, reg_index)) continue;
 
-    Storage *occupied_storage = builder->register_occupied_storage[reg_index];
-    assert(occupied_storage);
-    if (occupied_storage->tag == Storage_Tag_Register) {
-      assert(occupied_storage->tag == Storage_Tag_Register);
-      assert(occupied_storage->Register.index == reg_index);
-      Storage stack_storage = reserve_stack_storage(builder, occupied_storage->byte_size);
-      push_instruction(
-        instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {stack_storage, *occupied_storage}}}
-      );
-      *occupied_storage = stack_storage;
-    } else if (occupied_storage->tag == Storage_Tag_Memory) {
-      assert(occupied_storage->Memory.location.tag == Memory_Location_Tag_Indirect);
-      assert(occupied_storage->Memory.location.Indirect.base_register == reg_index);
-      Register temp_reg = register_acquire_temp(builder);
-      Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
-      Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
-      push_instruction(
-        instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_reg_storage, original_reg_storage}}}
-      );
-      occupied_storage->Memory.location.Indirect.base_register = temp_reg;
-    } else {
-      panic("Unexpected storage tag for an argument");
-    }
+    Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
+      .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
+      .stack = reserve_stack_storage(builder, descriptor_byte_size(&descriptor_void_pointer)),
+    });
+
+    push_instruction(instructions, *source_range, (Instruction) {
+      .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {saved->stack, saved->reg}}
+    });
   }
 
   builder->register_occupied_bitset &= ~saved_registers_bit_set;
@@ -3611,35 +3605,14 @@ call_function_overload(
 
   builder->register_occupied_bitset &= ~(argument_register_bit_set | return_value_bit_set);
 
-  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
-    register_acquire(builder, reg_index);
-
-    // :NoSaveResult
-    if (maybe_expected_storage && storage_is_register_index(maybe_expected_storage, reg_index)) continue;
-
-    Storage *occupied_storage = builder->register_occupied_storage[reg_index];
-    assert(occupied_storage->tag == Storage_Tag_Memory);
-    if (occupied_storage->Memory.location.tag == Memory_Location_Tag_Stack) {
-      Storage reg_storage = (Storage) {
-        .tag = Storage_Tag_Register,
-        .byte_size = occupied_storage->byte_size,
-        .Register.index = reg_index,
-      };
-      move_value(context->allocator, builder, source_range, &reg_storage, occupied_storage);
-      *occupied_storage = reg_storage;
-    } else {
-      assert(occupied_storage->Memory.location.tag == Memory_Location_Tag_Indirect);
-      Register temp_reg = occupied_storage->Memory.location.Indirect.base_register;
-      Storage temp_reg_storage = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
-      Storage original_reg_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
-      push_instruction(
-        instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {original_reg_storage, temp_reg_storage}}}
-      );
-      occupied_storage->Register.index = reg_index;
-    }
+  DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
+    push_instruction(instructions, *source_range, (Instruction) {
+      .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {saved->reg, saved->stack}}
+    });
   }
+
+  builder->register_occupied_bitset |= saved_registers_bit_set;
 
   context_temp_reset_to_mark(context, temp_mark);
 
