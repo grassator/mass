@@ -292,13 +292,23 @@ program_get_label(
   return dyn_array_get(program->labels, label.value);
 }
 
-bool
+static bool
 same_type(
   const Descriptor *a,
   const Descriptor *b
 ) {
+  if (a->tag == Descriptor_Tag_Reference_To) {
+    return same_type(a->Reference_To.descriptor, b);
+  }
+  if (b->tag == Descriptor_Tag_Reference_To) {
+    return same_type(a, b->Reference_To.descriptor);
+  }
   if (a->tag != b->tag) return false;
   switch(a->tag) {
+    case Descriptor_Tag_Reference_To: {
+      panic("Should be unwrapped above");
+      return false;
+    }
     case Descriptor_Tag_Pointer_To: {
       if (
         a->Pointer_To.descriptor->tag == Descriptor_Tag_Fixed_Size_Array &&
@@ -833,7 +843,7 @@ storage_is_register_index(
   return storage->tag == Storage_Tag_Register && storage->Register.index == reg_index;
 }
 
-bool
+static bool
 storage_static_equal_internal(
   const Descriptor *a_descriptor,
   const void *a_memory,
@@ -846,8 +856,9 @@ storage_static_equal_internal(
   }
   u64 byte_size = descriptor_byte_size(a_descriptor);
   switch(a_descriptor->tag) {
-    // Opaques and pointers can be compared with memcmp
+    // Opaques, references and pointers can be compared with memcmp
     case Descriptor_Tag_Opaque:
+    case Descriptor_Tag_Reference_To:
     case Descriptor_Tag_Pointer_To: {
       return memcmp(a_memory, b_memory, byte_size) == 0;
     }
@@ -1335,6 +1346,29 @@ value_register_for_descriptor_internal(
   value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
+value_temporary_acquire_indirect_for_descriptor_internal(
+  Compiler_Source_Location compiler_source_location,
+  Execution_Context *context,
+  Function_Builder *builder,
+  Register reg,
+  const Descriptor *descriptor,
+  Source_Range source_range
+) {
+  register_acquire(builder, reg);
+  Value *value = value_make_internal(
+    compiler_source_location, context, descriptor,
+    storage_indirect(descriptor_byte_size(descriptor), reg),
+    source_range
+  );
+  value->is_temporary = true;
+  builder->register_occupied_storage[reg] = &value->storage;
+  return value;
+}
+
+#define value_temporary_acquire_indirect_for_descriptor(...)\
+  value_temporary_acquire_indirect_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
+
+static inline Value *
 value_temporary_acquire_register_for_descriptor_internal(
   Compiler_Source_Location compiler_source_location,
   Execution_Context *context,
@@ -1500,6 +1534,21 @@ descriptor_function_instance(
       .return_value = calling_convention->return_proc(allocator, info, Function_Parameter_Mode_Call),
       .calling_convention = calling_convention,
     },
+  };
+  return result;
+}
+
+static inline Descriptor *
+descriptor_reference_to(
+  const Allocator *allocator,
+  const Descriptor *descriptor
+) {
+  Descriptor *result = allocator_allocate(allocator, Descriptor);
+  *result = (const Descriptor) {
+    .tag = Descriptor_Tag_Reference_To,
+    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_alignment = sizeof(void *) * CHAR_BIT,
+    .Pointer_To.descriptor = descriptor,
   };
   return result;
 }

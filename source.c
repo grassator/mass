@@ -456,6 +456,108 @@ maybe_coerce_number_literal_to_integer(
   return token_value_force_immediate_integer(context, value, target_descriptor);
 }
 
+static bool
+assign_from_static(
+  Execution_Context *context,
+  Function_Builder *builder,
+  Value *target,
+  Value *source
+) {
+  Source_Range source_range = target->source_range;
+  if (
+    !context_is_compile_time_eval(context) &&
+    (
+      source->descriptor->tag == Descriptor_Tag_Pointer_To ||
+      source->descriptor->tag == Descriptor_Tag_Reference_To
+    )
+  ) {
+    // If a static value contains a pointer, we expect an entry in a special map used to track
+    // whether the target memory is also already copied to the compiled binary.
+    // This is done to only include static values actually used at runtime.
+    void *source_memory = *storage_static_as_c_type(&source->storage, void *);
+    Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
+    assert(static_pointer);
+    if (static_pointer->storage.tag == Storage_Tag_None) {
+      // TODO should depend on constness of the static value I guess?
+      //      Do not forget to make memory readable for ro_dar
+      Section *section = &context->program->memory.rw_data;
+      u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
+      u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
+
+      // TODO this should also be deduped
+      Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
+      static_pointer->storage = data_label32(label_index, byte_size);
+
+      Value static_source_value = {
+        .descriptor = static_pointer->descriptor,
+        .storage = storage_static_heap(source_memory, byte_size),
+        .source_range = source->source_range,
+      };
+
+      // It is important to call assign here to make sure we recursively handle
+      // any complex types such as structs and arrays
+      MASS_ON_ERROR(assign(context, builder, static_pointer, &static_source_value)) return true;
+    }
+    assert(storage_is_label(&static_pointer->storage));
+    if (storage_is_label(&target->storage)) {
+      dyn_array_push(context->program->relocations, (Relocation) {
+        .patch_at = target->storage,
+        .address_of = static_pointer->storage,
+      });
+    } else {
+      load_address(context, builder, &source_range, target, static_pointer->storage);
+    }
+    return true;
+  } else if (storage_is_label(&target->storage)) {
+    Label_Index label_index =
+      target->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
+    u64 byte_size = source->storage.byte_size;
+    const void *source_memory = storage_static_as_c_type_internal(&source->storage, byte_size);
+    memcpy(section_memory, source_memory, byte_size);
+    return true;
+  }
+  return false;
+}
+
+static PRELUDE_NO_DISCARD Value *
+value_indirect_from_reference(
+  Execution_Context *context,
+  Function_Builder *builder,
+  Value *source
+) {
+  assert(source->descriptor->tag == Descriptor_Tag_Reference_To);
+  const Descriptor *referenced_descriptor = source->descriptor->Reference_To.descriptor;
+  u64 byte_size = descriptor_byte_size(referenced_descriptor);
+  switch(source->storage.tag) {
+    case Storage_Tag_Register: {
+      Register reg = source->storage.Register.index;
+      Storage referenced_storage = storage_indirect(byte_size, reg);
+      return value_make(
+        context, referenced_descriptor, referenced_storage, source->source_range
+      );
+    }
+    case Storage_Tag_Memory: {
+      Register reg = register_find_available(builder, 0);
+      Value *temp = value_temporary_acquire_indirect_for_descriptor(
+        context, builder, reg, referenced_descriptor, source->source_range
+      );
+      Storage reg_storage = storage_register_for_descriptor(reg, source->descriptor);
+      move_value(context->allocator, builder, &source->source_range, &reg_storage, &source->storage);
+      return temp;
+    }
+    default:
+    case Storage_Tag_Static:
+    case Storage_Tag_None:
+    case Storage_Tag_Any:
+    case Storage_Tag_Eflags:
+    case Storage_Tag_Xmm:{
+      panic("Unexpected storage for a reference");
+      return 0;
+    }
+  }
+}
+
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
@@ -478,7 +580,42 @@ assign(
   }
 
   Source_Range source_range = target->source_range;
-  if (value_is_static_number_literal(source)) {
+  if (
+    source->descriptor->tag == Descriptor_Tag_Reference_To &&
+    target->descriptor->tag != Descriptor_Tag_Reference_To
+  ) {
+    Value *referenced_value = value_indirect_from_reference(context, builder, source);
+    MASS_TRY(assign(context, builder, target, referenced_value));
+    value_release_if_temporary(builder, referenced_value);
+    return *context->result;
+  } else if (
+    target->descriptor->tag == Descriptor_Tag_Reference_To &&
+    source->descriptor->tag != Descriptor_Tag_Reference_To
+  ) {
+    const Descriptor *reference_descriptor = target->descriptor->Reference_To.descriptor;
+    if (!same_value_type_or_can_implicitly_move_cast(reference_descriptor, source)) goto err;
+    if (source->storage.tag == Storage_Tag_Static) {
+      if (!assign_from_static(context, builder, target, source)) {
+        Value *referenced_value = value_indirect_from_reference(context, builder, target);
+        MASS_TRY(assign(context, builder, referenced_value, source));
+        value_release_if_temporary(builder, referenced_value);
+      }
+    } else {
+      load_address(context, builder, &source_range, target, source->storage);
+    }
+    return *context->result;
+  } else if (
+    target->descriptor->tag == Descriptor_Tag_Reference_To &&
+    source->descriptor->tag == Descriptor_Tag_Reference_To
+  ) {
+    if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
+    Value *referenced_source = value_indirect_from_reference(context, builder, source);
+    Value *referenced_target = value_indirect_from_reference(context, builder, target);
+    MASS_TRY(assign(context, builder, referenced_target, referenced_source));
+    value_release_if_temporary(builder, referenced_source);
+    value_release_if_temporary(builder, referenced_target);
+    return *context->result;
+  } else if (value_is_static_number_literal(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       const Number_Literal *literal = storage_static_as_c_type(&source->storage, Number_Literal);
       if (literal->bits == 0) {
@@ -527,54 +664,7 @@ assign(
     }
     return *context->result;
   } else if (source->storage.tag == Storage_Tag_Static) {
-    if (
-      !context_is_compile_time_eval(context) &&
-      source->descriptor->tag == Descriptor_Tag_Pointer_To
-    ) {
-      // If a static value contains a pointer, we expect an entry in a special map used to track
-      // whether the target memory is also already copied to the compiled binary.
-      // This is done to only include static values actually used at runtime.
-      void *source_memory = *storage_static_as_c_type(&source->storage, void *);
-      Value *static_pointer = hash_map_get(context->compilation->static_pointer_map, source_memory);
-      assert(static_pointer);
-      if (static_pointer->storage.tag == Storage_Tag_None) {
-        // TODO should depend on constness of the static value I guess?
-        //      Do not forget to make memory readable for ro_dar
-        Section *section = &context->program->memory.rw_data;
-        u64 byte_size = descriptor_byte_size(static_pointer->descriptor);
-        u64 alignment = descriptor_byte_alignment(static_pointer->descriptor);
-
-        // TODO this should also be deduped
-        Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-        static_pointer->storage = data_label32(label_index, byte_size);
-
-        Value static_source_value = {
-          .descriptor = static_pointer->descriptor,
-          .storage = storage_static_heap(source_memory, byte_size),
-          .source_range = source->source_range,
-        };
-
-        // It is important to call assign here to make sure we recursively handle
-        // any complex types such as structs and arrays
-        MASS_TRY(assign(context, builder, static_pointer, &static_source_value));
-      }
-      assert(storage_is_label(&static_pointer->storage));
-      if (storage_is_label(&target->storage)) {
-        dyn_array_push(context->program->relocations, (Relocation) {
-          .patch_at = target->storage,
-          .address_of = static_pointer->storage,
-        });
-      } else {
-        load_address(context, builder, &source_range, target, static_pointer->storage);
-      }
-      return *context->result;
-    } else if (storage_is_label(&target->storage)) {
-      Label_Index label_index =
-        target->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-      void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-      u64 byte_size = source->storage.byte_size;
-      const void *source_memory = storage_static_as_c_type_internal(&source->storage, byte_size);
-      memcpy(section_memory, source_memory, byte_size);
+    if (assign_from_static(context, builder, target, source)) {
       return *context->result;
     }
   }
@@ -1906,13 +1996,13 @@ expected_result_ensure_value_or_temp(
   switch(expected_result->tag) {
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
+      MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
       if (
         value->storage.tag != Storage_Tag_Static &&
         !storage_equal(&result_value->storage, &value->storage)
       ) {
         value_release_if_temporary(builder, value);
       }
-      MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
       return result_value;
     }
     case Expected_Result_Tag_Flexible: {
@@ -3410,29 +3500,16 @@ call_function_overload(
 
     source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
 
-    if (target_arg_definition->flags & Memory_Layout_Item_Flags_Implicit_Pointer) {
-      // Large values are copied to the stack and passed by reference
-      assert(target_arg->storage.tag == Storage_Tag_Memory);
-      assert(target_arg->storage.Memory.location.tag == Memory_Location_Tag_Indirect);
-      Register reg_index = target_arg->storage.Memory.location.Indirect.base_register;
-      Storage reference_storage;
-      if (reg_index == Register_SP) {
-        reference_storage = target_arg->storage;
-      } else {
-        reference_storage = storage_register_for_descriptor(reg_index, &descriptor_void_pointer);
-      }
-      Value *reference_pointer = value_init(
-        &(Value){0}, &descriptor_void_pointer, reference_storage, *source_range
-      );
-
-      Value *stack_value = reserve_stack(context, builder, target_arg->descriptor, *source_range);
+    if (target_arg_definition->descriptor->tag == Descriptor_Tag_Reference_To) {
+      const Descriptor *referenced_descriptor =
+        target_arg_definition->descriptor->Reference_To.descriptor;
+      Value *stack_value = reserve_stack(context, builder, referenced_descriptor, *source_range);
       if (!(target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized)) {
         MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
       }
-      load_address(context, builder, source_range, reference_pointer, stack_value->storage);
-    } else {
-      MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
+      source_arg = stack_value;
     }
+    MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
     Slice name = target_arg_definition->name;
     if (name.length) {
       scope_define_value(default_arguments_scope, context->epoch, target_arg->source_range, name, target_arg);
@@ -4837,11 +4914,11 @@ mass_handle_field_access_lazy_proc(
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
 
   const Descriptor *struct_descriptor = struct_->descriptor;
+  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
 
   // Auto dereference pointers to structs
-  if (struct_descriptor->tag == Descriptor_Tag_Pointer_To) {
-    struct_descriptor = struct_->descriptor->Pointer_To.descriptor;
-    assert(struct_descriptor->tag == Descriptor_Tag_Struct);
+  if (struct_descriptor != unwrapped_descriptor) {
+    assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
     Storage base_storage;
     bool is_temporary;
     if (struct_->storage.tag == Storage_Tag_Register) {
@@ -4862,17 +4939,16 @@ mass_handle_field_access_lazy_proc(
     }
 
     Storage pointee_storage =
-      storage_indirect(descriptor_byte_size(struct_descriptor), base_storage.Register.index);
-    struct_ = value_make(context, struct_descriptor, pointee_storage, struct_->source_range);
+      storage_indirect(descriptor_byte_size(unwrapped_descriptor), base_storage.Register.index);
+    struct_ = value_make(context, unwrapped_descriptor, pointee_storage, struct_->source_range);
     struct_->is_temporary = is_temporary;
   }
 
-  assert(struct_descriptor->tag == Descriptor_Tag_Struct);
+  assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct);
   Storage field_storage = memory_layout_item_storage(
-    &struct_->storage, &struct_->descriptor->Struct.memory_layout, field
+    &struct_->storage, &unwrapped_descriptor->Struct.memory_layout, field
   );
-  Value *field_value =
-    value_make(context, field->descriptor, field_storage, struct_->source_range);
+  Value *field_value = value_make(context, field->descriptor, field_storage, struct_->source_range);
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
@@ -4955,13 +5031,10 @@ mass_handle_dot_operator(
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
   const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
+  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
 
   if (
-    lhs_descriptor->tag == Descriptor_Tag_Struct ||
-    (
-      lhs_descriptor->tag == Descriptor_Tag_Pointer_To &&
-      lhs_descriptor->Pointer_To.descriptor->tag == Descriptor_Tag_Struct
-    ) ||
+    unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
     lhs_descriptor == &descriptor_scope
   ) {
 
@@ -4992,17 +5065,14 @@ mass_handle_dot_operator(
       }
       return lookup;
     } else {
-      if (lhs_descriptor->tag == Descriptor_Tag_Pointer_To) {
-        lhs_descriptor = lhs_descriptor->Pointer_To.descriptor;
-      }
-      Memory_Layout_Item *field = struct_find_field_by_name(lhs_descriptor, field_name);
+      Memory_Layout_Item *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
           .Unknown_Field = {
             .name = field_name,
-            .type = lhs_descriptor,
+            .type = unwrapped_descriptor,
           },
         });
         return 0;

@@ -244,7 +244,7 @@ x86_64_system_v_memory_layout_item_for_class(
   relative: {
     *out_result = (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
-      .flags = Memory_Layout_Item_Flags_Implicit_Pointer,
+      .flags = Memory_Layout_Item_Flags_None,
       .name = name,
       .descriptor = descriptor,
       .Base_Relative = {.offset = state->stack_offset},
@@ -282,6 +282,7 @@ x86_64_system_v_classify(
   switch(descriptor->tag) {
     case Descriptor_Tag_Function_Instance:
     case Descriptor_Tag_Pointer_To:
+    case Descriptor_Tag_Reference_To:
     case Descriptor_Tag_Opaque: {
       if (byte_size <= eightbyte) {
         SYSTEM_V_ARGUMENT_CLASS class =
@@ -566,13 +567,14 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   }
 
   if (is_indirect_return) {
+    const Descriptor *reference = descriptor_reference_to(allocator, return_value->descriptor);
     dyn_array_push(state.memory_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized | Memory_Layout_Item_Flags_Implicit_Pointer,
+      .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
-      .descriptor = function->returns.descriptor,
-      .source_range = function->returns.source_range,
-      .Absolute = { .storage = return_value->storage, },
+      .descriptor = reference,
+      .source_range = return_value->source_range,
+      .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
     });
   }
 
@@ -607,19 +609,17 @@ calling_convention_x86_64_windows_return_proc(
   if (descriptor_is_float(descriptor)) {
     storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
   } else {
-    u64 byte_size = descriptor_byte_size(descriptor);
-    if (byte_size <= 8) {
-      storage = storage_register_for_descriptor(Register_A, descriptor);
-    } else {
+    Register base_register = Register_A;
+    if (descriptor_byte_size(descriptor) > 8) {
+      descriptor = descriptor_reference_to(allocator, descriptor);
       // :ReturnTypeLargerThanRegister
       // Inside the function large returns are pointed to by RCX,
       // but this pointer is also returned in A
-      Register base_register = Register_A;
       if (mode == Function_Parameter_Mode_Body) {
         base_register = Register_C;
       }
-      storage = storage_indirect(byte_size, base_register);
     }
+    storage = storage_register_for_descriptor(base_register, descriptor);
   }
   return value_init(
     allocator_allocate(allocator, Value), descriptor, storage, COMPILER_SOURCE_RANGE
@@ -659,20 +659,18 @@ calling_convention_x86_64_windows_arguments_layout_proc(
       .source_range = param->source_range,
     };
 
-    u64 byte_size = descriptor_byte_size(param->descriptor);
+    u64 byte_size = descriptor_byte_size(item.descriptor);
     bool is_large_argument = byte_size > 8;
     Storage arg_storage;
     if (index < countof(general_registers)) {
-      Register reg = descriptor_is_float(param->descriptor)
+      Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[index]
         : general_registers[index];
       if (is_large_argument) {
         // Large arguments are passed "by reference", i.e. their memory location in the register
-        arg_storage = storage_indirect(byte_size, reg);
-        item.flags |= Memory_Layout_Item_Flags_Implicit_Pointer;
-      } else {
-        arg_storage = storage_register_for_descriptor(reg, param->descriptor);
+        item.descriptor = descriptor_reference_to(allocator, item.descriptor);
       }
+      arg_storage = storage_register_for_descriptor(reg, item.descriptor);
       item.tag = Memory_Layout_Item_Tag_Absolute;
       item.Absolute.storage = arg_storage;
     } else {
@@ -684,13 +682,15 @@ calling_convention_x86_64_windows_arguments_layout_proc(
   }
 
   if (is_return_larger_than_register) {
+    const Descriptor *return_descriptor =
+      descriptor_reference_to(allocator, function->returns.descriptor);
     dyn_array_push(layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
-      .flags = Memory_Layout_Item_Flags_Uninitialized | Memory_Layout_Item_Flags_Implicit_Pointer,
+      .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
-      .descriptor = function->returns.descriptor,
+      .descriptor = return_descriptor,
       .source_range = function->returns.source_range,
-      .Absolute = { .storage = storage_indirect(return_byte_size, Register_C), },
+      .Absolute = { .storage = storage_register_for_descriptor(Register_C, return_descriptor), },
     });
   }
 

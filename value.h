@@ -180,6 +180,9 @@ maybe_unwrap_pointer_descriptor(
   if (descriptor->tag == Descriptor_Tag_Pointer_To) {
     return descriptor->Pointer_To.descriptor;
   }
+  if (descriptor->tag == Descriptor_Tag_Reference_To) {
+    return descriptor->Reference_To.descriptor;
+  }
   return descriptor;
 }
 
