@@ -3555,12 +3555,7 @@ call_function_overload(
     }
   }
 
-  // The "release" of registers has to happen as a separate loop to make sure
-  // we do not use any of them for the temporaries
-  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
-    register_bitset_unset(&builder->register_occupied_bitset, reg_index);
-  }
+  builder->register_occupied_bitset &= ~saved_registers_bit_set;
 
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
