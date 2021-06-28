@@ -65,7 +65,7 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
     (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
     (1llu << Register_C) | (1llu << Register_R8) | (1llu << Register_R9) |
     // Varargs / Return
-    (1llu << Register_A) |
+    (1llu << Register_A) | (1llu << Register_D) | // 'D' is used both for args and return
     // Other
     (1llu << Register_R10) | (1llu << Register_R11)
   ),
