@@ -547,7 +547,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should correctly deal with sign extending negative immediate integers") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "foo", &test_context,
@@ -574,7 +573,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 18446744073709551615llu);
     }
-    #endif
 
     it("should be able to parse and run a function with 5 arguments") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
@@ -1139,7 +1137,6 @@ spec("source") {
       check(checker(30, 10, 2) == 42);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should be able to parse and run a subtraction of a negative literal") {
       s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "plus_one", &test_context,
@@ -1148,7 +1145,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker(41) == 42);
     }
-    #endif
 
     it("should be able to parse and run a sum passed to another function as an argument") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
@@ -1701,7 +1697,6 @@ spec("source") {
       check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should report an error when fixed size array size is negative") {
       test_program_inline_source_base(
         "test", &test_context,
@@ -1713,7 +1708,6 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Parse);
     }
-    #endif
   }
 
   describe("User-defined Types") {
@@ -1915,7 +1909,6 @@ spec("source") {
   }
 
   describe("PE32 Executables") {
-    #if defined(_WIN32) // TODO support on Linux
     it("should parse and write out an executable that exits with status code 42") {
       Program *test_program = test_context.program;
       test_program->default_calling_convention = &calling_convention_x86_64_windows;
@@ -1959,7 +1952,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       write_executable("build\\print.exe", &test_context, Executable_Type_Cli);
     }
-    #endif
   }
 
   describe("Relocations") {
@@ -1971,6 +1963,7 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       checker();
     }
+    #endif
 
     it("should work in an executable") {
       Program *test_program = test_context.program;
@@ -1982,7 +1975,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       write_executable("build/relocations.exe", &test_context, Executable_Type_Cli);
     }
-    #endif
   }
 
   describe("Complex Examples") {
