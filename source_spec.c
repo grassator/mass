@@ -978,6 +978,15 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+    it("should support assigning a literal zero to a pointer") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> () {"
+          "pointer : &s32 = 0;"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+    }
   }
 
   describe("Math") {

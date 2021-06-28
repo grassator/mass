@@ -629,6 +629,8 @@ assign(
       if (literal->bits == 0) {
         source = token_value_force_immediate_integer(context, source, &descriptor_u64);
         source->descriptor = target->descriptor;
+        move_value(context->allocator, builder, &source_range, &target->storage, &source->storage);
+        return *context->result;
       } else {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
