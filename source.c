@@ -3616,15 +3616,15 @@ call_function_overload(
     );
   }
 
-  register_acquire_from_storage(builder, &argument_register_bit_set, &fn_return_value->storage);
+  u64 return_value_bit_set = register_bit_set_from_storage(&fn_return_value->storage);
+  assert(!(builder->register_occupied_bitset & return_value_bit_set));
+  builder->register_occupied_bitset |= return_value_bit_set;
+  builder->used_register_bitset |= return_value_bit_set;
+
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
-  // :ArgumentRegisterAcquire
-  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (!register_bitset_get(argument_register_bit_set, reg_index)) continue;
-    register_bitset_unset(&builder->register_occupied_bitset, reg_index);
-  }
+  builder->register_occupied_bitset &= ~(argument_register_bit_set | return_value_bit_set);
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(saved_registers_bit_set, reg_index)) continue;
