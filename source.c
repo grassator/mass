@@ -3527,6 +3527,11 @@ call_function_overload(
       copied_straight_to_param_bitset |= target_arg_register_bitset;
       register_acquire_bitset(builder, target_arg_register_bitset);
     } else {
+      // TODO it should be possible to try to find a register_bitset that
+      //      is free and is not going to be used for the actual arguments
+      //      and use that as a temporary value. On X86_64 this would then
+      //      just be a rename.
+
       // The code below is useful to check how many spills to stack happen
       //static int stack_counter = 0;
       //printf(" > stack %i\n", stack_counter++);
