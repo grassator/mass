@@ -101,29 +101,6 @@ move_value(
 );
 
 static void
-register_release(
-  Function_Builder *builder,
-  Register reg_index
-);
-
-static Register
-register_find_available(
-  Function_Builder *builder,
-  u64 register_disallowed_bit_mask
-);
-
-static inline Register
-register_acquire(
-  Function_Builder *builder,
-  Register reg_index
-);
-
-static inline Register
-register_acquire_temp(
-  Function_Builder *builder
-);
-
-static void
 fn_encode(
   Program *program,
   Virtual_Memory_Buffer *buffer,
@@ -143,6 +120,83 @@ load_address(
 static Array_Value_Ptr empty_value_array = {
   .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
 };
+
+// Register bitset manipulation
+
+
+static Register
+register_find_available(
+  Function_Builder *builder,
+  u64 register_disallowed_bit_mask
+);
+
+static inline void
+register_bitset_set(
+  u64 *bitset,
+  Register reg
+) {
+  *bitset |= 1llu << reg;
+}
+
+static inline void
+register_bitset_unset(
+  u64 *bitset,
+  Register reg
+) {
+  *bitset &= ~(1llu << reg);
+}
+
+static inline bool
+register_bitset_get(
+  u64 bitset,
+  Register reg
+) {
+  return !!(bitset & (1llu << reg));
+}
+
+static inline void
+register_acquire_bitset(
+  Function_Builder *builder,
+  u64 to_acquire_bitset
+) {
+  assert(!(builder->register_occupied_bitset & to_acquire_bitset));
+  builder->register_occupied_bitset |= to_acquire_bitset;
+  builder->register_used_bitset |= to_acquire_bitset;
+}
+
+static inline void
+register_release_bitset(
+  Function_Builder *builder,
+  Register to_release_bitset
+) {
+  assert((builder->register_occupied_bitset & to_release_bitset) == to_release_bitset);
+  builder->register_occupied_bitset &= ~to_release_bitset;
+}
+
+static inline Register
+register_acquire(
+  Function_Builder *builder,
+  Register reg_index
+) {
+  register_acquire_bitset(builder, 1llu << reg_index);
+  return reg_index;
+}
+
+static inline Register
+register_acquire_temp(
+  Function_Builder *builder
+) {
+  return register_acquire(builder, register_find_available(builder, 0));
+}
+
+static inline void
+register_release(
+  Function_Builder *builder,
+  Register reg_index
+) {
+  register_release_bitset(builder, 1llu << reg_index);
+}
+
 
 #endif
 

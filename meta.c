@@ -1312,7 +1312,7 @@ main(void) {
     { "u32", "max_call_parameters_stack_size" },
     { "Value *", "return_value" },
     { "Code_Block", "code_block" },
-    { "u64", "used_register_bitset" },
+    { "u64", "register_used_bitset" },
     { "u64", "register_volatile_bitset" },
     { "u64", "register_occupied_bitset" },
     { "Slice", "source" },
@@ -1472,7 +1472,7 @@ main(void) {
       { "const Descriptor *", "descriptor" },
       { "Expected_Result_Storage", "storage" },
       { "s32", "_storage_padding" },
-      { "u64", "register_bit_set"},
+      { "u64", "register_bitset"},
     }),
   }));
 

@@ -32,17 +32,6 @@ reserve_stack_internal(
 #define reserve_stack(...)\
   reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-static inline Register
-register_acquire(
-  Function_Builder *builder,
-  Register reg_index
-) {
-  assert(!register_bitset_get(builder->register_occupied_bitset, reg_index));
-  register_bitset_set(&builder->used_register_bitset, reg_index);
-  register_bitset_set(&builder->register_occupied_bitset, reg_index);
-  return reg_index;
-}
-
 static Register
 register_find_available(
   Function_Builder *builder,
@@ -64,22 +53,6 @@ register_find_available(
   // FIXME
   panic("Could not acquire a temp register");
   return -1;
-}
-
-static inline Register
-register_acquire_temp(
-  Function_Builder *builder
-) {
-  return register_acquire(builder, register_find_available(builder, 0));
-}
-
-void
-register_release(
-  Function_Builder *builder,
-  Register reg_index
-) {
-  assert(register_bitset_get(builder->register_occupied_bitset, reg_index));
-  register_bitset_unset(&builder->register_occupied_bitset, reg_index);
 }
 
 
@@ -457,7 +430,7 @@ fn_encode(
   // Push non-volatile registers (in reverse order)
   u8 push_index = 0;
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
@@ -492,7 +465,7 @@ fn_encode(
   // :RegisterPushPop
   // Pop non-volatile registers (in original order)
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
         encode_instruction_with_compiler_location(

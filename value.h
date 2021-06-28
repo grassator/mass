@@ -87,24 +87,6 @@ storage_equal(
 
 #define storage_none ((Storage){.tag = Storage_Tag_None })
 
-static inline void
-register_bitset_set(
-  u64 *bitset,
-  Register reg
-);
-
-static inline void
-register_bitset_unset(
-  u64 *bitset,
-  Register reg
-);
-
-static inline bool
-register_bitset_get(
-  u64 bitset,
-  Register reg
-);
-
 #define MASS_ON_ERROR(...)\
   if ((__VA_ARGS__).tag != Mass_Result_Tag_Success)
 

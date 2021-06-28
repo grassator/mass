@@ -49,7 +49,7 @@ expected_result_any(
         | Expected_Result_Storage_Register
         | Expected_Result_Storage_Xmm
         | Expected_Result_Storage_Eflags,
-      .register_bit_set = 0xffffffffffffffffllu,
+      .register_bitset = 0xffffffffffffffffllu,
     },
   };
 }
@@ -2054,7 +2054,7 @@ expected_result_ensure_value_or_temp(
       if (flexible->storage & Expected_Result_Storage_Register) {
         if (
           value->storage.tag == Storage_Tag_Register &&
-          (flexible->register_bit_set & (1llu << value->storage.Register.index))
+          (flexible->register_bitset & (1llu << value->storage.Register.index))
         ) {
           return value;
         }
@@ -3352,7 +3352,7 @@ call_function_macro(
 }
 
 static u64
-register_bit_set_from_storage(
+register_bitset_from_storage(
   const Storage *storage
 ) {
   u64 result = 0;
@@ -3382,7 +3382,7 @@ register_bit_set_from_storage(
     case Storage_Tag_Unpacked: {
       DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
         assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-        result |= register_bit_set_from_storage(&item->Absolute.storage);
+        result |= register_bitset_from_storage(&item->Absolute.storage);
       }
     } break;
   }
@@ -3462,8 +3462,8 @@ call_function_overload(
   }
 
   // :ArgumentRegisterAcquire
-  u64 argument_register_bit_set = 0;
-  u64 copied_straight_to_param_bit_set = 0;
+  u64 argument_register_bitset = 0;
+  u64 copied_straight_to_param_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
@@ -3497,10 +3497,13 @@ call_function_overload(
     );
     bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
 
-    u64 target_arg_register_bit_set = register_bit_set_from_storage(&target_arg->storage);
-    argument_register_bit_set |= target_arg_register_bit_set;
+    u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
+    if(argument_register_bitset & target_arg_register_bitset) {
+      panic("Found overlapping register usage in arguments");
+    }
+    argument_register_bitset |= target_arg_register_bitset;
     bool target_arg_registers_are_free =
-      !(builder->register_occupied_bitset & target_arg_register_bit_set);
+      !(builder->register_occupied_bitset & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
       target_arg_registers_are_free &&
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
@@ -3520,9 +3523,8 @@ call_function_overload(
       should_assign = false;
     } else if (can_assign_straight_to_target) {
       arg_value = target_arg;
-      copied_straight_to_param_bit_set |= target_arg_register_bit_set;
-      builder->register_occupied_bitset |= target_arg_register_bit_set;
-      builder->used_register_bitset |= target_arg_register_bit_set;
+      copied_straight_to_param_bitset |= target_arg_register_bitset;
+      register_acquire_bitset(builder, target_arg_register_bitset);
     } else {
       // The code below is useful to check how many spills to stack happen
       //static int stack_counter = 0;
@@ -3542,21 +3544,21 @@ call_function_overload(
 
   u64 target_volatile_registers_bitset =
     instance_descriptor->calling_convention->register_volatile_bitset;
-  u64 saved_registers_bit_set = 0;
-  u64 expected_result_bit_set = maybe_expected_storage
-    ? register_bit_set_from_storage(maybe_expected_storage)
+  u64 saved_registers_bitset = 0;
+  u64 expected_result_bitset = maybe_expected_storage
+    ? register_bitset_from_storage(maybe_expected_storage)
     : 0;
 
   for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
     if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
-    if (register_bitset_get(copied_straight_to_param_bit_set, reg_index)) continue;
+    if (register_bitset_get(copied_straight_to_param_bitset, reg_index)) continue;
 
-    register_bitset_set(&saved_registers_bit_set, reg_index);
+    register_bitset_set(&saved_registers_bitset, reg_index);
 
     // We must not save the register that we will overwrite with the result
     // otherwise we will overwrite it with the restored value
-    if (register_bitset_get(expected_result_bit_set, reg_index)) continue;
+    if (register_bitset_get(expected_result_bitset, reg_index)) continue;
 
     Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
       .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
@@ -3569,12 +3571,9 @@ call_function_overload(
     });
   }
 
-  builder->register_occupied_bitset &= ~saved_registers_bit_set;
-  u64 occupied_registers_before_call =
-    builder->register_occupied_bitset & ~copied_straight_to_param_bit_set;
-  assert(!(occupied_registers_before_call & argument_register_bit_set));
-  builder->register_occupied_bitset |= argument_register_bit_set;
-  builder->used_register_bitset |= argument_register_bit_set;
+  register_release_bitset(builder, saved_registers_bitset);
+  u64 spilled_param_register_bitset = argument_register_bitset & ~copied_straight_to_param_bitset;
+  register_acquire_bitset(builder, spilled_param_register_bitset);
 
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Value *param = dyn_array_get(target_params, i);
@@ -3613,15 +3612,18 @@ call_function_overload(
     );
   }
 
-  u64 return_value_bit_set = register_bit_set_from_storage(&fn_return_value->storage);
-  assert(!(builder->register_occupied_bitset & return_value_bit_set));
-  builder->register_occupied_bitset |= return_value_bit_set;
-  builder->used_register_bitset |= return_value_bit_set;
+  u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
+  register_acquire_bitset(builder, return_value_bitset);
 
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
-  builder->register_occupied_bitset &= ~(argument_register_bit_set | return_value_bit_set);
+  register_release_bitset(builder, argument_register_bitset);
+
+  // This is awkward that we need to manually clear return bitset because
+  // it *might* be set depending on whether the expected result it a temp.
+  // The whole thing feels a bit fishy but not sure what is the fix.
+  builder->register_occupied_bitset &= ~return_value_bitset;
 
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
     push_instruction(instructions, *source_range, (Instruction) {
@@ -3630,7 +3632,7 @@ call_function_overload(
     });
   }
 
-  builder->register_occupied_bitset |= saved_registers_bit_set;
+  register_acquire_bitset(builder, saved_registers_bitset);
 
   context_temp_reset_to_mark(context, temp_mark);
 

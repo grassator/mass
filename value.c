@@ -796,30 +796,6 @@ storage_with_offset_and_byte_size(
   return result;
 }
 
-static inline void
-register_bitset_set(
-  u64 *bitset,
-  Register reg
-) {
-  *bitset |= 1llu << reg;
-}
-
-static inline void
-register_bitset_unset(
-  u64 *bitset,
-  Register reg
-) {
-  *bitset &= ~(1llu << reg);
-}
-
-static inline bool
-register_bitset_get(
-  u64 bitset,
-  Register reg
-) {
-  return !!(bitset & (1llu << reg));
-}
-
 static inline bool
 storage_is_stack(
   const Storage *operand

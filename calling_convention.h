@@ -86,7 +86,7 @@ calling_convention_x86_64_common_end_proc(
   // :RegisterPushPop
   // pushes change the stack pointer so we need to account for that
   for (s32 reg_index = Register_R15; reg_index >= Register_A; --reg_index) {
-    if (register_bitset_get(builder->used_register_bitset, reg_index)) {
+    if (register_bitset_get(builder->register_used_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         push_size += register_size;
       }
