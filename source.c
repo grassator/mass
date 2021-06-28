@@ -3437,7 +3437,7 @@ call_function_overload(
   }
 
   Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_Ptr temp_arguments_on_the_stack = dyn_array_make(
+  Array_Value_Ptr temp_arguments = dyn_array_make(
     Array_Value_Ptr,
     .allocator = context->temp_allocator,
     .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
@@ -3522,7 +3522,7 @@ call_function_overload(
     if (should_assign) {
       MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
     }
-    dyn_array_push(temp_arguments_on_the_stack, arg_value);
+    dyn_array_push(temp_arguments, arg_value);
     Slice name = target_item->name;
     if (name.length) {
       scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, name, arg_value);
@@ -3580,7 +3580,7 @@ call_function_overload(
 
     if (storage_is_stack(&param->storage)) continue;
 
-    Value *source_arg = *dyn_array_get(temp_arguments_on_the_stack, i);
+    Value *source_arg = *dyn_array_get(temp_arguments, i);
     MASS_ON_ERROR(assign(context, builder, param, source_arg)) return 0;
   }
 
