@@ -3465,10 +3465,12 @@ call_function_overload(
     value_init(param, target_item->descriptor, storage, target_item->source_range);
   }
 
+  // :ArgumentRegisterAcquire
+  u64 argument_register_bit_set = 0;
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
-    const Storage *target_storage = &dyn_array_get(target_params, i)->storage;
+    Value *target_arg = dyn_array_get(target_params, i);
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
@@ -3493,15 +3495,17 @@ call_function_overload(
       stack_descriptor = stack_descriptor->Reference_To.descriptor;
     }
     bool source_is_stack = (
-      source_arg->storage.tag == Storage_Tag_Memory &&
-      source_arg->storage.Memory.location.tag == Memory_Location_Tag_Stack &&
+      storage_is_stack(&source_arg->storage) &&
       source_arg->descriptor->tag != Descriptor_Tag_Reference_To
     );
     bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
 
+    u64 target_arg_register_bit_set = register_bit_set_from_storage(&target_arg->storage);
+    argument_register_bit_set |= target_arg_register_bit_set;
+
     Value *arg_value;
-    if (storage_is_stack(target_storage)) {
-      arg_value = value_make(context, stack_descriptor, *target_storage, *source_range);
+    if (storage_is_stack(&target_arg->storage)) {
+      arg_value = value_make(context, stack_descriptor, target_arg->storage, *source_range);
     } else if (source_is_stack) {
       arg_value = source_arg;
       should_assign = false;
@@ -3567,19 +3571,15 @@ call_function_overload(
   }
 
   builder->register_occupied_bitset &= ~saved_registers_bit_set;
-
-  // :ArgumentRegisterAcquire
-  u64 argument_register_bit_set = 0;
+  assert(!(builder->register_occupied_bitset & argument_register_bit_set));
+  builder->register_occupied_bitset |= argument_register_bit_set;
+  builder->used_register_bitset |= argument_register_bit_set;
 
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Value *param = dyn_array_get(target_params, i);
 
     if (storage_is_stack(&param->storage)) continue;
 
-    // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
-    // must not be used as a temporary for any other argument loading. So we acquire them
-    // here and release after the function call
-    register_acquire_from_storage(builder, &argument_register_bit_set, &param->storage);
     Value *source_arg = *dyn_array_get(temp_arguments_on_the_stack, i);
     MASS_ON_ERROR(assign(context, builder, param, source_arg)) return 0;
   }
