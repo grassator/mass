@@ -615,11 +615,13 @@ assign(
     source->descriptor->tag == Descriptor_Tag_Reference_To
   ) {
     if (!same_type_or_can_implicitly_move_cast(target->descriptor, source->descriptor)) goto err;
-    Value *referenced_source = value_indirect_from_reference(context, builder, source);
-    Value *referenced_target = value_indirect_from_reference(context, builder, target);
-    MASS_TRY(assign(context, builder, referenced_target, referenced_source));
-    value_release_if_temporary(builder, referenced_source);
-    value_release_if_temporary(builder, referenced_target);
+    if (!storage_equal(&target->storage, &source->storage)) {
+      Value *referenced_source = value_indirect_from_reference(context, builder, source);
+      Value *referenced_target = value_indirect_from_reference(context, builder, target);
+      MASS_TRY(assign(context, builder, referenced_target, referenced_source));
+      value_release_if_temporary(builder, referenced_source);
+      value_release_if_temporary(builder, referenced_target);
+    }
     return *context->result;
   } else if (value_is_static_number_literal(source)) {
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
