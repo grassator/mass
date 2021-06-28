@@ -583,7 +583,7 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5) == 5);
     }
 
-    it("should correctly work with nested 5 argument calls") {
+    xit("should correctly work with nested 5 argument calls") {
       s8(*checker)(s8, s8, s8, s8, s8) = (s8(*)(s8, s8, s8, s8, s8))test_program_inline_source_function(
         "foo", &test_context,
         "foo :: fn(x1: s8, x2 : s8, x3 : s8, x4 : s8, x5 : s8) -> (s8) { bar(x1, x2, x3, x4, x5); x5 }\n"
@@ -759,10 +759,10 @@ spec("source") {
           "if (n < 2) { return n }\n"
           // FIXME Inline sum does not work on Linux because of some problem
           //       with register release
-          // "fibonnacci(n - 1) + fibonnacci(n - 2)"
-          "n1 := fibonnacci(n - 1)\n"
-          "n2 := fibonnacci(n - 2)\n"
-          "n1 + n2"
+           "fibonnacci(n - 1) + fibonnacci(n - 2)\n"
+          //"n1 := fibonnacci(n - 1)\n"
+          //"n2 := fibonnacci(n - 2)\n"
+          //"n1 + n2"
         "}"
       );
       check(spec_check_mass_result(test_context.result));

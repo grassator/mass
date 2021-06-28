@@ -3423,6 +3423,86 @@ call_function_overload(
     }
   }
 
+  Temp_Mark temp_mark = context_temp_mark(context);
+  Array_Value_Ptr temp_arguments_on_the_stack = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
+  );
+
+  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
+  Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
+
+  for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
+    Memory_Layout_Item *target_item =
+      dyn_array_get(instance_descriptor->arguments_layout.items, i);
+    Storage target_storage = memory_layout_item_storage_at_index(
+      &stack_argument_base, &instance_descriptor->arguments_layout, i
+    );
+    bool target_storage_is_stack = (
+      target_storage.tag == Storage_Tag_Memory &&
+      target_storage.Memory.location.tag == Memory_Location_Tag_Stack
+    );
+    if (target_storage_is_stack) {
+      assert(target_storage.Memory.location.Stack.area != Stack_Area_Local);
+      target_storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
+    }
+    Value *source_arg;
+    if (i >= dyn_array_length(arguments)) {
+      if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
+        source_arg = &void_value;
+      } else {
+        Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
+        Value_View default_expression = declared_argument->maybe_default_expression;
+        assert(default_expression.length);
+        Execution_Context arg_context = *context;
+        arg_context.scope = default_arguments_scope;
+        source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+        MASS_ON_ERROR(*arg_context.result) return 0;
+      }
+    } else {
+      source_arg = *dyn_array_get(arguments, i);
+    }
+    source_arg = maybe_coerce_number_literal_to_integer(
+      context, source_arg, target_item->descriptor
+    );
+    const Descriptor *stack_descriptor = target_item->descriptor;
+    if (stack_descriptor->tag == Descriptor_Tag_Reference_To) {
+      stack_descriptor = stack_descriptor->Reference_To.descriptor;
+    }
+    bool source_is_stack = (
+      source_arg->storage.tag == Storage_Tag_Memory &&
+      source_arg->storage.Memory.location.tag == Memory_Location_Tag_Stack &&
+      source_arg->descriptor->tag != Descriptor_Tag_Reference_To
+    );
+    bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
+
+    Value *arg_value;
+    if (target_storage_is_stack) {
+      arg_value = value_make(context, stack_descriptor, target_storage, *source_range);
+    } else if (source_is_stack) {
+      arg_value = source_arg;
+      should_assign = false;
+    } else if (
+      value_is_non_lazy_static(source_arg) &&
+      target_item->descriptor->tag != Descriptor_Tag_Reference_To
+    ) {
+      arg_value = source_arg;
+      should_assign = false;
+    } else {
+      arg_value = reserve_stack(context, builder, stack_descriptor, *source_range);
+      arg_value->is_temporary = true;
+    };
+    if (should_assign) {
+      MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
+    }
+    dyn_array_push(temp_arguments_on_the_stack, arg_value);
+    Slice name = target_item->name;
+    if (name.length) {
+      scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, name, arg_value);
+    }
+  }
+
   u64 target_volatile_registers_bitset =
     instance_descriptor->calling_convention->register_volatile_bitset;
   u64 saved_registers_bit_set = 0;
@@ -3474,8 +3554,6 @@ call_function_overload(
   // :ArgumentRegisterAcquire
   u64 argument_register_bit_set = 0;
 
-  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
-  Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
   for (u64 i = 0; i < dyn_array_length(instance_descriptor->arguments_layout.items); ++i) {
     Memory_Layout_Item *target_arg_definition =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
@@ -3487,8 +3565,7 @@ call_function_overload(
       target_storage.tag == Storage_Tag_Memory &&
       target_storage.Memory.location.tag == Memory_Location_Tag_Stack
     ) {
-      assert(target_storage.Memory.location.Stack.area != Stack_Area_Local);
-      target_storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
+      continue;
     }
     // :ArgumentRegisterAcquire Once the argument is loaded into the register, that register
     // must not be used as a temporary for any other argument loading. So we acquire them
@@ -3500,39 +3577,8 @@ call_function_overload(
       target_storage,
       target_arg_definition->source_range
     );
-    Value *source_arg;
-    if (i >= dyn_array_length(arguments)) {
-      if (target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized) {
-        source_arg = &void_value;
-      } else {
-        Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
-        Value_View default_expression = declared_argument->maybe_default_expression;
-        assert(default_expression.length);
-        Execution_Context arg_context = *context;
-        arg_context.scope = default_arguments_scope;
-        source_arg = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-        MASS_ON_ERROR(*arg_context.result) return 0;
-      }
-    } else {
-      source_arg = *dyn_array_get(arguments, i);
-    }
-
-    source_arg = maybe_coerce_number_literal_to_integer(context, source_arg, target_arg->descriptor);
-
-    if (target_arg_definition->descriptor->tag == Descriptor_Tag_Reference_To) {
-      const Descriptor *referenced_descriptor =
-        target_arg_definition->descriptor->Reference_To.descriptor;
-      Value *stack_value = reserve_stack(context, builder, referenced_descriptor, *source_range);
-      if (!(target_arg_definition->flags & Memory_Layout_Item_Flags_Uninitialized)) {
-        MASS_ON_ERROR(assign(context, builder, stack_value, source_arg)) return 0;
-      }
-      source_arg = stack_value;
-    }
+    Value *source_arg = *dyn_array_get(temp_arguments_on_the_stack, i);
     MASS_ON_ERROR(assign(context, builder, target_arg, source_arg)) return 0;
-    Slice name = target_arg_definition->name;
-    if (name.length) {
-      scope_define_value(default_arguments_scope, context->epoch, target_arg->source_range, name, target_arg);
-    }
   }
 
   // If we call a function, then we need to reserve space for the home area of at least 4 arguments
@@ -3562,7 +3608,6 @@ call_function_overload(
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {instance->storage, 0, 0}}}
     );
   }
-
 
   register_acquire_from_storage(builder, &argument_register_bit_set, &fn_return_value->storage);
   Value *expected_value =
@@ -3603,6 +3648,8 @@ call_function_overload(
       occupied_storage->Register.index = reg_index;
     }
   }
+
+  context_temp_reset_to_mark(context, temp_mark);
 
   return expected_value;
 }
