@@ -45,6 +45,7 @@ expected_result_any(
       .storage
         = Expected_Result_Storage_Static
         | Expected_Result_Storage_Memory
+        | Expected_Result_Storage_Unpacked
         | Expected_Result_Storage_Register
         | Expected_Result_Storage_Xmm
         | Expected_Result_Storage_Eflags,
@@ -105,6 +106,10 @@ expected_result_validate(
         }
         case Storage_Tag_Memory: {
           assert(flexible->storage & Expected_Result_Storage_Memory);
+          break;
+        }
+        case Storage_Tag_Unpacked: {
+          assert(flexible->storage & Expected_Result_Storage_Unpacked);
           break;
         }
         default: {
@@ -547,6 +552,7 @@ value_indirect_from_reference(
       return temp;
     }
     default:
+    case Storage_Tag_Unpacked:
     case Storage_Tag_Static:
     case Storage_Tag_None:
     case Storage_Tag_Any:
@@ -2035,6 +2041,12 @@ expected_result_ensure_value_or_temp(
       ) {
         return value;
       }
+      if (
+        value->storage.tag == Storage_Tag_Unpacked &&
+        (flexible->storage & Expected_Result_Storage_Unpacked)
+      ) {
+        return value;
+      }
       if (flexible->storage & Expected_Result_Storage_Register) {
         if (
           value->storage.tag == Storage_Tag_Register &&
@@ -3365,6 +3377,12 @@ register_acquire_from_storage(
         Register reg_index = storage->Memory.location.Indirect.base_register;
         register_acquire(builder, reg_index);
         register_bitset_set(argument_register_bit_set, reg_index);
+      }
+    } break;
+    case Storage_Tag_Unpacked: {
+      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
+        assert(item->tag == Memory_Layout_Item_Tag_Absolute);
+        register_acquire_from_storage(builder, argument_register_bit_set, &item->Absolute.storage);
       }
     } break;
   }

@@ -400,16 +400,25 @@ x86_64_system_v_classify(
         // Restore both the memory layout and the available registers info
         *state = saved_state;
       } else {
-        // :StructIds
-        // Because we have to allocate a distinct Descriptor here
-        // structs are not longer comparable by pointer.
-        Descriptor *updated_descriptor = allocator_allocate(allocator, Descriptor);
-        *updated_descriptor = *descriptor;
-        updated_descriptor->Struct.memory_layout = state->memory_layout;
-        descriptor = updated_descriptor;
+        Memory_Layout *unpacked_layout = allocator_allocate(allocator, Memory_Layout);
+        *unpacked_layout = state->memory_layout;
+        Storage unpacked_storage = {
+          .tag = Storage_Tag_Unpacked,
+          .byte_size = byte_size,
+          .Unpacked.layout = unpacked_layout,
+        };
 
         // Restore the memory layout, keep available registers info
         state->memory_layout = saved_state.memory_layout;
+
+        Memory_Layout_Item struct_item = {
+          .tag = Memory_Layout_Item_Tag_Absolute,
+          .flags = Memory_Layout_Item_Flags_None,
+          .name = name,
+          .descriptor = descriptor,
+          .Absolute = {.storage = unpacked_storage},
+        };
+        dyn_array_push(state->memory_layout.items, struct_item);
 
         // This is required to correctly propagate up the recursive call that a field
         // that is itself a struct is packed inside a single register.
@@ -417,6 +426,7 @@ x86_64_system_v_classify(
           assert(struct_class == SYSTEM_V_NO_CLASS);
           struct_class = eightbyte;
         }
+        return struct_class;
       }
       return x86_64_system_v_push_memory_layout_item_for_class(state, struct_class, name, descriptor);
     }
@@ -501,13 +511,21 @@ calling_convention_x86_64_system_v_return_proc(
     Register base_register = mode == Function_Parameter_Mode_Call ? Register_A : Register_DI;
     return_descriptor = function->returns.descriptor;
     return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
-  } else {
-    assert(dyn_array_length(state.memory_layout.items) == 1);
+  } else if (dyn_array_length(state.memory_layout.items)) {
     Memory_Layout_Item *item = dyn_array_get(state.memory_layout.items, 0);
     assert(item->tag == Memory_Layout_Item_Tag_Absolute);
     return_descriptor = item->descriptor;
     return_storage = item->Absolute.storage;
     dyn_array_destroy(state.memory_layout.items);
+  } else {
+    Memory_Layout *unpacked_layout = allocator_allocate(allocator, Memory_Layout);
+    *unpacked_layout = state.memory_layout;
+    return_descriptor = function->returns.descriptor;
+    return_storage = (Storage){
+      .tag = Storage_Tag_Unpacked,
+      .byte_size = descriptor_byte_size(return_descriptor),
+      .Unpacked.layout = unpacked_layout,
+    };
   }
 
   return value_init(

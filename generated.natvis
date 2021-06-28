@@ -726,6 +726,9 @@
   <DisplayString Condition="tag == Storage_Tag_Memory">
     Memory { Memory }
   </DisplayString>
+  <DisplayString Condition="tag == Storage_Tag_Unpacked">
+    Unpacked { Unpacked }
+  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="byte_size">byte_size</Item>
@@ -734,6 +737,7 @@
     <Item Name="Xmm" Condition="tag == Storage_Tag_Xmm">Xmm</Item>
     <Item Name="Static" Condition="tag == Storage_Tag_Static">Static</Item>
     <Item Name="Memory" Condition="tag == Storage_Tag_Memory">Memory</Item>
+    <Item Name="Unpacked" Condition="tag == Storage_Tag_Unpacked">Unpacked</Item>
   </Expand>
 </Type>
 <Type Name="Array_Relocation">

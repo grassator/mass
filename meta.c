@@ -1263,6 +1263,9 @@ main(void) {
     struct_fields("Memory", (Struct_Item[]){
       { "Memory_Location", "location" },
     }),
+    struct_fields("Unpacked", (Struct_Item[]){
+      { "Memory_Layout *", "layout" },
+    }),
   }), (Struct_Item[]){
     // TODO change to bit_size
     { "u64", "byte_size" },
@@ -1469,6 +1472,7 @@ main(void) {
     { "Register", 1 << 2 },
     { "Xmm", 1 << 3 },
     { "Eflags", 1 << 4 },
+    { "Unpacked", 1 << 5 },
   }));
 
   push_type(type_union("Expected_Result", (Struct_Type[]){

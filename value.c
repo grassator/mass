@@ -494,6 +494,7 @@ print_storage(
       }
       break;
     }
+    case Storage_Tag_Unpacked:
     default: {
       printf("<unknown>");
       break;
@@ -762,7 +763,8 @@ storage_with_offset_and_byte_size(
     case Storage_Tag_Any:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
-    case Storage_Tag_None: {
+    case Storage_Tag_None:
+    case Storage_Tag_Unpacked: {
       panic("Internal Error: Unexpected storage type for structs");
       break;
     }
@@ -992,6 +994,10 @@ storage_equal(
       }
       panic("Internal Error: Unexpected Memory_Location_Tag");
       return false;
+    }
+    case Storage_Tag_Unpacked: {
+      // TODO should this be by value comparison?
+      return a->Unpacked.layout == b->Unpacked.layout;
     }
     case Storage_Tag_Xmm:
     case Storage_Tag_Register: {
@@ -1430,6 +1436,7 @@ value_release_if_temporary(
       }
       break;
     }
+    case Storage_Tag_Unpacked:
     case Storage_Tag_Any:
     case Storage_Tag_None:
     case Storage_Tag_Eflags:
@@ -1613,6 +1620,20 @@ value_as_function(
   return 0;
 }
 
+static inline Memory_Layout_Item *
+memory_layout_item_find_by_name(
+  const Memory_Layout *layout,
+  Slice field_name
+) {
+  for (u64 i = 0; i < dyn_array_length(layout->items); ++i) {
+    Memory_Layout_Item *field = dyn_array_get(layout->items, i);
+    if (slice_equal(field->name, field_name)) {
+      return field;
+    }
+  }
+  return 0;
+}
+
 static inline Storage
 memory_layout_item_storage(
   const Storage *base,
@@ -1626,9 +1647,17 @@ memory_layout_item_storage(
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      return storage_with_offset_and_byte_size(
-        base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
-      );
+      if (base->tag == Storage_Tag_Unpacked) {
+        Memory_Layout_Item *unpacked_item =
+          memory_layout_item_find_by_name(base->Unpacked.layout, item->name);
+        assert(unpacked_item);
+        assert(unpacked_item->tag == Memory_Layout_Item_Tag_Absolute);
+        return unpacked_item->Absolute.storage;
+      } else {
+        return storage_with_offset_and_byte_size(
+          base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
+        );
+      }
     }
   }
   panic("Not reached");

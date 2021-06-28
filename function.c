@@ -703,23 +703,25 @@ mark_occupied_registers(
   Register arg_reg = Register_SP;
   switch(storage->tag) {
     case Storage_Tag_None: {
-      if (descriptor->tag == Descriptor_Tag_Struct) {
-        DYN_ARRAY_FOREACH(Memory_Layout_Item, item, descriptor->Struct.memory_layout.items) {
-          switch(item->tag) {
-            case Memory_Layout_Item_Tag_Absolute: {
-              break;
-            }
-            case Memory_Layout_Item_Tag_Base_Relative: {
-              item->tag = Memory_Layout_Item_Tag_Absolute;
-              item->Absolute.storage = memory_layout_item_storage(
-                stack_argument_base, &descriptor->Struct.memory_layout, item
-              );
-              break;
-            }
+      // Nothing to do
+      break;
+    }
+    case Storage_Tag_Unpacked: {
+      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
+        switch(item->tag) {
+          case Memory_Layout_Item_Tag_Absolute: {
+            break;
           }
-          assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-          mark_occupied_registers(builder, stack_argument_base, item->descriptor, &item->Absolute.storage);
+          case Memory_Layout_Item_Tag_Base_Relative: {
+            item->tag = Memory_Layout_Item_Tag_Absolute;
+            item->Absolute.storage = memory_layout_item_storage(
+              stack_argument_base, &descriptor->Struct.memory_layout, item
+            );
+            break;
+          }
         }
+        assert(item->tag == Memory_Layout_Item_Tag_Absolute);
+        mark_occupied_registers(builder, stack_argument_base, item->descriptor, &item->Absolute.storage);
       }
       break;
     }
