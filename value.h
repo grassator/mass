@@ -41,6 +41,11 @@ context_temp_reset(
   context->compilation->temp_buffer.occupied = 0;
 }
 
+static inline bool
+storage_is_stack(
+  const Storage *operand
+);
+
 static inline Storage
 storage_register_for_descriptor(
   Register reg,

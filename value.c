@@ -821,6 +821,14 @@ register_bitset_get(
 }
 
 static inline bool
+storage_is_stack(
+  const Storage *operand
+) {
+  return operand->tag == Storage_Tag_Memory
+    && operand->Memory.location.tag == Memory_Location_Tag_Stack;
+}
+
+static inline bool
 storage_is_label(
   const Storage *operand
 ) {
