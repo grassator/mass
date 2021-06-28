@@ -265,25 +265,7 @@ move_value(
   }
 
   if (source->tag == Storage_Tag_Static) {
-    if (source->byte_size > 8) {
-      // TODO use XMM or 64 bit registers where appropriate
-      // TODO support packed structs
-      static const s32 chunk_size = 4;
-      assert(source->byte_size % chunk_size == 0);
-      // TODO can there be something else?
-      assert(source->byte_size == target->byte_size);
-      for (s32 offset = 0; offset < u64_to_s32(source->byte_size); offset += chunk_size) {
-        Storage adjusted_target = storage_with_offset_and_byte_size(target, offset, chunk_size);
-        assert(source->Static.memory.tag == Static_Memory_Tag_Heap);
-        void *memory = (s8 *)source->Static.memory.Heap.pointer + offset;
-        Storage adjusted_source = storage_static_internal(memory, chunk_size);
-        push_instruction(
-          instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {adjusted_target, adjusted_source}}}
-        );
-      }
-      return;
-    }
+    assert(source->byte_size <= 8);
     s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization

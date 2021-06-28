@@ -647,7 +647,8 @@ assign(
       });
       return *context->result;
     }
-  } else if (source->descriptor->tag == Descriptor_Tag_Struct) {
+  }
+  if (source->descriptor->tag == Descriptor_Tag_Struct) {
     if (!same_value_type_or_can_implicitly_move_cast(target->descriptor, source)) goto err;
 
     for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
@@ -669,7 +670,8 @@ assign(
       MASS_TRY(assign(context, builder, &target_field, &source_field));
     }
     return *context->result;
-  } else if (source->storage.tag == Storage_Tag_Static) {
+  }
+  if (source->storage.tag == Storage_Tag_Static) {
     if (assign_from_static(context, builder, target, source)) {
       return *context->result;
     }
