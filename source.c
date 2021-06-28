@@ -3389,19 +3389,6 @@ register_bit_set_from_storage(
   return result;
 }
 
-static inline void
-register_acquire_from_storage(
-  Function_Builder *builder,
-  u64 *argument_register_bit_set,
-  const Storage *storage
-) {
-  u64 storage_register_bit_set = register_bit_set_from_storage(storage);
-  assert(!(builder->register_occupied_bitset & storage_register_bit_set));
-  assert(!(*argument_register_bit_set & storage_register_bit_set));
-  builder->register_occupied_bitset |= storage_register_bit_set;
-  *argument_register_bit_set |= storage_register_bit_set;
-}
-
 static Value *
 call_function_overload(
   Execution_Context *context,
