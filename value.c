@@ -330,11 +330,9 @@ same_type(
       return same_type(a->Fixed_Size_Array.item, b->Fixed_Size_Array.item) &&
         a->Fixed_Size_Array.length == b->Fixed_Size_Array.length;
     }
+    case Descriptor_Tag_Struct:
     case Descriptor_Tag_Opaque: {
       return a == b;
-    }
-    case Descriptor_Tag_Struct: {
-      return a->Struct.id == b->Struct.id;
     }
     case Descriptor_Tag_Function_Instance: {
       const Function_Info *a_info = a->Function_Instance.info;
