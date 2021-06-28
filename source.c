@@ -3351,12 +3351,11 @@ call_function_macro(
   return result_value;
 }
 
-static void
-register_acquire_from_storage(
-  Function_Builder *builder,
-  u64 *argument_register_bit_set,
+static u64
+register_bit_set_from_storage(
   const Storage *storage
 ) {
+  u64 result = 0;
   switch(storage->tag) {
     case Storage_Tag_None: {
       // Nothing to do
@@ -3372,23 +3371,35 @@ register_acquire_from_storage(
     case Storage_Tag_Register:
     case Storage_Tag_Xmm: {
       Register reg_index = storage->Register.index;
-      register_acquire(builder, reg_index);
-      register_bitset_set(argument_register_bit_set, reg_index);
+      register_bitset_set(&result, reg_index);
     } break;
     case Storage_Tag_Memory: {
       if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
         Register reg_index = storage->Memory.location.Indirect.base_register;
-        register_acquire(builder, reg_index);
-        register_bitset_set(argument_register_bit_set, reg_index);
+        register_bitset_set(&result, reg_index);
       }
     } break;
     case Storage_Tag_Unpacked: {
       DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
         assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-        register_acquire_from_storage(builder, argument_register_bit_set, &item->Absolute.storage);
+        result |= register_bit_set_from_storage(&item->Absolute.storage);
       }
     } break;
   }
+  return result;
+}
+
+static inline void
+register_acquire_from_storage(
+  Function_Builder *builder,
+  u64 *argument_register_bit_set,
+  const Storage *storage
+) {
+  u64 storage_register_bit_set = register_bit_set_from_storage(storage);
+  assert(!(builder->register_occupied_bitset & storage_register_bit_set));
+  assert(!(*argument_register_bit_set & storage_register_bit_set));
+  builder->register_occupied_bitset |= storage_register_bit_set;
+  *argument_register_bit_set |= storage_register_bit_set;
 }
 
 static Value *
