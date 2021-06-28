@@ -3461,7 +3461,6 @@ call_function_overload(
     value_init(param, target_item->descriptor, storage, target_item->source_range);
   }
 
-  // :ArgumentRegisterAcquire
   u64 argument_register_bitset = 0;
   u64 copied_straight_to_param_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
