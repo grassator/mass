@@ -915,31 +915,32 @@ add_common_fields_internal(
     .number_literal = __VA_ARGS__\
   }
 
+static inline Meta_Type
+type_function_impl(
+  const char *name,
+  const char *returns,
+  Argument_Type *arguments,
+  u64 argument_count,
+  bool is_typedef
+) {
+  return (Meta_Type){
+    .tag = Meta_Type_Tag_Function,
+    .name = name,
+    .function = {
+      .name = name,
+      .returns = returns,
+      .arguments = arguments,
+      .argument_count = argument_count,
+      .is_typedef = is_typedef,
+    }
+  };
+}
+
 #define typedef_function(_NAME_STRING_, _RETURNS_, ...)\
-  (Meta_Type){\
-    .tag = Meta_Type_Tag_Function,\
-    .name = (_NAME_STRING_),\
-    .function = {\
-      .name = (_NAME_STRING_),\
-      .returns = (_RETURNS_),\
-      .arguments = (__VA_ARGS__),\
-      .argument_count = countof(__VA_ARGS__),\
-      .is_typedef = true,\
-    }\
-  }
+  type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), true)
 
 #define type_function(_NAME_STRING_, _RETURNS_, ...)\
-  (Meta_Type){\
-    .tag = Meta_Type_Tag_Function,\
-    .name = (_NAME_STRING_),\
-    .function = {\
-      .name = (_NAME_STRING_),\
-      .returns = (_RETURNS_),\
-      .arguments = (__VA_ARGS__),\
-      .argument_count = countof(__VA_ARGS__),\
-    }\
-  }
-
+  type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), false)
 
 Meta_Type types[4096] = {0};
 uint32_t type_count = 0;
