@@ -3015,6 +3015,17 @@ mass_number_literal_logical_shift_left(
 }
 
 static Number_Literal
+mass_number_literal_logical_shift_right(
+  Number_Literal input,
+  Number_Literal shift
+) {
+  // TODO use proper bigint / bigdecimal library
+  Number_Literal result = input;
+  result.bits = input.bits >> shift.bits;
+  return result;
+}
+
+static Number_Literal
 mass_number_literal_bitwise_and(
   Number_Literal a,
   Number_Literal b
@@ -6300,7 +6311,7 @@ token_define_local_variable(
   const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
 
   const Descriptor *variable_descriptor;
-  if (value_is_static_number_literal(value)) {
+  if (descriptor == &descriptor_number_literal) {
     // x := 42 should always be initialized to s64 to avoid weird suprises
     variable_descriptor = &descriptor_s64;
   } else {
@@ -6589,24 +6600,6 @@ scope_define_builtins(
       .handler_payload = (void*)(s64)comparisons[i].type,
     )));
   }
-
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_number_literal_logical_shift_left, "logical_shift_left", &descriptor_number_literal,
-    MASS_FN_ARG("number", &descriptor_number_literal),
-    MASS_FN_ARG("shift", &descriptor_number_literal)
-  );
-
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_number_literal_bitwise_and, "bitwise_and", &descriptor_number_literal,
-    MASS_FN_ARG("a", &descriptor_number_literal),
-    MASS_FN_ARG("b", &descriptor_number_literal)
-  );
-
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
-    mass_number_literal_bitwise_or, "bitwise_or", &descriptor_number_literal,
-    MASS_FN_ARG("a", &descriptor_number_literal),
-    MASS_FN_ARG("b", &descriptor_number_literal)
-  );
 
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_bit_type, "bit_type", &descriptor_type,

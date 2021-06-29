@@ -53,6 +53,7 @@ typedef struct {
   const char *maybe_default_expression;
 } Argument_Type;
 
+
 typedef struct {
   const char *name;
   const char *returns;
@@ -1153,7 +1154,7 @@ main(void) {
     { "s32 *", "patch_target" },
   }));
 
-   push_type(type_enum("Number_Base", (Enum_Type_Item[]){
+  push_type(type_enum("Number_Base", (Enum_Type_Item[]){
     { "2", 2 },
     { "10", 10 },
     { "16", 16 },
@@ -1822,6 +1823,26 @@ main(void) {
   export_global(push_type(type_function("mass_import", "Scope", (Argument_Type[]){
     { "Slice", "name" },
     { "Execution_Context *", "context", "@context" },
+  })));
+
+  export_compiler(push_type(type_function("mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
+    { "Number_Literal", "input" },
+    { "Number_Literal", "shift" },
+  })));
+
+  export_compiler(push_type(type_function("mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
+    { "Number_Literal", "input" },
+    { "Number_Literal", "shift" },
+  })));
+
+  export_compiler(push_type(type_function("mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
+    { "Number_Literal", "a" },
+    { "Number_Literal", "b" },
+  })));
+
+  export_compiler(push_type(type_function("mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
+    { "Number_Literal", "a" },
+    { "Number_Literal", "b" },
   })));
 
   const char *arithmetic_fns[] = {

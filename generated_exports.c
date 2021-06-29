@@ -160,6 +160,26 @@ compiler_scope_define_exports(
     MASS_FN_ARG("out_tokens", &descriptor_value_view_pointer)
   );
   MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_logical_shift_left, "number_literal_logical_shift_left", &descriptor_number_literal,
+    MASS_FN_ARG("input", &descriptor_number_literal),
+    MASS_FN_ARG("shift", &descriptor_number_literal)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_logical_shift_right, "number_literal_logical_shift_right", &descriptor_number_literal,
+    MASS_FN_ARG("input", &descriptor_number_literal),
+    MASS_FN_ARG("shift", &descriptor_number_literal)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_bitwise_or, "number_literal_bitwise_or", &descriptor_number_literal,
+    MASS_FN_ARG("a", &descriptor_number_literal),
+    MASS_FN_ARG("b", &descriptor_number_literal)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+    mass_number_literal_bitwise_and, "number_literal_bitwise_and", &descriptor_number_literal,
+    MASS_FN_ARG("a", &descriptor_number_literal),
+    MASS_FN_ARG("b", &descriptor_number_literal)
+  );
+  MASS_DEFINE_COMPILE_TIME_FUNCTION(
     mass_add, "add", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),

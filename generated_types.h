@@ -319,6 +319,18 @@ static Mass_Result tokenize
 static Scope mass_import
   (Slice name, Execution_Context * context);
 
+static Number_Literal mass_number_literal_logical_shift_left
+  (Number_Literal input, Number_Literal shift);
+
+static Number_Literal mass_number_literal_logical_shift_right
+  (Number_Literal input, Number_Literal shift);
+
+static Number_Literal mass_number_literal_bitwise_or
+  (Number_Literal a, Number_Literal b);
+
+static Number_Literal mass_number_literal_bitwise_and
+  (Number_Literal a, Number_Literal b);
+
 static Value * mass_add
   (Execution_Context * context, Value_View arguments, void * payload);
 
@@ -1995,6 +2007,10 @@ static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_import;
+static Descriptor descriptor_mass_number_literal_logical_shift_left;
+static Descriptor descriptor_mass_number_literal_logical_shift_right;
+static Descriptor descriptor_mass_number_literal_bitwise_or;
+static Descriptor descriptor_mass_number_literal_bitwise_and;
 static Descriptor descriptor_mass_add;
 static Descriptor descriptor_mass_subtract;
 static Descriptor descriptor_mass_multiply;
