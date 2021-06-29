@@ -1585,6 +1585,11 @@ spec("source") {
         "test :: fn() -> (s64) { ExitProcess(42) }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Parse);
+      Slice actual_error_slice = source_from_source_range(&error->source_range);
+      Slice expected_error_slice = slice_literal("external(\"kernel32.dll\", \"ExitProcess\")");
+      check(slice_equal(slice_trim_whitespace(actual_error_slice), expected_error_slice));
     }
 
     it("should be able to parse and run macro id function at compile time") {
