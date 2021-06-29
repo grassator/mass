@@ -85,14 +85,14 @@ posix_program_jit(
   );
   (void)result;
 
-  u64 function_count = dyn_array_length(program->functions);
-
   // Encode newly added functions
+  u64 function_count = dyn_array_length(program->functions);
   for (u64 i = jit->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout layout;
     fn_encode(program, code_buffer, builder, &layout);
   }
+  jit->previous_counts.functions = function_count;
 
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations
@@ -104,20 +104,8 @@ posix_program_jit(
   // Setup permissions for the code segment
   posix_section_protect_from(&memory->code, code_protected_size);
 
-  // Resolve relocations
   program_jit_resolve_relocations(jit);
-
-  // Call new startup functions
-  u64 startup_count = dyn_array_length(program->startup_functions);
-  for (u64 i = jit->previous_counts.startup; i < startup_count; ++i) {
-    Value *value = *dyn_array_get(program->startup_functions, i);
-    fn_type_opaque fn = value_as_function(program, value);
-    fn();
-  }
-
-  jit->previous_counts.functions = function_count;
-  jit->previous_counts.startup = startup_count;
+  program_jit_call_startup_functions(jit);
 }
-
 
 #endif // POSIX_RUNTIME_H

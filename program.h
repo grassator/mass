@@ -86,5 +86,9 @@ program_jit_resolve_relocations(
   Jit *jit
 );
 
+static void
+program_jit_call_startup_functions(
+  Jit *jit
+);
 
 #endif // RUNTIME_H

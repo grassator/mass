@@ -595,7 +595,7 @@ win32_program_jit(
       };
     }
   }
-
+  jit->previous_counts.functions = function_count;
 
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations
@@ -620,17 +620,8 @@ win32_program_jit(
   }
 
   program_jit_resolve_relocations(jit);
+  program_jit_call_startup_functions(jit);
 
-  // Call new startup functions
-  u64 startup_count = dyn_array_length(program->startup_functions);
-  for (u64 i = jit->previous_counts.startup; i < startup_count; ++i) {
-    Value *value = *dyn_array_get(program->startup_functions, i);
-    fn_type_opaque fn = value_as_function(program, value);
-    fn();
-  }
-
-  jit->previous_counts.functions = function_count;
-  jit->previous_counts.startup = startup_count;
 }
 
 

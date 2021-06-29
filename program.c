@@ -240,6 +240,20 @@ program_jit_resolve_relocations(
 }
 
 static void
+program_jit_call_startup_functions(
+  Jit *jit
+) {
+  Program *program = jit->program;
+  u64 startup_count = dyn_array_length(program->startup_functions);
+  for (u64 i = jit->previous_counts.startup; i < startup_count; ++i) {
+    Value *value = *dyn_array_get(program->startup_functions, i);
+    fn_type_opaque fn = value_as_function(program, value);
+    fn();
+  }
+  jit->previous_counts.startup = startup_count;
+}
+
+static void
 program_jit(
   Compilation *compilation,
   Jit *jit
