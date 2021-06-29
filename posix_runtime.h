@@ -61,8 +61,7 @@ static const Native_Library_Load_Callbacks posix_library_load_callbacks = {
   .load_symbol = posix_load_symbol,
 };
 
-// TODO make this return MASS_RESULT
-static void
+static PRELUDE_NO_DISCARD Mass_Result
 posix_program_jit(
   Compilation *compilation,
   Jit *jit
@@ -80,10 +79,9 @@ posix_program_jit(
   u64 code_protected_size = posix_buffer_ensure_last_page_is_writable(code_buffer);
   u64 ro_data_protected_size = posix_buffer_ensure_last_page_is_writable(ro_data_buffer);
 
-  Mass_Result result = program_jit_imports(
+  MASS_TRY(program_jit_imports(
     compilation->temp_allocator, jit, ro_data_buffer, &posix_library_load_callbacks
-  );
-  (void)result;
+  ));
 
   // Encode newly added functions
   u64 function_count = dyn_array_length(program->functions);
@@ -106,6 +104,8 @@ posix_program_jit(
 
   program_jit_resolve_relocations(jit);
   program_jit_call_startup_functions(jit);
+
+  return mass_success();
 }
 
 #endif // POSIX_RUNTIME_H

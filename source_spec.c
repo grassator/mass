@@ -117,7 +117,11 @@ test_program_source_function(
   MASS_ON_ERROR(*context->result) return 0;
   if (!value) return 0;
   jit_init(&test_jit, context->program);
-  program_jit(context->compilation, &test_jit);
+  Mass_Result jit_result = program_jit(context->compilation, &test_jit);
+  MASS_ON_ERROR(jit_result) {
+    context_error(context, jit_result.Error.error);
+    return 0;
+  }
   MASS_ON_ERROR(*context->result) return 0;
   fn_type_opaque fn = value_as_function(test_jit.program, value);
   MASS_ON_ERROR(*context->result) return 0;

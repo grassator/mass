@@ -61,7 +61,7 @@ import_symbol(
   const Slice symbol_name
 );
 
-static void
+static PRELUDE_NO_DISCARD Mass_Result
 program_jit(
   Compilation *compilation,
   Jit *jit

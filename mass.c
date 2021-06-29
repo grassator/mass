@@ -148,7 +148,10 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Run: {
       Jit jit;
       jit_init(&jit, context.program);
-      program_jit(context.compilation, &jit);
+      result = program_jit(context.compilation, &jit);
+      if(result.tag != Mass_Result_Tag_Success) {
+        return mass_cli_print_error(&result.Error.error);
+      }
       fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
       main();
       return 0;

@@ -253,18 +253,20 @@ program_jit_call_startup_functions(
   jit->previous_counts.startup = startup_count;
 }
 
-static void
+static PRELUDE_NO_DISCARD Mass_Result
 program_jit(
   Compilation *compilation,
   Jit *jit
 ) {
   Temp_Mark mark = compilation_temp_mark(compilation);
+  Mass_Result result;
   #if defined(_WIN32)
-  win32_program_jit(compilation, jit);
+  result = win32_program_jit(compilation, jit);
   #elif defined(__linux__) || defined(__MACH__)
-  posix_program_jit(compilation, jit);
+  result = posix_program_jit(compilation, jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif
   compilation_temp_reset_to_mark(compilation, mark);
+  return result;
 }
