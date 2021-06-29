@@ -3512,6 +3512,10 @@ call_function_overload(
     bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
 
     u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
+    if (target_arg_register_bitset >> 16) {
+      panic("Found XMM usage");
+    }
+
     argument_register_bitset |= target_arg_register_bitset;
     bool target_arg_registers_are_free =
       !(builder->register_occupied_bitset & target_arg_register_bitset);

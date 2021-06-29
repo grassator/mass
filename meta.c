@@ -1840,34 +1840,28 @@ main(void) {
   set_flags(push_type(type_c_opaque("int")), Meta_Type_Flags_No_C_Type);
 
   // Prelude Types
-  const char *c_primitive_types[] = {
-    "u8", "u16", "u32", "u64",
-    "s8", "s16", "s32", "s64",
-    "f32", "f64",
-  };
+  #define PROCESS_PRELUDE_TYPES(F)\
+    F(u8) F(u16) F(u32) F(u64)\
+    F(s8) F(s16) F(s32) F(s64)\
+    F(f32) F(f64)
 
-  {
-    Meta_Type_Flags flags = Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array;
-    for (u64 i = 0; i < countof(c_primitive_types); ++i) {
-      export_global(set_flags(push_type(type_c_opaque(c_primitive_types[i])), flags));
-    }
+  #define DEFINE_PRIMITIVE(T)\
+    export_global(set_flags(push_type(type_c_opaque(#T)),\
+      Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
 
-    Fixed_Buffer *range_names_buffer = fixed_buffer_make(.capacity = 1024 * 1024);
-    for (u64 i = 0; i < countof(c_primitive_types); ++i) {
-      const char *string_name =
-        fixed_buffer_sprintf(range_names_buffer, "Range_%s", c_primitive_types[i]).bytes;
-      fixed_buffer_append_s8(range_names_buffer, 0);
-      set_flags(push_type(type_struct(string_name, (Struct_Item[]){
-        { c_primitive_types[i], "from" },
-        { c_primitive_types[i], "to" },
-      })), flags);
-    }
+  #define DEFINE_RANGES(T)\
+    set_flags(push_type(type_struct("Range_" #T, (Struct_Item[]){\
+      { #T, "from" },\
+      { #T, "to" },\
+    })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array);
 
-    export_global(set_flags(push_type(type_struct("Slice", (Struct_Item[]){
-      { "u8 *", "bytes" },
-      { "u64", "length" },
-    })), flags));
-  }
+  PROCESS_PRELUDE_TYPES(DEFINE_PRIMITIVE)
+  PROCESS_PRELUDE_TYPES(DEFINE_RANGES)
+
+  export_global(set_flags(push_type(type_struct("Slice", (Struct_Item[]){
+    { "u8 *", "bytes" },
+    { "u64", "length" },
+  })), Meta_Type_Flags_No_C_Type | Meta_Type_Flags_No_Value_Array));
 
   const char *this_filename = __FILE__;
   File_Info this_file_info;
