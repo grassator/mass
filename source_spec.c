@@ -757,7 +757,7 @@ spec("source") {
         "fibonnacci", &test_context,
         "fibonnacci :: fn(n : s64) -> (s64) {\n"
           "if (n < 2) { return n }\n"
-           "fibonnacci(n - 1) + fibonnacci(n - 2)"
+          "fibonnacci(n - 1) + fibonnacci(n - 2)"
         "}"
       );
       check(spec_check_mass_result(test_context.result));

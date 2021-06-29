@@ -3542,7 +3542,7 @@ call_function_overload(
       arg_value = source_arg;
       should_assign = false;
       register_acquire_bitset(builder, source_registers_bitset);
-      temp_register_argument_bitset |= source_registers_bitset;
+      //temp_register_argument_bitset |= source_registers_bitset;
     } else if (
       value_is_non_lazy_static(source_arg) &&
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
@@ -3554,16 +3554,33 @@ call_function_overload(
       copied_straight_to_param_bitset |= target_arg_register_bitset;
       register_acquire_bitset(builder, target_arg_register_bitset);
     } else {
-      // TODO it should be possible to try to find a register_bitset that
-      //      is free and is not going to be used for the actual arguments
-      //      and use that as a temporary value. On X86_64 this would then
-      //      just be a rename.
-
-      // The code below is useful to check how many spills to stack happen
-      //static int stack_counter = 0;
-      //printf(" > stack %i\n", stack_counter++);
-      arg_value = reserve_stack(context, builder, stack_descriptor, *source_range);
-      arg_value->is_temporary = true;
+      u64 prohibited_registers
+        = temp_register_argument_bitset
+        | all_used_arguments_register_bitset
+        | builder->register_occupied_bitset;
+      u64 allowed_temp_registers = registers_that_can_be_temp & ~prohibited_registers;
+      u64 required_register_count = register_bitset_occupied_count(target_arg_register_bitset);
+      if (
+        // TODO it should be possible to do this for unpacked structs as well,
+        //      but it will be quite gnarly
+        target_item->descriptor->tag != Descriptor_Tag_Reference_To &&
+        required_register_count == 1 &&
+        register_bitset_occupied_count(allowed_temp_registers) > 1
+      ) {
+        u64 temp_register = register_find_available(builder, prohibited_registers);
+        register_acquire(builder, temp_register);
+        register_bitset_set(&temp_register_argument_bitset, temp_register);
+        arg_value = value_register_for_descriptor(
+          context, temp_register, target_item->descriptor, target_item->source_range
+        );
+        arg_value->is_temporary = true;
+      } else {
+        // The code below is useful to check how many spills to stack happen
+        //static int stack_counter = 0;
+        //printf(" > stack %i\n", stack_counter++);
+        arg_value = reserve_stack(context, builder, stack_descriptor, *source_range);
+        arg_value->is_temporary = true;
+      }
     };
     if (should_assign) {
       MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
@@ -3586,6 +3603,7 @@ call_function_overload(
     if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
     if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
     if (register_bitset_get(copied_straight_to_param_bitset, reg_index)) continue;
+    if (register_bitset_get(temp_register_argument_bitset, reg_index)) continue;
 
     register_bitset_set(&saved_registers_bitset, reg_index);
 
@@ -3645,7 +3663,7 @@ call_function_overload(
     );
   }
 
-  register_release_bitset(builder, argument_register_bitset);
+  register_release_bitset(builder, argument_register_bitset | temp_register_argument_bitset);
 
   u64 return_value_bitset = register_bitset_from_storage(&fn_return_value->storage);
   register_acquire_bitset(builder, return_value_bitset);

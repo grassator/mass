@@ -32,6 +32,15 @@ reserve_stack_internal(
 #define reserve_stack(...)\
   reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
+static const u64 registers_that_can_be_temp = (
+  // FIXME this should be all registers except for RSP
+  (1llu << Register_C) | (1llu << Register_B) | (1llu << Register_D) |
+  (1llu << Register_BP) | (1llu << Register_SI) | (1llu << Register_DI) |
+  (1llu << Register_R8) | (1llu << Register_R9) | (1llu << Register_R10) |
+  (1llu << Register_R11) | (1llu << Register_R12) | (1llu << Register_R13) |
+  (1llu << Register_R14) | (1llu << Register_R15)
+);
+
 static Register
 register_find_available(
   Function_Builder *builder,
@@ -46,9 +55,8 @@ register_find_available(
   for (u32 i = 0; i < countof(temp_registers); ++i) {
     Register reg_index = temp_registers[i];
     if (register_bitset_get(register_disallowed_bit_mask, reg_index)) continue;
-    if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) {
-      return reg_index;
-    }
+    if (register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
+    return reg_index;
   }
   // FIXME
   panic("Could not acquire a temp register");
