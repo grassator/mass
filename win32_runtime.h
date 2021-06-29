@@ -99,8 +99,6 @@ typedef dyn_array_type(RUNTIME_FUNCTION) Array_RUNTIME_FUNCTION;
 
 typedef struct {
   Array_RUNTIME_FUNCTION function_table;
-  Fixed_Buffer *temp_buffer;
-  Allocator temp_allocator;
   u32 trampoline_rva;
 } Win32_Jit_Info;
 
@@ -491,8 +489,9 @@ win32_section_protect_from(
 }
 
 // TODO make this return MASS_RESULT
-void
+static void
 win32_program_jit(
+  Compilation *compilation,
   Jit *jit
 ) {
   Program *program = jit->program;
@@ -512,16 +511,9 @@ win32_program_jit(
   if (jit->platform_specific_payload) {
     dyn_array_clear(jit->program->patch_info_array);
     info = jit->platform_specific_payload;
-    info->temp_buffer->occupied = 0;
   } else {
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
-    Fixed_Buffer *temp_buffer = fixed_buffer_make(
-      .allocator = allocator_system,
-      .capacity = 1024 * 1024 // 1Mb
-    );
     *info = (Win32_Jit_Info) {
-      .temp_buffer = temp_buffer,
-      .temp_allocator = *fixed_buffer_allocator_make(temp_buffer),
       .trampoline_rva = memory->code.base_rva + make_trampoline(
         program, code_buffer, (u64)win32_program_test_exception_handler
       ),
@@ -558,7 +550,7 @@ win32_program_jit(
     if (maybe_handle_pointer) {
       handle = *maybe_handle_pointer;
     } else {
-      char *library_name = slice_to_c_string(&info->temp_allocator, lib->name);
+      char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
       handle = LoadLibraryA(library_name);
       assert(handle);
       hash_map_set(jit->import_library_handles, lib->name, handle);
@@ -568,7 +560,7 @@ win32_program_jit(
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       Label *label = program_get_label(program, symbol->label32);
       if (!label->resolved) {
-        char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
+        char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
         fn_type_opaque address = GetProcAddress(handle, symbol_name);
         assert(address);
         u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);

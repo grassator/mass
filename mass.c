@@ -147,7 +147,7 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Run: {
       Jit jit;
       jit_init(&jit, context.program);
-      program_jit(&jit);
+      program_jit(context.compilation, &jit);
       fn_type_opaque main = value_as_function(jit.program, jit.program->entry_point);
       main();
       return 0;

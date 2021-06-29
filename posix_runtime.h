@@ -53,8 +53,9 @@ posix_section_protect_from(
 }
 
 // TODO make this return MASS_RESULT
-void
+static void
 posix_program_jit(
+  Compilation *compilation,
   Jit *jit
 ) {
   Program *program = jit->program;
@@ -78,8 +79,7 @@ posix_program_jit(
     if (maybe_handle_pointer) {
       handle = *maybe_handle_pointer;
     } else {
-      // FIXME @Leak
-      char *library_name = slice_to_c_string(allocator_default, lib->name);
+      char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
       handle = dlopen(library_name, RTLD_LAZY);
       assert(handle);
       hash_map_set(jit->import_library_handles, lib->name, handle);
@@ -89,8 +89,7 @@ posix_program_jit(
       Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
       Label *label = program_get_label(program, symbol->label32);
       if (!label->resolved) {
-        // FIXME @Leak
-        char *symbol_name = slice_to_c_string(allocator_default, symbol->name);
+        char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
         fn_type_opaque address = dlsym(handle, symbol_name);
         assert(address);
         u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);

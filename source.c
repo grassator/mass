@@ -2933,7 +2933,7 @@ compile_time_eval(
   calling_convention->body_end_proc(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
-  program_jit(jit);
+  program_jit(context->compilation, jit);
 
   fn_type_opaque jitted_code = c_function_from_label(jit->program, eval_label_index);
   jitted_code();
@@ -3870,7 +3870,7 @@ token_handle_function_call(
       Value *instance = ensure_function_instance(&eval_context, overload);
       MASS_ON_ERROR(*eval_context.result) return 0;
 
-      program_jit(jit);
+      program_jit(context->compilation, jit);
       assert(storage_is_label(&instance->storage));
       Label_Index jit_label_index =
         instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;

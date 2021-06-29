@@ -20,10 +20,32 @@ typedef struct {
 } Temp_Mark;
 
 static inline Temp_Mark
+compilation_temp_mark(
+  Compilation *compilation
+) {
+  return (Temp_Mark){compilation->temp_buffer.occupied};
+}
+
+static inline void
+compilation_temp_reset_to_mark(
+  Compilation *compilation,
+  Temp_Mark mark
+) {
+  compilation->temp_buffer.occupied = mark.occupied;
+}
+
+static inline void
+compilation_temp_reset(
+  Compilation *compilation
+) {
+  compilation->temp_buffer.occupied = 0;
+}
+
+static inline Temp_Mark
 context_temp_mark(
   Execution_Context *context
 ) {
-  return (Temp_Mark){context->compilation->temp_buffer.occupied};
+  return compilation_temp_mark(context->compilation);
 }
 
 static inline void
@@ -31,14 +53,14 @@ context_temp_reset_to_mark(
   Execution_Context *context,
   Temp_Mark mark
 ) {
-  context->compilation->temp_buffer.occupied = mark.occupied;
+  compilation_temp_reset_to_mark(context->compilation, mark);
 }
 
 static inline void
 context_temp_reset(
   Execution_Context *context
 ) {
-  context->compilation->temp_buffer.occupied = 0;
+  compilation_temp_reset(context->compilation);
 }
 
 static inline bool
@@ -246,8 +268,9 @@ print_storage(
   const Storage *operand
 );
 
-void
+static void
 program_jit(
+  Compilation *compilation,
   Jit *jit
 );
 

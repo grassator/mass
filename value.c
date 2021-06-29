@@ -1864,20 +1864,23 @@ program_patch_labels(
   }
 }
 
-void
+static void
 program_jit(
+  Compilation *compilation,
   Jit *jit
 ) {
+  Temp_Mark mark = compilation_temp_mark(compilation);
   #if defined(_WIN32)
-  win32_program_jit(jit);
+  win32_program_jit(compilation, jit);
   #elif defined(__linux__) || defined(__MACH__)
-  posix_program_jit(jit);
+  posix_program_jit(compilation, jit);
   #else
   panic("JIT compilation is (yet) not implemented for this system");
   #endif
+  compilation_temp_reset_to_mark(compilation, mark);
 }
 
-Import_Library *
+static Import_Library *
 program_find_import_library(
   const Program *program,
   const Slice library_name
