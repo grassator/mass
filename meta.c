@@ -50,13 +50,17 @@ typedef struct {
   const char *maybe_default_expression;
 } Argument_Type;
 
+typedef enum {
+  Function_Kind_Default,
+  Function_Kind_Typedef,
+} Function_Kind;
 
 typedef struct {
   const char *name;
   const char *returns;
+  Function_Kind kind;
   Argument_Type *arguments;
   uint64_t argument_count;
-  bool is_typedef;
 } Function_Type;
 
 typedef struct {
@@ -133,7 +137,7 @@ print_c_type_forward_declaration(
     case Meta_Type_Tag_Function: {
       name = 0;
       if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
-        if (type->function.is_typedef) {
+        if (type->function.kind == Function_Kind_Typedef) {
           fprintf(file, "typedef %s (*%s)\n  (", type->function.returns, type->name);
         } else {
           fprintf(file, "static %s %s\n  (", type->function.returns, type->name);
@@ -385,7 +389,7 @@ print_scope_define_function(
       function->name, arg->name, arg->maybe_default_expression);
   }
 
-  if (function->is_typedef) {
+  if (function->kind == Function_Kind_Typedef) {
     fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(\n");
   } else {
     fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION(\n");
@@ -921,7 +925,7 @@ type_function_impl(
   const char *returns,
   Argument_Type *arguments,
   u64 argument_count,
-  bool is_typedef
+  Function_Kind kind
 ) {
   return (Meta_Type){
     .tag = Meta_Type_Tag_Function,
@@ -931,16 +935,13 @@ type_function_impl(
       .returns = returns,
       .arguments = arguments,
       .argument_count = argument_count,
-      .is_typedef = is_typedef,
+      .kind = kind,
     }
   };
 }
 
-#define typedef_function(_NAME_STRING_, _RETURNS_, ...)\
-  type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), true)
-
-#define type_function(_NAME_STRING_, _RETURNS_, ...)\
-  type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), false)
+#define type_function(_KIND_, _NAME_STRING_, _RETURNS_, ...)\
+  type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), Function_Kind_##_KIND_)
 
 Meta_Type types[4096] = {0};
 uint32_t type_count = 0;
@@ -1484,7 +1485,7 @@ main(void) {
     }),
   }));
 
-  push_type(typedef_function("Lazy_Value_Proc", "Value *", (Argument_Type[]){
+  push_type(type_function(Typedef, "Lazy_Value_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Function_Builder *", "builder" },
     { "const Expected_Result *", "expected_result" },
@@ -1505,7 +1506,7 @@ main(void) {
     { "u64", "resolving" },
   }));
 
-  push_type(typedef_function("Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
+  push_type(type_function(Typedef, "Mass_Handle_Operator_Proc", "Value *", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "void *", "payload" },
@@ -1684,17 +1685,17 @@ main(void) {
     { "const Calling_Convention *", "default_calling_convention"},
   }));
 
-  push_type(typedef_function("Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
+  push_type(type_function(Typedef, "Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
     { "Program *", "program" },
     { "Function_Builder *", "builder" },
   }));
 
-  push_type(typedef_function("Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
+  push_type(type_function(Typedef, "Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
   }));
 
-  push_type(typedef_function("Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
+  push_type(type_function(Typedef, "Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
     { "Function_Parameter_Mode", "mode" },
@@ -1707,7 +1708,7 @@ main(void) {
     { "Calling_Convention_Return_Proc", "return_proc"},
   }));
 
-  push_type(typedef_function("Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
+  push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
     { "Execution_Context *", "context" },
     { "Value_View", "view" },
     { "Lazy_Value *", "out_lazy_value" },
@@ -1816,40 +1817,42 @@ main(void) {
     { "u64", "encoding_count" },
   }));
 
-  export_compiler(push_type(type_function("tokenize", "Mass_Result", (Argument_Type[]){
+  export_compiler(push_type(type_function(Default, "tokenize", "Mass_Result", (Argument_Type[]){
     { "Compilation *", "compilation" },
     { "Source_File *", "file" },
     { "Value_View *", "out_tokens" },
   })));
 
-  export_global_custom_name("import", push_type(type_function("mass_import", "Scope", (Argument_Type[]){
-    { "Slice", "name" },
-    { "Execution_Context *", "context", "@context" },
-  })));
+  export_global_custom_name("import", push_type(
+    type_function(Default, "mass_import", "Scope", (Argument_Type[]){
+      { "Slice", "name" },
+      { "Execution_Context *", "context", "@context" },
+    })
+  ));
 
   export_compiler_custom_name("number_literal_logical_shift_left", push_type(
-    type_function("mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
+    type_function(Default, "mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "input" },
       { "Number_Literal", "shift" },
     })
   ));
 
   export_compiler_custom_name("number_literal_logical_shift_right", push_type(
-    type_function("mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
+    type_function(Default, "mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "input" },
       { "Number_Literal", "shift" },
     })
   ));
 
   export_compiler_custom_name("number_literal_bitwise_or", push_type(
-    type_function("mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
+    type_function(Default, "mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "a" },
       { "Number_Literal", "b" },
     })
   ));
 
   export_compiler_custom_name("number_literal_bitwise_and", push_type(
-    type_function("mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
+    type_function(Default, "mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "a" },
       { "Number_Literal", "b" },
     })
@@ -1857,7 +1860,7 @@ main(void) {
 
   #define DEFINE_ARITHMETIC(_NAME_)\
     export_compiler_custom_name(#_NAME_, push_type(\
-      type_function("mass_" #_NAME_, "Value *", (Argument_Type[]){\
+      type_function(Default, "mass_" #_NAME_, "Value *", (Argument_Type[]){\
         { "Execution_Context *", "context" },\
         { "Value_View", "arguments" },\
         { "void *", "payload" },\
