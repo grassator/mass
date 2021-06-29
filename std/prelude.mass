@@ -116,13 +116,15 @@ static_assert :: macro(condition : bool, message : String) {
   @{if condition == false { fail(@context, "Static Assert Failed", message) }}
 }
 
-external :: {
-  mass :: import("mass")
-  @fn(library_name : String, symbol_name : String) -> (result : mass.External_Symbol) {
-    result.library_name = library_name
-    result.symbol_name = symbol_name
-    result
-  }
+external :: @fn(
+  library_name : String,
+  symbol_name : String
+) -> (
+  result : import("mass").External_Symbol
+) {
+  result.library_name = library_name
+  result.symbol_name = symbol_name
+  result
 }
 
 negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
