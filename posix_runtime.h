@@ -1,6 +1,7 @@
 #ifndef POSIX_RUNTIME_H
 #define POSIX_RUNTIME_H
 
+#include "program.h"
 #include <sys/mman.h>
 #include <dlfcn.h>
 

@@ -6,6 +6,7 @@
 #include "encoding.c"
 #include "function.c"
 #include "source.c"
+#include "program.c"
 
 typedef struct {
   s64 x;

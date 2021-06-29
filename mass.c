@@ -6,6 +6,7 @@
 #include "encoding.c"
 #include "function.c"
 #include "source.c"
+#include "program.c"
 
 typedef enum {
   Mass_Cli_Mode_Compile,

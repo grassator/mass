@@ -268,28 +268,5 @@ print_storage(
   const Storage *operand
 );
 
-static void
-program_jit(
-  Compilation *compilation,
-  Jit *jit
-);
-
-static inline Label *
-program_get_label(
-  Program *program,
-  Label_Index label
-);
-
-void
-program_patch_labels(
-  Program *program
-);
-
-void
-program_set_label_offset(
-  Program *program,
-  Label_Index label_index,
-  u32 offset_in_section
-);
 
 #endif

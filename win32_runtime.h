@@ -2,6 +2,8 @@
 #define WIN32_RUNTIME_H
 
 #include "win32_platform.h"
+#include "program.h"
+#include "source.h"
 
 static DWORD
 win32_section_permissions_to_virtual_protect_flags(
