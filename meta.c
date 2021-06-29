@@ -1325,11 +1325,11 @@ main(void) {
     { "Body", 1 },
   }));
 
-  export_compiler(push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
+  push_type(type_enum("Operator_Fixity", (Enum_Type_Item[]){
     { "Infix", 1 << 0 },
     { "Prefix", 1 << 1 },
     { "Postfix", 1 << 2 },
-  })));
+  }));
 
   push_type(type_enum("Operator_Associativity", (Enum_Type_Item[]){
     { "Left", 0 },

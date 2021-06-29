@@ -1894,17 +1894,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 84);
     }
-    it("should support importing compiler functionality through `mass` module") {
-      Value *value = test_program_inline_source_base(
-        "Infix", &test_context,
-        "Infix :: { mass :: import(\"mass\") ; mass.Operator_Fixity.Infix }"
-      );
-      check(value);
-      check(value->descriptor == &descriptor_operator_fixity);
-      check(value->storage.tag == Storage_Tag_Static);
-      s32 item_value = *storage_static_as_c_type(&value->storage, s32);
-      check(item_value == Operator_Fixity_Infix);
-    }
     it("should support failing the compilation by calling fail() at compile time") {
      test_program_inline_source_function(
         "checker", &test_context,
