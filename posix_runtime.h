@@ -2,6 +2,7 @@
 #define POSIX_RUNTIME_H
 
 #include <sys/mman.h>
+#include <dlfcn.h>
 
 static int
 posix_section_permissions_to_mprotect_flags(
@@ -71,31 +72,32 @@ posix_program_jit(
 
   u64 import_count = dyn_array_length(program->import_libraries);
   for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
-    panic("TODO support dlopen on Linux");
-    //Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    //void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
-    //void *handle;
-    //if (maybe_handle_pointer) {
-      //handle = *maybe_handle_pointer;
-    //} else {
-      //char *library_name = slice_to_c_string(&info->temp_allocator, lib->name);
-      //handle = LoadLibraryA(library_name);
-      //assert(handle);
-      //hash_map_set(jit->import_library_handles, lib->name, handle);
-    //}
-//
-    //for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-      //Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      //Label *label = program_get_label(program, symbol->label32);
-      //if (!label->resolved) {
-        //char *symbol_name = slice_to_c_string(&info->temp_allocator, symbol->name);
-        //fn_type_opaque address = GetProcAddress(handle, symbol_name);
-        //assert(address);
-        //u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
-        //label->offset_in_section = u64_to_u32(offset);
-        //label->resolved = true;
-      //}
-    //}
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
+    void *handle;
+    if (maybe_handle_pointer) {
+      handle = *maybe_handle_pointer;
+    } else {
+      // FIXME @Leak
+      char *library_name = slice_to_c_string(allocator_default, lib->name);
+      handle = dlopen(library_name, RTLD_LAZY);
+      assert(handle);
+      hash_map_set(jit->import_library_handles, lib->name, handle);
+    }
+
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
+      Label *label = program_get_label(program, symbol->label32);
+      if (!label->resolved) {
+        // FIXME @Leak
+        char *symbol_name = slice_to_c_string(allocator_default, symbol->name);
+        fn_type_opaque address = dlsym(handle, symbol_name);
+        assert(address);
+        u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
+        label->offset_in_section = u64_to_u32(offset);
+        label->resolved = true;
+      }
+    }
   }
   u64 function_count = dyn_array_length(program->functions);
 

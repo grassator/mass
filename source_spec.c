@@ -1982,6 +1982,23 @@ spec("source") {
   }
 
   describe("Complex Examples") {
+    #if defined(__linux__)
+    it("should be able to print out a string") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "write :: fn(descriptor : s32, buffer : &u8, size : u64) "
+          "-> (s64) external(\"libc.so.6\", \"write\")\n"
+        "STDOUT_FILENO :: 1\n"
+        "checker :: fn() -> () {\n"
+          "hello :: \"Hello, world!\\n\"\n"
+          "write(STDOUT_FILENO, hello.bytes, hello.length) \n"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+    #endif
+
     #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =
