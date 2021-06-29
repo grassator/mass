@@ -81,4 +81,10 @@ program_jit_imports(
 );
 
 
+static void
+program_jit_resolve_relocations(
+  Jit *jit
+);
+
+
 #endif // RUNTIME_H

@@ -219,6 +219,27 @@ program_jit_imports(
 }
 
 static void
+program_jit_resolve_relocations(
+  Jit *jit
+) {
+  Program *program = jit->program;
+  u64 relocation_count = dyn_array_length(program->relocations);
+  for (u64 i = jit->previous_counts.relocations; i < relocation_count; ++i) {
+    Relocation *relocation = dyn_array_get(program->relocations, i);
+    assert(storage_is_label(&relocation->patch_at));
+    assert(storage_is_label(&relocation->address_of));
+    Label_Index patch_at_index =
+      relocation->patch_at.Memory.location.Instruction_Pointer_Relative.label_index;
+    Label_Index address_of_index =
+      relocation->address_of.Memory.location.Instruction_Pointer_Relative.label_index;
+    void *address_of = rip_value_pointer_from_label_index(program, address_of_index);
+    void **patch_at = rip_value_pointer_from_label_index(program, patch_at_index);
+    *patch_at = address_of;
+  }
+  jit->previous_counts.relocations = relocation_count;
+}
+
+static void
 program_jit(
   Compilation *compilation,
   Jit *jit

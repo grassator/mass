@@ -105,19 +105,7 @@ posix_program_jit(
   posix_section_protect_from(&memory->code, code_protected_size);
 
   // Resolve relocations
-  u64 relocation_count = dyn_array_length(program->relocations);
-  for (u64 i = jit->previous_counts.relocations; i < relocation_count; ++i) {
-    Relocation *relocation = dyn_array_get(program->relocations, i);
-    assert(storage_is_label(&relocation->patch_at));
-    assert(storage_is_label(&relocation->address_of));
-    Label_Index patch_at_index =
-      relocation->patch_at.Memory.location.Instruction_Pointer_Relative.label_index;
-    Label_Index address_of_index =
-      relocation->address_of.Memory.location.Instruction_Pointer_Relative.label_index;
-    void *address_of = rip_value_pointer_from_label_index(program, address_of_index);
-    void **patch_at = rip_value_pointer_from_label_index(program, patch_at_index);
-    *patch_at = address_of;
-  }
+  program_jit_resolve_relocations(jit);
 
   // Call new startup functions
   u64 startup_count = dyn_array_length(program->startup_functions);
@@ -127,7 +115,6 @@ posix_program_jit(
     fn();
   }
 
-  jit->previous_counts.relocations = relocation_count;
   jit->previous_counts.functions = function_count;
   jit->previous_counts.startup = startup_count;
 }
