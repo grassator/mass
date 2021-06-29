@@ -1607,6 +1607,13 @@ main(void) {
     struct_fields("File_Open", (Struct_Item[]){
       { "Slice", "path" },
     }),
+    struct_fields("Dynamic_Library_Load", (Struct_Item[]){
+      { "Slice", "library_name" },
+    }),
+    struct_fields("Dynamic_Library_Symbol_Not_Found", (Struct_Item[]){
+      { "Slice", "library_name" },
+      { "Slice", "symbol_name" },
+    }),
     struct_fields("Unexpected_Token", (Struct_Item[]){
       { "Slice", "expected" },
     }),

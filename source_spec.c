@@ -1986,7 +1986,7 @@ spec("source") {
     }
   }
 
-  describe("Complex Examples") {
+  describe("External (DLL Imports)") {
     #if defined(__linux__)
     it("should be able to print out a string") {
       void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
@@ -2004,6 +2004,19 @@ spec("source") {
     }
     #endif
 
+    it("should report a user error when failing to JIT load a library") {
+      test_program_inline_source_function(
+        "checker", &test_context,
+        "broken_import :: fn() -> () external(\"very broken dll name\", \"and a broken symbol\") \n"
+        "checker :: fn() { broken_import() }\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Dynamic_Library_Load);
+    }
+  }
+
+  describe("Complex Examples") {
     #if defined(_WIN32) // TODO support on Linux
     it("should be able to run fizz buzz") {
       fn_type_opaque fizz_buzz =

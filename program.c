@@ -197,7 +197,14 @@ program_jit_imports(
     } else {
       char *library_name = slice_to_c_string(temp_allocator, lib->name);
       handle = callbacks->load_library(library_name);
-      assert(handle);
+      if (!handle) return mass_error((Mass_Error) {
+        .tag = Mass_Error_Tag_Dynamic_Library_Load,
+        .source_range = COMPILER_SOURCE_RANGE, // TODO provide a better range here
+        .Dynamic_Library_Load = {
+          .library_name = lib->name,
+          //.symbol_name = lib->name,
+        }
+      });
       hash_map_set(jit->import_library_handles, lib->name, handle);
     }
 
@@ -207,7 +214,14 @@ program_jit_imports(
       if (!label->resolved) {
         char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
         fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
-        assert(address);
+        if (!address) return mass_error((Mass_Error) {
+          .tag = Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found,
+          .source_range = COMPILER_SOURCE_RANGE, // TODO provide a better range here
+          .Dynamic_Library_Symbol_Not_Found = {
+            .library_name = lib->name,
+            .symbol_name = lib->name,
+          }
+        });
         u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
         label->offset_in_section = u64_to_u32(offset);
         label->resolved = true;

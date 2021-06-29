@@ -163,6 +163,16 @@ mass_error_to_string(
     case Mass_Error_Tag_Invalid_Identifier: {
       APPEND_LITERAL("Invalid identifier");
     } break;
+    case Mass_Error_Tag_Dynamic_Library_Load: {
+      APPEND_LITERAL("Unable to load a dynamic library");
+      APPEND_SLICE(error->Dynamic_Library_Load.library_name);
+    } break;
+    case Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found: {
+      APPEND_LITERAL("Unable to resolve a symbol ");
+      APPEND_SLICE(error->Dynamic_Library_Symbol_Not_Found.symbol_name);
+      APPEND_LITERAL(" from a dynamic library ");
+      APPEND_SLICE(error->Dynamic_Library_Symbol_Not_Found.library_name);
+    } break;
     case Mass_Error_Tag_File_Open: {
       APPEND_LITERAL("Can not open file ");
       APPEND_SLICE(error->File_Open.path);

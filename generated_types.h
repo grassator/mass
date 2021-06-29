@@ -1326,17 +1326,19 @@ typedef enum {
   Mass_Error_Tag_Expected_Static = 5,
   Mass_Error_Tag_Integer_Range = 6,
   Mass_Error_Tag_File_Open = 7,
-  Mass_Error_Tag_Unexpected_Token = 8,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 9,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 10,
-  Mass_Error_Tag_Undefined_Variable = 11,
-  Mass_Error_Tag_Redifinition = 12,
-  Mass_Error_Tag_Unknown_Field = 13,
-  Mass_Error_Tag_Invalid_Identifier = 14,
-  Mass_Error_Tag_Type_Mismatch = 15,
-  Mass_Error_Tag_Epoch_Mismatch = 16,
-  Mass_Error_Tag_No_Matching_Overload = 17,
-  Mass_Error_Tag_Undecidable_Overload = 18,
+  Mass_Error_Tag_Dynamic_Library_Load = 8,
+  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 9,
+  Mass_Error_Tag_Unexpected_Token = 10,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 11,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 12,
+  Mass_Error_Tag_Undefined_Variable = 13,
+  Mass_Error_Tag_Redifinition = 14,
+  Mass_Error_Tag_Unknown_Field = 15,
+  Mass_Error_Tag_Invalid_Identifier = 16,
+  Mass_Error_Tag_Type_Mismatch = 17,
+  Mass_Error_Tag_Epoch_Mismatch = 18,
+  Mass_Error_Tag_No_Matching_Overload = 19,
+  Mass_Error_Tag_Undecidable_Overload = 20,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -1352,6 +1354,13 @@ typedef struct Mass_Error_Integer_Range {
 typedef struct Mass_Error_File_Open {
   Slice path;
 } Mass_Error_File_Open;
+typedef struct Mass_Error_Dynamic_Library_Load {
+  Slice library_name;
+} Mass_Error_Dynamic_Library_Load;
+typedef struct Mass_Error_Dynamic_Library_Symbol_Not_Found {
+  Slice library_name;
+  Slice symbol_name;
+} Mass_Error_Dynamic_Library_Symbol_Not_Found;
 typedef struct Mass_Error_Unexpected_Token {
   Slice expected;
 } Mass_Error_Unexpected_Token;
@@ -1399,6 +1408,8 @@ typedef struct Mass_Error {
     Mass_Error_Circular_Dependency Circular_Dependency;
     Mass_Error_Integer_Range Integer_Range;
     Mass_Error_File_Open File_Open;
+    Mass_Error_Dynamic_Library_Load Dynamic_Library_Load;
+    Mass_Error_Dynamic_Library_Symbol_Not_Found Dynamic_Library_Symbol_Not_Found;
     Mass_Error_Unexpected_Token Unexpected_Token;
     Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
     Mass_Error_Operator_Prefix_Conflict Operator_Prefix_Conflict;
@@ -4273,17 +4284,19 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Expected_Static"), .value = 5 },
 { .name = slice_literal_fields("Integer_Range"), .value = 6 },
 { .name = slice_literal_fields("File_Open"), .value = 7 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 8 },
-{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 9 },
-{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 10 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 11 },
-{ .name = slice_literal_fields("Redifinition"), .value = 12 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 13 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 14 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 15 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 16 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 17 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 18 },
+{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 8 },
+{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 9 },
+{ .name = slice_literal_fields("Unexpected_Token"), .value = 10 },
+{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 11 },
+{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 12 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 13 },
+{ .name = slice_literal_fields("Redifinition"), .value = 14 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 15 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 16 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 17 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 18 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 19 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 20 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {
@@ -4327,6 +4340,30 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_file_open, Mass_Error_File_Open,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_file_open);
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_dynamic_library_load, Mass_Error_Dynamic_Library_Load,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("library_name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_Dynamic_Library_Load, library_name),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_error_dynamic_library_load);
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_dynamic_library_symbol_not_found, Mass_Error_Dynamic_Library_Symbol_Not_Found,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("library_name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_Dynamic_Library_Symbol_Not_Found, library_name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("symbol_name"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_Dynamic_Library_Symbol_Not_Found, symbol_name),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_error_dynamic_library_symbol_not_found);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_unexpected_token, Mass_Error_Unexpected_Token,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4501,6 +4538,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .name = slice_literal_fields("File_Open"),
     .descriptor = &descriptor_mass_error_file_open,
     .Base_Relative.offset = offsetof(Mass_Error, File_Open),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Dynamic_Library_Load"),
+    .descriptor = &descriptor_mass_error_dynamic_library_load,
+    .Base_Relative.offset = offsetof(Mass_Error, Dynamic_Library_Load),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"),
+    .descriptor = &descriptor_mass_error_dynamic_library_symbol_not_found,
+    .Base_Relative.offset = offsetof(Mass_Error, Dynamic_Library_Symbol_Not_Found),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -94,6 +94,14 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Error_Dynamic_Library_Load"), type_mass_error_dynamic_library_load_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Error_Dynamic_Library_Symbol_Not_Found"), type_mass_error_dynamic_library_symbol_not_found_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Error_Unexpected_Token"), type_mass_error_unexpected_token_value
   );
   scope_define_value(
