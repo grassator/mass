@@ -1111,6 +1111,15 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should support a u8 version of the remainder") {
+      u8(*checker)() = (u8(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> (u8) { remainder(cast(u8, 142), 100) }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
     #endif
   }
 

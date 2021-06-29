@@ -63,6 +63,8 @@ instruction_add_source_location_internal(
 // TODO properly support unsigned numbers
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
+    const Expected_Result *fold_result = (_result_);\
+    const Descriptor *fold_descriptor = expected_result_descriptor(fold_result);\
     Execution_Context *fold_context = (_context_);\
     Value *fold_a = (_a_);\
     Value *fold_b = (_b_);\
@@ -72,13 +74,21 @@ instruction_add_source_location_internal(
       fold_a->storage.tag == Storage_Tag_Static &&\
       fold_b->storage.tag == Storage_Tag_Static\
     ) {\
-      fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_s64);\
-      fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_s64);\
-      s64 a_s64 = storage_static_value_up_to_s64(&fold_a->storage);\
-      s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
-      s64 constant_result = a_s64 _operator_ b_s64;\
-      /* printf("%lld %s %lld = %lld", a_s64, #_operator_, b_s64, constant_result); */\
-      return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, (_result_), (_loc_));\
+      if (descriptor_is_signed_integer(fold_descriptor)) {\
+        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_s64);\
+        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_s64);\
+        s64 a_s64 = storage_static_value_up_to_s64(&fold_a->storage);\
+        s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
+        s64 constant_result = a_s64 _operator_ b_s64;\
+        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, (_loc_));\
+      } else {\
+        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_u64);\
+        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_u64);\
+        u64 a_u64 = storage_static_value_up_to_u64(&fold_a->storage);\
+        u64 b_u64 = storage_static_value_up_to_u64(&fold_b->storage);\
+        u64 constant_result = a_u64 _operator_ b_u64;\
+        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, (_loc_));\
+      }\
     }\
   } while(0)
 

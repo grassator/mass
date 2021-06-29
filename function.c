@@ -594,7 +594,7 @@ make_if(
   return label;
 }
 
-Value *
+static Value *
 maybe_constant_fold_internal(
   Execution_Context *context,
   Function_Builder *builder,
