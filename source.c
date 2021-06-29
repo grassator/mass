@@ -3359,14 +3359,14 @@ register_bitset_from_storage(
 ) {
   u64 result = 0;
   switch(storage->tag) {
-    case Storage_Tag_None: {
+    case Storage_Tag_None:
+    case Storage_Tag_Static: {
       // Nothing to do
       break;
     }
     default:
     case Storage_Tag_Any:
-    case Storage_Tag_Eflags:
-    case Storage_Tag_Static: {
+    case Storage_Tag_Eflags: {
       panic("Internal Error: Unexpected storage type for a function argument");
       break;
     }
@@ -3451,6 +3451,7 @@ call_function_overload(
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
+  u64 all_used_arguments_register_bitset = 0;
   DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, instance_descriptor->arguments_layout.items) {
     Storage storage = memory_layout_item_storage(
       &stack_argument_base, &instance_descriptor->arguments_layout, target_item
@@ -3461,10 +3462,18 @@ call_function_overload(
     }
     Value *param = dyn_array_push_uninitialized(target_params);
     value_init(param, target_item->descriptor, storage, target_item->source_range);
+
+    // TODO avoid doing this twice - here and below
+    u64 target_arg_register_bitset = register_bitset_from_storage(&storage);
+    if(all_used_arguments_register_bitset & target_arg_register_bitset) {
+      panic("Found overlapping register usage in arguments");
+    }
+    all_used_arguments_register_bitset |= target_arg_register_bitset;
   }
 
   u64 argument_register_bitset = 0;
   u64 copied_straight_to_param_bitset = 0;
+  u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
     Memory_Layout_Item *target_item =
       dyn_array_get(instance_descriptor->arguments_layout.items, i);
@@ -3499,9 +3508,6 @@ call_function_overload(
     bool should_assign = !(target_item->flags & Memory_Layout_Item_Flags_Uninitialized);
 
     u64 target_arg_register_bitset = register_bitset_from_storage(&target_arg->storage);
-    if(argument_register_bitset & target_arg_register_bitset) {
-      panic("Found overlapping register usage in arguments");
-    }
     argument_register_bitset |= target_arg_register_bitset;
     bool target_arg_registers_are_free =
       !(builder->register_occupied_bitset & target_arg_register_bitset);
@@ -3510,12 +3516,33 @@ call_function_overload(
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
     );
 
+
+    bool can_use_source_registers = false;
+    u64 source_registers_bitset = 0;
+    if (
+      source_arg->descriptor != &descriptor_lazy_value &&
+      source_arg->storage.tag != Storage_Tag_Static &&
+      target_arg->descriptor->tag != Descriptor_Tag_Reference_To
+    ) {
+      source_registers_bitset = register_bitset_from_storage(&source_arg->storage);
+      if (!(all_used_arguments_register_bitset & source_registers_bitset)) {
+        if (!(temp_register_argument_bitset & source_registers_bitset)) {
+          can_use_source_registers = true;
+        }
+      }
+    }
+
     Value *arg_value;
     if (storage_is_stack(&target_arg->storage)) {
       arg_value = value_make(context, stack_descriptor, target_arg->storage, *source_range);
     } else if (source_is_stack) {
       arg_value = source_arg;
       should_assign = false;
+    } else if (can_use_source_registers) {
+      arg_value = source_arg;
+      should_assign = false;
+      register_acquire_bitset(builder, source_registers_bitset);
+      temp_register_argument_bitset |= source_registers_bitset;
     } else if (
       value_is_non_lazy_static(source_arg) &&
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
