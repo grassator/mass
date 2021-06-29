@@ -1066,7 +1066,6 @@ spec("source") {
       }
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should have an add function") {
       s64(*checker)() = (s64(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1120,7 +1119,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-    #endif
   }
 
   describe("Operators") {

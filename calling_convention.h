@@ -159,12 +159,7 @@ typedef enum {
   SYSTEM_V_COMPLEX_X87,
   SYSTEM_V_MEMORY,
 } SYSTEM_V_ARGUMENT_CLASS;
-
-typedef struct {
-  Storage storage;
-  SYSTEM_V_ARGUMENT_CLASS class;
-} System_V_Class_Entry;
-typedef dyn_array_type(System_V_Class_Entry) Array_System_V_Class_Entry;
+typedef dyn_array_type(SYSTEM_V_ARGUMENT_CLASS) Array_SYSTEM_V_ARGUMENT_CLASS;
 
 typedef struct {
   const Register *items;
@@ -267,6 +262,9 @@ x86_64_system_v_push_memory_layout_item_for_class(
   return class;
 }
 
+// TODO verify this implementation against GCC
+// https://github.com/gcc-mirror/gcc/blob/master/gcc/config/i386/i386.c#L2080
+
 static SYSTEM_V_ARGUMENT_CLASS
 x86_64_system_v_classify(
   const Allocator *allocator,
@@ -317,23 +315,30 @@ x86_64_system_v_classify(
       //       for the struct as a whole and then its fields have register storages.
       //       This might cause problems down the line.
       SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
+      Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
 
       System_V_Classification_State saved_state = *state;
       state->memory_layout = (Memory_Layout) {
         .items = dyn_array_make(
           Array_Memory_Layout_Item,
           .allocator = allocator,
-          .capacity = dyn_array_length(descriptor->Struct.memory_layout.items),
+          .capacity = dyn_array_length(struct_items),
         ),
       };
 
-      u64 last_offset = 0;
+      // TODO use a temp allocator
+      Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
+        Array_SYSTEM_V_ARGUMENT_CLASS,
+        .allocator = allocator,
+        .capacity = dyn_array_length(struct_items),
+      );
+
 
       // 4. Each field of an object is classified recursively so that always two fields are
       // considered. The resulting class is calculated according to the classes of the
       // fields in the eightbyte:
-      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, descriptor->Struct.memory_layout.items) {
-        const Descriptor *item_descriptor = item->descriptor;
+      u64 last_offset = 0;
+      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, struct_items) {
         assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
         u64 offset = item->Base_Relative.offset;
 
@@ -348,19 +353,20 @@ x86_64_system_v_classify(
         }
 
         if (offset - state->offset_in_classified_eightbyte >= eightbyte) {
+          dyn_array_push(eightbyte_classes, eightbyte_class);
           eightbyte_class = SYSTEM_V_NO_CLASS;
           state->offset_in_classified_eightbyte = offset;
           assert(state->offset_in_classified_eightbyte % 8 == 0);
         }
         SYSTEM_V_ARGUMENT_CLASS field_class =
-          x86_64_system_v_classify(allocator, state, item->name, item_descriptor);
+          x86_64_system_v_classify(allocator, state, item->name, item->descriptor);
         // 4(a) If both classes are equal, this is the resulting class.
         if (eightbyte_class == field_class) {
-          continue;
+          eightbyte_class = field_class;
         } else
         // 4(b) If one of the classes is NO_CLASS, the resulting class is the other class.
         if (field_class == SYSTEM_V_NO_CLASS) {
-          continue;
+          eightbyte_class = eightbyte_class;
         } else if (eightbyte_class == SYSTEM_V_NO_CLASS) {
           eightbyte_class = field_class;
         } else
@@ -387,13 +393,45 @@ x86_64_system_v_classify(
         else {
           eightbyte_class = SYSTEM_V_SSE;
         }
-        if (eightbyte_class == SYSTEM_V_MEMORY) {
+      }
+      dyn_array_push(eightbyte_classes, eightbyte_class);
+
+      // 5. Then a post merger cleanup is done:
+      DYN_ARRAY_FOREACH(SYSTEM_V_ARGUMENT_CLASS, class, eightbyte_classes) {
+        // 5(a) If one of the classes is MEMORY, the whole argument is passed in memory.
+        if (*class == SYSTEM_V_MEMORY) {
           struct_class = SYSTEM_V_MEMORY;
           break;
         }
+        // 5(b) If X87UP is not preceded by X87, the whole argument is passed in memory.
+        if (0) {
+          // TODO
+        }
+        // 5(c) If the size of the aggregate exceeds two eightbytes and the first eightbyte
+        // isn't SSE or any other eightbyte isn’t SSEUP, the whole argument is passed in memory.
+        bool is_first = class == dyn_array_get(eightbyte_classes, 0);
+        if (byte_size > 2 * eightbyte) {
+          if (is_first) {
+            if (*class != SYSTEM_V_SSE) {
+              struct_class = SYSTEM_V_MEMORY;
+              break;
+            }
+          } else {
+            if (*class != SYSTEM_V_SSEUP) {
+              struct_class = SYSTEM_V_MEMORY;
+              break;
+            }
+          }
+        }
+        // 5(d) If SSEUP is not preceded by SSE or SSEUP, it is converted to SSE.
+        if (*class == SYSTEM_V_SSEUP) {
+          SYSTEM_V_ARGUMENT_CLASS previous = is_first ? SYSTEM_V_NO_CLASS : *(class - 1);
+          if (previous != SYSTEM_V_SSE && previous != SYSTEM_V_SSEUP) {
+            *class = SYSTEM_V_SSE;
+          }
+        }
       }
-
-      // FIXME 5. Then a post merger cleanup is done:
+      dyn_array_destroy(eightbyte_classes);
 
       if (struct_class == SYSTEM_V_MEMORY) {
         dyn_array_destroy(state->memory_layout.items);
