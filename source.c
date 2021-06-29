@@ -5156,14 +5156,14 @@ mass_handle_dot_operator(
 
   Source_Range rhs_range = rhs->source_range;
   Source_Range lhs_range = lhs->source_range;
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
-  const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(lhs_descriptor);
+  const Descriptor *lhs_forced_descriptor = value_or_lazy_value_descriptor(lhs);
+  const Descriptor *unwrapped_descriptor =
+    maybe_unwrap_pointer_descriptor(lhs_forced_descriptor);
 
   if (
     unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
-    lhs_descriptor == &descriptor_scope
+    lhs_forced_descriptor == &descriptor_scope
   ) {
-
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
@@ -5173,18 +5173,23 @@ mass_handle_dot_operator(
       return 0;
     }
     Slice field_name = value_as_symbol(rhs)->name;
-    if (lhs->descriptor == &descriptor_scope) {
-      // FIXME Figure out how to avoid this cast
-      Scope *module_scope = (Scope *)storage_static_as_c_type(&lhs->storage, Scope);
+    if (lhs_forced_descriptor == &descriptor_scope) {
+      if (!value_is_non_lazy_static(lhs)) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Expected_Static,
+          .source_range = lhs_range,
+        });
+        return 0;
+      }
+      const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
       Value *lookup = scope_lookup_force(context, module_scope, field_name, &args_view.source_range);
       if (!lookup) {
-        //scope_print_names(module_scope);
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
           .Unknown_Field = {
             .name = field_name,
-            .type = lhs->descriptor,
+            .type = lhs_forced_descriptor,
           },
         });
         return 0;
@@ -5216,11 +5221,11 @@ mass_handle_dot_operator(
       );
     }
   } else if (
-    lhs_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
-    lhs_descriptor->tag == Descriptor_Tag_Pointer_To
+    lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
+    lhs_forced_descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
     if (value_match_group(rhs, Group_Tag_Paren) || value_is_number_literal(rhs)) {
-      const Descriptor *descriptor = lhs_descriptor;
+      const Descriptor *descriptor = lhs_forced_descriptor;
       if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
         descriptor = descriptor->Fixed_Size_Array.item;
       } else {
@@ -6532,14 +6537,16 @@ scope_define_builtins(
     .handler = mass_handle_reify_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
-    .precedence = 21,
+    .precedence = 20,
     .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_paren_operator,
   )));
