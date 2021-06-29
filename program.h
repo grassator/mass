@@ -67,5 +67,18 @@ program_jit(
   Jit *jit
 );
 
+typedef struct {
+  void *(*load_library)(const char *name);
+  void *(*load_symbol)(void *handle, const char *name);
+} Native_Library_Load_Callbacks;
+
+static Mass_Result
+program_jit_imports(
+  const Allocator *temp_allocator,
+  Jit *jit,
+  Virtual_Memory_Buffer *ro_data_buffer,
+  const Native_Library_Load_Callbacks *callbacks
+);
+
 
 #endif // RUNTIME_H

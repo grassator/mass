@@ -53,6 +53,14 @@ posix_section_protect_from(
   }
 }
 
+void *posix_load_library(const char *name) { return dlopen(name, RTLD_LAZY); }
+void *posix_load_symbol(void *handle, const char *name) { return dlsym(handle, name); }
+
+static const Native_Library_Load_Callbacks posix_library_load_callbacks = {
+  .load_library = posix_load_library,
+  .load_symbol = posix_load_symbol,
+};
+
 // TODO make this return MASS_RESULT
 static void
 posix_program_jit(
@@ -72,43 +80,19 @@ posix_program_jit(
   u64 code_protected_size = posix_buffer_ensure_last_page_is_writable(code_buffer);
   u64 ro_data_protected_size = posix_buffer_ensure_last_page_is_writable(ro_data_buffer);
 
-  u64 import_count = dyn_array_length(program->import_libraries);
-  for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
-    void *handle;
-    if (maybe_handle_pointer) {
-      handle = *maybe_handle_pointer;
-    } else {
-      char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
-      handle = dlopen(library_name, RTLD_LAZY);
-      assert(handle);
-      hash_map_set(jit->import_library_handles, lib->name, handle);
-    }
+  Mass_Result result = program_jit_imports(
+    compilation->temp_allocator, jit, ro_data_buffer, &posix_library_load_callbacks
+  );
+  (void)result;
 
-    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      Label *label = program_get_label(program, symbol->label32);
-      if (!label->resolved) {
-        char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
-        fn_type_opaque address = dlsym(handle, symbol_name);
-        assert(address);
-        u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
-        label->offset_in_section = u64_to_u32(offset);
-        label->resolved = true;
-      }
-    }
-  }
   u64 function_count = dyn_array_length(program->functions);
 
   // Encode newly added functions
   for (u64 i = jit->previous_counts.functions; i < function_count; ++i) {
     Function_Builder *builder = dyn_array_get(program->functions, i);
     Function_Layout layout;
-
     fn_encode(program, code_buffer, builder, &layout);
   }
-
 
   // After all the functions are encoded we should know all the offsets
   // and can patch all the label locations
@@ -145,7 +129,6 @@ posix_program_jit(
 
   jit->previous_counts.relocations = relocation_count;
   jit->previous_counts.functions = function_count;
-  jit->previous_counts.imports = import_count;
   jit->previous_counts.startup = startup_count;
 }
 

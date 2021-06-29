@@ -490,6 +490,14 @@ win32_section_protect_from(
   }
 }
 
+void *win32_load_library(const char *name) { return LoadLibraryA(name); }
+void *win32_load_symbol(void *handle, const char *name) { return (void *)GetProcAddress(handle, name); }
+
+static const Native_Library_Load_Callbacks win32_library_load_callbacks = {
+  .load_library = win32_load_library,
+  .load_symbol = win32_load_symbol,
+};
+
 // TODO make this return MASS_RESULT
 static void
 win32_program_jit(
@@ -544,35 +552,12 @@ win32_program_jit(
     }
   }
 
-  u64 import_count = dyn_array_length(program->import_libraries);
-  for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
-    Import_Library *lib = dyn_array_get(program->import_libraries, i);
-    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
-    void *handle;
-    if (maybe_handle_pointer) {
-      handle = *maybe_handle_pointer;
-    } else {
-      char *library_name = slice_to_c_string(compilation->temp_allocator, lib->name);
-      handle = LoadLibraryA(library_name);
-      assert(handle);
-      hash_map_set(jit->import_library_handles, lib->name, handle);
-    }
+  Mass_Result result = program_jit_imports(
+    compilation->temp_allocator, jit, ro_data_buffer, &win32_library_load_callbacks
+  );
+  (void)result;
 
-    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
-      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
-      Label *label = program_get_label(program, symbol->label32);
-      if (!label->resolved) {
-        char *symbol_name = slice_to_c_string(compilation->temp_allocator, symbol->name);
-        fn_type_opaque address = GetProcAddress(handle, symbol_name);
-        assert(address);
-        u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
-        label->offset_in_section = u64_to_u32(offset);
-        label->resolved = true;
-      }
-    }
-  }
   u64 function_count = dyn_array_length(program->functions);
-
   assert(dyn_array_length(info->function_table) == jit->previous_counts.functions);
   dyn_array_reserve_uninitialized(info->function_table, function_count);
 
@@ -659,7 +644,6 @@ win32_program_jit(
 
   jit->previous_counts.relocations = relocation_count;
   jit->previous_counts.functions = function_count;
-  jit->previous_counts.imports = import_count;
   jit->previous_counts.startup = startup_count;
 }
 

@@ -179,6 +179,45 @@ import_symbol(
   return data_label32(symbol->label32, byte_size);
 }
 
+static Mass_Result
+program_jit_imports(
+  const Allocator *temp_allocator,
+  Jit *jit,
+  Virtual_Memory_Buffer *ro_data_buffer,
+  const Native_Library_Load_Callbacks *callbacks
+) {
+  Program *program = jit->program;
+  u64 import_count = dyn_array_length(program->import_libraries);
+  for (u64 i = jit->previous_counts.imports; i < import_count; ++i) {
+    Import_Library *lib = dyn_array_get(program->import_libraries, i);
+    void **maybe_handle_pointer = hash_map_get(jit->import_library_handles, lib->name);
+    void *handle;
+    if (maybe_handle_pointer) {
+      handle = *maybe_handle_pointer;
+    } else {
+      char *library_name = slice_to_c_string(temp_allocator, lib->name);
+      handle = callbacks->load_library(library_name);
+      assert(handle);
+      hash_map_set(jit->import_library_handles, lib->name, handle);
+    }
+
+    for (u64 symbol_index = 0; symbol_index < dyn_array_length(lib->symbols); ++symbol_index) {
+      Import_Symbol *symbol = dyn_array_get(lib->symbols, symbol_index);
+      Label *label = program_get_label(program, symbol->label32);
+      if (!label->resolved) {
+        char *symbol_name = slice_to_c_string(temp_allocator, symbol->name);
+        fn_type_opaque address = (fn_type_opaque)callbacks->load_symbol(handle, symbol_name);
+        assert(address);
+        u64 offset = virtual_memory_buffer_append_u64(ro_data_buffer, (u64)address);
+        label->offset_in_section = u64_to_u32(offset);
+        label->resolved = true;
+      }
+    }
+  }
+  jit->previous_counts.imports = import_count;
+  return mass_success();
+}
+
 static void
 program_jit(
   Compilation *compilation,
