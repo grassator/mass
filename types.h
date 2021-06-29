@@ -118,7 +118,7 @@
     .source_range = COMPILER_SOURCE_RANGE,\
   }
 
-#define MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER(_RETURN_DESCRIPTOR_, ...)\
+#define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\
   Function_Parameter raw_parameters[] = {__VA_ARGS__};\
   u64 arg_length = countof(raw_parameters);\
   Array_Function_Parameter parameters = \
@@ -128,15 +128,15 @@
   }\
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
-    .flags = Descriptor_Function_Flags_None,\
+    .flags = (_FLAGS_),\
     .returns.descriptor = (_RETURN_DESCRIPTOR_),\
     .parameters = parameters,\
     .scope = scope,\
   };
 
-#define MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+#define MASS_DEFINE_FUNCTION_TYPE(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
 do {\
-  MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER((_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   Value *info_value = value_init(\
     allocator_allocate(allocator, Value),\
     &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
@@ -144,9 +144,9 @@ do {\
   scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), info_value);\
 } while(0)
 
-#define MASS_DEFINE_COMPILE_TIME_FUNCTION(_FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
+#define MASS_DEFINE_FUNCTION(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
 do {\
-  MASS_DEFINE_COMPILE_TIME_FUNCTION_INFO_HELPER((_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
+  MASS_DEFINE_FUNCTION_INFO_HELPER((_FLAGS_), (_RETURN_DESCRIPTOR_), ##__VA_ARGS__)\
   const Descriptor *instance_descriptor = descriptor_function_instance(\
     allocator, slice_literal(_NAME_), function, calling_convention\
   );\

@@ -86,18 +86,10 @@ multiply :: arithmetic_overloads(mass.multiply)
 divide :: arithmetic_overloads(mass.divide)
 remainder :: arithmetic_overloads(mass.remainder)
 
-__forward_to_number_literal :: {
-  macro(callback : fn(a : Number_Literal, b : Number_Literal) -> (Number_Literal)) {
-    macro(a : Number_Literal, b : Number_Literal) -> (Number_Literal) {
-      @(callback(a, b))
-    }
-  }
-}
-
-logical_shift_left :: __forward_to_number_literal(mass.number_literal_logical_shift_left)
-logical_shift_right :: __forward_to_number_literal(mass.number_literal_logical_shift_right)
-bitwise_or :: __forward_to_number_literal(mass.number_literal_bitwise_or)
-bitwise_and :: __forward_to_number_literal(mass.number_literal_bitwise_and)
+logical_shift_left :: mass.number_literal_logical_shift_left
+logical_shift_right :: mass.number_literal_logical_shift_right
+bitwise_or :: mass.number_literal_bitwise_or
+bitwise_and :: mass.number_literal_bitwise_and
 
 operator 16 (- x) { negate(x) }
 operator 16 (& x) { address_of(x) }

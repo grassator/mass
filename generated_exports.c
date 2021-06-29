@@ -141,57 +141,67 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Result_Error"), type_mass_result_error_value
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     tokenize, "tokenize", &descriptor_mass_result,
     MASS_FN_ARG("compilation", &descriptor_compilation_pointer),
     MASS_FN_ARG("file", &descriptor_source_file_pointer),
     MASS_FN_ARG("out_tokens", &descriptor_value_view_pointer)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_number_literal_logical_shift_left, "number_literal_logical_shift_left", &descriptor_number_literal,
     MASS_FN_ARG("input", &descriptor_number_literal),
     MASS_FN_ARG("shift", &descriptor_number_literal)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_number_literal_logical_shift_right, "number_literal_logical_shift_right", &descriptor_number_literal,
     MASS_FN_ARG("input", &descriptor_number_literal),
     MASS_FN_ARG("shift", &descriptor_number_literal)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_number_literal_bitwise_or, "number_literal_bitwise_or", &descriptor_number_literal,
     MASS_FN_ARG("a", &descriptor_number_literal),
     MASS_FN_ARG("b", &descriptor_number_literal)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_number_literal_bitwise_and, "number_literal_bitwise_and", &descriptor_number_literal,
     MASS_FN_ARG("a", &descriptor_number_literal),
     MASS_FN_ARG("b", &descriptor_number_literal)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_add, "add", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
     MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_subtract, "subtract", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
     MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_multiply, "multiply", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
     MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_divide, "divide", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
     MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_remainder, "remainder", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("arguments", &descriptor_value_view),
@@ -214,7 +224,8 @@ global_scope_define_exports(
     slice_literal("Number_Literal"), type_number_literal_value
   );
   MASS_FN_ARG_DEFAULT_EXPRESSION(mass_import_context__default_expression, "@context")
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_import, "import", &descriptor_scope,
     MASS_FN_ARG("name", &descriptor_slice),
     MASS_FN_ARG_WITH_DEFAULT("context", mass_import_context__default_expression, &descriptor_execution_context_pointer)

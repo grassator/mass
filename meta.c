@@ -53,6 +53,7 @@ typedef struct {
 typedef enum {
   Function_Kind_Default,
   Function_Kind_Typedef,
+  Function_Kind_Compile_Time,
 } Function_Kind;
 
 typedef struct {
@@ -390,10 +391,16 @@ print_scope_define_function(
   }
 
   if (function->kind == Function_Kind_Typedef) {
-    fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(\n");
+    fprintf(file, "  MASS_DEFINE_FUNCTION_TYPE(\n");
   } else {
-    fprintf(file, "  MASS_DEFINE_COMPILE_TIME_FUNCTION(\n");
+    fprintf(file, "  MASS_DEFINE_FUNCTION(\n");
   }
+  fprintf(file, "    Descriptor_Function_Flags_None");
+  if (function->kind == Function_Kind_Compile_Time) {
+    fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
+  }
+  fprintf(file, ",\n");
+
   fprintf(file, "    %s,", function->name);
   fprintf(file, " \"%s\",", type->export_name);
   {
@@ -1824,35 +1831,35 @@ main(void) {
   })));
 
   export_global_custom_name("import", push_type(
-    type_function(Default, "mass_import", "Scope", (Argument_Type[]){
+    type_function(Compile_Time, "mass_import", "Scope", (Argument_Type[]){
       { "Slice", "name" },
       { "Execution_Context *", "context", "@context" },
     })
   ));
 
   export_compiler_custom_name("number_literal_logical_shift_left", push_type(
-    type_function(Default, "mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
+    type_function(Compile_Time, "mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "input" },
       { "Number_Literal", "shift" },
     })
   ));
 
   export_compiler_custom_name("number_literal_logical_shift_right", push_type(
-    type_function(Default, "mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
+    type_function(Compile_Time, "mass_number_literal_logical_shift_right", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "input" },
       { "Number_Literal", "shift" },
     })
   ));
 
   export_compiler_custom_name("number_literal_bitwise_or", push_type(
-    type_function(Default, "mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
+    type_function(Compile_Time, "mass_number_literal_bitwise_or", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "a" },
       { "Number_Literal", "b" },
     })
   ));
 
   export_compiler_custom_name("number_literal_bitwise_and", push_type(
-    type_function(Default, "mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
+    type_function(Compile_Time, "mass_number_literal_bitwise_and", "Number_Literal", (Argument_Type[]){
       { "Number_Literal", "a" },
       { "Number_Literal", "b" },
     })

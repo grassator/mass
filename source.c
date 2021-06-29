@@ -6499,7 +6499,8 @@ module_compiler_init(
 
   compiler_scope_define_exports(compilation, scope);
 
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("view", &descriptor_value_view),
@@ -6608,7 +6609,8 @@ scope_define_builtins(
     )));
   }
 
-  MASS_DEFINE_COMPILE_TIME_FUNCTION(
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None,
     mass_bit_type, "bit_type", &descriptor_type,
     MASS_FN_ARG("bit_size", &descriptor_u64),
   );
