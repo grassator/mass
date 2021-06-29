@@ -63,7 +63,10 @@ source_file_offset_to_position(
     }
   }
 
-  u64 column = offset - dyn_array_get(file->line_ranges, line_index)->from;
+  u64 column = 0;
+  if (dyn_array_length(file->line_ranges)) {
+    column = offset - dyn_array_get(file->line_ranges, line_index)->from;
+  }
   return (Source_Position) {
     .line = line_index + 1,
     .column = column,
