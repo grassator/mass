@@ -18,11 +18,6 @@ compiler_scope_define_exports(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("External_Symbol"), type_external_symbol_value
   );
-  scope_define_enum(
-    compilation->allocator, scope, COMPILER_SOURCE_RANGE,
-    slice_literal("Operator_Fixity"), type_operator_fixity_value,
-    operator_fixity_items, countof(operator_fixity_items)
-  );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Execution_Context"), type_execution_context_value
@@ -30,13 +25,6 @@ compiler_scope_define_exports(
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Value"), type_value_value
-  );
-  MASS_DEFINE_COMPILE_TIME_FUNCTION_TYPE(
-    lazy_value_proc, "Lazy_Value_Proc", &descriptor_value_pointer,
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("builder", &descriptor_function_builder_pointer),
-    MASS_FN_ARG("expected_result", &descriptor_expected_result_pointer),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
