@@ -4105,54 +4105,6 @@ token_handle_function_call(
   return mass_make_lazy_value(context, source_range, payload, info->returns.descriptor, proc);
 }
 
-static inline Value *
-extend_integer_value(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value *value,
-  const Descriptor *target_descriptor
-) {
-  assert(descriptor_is_integer(value->descriptor));
-  assert(descriptor_is_integer(target_descriptor));
-  assert(descriptor_byte_size(target_descriptor) > descriptor_byte_size(value->descriptor));
-  Value *result = reserve_stack(context, builder, target_descriptor, *source_range);
-  move_value(context->allocator, builder, source_range, &result->storage, &value->storage);
-  return result;
-}
-
-
-static void
-maybe_resize_values_for_integer_math_operation(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Source_Range *source_range,
-  Value **lhs_pointer,
-  Value **rhs_pointer
-) {
-  const Descriptor *result_descriptor =
-    large_enough_common_integer_descriptor_for_values(context, *lhs_pointer, *rhs_pointer);
-  MASS_ON_ERROR(*context->result) return;
-
-  const Descriptor *ld = (*lhs_pointer)->descriptor;
-  const Descriptor *rd = (*rhs_pointer)->descriptor;
-
-  if (ld != result_descriptor) {
-    if (value_is_static_number_literal(*lhs_pointer)) {
-      *lhs_pointer = maybe_coerce_number_literal_to_integer(context, *lhs_pointer, result_descriptor);
-    } else {
-      *lhs_pointer = extend_integer_value(context, builder, source_range, *lhs_pointer, result_descriptor);
-    }
-  }
-  if (rd != result_descriptor) {
-    if (value_is_static_number_literal(*rhs_pointer)) {
-      *rhs_pointer = maybe_coerce_number_literal_to_integer(context, *rhs_pointer, result_descriptor);
-    } else {
-      *rhs_pointer = extend_integer_value(context, builder, source_range, *rhs_pointer, result_descriptor);
-    }
-  }
-}
-
 static Storage
 storage_load_index_address(
   Execution_Context *context,
