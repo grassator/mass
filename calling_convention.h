@@ -176,6 +176,24 @@ typedef struct {
 } System_V_Classification_State;
 
 static SYSTEM_V_ARGUMENT_CLASS
+x86_64_system_v_adjust_class_if_no_register_available(
+  System_V_Classification_State *state,
+  SYSTEM_V_ARGUMENT_CLASS class
+) {
+  if (class == SYSTEM_V_INTEGER) {
+    if (state->general_purpose_registers.index >= state->general_purpose_registers.count) {
+      return SYSTEM_V_MEMORY;
+    }
+  }
+  if (class == SYSTEM_V_SSE) {
+    if (state->vector_registers.index >= state->vector_registers.count) {
+      return SYSTEM_V_MEMORY;
+    }
+  }
+  return class;
+}
+
+static SYSTEM_V_ARGUMENT_CLASS
 x86_64_system_v_memory_layout_item_for_class(
   System_V_Classification_State *state,
   SYSTEM_V_ARGUMENT_CLASS class,
@@ -183,6 +201,7 @@ x86_64_system_v_memory_layout_item_for_class(
   const Descriptor *descriptor,
   Memory_Layout_Item *out_result
 ) {
+  class = x86_64_system_v_adjust_class_if_no_register_available(state, class);
   u64 byte_size = descriptor_byte_size(descriptor);
   switch(class) {
     case SYSTEM_V_NO_CLASS: {
@@ -195,34 +214,24 @@ x86_64_system_v_memory_layout_item_for_class(
       return SYSTEM_V_NO_CLASS;
     }
     case SYSTEM_V_INTEGER: {
-      if (state->general_purpose_registers.index < state->general_purpose_registers.count) {
-        Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
-        *out_result = (Memory_Layout_Item) {
-          .tag = Memory_Layout_Item_Tag_Absolute,
-          .name = name,
-          .descriptor = descriptor,
-          .Absolute = {.storage = storage_register(reg, byte_size)},
-        };
-        return SYSTEM_V_INTEGER;
-      } else {
-        goto relative;
-      }
-      break;
+      Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
+      *out_result = (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Absolute,
+        .name = name,
+        .descriptor = descriptor,
+        .Absolute = {.storage = storage_register(reg, byte_size)},
+      };
+      return SYSTEM_V_INTEGER;
     }
     case SYSTEM_V_SSE: {
-      if (state->vector_registers.index < state->vector_registers.count) {
-        Register reg = state->vector_registers.items[state->vector_registers.index++];
-        *out_result = (Memory_Layout_Item) {
-          .tag = Memory_Layout_Item_Tag_Absolute,
-          .name = name,
-          .descriptor = descriptor,
-          .Absolute = {.storage = storage_register(reg, byte_size)},
-        };
-        return SYSTEM_V_SSE;
-      } else {
-        goto relative;
-      }
-      break;
+      Register reg = state->vector_registers.items[state->vector_registers.index++];
+      *out_result = (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Absolute,
+        .name = name,
+        .descriptor = descriptor,
+        .Absolute = {.storage = storage_register(reg, byte_size)},
+      };
+      return SYSTEM_V_SSE;
     }
     case SYSTEM_V_MEMORY: {
       goto relative;
