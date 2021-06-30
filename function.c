@@ -294,45 +294,7 @@ move_value(
     return;
   }
 
-  if (target_size != source_size) {
-    if (source_size < target_size) {
-      // TODO deal with unsigned numbers
-      if (target->tag == Storage_Tag_Register) {
-        if (source_size == 4) {
-          // TODO check whether this correctly sign extends
-          Storage adjusted_target = {
-            .tag = Storage_Tag_Register,
-            .Register = target->Register,
-            .byte_size = 4,
-          };
-          push_instruction(instructions, *source_range,
-            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {adjusted_target, *source}}});
-        } else {
-          push_instruction(instructions, *source_range,
-            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {*target, *source}}});
-        }
-      } else {
-        Storage temp = {
-          .tag = Storage_Tag_Register,
-          .byte_size = target->byte_size,
-          .Register.index = register_acquire_temp(builder),
-        };
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {temp, *source}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
-        register_release(builder, temp.Register.index);
-      }
-      return;
-    } else {
-      print_storage(target);
-      printf(" ");
-      print_storage(source);
-      printf("\nat ");
-      source_range_print_start_position(source_range);
-      assert(!"Mismatched operand size when moving");
-    }
-  }
+  assert(target_size == source_size);
 
   if (target->tag == Storage_Tag_Memory && source->tag == Storage_Tag_Memory) {
     Storage temp = {

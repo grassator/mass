@@ -967,6 +967,14 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+    it("should correctly sign extend numbers when assigning") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "foo", &test_context,
+        "foo :: fn() -> (s64) { a : u8 = 200; a }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 200);
+    }
     it("should be able to parse typed definition and assignment in the same statement") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,

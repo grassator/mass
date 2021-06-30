@@ -564,6 +564,169 @@ value_indirect_from_reference(
   }
 }
 
+
+static inline const Descriptor *
+signed_integer_next_size_descriptor(
+  const Descriptor *descriptor
+) {
+  assert(descriptor_is_signed_integer(descriptor));
+  assert(descriptor->tag == Descriptor_Tag_Opaque);
+  if (descriptor == &descriptor_s8) {
+    return &descriptor_s16;
+  } else if (descriptor == &descriptor_s16) {
+    return &descriptor_s32;
+  } else if (descriptor == &descriptor_s32) {
+    return &descriptor_s64;
+  } else {
+    panic("Unexpected iteger size");
+    return 0;
+  }
+}
+
+static const Descriptor *
+large_enough_common_integer_descriptor_for_values(
+  Execution_Context *context,
+  const Value *left_value,
+  const Value *right_value
+) {
+  const Descriptor *left = value_or_lazy_value_descriptor(left_value);
+  const Descriptor *right = value_or_lazy_value_descriptor(right_value);
+
+  bool left_is_integer = descriptor_is_integer(left);
+  bool right_is_integer = descriptor_is_integer(right);
+
+  bool left_is_literal = value_is_static_number_literal(left_value);
+  bool right_is_literal = value_is_static_number_literal(right_value);
+
+  if (!left_is_integer && !left_is_literal) {
+    // TODO :GenericIntegerType
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = left_value->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = left },
+    });
+    return 0;
+  }
+  if (!right_is_integer && !right_is_literal) {
+    // TODO :GenericIntegerType
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = right_value->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = right },
+    });
+    return 0;
+  }
+
+  if (left_is_literal) {
+    if (right_is_literal) {
+      // TODO consider if this should support large unsigned numbers
+      return &descriptor_s64;
+    } else {
+      return right;
+    }
+  } else {
+    if (right_is_literal) {
+      return left;
+    }
+  }
+
+  bool left_signed = descriptor_is_signed_integer(left);
+  bool right_signed = descriptor_is_signed_integer(right);
+
+  u64 left_size = descriptor_byte_size(left);
+  u64 right_size = descriptor_byte_size(right);
+
+  if (left_signed == right_signed) {
+    if (left_size == right_size) return left;
+    return left_size > right_size ? left : right;
+  } else {
+    const Descriptor *signed_side = left_signed ? left : right;
+    const Descriptor *other_side = left_signed ? right : left;
+    // If the signed and unsigned have the same size need to
+    // increase the size of the signed one so it fits the unsigned
+    if (left_size == right_size) {
+      if (left_size == 8) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Type_Mismatch,
+          .source_range = left_value->source_range,
+          .Type_Mismatch = { .expected = signed_side, .actual = other_side },
+          .detailed_message = "Could not find large enough signed integer to fit both operands"
+        });
+        return 0;
+      }
+      return signed_integer_next_size_descriptor(signed_side);
+    }
+
+    // Now we know that the signed operand is large enough to fit the unsigned one
+    return signed_side;
+  }
+}
+
+static PRELUDE_NO_DISCARD Mass_Result
+assign_integers(
+  Execution_Context *context,
+  Function_Builder *builder,
+  Value *target,
+  Value *source
+) {
+  const Descriptor *descriptor =
+    large_enough_common_integer_descriptor_for_values(context, source, target);
+  MASS_TRY(*context->result);
+
+  if (descriptor_byte_size(target->descriptor) < descriptor_byte_size(descriptor)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = target->source_range,
+      .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
+      .detailed_message = "Target integer is too small to fit the range of source values"
+    });
+    return *context->result;
+  }
+  bool is_temp = false;
+  Storage adjusted_source;
+  if (
+    descriptor_byte_size(source->descriptor) == descriptor_byte_size(target->descriptor) ||
+    source->storage.tag == Storage_Tag_Static
+  ) {
+    adjusted_source = source->storage;
+  } else {
+    if (source->storage.tag == Storage_Tag_Register) {
+      adjusted_source = source->storage;
+    } else {
+      is_temp = true;
+      Register reg = register_acquire_temp(builder);
+      adjusted_source = storage_register_for_descriptor(reg, target->descriptor);
+    }
+
+    if (descriptor_is_signed_integer(source->descriptor)) {
+      assert(!descriptor_is_unsigned_integer(target->descriptor));
+      push_instruction(
+        &builder->code_block.instructions, source->source_range,
+        (Instruction) {
+          .tag = Instruction_Tag_Assembly,
+          .Assembly = {movsx, {adjusted_source, source->storage}}
+         }
+      );
+    } else {
+      push_instruction(
+        &builder->code_block.instructions, source->source_range,
+        (Instruction) {
+          .tag = Instruction_Tag_Assembly,
+          .Assembly = {movzx, {adjusted_source, source->storage}}
+         }
+      );
+    }
+  }
+  move_value(context->allocator, builder, &target->source_range, &target->storage, &adjusted_source);
+
+  if (is_temp) {
+    assert(adjusted_source.tag == Storage_Tag_Register);
+    register_release(builder, adjusted_source.Register.index);
+  }
+
+  return *context->result;
+}
+
 static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
@@ -679,6 +842,10 @@ assign(
     if (assign_from_static(context, builder, target, source)) {
       return *context->result;
     }
+  }
+
+  if (descriptor_is_integer(source->descriptor) || descriptor_is_integer(target->descriptor)) {
+    return assign_integers(context, builder, target, source);
   }
 
   MASS_TRY(*context->result);
@@ -3954,102 +4121,6 @@ extend_integer_value(
   return result;
 }
 
-static inline const Descriptor *
-signed_integer_next_size_descriptor(
-  const Descriptor *descriptor
-) {
-  assert(descriptor_is_signed_integer(descriptor));
-  assert(descriptor->tag == Descriptor_Tag_Opaque);
-  if (descriptor == &descriptor_s8) {
-    return &descriptor_s16;
-  } else if (descriptor == &descriptor_s16) {
-    return &descriptor_s32;
-  } else if (descriptor == &descriptor_s32) {
-    return &descriptor_s64;
-  } else {
-    panic("Unexpected iteger size");
-    return 0;
-  }
-}
-
-static const Descriptor *
-large_enough_common_integer_descriptor_for_values(
-  Execution_Context *context,
-  const Value *left_value,
-  const Value *right_value
-) {
-  const Descriptor *left = value_or_lazy_value_descriptor(left_value);
-  const Descriptor *right = value_or_lazy_value_descriptor(right_value);
-
-  bool left_is_integer = descriptor_is_integer(left);
-  bool right_is_integer = descriptor_is_integer(right);
-
-  bool left_is_literal = value_is_static_number_literal(left_value);
-  bool right_is_literal = value_is_static_number_literal(right_value);
-
-  if (!left_is_integer && !left_is_literal) {
-    // TODO :GenericIntegerType
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = left_value->source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = left },
-    });
-    return 0;
-  }
-  if (!right_is_integer && !right_is_literal) {
-    // TODO :GenericIntegerType
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = right_value->source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = right },
-    });
-    return 0;
-  }
-
-  if (left_is_literal) {
-    if (right_is_literal) {
-      // TODO consider if this should support large unsigned numbers
-      return &descriptor_s64;
-    } else {
-      return right;
-    }
-  } else {
-    if (right_is_literal) {
-      return left;
-    }
-  }
-
-  bool left_signed = descriptor_is_signed_integer(left);
-  bool right_signed = descriptor_is_signed_integer(right);
-
-  u64 left_size = descriptor_byte_size(left);
-  u64 right_size = descriptor_byte_size(right);
-
-  if (left_signed == right_signed) {
-    if (left_size == right_size) return left;
-    return left_size > right_size ? left : right;
-  } else {
-    const Descriptor *signed_side = left_signed ? left : right;
-    const Descriptor *other_side = left_signed ? right : left;
-    // If the signed and unsigned have the same size need to
-    // increase the size of the signed one so it fits the unsigned
-    if (left_size == right_size) {
-      if (left_size == 8) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Type_Mismatch,
-          .source_range = left_value->source_range,
-          .Type_Mismatch = { .expected = signed_side, .actual = other_side },
-          .detailed_message = "Could not find large enough signed integer to fit both operands"
-        });
-        return 0;
-      }
-      return signed_integer_next_size_descriptor(signed_side);
-    }
-
-    // Now we know that the signed operand is large enough to fit the unsigned one
-    return signed_side;
-  }
-}
 
 static void
 maybe_resize_values_for_integer_math_operation(
@@ -4195,33 +4266,33 @@ mass_handle_arithmetic_operation_lazy_proc(
   assert(descriptor_is_integer(descriptor));
 
   const Source_Range result_range = payload->lhs->source_range;
-  Value *a = payload->lhs;
-  Value *b = payload->rhs;
+  Value *lhs = payload->lhs;
+  Value *rhs = payload->rhs;
 
   switch(payload->operator) {
     case Mass_Arithmetic_Operator_Add:
     case Mass_Arithmetic_Operator_Subtract: {
       if (payload->operator == Mass_Arithmetic_Operator_Add) {
-        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, +);
+        maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, +);
       } else {
-        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, -);
+        maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, -);
       }
 
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
-      Value *temp_a = value_temporary_acquire_register_for_descriptor(
+      Value *temp_lhs = value_temporary_acquire_register_for_descriptor(
         context, builder, register_find_available(builder, 0), descriptor, result_range
       );
 
-      Expected_Result expected_a = expected_result_from_value(temp_a);
-      temp_a = value_force(context, builder, &expected_a, payload->lhs);
+      Expected_Result expected_a = expected_result_from_value(temp_lhs);
+      temp_lhs = value_force(context, builder, &expected_a, payload->lhs);
 
       // TODO This can be optimized in cases where one of the operands is an immediate
-      Value *temp_b = value_temporary_acquire_register_for_descriptor(
+      Value *temp_rhs = value_temporary_acquire_register_for_descriptor(
         context, builder, register_find_available(builder, 0), descriptor, result_range
       );
-      Expected_Result expected_b = expected_result_from_value(temp_b);
-      temp_b = value_force(context, builder, &expected_b, payload->rhs);
+      Expected_Result expected_b = expected_result_from_value(temp_rhs);
+      temp_rhs = value_force(context, builder, &expected_b, payload->rhs);
 
       MASS_ON_ERROR(*context->result) return 0;
 
@@ -4229,15 +4300,18 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       push_instruction(
         &builder->code_block.instructions, result_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mnemonic, {temp_a->storage, temp_b->storage}}}
+        (Instruction) {
+          .tag = Instruction_Tag_Assembly,
+          .Assembly = {mnemonic, {temp_lhs->storage, temp_rhs->storage}}
+         }
       );
-      value_release_if_temporary(builder, temp_b);
+      value_release_if_temporary(builder, temp_rhs);
 
       // temp_a is used as a result so it is intentionnaly not released
-      return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_a);
+      return expected_result_ensure_value_or_temp(context, builder, expected_result, temp_lhs);
     }
     case Mass_Arithmetic_Operator_Multiply: {
-      maybe_constant_fold(context, builder, &result_range, expected_result, a, b, *);
+      maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, *);
 
       Allocator *allocator = context->allocator;
 
@@ -4296,9 +4370,9 @@ mass_handle_arithmetic_operation_lazy_proc(
       u64 byte_size = descriptor_byte_size(descriptor);
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
-        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, /);
+        maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, /);
       } else {
-        maybe_constant_fold(context, builder, &result_range, expected_result, a, b, %);
+        maybe_constant_fold(context, builder, &result_range, expected_result, lhs, rhs, %);
       }
 
       // We need both D and A for this operation so using either as temp will not work
