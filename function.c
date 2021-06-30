@@ -307,6 +307,32 @@ move_value(
     register_release(builder, temp.Register.index);
     return;
   }
+  if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
+    assert(source->byte_size <= 4);
+    assert(source->Register.offset_in_bits <= 32);
+    Storage temp_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = register_acquire_temp(builder),
+    };
+    Storage source_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = source->Register.index,
+    };
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {temp_full_register, source_full_register}}
+    });
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
+    });
+
+    Storage right_size_temp = temp_full_register;
+    right_size_temp.byte_size = source->byte_size;
+    move_value(allocator, builder, source_range, target, &right_size_temp);
+    register_release(builder, temp_full_register.Register.index);
+    return;
+  }
 
   push_instruction(instructions, *source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});

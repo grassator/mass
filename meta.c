@@ -1260,9 +1260,11 @@ main(void) {
     }),
     struct_fields("Register", (Struct_Item[]){
       { "Register", "index" },
+      { "u32", "offset_in_bits" },
     }),
     struct_fields("Xmm", (Struct_Item[]){
       { "Register", "index" },
+      { "u32", "offset" },
     }),
     struct_fields("Static", (Struct_Item[]){
       { "Static_Memory", "memory" },

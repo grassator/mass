@@ -273,6 +273,20 @@ mnemonic(cqo,
   encoding(0x4899, none, 0),
 );
 
+mnemonic(and,
+  encoding(0x80, _op_code(4), r_m16, imm16),
+  encoding(0x81, _op_code(4), r_m16, imm16),
+  encoding(0x81, _op_code(4), r_m32, imm32),
+  encoding(0x81, _op_code(4), r_m64, imm32),
+);
+
+mnemonic(shr,
+  encoding(0xC0, _op_code(5), r_m8, imm8),
+  encoding(0xC1, _op_code(5), r_m16, imm8),
+  encoding(0xC1, _op_code(5), r_m32, imm8),
+  encoding(0xC1, _op_code(5), r_m64, imm8),
+);
+
 mnemonic(call,
   encoding(0xE8, none, imm16),
   encoding(0xE8, none, imm32),

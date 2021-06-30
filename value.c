@@ -774,7 +774,7 @@ storage_with_offset_and_byte_size(
       break;
     }
     case Storage_Tag_Register: {
-      assert(diff == 0); // FIXME
+      result.Register.offset_in_bits = s32_to_u32(diff) * 8;
       break;
     }
     case Storage_Tag_Static: {

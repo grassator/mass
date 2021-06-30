@@ -1788,6 +1788,20 @@ spec("source") {
       spec_check_slice(error->Unknown_Field.name, slice_literal("foo"));
     }
 
+    it("should support receiving register-sized structs in the function") {
+      struct Point { s32 x; s32 y;};
+      s32(*checker)(struct Point) = (s32(*)(struct Point))test_program_inline_source_function(
+        "checker", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "checker :: fn(p: Point) -> (s32) {"
+          "p.x - p.y"
+        "}"
+      );
+      struct Point p = {44, 2};
+      check(spec_check_mass_result(test_context.result));
+      check(checker(p) == 42);
+    }
+
     it("should auto-dereference pointers to struct on field access") {
       s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
         "checker", &test_context,

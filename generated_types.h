@@ -835,9 +835,11 @@ typedef struct Storage_Eflags {
 } Storage_Eflags;
 typedef struct Storage_Register {
   Register index;
+  u32 offset_in_bits;
 } Storage_Register;
 typedef struct Storage_Xmm {
   Register index;
+  u32 offset;
 } Storage_Xmm;
 typedef struct Storage_Static {
   Static_Memory memory;
@@ -2926,6 +2928,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_register, Storage_Register,
     .descriptor = &descriptor_register,
     .Base_Relative.offset = offsetof(Storage_Register, index),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("offset_in_bits"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Storage_Register, offset_in_bits),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(storage_register);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_xmm, Storage_Xmm,
@@ -2934,6 +2942,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage_xmm, Storage_Xmm,
     .name = slice_literal_fields("index"),
     .descriptor = &descriptor_register,
     .Base_Relative.offset = offsetof(Storage_Xmm, index),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("offset"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Storage_Xmm, offset),
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_xmm);
