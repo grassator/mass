@@ -311,11 +311,6 @@ x86_64_system_v_classify(
       // separately. Each eightbyte gets initialized to class NO_CLASS.
       SYSTEM_V_ARGUMENT_CLASS eightbyte_class = SYSTEM_V_NO_CLASS;
 
-      // @Hack We need to somehow say that the struct has no Storage in Mass terms so
-      //       if struct fields are unpacked to registers, SYSTEM_V_NO_CLASS is used
-      //       for the struct as a whole and then its fields have register storages.
-      //       This might cause problems down the line.
-      SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
       Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
 
       System_V_Classification_State saved_state = *state;
@@ -396,6 +391,8 @@ x86_64_system_v_classify(
         }
       }
       dyn_array_push(eightbyte_classes, eightbyte_class);
+
+      SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
 
       // 5. Then a post merger cleanup is done:
       DYN_ARRAY_FOREACH(SYSTEM_V_ARGUMENT_CLASS, class, eightbyte_classes) {
