@@ -303,6 +303,7 @@ x86_64_system_v_classify(
       // parameter list by a pointer that has class INTEGER)
       bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
       if (is_c_plus_plus_non_trivial) {
+        descriptor = descriptor_reference_to(allocator, descriptor);
         return x86_64_system_v_push_memory_layout_item_for_class(state, SYSTEM_V_INTEGER, name, descriptor);
       }
 
