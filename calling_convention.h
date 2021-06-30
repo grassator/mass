@@ -193,48 +193,49 @@ x86_64_system_v_adjust_class_if_no_register_available(
   return class;
 }
 
-static SYSTEM_V_ARGUMENT_CLASS
+static Memory_Layout_Item
 x86_64_system_v_memory_layout_item_for_class(
   System_V_Classification_State *state,
   SYSTEM_V_ARGUMENT_CLASS class,
   Slice name,
-  const Descriptor *descriptor,
-  Memory_Layout_Item *out_result
+  const Descriptor *descriptor
 ) {
-  class = x86_64_system_v_adjust_class_if_no_register_available(state, class);
   u64 byte_size = descriptor_byte_size(descriptor);
   switch(class) {
     case SYSTEM_V_NO_CLASS: {
-      *out_result = (Memory_Layout_Item) {
+      return (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Absolute,
         .name = name,
         .descriptor = descriptor,
         .Absolute = {.storage = storage_none},
       };
-      return SYSTEM_V_NO_CLASS;
     }
     case SYSTEM_V_INTEGER: {
       Register reg = state->general_purpose_registers.items[state->general_purpose_registers.index++];
-      *out_result = (Memory_Layout_Item) {
+      return (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Absolute,
         .name = name,
         .descriptor = descriptor,
         .Absolute = {.storage = storage_register(reg, byte_size)},
       };
-      return SYSTEM_V_INTEGER;
     }
     case SYSTEM_V_SSE: {
       Register reg = state->vector_registers.items[state->vector_registers.index++];
-      *out_result = (Memory_Layout_Item) {
+      return (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Absolute,
         .name = name,
         .descriptor = descriptor,
         .Absolute = {.storage = storage_register(reg, byte_size)},
       };
-      return SYSTEM_V_SSE;
     }
     case SYSTEM_V_MEMORY: {
-      goto relative;
+      return (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Base_Relative,
+        .flags = Memory_Layout_Item_Flags_None,
+        .name = name,
+        .descriptor = descriptor,
+        .Base_Relative = {.offset = state->stack_offset},
+      };
     }
     case SYSTEM_V_SSEUP:
     case SYSTEM_V_X87:
@@ -244,18 +245,8 @@ x86_64_system_v_memory_layout_item_for_class(
       break;
     }
   }
-
-  relative: {
-    *out_result = (Memory_Layout_Item) {
-      .tag = Memory_Layout_Item_Tag_Base_Relative,
-      .flags = Memory_Layout_Item_Flags_None,
-      .name = name,
-      .descriptor = descriptor,
-      .Base_Relative = {.offset = state->stack_offset},
-    };
-    state->stack_offset += u64_align(byte_size, 8);
-    return SYSTEM_V_MEMORY;
-  }
+  panic("Unpexected SYSTEM_V class");
+  return (Memory_Layout_Item){0};
 }
 
 static inline SYSTEM_V_ARGUMENT_CLASS
@@ -265,8 +256,9 @@ x86_64_system_v_push_memory_layout_item_for_class(
   Slice name,
   const Descriptor *descriptor
 ) {
-  Memory_Layout_Item item;
-  class = x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor, &item);
+  class = x86_64_system_v_adjust_class_if_no_register_available(state, class);
+  Memory_Layout_Item item =
+    x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor);
   dyn_array_push(state->memory_layout.items, item);
   return class;
 }
