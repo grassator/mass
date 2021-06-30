@@ -1792,7 +1792,7 @@ spec("source") {
       struct Point { s32 x; s32 y;};
       s32(*checker)(struct Point) = (s32(*)(struct Point))test_program_inline_source_function(
         "checker", &test_context,
-        "Point :: c_struct({ x : s32; y : s32; });"
+        "Point :: c_struct({ x : s32; y : s32; })\n"
         "checker :: fn(p: Point) -> (s32) {"
           "p.x - p.y"
         "}"
@@ -1800,6 +1800,43 @@ spec("source") {
       struct Point p = {44, 2};
       check(spec_check_mass_result(test_context.result));
       check(checker(p) == 42);
+    }
+
+    it("should support passing register-sized structs into the function") {
+      s32(*checker)() = (s32(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; })\n"
+        "nested :: fn(p: Point) -> (s32) {"
+          "p.x - p.y"
+        "}\n"
+        "checker :: fn() -> (s32) {"
+          "p : Point\n"
+          "p.x = 44\n"
+          "p.y = 2\n"
+          "nested(p)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should support passing register-sized structs in larger structs into the function") {
+      s32(*checker)() = (s32(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; })\n"
+        "Line :: c_struct({ from : Point; to : Point; })\n"
+        "nested :: fn(line: Line) -> (s32) {"
+          "line.to.y - line.from.y"
+        "}\n"
+        "checker :: fn() -> (s32) {"
+          "from : Point; from.x = 31; from.y = 2\n"
+          "to : Point; to.x = 60; to.y = 44\n"
+          "line : Line; line.from = from; line.to = to\n"
+          "nested(line)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
     }
 
     it("should auto-dereference pointers to struct on field access") {

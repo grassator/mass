@@ -333,6 +333,59 @@ move_value(
     register_release(builder, temp_full_register.Register.index);
     return;
   }
+  if (target->tag == Storage_Tag_Register && target->Register.packed) {
+    assert(source->byte_size <= 4);
+    assert(target->Register.offset_in_bits <= 32);
+    if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
+      panic("Expected unpacking to be handled by the recursion above");
+    }
+    s64 clear_mask = ~(((1ll << (source->byte_size * 8)) - 1) << target->Register.offset_in_bits);
+    Storage temp_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = register_acquire_temp(builder),
+    };
+    Storage target_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = target->Register.index,
+    };
+
+    // Clear bits from the target register
+    {
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {mov, {temp_full_register, imm64(clear_mask)}}
+      });
+
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {and, {target_full_register, temp_full_register}}
+      });
+    }
+
+    // Prepare new bits from the source register
+    {
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {xor, {temp_full_register, temp_full_register}}
+      });
+      Storage right_size_temp = temp_full_register;
+      right_size_temp.byte_size = source->byte_size;
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {mov, {right_size_temp, *source}}
+      });
+      if (target->Register.offset_in_bits) {
+        push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+          .Assembly = {shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
+        });
+      }
+    }
+
+    // Merge new bits into the target register
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {or, {target_full_register, temp_full_register}}
+    });
+    register_release(builder, temp_full_register.Register.index);
+    return;
+  }
 
   push_instruction(instructions, *source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});

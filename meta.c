@@ -1260,7 +1260,8 @@ main(void) {
     }),
     struct_fields("Register", (Struct_Item[]){
       { "Register", "index" },
-      { "u32", "offset_in_bits" },
+      { "u16", "packed" },
+      { "u16", "offset_in_bits" },
     }),
     struct_fields("Xmm", (Struct_Item[]){
       { "Register", "index" },

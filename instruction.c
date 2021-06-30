@@ -274,10 +274,33 @@ mnemonic(cqo,
 );
 
 mnemonic(and,
-  encoding(0x80, _op_code(4), r_m16, imm16),
+  encoding(0x80, _op_code(4), r_m8, imm8),
   encoding(0x81, _op_code(4), r_m16, imm16),
   encoding(0x81, _op_code(4), r_m32, imm32),
   encoding(0x81, _op_code(4), r_m64, imm32),
+  encoding(0x20, _r, r_m8, r8),
+  encoding(0x21, _r, r_m16, r16),
+  encoding(0x21, _r, r_m32, r32),
+  encoding(0x21, _r, r_m64, r64),
+  encoding(0x22, _r, r8, r_m8),
+  encoding(0x23, _r, r16, r_m16),
+  encoding(0x23, _r, r32, r_m32),
+  encoding(0x23, _r, r64, r_m64),
+);
+
+mnemonic(or,
+  encoding(0x80, _op_code(1), r_m8, imm8),
+  encoding(0x81, _op_code(1), r_m16, imm16),
+  encoding(0x81, _op_code(1), r_m32, imm32),
+  encoding(0x81, _op_code(1), r_m64, imm32),
+  encoding(0x08, _r, r_m8, r8),
+  encoding(0x09, _r, r_m16, r16),
+  encoding(0x09, _r, r_m32, r32),
+  encoding(0x09, _r, r_m64, r64),
+  encoding(0x0A, _r, r8, r_m8),
+  encoding(0x0B, _r, r16, r_m16),
+  encoding(0x0B, _r, r32, r_m32),
+  encoding(0x0B, _r, r64, r_m64),
 );
 
 mnemonic(shr,
@@ -285,6 +308,13 @@ mnemonic(shr,
   encoding(0xC1, _op_code(5), r_m16, imm8),
   encoding(0xC1, _op_code(5), r_m32, imm8),
   encoding(0xC1, _op_code(5), r_m64, imm8),
+);
+
+mnemonic(shl,
+  encoding(0xC0, _op_code(4), r_m8, imm8),
+  encoding(0xC1, _op_code(4), r_m16, imm8),
+  encoding(0xC1, _op_code(4), r_m32, imm8),
+  encoding(0xC1, _op_code(4), r_m64, imm8),
 );
 
 mnemonic(call,
