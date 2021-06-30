@@ -335,52 +335,14 @@ move_value(
   }
 
   if (target->tag == Storage_Tag_Memory && source->tag == Storage_Tag_Memory) {
-    if (target_size >= 16) {
-      // TODO probably can use larger chunks for copying but need to check alignment
-      Storage temp_rsi = storage_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
-      Storage temp_rdi = storage_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
-      Storage temp_rcx = storage_register_for_descriptor(register_acquire_temp(builder), &descriptor_s64);
-      {
-        Storage reg_rsi = storage_register_for_descriptor(Register_SI, &descriptor_s64);
-        Storage reg_rdi = storage_register_for_descriptor(Register_DI, &descriptor_s64);
-        Storage reg_rcx = storage_register_for_descriptor(Register_C, &descriptor_s64);
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rsi, reg_rsi}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rdi, reg_rdi}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp_rcx, reg_rcx}}});
-
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_rsi, *source}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {reg_rdi, *target}}});
-        Storage size_operand = imm64(target_size);
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rcx, size_operand}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {rep_movsb}});
-
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rsi, temp_rsi}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rdi, temp_rdi}}});
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg_rcx, temp_rcx}}});
-      }
-      register_release(builder, temp_rsi.Register.index);
-      register_release(builder, temp_rdi.Register.index);
-      register_release(builder, temp_rcx.Register.index);
-    } else {
-      Storage temp = {
-        .tag = Storage_Tag_Register,
-        .byte_size = target->byte_size,
-        .Register.index = register_acquire_temp(builder),
-      };
-      move_value(allocator, builder, source_range, &temp, source);
-      move_value(allocator, builder, source_range, target, &temp);
-      register_release(builder, temp.Register.index);
-    }
+    Storage temp = {
+      .tag = Storage_Tag_Register,
+      .byte_size = target->byte_size,
+      .Register.index = register_acquire_temp(builder),
+    };
+    move_value(allocator, builder, source_range, &temp, source);
+    move_value(allocator, builder, source_range, target, &temp);
+    register_release(builder, temp.Register.index);
     return;
   }
 
