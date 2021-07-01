@@ -61,6 +61,8 @@ encode_instruction_assembly(
     }
 
     if (storage->tag == Storage_Tag_Register) {
+      assert(storage->Register.offset_in_bits == 0);
+
       if (storage->byte_size == 1) {
         // :64bitMode8BitOperations
         // These registers are inaccessible in 32bit mode and AH, BH, CH, and DH
