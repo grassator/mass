@@ -455,6 +455,11 @@ typedef struct Module_Export {
     Module_Export_Selective Selective;
   };
 } Module_Export;
+static inline Module_Export_Selective *
+module_export_as_selective(Module_Export *module_export) {
+  assert(module_export->tag == Module_Export_Tag_Selective);
+  return &module_export->Selective;
+}
 typedef dyn_array_type(Module_Export) Array_Module_Export;
 typedef struct Module {
   Source_File source_file;
@@ -543,6 +548,21 @@ typedef struct Token_Pattern {
     Token_Pattern_String String;
   };
 } Token_Pattern;
+static inline Token_Pattern_Symbol *
+token_pattern_as_symbol(Token_Pattern *token_pattern) {
+  assert(token_pattern->tag == Token_Pattern_Tag_Symbol);
+  return &token_pattern->Symbol;
+}
+static inline Token_Pattern_Group *
+token_pattern_as_group(Token_Pattern *token_pattern) {
+  assert(token_pattern->tag == Token_Pattern_Tag_Group);
+  return &token_pattern->Group;
+}
+static inline Token_Pattern_String *
+token_pattern_as_string(Token_Pattern *token_pattern) {
+  assert(token_pattern->tag == Token_Pattern_Tag_String);
+  return &token_pattern->String;
+}
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 typedef enum Section_Permissions {
   Section_Permissions_Read = 1,
@@ -783,6 +803,21 @@ typedef struct Memory_Location {
     Memory_Location_Stack Stack;
   };
 } Memory_Location;
+static inline Memory_Location_Instruction_Pointer_Relative *
+memory_location_as_instruction_pointer_relative(Memory_Location *memory_location) {
+  assert(memory_location->tag == Memory_Location_Tag_Instruction_Pointer_Relative);
+  return &memory_location->Instruction_Pointer_Relative;
+}
+static inline Memory_Location_Indirect *
+memory_location_as_indirect(Memory_Location *memory_location) {
+  assert(memory_location->tag == Memory_Location_Tag_Indirect);
+  return &memory_location->Indirect;
+}
+static inline Memory_Location_Stack *
+memory_location_as_stack(Memory_Location *memory_location) {
+  assert(memory_location->tag == Memory_Location_Tag_Stack);
+  return &memory_location->Stack;
+}
 typedef dyn_array_type(Memory_Location) Array_Memory_Location;
 typedef enum {
   Static_Memory_Tag_U8 = 0,
@@ -818,6 +853,31 @@ typedef struct Static_Memory {
     Static_Memory_Heap Heap;
   };
 } Static_Memory;
+static inline Static_Memory_U8 *
+static_memory_as_u8(Static_Memory *static_memory) {
+  assert(static_memory->tag == Static_Memory_Tag_U8);
+  return &static_memory->U8;
+}
+static inline Static_Memory_U16 *
+static_memory_as_u16(Static_Memory *static_memory) {
+  assert(static_memory->tag == Static_Memory_Tag_U16);
+  return &static_memory->U16;
+}
+static inline Static_Memory_U32 *
+static_memory_as_u32(Static_Memory *static_memory) {
+  assert(static_memory->tag == Static_Memory_Tag_U32);
+  return &static_memory->U32;
+}
+static inline Static_Memory_U64 *
+static_memory_as_u64(Static_Memory *static_memory) {
+  assert(static_memory->tag == Static_Memory_Tag_U64);
+  return &static_memory->U64;
+}
+static inline Static_Memory_Heap *
+static_memory_as_heap(Static_Memory *static_memory) {
+  assert(static_memory->tag == Static_Memory_Tag_Heap);
+  return &static_memory->Heap;
+}
 typedef dyn_array_type(Static_Memory) Array_Static_Memory;
 typedef enum {
   Storage_Tag_None = 0,
@@ -864,6 +924,36 @@ typedef struct Storage {
     Storage_Unpacked Unpacked;
   };
 } Storage;
+static inline Storage_Eflags *
+storage_as_eflags(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Eflags);
+  return &storage->Eflags;
+}
+static inline Storage_Register *
+storage_as_register(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Register);
+  return &storage->Register;
+}
+static inline Storage_Xmm *
+storage_as_xmm(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Xmm);
+  return &storage->Xmm;
+}
+static inline Storage_Static *
+storage_as_static(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Static);
+  return &storage->Static;
+}
+static inline Storage_Memory *
+storage_as_memory(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Memory);
+  return &storage->Memory;
+}
+static inline Storage_Unpacked *
+storage_as_unpacked(Storage *storage) {
+  assert(storage->tag == Storage_Tag_Unpacked);
+  return &storage->Unpacked;
+}
 typedef dyn_array_type(Storage) Array_Storage;
 typedef struct Relocation {
   Storage patch_at;
@@ -914,6 +1004,26 @@ typedef struct Instruction {
     Instruction_Label_Patch Label_Patch;
   };
 } Instruction;
+static inline Instruction_Assembly *
+instruction_as_assembly(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Assembly);
+  return &instruction->Assembly;
+}
+static inline Instruction_Label *
+instruction_as_label(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Label);
+  return &instruction->Label;
+}
+static inline Instruction_Bytes *
+instruction_as_bytes(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Bytes);
+  return &instruction->Bytes;
+}
+static inline Instruction_Label_Patch *
+instruction_as_label_patch(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Label_Patch);
+  return &instruction->Label_Patch;
+}
 typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct Code_Block {
   Label_Index start_label;
@@ -1046,6 +1156,11 @@ typedef struct Macro_Pattern {
     Macro_Pattern_Single_Token Single_Token;
   };
 } Macro_Pattern;
+static inline Macro_Pattern_Single_Token *
+macro_pattern_as_single_token(Macro_Pattern *macro_pattern) {
+  assert(macro_pattern->tag == Macro_Pattern_Tag_Single_Token);
+  return &macro_pattern->Single_Token;
+}
 typedef dyn_array_type(Macro_Pattern) Array_Macro_Pattern;
 typedef struct Macro {
   Array_Macro_Pattern pattern;
@@ -1084,6 +1199,16 @@ typedef struct Scope_Entry {
     Scope_Entry_Operator Operator;
   };
 } Scope_Entry;
+static inline Scope_Entry_Value *
+scope_entry_as_value(Scope_Entry *scope_entry) {
+  assert(scope_entry->tag == Scope_Entry_Tag_Value);
+  return &scope_entry->Value;
+}
+static inline Scope_Entry_Operator *
+scope_entry_as_operator(Scope_Entry *scope_entry) {
+  assert(scope_entry->tag == Scope_Entry_Tag_Operator);
+  return &scope_entry->Operator;
+}
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 typedef struct Scope {
   const Allocator * allocator;
@@ -1128,6 +1253,16 @@ typedef struct Overload_Match {
     Overload_Match_Found Found;
   };
 } Overload_Match;
+static inline Overload_Match_Undecidable *
+overload_match_as_undecidable(Overload_Match *overload_match) {
+  assert(overload_match->tag == Overload_Match_Tag_Undecidable);
+  return &overload_match->Undecidable;
+}
+static inline Overload_Match_Found *
+overload_match_as_found(Overload_Match *overload_match) {
+  assert(overload_match->tag == Overload_Match_Tag_Found);
+  return &overload_match->Found;
+}
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
 typedef struct Value {
   const Descriptor * descriptor;
@@ -1182,6 +1317,16 @@ typedef struct Expected_Result {
     Expected_Result_Flexible Flexible;
   };
 } Expected_Result;
+static inline Expected_Result_Exact *
+expected_result_as_exact(Expected_Result *expected_result) {
+  assert(expected_result->tag == Expected_Result_Tag_Exact);
+  return &expected_result->Exact;
+}
+static inline Expected_Result_Flexible *
+expected_result_as_flexible(Expected_Result *expected_result) {
+  assert(expected_result->tag == Expected_Result_Tag_Flexible);
+  return &expected_result->Flexible;
+}
 typedef dyn_array_type(Expected_Result) Array_Expected_Result;
 typedef struct Lazy_Value {
   Execution_Context context;
@@ -1235,6 +1380,16 @@ typedef struct Memory_Layout_Item {
     Memory_Layout_Item_Base_Relative Base_Relative;
   };
 } Memory_Layout_Item;
+static inline Memory_Layout_Item_Absolute *
+memory_layout_item_as_absolute(Memory_Layout_Item *memory_layout_item) {
+  assert(memory_layout_item->tag == Memory_Layout_Item_Tag_Absolute);
+  return &memory_layout_item->Absolute;
+}
+static inline Memory_Layout_Item_Base_Relative *
+memory_layout_item_as_base_relative(Memory_Layout_Item *memory_layout_item) {
+  assert(memory_layout_item->tag == Memory_Layout_Item_Tag_Base_Relative);
+  return &memory_layout_item->Base_Relative;
+}
 typedef dyn_array_type(Memory_Layout_Item) Array_Memory_Layout_Item;
 typedef struct Memory_Layout {
   Array_Memory_Layout_Item items;
@@ -1331,6 +1486,31 @@ typedef struct Descriptor {
     Descriptor_Reference_To Reference_To;
   };
 } Descriptor;
+static inline Descriptor_Function_Instance *
+descriptor_as_function_instance(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Function_Instance);
+  return &descriptor->Function_Instance;
+}
+static inline Descriptor_Fixed_Size_Array *
+descriptor_as_fixed_size_array(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
+  return &descriptor->Fixed_Size_Array;
+}
+static inline Descriptor_Struct *
+descriptor_as_struct(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Struct);
+  return &descriptor->Struct;
+}
+static inline Descriptor_Pointer_To *
+descriptor_as_pointer_to(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Pointer_To);
+  return &descriptor->Pointer_To;
+}
+static inline Descriptor_Reference_To *
+descriptor_as_reference_to(Descriptor *descriptor) {
+  assert(descriptor->tag == Descriptor_Tag_Reference_To);
+  return &descriptor->Reference_To;
+}
 typedef dyn_array_type(Descriptor) Array_Descriptor;
 typedef enum {
   Mass_Error_Tag_Unimplemented = 0,
@@ -1437,6 +1617,86 @@ typedef struct Mass_Error {
     Mass_Error_Undecidable_Overload Undecidable_Overload;
   };
 } Mass_Error;
+static inline Mass_Error_User_Defined *
+mass_error_as_user_defined(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_User_Defined);
+  return &mass_error->User_Defined;
+}
+static inline Mass_Error_Circular_Dependency *
+mass_error_as_circular_dependency(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Circular_Dependency);
+  return &mass_error->Circular_Dependency;
+}
+static inline Mass_Error_Integer_Range *
+mass_error_as_integer_range(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Integer_Range);
+  return &mass_error->Integer_Range;
+}
+static inline Mass_Error_File_Open *
+mass_error_as_file_open(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_File_Open);
+  return &mass_error->File_Open;
+}
+static inline Mass_Error_Dynamic_Library_Load *
+mass_error_as_dynamic_library_load(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Dynamic_Library_Load);
+  return &mass_error->Dynamic_Library_Load;
+}
+static inline Mass_Error_Dynamic_Library_Symbol_Not_Found *
+mass_error_as_dynamic_library_symbol_not_found(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found);
+  return &mass_error->Dynamic_Library_Symbol_Not_Found;
+}
+static inline Mass_Error_Unexpected_Token *
+mass_error_as_unexpected_token(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Unexpected_Token);
+  return &mass_error->Unexpected_Token;
+}
+static inline Mass_Error_Operator_Infix_Suffix_Conflict *
+mass_error_as_operator_infix_suffix_conflict(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
+  return &mass_error->Operator_Infix_Suffix_Conflict;
+}
+static inline Mass_Error_Operator_Prefix_Conflict *
+mass_error_as_operator_prefix_conflict(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Operator_Prefix_Conflict);
+  return &mass_error->Operator_Prefix_Conflict;
+}
+static inline Mass_Error_Undefined_Variable *
+mass_error_as_undefined_variable(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Undefined_Variable);
+  return &mass_error->Undefined_Variable;
+}
+static inline Mass_Error_Redifinition *
+mass_error_as_redifinition(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Redifinition);
+  return &mass_error->Redifinition;
+}
+static inline Mass_Error_Unknown_Field *
+mass_error_as_unknown_field(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Unknown_Field);
+  return &mass_error->Unknown_Field;
+}
+static inline Mass_Error_Invalid_Identifier *
+mass_error_as_invalid_identifier(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Invalid_Identifier);
+  return &mass_error->Invalid_Identifier;
+}
+static inline Mass_Error_Type_Mismatch *
+mass_error_as_type_mismatch(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Type_Mismatch);
+  return &mass_error->Type_Mismatch;
+}
+static inline Mass_Error_No_Matching_Overload *
+mass_error_as_no_matching_overload(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_No_Matching_Overload);
+  return &mass_error->No_Matching_Overload;
+}
+static inline Mass_Error_Undecidable_Overload *
+mass_error_as_undecidable_overload(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Undecidable_Overload);
+  return &mass_error->Undecidable_Overload;
+}
 typedef dyn_array_type(Mass_Error) Array_Mass_Error;
 typedef enum {
   Mass_Result_Tag_Success = 0,
@@ -1453,6 +1713,11 @@ typedef struct Mass_Result {
     Mass_Result_Error Error;
   };
 } Mass_Result;
+static inline Mass_Result_Error *
+mass_result_as_error(Mass_Result *mass_result) {
+  assert(mass_result->tag == Mass_Result_Tag_Error);
+  return &mass_result->Error;
+}
 typedef dyn_array_type(Mass_Result) Array_Mass_Result;
 typedef struct Program {
   Array_Import_Library import_libraries;

@@ -210,6 +210,22 @@ print_c_struct(
   fprintf(file, "} %s;\n", name);
 }
 
+static void
+print_union_variant_getter(
+  FILE *file,
+  const char *union_name,
+  const char *variant_name
+) {
+  char *lower_union_name = strtolower(union_name);
+  char *lower_variant_name = strtolower(variant_name);
+  fprintf(file, "static inline %s_%s *\n", union_name, variant_name); // type signature
+  fprintf(file, "%s_as_%s", lower_union_name, lower_variant_name); // fn name
+  fprintf(file, "(%s *%s) {\n", union_name, lower_union_name); // args
+  fprintf(file, "  assert(%s->tag == %s_Tag_%s);\n", lower_union_name, union_name, variant_name); // body
+  fprintf(file, "  return &%s->%s;\n", lower_union_name, variant_name); // body
+  fprintf(file, "}\n");
+}
+
 void
 print_c_type(
   FILE *file,
@@ -289,6 +305,16 @@ print_c_type(
           }
           fprintf(file, "  };\n");
           fprintf(file, "} %s;\n", type->name);
+        }
+
+        // Write out helper getters
+        {
+          for (uint64_t i = 0; i < type->union_.item_count; ++i) {
+            Struct_Type *struct_ = &type->union_.items[i];
+            if (struct_->item_count) {
+              print_union_variant_getter(file, type->name, struct_->name);
+            }
+          }
         }
       }
       if (!(type->flags & Meta_Type_Flags_No_Value_Array)) {
