@@ -849,7 +849,7 @@ typedef struct Storage_Memory {
   Memory_Location location;
 } Storage_Memory;
 typedef struct Storage_Unpacked {
-  Memory_Layout * layout;
+  Register registers[2];
 } Storage_Unpacked;
 typedef struct Storage {
   Storage_Tag tag;
@@ -2122,6 +2122,7 @@ static Descriptor descriptor_array_slice;
 static Descriptor descriptor_array_slice_ptr;
 static Descriptor descriptor_slice_pointer;
 static Descriptor descriptor_slice_pointer_pointer;
+static Descriptor descriptor_register_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Register, 2, &descriptor_register);
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
@@ -2979,9 +2980,9 @@ MASS_DEFINE_TYPE_VALUE(storage_memory);
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_unpacked, Storage_Unpacked,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("layout"),
-    .descriptor = &descriptor_memory_layout_pointer,
-    .Base_Relative.offset = offsetof(Storage_Unpacked, layout),
+    .name = slice_literal_fields("registers"),
+    .descriptor = &descriptor_register_2,
+    .Base_Relative.offset = offsetof(Storage_Unpacked, registers),
   },
 );
 MASS_DEFINE_TYPE_VALUE(storage_unpacked);

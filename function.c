@@ -235,6 +235,84 @@ move_value(
     }
     return;
   }
+  if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
+    assert(source->byte_size <= 4);
+    assert(source->Register.offset_in_bits <= 32);
+    Storage temp_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = register_acquire_temp(builder),
+    };
+    Storage source_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = source->Register.index,
+    };
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {temp_full_register, source_full_register}}
+    });
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
+    });
+
+    Storage right_size_temp = temp_full_register;
+    right_size_temp.byte_size = source->byte_size;
+    move_value(allocator, builder, source_range, target, &right_size_temp);
+    register_release(builder, temp_full_register.Register.index);
+    return;
+  }
+
+  if (target->tag == Storage_Tag_Register && target->Register.packed) {
+    assert(source->byte_size <= 4);
+    assert(target->Register.offset_in_bits <= 32);
+    if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
+      panic("Expected unpacking to be handled by the recursion above");
+    }
+    s64 clear_mask = ~(((1ll << (source->byte_size * 8)) - 1) << target->Register.offset_in_bits);
+    Storage temp_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = register_acquire_temp(builder),
+    };
+    Storage target_full_register = {
+      .tag = Storage_Tag_Register,
+      .byte_size = 8,
+      .Register.index = target->Register.index,
+    };
+
+    // Clear bits from the target register
+    {
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {mov, {temp_full_register, imm64(clear_mask)}}
+      });
+
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {and, {target_full_register, temp_full_register}}
+      });
+    }
+
+    // Prepare new bits from the source register
+    {
+      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+        .Assembly = {xor, {temp_full_register, temp_full_register}}
+      });
+      Storage right_size_temp = temp_full_register;
+      right_size_temp.byte_size = source->byte_size;
+      move_value(allocator, builder, source_range, &right_size_temp, source);
+      if (target->Register.offset_in_bits) {
+        push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+          .Assembly = {shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
+        });
+      }
+    }
+
+    // Merge new bits into the target register
+    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+      .Assembly = {or, {target_full_register, temp_full_register}}
+    });
+    register_release(builder, temp_full_register.Register.index);
+    return;
+  }
 
   if (source->tag == Storage_Tag_Static) {
     assert(source->byte_size <= 8);
@@ -305,85 +383,6 @@ move_value(
     move_value(allocator, builder, source_range, &temp, source);
     move_value(allocator, builder, source_range, target, &temp);
     register_release(builder, temp.Register.index);
-    return;
-  }
-  if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
-    assert(source->byte_size <= 4);
-    assert(source->Register.offset_in_bits <= 32);
-    Storage temp_full_register = {
-      .tag = Storage_Tag_Register,
-      .byte_size = 8,
-      .Register.index = register_acquire_temp(builder),
-    };
-    Storage source_full_register = {
-      .tag = Storage_Tag_Register,
-      .byte_size = 8,
-      .Register.index = source->Register.index,
-    };
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {temp_full_register, source_full_register}}
-    });
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
-    });
-
-    Storage right_size_temp = temp_full_register;
-    right_size_temp.byte_size = source->byte_size;
-    move_value(allocator, builder, source_range, target, &right_size_temp);
-    register_release(builder, temp_full_register.Register.index);
-    return;
-  }
-  if (target->tag == Storage_Tag_Register && target->Register.packed) {
-    assert(source->byte_size <= 4);
-    assert(target->Register.offset_in_bits <= 32);
-    if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
-      panic("Expected unpacking to be handled by the recursion above");
-    }
-    s64 clear_mask = ~(((1ll << (source->byte_size * 8)) - 1) << target->Register.offset_in_bits);
-    Storage temp_full_register = {
-      .tag = Storage_Tag_Register,
-      .byte_size = 8,
-      .Register.index = register_acquire_temp(builder),
-    };
-    Storage target_full_register = {
-      .tag = Storage_Tag_Register,
-      .byte_size = 8,
-      .Register.index = target->Register.index,
-    };
-
-    // Clear bits from the target register
-    {
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {mov, {temp_full_register, imm64(clear_mask)}}
-      });
-
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {and, {target_full_register, temp_full_register}}
-      });
-    }
-
-    // Prepare new bits from the source register
-    {
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {xor, {temp_full_register, temp_full_register}}
-      });
-      Storage right_size_temp = temp_full_register;
-      right_size_temp.byte_size = source->byte_size;
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {mov, {right_size_temp, *source}}
-      });
-      if (target->Register.offset_in_bits) {
-        push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-          .Assembly = {shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
-        });
-      }
-    }
-
-    // Merge new bits into the target register
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {or, {target_full_register, temp_full_register}}
-    });
-    register_release(builder, temp_full_register.Register.index);
     return;
   }
 
@@ -494,7 +493,7 @@ fn_encode(
 Label_Index
 make_if(
   Execution_Context *context,
-  Array_Instruction *instructions,
+  Function_Builder *builder,
   const Source_Range *source_range,
   Value *value
 ) {
@@ -511,54 +510,54 @@ make_if(
     if (value->storage.tag == Storage_Tag_Eflags) {
       switch(value->storage.Eflags.compare_type) {
         case Compare_Type_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jne, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Not_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {je, {code_label32(label), value->storage, 0}}});
           break;
         }
 
         case Compare_Type_Unsigned_Below: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jae, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Below_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ja, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jbe, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Unsigned_Above_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jb, {code_label32(label), value->storage, 0}}});
           break;
         }
 
         case Compare_Type_Signed_Less: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jge, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Less_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jg, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jle, {code_label32(label), value->storage, 0}}});
           break;
         }
         case Compare_Type_Signed_Greater_Equal: {
-          push_instruction(instructions, *source_range,
+          push_instruction(&builder->code_block.instructions, *source_range,
           (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jl, {code_label32(label), value->storage, 0}}});
           break;
         }
@@ -567,22 +566,27 @@ make_if(
         }
       }
     } else {
-      Storage test_temp = value->storage;
-      if (test_temp.tag == Storage_Tag_Register) {
-        push_instruction(
-          instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {x64_test, {test_temp, test_temp, 0}}}
-        );
+      if (value->storage.tag == Storage_Tag_Register) {
+        Storage test_storage = value->storage;
+        bool is_packed = value->storage.Register.offset_in_bits != 0;
+        if (is_packed) {
+          test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
+          move_value(context->allocator, builder, source_range, &test_storage, &value->storage);
+        }
+        push_instruction(&builder->code_block.instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly,
+          .Assembly = {x64_test, {test_storage, test_storage}}
+        });
+        if (is_packed) register_release(builder, test_storage.Register.index);
       } else {
         u64 byte_size = descriptor_byte_size(value->descriptor);
         if (byte_size == 4 || byte_size == 8) {
           push_instruction(
-            instructions, *source_range,
+            &builder->code_block.instructions, *source_range,
             (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm32(0), 0}}}
           );
         } else if (byte_size == 1) {
           push_instruction(
-            instructions, *source_range,
+            &builder->code_block.instructions, *source_range,
             (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm8(0), 0}}}
           );
         } else {
@@ -590,7 +594,7 @@ make_if(
         }
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
-      push_instruction(instructions, *source_range,
+      push_instruction(&builder->code_block.instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jz, {code_label32(label), eflags->storage, 0}}});
     }
   }
@@ -657,34 +661,19 @@ mark_occupied_registers(
   const Descriptor *descriptor,
   Storage *storage
 ) {
-  Register arg_reg = Register_SP;
   switch(storage->tag) {
     case Storage_Tag_None: {
       // Nothing to do
       break;
     }
     case Storage_Tag_Unpacked: {
-      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
-        switch(item->tag) {
-          case Memory_Layout_Item_Tag_Absolute: {
-            break;
-          }
-          case Memory_Layout_Item_Tag_Base_Relative: {
-            item->tag = Memory_Layout_Item_Tag_Absolute;
-            item->Absolute.storage = memory_layout_item_storage(
-              stack_argument_base, &descriptor->Struct.memory_layout, item
-            );
-            break;
-          }
-        }
-        assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-        mark_occupied_registers(builder, stack_argument_base, item->descriptor, &item->Absolute.storage);
-      }
+      register_bitset_set(&builder->register_occupied_bitset, storage->Unpacked.registers[0]);
+      register_bitset_set(&builder->register_occupied_bitset, storage->Unpacked.registers[1]);
       break;
     }
     case Storage_Tag_Register:
     case Storage_Tag_Xmm: {
-      arg_reg = storage->Register.index;
+      register_bitset_set(&builder->register_occupied_bitset, storage->Register.index);
       break;
     }
     case Storage_Tag_Memory: {
@@ -694,11 +683,12 @@ mark_occupied_registers(
           break;
         }
         case Memory_Location_Tag_Indirect: {
-          arg_reg = storage->Memory.location.Indirect.base_register;
+          Register reg = storage->Memory.location.Indirect.base_register;
+          register_bitset_set(&builder->register_occupied_bitset, reg);
           break;
         }
         case Memory_Location_Tag_Stack: {
-          arg_reg = Register_SP;
+          // Nothing to do
           break;
         }
       }
@@ -710,9 +700,6 @@ mark_occupied_registers(
       panic("Unexpected storage tag for an argument");
       break;
     }
-  }
-  if (arg_reg != Register_SP) {
-    register_bitset_set(&builder->register_occupied_bitset, arg_reg);
   }
 }
 

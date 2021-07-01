@@ -3564,10 +3564,8 @@ register_bitset_from_storage(
       }
     } break;
     case Storage_Tag_Unpacked: {
-      DYN_ARRAY_FOREACH(Memory_Layout_Item, item, storage->Unpacked.layout->items) {
-        assert(item->tag == Memory_Layout_Item_Tag_Absolute);
-        result |= register_bitset_from_storage(&item->Absolute.storage);
-      }
+      register_bitset_set(&result, storage->Unpacked.registers[0]);
+      register_bitset_set(&result, storage->Unpacked.registers[1]);
     } break;
   }
   return result;
@@ -5356,9 +5354,7 @@ mass_handle_if_expression_lazy_proc(
     condition = temp_condition;
   }
 
-  Label_Index else_label = make_if(
-    context, &builder->code_block.instructions, &condition->source_range, condition
-  );
+  Label_Index else_label = make_if(context, builder, &condition->source_range, condition);
 
   Value *result_value = value_force(context, builder, expected_result, then);
   MASS_ON_ERROR(*context->result) return 0;

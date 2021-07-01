@@ -1274,7 +1274,7 @@ main(void) {
       { "Memory_Location", "location" },
     }),
     struct_fields("Unpacked", (Struct_Item[]){
-      { "Memory_Layout *", "layout" },
+      { "Register", "registers", 2 },
     }),
   }), (Struct_Item[]){
     // TODO change to bit_size

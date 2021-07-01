@@ -172,7 +172,7 @@ typedef struct {
   System_V_Registers general_purpose_registers;
   System_V_Registers vector_registers;
   u64 stack_offset;
-  u64 offset_in_classified_eightbyte;
+  bool nested;
 } System_V_Classification_State;
 
 static SYSTEM_V_ARGUMENT_CLASS
@@ -256,7 +256,7 @@ x86_64_system_v_push_memory_layout_item_for_class(
   Slice name,
   const Descriptor *descriptor
 ) {
-  class = x86_64_system_v_adjust_class_if_no_register_available(state, class);
+  if (!state->nested) class = x86_64_system_v_adjust_class_if_no_register_available(state, class);
   Memory_Layout_Item item =
     x86_64_system_v_memory_layout_item_for_class(state, class, name, descriptor);
   dyn_array_push(state->memory_layout.items, item);
@@ -315,6 +315,7 @@ x86_64_system_v_classify(
       Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
 
       System_V_Classification_State saved_state = *state;
+      state->nested = true;
       state->memory_layout = (Memory_Layout) {
         .items = dyn_array_make(
           Array_Memory_Layout_Item,
@@ -329,7 +330,6 @@ x86_64_system_v_classify(
         .allocator = allocator,
         .capacity = dyn_array_length(struct_items),
       );
-
 
       // 4. Each field of an object is classified recursively so that always two fields are
       // considered. The resulting class is calculated according to the classes of the
@@ -346,14 +346,13 @@ x86_64_system_v_classify(
         if (offset < last_offset) {
           panic("FIXME support unions");
         } else {
-          last_offset = offset;
+          last_offset = offset + descriptor_byte_size(item->descriptor);
         }
 
-        if (offset - state->offset_in_classified_eightbyte >= eightbyte) {
+        // TODO this is incorrect when nested structs are larger than eightbyte
+        if (offset >= eightbyte) {
           dyn_array_push(eightbyte_classes, eightbyte_class);
           eightbyte_class = SYSTEM_V_NO_CLASS;
-          state->offset_in_classified_eightbyte = offset;
-          assert(state->offset_in_classified_eightbyte % 8 == 0);
         }
         SYSTEM_V_ARGUMENT_CLASS field_class =
           x86_64_system_v_classify(allocator, state, item->name, item->descriptor);
@@ -430,23 +429,35 @@ x86_64_system_v_classify(
           }
         }
       }
-      dyn_array_destroy(eightbyte_classes);
+      if (struct_class == SYSTEM_V_NO_CLASS) struct_class = eightbyte_class;
 
-      if (struct_class == SYSTEM_V_MEMORY) {
-        dyn_array_destroy(state->memory_layout.items);
-        // Restore both the memory layout and the available registers info
-        *state = saved_state;
-      } else {
-        Memory_Layout *unpacked_layout = allocator_allocate(allocator, Memory_Layout);
-        *unpacked_layout = state->memory_layout;
+      u64 eightbyte_count = dyn_array_length(eightbyte_classes);
+      dyn_array_destroy(eightbyte_classes);
+      // FIXME this layout should not be necessary
+      dyn_array_destroy(state->memory_layout.items);
+
+      *state = saved_state;
+      System_V_Registers *gpr = &state->general_purpose_registers;
+      if (gpr->index + eightbyte_count > gpr->count) {
+        struct_class = SYSTEM_V_MEMORY;
+      }
+
+      if (struct_class != SYSTEM_V_MEMORY && eightbyte_count != 1) {
+        if(struct_class == SYSTEM_V_SSE) panic("TODO");
+        if(struct_class != SYSTEM_V_INTEGER) panic("Unexpected struct class");
+
+        assert(eightbyte_count == 2);
+
         Storage unpacked_storage = {
           .tag = Storage_Tag_Unpacked,
           .byte_size = byte_size,
-          .Unpacked.layout = unpacked_layout,
+          .Unpacked = {
+            .registers = {
+              gpr->items[gpr->index++],
+              gpr->items[gpr->index++]
+            },
+          },
         };
-
-        // Restore the memory layout, keep available registers info
-        state->memory_layout = saved_state.memory_layout;
 
         Memory_Layout_Item struct_item = {
           .tag = Memory_Layout_Item_Tag_Absolute,
@@ -456,13 +467,6 @@ x86_64_system_v_classify(
           .Absolute = {.storage = unpacked_storage},
         };
         dyn_array_push(state->memory_layout.items, struct_item);
-
-        // This is required to correctly propagate up the recursive call that a field
-        // that is itself a struct is packed inside a single register.
-        if (byte_size <= eightbyte) {
-          assert(struct_class == SYSTEM_V_NO_CLASS);
-          struct_class = eightbyte;
-        }
         return struct_class;
       }
       return x86_64_system_v_push_memory_layout_item_for_class(state, struct_class, name, descriptor);
@@ -548,21 +552,12 @@ calling_convention_x86_64_system_v_return_proc(
     Register base_register = mode == Function_Parameter_Mode_Call ? Register_A : Register_DI;
     return_descriptor = function->returns.descriptor;
     return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
-  } else if (dyn_array_length(state.memory_layout.items)) {
+  } else {
     Memory_Layout_Item *item = dyn_array_get(state.memory_layout.items, 0);
     assert(item->tag == Memory_Layout_Item_Tag_Absolute);
     return_descriptor = item->descriptor;
     return_storage = item->Absolute.storage;
     dyn_array_destroy(state.memory_layout.items);
-  } else {
-    Memory_Layout *unpacked_layout = allocator_allocate(allocator, Memory_Layout);
-    *unpacked_layout = state.memory_layout;
-    return_descriptor = function->returns.descriptor;
-    return_storage = (Storage){
-      .tag = Storage_Tag_Unpacked,
-      .byte_size = descriptor_byte_size(return_descriptor),
-      .Unpacked.layout = unpacked_layout,
-    };
   }
 
   return value_init(

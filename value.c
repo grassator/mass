@@ -768,14 +768,38 @@ storage_with_offset_and_byte_size(
     case Storage_Tag_Any:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
-    case Storage_Tag_None:
-    case Storage_Tag_Unpacked: {
+    case Storage_Tag_None: {
       panic("Internal Error: Unexpected storage type for structs");
       break;
     }
     case Storage_Tag_Register: {
-      result.Register.packed = true;
+      result.Register.packed = byte_size != 8;
       result.Register.offset_in_bits = s32_to_u16(diff * 8);
+      break;
+    }
+    case Storage_Tag_Unpacked: {
+      // TODO Consider making this generic and providing to users
+      //      (instead of it being a side effect of System V ABI)
+      if (diff < 0) panic("Can not index before an unpacked register");
+      if (diff + byte_size > 16) panic("Out of bounds access on an unpacked struct");
+      // This is the case for something like `struct { struct { u64 x; u64 y; } nested; } root`
+      // where `root` is unpacked but the only field inside is `nested` which we also unpack.
+      if (diff == 0 && byte_size == 16) {
+        return result;
+      }
+      // Otherwise we expect requested slice to not cross an eight-byte boundary
+      if (diff % 8 + byte_size > 8) panic("Unaligned unpacked struct field access");
+      s32 start_index = diff / 8;
+      Register reg = base->Unpacked.registers[start_index];
+      result = (Storage){
+        .tag = Storage_Tag_Register,
+        .byte_size = byte_size,
+        .Register = {
+          .index = reg,
+          .packed = byte_size != 8,
+          .offset_in_bits = s32_to_u16((diff % 8) * 8),
+        },
+      };
       break;
     }
     case Storage_Tag_Static: {
@@ -986,12 +1010,16 @@ storage_equal(
       return false;
     }
     case Storage_Tag_Unpacked: {
-      // TODO should this be by value comparison?
-      return a->Unpacked.layout == b->Unpacked.layout;
+      return memcmp(a->Unpacked.registers, b->Unpacked.registers, sizeof(a->Unpacked.registers)) == 0;
     }
-    case Storage_Tag_Xmm:
+    case Storage_Tag_Xmm: {
+      return a->Xmm.index == b->Xmm.index;
+    }
     case Storage_Tag_Register: {
-      return a->Register.index == b->Register.index;
+      return (
+        a->Register.index == b->Register.index &&
+        a->Register.offset_in_bits == b->Register.offset_in_bits
+      );
     }
     case Storage_Tag_Any: {
       return false; // Is this the semantics I want though?
@@ -1635,17 +1663,9 @@ memory_layout_item_storage(
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      if (base->tag == Storage_Tag_Unpacked) {
-        Memory_Layout_Item *unpacked_item =
-          memory_layout_item_find_by_name(base->Unpacked.layout, item->name);
-        assert(unpacked_item);
-        assert(unpacked_item->tag == Memory_Layout_Item_Tag_Absolute);
-        return unpacked_item->Absolute.storage;
-      } else {
-        return storage_with_offset_and_byte_size(
-          base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
-        );
-      }
+      return storage_with_offset_and_byte_size(
+        base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->descriptor)
+      );
     }
   }
   panic("Not reached");
