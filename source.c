@@ -5462,24 +5462,27 @@ token_parse_intrinsic_literal(
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
   Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
-  // @Volatile :IntrinsicFunctionSignature
-  // These arguments must match how we call it.
-  Value *name_symbol = token_make_symbol(
-    context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, keyword->source_range
-  );
-  Value *colon_symbol = token_make_symbol(
-    context->allocator, slice_literal(":"), Symbol_Type_Operator_Like, keyword->source_range
-  );
-  Value *args_tokens[] = {name_symbol, colon_symbol, type_value_view_value};
+  Scope *function_scope = scope_make(context->allocator, context->scope);
 
-  Value_View args_view = {
-    .values = args_tokens,
-    .length = countof(args_tokens),
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, function_scope);
+  fn_info->returns = (Function_Return) {
+    .descriptor = &descriptor_value_pointer,
     .source_range = keyword->source_range,
   };
 
-  Function_Info *fn_info = token_process_function_literal(context, args_view, type_value_pointer_value);
-  MASS_ON_ERROR(*context->result) return 0;
+  // @Volatile :IntrinsicFunctionSignature
+  // These arguments must match how we call it.
+  fn_info->parameters = dyn_array_make(
+    Array_Function_Parameter,
+    .allocator = context->allocator,
+    .capacity = 2
+  );
+  dyn_array_push(fn_info->parameters, (Function_Parameter) {
+    .name = slice_literal("arguments"),
+    .descriptor = &descriptor_value_view,
+    .source_range = keyword->source_range,
+  });
   fn_info->flags |= Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic;
 
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
