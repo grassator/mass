@@ -1258,7 +1258,6 @@ spec("source") {
       spec_check_slice(error->Operator_Infix_Suffix_Conflict.symbol, slice_literal("**"));
     }
 
-    #if defined(_WIN32) // TODO support on Linux
     it("should have a built-in compile-time shift operator") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,
@@ -1298,7 +1297,6 @@ spec("source") {
       s64 actual = checker();
       check(actual == 0b111);
     }
-    #endif
   }
 
   describe("Compile Time Execution") {
