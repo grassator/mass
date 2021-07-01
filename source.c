@@ -4065,9 +4065,10 @@ token_handle_function_call(
       fn_type_opaque jitted_code = c_function_from_label(jit->program, jit_label_index);
 
       // @Volatile :IntrinsicFunctionSignature
-      Value *(*jitted_intrinsic)(Value_View) = (Value *(*)(Value_View))jitted_code;
+      Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
+        (Value *(*)(Execution_Context *, Value_View))jitted_code;
       Value_View args_view = value_view_from_value_array(args, &args_token->source_range);
-      result = jitted_intrinsic(args_view);
+      result = jitted_intrinsic(&eval_context, args_view);
 
       // The value that comes out of an intrinsic is consider to originate in the same
       // epoch as the function, which is true since we evaluate right at this point.
@@ -5478,6 +5479,11 @@ token_parse_intrinsic_literal(
     .allocator = context->allocator,
     .capacity = 2
   );
+  dyn_array_push(fn_info->parameters, (Function_Parameter) {
+    .name = slice_literal("context"),
+    .descriptor = &descriptor_execution_context_pointer,
+    .source_range = keyword->source_range,
+  });
   dyn_array_push(fn_info->parameters, (Function_Parameter) {
     .name = slice_literal("arguments"),
     .descriptor = &descriptor_value_view,

@@ -62,7 +62,7 @@ Arithmetic_Proc :: fn(
 arithmetic_overloads :: macro(impl : Arithmetic_Proc) {
   Type :: mass.Descriptor
   intrinsic :: @intrinsic {
-    impl(@context, arguments, 0)
+    impl(context, arguments, 0)
   }
   template :: macro(type : Type) {
     macro add(x : type, y : type) -> (type) { intrinsic(x, y) }
