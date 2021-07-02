@@ -3545,6 +3545,7 @@ const_void_pointer_equal(
 
 typedef struct {
   bool occupied;
+  bool tombstone;
   s32 hash;
 } Hash_Map_Entry_Bookkeeping;
 
@@ -3618,7 +3619,7 @@ hash_map_resize(
   for (u64 i = 0; i < previous_capacity; ++i) {
     void *old_entry = entries + i * entry_byte_size;
     Hash_Map_Entry_Bookkeeping *old_bookkeeping = old_entry;
-    if (old_bookkeeping->occupied) {
+    if (old_bookkeeping->occupied && !old_bookkeeping->tombstone) {
       u64 insertion_index = hash_map_get_insert_index_internal(
         map, entry_byte_size, old_bookkeeping->hash
       );
@@ -3676,7 +3677,7 @@ struct Hash_Map_Make_Options {
       s32 hash_index = hash & map->hash_mask;\
       _hash_map_type_##__Entry *entry = &map->entries[hash_index];\
       if (!entry->occupied) return 0;\
-      if (_key_equality_fn_(key, entry->key)) return entry;\
+      if (!entry->bookkeeping.tombstone && _key_equality_fn_(key, entry->key)) return entry; \
       hash = hash_s32(hash);\
     }\
   }\
@@ -3689,7 +3690,7 @@ struct Hash_Map_Make_Options {
     _key_type_ key\
   ) {\
     _hash_map_type_##__Entry *entry =\
-      _hash_map_type_##__get_by_hash_internal(map, _key_hash_fn_(key), key);\
+      _hash_map_type_##__get_by_hash_internal(map, hash, key);\
     return entry ? &entry->value : 0;\
   }\
   \
@@ -3708,7 +3709,7 @@ struct Hash_Map_Make_Options {
     _key_type_ key\
   ) {\
     _hash_map_type_##__Entry *entry = _hash_map_type_##__get_by_hash_internal(map, hash, key);\
-    if (entry) memset(entry, 0, sizeof(*entry));\
+    if (entry) entry->bookkeeping.tombstone = true;\
   }\
   \
   static inline void\
