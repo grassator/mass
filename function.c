@@ -795,6 +795,8 @@ ensure_function_instance(
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = storage_static_as_c_type(&literal->body->storage, Value_View);
     parse_result = token_parse_block_view(&body_context, *view);
+  } else if (literal->body->descriptor == &descriptor_lazy_value) {
+    parse_result = literal->body;
   } else {
     panic("Unexpected function body type");
   }

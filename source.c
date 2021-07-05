@@ -6267,6 +6267,30 @@ token_parse_definition(
   return peek_index;
 }
 
+typedef struct {
+  Source_Range source_range;
+  Value *target;
+  Value *expression;
+} Mass_Assignment_Lazy_Payload;
+
+static Value *
+mass_handle_assignment_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Assignment_Lazy_Payload *payload
+) {
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
+  Expected_Result expected_target = expected_result_any(descriptor);
+  Value *target = value_force(context, builder, &expected_target, payload->target);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  value_force_exact(context, builder, target, payload->expression);
+  value_release_if_temporary(builder, target);
+
+  return expected_result_validate(expected_result, &void_value);
+}
+
 static void
 token_define_global_variable(
   Execution_Context *context,
@@ -6299,68 +6323,32 @@ token_define_global_variable(
     if (value_is_non_lazy_static(value)) {
       MASS_ON_ERROR(assign(context, 0, global_value, value)) return;
     } else {
-      // TODO @CopyPaste from ensure_function_instance
-      Program *program = context->program;
-      const Calling_Convention *calling_convention = program->default_calling_convention;
-
-      Slice fn_name = slice_literal("global :=");
-      Slice end_label_name = slice_literal("end of global :=");
-      Label_Index call_label = make_label(program, &program->memory.code, fn_name);
-
-      Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-      function_info_init(fn_info, context->scope);
-
-      Function_Builder *builder = &(Function_Builder){
-        .function = fn_info,
-        .register_volatile_bitset = calling_convention->register_volatile_bitset,
-        .return_value = &void_value,
-        .code_block = {
-          .start_label = call_label,
-          .end_label = make_label(program, &program->memory.code, end_label_name),
-          .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
-        },
+      Mass_Assignment_Lazy_Payload *assignment_payload =
+        allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
+      *assignment_payload = (Mass_Assignment_Lazy_Payload) {
+        .source_range = expression.source_range,
+        .target = global_value,
+        .expression = value,
       };
 
-      MASS_ON_ERROR(assign(context, builder, global_value, value)) return;
+      Value *body_value = mass_make_lazy_value(
+        context, symbol->source_range, assignment_payload, &descriptor_void,
+        mass_handle_assignment_lazy_proc
+      );
 
-      calling_convention->body_end_proc(program, builder);
-
-      dyn_array_push(program->functions, *builder);
-
-      const Descriptor *instance_descriptor =
-        descriptor_function_instance(context->allocator, fn_name, fn_info, calling_convention);
-      Value *startup_function =
-        value_make(context, instance_descriptor, code_label32(call_label), value->source_range);
+      Function_Literal *startup_literal = mass_make_fake_function_literal(
+        context, body_value, &descriptor_void, &expression.source_range
+      );
+      Value *startup_function = value_make(
+        context, &descriptor_function_literal, storage_static(startup_literal), value->source_range
+      );
+      ensure_function_instance(context, startup_function);
       dyn_array_push(context->program->startup_functions, startup_function);
     }
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;
   scope_define_value(context->scope, VALUE_STATIC_EPOCH, symbol->source_range, scope_name, global_value);
-}
-
-typedef struct {
-  Source_Range source_range;
-  Value *target;
-  Value *expression;
-} Mass_Assignment_Lazy_Payload;
-
-static Value *
-mass_handle_assignment_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Mass_Assignment_Lazy_Payload *payload
-) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(payload->expression);
-  Expected_Result expected_target = expected_result_any(descriptor);
-  Value *target = value_force(context, builder, &expected_target, payload->target);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  value_force_exact(context, builder, target, payload->expression);
-  value_release_if_temporary(builder, target);
-
-  return expected_result_validate(expected_result, &void_value);
 }
 
 static void
