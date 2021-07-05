@@ -174,23 +174,22 @@ typedef struct {
 } System_V_Registers;
 
 typedef struct {
-  System_V_Registers general_purpose_registers;
-  System_V_Registers vector_registers;
-  u64 stack_offset;
-} System_V_Classification_State;
+  System_V_Registers general;
+  System_V_Registers vector;
+} System_V_Register_State;
 
 static SYSTEM_V_ARGUMENT_CLASS
 x86_64_system_v_adjust_class_if_no_register_available(
-  System_V_Classification_State *state,
+  System_V_Register_State *registers,
   SYSTEM_V_ARGUMENT_CLASS class
 ) {
   if (class == SYSTEM_V_INTEGER) {
-    if (state->general_purpose_registers.index >= state->general_purpose_registers.count) {
+    if (registers->general.index >= registers->general.count) {
       return SYSTEM_V_MEMORY;
     }
   }
   if (class == SYSTEM_V_SSE) {
-    if (state->vector_registers.index >= state->vector_registers.count) {
+    if (registers->vector.index >= registers->vector.count) {
       return SYSTEM_V_MEMORY;
     }
   }
@@ -199,9 +198,10 @@ x86_64_system_v_adjust_class_if_no_register_available(
 
 static Memory_Layout_Item
 x86_64_system_v_memory_layout_item_for_classification(
-  System_V_Classification_State *state,
+  System_V_Register_State *registers,
   const System_V_Classification *classification,
-  Slice name
+  Slice name,
+  u64 *stack_offset
 ) {
   u64 byte_size = descriptor_byte_size(classification->descriptor);
   Storage storage = storage_none;
@@ -210,7 +210,7 @@ x86_64_system_v_memory_layout_item_for_classification(
       goto absolute;
     } break;
     case SYSTEM_V_INTEGER: {
-      System_V_Registers *gpr = &state->general_purpose_registers;
+      System_V_Registers *gpr = &registers->general;
       assert (gpr->index + classification->eightbyte_count <= gpr->count);
       if (classification->eightbyte_count == 1) {
         Register reg = gpr->items[gpr->index++];
@@ -232,10 +232,9 @@ x86_64_system_v_memory_layout_item_for_classification(
       goto absolute;
     } break;
     case SYSTEM_V_SSE: {
-      System_V_Registers *vector = &state->general_purpose_registers;
-      assert (vector->index + classification->eightbyte_count <= vector->count);
+      assert (registers->vector.index + classification->eightbyte_count <= registers->vector.count);
       if (classification->eightbyte_count == 1) {
-        Register reg = vector->items[vector->index++];
+        Register reg = registers->vector.items[registers->vector.index++];
         storage = storage_register(reg, byte_size);
       } else {
         panic("TODO support packed vector values");
@@ -243,13 +242,17 @@ x86_64_system_v_memory_layout_item_for_classification(
       goto absolute;
     } break;
     case SYSTEM_V_MEMORY: {
-      return (Memory_Layout_Item) {
+      u64 alignment = descriptor_byte_alignment(classification->descriptor);
+      *stack_offset = u64_align(*stack_offset, u64_max(8, alignment));
+      Memory_Layout_Item result = {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
         .flags = Memory_Layout_Item_Flags_None,
         .name = name,
         .descriptor = classification->descriptor,
-        .Base_Relative = {.offset = state->stack_offset},
+        .Base_Relative = {.offset = *stack_offset},
       };
+      *stack_offset += byte_size;
+      return result;
     } break;
     case SYSTEM_V_SSEUP:
     case SYSTEM_V_X87:
@@ -277,7 +280,7 @@ x86_64_system_v_memory_layout_item_for_classification(
 static System_V_Classification
 x86_64_system_v_classify(
   const Allocator *allocator,
-  System_V_Classification_State *state,
+  System_V_Register_State *registers,
   Slice name,
   const Descriptor *descriptor
 ) {
@@ -326,7 +329,7 @@ x86_64_system_v_classify(
 
       Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
 
-      System_V_Classification_State saved_state = *state;
+      System_V_Register_State saved_registers = *registers;
 
       // TODO use a temp allocator
       Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
@@ -359,7 +362,7 @@ x86_64_system_v_classify(
           eightbyte_class = SYSTEM_V_NO_CLASS;
         }
         System_V_Classification field_classification =
-          x86_64_system_v_classify(allocator, state, item->name, item->descriptor);
+          x86_64_system_v_classify(allocator, registers, item->name, item->descriptor);
         SYSTEM_V_ARGUMENT_CLASS field_class = field_classification.class;
         // 4(a) If both classes are equal, this is the resulting class.
         if (eightbyte_class == field_class) {
@@ -439,9 +442,8 @@ x86_64_system_v_classify(
       u64 eightbyte_count = dyn_array_length(eightbyte_classes);
       dyn_array_destroy(eightbyte_classes);
 
-      *state = saved_state;
-      System_V_Registers *gpr = &state->general_purpose_registers;
-      if (gpr->index + eightbyte_count > gpr->count) {
+      *registers = saved_registers;
+      if (registers->general.index + eightbyte_count > registers->general.count) {
         struct_class = SYSTEM_V_MEMORY;
       }
 
@@ -504,13 +506,13 @@ calling_convention_x86_64_system_v_return_proc(
   static const Register general_registers[] = { Register_A, Register_D };
   static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
 
-  System_V_Classification_State state = {
-    .general_purpose_registers = {
+  System_V_Register_State registers = {
+    .general = {
       .items = general_registers,
       .count = countof(general_registers),
       .index = 0,
     },
-    .vector_registers = {
+    .vector = {
       .items = vector_registers,
       .count = countof(vector_registers),
       .index = 0,
@@ -518,9 +520,10 @@ calling_convention_x86_64_system_v_return_proc(
   };
 
   System_V_Classification classification = x86_64_system_v_classify(
-    allocator_default, &state, function->returns.name, function->returns.descriptor
+    allocator_default, &registers, function->returns.name, function->returns.descriptor
   );
-  classification.class = x86_64_system_v_adjust_class_if_no_register_available(&state, classification.class);
+  classification.class =
+    x86_64_system_v_adjust_class_if_no_register_available(&registers, classification.class);
   Storage return_storage;
   const Descriptor *return_descriptor;
   if (classification.class == SYSTEM_V_MEMORY) {
@@ -528,8 +531,10 @@ calling_convention_x86_64_system_v_return_proc(
     return_descriptor = function->returns.descriptor;
     return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
   } else {
-    Memory_Layout_Item item =
-      x86_64_system_v_memory_layout_item_for_classification(&state, &classification, function->returns.name);
+    u64 stack_offset = 0;
+    Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
+      &registers, &classification, function->returns.name, &stack_offset
+    );
     assert(item.tag == Memory_Layout_Item_Tag_Absolute);
     return_descriptor = item.descriptor;
     return_storage = item.Absolute.storage;
@@ -567,13 +572,13 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     return_value->storage.Memory.location.Indirect.base_register == Register_DI
   );
 
-  System_V_Classification_State state = {
-    .general_purpose_registers = {
+  System_V_Register_State registers = {
+    .general = {
       .items = general_registers,
       .count = countof(general_registers),
       .index = is_indirect_return ? 1 : 0,
     },
-    .vector_registers = {
+    .vector = {
       .items = vector_registers,
       .count = countof(vector_registers),
       .index = 0,
@@ -588,14 +593,17 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     ),
   };
 
+  u64 stack_offset = 0;
   DYN_ARRAY_FOREACH(Function_Parameter, arg, function->parameters) {
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, &state, arg->name, arg->descriptor);
+      x86_64_system_v_classify(allocator_default, &registers, arg->name, arg->descriptor);
 
-    classification.class = x86_64_system_v_adjust_class_if_no_register_available(&state, classification.class);
+    classification.class =
+      x86_64_system_v_adjust_class_if_no_register_available(&registers, classification.class);
 
-    Memory_Layout_Item struct_item =
-      x86_64_system_v_memory_layout_item_for_classification(&state, &classification, arg->name);
+    Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
+      &registers, &classification, arg->name, &stack_offset
+    );
 
     dyn_array_push(memory_layout.items, struct_item);
   }
