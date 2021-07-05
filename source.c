@@ -5450,6 +5450,30 @@ token_parse_if_expression(
   );
 }
 
+static Function_Literal *
+mass_make_fake_function_literal(
+  Execution_Context *context,
+  Value *body,
+  const Descriptor *returns,
+  const Source_Range *source_range
+) {
+  Scope *function_scope = scope_make(context->allocator, context->scope);
+
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, function_scope);
+  fn_info->returns = (Function_Return) {
+    .descriptor = returns,
+    .source_range = *source_range,
+  };
+
+  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
+  *literal = (Function_Literal){
+    .info = fn_info,
+    .body = body,
+  };
+  return literal;
+}
+
 static Value *
 token_parse_intrinsic_literal(
   Execution_Context *context,
@@ -5462,40 +5486,32 @@ token_parse_intrinsic_literal(
   Token_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
   Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+  *matched_length = peek_index;
 
-  Scope *function_scope = scope_make(context->allocator, context->scope);
-
-  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_scope);
-  fn_info->returns = (Function_Return) {
-    .descriptor = &descriptor_value_pointer,
-    .source_range = keyword->source_range,
-  };
+  Function_Literal *literal = mass_make_fake_function_literal(
+    context, body, &descriptor_value_pointer, &keyword->source_range
+  );
 
   // @Volatile :IntrinsicFunctionSignature
   // These arguments must match how we call it.
-  fn_info->parameters = dyn_array_make(
+  literal->info->parameters = dyn_array_make(
     Array_Function_Parameter,
     .allocator = context->allocator,
     .capacity = 2
   );
-  dyn_array_push(fn_info->parameters, (Function_Parameter) {
+  dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .name = slice_literal("context"),
     .descriptor = &descriptor_execution_context_pointer,
     .source_range = keyword->source_range,
   });
-  dyn_array_push(fn_info->parameters, (Function_Parameter) {
+  dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .name = slice_literal("arguments"),
     .descriptor = &descriptor_value_view,
     .source_range = keyword->source_range,
   });
-  fn_info->flags |= Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic;
+  literal->info->flags |= Descriptor_Function_Flags_Compile_Time;
+  literal->info->flags |= Descriptor_Function_Flags_Intrinsic;
 
-  Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
-  *literal = (Function_Literal){
-    .info = fn_info,
-    .body = body,
-  };
   *matched_length = peek_index;
   return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
 }
