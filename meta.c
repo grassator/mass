@@ -1013,6 +1013,12 @@ type_function_impl(
 #define type_function(_KIND_, _NAME_STRING_, _RETURNS_, ...)\
   type_function_impl((_NAME_STRING_), (_RETURNS_), (__VA_ARGS__), countof(__VA_ARGS__), Function_Kind_##_KIND_)
 
+#define type_intrinsic(_NAME_STRING_)\
+  type_function(Intrinsic, (_NAME_STRING_), "Value *", (Argument_Type[]){\
+    { "Execution_Context *", "context" },\
+    { "Value_View", "args" },\
+  })
+
 Meta_Type types[4096] = {0};
 uint32_t type_count = 0;
 
@@ -1895,6 +1901,8 @@ main(void) {
     { "Source_File *", "file" },
     { "Value_View *", "out_tokens" },
   })));
+
+  export_global_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
 
   export_global_custom_name("import", push_type(
     type_function(Compile_Time, "mass_import", "Scope", (Argument_Type[]){

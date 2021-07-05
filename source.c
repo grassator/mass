@@ -4059,10 +4059,15 @@ token_handle_function_call(
         context_error(context, jit_result.Error.error);
         return 0;
       }
-      assert(storage_is_label(&instance->storage));
-      Label_Index jit_label_index =
-        instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-      fn_type_opaque jitted_code = c_function_from_label(jit->program, jit_label_index);
+      fn_type_opaque jitted_code;
+      if (storage_is_label(&instance->storage)) {
+        Label_Index jit_label_index =
+          instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+        jitted_code = c_function_from_label(jit->program, jit_label_index);
+      } else {
+        u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
+        jitted_code = (fn_type_opaque)absolute_address;
+      }
 
       // @Volatile :IntrinsicFunctionSignature
       Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
@@ -4817,33 +4822,21 @@ token_handle_size_of(
 }
 
 static Value *
-token_handle_address_of(
+mass_address_of(
   Execution_Context *context,
-  Value *args_token
+  Value_View args
 ) {
-  Source_Range args_range = args_token->source_range;
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_Ptr args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->temp_allocator,
-    .capacity = 16,
-  );
-  token_match_call_arguments(context, args_token, &args);
-
   Value *pointer;
-
-  if (dyn_array_length(args) != 1) {
+  if (args.length != 1) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
-      .source_range = args_range,
+      .source_range = args.source_range,
       .detailed_message = "address_of expects a single argument"
     });
-    pointer = 0;
-    goto defer;
+    return 0;
   }
-  Value *pointee = *dyn_array_get(args, 0);
 
+  Value *pointee = value_view_get(args, 0);
   // This is the support for using `&u32` in types
   // TODO move this to the std/prelude.mass somehow
   if (context_is_compile_time_eval(context) && pointee->descriptor == &descriptor_type) {
@@ -4854,12 +4847,9 @@ token_handle_address_of(
     const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
     const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
     pointer = mass_make_lazy_value(
-      context, args_range, pointee, descriptor, mass_handle_address_of_lazy_proc
+      context, args.source_range, pointee, descriptor, mass_handle_address_of_lazy_proc
     );
   }
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
 
   return pointer;
 }
@@ -4893,8 +4883,6 @@ mass_handle_paren_operator(
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
-  } else if (slice_equal(target_name, slice_literal("address_of"))) {
-    return token_handle_address_of(context, args_token);
   } else {
     return token_handle_function_call(context, target, args_token, args_view.source_range);
   }
