@@ -54,6 +54,7 @@ typedef enum {
   Function_Kind_Default,
   Function_Kind_Typedef,
   Function_Kind_Compile_Time,
+  Function_Kind_Intrinsic,
 } Function_Kind;
 
 typedef struct {
@@ -422,8 +423,44 @@ print_scope_define_function(
     fprintf(file, "  MASS_DEFINE_FUNCTION(\n");
   }
   fprintf(file, "    Descriptor_Function_Flags_None");
-  if (function->kind == Function_Kind_Compile_Time) {
-    fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
+  switch(function->kind) {
+    case Function_Kind_Default:
+    case Function_Kind_Typedef: {
+      // Nothing to do
+    } break;
+    case Function_Kind_Compile_Time: {
+      fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
+    } break;
+    case Function_Kind_Intrinsic: {
+      fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
+      fprintf(file, " | Descriptor_Function_Flags_Intrinsic");
+
+      if (function->argument_count != 2) {
+        printf("Intrinsic %s must have 2 arguments", function->name);
+        exit(1);
+      }
+      {
+        const char *expected = "Execution_Context *";
+        if (strcmp(function->arguments[0].type, expected) != 0) {
+          printf("Intrinsic %s first argument must have type %s", function->name, expected);
+          exit(1);
+        }
+      }
+      {
+        const char *expected = "Value_View";
+        if (strcmp(function->arguments[1].type, expected) != 0) {
+          printf("Intrinsic %s second argument must have type %s", function->name, expected);
+          exit(1);
+        }
+      }
+      {
+        const char *expected = "Value *";
+        if (strcmp(function->returns, expected) != 0) {
+          printf("Intrinsic %s return type must be %s", function->name, expected);
+          exit(1);
+        }
+      }
+    } break;
   }
   fprintf(file, ",\n");
 
