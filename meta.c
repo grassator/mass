@@ -1657,7 +1657,7 @@ main(void) {
 
   push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
     { "Function_Call_Setup_Flags", "flags"},
-    { "u32", "stack_arguments_size"},
+    { "u32", "parameters_stack_size"},
     { "const Calling_Convention *", "calling_convention" },
     { "Memory_Layout", "arguments_layout" },
     { "Value *", "caller_return_value" },

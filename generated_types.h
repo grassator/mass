@@ -1464,7 +1464,7 @@ const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
 
 typedef struct Function_Call_Setup {
   Function_Call_Setup_Flags flags;
-  u32 stack_arguments_size;
+  u32 parameters_stack_size;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
   Value * caller_return_value;
@@ -4486,9 +4486,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("stack_arguments_size"),
+    .name = slice_literal_fields("parameters_stack_size"),
     .descriptor = &descriptor_u32,
-    .Base_Relative.offset = offsetof(Function_Call_Setup, stack_arguments_size),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, parameters_stack_size),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -566,6 +566,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
 
     dyn_array_push(result.arguments_layout.items, struct_item);
   }
+  result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
     const Descriptor *reference = descriptor_reference_to(allocator, function->returns.descriptor);
@@ -702,6 +703,9 @@ calling_convention_x86_64_windows_call_setup_proc(
       .Absolute = { .storage = storage_register_for_descriptor(Register_C, return_descriptor), },
     });
   }
+
+  // In this calling convention a home area for at least 4 arguments is always reserved
+  result.parameters_stack_size = u64_to_u32(u64_max(4, dyn_array_length(function->parameters)) * 8);
 
   return result;
 }

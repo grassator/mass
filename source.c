@@ -3730,7 +3730,6 @@ call_function_overload(
       arg_value = source_arg;
       should_assign = false;
       register_acquire_bitset(builder, source_registers_bitset);
-      //temp_register_argument_bitset |= source_registers_bitset;
     } else if (
       value_is_non_lazy_static(source_arg) &&
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
@@ -3822,14 +3821,10 @@ call_function_overload(
     MASS_ON_ERROR(assign(context, builder, param, source_arg)) return 0;
   }
 
-  // If we call a function, then we need to reserve space for the home area of at least 4 arguments
-  // TODO move this calculation to the calling convention somehow?
-  u64 parameters_stack_size = u64_max(4, dyn_array_length(fn_info->parameters)) * 8;
-
-  builder->max_call_parameters_stack_size = u64_to_u32(u64_max(
+  builder->max_call_parameters_stack_size = u32_max(
     builder->max_call_parameters_stack_size,
-    parameters_stack_size
-  ));
+    call_setup->parameters_stack_size
+  );
 
   if (instance->storage.tag == Storage_Tag_Static) {
     Register temp_reg = register_acquire_temp(builder);
