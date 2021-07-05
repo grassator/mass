@@ -162,6 +162,12 @@ typedef enum {
 typedef dyn_array_type(SYSTEM_V_ARGUMENT_CLASS) Array_SYSTEM_V_ARGUMENT_CLASS;
 
 typedef struct {
+  SYSTEM_V_ARGUMENT_CLASS class;
+  const Descriptor *descriptor;
+  u64 eightbyte_count;
+} System_V_Classification;
+
+typedef struct {
   const Register *items;
   u32 count;
   u32 index;
@@ -191,6 +197,80 @@ x86_64_system_v_adjust_class_if_no_register_available(
     }
   }
   return class;
+}
+
+static Memory_Layout_Item
+x86_64_system_v_memory_layout_item_for_classification(
+  System_V_Classification_State *state,
+  const System_V_Classification *classification,
+  Slice name
+) {
+  u64 byte_size = descriptor_byte_size(classification->descriptor);
+  Storage storage = storage_none;
+  switch(classification->class) {
+    case SYSTEM_V_NO_CLASS: {
+      goto absolute;
+    } break;
+    case SYSTEM_V_INTEGER: {
+      System_V_Registers *gpr = &state->general_purpose_registers;
+      assert (gpr->index + classification->eightbyte_count <= gpr->count);
+      if (classification->eightbyte_count == 1) {
+        Register reg = gpr->items[gpr->index++];
+        storage = storage_register(reg, byte_size);
+      } else if (classification->eightbyte_count == 2) {
+        storage = (Storage) {
+          .tag = Storage_Tag_Unpacked,
+          .byte_size = byte_size,
+          .Unpacked = {
+            .registers = {
+              gpr->items[gpr->index++],
+              gpr->items[gpr->index++]
+            },
+          },
+        };
+      } else {
+        panic("Unexpected eightbyte_count for an INTEGER class argument");
+      }
+      goto absolute;
+    } break;
+    case SYSTEM_V_SSE: {
+      System_V_Registers *vector = &state->general_purpose_registers;
+      assert (vector->index + classification->eightbyte_count <= vector->count);
+      if (classification->eightbyte_count == 1) {
+        Register reg = vector->items[vector->index++];
+        storage = storage_register(reg, byte_size);
+      } else {
+        panic("TODO support packed vector values");
+      }
+      goto absolute;
+    } break;
+    case SYSTEM_V_MEMORY: {
+      return (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Base_Relative,
+        .flags = Memory_Layout_Item_Flags_None,
+        .name = name,
+        .descriptor = classification->descriptor,
+        .Base_Relative = {.offset = state->stack_offset},
+      };
+    } break;
+    case SYSTEM_V_SSEUP:
+    case SYSTEM_V_X87:
+    case SYSTEM_V_X87UP:
+    case SYSTEM_V_COMPLEX_X87: {
+      panic("TODO");
+    } break;
+    default: {
+      panic("Unpexected SYSTEM_V class");
+    } break;
+  }
+
+  absolute:
+  return (Memory_Layout_Item){
+    .tag = Memory_Layout_Item_Tag_Absolute,
+    .name = name,
+    .descriptor = classification->descriptor,
+    .Absolute = {.storage = storage},
+  };
 }
 
 static Memory_Layout_Item
@@ -442,34 +522,15 @@ x86_64_system_v_classify(
         struct_class = SYSTEM_V_MEMORY;
       }
 
-      if (struct_class != SYSTEM_V_MEMORY && eightbyte_count != 1) {
-        if(struct_class == SYSTEM_V_SSE) panic("TODO");
-        if(struct_class != SYSTEM_V_INTEGER) panic("Unexpected struct class");
-
-        assert(eightbyte_count == 2);
-
-        Storage unpacked_storage = {
-          .tag = Storage_Tag_Unpacked,
-          .byte_size = byte_size,
-          .Unpacked = {
-            .registers = {
-              gpr->items[gpr->index++],
-              gpr->items[gpr->index++]
-            },
-          },
-        };
-
-        Memory_Layout_Item struct_item = {
-          .tag = Memory_Layout_Item_Tag_Absolute,
-          .flags = Memory_Layout_Item_Flags_None,
-          .name = name,
-          .descriptor = descriptor,
-          .Absolute = {.storage = unpacked_storage},
-        };
-        dyn_array_push(state->memory_layout.items, struct_item);
-        return struct_class;
-      }
-      return x86_64_system_v_push_memory_layout_item_for_class(state, struct_class, name, descriptor);
+      System_V_Classification classification = {
+        .descriptor = descriptor,
+        .eightbyte_count = eightbyte_count,
+        .class = struct_class,
+      };
+      Memory_Layout_Item struct_item =
+        x86_64_system_v_memory_layout_item_for_classification(state, &classification, name);
+      dyn_array_push(state->memory_layout.items, struct_item);
+      return struct_class;
     }
     case Descriptor_Tag_Fixed_Size_Array: {
       panic("TODO implement array classification");
