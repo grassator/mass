@@ -3554,11 +3554,25 @@ mass_handle_macro_call(
   Value *body_value = token_parse_block_no_scope(&body_context, literal->body);
   MASS_ON_ERROR(*context->result) return 0;
 
-  // TODO typecheck return value if it is defined
+  const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
+  if (
+    literal->info->returns.descriptor &&
+    !same_type_or_can_implicitly_move_cast(literal->info->returns.descriptor, return_descriptor)
+  ) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = body_value->source_range,
+      .Type_Mismatch = {
+        .expected = literal->info->returns.descriptor,
+        .actual = return_descriptor,
+      },
+    });
+    return 0;
+  }
+
   if (value_is_non_lazy_static(body_value)) {
     return body_value;
   }
-  const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
   return mass_make_lazy_value(
     context, source_range, body_value, return_descriptor, mass_macro_lazy_proc
   );

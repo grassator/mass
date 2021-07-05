@@ -1453,9 +1453,9 @@ spec("source") {
 
     it("should be able to parse and run macro id fn with an explicit return and an immediate arg") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
+        "checker", &test_context,
         "id :: macro(x : s64) -> (s64) { if (x > 0) { return 20 }; x }\n"
-        "test :: fn() -> (s64) { id(42) + 1 }"
+        "checker :: fn() -> (s64) { id(42) + 1 }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 21);
@@ -1463,12 +1463,25 @@ spec("source") {
 
     it("should allow changes to the passed arguments to macro function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
+        "checker", &test_context,
         "process :: macro(y : s64) -> () { y = 42; }\n"
-        "test :: fn() -> (s64) { x := 20; process(x); x }"
+        "checker :: fn() -> (s64) { x := 20; process(x); x }"
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
+    }
+
+    it("should type check macro return value if it is defined") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "oops :: macro() -> (s64) { \"oops\" }\n"
+        "checker :: fn() -> (s64) { oops() }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+      check(error->Type_Mismatch.expected == &descriptor_s64);
+      check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
     it("should be able to define and use a syntax macro without a capture") {
