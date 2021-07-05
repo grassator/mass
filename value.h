@@ -118,6 +118,7 @@ storage_equal(
 #define MASS_MUST_SUCCEED(...)\
   do {\
     Mass_Result __result = (__VA_ARGS__);\
+    (void)__result;\
     assert(__result.tag == Mass_Result_Tag_Success);\
   } while (0)\
 
