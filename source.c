@@ -3499,15 +3499,10 @@ mass_macro_lazy_proc(
     result_value = value_force(context, builder, expected_result, body_value);
     MASS_ON_ERROR(*context->result) return 0;
 
-    // @Hack if there are no instructions generated so far there definitely was no jumps
-    //       to return so we can avoid generating this instructions which also can enable
-    //       optimizations in the compile_time_eval that check for the instruction count.
-    if (dyn_array_length(builder->code_block.instructions)) {
-      push_instruction(
-        &builder->code_block.instructions, body_value->source_range,
-        (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
-      );
-    }
+    push_instruction(
+      &builder->code_block.instructions, body_value->source_range,
+      (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+    );
   }
   builder->code_block.end_label = saved_return_label;
   builder->return_value = saved_return_value;
