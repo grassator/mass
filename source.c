@@ -4844,31 +4844,13 @@ token_handle_address_of(
   }
   Value *pointee = *dyn_array_get(args, 0);
 
-  if (context_is_compile_time_eval(context)) { // compile time
-    if (pointee->descriptor == &descriptor_type) {
-      const Descriptor *type = storage_static_as_c_type(&pointee->storage, Descriptor);
-      Descriptor *descriptor = descriptor_pointer_to(context->allocator, type);
-      pointer = value_make(context, &descriptor_type, storage_static(descriptor), pointee->source_range);
-    } else {
-      assert(pointee->storage.tag == Storage_Tag_Memory);
-      Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee->descriptor);
-
-      // TODO put this into a separate section and make readonly after relocations are done
-      //      this section can probably be zero-initialized
-      Program *runtime_program = context->compilation->runtime_program;
-      Section *section = &runtime_program->memory.rw_data;
-      u64 byte_size = descriptor_byte_size(descriptor);
-      u64 alignment = descriptor_byte_alignment(descriptor);
-
-      Label_Index label_index = allocate_section_memory(runtime_program, section, byte_size, alignment);
-      Storage pointer_storage = data_label32(label_index, byte_size);
-      pointer = value_make(context, descriptor, pointer_storage, pointee->source_range);
-      dyn_array_push(runtime_program->relocations, (Relocation) {
-        .patch_at = pointer_storage,
-        .address_of = pointee->storage,
-      });
-    }
-  } else { // run time
+  // This is the support for using `&u32` in types
+  // TODO move this to the std/prelude.mass somehow
+  if (context_is_compile_time_eval(context) && pointee->descriptor == &descriptor_type) {
+    const Descriptor *type = storage_static_as_c_type(&pointee->storage, Descriptor);
+    Descriptor *descriptor = descriptor_pointer_to(context->allocator, type);
+    pointer = value_make(context, &descriptor_type, storage_static(descriptor), pointee->source_range);
+  } else {
     const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
     const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
     pointer = mass_make_lazy_value(
@@ -6293,7 +6275,7 @@ token_define_global_variable(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
-  Value *value = compile_time_eval(context, expression);
+  Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return;
 
   // x := 42 should always be initialized to s64 to avoid weird suprises
@@ -6301,24 +6283,52 @@ token_define_global_variable(
     value = token_value_force_immediate_integer(context, value, &descriptor_s64);
   }
 
+  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
   Value *global_value;
   if (storage_is_label(&value->storage)) {
     global_value = value;
   } else {
-    assert(value->storage.tag == Storage_Tag_Static);
+    // TODO @CopyPaste from ensure_function_instance
+    Program *program = context->program;
+    const Calling_Convention *calling_convention = program->default_calling_convention;
+
+    Slice fn_name = slice_literal("global :=");
+    Slice end_label_name = slice_literal("end of global :=");
+    Label_Index call_label = make_label(program, &program->memory.code, fn_name);
+
+    Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+    function_info_init(fn_info, context->scope);
+
+    Function_Builder *builder = &(Function_Builder){
+      .function = fn_info,
+      .register_volatile_bitset = calling_convention->register_volatile_bitset,
+      .return_value = &void_value,
+      .code_block = {
+        .start_label = call_label,
+        .end_label = make_label(program, &program->memory.code, end_label_name),
+        .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
+      },
+    };
 
     Section *section = &context->program->memory.rw_data;
-    u64 byte_size = descriptor_byte_size(value->descriptor);
-    u64 alignment = descriptor_byte_alignment(value->descriptor);
+    u64 byte_size = descriptor_byte_size(descriptor);
+    u64 alignment = descriptor_byte_alignment(descriptor);
 
-    // TODO this should also be deduped
     Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-    global_value = value_make(
-      context, value->descriptor, data_label32(label_index, byte_size), value->source_range
-    );
+    Storage global_label = data_label32(label_index, byte_size);
+    global_value = value_make(context, descriptor, global_label, expression.source_range);
 
-    void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-    memcpy(section_memory, storage_static_as_c_type_internal(&value->storage, byte_size), byte_size);
+    MASS_ON_ERROR(assign(context, builder, global_value, value)) return;
+
+    calling_convention->body_end_proc(program, builder);
+
+    dyn_array_push(program->functions, *builder);
+
+    const Descriptor *instance_descriptor =
+      descriptor_function_instance(context->allocator, fn_name, fn_info, calling_convention);
+    Value *startup_function =
+      value_make(context, instance_descriptor, code_label32(call_label), value->source_range);
+    dyn_array_push(context->program->startup_functions, startup_function);
   }
 
   Slice scope_name = value_as_symbol(symbol)->name;

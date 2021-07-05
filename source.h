@@ -140,6 +140,12 @@ value_or_lazy_value_descriptor(
 );
 
 static PRELUDE_NO_DISCARD Value *
+token_parse_block_view(
+  Execution_Context *program,
+  Value_View view
+);
+
+static PRELUDE_NO_DISCARD Value *
 token_parse_block_no_scope(
   Execution_Context *context,
   Value *block

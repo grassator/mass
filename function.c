@@ -789,7 +789,15 @@ ensure_function_instance(
   if (function->returns.name.length) {
     scope_define_value(body_scope, body_context.epoch, return_value->source_range, function->returns.name, return_value);
   }
-  Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
+  Value *parse_result = 0;
+  if (value_is_group(literal->body)) {
+    parse_result = token_parse_block_no_scope(&body_context, literal->body);
+  } else if (literal->body->descriptor == &descriptor_value_view) {
+    const Value_View *view = storage_static_as_c_type(&literal->body->storage, Value_View);
+    parse_result = token_parse_block_view(&body_context, *view);
+  } else {
+    panic("Unexpected function body type");
+  }
   MASS_ON_ERROR(*context->result) return 0;
 
   value_force_exact(&body_context, builder, return_value, parse_result);
