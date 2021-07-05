@@ -1939,13 +1939,7 @@ main(void) {
   ));
 
   #define DEFINE_ARITHMETIC(_NAME_)\
-    export_compiler_custom_name(#_NAME_, push_type(\
-      type_function(Default, "mass_" #_NAME_, "Value *", (Argument_Type[]){\
-        { "Execution_Context *", "context" },\
-        { "Value_View", "arguments" },\
-        { "void *", "payload" },\
-      })\
-    ))
+    export_compiler_custom_name(#_NAME_, push_type(type_intrinsic("mass_" #_NAME_)))
 
   DEFINE_ARITHMETIC(add);
   DEFINE_ARITHMETIC(subtract);

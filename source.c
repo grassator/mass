@@ -4496,19 +4496,19 @@ mass_handle_arithmetic_operation(
   }
 }
 
-static inline Value *mass_add(Execution_Context *context, Value_View arguments, void *unused_payload) {
+static inline Value *mass_add(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Add);
 }
-static inline Value *mass_subtract(Execution_Context *context, Value_View arguments, void *unused_payload) {
+static inline Value *mass_subtract(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Subtract);
 }
-static inline Value *mass_multiply(Execution_Context *context, Value_View arguments, void *unused_payload) {
+static inline Value *mass_multiply(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Multiply);
 }
-static inline Value *mass_divide(Execution_Context *context, Value_View arguments, void *unused_payload) {
+static inline Value *mass_divide(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Divide);
 }
-static inline Value *mass_remainder(Execution_Context *context, Value_View arguments, void *unused_payload) {
+static inline Value *mass_remainder(Execution_Context *context, Value_View arguments) {
   return mass_handle_arithmetic_operation(context, arguments, (void*)Mass_Arithmetic_Operator_Remainder);
 }
 

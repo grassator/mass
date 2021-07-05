@@ -335,19 +335,19 @@ static Number_Literal mass_number_literal_bitwise_and
   (Number_Literal a, Number_Literal b);
 
 static Value * mass_add
-  (Execution_Context * context, Value_View arguments, void * payload);
+  (Execution_Context * context, Value_View args);
 
 static Value * mass_subtract
-  (Execution_Context * context, Value_View arguments, void * payload);
+  (Execution_Context * context, Value_View args);
 
 static Value * mass_multiply
-  (Execution_Context * context, Value_View arguments, void * payload);
+  (Execution_Context * context, Value_View args);
 
 static Value * mass_divide
-  (Execution_Context * context, Value_View arguments, void * payload);
+  (Execution_Context * context, Value_View args);
 
 static Value * mass_remainder
-  (Execution_Context * context, Value_View arguments, void * payload);
+  (Execution_Context * context, Value_View args);
 
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;

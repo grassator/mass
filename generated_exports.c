@@ -173,39 +173,34 @@ compiler_scope_define_exports(
     MASS_FN_ARG("b", &descriptor_number_literal)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_add, "add", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("arguments", &descriptor_value_view),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_subtract, "subtract", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("arguments", &descriptor_value_view),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_multiply, "multiply", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("arguments", &descriptor_value_view),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_divide, "divide", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("arguments", &descriptor_value_view),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_remainder, "remainder", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("arguments", &descriptor_value_view),
-    MASS_FN_ARG("payload", &descriptor_void_pointer)
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
 }
 
