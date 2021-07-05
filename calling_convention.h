@@ -279,7 +279,6 @@ x86_64_system_v_memory_layout_item_for_classification(
 static System_V_Classification
 x86_64_system_v_classify(
   const Allocator *allocator,
-  System_V_Register_State *registers,
   Slice name,
   const Descriptor *descriptor
 ) {
@@ -328,8 +327,6 @@ x86_64_system_v_classify(
 
       Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
 
-      System_V_Register_State saved_registers = *registers;
-
       // TODO use a temp allocator
       Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
         Array_SYSTEM_V_ARGUMENT_CLASS,
@@ -361,7 +358,7 @@ x86_64_system_v_classify(
           eightbyte_class = SYSTEM_V_NO_CLASS;
         }
         System_V_Classification field_classification =
-          x86_64_system_v_classify(allocator, registers, item->name, item->descriptor);
+          x86_64_system_v_classify(allocator, item->name, item->descriptor);
         SYSTEM_V_ARGUMENT_CLASS field_class = field_classification.class;
         // 4(a) If both classes are equal, this is the resulting class.
         if (eightbyte_class == field_class) {
@@ -438,10 +435,9 @@ x86_64_system_v_classify(
       }
       if (struct_class == SYSTEM_V_NO_CLASS) struct_class = eightbyte_class;
 
+      // TODO this should include eightbytes from nested classifications
       u64 eightbyte_count = dyn_array_length(eightbyte_classes);
       dyn_array_destroy(eightbyte_classes);
-
-      *registers = saved_registers;
 
       System_V_Classification classification = {
         .descriptor = descriptor,
@@ -516,7 +512,7 @@ calling_convention_x86_64_system_v_return_proc(
   };
 
   System_V_Classification classification = x86_64_system_v_classify(
-    allocator_default, &registers, function->returns.name, function->returns.descriptor
+    allocator_default, function->returns.name, function->returns.descriptor
   );
   x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
   Storage return_storage;
@@ -591,7 +587,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   u64 stack_offset = 0;
   DYN_ARRAY_FOREACH(Function_Parameter, arg, function->parameters) {
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, &registers, arg->name, arg->descriptor);
+      x86_64_system_v_classify(allocator_default, arg->name, arg->descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
