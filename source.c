@@ -6592,37 +6592,6 @@ scope_define_builtins(
     .handler = mass_handle_at_operator,
   )));
 
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("+"), allocator_make(allocator, Operator,
-    .precedence = 10,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_add,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("-"), allocator_make(allocator, Operator,
-    .precedence = 10,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_subtract,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("*"), allocator_make(allocator, Operator,
-    .precedence = 15,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_multiply,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("/"), allocator_make(allocator, Operator,
-    .precedence = 15,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_divide,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("%"), allocator_make(allocator, Operator,
-    .precedence = 15,
-    .fixity = Operator_Fixity_Infix,
-    .argument_count = 2,
-    .handler = mass_remainder,
-  )));
-
   struct { Slice symbol; u32 precedence; Compare_Type type; } comparisons[] = {
     { .symbol = slice_literal("<"),  .precedence = 8, .type = Compare_Type_Signed_Less },
     { .symbol = slice_literal(">"),  .precedence = 8, .type = Compare_Type_Signed_Greater },

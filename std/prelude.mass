@@ -46,6 +46,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
+Type :: mass.Descriptor
 String :: Slice
 bool :: s8
 true :: 1
@@ -60,7 +61,6 @@ Arithmetic_Proc :: fn(
 ) -> (&mass.Value)
 
 arithmetic_overloads :: macro(impl : Arithmetic_Proc) {
-  Type :: mass.Descriptor
   intrinsic :: @intrinsic {
     impl(context, arguments, 0)
   }
@@ -75,6 +75,8 @@ arithmetic_overloads :: macro(impl : Arithmetic_Proc) {
     f
   }
 
+  // TODO this should produce a Number_Literal
+  f :: macro add(x : Number_Literal, y : Number_Literal) -> s64 { intrinsic(x, y) }
   f :: expand(s64, s32, s16, s8)
   f :: expand(u64, u32, u16, u8)
   f
@@ -90,6 +92,21 @@ logical_shift_left :: mass.number_literal_logical_shift_left
 logical_shift_right :: mass.number_literal_logical_shift_right
 bitwise_or :: mass.number_literal_bitwise_or
 bitwise_and :: mass.number_literal_bitwise_and
+
+// TODO Turn this into a compile-time functions implemented here instead of the compiler
+multiply :: {
+  intrinsic :: @intrinsic {
+    mass.multiply(context, arguments, 0)
+  }
+  macro array(type : Type, count : Number_Literal) { intrinsic(type, count) }
+}
+
+operator 10 (x + y) { add(x, y) }
+operator 10 (x - y) { subtract(x, y) }
+
+operator 15 (x * y) { multiply(x, y) }
+operator 15 (x / y) { divide(x, y) }
+operator 15 (x % y) { remainder(x, y) }
 
 operator 16 (- x) { negate(x) }
 operator 16 (& x) { address_of(x) }
