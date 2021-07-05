@@ -279,7 +279,6 @@ x86_64_system_v_memory_layout_item_for_classification(
 static System_V_Classification
 x86_64_system_v_classify(
   const Allocator *allocator,
-  Slice name,
   const Descriptor *descriptor
 ) {
   u64 byte_size = descriptor_byte_size(descriptor);
@@ -358,7 +357,7 @@ x86_64_system_v_classify(
           eightbyte_class = SYSTEM_V_NO_CLASS;
         }
         System_V_Classification field_classification =
-          x86_64_system_v_classify(allocator, item->name, item->descriptor);
+          x86_64_system_v_classify(allocator, item->descriptor);
         SYSTEM_V_ARGUMENT_CLASS field_class = field_classification.class;
         // 4(a) If both classes are equal, this is the resulting class.
         if (eightbyte_class == field_class) {
@@ -511,9 +510,8 @@ calling_convention_x86_64_system_v_return_proc(
     },
   };
 
-  System_V_Classification classification = x86_64_system_v_classify(
-    allocator_default, function->returns.name, function->returns.descriptor
-  );
+  System_V_Classification classification =
+    x86_64_system_v_classify(allocator_default, function->returns.descriptor);
   x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
   Storage return_storage;
   const Descriptor *return_descriptor;
@@ -587,7 +585,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   u64 stack_offset = 0;
   DYN_ARRAY_FOREACH(Function_Parameter, arg, function->parameters) {
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, arg->name, arg->descriptor);
+      x86_64_system_v_classify(allocator_default, arg->descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
