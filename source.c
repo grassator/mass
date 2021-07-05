@@ -3097,7 +3097,10 @@ compile_time_eval(
     context->result = eval_context.result;
     return 0;
   }
-  calling_convention->body_end_proc(jit->program, &eval_builder);
+
+  // Should we use a custom calling convention for compile-time calls?
+  Function_Call_Setup call_setup = {0};
+  calling_convention->body_end_proc(jit->program, &call_setup, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
   Mass_Result jit_result = program_jit(context->compilation, jit);
@@ -3595,7 +3598,7 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  Value *fn_return_value = instance_descriptor->call_setup.return_value;
+  Value *fn_return_value = instance_descriptor->call_setup.caller_return_value;
   if (fn_info->returns.descriptor != &descriptor_void) {
     fn_return_value->is_temporary = true;
   }

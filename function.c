@@ -728,9 +728,6 @@ ensure_function_instance(
   Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
 
-  Value *return_value =
-    calling_convention->return_proc(context->allocator, function, Function_Parameter_Mode_Body);
-
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
@@ -738,9 +735,6 @@ ensure_function_instance(
   const Descriptor *instance_descriptor = descriptor_function_instance(
     context->allocator, fn_name, function, calling_convention
   );
-
-  const Memory_Layout *arguments_layout =
-    &instance_descriptor->Function_Instance.call_setup.arguments_layout;
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
@@ -763,6 +757,8 @@ ensure_function_instance(
   Slice end_label_pieces[] = {fn_name, slice_literal(":end")};
   Slice end_label_name = slice_join(context->allocator, end_label_pieces, countof(end_label_pieces));
 
+  Value *return_value = instance_descriptor->Function_Instance.call_setup.callee_return_value;
+
   Function_Builder *builder = &(Function_Builder){
     .function = function,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
@@ -774,7 +770,9 @@ ensure_function_instance(
     },
   };
 
+  const Function_Call_Setup *call_setup = &instance_descriptor->Function_Instance.call_setup;
   {
+    const Memory_Layout *arguments_layout = &call_setup->arguments_layout;
     Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Received_Argument);
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
@@ -810,7 +808,7 @@ ensure_function_instance(
     (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
   );
 
-  calling_convention->body_end_proc(program, builder);
+  calling_convention->body_end_proc(program, call_setup, builder);
 
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);

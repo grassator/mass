@@ -1553,11 +1553,7 @@ descriptor_function_instance(
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = {
       .info = info,
-      .call_setup = {
-        .arguments_layout = calling_convention->arguments_layout_proc(allocator, info),
-        .return_value = calling_convention->return_proc(allocator, info, Function_Parameter_Mode_Call),
-        .calling_convention = calling_convention,
-      },
+      .call_setup = calling_convention->call_setup_proc(allocator, info),
     },
   };
   return result;

@@ -7,26 +7,19 @@
 static void
 calling_convention_x86_64_windows_body_end_proc(
   Program *program,
+  const Function_Call_Setup *call_setup,
   Function_Builder *builder
 );
 
-static Memory_Layout
-calling_convention_x86_64_windows_arguments_layout_proc(
+static Function_Call_Setup
+calling_convention_x86_64_windows_call_setup_proc(
   const Allocator *allocator,
   const Function_Info *function
 );
 
-static Value *
-calling_convention_x86_64_windows_return_proc(
-  const Allocator *allocator,
-  const Function_Info *function,
-  Function_Parameter_Mode mode
-);
-
 static const Calling_Convention calling_convention_x86_64_windows = {
   .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
-  .arguments_layout_proc = calling_convention_x86_64_windows_arguments_layout_proc,
-  .return_proc = calling_convention_x86_64_windows_return_proc,
+  .call_setup_proc = calling_convention_x86_64_windows_call_setup_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_C) | (1llu << Register_D) | (1llu << Register_R8) | (1llu << Register_R9) |
@@ -40,26 +33,19 @@ static const Calling_Convention calling_convention_x86_64_windows = {
 static void
 calling_convention_x86_64_system_v_body_end_proc(
   Program *program,
+  const Function_Call_Setup *call_setup,
   Function_Builder *builder
 );
 
-static Memory_Layout
-calling_convention_x86_64_system_v_arguments_layout_proc(
+static Function_Call_Setup
+calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
   const Function_Info *function
 );
 
-static Value *
-calling_convention_x86_64_system_v_return_proc(
-  const Allocator *allocator,
-  const Function_Info *function,
-  Function_Parameter_Mode mode
-);
-
 static const Calling_Convention calling_convention_x86_64_system_v = {
   .body_end_proc = calling_convention_x86_64_system_v_body_end_proc,
-  .arguments_layout_proc = calling_convention_x86_64_system_v_arguments_layout_proc,
-  .return_proc = calling_convention_x86_64_system_v_return_proc,
+  .call_setup_proc = calling_convention_x86_64_system_v_call_setup_proc,
   .register_volatile_bitset = (
     // Arguments
     (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
@@ -466,91 +452,79 @@ x86_64_system_v_classify(
 static void
 calling_convention_x86_64_system_v_body_end_proc(
   Program *program,
+  const Function_Call_Setup *call_setup,
   Function_Builder *builder
 ) {
-
-  // FIXME avoid doing this
-  Value *return_value = calling_convention_x86_64_system_v_return_proc(
-    allocator_default, builder->function, Function_Parameter_Mode_Body
-  );
-
-  bool is_indirect_return = (
-    return_value->storage.tag == Storage_Tag_Memory &&
-    return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
-    return_value->storage.Memory.location.Indirect.base_register == Register_DI
-  );
-  allocator_deallocate(allocator_default, return_value, sizeof(return_value));
-
-  // :ReturnTypeLargerThanRegister
-  if(is_indirect_return) {
+  if(call_setup->flags & Function_Call_Setup_Flags_Indirect_Return) {
     push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
   }
   calling_convention_x86_64_common_end_proc(program, builder);
 }
 
-static Value *
-calling_convention_x86_64_system_v_return_proc(
-  const Allocator *allocator,
-  const Function_Info *function,
-  Function_Parameter_Mode mode
-) {
-  if (function->returns.descriptor == &descriptor_void) {
-    return value_init(
-      allocator_allocate(allocator, Value),
-      &descriptor_void,
-      storage_none,
-      function->returns.source_range
-    );
-  }
-  static const Register general_registers[] = { Register_A, Register_D };
-  static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
-
-  System_V_Register_State registers = {
-    .general = {
-      .items = general_registers,
-      .count = countof(general_registers),
-      .index = 0,
-    },
-    .vector = {
-      .items = vector_registers,
-      .count = countof(vector_registers),
-      .index = 0,
-    },
-  };
-
-  System_V_Classification classification =
-    x86_64_system_v_classify(allocator_default, function->returns.descriptor);
-  x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
-  Storage return_storage;
-  const Descriptor *return_descriptor;
-  if (classification.class == SYSTEM_V_MEMORY) {
-    Register base_register = mode == Function_Parameter_Mode_Call ? Register_A : Register_DI;
-    return_descriptor = function->returns.descriptor;
-    return_storage = storage_indirect(descriptor_byte_size(return_descriptor), base_register);
-  } else {
-    u64 stack_offset = 0;
-    Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
-      &registers, &classification, function->returns.name, &stack_offset
-    );
-    assert(item.tag == Memory_Layout_Item_Tag_Absolute);
-    return_descriptor = item.descriptor;
-    return_storage = item.Absolute.storage;
-  }
-
-  return value_init(
-    allocator_allocate(allocator, Value),
-    return_descriptor,
-    return_storage,
-    function->returns.source_range
-  );
-}
-
-static Memory_Layout
-calling_convention_x86_64_system_v_arguments_layout_proc(
+static Function_Call_Setup
+calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
   const Function_Info *function
 ) {
+  Function_Call_Setup result = {
+    .calling_convention = &calling_convention_x86_64_system_v,
+  };
+  if (function->returns.descriptor == &descriptor_void) {
+    result.callee_return_value = &void_value;
+    result.caller_return_value = &void_value;
+  } else {
+    static const Register general_registers[] = { Register_A, Register_D };
+    static const Register vector_registers[] = { Register_Xmm0, Register_Xmm1 };
+
+    System_V_Register_State registers = {
+      .general = {
+        .items = general_registers,
+        .count = countof(general_registers),
+        .index = 0,
+      },
+      .vector = {
+        .items = vector_registers,
+        .count = countof(vector_registers),
+        .index = 0,
+      },
+    };
+
+    System_V_Classification classification =
+      x86_64_system_v_classify(allocator_default, function->returns.descriptor);
+    x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
+    if (classification.class == SYSTEM_V_MEMORY) {
+      result.flags |= Function_Call_Setup_Flags_Indirect_Return;
+      result.caller_return_value = value_init(
+        allocator_allocate(allocator, Value),
+        function->returns.descriptor,
+        storage_indirect(descriptor_byte_size(function->returns.descriptor), Register_A),
+        function->returns.source_range
+      );
+      result.callee_return_value = value_init(
+        allocator_allocate(allocator, Value),
+        function->returns.descriptor,
+        storage_indirect(descriptor_byte_size(function->returns.descriptor), Register_DI),
+        function->returns.source_range
+      );
+    } else {
+      u64 stack_offset = 0;
+      Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
+        &registers, &classification, function->returns.name, &stack_offset
+      );
+      assert(item.tag == Memory_Layout_Item_Tag_Absolute);
+
+      Value *common_return_value = value_init(
+        allocator_allocate(allocator, Value),
+        item.descriptor,
+        item.Absolute.storage,
+        function->returns.source_range
+      );
+      result.callee_return_value = common_return_value;
+      result.caller_return_value = common_return_value;
+    }
+  }
+
   static const Register general_registers[] = {
     Register_DI, Register_SI, Register_D, Register_C, Register_R8, Register_R9
   };
@@ -559,22 +533,11 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     Register_Xmm4, Register_Xmm5, Register_Xmm6, Register_Xmm7,
   };
 
-  // FIXME avoid doing this
-  Value *return_value = calling_convention_x86_64_system_v_return_proc(
-    allocator, function, Function_Parameter_Mode_Body
-  );
-
-  bool is_indirect_return = (
-    return_value->storage.tag == Storage_Tag_Memory &&
-    return_value->storage.Memory.location.tag == Memory_Location_Tag_Indirect &&
-    return_value->storage.Memory.location.Indirect.base_register == Register_DI
-  );
-
   System_V_Register_State registers = {
     .general = {
       .items = general_registers,
       .count = countof(general_registers),
-      .index = is_indirect_return ? 1 : 0,
+      .index = (result.flags & Function_Call_Setup_Flags_Indirect_Return) ? 1 : 0,
     },
     .vector = {
       .items = vector_registers,
@@ -583,7 +546,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
     },
   };
 
-  Memory_Layout memory_layout = {
+  result.arguments_layout = (Memory_Layout){
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
@@ -601,79 +564,94 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
       &registers, &classification, arg->name, &stack_offset
     );
 
-    dyn_array_push(memory_layout.items, struct_item);
+    dyn_array_push(result.arguments_layout.items, struct_item);
   }
 
-  if (is_indirect_return) {
-    const Descriptor *reference = descriptor_reference_to(allocator, return_value->descriptor);
-    dyn_array_push(memory_layout.items, (Memory_Layout_Item) {
+  if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
+    const Descriptor *reference = descriptor_reference_to(allocator, function->returns.descriptor);
+    dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
       .descriptor = reference,
-      .source_range = return_value->source_range,
+      .source_range = function->returns.source_range,
       .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
     });
   }
 
-  return memory_layout;
+  return result;
 }
 
 static void
 calling_convention_x86_64_windows_body_end_proc(
   Program *program,
+  const Function_Call_Setup *call_setup,
   Function_Builder *builder
 ) {
-  // :ReturnTypeLargerThanRegister
-  if(descriptor_byte_size(builder->function->returns.descriptor) > 8) {
+  if(call_setup->flags & Function_Call_Setup_Flags_Indirect_Return) {
     push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}});
   }
   calling_convention_x86_64_common_end_proc(program, builder);
 }
 
-static Value *
-calling_convention_x86_64_windows_return_proc(
-  const Allocator *allocator,
-  const Function_Info *function,
-  Function_Parameter_Mode mode
-) {
-  const Descriptor *descriptor = function->returns.descriptor;
-  if (descriptor == &descriptor_void) {
-    return &void_value;
-  }
-  Storage storage;
-  // TODO handle 16 byte non-float return values in XMM0
-  if (descriptor_is_float(descriptor)) {
-    storage = storage_register_for_descriptor(Register_Xmm0, descriptor);
-  } else {
-    Register base_register = Register_A;
-    if (descriptor_byte_size(descriptor) > 8) {
-      descriptor = descriptor_reference_to(allocator, descriptor);
-      // :ReturnTypeLargerThanRegister
-      // Inside the function large returns are pointed to by RCX,
-      // but this pointer is also returned in A
-      if (mode == Function_Parameter_Mode_Body) {
-        base_register = Register_C;
-      }
-    }
-    storage = storage_register_for_descriptor(base_register, descriptor);
-  }
-  return value_init(
-    allocator_allocate(allocator, Value), descriptor, storage, COMPILER_SOURCE_RANGE
-  );
-}
-
-static Memory_Layout
-calling_convention_x86_64_windows_arguments_layout_proc(
+static Function_Call_Setup
+calling_convention_x86_64_windows_call_setup_proc(
   const Allocator *allocator,
   const Function_Info *function
 ) {
+  Function_Call_Setup result = {
+    .calling_convention = &calling_convention_x86_64_windows,
+  };
+  if (function->returns.descriptor == &descriptor_void) {
+    result.callee_return_value = &void_value;
+    result.caller_return_value = &void_value;
+  } else {
+    if (descriptor_is_float(function->returns.descriptor)) {
+      Value *common_return_value = value_init(
+        allocator_allocate(allocator, Value),
+        function->returns.descriptor,
+        storage_register_for_descriptor(Register_Xmm0, function->returns.descriptor),
+        function->returns.source_range
+      );
+      result.callee_return_value = common_return_value;
+      result.caller_return_value = common_return_value;
+    } else {
+      if (descriptor_byte_size(function->returns.descriptor) > 8) {
+        result.flags |= Function_Call_Setup_Flags_Indirect_Return;
+        const Descriptor *reference =
+          descriptor_reference_to(allocator, function->returns.descriptor);
+
+        result.caller_return_value = value_init(
+          allocator_allocate(allocator, Value),
+          reference,
+          storage_register_for_descriptor(Register_A, reference),
+          function->returns.source_range
+        );
+        result.callee_return_value = value_init(
+          allocator_allocate(allocator, Value),
+          reference,
+          storage_register_for_descriptor(Register_C, reference),
+          function->returns.source_range
+        );
+      } else {
+        Value *common_return_value = value_init(
+          allocator_allocate(allocator, Value),
+          function->returns.descriptor,
+          storage_register_for_descriptor(Register_A, function->returns.descriptor),
+          function->returns.source_range
+        );
+        result.callee_return_value = common_return_value;
+        result.caller_return_value = common_return_value;
+      }
+    }
+  }
+
   static const Register general_registers[] = {Register_C, Register_D, Register_R8, Register_R9};
   static const Register float_registers[] = {Register_Xmm0, Register_Xmm1, Register_Xmm2, Register_Xmm3};
   assert(countof(general_registers) == countof(float_registers));
 
-  Memory_Layout layout = {
+  result.arguments_layout = (Memory_Layout){
     .items = dyn_array_make(
       Array_Memory_Layout_Item,
       .allocator = allocator,
@@ -681,13 +659,7 @@ calling_convention_x86_64_windows_arguments_layout_proc(
     ),
   };
 
-  // :ReturnTypeLargerThanRegister
-  // If return type is larger than register, the pointer to stack location
-  // where it needs to be written to is passed as the first argument
-  // shifting registers for actual arguments by one
-  u64 return_byte_size = descriptor_byte_size(function->returns.descriptor);
-  bool is_return_larger_than_register = return_byte_size > 8;
-  u64 index = is_return_larger_than_register ? 1 : 0;
+  u64 index = (result.flags & Function_Call_Setup_Flags_Indirect_Return) ? 1 : 0;
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     Memory_Layout_Item item = {
@@ -714,14 +686,14 @@ calling_convention_x86_64_windows_arguments_layout_proc(
       item.tag = Memory_Layout_Item_Tag_Base_Relative;
       item.Base_Relative.offset = index * 8;
     }
-    dyn_array_push(layout.items, item);
+    dyn_array_push(result.arguments_layout.items, item);
     index += 1;
   }
 
-  if (is_return_larger_than_register) {
+  if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
     const Descriptor *return_descriptor =
       descriptor_reference_to(allocator, function->returns.descriptor);
-    dyn_array_push(layout.items, (Memory_Layout_Item) {
+    dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .name = {0}, // Defining return value name happens separately
@@ -731,7 +703,8 @@ calling_convention_x86_64_windows_arguments_layout_proc(
     });
   }
 
-  return layout;
+  return result;
 }
+
 #endif
 

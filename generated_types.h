@@ -241,6 +241,8 @@ typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
+typedef enum Function_Call_Setup_Flags Function_Call_Setup_Flags;
+
 typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
@@ -262,13 +264,10 @@ typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
 typedef void (*Calling_Convention_Body_End_Proc)
-  (Program * program, Function_Builder * builder);
+  (Program * program, const Function_Call_Setup * call_setup, Function_Builder * builder);
 
-typedef Memory_Layout (*Calling_Convention_Arguments_Layout_Proc)
+typedef Function_Call_Setup (*Calling_Convention_Call_Setup_Proc)
   (const Allocator * allocator, const Function_Info * function_info);
-
-typedef Value * (*Calling_Convention_Return_Proc)
-  (const Allocator * allocator, const Function_Info * function_info, Function_Parameter_Mode mode);
 
 typedef struct Calling_Convention Calling_Convention;
 typedef dyn_array_type(Calling_Convention *) Array_Calling_Convention_Ptr;
@@ -1451,10 +1450,25 @@ typedef struct Function_Literal {
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
+typedef enum Function_Call_Setup_Flags {
+  Function_Call_Setup_Flags_None = 0,
+  Function_Call_Setup_Flags_Indirect_Return = 1,
+} Function_Call_Setup_Flags;
+
+const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
+  if (value == 0) return "Function_Call_Setup_Flags_None";
+  if (value == 1) return "Function_Call_Setup_Flags_Indirect_Return";
+  assert(!"Unexpected value for enum Function_Call_Setup_Flags");
+  return 0;
+};
+
 typedef struct Function_Call_Setup {
+  Function_Call_Setup_Flags flags;
+  u32 stack_arguments_size;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
-  Value * return_value;
+  Value * caller_return_value;
+  Value * callee_return_value;
 } Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
@@ -1747,8 +1761,7 @@ typedef dyn_array_type(Program) Array_Program;
 typedef struct Calling_Convention {
   u64 register_volatile_bitset;
   Calling_Convention_Body_End_Proc body_end_proc;
-  Calling_Convention_Arguments_Layout_Proc arguments_layout_proc;
-  Calling_Convention_Return_Proc return_proc;
+  Calling_Convention_Call_Setup_Proc call_setup_proc;
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
@@ -2206,6 +2219,11 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
+static Descriptor descriptor_function_call_setup_flags;
+static Descriptor descriptor_array_function_call_setup_flags;
+static Descriptor descriptor_array_function_call_setup_flags_ptr;
+static Descriptor descriptor_function_call_setup_flags_pointer;
+static Descriptor descriptor_function_call_setup_flags_pointer_pointer;
 static Descriptor descriptor_function_call_setup;
 static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
@@ -2232,8 +2250,7 @@ static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
 static Descriptor descriptor_calling_convention_body_end_proc;
-static Descriptor descriptor_calling_convention_arguments_layout_proc;
-static Descriptor descriptor_calling_convention_return_proc;
+static Descriptor descriptor_calling_convention_call_setup_proc;
 static Descriptor descriptor_calling_convention;
 static Descriptor descriptor_array_calling_convention;
 static Descriptor descriptor_array_calling_convention_ptr;
@@ -4453,9 +4470,26 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
+MASS_DEFINE_OPAQUE_C_TYPE(function_call_setup_flags, Function_Call_Setup_Flags)
+static C_Enum_Item function_call_setup_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Indirect_Return"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Setup_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("flags"),
+    .descriptor = &descriptor_function_call_setup_flags,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("stack_arguments_size"),
+    .descriptor = &descriptor_u32,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, stack_arguments_size),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("calling_convention"),
@@ -4470,9 +4504,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("return_value"),
+    .name = slice_literal_fields("caller_return_value"),
     .descriptor = &descriptor_value_pointer,
-    .Base_Relative.offset = offsetof(Function_Call_Setup, return_value),
+    .Base_Relative.offset = offsetof(Function_Call_Setup, caller_return_value),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("callee_return_value"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, callee_return_value),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_call_setup);
@@ -5055,15 +5095,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("arguments_layout_proc"),
-    .descriptor = &descriptor_calling_convention_arguments_layout_proc,
-    .Base_Relative.offset = offsetof(Calling_Convention, arguments_layout_proc),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("return_proc"),
-    .descriptor = &descriptor_calling_convention_return_proc,
-    .Base_Relative.offset = offsetof(Calling_Convention, return_proc),
+    .name = slice_literal_fields("call_setup_proc"),
+    .descriptor = &descriptor_calling_convention_call_setup_proc,
+    .Base_Relative.offset = offsetof(Calling_Convention, call_setup_proc),
   },
 );
 MASS_DEFINE_TYPE_VALUE(calling_convention);

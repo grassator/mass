@@ -1650,10 +1650,18 @@ main(void) {
     { "Value *", "compile_time_instance"},
   }));
 
+  push_type(type_enum("Function_Call_Setup_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Indirect_Return", 1 << 0 },
+  }));
+
   push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
+    { "Function_Call_Setup_Flags", "flags"},
+    { "u32", "stack_arguments_size"},
     { "const Calling_Convention *", "calling_convention" },
     { "Memory_Layout", "arguments_layout" },
-    { "Value *", "return_value" },
+    { "Value *", "caller_return_value" },
+    { "Value *", "callee_return_value" },
   }));
 
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
@@ -1770,25 +1778,19 @@ main(void) {
 
   push_type(type_function(Typedef, "Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
     { "Program *", "program" },
+    { "const Function_Call_Setup *", "call_setup" },
     { "Function_Builder *", "builder" },
   }));
 
-  push_type(type_function(Typedef, "Calling_Convention_Arguments_Layout_Proc", "Memory_Layout", (Argument_Type[]){
+  push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
-  }));
-
-  push_type(type_function(Typedef, "Calling_Convention_Return_Proc", "Value *", (Argument_Type[]){
-    { "const Allocator *", "allocator" },
-    { "const Function_Info *", "function_info" },
-    { "Function_Parameter_Mode", "mode" },
   }));
 
   push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
     { "Calling_Convention_Body_End_Proc", "body_end_proc" },
-    { "Calling_Convention_Arguments_Layout_Proc", "arguments_layout_proc"},
-    { "Calling_Convention_Return_Proc", "return_proc"},
+    { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 
   push_type(type_function(Typedef, "Token_Statement_Matcher_Proc", "u64", (Argument_Type[]){
