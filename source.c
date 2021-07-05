@@ -3431,111 +3431,6 @@ token_parse_constant_definitions(
   return statement_length;
 }
 
-typedef struct {
-  Array_Value_Ptr args;
-  Value *overload;
-  Source_Range source_range;
-} Mass_Function_Call_Lazy_Payload;
-
-static Value *
-call_function_macro(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Mass_Function_Call_Lazy_Payload *payload
-) {
-  Value *fn_value = payload->overload;
-  Array_Value_Ptr args = payload->args;
-  assert(fn_value->descriptor == &descriptor_function_literal);
-  const Function_Literal *literal = storage_static_as_c_type(&fn_value->storage, Function_Literal);
-  const Function_Info *function = literal->info;
-  assert(function->flags & Descriptor_Function_Flags_Macro);
-
-  // We make a nested scope based on function's original scope
-  // instead of current scope for hygiene reasons. I.e. function body
-  // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, function->scope);
-
-  for(u64 i = 0; i < dyn_array_length(function->parameters); ++i) {
-    MASS_ON_ERROR(*context->result) return 0;
-    Function_Parameter *arg = dyn_array_get(function->parameters, i);
-    if (arg->name.length) {
-      Value *arg_value;
-      if (i >= dyn_array_length(args)) {
-        // We should catch the missing default expression in the matcher
-        Value_View default_expression = arg->maybe_default_expression;
-        assert(default_expression.length);
-        const Source_Range *source_range = &default_expression.source_range;
-        // FIXME avoid using a stack value
-        arg_value = reserve_stack(context, builder, arg->descriptor, *source_range);
-        {
-          Execution_Context arg_context = *context;
-          arg_context.scope = body_scope;
-          Value *parse_result = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
-          value_force_exact(&arg_context, builder, arg_value, parse_result);
-        }
-      } else {
-        arg_value = *dyn_array_get(args, i);
-      }
-
-      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
-      u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
-      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->name, arg_value);
-    }
-  }
-
-  // Define a new return target label and value so that explicit return statements
-  // jump to correct location and put value in the right place
-  Program *program = context->program;
-
-  Value *result_value = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      const Descriptor *return_descriptor = function->returns.descriptor;
-      if (!return_descriptor) {
-        return_descriptor = expected_result_descriptor(expected_result);
-      }
-      // FIXME :ExpectedStack
-      result_value = return_descriptor == &descriptor_void
-        ? &void_value
-        : reserve_stack(context, builder, return_descriptor, payload->source_range);
-      break;
-    }
-  }
-
-  Label_Index saved_return_label = builder->code_block.end_label;
-  Value *saved_return_value = builder->return_value;
-  {
-    builder->code_block.end_label =
-      make_label(program, &program->memory.code, slice_literal("macro return"));
-    builder->return_value = result_value;
-    Execution_Context body_context = *context;
-    body_context.scope = body_scope;
-    Value *parse_result = token_parse_block_no_scope(&body_context, literal->body);
-    result_value = value_force(&body_context, builder, expected_result, parse_result);
-    MASS_ON_ERROR(*context->result) return 0;
-
-    // @Hack if there are no instructions generated so far there definitely was no jumps
-    //       to return so we can avoid generating this instructions which also can enable
-    //       optimizations in the compile_time_eval that check for the instruction count.
-    if (dyn_array_length(builder->code_block.instructions)) {
-      push_instruction(
-        &builder->code_block.instructions, fn_value->source_range,
-        (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
-      );
-    }
-  }
-  builder->code_block.end_label = saved_return_label;
-  builder->return_value = saved_return_value;
-
-  dyn_array_destroy(args);
-  return result_value;
-}
-
 static u64
 register_bitset_from_storage(
   const Storage *storage
@@ -3572,11 +3467,119 @@ register_bitset_from_storage(
   return result;
 }
 
+static Value *
+mass_macro_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Value *body_value
+) {
+  Value *result_value = 0;
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      result_value = value_from_exact_expected_result(expected_result);
+      break;
+    }
+    case Expected_Result_Tag_Flexible: {
+      const Descriptor *return_descriptor = expected_result_descriptor(expected_result);
+      // FIXME :ExpectedStack
+      result_value = return_descriptor == &descriptor_void
+        ? &void_value
+        : reserve_stack(context, builder, return_descriptor, body_value->source_range);
+      break;
+    }
+  }
+
+  Label_Index saved_return_label = builder->code_block.end_label;
+  Value *saved_return_value = builder->return_value;
+  {
+    builder->code_block.end_label =
+      make_label(context->program, &context->program->memory.code, slice_literal("macro return"));
+    builder->return_value = result_value;
+    result_value = value_force(context, builder, expected_result, body_value);
+    MASS_ON_ERROR(*context->result) return 0;
+
+    // @Hack if there are no instructions generated so far there definitely was no jumps
+    //       to return so we can avoid generating this instructions which also can enable
+    //       optimizations in the compile_time_eval that check for the instruction count.
+    if (dyn_array_length(builder->code_block.instructions)) {
+      push_instruction(
+        &builder->code_block.instructions, body_value->source_range,
+        (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+      );
+    }
+  }
+  builder->code_block.end_label = saved_return_label;
+  builder->return_value = saved_return_value;
+
+  return result_value;
+}
+
+static inline Value *
+mass_handle_macro_call(
+  Execution_Context *context,
+  Value *overload,
+  Array_Value_Ptr args,
+  Source_Range source_range
+) {
+  assert(overload->descriptor == &descriptor_function_literal);
+  const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+  assert(literal->info->flags & Descriptor_Function_Flags_Macro);
+
+  // We make a nested scope based on function's original scope
+  // instead of current scope for hygiene reasons. I.e. function body
+  // should not have access to locals inside the call scope.
+  Scope *body_scope = scope_make(context->allocator, literal->info->scope);
+
+  for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
+    MASS_ON_ERROR(*context->result) return 0;
+    Function_Parameter *arg = dyn_array_get(literal->info->parameters, i);
+    if (arg->name.length) {
+      Value *arg_value;
+      if (i >= dyn_array_length(args)) {
+        // We should catch the missing default expression in the matcher
+        Value_View default_expression = arg->maybe_default_expression;
+        assert(default_expression.length);
+        Execution_Context arg_context = *context;
+        arg_context.scope = body_scope;
+        arg_value = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
+      } else {
+        arg_value = *dyn_array_get(args, i);
+      }
+
+      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
+      u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
+      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->name, arg_value);
+    }
+  }
+  dyn_array_destroy(args);
+
+  Execution_Context body_context = *context;
+  body_context.scope = body_scope;
+  Value *body_value = token_parse_block_no_scope(&body_context, literal->body);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  // TODO typecheck return value if it is defined
+  if (value_is_non_lazy_static(body_value)) {
+    return body_value;
+  }
+  const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
+  return mass_make_lazy_value(
+    context, source_range, body_value, return_descriptor, mass_macro_lazy_proc
+  );
+}
+
 typedef struct {
   Storage reg;
   Storage stack;
 } Saved_Register;
 typedef dyn_array_type(Saved_Register) Array_Saved_Register;
+
+typedef struct {
+  Array_Value_Ptr args;
+  Value *overload;
+  Source_Range source_range;
+} Mass_Function_Call_Lazy_Payload;
 
 static Value *
 call_function_overload(
@@ -4090,19 +4093,21 @@ token_handle_function_call(
     return result;
   }
 
-  Mass_Function_Call_Lazy_Payload *payload =
+  if (info->flags & Descriptor_Function_Flags_Macro) {
+    return mass_handle_macro_call(context, overload, args, source_range);
+  }
+
+  Mass_Function_Call_Lazy_Payload *call_payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
-  *payload = (Mass_Function_Call_Lazy_Payload) {
+  *call_payload = (Mass_Function_Call_Lazy_Payload){
     .overload = overload,
     .args = args,
     .source_range = source_range,
   };
 
-  Lazy_Value_Proc proc = (info->flags & Descriptor_Function_Flags_Macro)
-    ? call_function_macro
-    : call_function_overload;
-
-  return mass_make_lazy_value(context, source_range, payload, info->returns.descriptor, proc);
+  return mass_make_lazy_value(
+    context, source_range, call_payload, info->returns.descriptor, call_function_overload
+  );
 }
 
 static Storage
