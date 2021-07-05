@@ -20,7 +20,7 @@ if %errorlevel% neq 0 (goto Fail)
 .\meta
 if %errorlevel% neq 0 (goto Fail)
 
-cl /O2 /Oy /GL %FLAGS% /wd4189 /D NDEBUG ..\mass.c
+cl /O2 /Oy /Ob2 /GL %FLAGS% /wd4189 /D NDEBUG ..\mass.c
 if %errorlevel% neq 0 (goto Fail)
 
 :Success
