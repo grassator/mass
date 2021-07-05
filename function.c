@@ -739,7 +739,8 @@ ensure_function_instance(
     context->allocator, fn_name, function, calling_convention
   );
 
-  const Memory_Layout *arguments_layout = &instance_descriptor->Function_Instance.arguments_layout;
+  const Memory_Layout *arguments_layout =
+    &instance_descriptor->Function_Instance.call_setup.arguments_layout;
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);

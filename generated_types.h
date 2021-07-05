@@ -241,6 +241,10 @@ typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
+typedef struct Function_Call_Setup Function_Call_Setup;
+typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
+typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -1447,6 +1451,13 @@ typedef struct Function_Literal {
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
+typedef struct Function_Call_Setup {
+  const Calling_Convention * calling_convention;
+  Memory_Layout arguments_layout;
+  Value * return_value;
+} Function_Call_Setup;
+typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
+
 typedef enum {
   Descriptor_Tag_Opaque = 0,
   Descriptor_Tag_Function_Instance = 1,
@@ -1458,9 +1469,7 @@ typedef enum {
 
 typedef struct Descriptor_Function_Instance {
   Function_Info * info;
-  const Calling_Convention * calling_convention;
-  Memory_Layout arguments_layout;
-  Value * return_value;
+  Function_Call_Setup call_setup;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
   const Descriptor * item;
@@ -2197,6 +2206,11 @@ static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
 static Descriptor descriptor_function_literal_pointer;
 static Descriptor descriptor_function_literal_pointer_pointer;
+static Descriptor descriptor_function_call_setup;
+static Descriptor descriptor_array_function_call_setup;
+static Descriptor descriptor_array_function_call_setup_ptr;
+static Descriptor descriptor_function_call_setup_pointer;
+static Descriptor descriptor_function_call_setup_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -4439,6 +4453,29 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Setup_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("calling_convention"),
+    .descriptor = &descriptor_calling_convention_pointer,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, calling_convention),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("arguments_layout"),
+    .descriptor = &descriptor_memory_layout,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, arguments_layout),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("return_value"),
+    .descriptor = &descriptor_value_pointer,
+    .Base_Relative.offset = offsetof(Function_Call_Setup, return_value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_call_setup);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
@@ -4460,21 +4497,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_function_instance, Descriptor_Function_
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("calling_convention"),
-    .descriptor = &descriptor_calling_convention_pointer,
-    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, calling_convention),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("arguments_layout"),
-    .descriptor = &descriptor_memory_layout,
-    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, arguments_layout),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("return_value"),
-    .descriptor = &descriptor_value_pointer,
-    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, return_value),
+    .name = slice_literal_fields("call_setup"),
+    .descriptor = &descriptor_function_call_setup,
+    .Base_Relative.offset = offsetof(Descriptor_Function_Instance, call_setup),
   },
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_function_instance);

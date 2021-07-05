@@ -1650,13 +1650,17 @@ main(void) {
     { "Value *", "compile_time_instance"},
   }));
 
+  push_type(type_struct("Function_Call_Setup", (Struct_Item[]){
+    { "const Calling_Convention *", "calling_convention" },
+    { "Memory_Layout", "arguments_layout" },
+    { "Value *", "return_value" },
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
       { "Function_Info *", "info" },
-      { "const Calling_Convention *", "calling_convention" },
-      { "Memory_Layout", "arguments_layout" },
-      { "Value *", "return_value" },
+      { "Function_Call_Setup", "call_setup"},
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){
       { "const Descriptor *", "item" },

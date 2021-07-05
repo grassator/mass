@@ -3595,7 +3595,7 @@ call_function_overload(
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
   const Function_Info *fn_info = instance_descriptor->info;
 
-  Value *fn_return_value = instance_descriptor->return_value;
+  Value *fn_return_value = instance_descriptor->call_setup.return_value;
   if (fn_info->returns.descriptor != &descriptor_void) {
     fn_return_value->is_temporary = true;
   }
@@ -3611,16 +3611,18 @@ call_function_overload(
     }
   }
 
+  const Function_Call_Setup *call_setup = &instance_descriptor->call_setup;
+
   Temp_Mark temp_mark = context_temp_mark(context);
   Array_Value_Ptr temp_arguments = dyn_array_make(
     Array_Value_Ptr,
     .allocator = context->temp_allocator,
-    .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
+    .capacity = dyn_array_length(call_setup->arguments_layout.items),
   );
   Array_Value target_params = dyn_array_make(
     Array_Value,
     .allocator = context->temp_allocator,
-    .capacity = dyn_array_length(instance_descriptor->arguments_layout.items),
+    .capacity = dyn_array_length(call_setup->arguments_layout.items),
   );
   Array_Saved_Register stack_saved_registers = dyn_array_make(
     Array_Saved_Register,
@@ -3632,9 +3634,9 @@ call_function_overload(
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
   u64 all_used_arguments_register_bitset = 0;
-  DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, instance_descriptor->arguments_layout.items) {
+  DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, call_setup->arguments_layout.items) {
     Storage storage = memory_layout_item_storage(
-      &stack_argument_base, &instance_descriptor->arguments_layout, target_item
+      &stack_argument_base, &call_setup->arguments_layout, target_item
     );
     if (storage_is_stack(&storage)) {
       assert(storage.Memory.location.Stack.area != Stack_Area_Local);
@@ -3655,8 +3657,7 @@ call_function_overload(
   u64 copied_straight_to_param_bitset = 0;
   u64 temp_register_argument_bitset = 0;
   for (u64 i = 0; i < dyn_array_length(target_params); ++i) {
-    Memory_Layout_Item *target_item =
-      dyn_array_get(instance_descriptor->arguments_layout.items, i);
+    Memory_Layout_Item *target_item = dyn_array_get(call_setup->arguments_layout.items, i);
     Value *target_arg = dyn_array_get(target_params, i);
     Value *source_arg;
     if (i >= dyn_array_length(arguments)) {
@@ -3776,8 +3777,7 @@ call_function_overload(
     }
   }
 
-  u64 target_volatile_registers_bitset =
-    instance_descriptor->calling_convention->register_volatile_bitset;
+  u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset;
   u64 saved_registers_bitset = 0;
   u64 expected_result_bitset = maybe_expected_storage
     ? register_bitset_from_storage(maybe_expected_storage)
