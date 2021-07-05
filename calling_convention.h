@@ -178,22 +178,21 @@ typedef struct {
   System_V_Registers vector;
 } System_V_Register_State;
 
-static SYSTEM_V_ARGUMENT_CLASS
-x86_64_system_v_adjust_class_if_no_register_available(
+static void
+x86_64_system_v_adjust_classification_if_no_register_available(
   System_V_Register_State *registers,
-  SYSTEM_V_ARGUMENT_CLASS class
+  System_V_Classification *classification
 ) {
-  if (class == SYSTEM_V_INTEGER) {
-    if (registers->general.index >= registers->general.count) {
-      return SYSTEM_V_MEMORY;
+  if (classification->class == SYSTEM_V_INTEGER) {
+    if (registers->general.index + classification->eightbyte_count > registers->general.count) {
+      classification->class = SYSTEM_V_MEMORY;
     }
   }
-  if (class == SYSTEM_V_SSE) {
-    if (registers->vector.index >= registers->vector.count) {
-      return SYSTEM_V_MEMORY;
+  if (classification->class == SYSTEM_V_SSE) {
+    if (registers->vector.index + classification->eightbyte_count > registers->vector.count) {
+      classification->class = SYSTEM_V_MEMORY;
     }
   }
-  return class;
 }
 
 static Memory_Layout_Item
@@ -443,9 +442,6 @@ x86_64_system_v_classify(
       dyn_array_destroy(eightbyte_classes);
 
       *registers = saved_registers;
-      if (registers->general.index + eightbyte_count > registers->general.count) {
-        struct_class = SYSTEM_V_MEMORY;
-      }
 
       System_V_Classification classification = {
         .descriptor = descriptor,
@@ -522,8 +518,7 @@ calling_convention_x86_64_system_v_return_proc(
   System_V_Classification classification = x86_64_system_v_classify(
     allocator_default, &registers, function->returns.name, function->returns.descriptor
   );
-  classification.class =
-    x86_64_system_v_adjust_class_if_no_register_available(&registers, classification.class);
+  x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
   Storage return_storage;
   const Descriptor *return_descriptor;
   if (classification.class == SYSTEM_V_MEMORY) {
@@ -597,9 +592,7 @@ calling_convention_x86_64_system_v_arguments_layout_proc(
   DYN_ARRAY_FOREACH(Function_Parameter, arg, function->parameters) {
     System_V_Classification classification =
       x86_64_system_v_classify(allocator_default, &registers, arg->name, arg->descriptor);
-
-    classification.class =
-      x86_64_system_v_adjust_class_if_no_register_available(&registers, classification.class);
+    x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
       &registers, &classification, arg->name, &stack_offset
