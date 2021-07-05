@@ -29,6 +29,7 @@ program_init(
   // (640 + 640 + 640 == 1920) < 2048
   #define MAX_PROGRAM_SIZE (MAX_RW_DATA_SIZE + MAX_CODE_SIZE + MAX_RO_DATA_SIZE)
   virtual_memory_buffer_init(&program->memory.buffer, MAX_PROGRAM_SIZE);
+  program->memory.buffer.commit_step_byte_size = 1024 * 1024;
 
   u64 offset_in_memory = 0;
 
@@ -36,6 +37,7 @@ program_init(
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_CODE_SIZE,
+      .commit_step_byte_size = program->memory.buffer.commit_step_byte_size,
     },
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Execute,
@@ -46,6 +48,7 @@ program_init(
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_RW_DATA_SIZE,
+      .commit_step_byte_size = program->memory.buffer.commit_step_byte_size,
     },
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Read | Section_Permissions_Write,
@@ -56,6 +59,7 @@ program_init(
     .buffer = {
       .memory = program->memory.buffer.memory + offset_in_memory,
       .capacity = MAX_RO_DATA_SIZE,
+      .commit_step_byte_size = program->memory.buffer.commit_step_byte_size,
     },
     .base_rva = u64_to_u32(offset_in_memory),
     .permissions = Section_Permissions_Read,

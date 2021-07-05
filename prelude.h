@@ -2606,10 +2606,11 @@ typedef struct {
   u64 capacity;
   u64 occupied;
   u64 committed;
+  u64 commit_step_byte_size;
   s8 *memory;
 } Virtual_Memory_Buffer;
 
-void
+static void
 virtual_memory_buffer_init(
   Virtual_Memory_Buffer *buffer,
   u64 minimum_capacity
@@ -2631,10 +2632,11 @@ virtual_memory_buffer_init(
     .occupied = 0,
     .committed = 0,
     .memory = memory,
+    .commit_step_byte_size = 16 * memory_page_size(),
   };
 }
 
-void
+static void
 virtual_memory_buffer_deinit(
   Virtual_Memory_Buffer *buffer
 ) {
@@ -2653,9 +2655,8 @@ virtual_memory_buffer_ensure_committed(
 ) {
   assert(buffer->capacity >= size);
   #ifdef _WIN32
-  u64 page_size = s32_to_u64(memory_page_size());
-  u64 required_to_commit = u64_align(size, page_size);
-  if (required_to_commit > buffer->committed) {
+  if (size > buffer->committed) {
+    u64 required_to_commit = u64_align(size, buffer->commit_step_byte_size);
     void *commit_pointer = buffer->memory + buffer->committed;
     u64 commit_size = required_to_commit - buffer->committed;
     VirtualAlloc(commit_pointer, commit_size, MEM_COMMIT, PAGE_READWRITE);
