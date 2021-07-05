@@ -4,13 +4,6 @@
 #include "types.h"
 #include "value.h"
 
-static void
-calling_convention_x86_64_windows_body_end_proc(
-  Program *program,
-  const Function_Call_Setup *call_setup,
-  Function_Builder *builder
-);
-
 static Function_Call_Setup
 calling_convention_x86_64_windows_call_setup_proc(
   const Allocator *allocator,
@@ -18,7 +11,6 @@ calling_convention_x86_64_windows_call_setup_proc(
 );
 
 static const Calling_Convention calling_convention_x86_64_windows = {
-  .body_end_proc = calling_convention_x86_64_windows_body_end_proc,
   .call_setup_proc = calling_convention_x86_64_windows_call_setup_proc,
   .register_volatile_bitset = (
     // Arguments
@@ -30,13 +22,6 @@ static const Calling_Convention calling_convention_x86_64_windows = {
   ),
 };
 
-static void
-calling_convention_x86_64_system_v_body_end_proc(
-  Program *program,
-  const Function_Call_Setup *call_setup,
-  Function_Builder *builder
-);
-
 static Function_Call_Setup
 calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
@@ -44,7 +29,6 @@ calling_convention_x86_64_system_v_call_setup_proc(
 );
 
 static const Calling_Convention calling_convention_x86_64_system_v = {
-  .body_end_proc = calling_convention_x86_64_system_v_body_end_proc,
   .call_setup_proc = calling_convention_x86_64_system_v_call_setup_proc,
   .register_volatile_bitset = (
     // Arguments
@@ -58,6 +42,12 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
 };
 
 #endif // CALLING_CONVENTION_H
+
+static void
+calling_convention_x86_64_common_end_proc(
+  Program *program,
+  Function_Builder *builder
+);
 
 #ifdef CALLING_CONVENTION_IMPLEMENTATION
 
@@ -449,19 +439,6 @@ x86_64_system_v_classify(
   return (System_V_Classification){0};
 }
 
-static void
-calling_convention_x86_64_system_v_body_end_proc(
-  Program *program,
-  const Function_Call_Setup *call_setup,
-  Function_Builder *builder
-) {
-  if(call_setup->flags & Function_Call_Setup_Flags_Indirect_Return) {
-    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rdi}}});
-  }
-  calling_convention_x86_64_common_end_proc(program, builder);
-}
-
 static Function_Call_Setup
 calling_convention_x86_64_system_v_call_setup_proc(
   const Allocator *allocator,
@@ -581,19 +558,6 @@ calling_convention_x86_64_system_v_call_setup_proc(
   }
 
   return result;
-}
-
-static void
-calling_convention_x86_64_windows_body_end_proc(
-  Program *program,
-  const Function_Call_Setup *call_setup,
-  Function_Builder *builder
-) {
-  if(call_setup->flags & Function_Call_Setup_Flags_Indirect_Return) {
-    push_instruction(&builder->code_block.instructions, builder->return_value->source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, rcx}}});
-  }
-  calling_convention_x86_64_common_end_proc(program, builder);
 }
 
 static Function_Call_Setup

@@ -263,9 +263,6 @@ typedef struct Program Program;
 typedef dyn_array_type(Program *) Array_Program_Ptr;
 typedef dyn_array_type(const Program *) Array_Const_Program_Ptr;
 
-typedef void (*Calling_Convention_Body_End_Proc)
-  (Program * program, const Function_Call_Setup * call_setup, Function_Builder * builder);
-
 typedef Function_Call_Setup (*Calling_Convention_Call_Setup_Proc)
   (const Allocator * allocator, const Function_Info * function_info);
 
@@ -1760,7 +1757,6 @@ typedef dyn_array_type(Program) Array_Program;
 
 typedef struct Calling_Convention {
   u64 register_volatile_bitset;
-  Calling_Convention_Body_End_Proc body_end_proc;
   Calling_Convention_Call_Setup_Proc call_setup_proc;
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
@@ -2249,7 +2245,6 @@ static Descriptor descriptor_array_program;
 static Descriptor descriptor_array_program_ptr;
 static Descriptor descriptor_program_pointer;
 static Descriptor descriptor_program_pointer_pointer;
-static Descriptor descriptor_calling_convention_body_end_proc;
 static Descriptor descriptor_calling_convention_call_setup_proc;
 static Descriptor descriptor_calling_convention;
 static Descriptor descriptor_array_calling_convention;
@@ -5086,12 +5081,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(calling_convention, Calling_Convention,
     .name = slice_literal_fields("register_volatile_bitset"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Calling_Convention, register_volatile_bitset),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("body_end_proc"),
-    .descriptor = &descriptor_calling_convention_body_end_proc,
-    .Base_Relative.offset = offsetof(Calling_Convention, body_end_proc),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

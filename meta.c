@@ -1776,12 +1776,6 @@ main(void) {
     { "const Calling_Convention *", "default_calling_convention"},
   }));
 
-  push_type(type_function(Typedef, "Calling_Convention_Body_End_Proc", "void", (Argument_Type[]){
-    { "Program *", "program" },
-    { "const Function_Call_Setup *", "call_setup" },
-    { "Function_Builder *", "builder" },
-  }));
-
   push_type(type_function(Typedef, "Calling_Convention_Call_Setup_Proc", "Function_Call_Setup", (Argument_Type[]){
     { "const Allocator *", "allocator" },
     { "const Function_Info *", "function_info" },
@@ -1789,7 +1783,6 @@ main(void) {
 
   push_type(type_struct("Calling_Convention", (Struct_Item[]){
     { "u64", "register_volatile_bitset" },
-    { "Calling_Convention_Body_End_Proc", "body_end_proc" },
     { "Calling_Convention_Call_Setup_Proc", "call_setup_proc"},
   }));
 

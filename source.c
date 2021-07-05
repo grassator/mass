@@ -3098,9 +3098,7 @@ compile_time_eval(
     return 0;
   }
 
-  // Should we use a custom calling convention for compile-time calls?
-  Function_Call_Setup call_setup = {0};
-  calling_convention->body_end_proc(jit->program, &call_setup, &eval_builder);
+  calling_convention_x86_64_common_end_proc(jit->program, &eval_builder);
   dyn_array_push(jit->program->functions, eval_builder);
 
   Mass_Result jit_result = program_jit(context->compilation, jit);

@@ -703,6 +703,41 @@ mark_occupied_registers(
   }
 }
 
+static inline Register
+function_return_value_register_from_storage(
+  const Storage *storage
+) {
+  switch(storage->tag) {
+    case Storage_Tag_Register: {
+      return storage->Register.index;
+    }
+    case Storage_Tag_Xmm: {
+      return storage->Xmm.index;
+    }
+    case Storage_Tag_Memory: {
+      switch(storage->Memory.location.tag) {
+        case Memory_Location_Tag_Stack:
+        case Memory_Location_Tag_Instruction_Pointer_Relative: {
+          break;
+        }
+        case Memory_Location_Tag_Indirect: {
+          return storage->Memory.location.Indirect.base_register;
+        }
+      }
+      break;
+    }
+    case Storage_Tag_None:
+    case Storage_Tag_Unpacked:
+    case Storage_Tag_Any:
+    case Storage_Tag_Static:
+    case Storage_Tag_Eflags: {
+      break;
+    }
+  }
+  panic("Unexpected storage for a return value");
+  return 0;
+}
+
 static Value *
 ensure_function_instance(
   Execution_Context *context,
@@ -808,7 +843,22 @@ ensure_function_instance(
     (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
   );
 
-  calling_convention->body_end_proc(program, call_setup, builder);
+  const Storage *callee_return_storage = &call_setup->callee_return_value->storage;
+  const Storage *caller_return_storage = &call_setup->caller_return_value->storage;
+  if (!storage_equal(callee_return_storage, caller_return_storage)) {
+    Register caller_register = function_return_value_register_from_storage(caller_return_storage);
+    Register callee_register = function_return_value_register_from_storage(callee_return_storage);
+    Storage callee_register_storage =
+      storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
+    Storage caller_register_storage =
+      storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
+    push_instruction(&builder->code_block.instructions, return_value->source_range, (Instruction) {
+      .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {caller_register_storage, callee_register_storage}}
+    });
+  }
+
+  calling_convention_x86_64_common_end_proc(program, builder);
 
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);
