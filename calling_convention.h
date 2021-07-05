@@ -337,9 +337,19 @@ x86_64_system_v_classify(
       // considered. The resulting class is calculated according to the classes of the
       // fields in the eightbyte:
       u64 last_offset = 0;
+      u64 last_eightbyte_offset = 0;
+      u64 struct_eightbyte_count = 0;
       DYN_ARRAY_FOREACH(Memory_Layout_Item, item, struct_items) {
         assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
         u64 offset = item->Base_Relative.offset;
+
+        u64 field_eightbyte_count = (offset - last_eightbyte_offset) / eightbyte;
+        if (field_eightbyte_count >= 1) {
+          dyn_array_push(eightbyte_classes, eightbyte_class);
+          eightbyte_class = SYSTEM_V_NO_CLASS;
+          last_eightbyte_offset = offset;
+          struct_eightbyte_count += field_eightbyte_count;
+        }
 
         // FIXME this algorithm is designed to operate on C-style aggregates
         //       which unlike the Memory_Layout can not specify arbitrary offsets
@@ -351,11 +361,6 @@ x86_64_system_v_classify(
           last_offset = offset + descriptor_byte_size(item->descriptor);
         }
 
-        // TODO this is incorrect when nested structs are larger than eightbyte
-        if (offset >= eightbyte) {
-          dyn_array_push(eightbyte_classes, eightbyte_class);
-          eightbyte_class = SYSTEM_V_NO_CLASS;
-        }
         System_V_Classification field_classification =
           x86_64_system_v_classify(allocator, item->descriptor);
         SYSTEM_V_ARGUMENT_CLASS field_class = field_classification.class;
@@ -393,7 +398,11 @@ x86_64_system_v_classify(
           eightbyte_class = SYSTEM_V_SSE;
         }
       }
-      dyn_array_push(eightbyte_classes, eightbyte_class);
+      if (eightbyte_class != SYSTEM_V_NO_CLASS) {
+        dyn_array_push(eightbyte_classes, eightbyte_class);
+        eightbyte_class = SYSTEM_V_NO_CLASS;
+        struct_eightbyte_count += 1;
+      }
 
       SYSTEM_V_ARGUMENT_CLASS struct_class = SYSTEM_V_NO_CLASS;
 
@@ -432,15 +441,15 @@ x86_64_system_v_classify(
           }
         }
       }
-      if (struct_class == SYSTEM_V_NO_CLASS) struct_class = eightbyte_class;
+      if (struct_class == SYSTEM_V_NO_CLASS) {
+        struct_class = *dyn_array_get(eightbyte_classes, 0);
+      }
 
-      // TODO this should include eightbytes from nested classifications
-      u64 eightbyte_count = dyn_array_length(eightbyte_classes);
       dyn_array_destroy(eightbyte_classes);
 
       System_V_Classification classification = {
         .descriptor = descriptor,
-        .eightbyte_count = eightbyte_count,
+        .eightbyte_count = struct_eightbyte_count,
         .class = struct_class,
       };
       return classification;
