@@ -6658,7 +6658,13 @@ program_parse(
   assert(context->module);
   Value_View tokens;
 
+  Performance_Counter perf = system_performance_counter_start();
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
+  if (0) {
+    u64 usec = system_performance_counter_end(&perf);
+    printf("Tokenizer took %llu usec\n", usec);
+  }
+
   Value *block_result = token_parse_block_view(context, tokens);
   value_force_exact(context, 0, &void_value, block_result);
   return *context->result;
