@@ -13,12 +13,13 @@ tokenize(
 ) {
   const Allocator *allocator = compilation->allocator;
   assert(!dyn_array_is_initialized(file->line_ranges));
-  file->line_ranges = dyn_array_make(Array_Range_u64);
+  file->line_ranges = dyn_array_make(Array_Range_u64, .capacity = file->text.length / 40);
 
   Range_u64 current_line = {0};
 
   Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
-  Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
+  Array_Tokenizer_Parent parent_stack =
+    dyn_array_make(Array_Tokenizer_Parent, .capacity = 16);
 
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
   Slice input = file->text;
