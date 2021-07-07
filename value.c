@@ -145,8 +145,9 @@ mass_error_to_string(
       }
     } break;
     case Mass_Error_Tag_Undefined_Variable: {
-      APPEND_LITERAL("Undefined variable ");
+      APPEND_LITERAL("Undefined variable '");
       APPEND_SLICE(error->Undefined_Variable.name);
+      APPEND_LITERAL("'");
     } break;
     case Mass_Error_Tag_Redifinition: {
       // TODO report original location somehow
