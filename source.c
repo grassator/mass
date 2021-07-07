@@ -1080,38 +1080,6 @@ scope_define_operator(
   return mass_success();
 }
 
-bool
-code_point_is_operator(
-  s32 code_point
-) {
-  switch(code_point) {
-    case '+':
-    case '-':
-    case '=':
-    case '!':
-    case '@':
-    case '%':
-    case '^':
-    case '&':
-    case '$':
-    case '*':
-    case '/':
-    case '\\':
-    case ':':
-    case ';':
-    case ',':
-    case '?':
-    case '|':
-    case '.':
-    case '~':
-    case '>':
-    case '<':
-      return true;
-    default:
-      return false;
-  }
-}
-
 static inline Value *
 token_make_symbol(
   const Allocator *allocator,
@@ -1248,351 +1216,154 @@ tokenizer_maybe_push_fake_semicolon(
   ));
 }
 
-PRELUDE_NO_DISCARD Mass_Result
-tokenize(
-  Compilation *compilation,
-  Source_File *file,
-  Value_View *out_tokens
+static inline void
+tokenizer_group_start(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  Group_Tag tag,
+  Source_Range source_range
 ) {
-  const Allocator *allocator = compilation->allocator;
-  assert(!dyn_array_is_initialized(file->line_ranges));
-  file->line_ranges = dyn_array_make(Array_Range_u64);
-
-  enum Tokenizer_State {
-    Tokenizer_State_Default,
-    Tokenizer_State_Decimal_Integer,
-    Tokenizer_State_Binary_Integer,
-    Tokenizer_State_Hex_Integer,
-    Tokenizer_State_Operator,
-    Tokenizer_State_Symbol,
-    Tokenizer_State_String,
-    Tokenizer_State_String_Escape,
-    Tokenizer_State_Single_Line_Comment,
-  };
-
-  Range_u64 current_line = {0};
-  Source_Range current_token_range = {.file = file};
-  enum Tokenizer_State state = Tokenizer_State_Default;
-  Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
-  Array_Tokenizer_Parent parent_stack = dyn_array_make(Array_Tokenizer_Parent);
-
-  Fixed_Buffer *string_buffer = fixed_buffer_make(
-    .allocator = allocator_system,
-    .capacity = 4096,
+  Group *group = allocator_allocate(allocator, Group);
+  group->tag = tag;
+  Value *value = value_init(
+    allocator_allocate(allocator, Value),
+    &descriptor_group, storage_static(group), source_range
   );
-
-  Mass_Result result = {.tag = Mass_Result_Tag_Success};
-
-#define current_token_source()\
-   slice_sub(file->text, current_token_range.offsets.from, i)
-
-#define push(_VALUE_)\
-  do {\
-    dyn_array_push(stack, (_VALUE_));\
-    state = Tokenizer_State_Default;\
-  } while(0)
-
-#define TOKENIZER_HANDLE_ERROR(_EXPECTED_SLICE_)\
-  do {\
-    result = (Mass_Result) {\
-      .tag = Mass_Result_Tag_Error,\
-      .Error.error = {\
-        .tag = Mass_Error_Tag_Unexpected_Token,\
-        .Unexpected_Token = { .expected = (_EXPECTED_SLICE_), },\
-        .source_range = {\
-          .file = file,\
-          .offsets = {.from = i, .to = i},\
-        }\
-      }\
-    };\
-    goto err;\
-  } while (0)
-
-  u64 i = 0;
-  for (; i < file->text.length; ++i) {
-    u8 ch = file->text.bytes[i];
-    u8 peek = i + 1 < file->text.length ? file->text.bytes[i + 1] : 0;
-
-    // Normalize line endings
-    if (ch == '\r') {
-      if (peek != '\n') ch = '\n';
-    }
-
-    if (ch == '\n') {
-      current_line.to = i + 1;
-      dyn_array_push(file->line_ranges, current_line);
-      current_line.from = current_line.to;
-    }
-
-    retry: switch(state) {
-      case Tokenizer_State_Default: {
-        current_token_range.offsets = (Range_u64){.from = i, .to = i};
-        if (isspace(ch)) {
-          if (ch == '\n') {
-            current_token_range.offsets = (Range_u64){i + 1, i + 1};
-            tokenizer_maybe_push_fake_semicolon(
-              allocator, &stack, &parent_stack, current_token_range
-            );
-          }
-          continue;
-        } else if (ch == '0' && peek == 'x') {
-          i++;
-          state = Tokenizer_State_Hex_Integer;
-        } else if (ch == '0' && peek == 'b') {
-          i++;
-          state = Tokenizer_State_Binary_Integer;
-        } else if (isdigit(ch)) {
-          state = Tokenizer_State_Decimal_Integer;
-        } else if (isalpha(ch) || ch == '_') {
-          state = Tokenizer_State_Symbol;
-        } else if(ch == '/' && peek == '/') {
-          state = Tokenizer_State_Single_Line_Comment;
-        } else if (code_point_is_operator(ch)) {
-          state = Tokenizer_State_Operator;
-        } else if (ch == '"') {
-          string_buffer->occupied = 0;
-          state = Tokenizer_State_String;
-        } else if (ch == '(' || ch == '{' || ch == '[') {
-          Group *group = allocator_allocate(allocator, Group);
-          group->tag =
-            ch == '(' ? Group_Tag_Paren :
-            ch == '{' ? Group_Tag_Curly :
-            Group_Tag_Square;
-          Value *value = value_init(
-            allocator_allocate(allocator, Value),
-            &descriptor_group, storage_static(group), current_token_range
-          );
-          dyn_array_push(parent_stack, (Tokenizer_Parent){
-            .group = group,
-            .index = dyn_array_length(stack)
-          });
-          push(value);
-        } else if (ch == ')' || ch == '}' || ch == ']') {
-          Value *parent_value = 0;
-          Tokenizer_Parent *parent = 0;
-          if (dyn_array_length(parent_stack)) {
-            parent = dyn_array_last(parent_stack);
-            parent_value = *dyn_array_get(stack, parent->index);
-          }
-          if (!parent_value || !value_is_group(parent_value)) {
-            panic("Tokenizer: unexpected closing char for group");
-          }
-          Slice expected_paren = {0};
-          switch (parent->group->tag) {
-            case Group_Tag_Paren: {
-              expected_paren = slice_literal(")");
-              break;
-            }
-            case Group_Tag_Curly: {
-              // Newlines at the end of the block do not count as semicolons otherwise this:
-              // { 42
-              // }
-              // is being interpreted as:
-              // { 42 ; }
-              while (parent->index + 1 < dyn_array_length(stack)) {
-                Value *last = *dyn_array_last(stack);
-                bool is_last_token_a_fake_semicolon = (
-                  range_length(last->source_range.offsets) == 0 &&
-                  value_is_symbol(last) &&
-                  slice_equal(value_as_symbol(last)->name, slice_literal(";"))
-                );
-                if (!is_last_token_a_fake_semicolon) break;
-                dyn_array_pop(stack);
-              }
-
-              expected_paren = slice_literal("}");
-              break;
-            }
-            case Group_Tag_Square: {
-              expected_paren = slice_literal("]");
-              break;
-            }
-          }
-          if (ch != expected_paren.bytes[0]) {
-            TOKENIZER_HANDLE_ERROR(expected_paren);
-          }
-          parent_value->source_range.offsets.to = i + 1;
-          Source_Range children_range = parent_value->source_range;
-          children_range.offsets.to -= 1;
-          children_range.offsets.from += 1;
-          Value **children_values = dyn_array_raw(stack) + parent->index + 1;
-          u64 child_count = dyn_array_length(stack) - parent->index - 1;
-          parent->group->children = temp_token_array_into_value_view(
-            allocator, children_values, child_count, children_range
-          );
-          stack.data->length = parent->index + 1; // pop the children
-          dyn_array_pop(parent_stack);
-        } else {
-          TOKENIZER_HANDLE_ERROR((Slice){0});
-        }
-        break;
-      }
-      case Tokenizer_State_Decimal_Integer: {
-        if (!isdigit(ch)) {
-          Slice digits = current_token_source();
-          current_token_range.offsets.to = i;
-          push(value_number_literal(allocator, digits, Number_Base_10, current_token_range));
-          goto retry;
-        }
-        break;
-      }
-      case Tokenizer_State_Hex_Integer: {
-        if (!code_point_is_hex_digit(ch)) {
-          Slice digits = current_token_source();
-          current_token_range.offsets.to = i;
-          // Cut off `0x` prefix
-          digits = slice_sub(digits, 2, digits.length);
-          push(value_number_literal(allocator, digits, Number_Base_16, current_token_range));
-          goto retry;
-        }
-        break;
-      }
-      case Tokenizer_State_Binary_Integer: {
-        if (ch != '0' && ch != '1') {
-          Slice digits = current_token_source();
-          current_token_range.offsets.to = i;
-          // Cut off `0b` prefix
-          digits = slice_sub(digits, 2, digits.length);
-          push(value_number_literal(allocator, digits, Number_Base_2, current_token_range));
-          goto retry;
-        }
-        break;
-      }
-      case Tokenizer_State_Symbol: {
-        if (!(isalpha(ch) || isdigit(ch) || ch == '_')) {
-          Slice name = current_token_source();
-          current_token_range.offsets.to = i;
-          push(token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range));
-          goto retry;
-        }
-        break;
-      }
-      case Tokenizer_State_Operator: {
-        if (!code_point_is_operator(ch)) {
-          Slice name = current_token_source();
-          current_token_range.offsets.to = i;
-          push(token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range));
-          goto retry;
-        }
-        break;
-      }
-      case Tokenizer_State_String: {
-        if (ch == '\\') {
-          state = Tokenizer_State_String_Escape;
-        } else if (ch == '"') {
-          current_token_range.offsets.to = i + 1;
-          u64 length = string_buffer->occupied;
-          char *bytes = allocator_allocate_bytes(allocator, length, 1);
-          memcpy(bytes, string_buffer->memory, length);
-          {
-            Descriptor *bytes_descriptor =
-              descriptor_array_of(allocator, &descriptor_u8, u64_to_u32(length));
-            value_init(
-              hash_map_set(compilation->static_pointer_map, bytes, (Value){0}),
-              bytes_descriptor,
-              storage_none,
-              current_token_range
-            );
-          }
-
-          Slice *string = allocator_allocate(allocator, Slice);
-          *string = (Slice){bytes, string_buffer->occupied};
-          Value *string_value = value_init(
-            allocator_allocate(allocator, Value),
-            &descriptor_slice, storage_static(string), current_token_range
-          );
-          push(string_value);
-        } else {
-          fixed_buffer_resizing_append_u8(&string_buffer, ch);
-        }
-        break;
-      }
-      case Tokenizer_State_String_Escape: {
-        s8 escaped_character;
-        switch (ch) {
-          case 'n': escaped_character = '\n'; break;
-          case 'r': escaped_character = '\r'; break;
-          case 't': escaped_character = '\t'; break;
-          case 'v': escaped_character = '\v'; break;
-          case '0': escaped_character = '\0'; break;
-          default: escaped_character = ch; break;
-        }
-        fixed_buffer_resizing_append_s8(&string_buffer, escaped_character);
-        state = Tokenizer_State_String;
-        break;
-      }
-      case Tokenizer_State_Single_Line_Comment: {
-        if (ch == '\n') {
-          state = Tokenizer_State_Default;
-        }
-        break;
-      }
-    }
-  }
-
-  // Handle end of file
-  current_token_range.offsets.to = i;
-  switch(state) {
-    case Tokenizer_State_Operator: {
-      Slice name = current_token_source();
-      push(token_make_symbol(allocator, name, Symbol_Type_Operator_Like, current_token_range));
-      break;
-    }
-    case Tokenizer_State_Symbol: {
-      Slice name = current_token_source();
-      push(token_make_symbol(allocator, name, Symbol_Type_Id_Like, current_token_range));
-      break;
-    }
-    case Tokenizer_State_Default:
-    case Tokenizer_State_Single_Line_Comment: {
-      // Nothing to do
-      break;
-    }
-
-    case Tokenizer_State_Decimal_Integer: {
-      Slice digits = current_token_source();
-      push(value_number_literal(allocator, digits, Number_Base_10, current_token_range));
-      break;
-    }
-    case Tokenizer_State_Hex_Integer: {
-      Slice digits = current_token_source();
-      digits = slice_sub(digits, 2, digits.length); // Cut off `0x` prefix
-      push(value_number_literal(allocator, digits, Number_Base_16, current_token_range));
-      break;
-    }
-    case Tokenizer_State_Binary_Integer: {
-      Slice digits = current_token_source();
-      digits = slice_sub(digits, 2, digits.length); // Cut off `0b` prefix
-      push(value_number_literal(allocator, digits, Number_Base_2, current_token_range));
-      break;
-    }
-    case Tokenizer_State_String:
-    case Tokenizer_State_String_Escape: {
-      TOKENIZER_HANDLE_ERROR("String without closing quote");
-      break;
-    }
-  }
-
-  current_line.to = file->text.length;
-  dyn_array_push(file->line_ranges, current_line);
-
-  if (dyn_array_length(parent_stack)) {
-    TOKENIZER_HANDLE_ERROR("Unexpected end of file. Expected a closing brace.");
-  }
-
-  err:
-#undef TOKENIZER_HANDLE_ERROR
-  if (result.tag == Mass_Result_Tag_Success) {
-    Source_Range children_range = { .file = file, .offsets = {.from = 0, .to = file->text.length} };
-    *out_tokens = temp_token_array_into_value_view(
-      allocator, dyn_array_raw(stack), dyn_array_length(stack), children_range
-    );
-  }
-  fixed_buffer_destroy(string_buffer);
-  dyn_array_destroy(stack);
-  dyn_array_destroy(parent_stack);
-  return result;
+  dyn_array_push(*parent_stack, (Tokenizer_Parent){
+    .group = group,
+    .index = dyn_array_length(*stack)
+  });
+  dyn_array_push(*stack, value);
 }
+
+static inline bool
+tokenizer_group_end(
+  const Allocator *allocator,
+  Array_Value_Ptr *stack,
+  Array_Tokenizer_Parent *parent_stack,
+  char actual_paren,
+  u64 offset
+) {
+  Value *parent_value = 0;
+  Tokenizer_Parent *parent = 0;
+  if (dyn_array_length(*parent_stack)) {
+    parent = dyn_array_last(*parent_stack);
+    parent_value = *dyn_array_get(*stack, parent->index);
+  }
+  if (!parent_value || !value_is_group(parent_value)) {
+    panic("Tokenizer: unexpected parent stack entry");
+  }
+
+  Slice expected_paren = {0};
+  switch (parent->group->tag) {
+    case Group_Tag_Paren: {
+      expected_paren = slice_literal(")");
+      break;
+    }
+    case Group_Tag_Curly: {
+      // Newlines at the end of the block do not count as semicolons otherwise this:
+      // { 42
+      // }
+      // is being interpreted as:
+      // { 42 ; }
+      while (parent->index + 1 < dyn_array_length(*stack)) {
+        Value *last = *dyn_array_last(*stack);
+        // :FakeSemicolon
+        // We detect fake semicolons with range_length == 0
+        // so it needs to be done like that in the tokenizer
+        bool is_last_token_a_fake_semicolon = (
+          range_length(last->source_range.offsets) == 0 &&
+          value_is_symbol(last) &&
+          slice_equal(value_as_symbol(last)->name, slice_literal(";"))
+        );
+        if (!is_last_token_a_fake_semicolon) break;
+        dyn_array_pop(*stack);
+      }
+
+      expected_paren = slice_literal("}");
+      break;
+    }
+    case Group_Tag_Square: {
+      expected_paren = slice_literal("]");
+      break;
+    }
+  }
+  if (actual_paren != expected_paren.bytes[0]) {
+    return false;
+  }
+
+  parent_value->source_range.offsets.to = offset;
+  Source_Range children_range = parent_value->source_range;
+  children_range.offsets.to -= 1;
+  children_range.offsets.from += 1;
+  Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
+  u64 child_count = dyn_array_length(*stack) - parent->index - 1;
+  parent->group->children = temp_token_array_into_value_view(
+    allocator, children_values, child_count, children_range
+  );
+  stack->data->length = parent->index + 1; // pop the children
+  dyn_array_pop(*parent_stack);
+
+  return true;
+}
+
+static inline void
+tokenizer_push_string_literal(
+  Compilation *compilation,
+  Fixed_Buffer **string_buffer,
+  Array_Value_Ptr *stack,
+  Slice raw_bytes,
+  Source_Range source_range
+) {
+  (*string_buffer)->occupied = 0;
+  Slice remainder = raw_bytes;
+  for(s64 escape_index; ; ) {
+    escape_index = slice_index_of_char(remainder, '\\');
+    if (escape_index == -1) {
+      break;
+    }
+    Slice to_copy = slice_sub(remainder, 0, escape_index);
+    remainder = slice_sub(remainder, escape_index + 2, remainder.length);
+    fixed_buffer_resizing_ensure_capacity(string_buffer, to_copy.length);
+    fixed_buffer_append_slice(*string_buffer, to_copy);
+    char ch = raw_bytes.bytes[escape_index + 1];
+    s8 escaped_character;
+    switch (ch) {
+      case 'n': escaped_character = '\n'; break;
+      case 'r': escaped_character = '\r'; break;
+      case 't': escaped_character = '\t'; break;
+      case 'v': escaped_character = '\v'; break;
+      case '0': escaped_character = '\0'; break;
+      default: escaped_character = ch; break;
+    }
+    fixed_buffer_resizing_append_s8(string_buffer, escaped_character);
+  }
+  {
+    fixed_buffer_resizing_ensure_capacity(string_buffer, remainder.length);
+    fixed_buffer_append_slice(*string_buffer, remainder);
+  }
+
+  u64 length = (*string_buffer)->occupied;
+  char *bytes = allocator_allocate_bytes(compilation->allocator, length, 1);
+  memcpy(bytes, (*string_buffer)->memory, length);
+  {
+    Descriptor *bytes_descriptor =
+      descriptor_array_of(compilation->allocator, &descriptor_u8, u64_to_u32(length));
+    Value *pointer_value = hash_map_set(compilation->static_pointer_map, bytes, (Value){0});
+    value_init(pointer_value, bytes_descriptor, storage_none, source_range);
+  }
+
+  Slice *string = allocator_allocate(compilation->allocator, Slice);
+  *string = (Slice){bytes, (*string_buffer)->occupied};
+  Value *string_value = value_init(
+    allocator_allocate(compilation->allocator, Value),
+    &descriptor_slice, storage_static(string), source_range
+  );
+  dyn_array_push(*stack, string_value);
+}
+
+#include "generated_tokenizer.c"
 
 static inline Value *
 token_peek_match(
@@ -6662,7 +6433,7 @@ program_parse(
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
   if (0) {
     u64 usec = system_performance_counter_end(&perf);
-    printf("Tokenizer took %llu usec\n", usec);
+    printf("Tokenizer took %"PRIu64" usec\n", usec);
   }
 
   Value *block_result = token_parse_block_view(context, tokens);
