@@ -801,6 +801,10 @@ encode_instruction(
       });
       return;
     }
+    case Instruction_Tag_Stack_Patch: {
+      panic("Expected stack patching to happen before");
+      break;
+    }
     case Instruction_Tag_Assembly: {
       // Handled below
       break;

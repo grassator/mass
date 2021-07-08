@@ -51,6 +51,31 @@ calling_convention_x86_64_common_end_proc(
 
 #ifdef CALLING_CONVENTION_IMPLEMENTATION
 
+static s32
+calling_convention_x86_64_adjust_stack_offset(
+  Stack_Area area,
+  s32 stack_offset,
+  s32 stack_reserve,
+  s32 argument_stack_base
+) {
+  switch(area) {
+    case Stack_Area_Local: {
+      assert(stack_offset < 0);
+      return stack_reserve + stack_offset;
+    }
+    case Stack_Area_Received_Argument: {
+      assert(stack_offset >= 0);
+      return argument_stack_base + stack_offset;
+    }
+    case Stack_Area_Call_Target_Argument: {
+      assert(stack_offset >= 0);
+      return stack_offset;
+    }
+  }
+  panic("Unexpected stack area tag");
+  return 0;
+}
+
 static void
 calling_convention_x86_64_common_end_proc(
   Program *program,
@@ -87,41 +112,52 @@ calling_convention_x86_64_common_end_proc(
   }
 
   // Adjust stack locations
+  Instruction *previous = 0;
   DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
-    for (u8 storage_index = 0; storage_index < countof(instruction->Assembly.operands); ++storage_index) {
-      Storage *storage = &instruction->Assembly.operands[storage_index];
-      if (storage->tag != Storage_Tag_Memory) continue;
-      Memory_Location *location = &storage->Memory.location;
-      switch(location->tag) {
-        case Memory_Location_Tag_Stack: {
-          Memory_Location_Stack stack = location->Stack;
-          *storage = storage_indirect(storage->byte_size, Register_SP);
-          switch(stack.area) {
-            case Stack_Area_Local: {
-              assert(stack.offset < 0);
-              storage->Memory.location.Indirect.offset = builder->stack_reserve + stack.offset;
+    switch(instruction->tag) {
+      case Instruction_Tag_Assembly: {
+        Instruction_Assembly *assembly = &instruction->Assembly;
+        for (u8 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
+          Storage *storage = &assembly->operands[storage_index];
+          if (storage->tag != Storage_Tag_Memory) continue;
+          Memory_Location *location = &storage->Memory.location;
+          switch(location->tag) {
+            case Memory_Location_Tag_Stack: {
+              Memory_Location_Stack stack = location->Stack;
+              *storage = storage_indirect(storage->byte_size, Register_SP);
+              storage->Memory.location.Indirect.offset =
+                calling_convention_x86_64_adjust_stack_offset(
+                  stack.area, stack.offset, builder->stack_reserve, argument_stack_base
+                );
               break;
             }
-            case Stack_Area_Received_Argument: {
-              assert(stack.offset >= 0);
-              storage->Memory.location.Indirect.offset = argument_stack_base + stack.offset;
-              break;
-            }
-            case Stack_Area_Call_Target_Argument: {
-              assert(stack.offset >= 0);
-              storage->Memory.location.Indirect.offset = stack.offset;
+            case Memory_Location_Tag_Instruction_Pointer_Relative:
+            case Memory_Location_Tag_Indirect: {
+              // Nothing to do
               break;
             }
           }
-          break;
         }
-        case Memory_Location_Tag_Instruction_Pointer_Relative:
-        case Memory_Location_Tag_Indirect: {
-          // Nothing to do
-          break;
-        }
-      }
+      } break;
+      case Instruction_Tag_Label:
+      case Instruction_Tag_Label_Patch: {
+        // Nothing to do
+      } break;
+      case Instruction_Tag_Bytes: {
+        // Handled below
+      } break;
+      case Instruction_Tag_Stack_Patch: {
+        assert(previous->tag == Instruction_Tag_Bytes);
+        Instruction_Stack_Patch *patch = &instruction->Stack_Patch;
+        s32 offset = patch->offset_in_previous_instruction;
+        assert(offset + sizeof(s32) <= previous->Bytes.length);
+        s32 *patch_target = (s32 *)(previous->Bytes.memory + offset);
+        *patch_target = calling_convention_x86_64_adjust_stack_offset(
+          patch->stack_area, *patch_target, builder->stack_reserve, argument_stack_base
+        );
+      } break;
     }
+    previous = instruction;
   }
 }
 

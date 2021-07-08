@@ -833,6 +833,9 @@
   <DisplayString Condition="tag == Instruction_Tag_Label_Patch">
     Label_Patch { Label_Patch }
   </DisplayString>
+  <DisplayString Condition="tag == Instruction_Tag_Stack_Patch">
+    Stack_Patch { Stack_Patch }
+  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="compiler_source_location">compiler_source_location</Item>
@@ -843,6 +846,7 @@
     <Item Name="Label" Condition="tag == Instruction_Tag_Label">Label</Item>
     <Item Name="Bytes" Condition="tag == Instruction_Tag_Bytes">Bytes</Item>
     <Item Name="Label_Patch" Condition="tag == Instruction_Tag_Label_Patch">Label_Patch</Item>
+    <Item Name="Stack_Patch" Condition="tag == Instruction_Tag_Stack_Patch">Stack_Patch</Item>
   </Expand>
 </Type>
 <Type Name="Array_Code_Block">

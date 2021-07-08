@@ -1090,6 +1090,12 @@ instruction_equal(
         a->Label_Patch.offset == b->Label_Patch.offset
       );
     }
+    case Instruction_Tag_Stack_Patch: {
+      return (
+        a->Stack_Patch.stack_area == b->Stack_Patch.stack_area &&
+        a->Stack_Patch.offset_in_previous_instruction == b->Stack_Patch.offset_in_previous_instruction
+      );
+    }
     case Instruction_Tag_Bytes: {
       if (a->Bytes.length != b->Bytes.length) return false;
       return !!memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length);

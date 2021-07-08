@@ -1375,6 +1375,10 @@ main(void) {
       { "s64", "offset" },
       { "Label_Index", "label_index" },
     }),
+    struct_fields("Stack_Patch", (Struct_Item[]){
+      { "s32", "offset_in_previous_instruction" },
+      { "Stack_Area", "stack_area" },
+    }),
   }), (Struct_Item[]){
     { "Compiler_Source_Location", "compiler_source_location" },
     { "Source_Range", "source_range" },

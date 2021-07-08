@@ -975,6 +975,7 @@ typedef enum {
   Instruction_Tag_Label = 1,
   Instruction_Tag_Bytes = 2,
   Instruction_Tag_Label_Patch = 3,
+  Instruction_Tag_Stack_Patch = 4,
 } Instruction_Tag;
 
 typedef struct Instruction_Assembly {
@@ -992,6 +993,10 @@ typedef struct Instruction_Label_Patch {
   s64 offset;
   Label_Index label_index;
 } Instruction_Label_Patch;
+typedef struct Instruction_Stack_Patch {
+  s32 offset_in_previous_instruction;
+  Stack_Area stack_area;
+} Instruction_Stack_Patch;
 typedef struct Instruction {
   Instruction_Tag tag;
   char _tag_padding[4];
@@ -1004,6 +1009,7 @@ typedef struct Instruction {
     Instruction_Label Label;
     Instruction_Bytes Bytes;
     Instruction_Label_Patch Label_Patch;
+    Instruction_Stack_Patch Stack_Patch;
   };
 } Instruction;
 static inline Instruction_Assembly *
@@ -1025,6 +1031,11 @@ static inline Instruction_Label_Patch *
 instruction_as_label_patch(Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Label_Patch);
   return &instruction->Label_Patch;
+}
+static inline Instruction_Stack_Patch *
+instruction_as_stack_patch(Instruction *instruction) {
+  assert(instruction->tag == Instruction_Tag_Stack_Patch);
+  return &instruction->Stack_Patch;
 }
 typedef dyn_array_type(Instruction) Array_Instruction;
 typedef struct Code_Block {
@@ -3376,6 +3387,7 @@ static C_Enum_Item instruction_tag_items[] = {
 { .name = slice_literal_fields("Label"), .value = 1 },
 { .name = slice_literal_fields("Bytes"), .value = 2 },
 { .name = slice_literal_fields("Label_Patch"), .value = 3 },
+{ .name = slice_literal_fields("Stack_Patch"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
   {
@@ -3431,6 +3443,21 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label_patch, Instruction_Label_Patch,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_label_patch);
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_stack_patch, Instruction_Stack_Patch,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("offset_in_previous_instruction"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Instruction_Stack_Patch, offset_in_previous_instruction),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("stack_area"),
+    .descriptor = &descriptor_stack_area,
+    .Base_Relative.offset = offsetof(Instruction_Stack_Patch, stack_area),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_stack_patch);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3485,6 +3512,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
     .name = slice_literal_fields("Label_Patch"),
     .descriptor = &descriptor_instruction_label_patch,
     .Base_Relative.offset = offsetof(Instruction, Label_Patch),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Stack_Patch"),
+    .descriptor = &descriptor_instruction_stack_patch,
+    .Base_Relative.offset = offsetof(Instruction, Stack_Patch),
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction);
