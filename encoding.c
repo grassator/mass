@@ -297,16 +297,15 @@ eager_encode_instruction_assembly(
     }
     const Storage *storage = &instruction->Assembly.operands[storage_index];
     if (storage_is_label(storage)) {
-      panic("TODO");
-      //Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
-      //s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
-      //// :AfterInstructionPatch
-      //immediate_label_patch_info =
-        //dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-          //.target_label_index = label_index,
-          //.from = {.section = &program->memory.code},
-          //.patch_target = patch_target,
-        //});
+      Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
+      u8 empty_patch_bytes[4] = {0};
+      dyn_array_push(*instructions, (Instruction) {
+        .tag = Instruction_Tag_Label_Patch,
+        .Label_Patch = { .offset = -(s64)countof(empty_patch_bytes), .label_index = label_index },
+        .source_range = instruction->source_range,
+        .compiler_source_location = instruction->compiler_source_location,
+      });
+      instruction_bytes_append_bytes(&result->Bytes, empty_patch_bytes, countof(empty_patch_bytes));
     } else if (storage->tag == Storage_Tag_Static) {
       const u8 *bytes = storage_static_as_c_type_internal(storage, storage->byte_size);
       instruction_bytes_append_bytes(&result->Bytes, bytes, storage->byte_size);

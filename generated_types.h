@@ -989,7 +989,7 @@ typedef struct Instruction_Bytes {
   u8 length;
 } Instruction_Bytes;
 typedef struct Instruction_Label_Patch {
-  u64 offset;
+  s64 offset;
   Label_Index label_index;
 } Instruction_Label_Patch;
 typedef struct Instruction {
@@ -3420,7 +3420,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label_patch, Instruction_Label_Patch,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("offset"),
-    .descriptor = &descriptor_u64,
+    .descriptor = &descriptor_s64,
     .Base_Relative.offset = offsetof(Instruction_Label_Patch, offset),
   },
   {

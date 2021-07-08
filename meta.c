@@ -1372,7 +1372,7 @@ main(void) {
       { "u8", "length" },
     }),
     struct_fields("Label_Patch", (Struct_Item[]){
-      { "u64", "offset" },
+      { "s64", "offset" },
       { "Label_Index", "label_index" },
     }),
   }), (Struct_Item[]){

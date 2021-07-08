@@ -5832,7 +5832,7 @@ mass_handle_explicit_return_lazy_proc(
   MASS_ON_ERROR(assign(context, builder, builder->return_value, parse_result)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 
-  push_instruction(
+  push_eagerly_encoded_instruction(
     &builder->code_block.instructions,
     builder->return_value->source_range,
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {return_label, 0, 0}}}
