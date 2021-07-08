@@ -1147,22 +1147,44 @@ value_number_literal(
   Number_Base base,
   Source_Range source_range
 ) {
-  Number_Literal *literal = allocator_allocate(allocator, Number_Literal);
-  u64 bits = 0;
-  bool ok = true;
-  switch(base) {
-    case Number_Base_2: bits = slice_parse_binary(digits, &ok); break;
-    case Number_Base_10: bits = slice_parse_u64(digits, &ok); break;
-    case Number_Base_16: bits = slice_parse_hex(digits, &ok); break;
-    default: panic("Internal Error: Unexpected number base"); break;
-  }
-  if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
-
-  *literal = (Number_Literal) {
-    .base = base,
-    .negative = false,
-    .bits = bits,
+  static const Number_Literal single_decimal_digits[10] = {
+    {.base = Number_Base_10, .bits = 0},
+    {.base = Number_Base_10, .bits = 1},
+    {.base = Number_Base_10, .bits = 2},
+    {.base = Number_Base_10, .bits = 3},
+    {.base = Number_Base_10, .bits = 4},
+    {.base = Number_Base_10, .bits = 5},
+    {.base = Number_Base_10, .bits = 6},
+    {.base = Number_Base_10, .bits = 7},
+    {.base = Number_Base_10, .bits = 8},
+    {.base = Number_Base_10, .bits = 9},
   };
+
+  const Number_Literal *literal;
+  if (base == Number_Base_10 && digits.length == 1) {
+    char byte = digits.bytes[0];
+    assert(byte >= '0' && byte <= '9');
+    byte -= '0';
+    literal = &single_decimal_digits[byte];
+  } else {
+    u64 bits = 0;
+    bool ok = true;
+    switch(base) {
+      case Number_Base_2: bits = slice_parse_binary(digits, &ok); break;
+      case Number_Base_10: bits = slice_parse_u64(digits, &ok); break;
+      case Number_Base_16: bits = slice_parse_hex(digits, &ok); break;
+      default: panic("Internal Error: Unexpected number base"); break;
+    }
+    if (!ok) panic("Internal Error: Mismatch between number tokenizer and parser");
+
+    Number_Literal *heap_literal = allocator_allocate(allocator, Number_Literal);
+    *heap_literal = (Number_Literal) {
+      .base = base,
+      .negative = false,
+      .bits = bits,
+    };
+    literal = heap_literal;
+  }
   return value_init(
     allocator_allocate(allocator, Value),
     &descriptor_number_literal, storage_static(literal), source_range
@@ -1796,7 +1818,7 @@ typedef enum {
   Literal_Cast_Result_Unsigned_Target_For_Negative_Literal,
 } Literal_Cast_Result;
 
-Literal_Cast_Result
+static Literal_Cast_Result
 value_number_literal_cast_to(
   const Value *value,
   const Descriptor *target_descriptor,
