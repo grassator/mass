@@ -15,36 +15,30 @@ typedef enum {
   REX_B = 0b01000001, // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
 } REX_BYTE;
 
-
-static Instruction
-eager_encode_instruction_assembly(
-  const Instruction *instruction,
-  const Instruction_Encoding *encoding,
-  u32 storage_count
+static inline void
+instruction_bytes_append_bytes(
+  Instruction_Bytes *instruction,
+  u8 *bytes,
+  u64 length
 ) {
-  Instruction result = {
+  assert(instruction->length + length <= countof(instruction->memory));
+  memcpy(instruction->memory + instruction->length, bytes, length);
+  instruction->length += u64_to_u8(length);
+}
+
+static void
+eager_encode_instruction_assembly(
+  Array_Instruction *instructions,
+  const Instruction *instruction,
+  const Instruction_Encoding *encoding
+) {
+  assert(instruction->tag == Instruction_Tag_Assembly);
+  Instruction *result = dyn_array_push(*instructions, (Instruction){
     .tag = Instruction_Tag_Bytes,
     .Bytes = {0},
     .source_range = instruction->source_range,
     .compiler_source_location = instruction->compiler_source_location,
-  };
-  u8 *byte_cursor = result.Bytes.memory;
-  #define PUSH_BYTE(_BYTE_)\
-    do {\
-      assert(byte_cursor - result.Bytes.memory < countof(result.Bytes.memory));\
-      *byte_cursor = (_BYTE_);\
-      byte_cursor++;\
-    } while(0)
-
-  #define PUSH_U32(_SOURCE_)\
-    do {\
-      u32 source = (_SOURCE_);\
-      assert(byte_cursor + sizeof(source) - result.Bytes.memory <= countof(result.Bytes.memory));\
-      u8 bytes[sizeof(source)];\
-      memcpy(bytes, &source, sizeof(source));\
-      for (u64 i = 0; i < sizeof(source); ++i) { PUSH_BYTE(bytes[i]); }\
-    } while(0)
-
+  });
 
   assert(instruction->tag == Instruction_Tag_Assembly);
 
@@ -64,6 +58,7 @@ eager_encode_instruction_assembly(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
+  u32 storage_count = countof(instruction->Assembly.operands);
   for (u8 storage_index = 0; storage_index < storage_count; ++storage_index) {
     const Storage *storage = &instruction->Assembly.operands[storage_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
@@ -225,23 +220,23 @@ eager_encode_instruction_assembly(
   }
 
   if (needs_16_bit_prefix) {
-    PUSH_BYTE(0x66);
+    instruction_bytes_append_bytes(&result->Bytes, &(u8){0x66}, 1);
   }
 
   if (rex_byte) {
-    PUSH_BYTE(rex_byte);
+    instruction_bytes_append_bytes(&result->Bytes, &rex_byte, 1);
   }
 
   if (op_code[0]) {
-    PUSH_BYTE(op_code[0]);
+    instruction_bytes_append_bytes(&result->Bytes, &op_code[0], 1);
   }
   if (op_code[1]) {
-    PUSH_BYTE(op_code[1]);
+    instruction_bytes_append_bytes(&result->Bytes, &op_code[1], 1);
   }
   if (op_code[2]) {
-    PUSH_BYTE(op_code[2]);
+    instruction_bytes_append_bytes(&result->Bytes, &op_code[2], 1);
   }
-  PUSH_BYTE(op_code[3]);
+  instruction_bytes_append_bytes(&result->Bytes, &op_code[3], 1);
 
   if (mod_r_m_storage_index != -1) {
     u8 mod_r_m = (
@@ -249,11 +244,11 @@ eager_encode_instruction_assembly(
       ((reg_or_op_code & 0b111) << 3) |
       ((r_m & 0b111))
     );
-    PUSH_BYTE(mod_r_m);
+    instruction_bytes_append_bytes(&result->Bytes, &mod_r_m, 1);
   }
 
   if (needs_sib) {
-    PUSH_BYTE(sib_byte);
+    instruction_bytes_append_bytes(&result->Bytes, &sib_byte, 1);
   }
 
   // Write out displacement
@@ -279,9 +274,10 @@ eager_encode_instruction_assembly(
       }
       case Memory_Location_Tag_Indirect: {
         if (mod == MOD_Displacement_s32) {
-          PUSH_U32(displacement);
+          instruction_bytes_append_bytes(&result->Bytes, (u8 *)&displacement, sizeof(displacement));
         } else if (mod == MOD_Displacement_s8) {
-          PUSH_BYTE(s32_to_s8(displacement));
+          u8 byte = (u8)s32_to_s8(displacement);
+          instruction_bytes_append_bytes(&result->Bytes, &byte, sizeof(byte));
         } else {
           assert(mod == MOD_Displacement_0);
         }
@@ -323,10 +319,10 @@ eager_encode_instruction_assembly(
     }
   }
 
-  result.Bytes.length = s64_to_u8(byte_cursor - result.Bytes.memory);
-  result.encoded_byte_size = result.Bytes.length;
+  result->encoded_byte_size = result->Bytes.length;
 
-  return result;
+  #undef PUSH_BYTE
+  #undef PUSH_U32
 }
 
 static void
@@ -750,8 +746,7 @@ push_eagerly_encoded_instruction(
       }
     }
     if (!has_stack_operands) {
-      Instruction encoded = eager_encode_instruction_assembly(&instruction, encoding, storage_count);
-      dyn_array_push(*instructions, encoded);
+      eager_encode_instruction_assembly(instructions, &instruction, encoding);
       return;
     }
   }

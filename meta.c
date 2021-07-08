@@ -1375,10 +1375,6 @@ main(void) {
       { "u64", "offset" },
       { "Label_Index", "label_index" },
     }),
-    struct_fields("Stack_Patch", (Struct_Item[]){
-      { "u64", "offset" },
-      { "Memory_Location_Stack", "stack" },
-    }),
   }), (Struct_Item[]){
     { "Compiler_Source_Location", "compiler_source_location" },
     { "Source_Range", "source_range" },
