@@ -1376,7 +1376,7 @@ main(void) {
       { "Label_Index", "label_index" },
     }),
     struct_fields("Stack_Patch", (Struct_Item[]){
-      { "s32", "offset_in_previous_instruction" },
+      { "s32", "mod_r_m_offset_in_previous_instruction" },
       { "Stack_Area", "stack_area" },
     }),
   }), (Struct_Item[]){

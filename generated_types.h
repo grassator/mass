@@ -994,7 +994,7 @@ typedef struct Instruction_Label_Patch {
   Label_Index label_index;
 } Instruction_Label_Patch;
 typedef struct Instruction_Stack_Patch {
-  s32 offset_in_previous_instruction;
+  s32 mod_r_m_offset_in_previous_instruction;
   Stack_Area stack_area;
 } Instruction_Stack_Patch;
 typedef struct Instruction {
@@ -3446,9 +3446,9 @@ MASS_DEFINE_TYPE_VALUE(instruction_label_patch);
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_stack_patch, Instruction_Stack_Patch,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("offset_in_previous_instruction"),
+    .name = slice_literal_fields("mod_r_m_offset_in_previous_instruction"),
     .descriptor = &descriptor_s32,
-    .Base_Relative.offset = offsetof(Instruction_Stack_Patch, offset_in_previous_instruction),
+    .Base_Relative.offset = offsetof(Instruction_Stack_Patch, mod_r_m_offset_in_previous_instruction),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

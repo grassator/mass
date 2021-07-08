@@ -1093,7 +1093,8 @@ instruction_equal(
     case Instruction_Tag_Stack_Patch: {
       return (
         a->Stack_Patch.stack_area == b->Stack_Patch.stack_area &&
-        a->Stack_Patch.offset_in_previous_instruction == b->Stack_Patch.offset_in_previous_instruction
+        a->Stack_Patch.mod_r_m_offset_in_previous_instruction ==
+          b->Stack_Patch.mod_r_m_offset_in_previous_instruction
       );
     }
     case Instruction_Tag_Bytes: {

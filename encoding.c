@@ -243,6 +243,10 @@ eager_encode_instruction_assembly(
   }
   instruction_bytes_append_bytes(&result.Bytes, &op_code[3], 1);
 
+  Instruction_Stack_Patch stack_patch = {
+    .mod_r_m_offset_in_previous_instruction = result.Bytes.length,
+  };
+  bool has_stack_patch = false;
   if (mod_r_m_storage_index != -1) {
     u8 mod_r_m = (
       (mod << 6) |
@@ -259,9 +263,6 @@ eager_encode_instruction_assembly(
   enum {MAX_PATCH_COUNT = 2};
   Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
   s32 patch_count = 0;
-
-  Instruction_Stack_Patch stack_patch = {0};
-  bool has_stack_patch = false;
 
   // Write out displacement
   if (mod_r_m_storage_index != -1 && mod != MOD_Register) {
@@ -290,16 +291,12 @@ eager_encode_instruction_assembly(
         }
       } break;
       case Memory_Location_Tag_Stack: {
-        stack_patch = (Instruction_Stack_Patch){
-          .stack_area = location->Stack.area,
-          .offset_in_previous_instruction = result.Bytes.length,
-        };
+        stack_patch.stack_area = location->Stack.area;
         has_stack_patch = true;
 
         // :OversizedStackOffsets
-        // Currently stack offsets are always encoded as 4 bytes which is inefficient
-        // to solve this we would need to encode the instruction twice and then choose
-        // the right one when the size of the stack is known.
+        // Here we reserve full 4 bytes for stack offset but it might be patched
+        // to a smaller size when total stack size is known
         s32 stack_offset = location->Stack.offset;
         instruction_bytes_append_bytes(&result.Bytes, (u8 *)&stack_offset, sizeof(stack_offset));
       } break;
@@ -335,21 +332,22 @@ eager_encode_instruction_assembly(
   // that still needs to be updated like the patch offsets below.
   dyn_array_push(*instructions, result);
 
+  // Stack patch MUST go before label patches as it might change the size of the instruction
+  if (has_stack_patch) {
+    dyn_array_push(*instructions, instruction->source_range, (Instruction) {
+      .tag = Instruction_Tag_Stack_Patch,
+      .Stack_Patch = stack_patch,
+      .source_range = instruction->source_range,
+      .compiler_source_location = instruction->compiler_source_location,
+    });
+  }
+
   assert(patch_count <= MAX_PATCH_COUNT);
   for (s32 i = 0; i < patch_count; i += 1) {
     patches[i].offset -= result.Bytes.length;
     dyn_array_push(*instructions, instruction->source_range, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
-      .source_range = instruction->source_range,
-      .compiler_source_location = instruction->compiler_source_location,
-    });
-  }
-
-  if (has_stack_patch) {
-    dyn_array_push(*instructions, instruction->source_range, (Instruction) {
-      .tag = Instruction_Tag_Stack_Patch,
-      .Stack_Patch = stack_patch,
       .source_range = instruction->source_range,
       .compiler_source_location = instruction->compiler_source_location,
     });
