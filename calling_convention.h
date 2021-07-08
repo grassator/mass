@@ -146,9 +146,11 @@ calling_convention_x86_64_common_end_proc(
       case Instruction_Tag_Bytes: {
         // Handled below
       } break;
+      // :StackPatch
       case Instruction_Tag_Stack_Patch: {
         assert(previous->tag == Instruction_Tag_Bytes);
         Instruction_Stack_Patch *patch = &instruction->Stack_Patch;
+        // :OversizedStackOffsets
         s32 offset = patch->offset_in_previous_instruction;
         assert(offset + sizeof(s32) <= previous->Bytes.length);
         s32 *patch_target = (s32 *)(previous->Bytes.memory + offset);

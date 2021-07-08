@@ -135,12 +135,26 @@ eager_encode_instruction_assembly(
         r_m = storage->Register.index;
         mod = MOD_Register;
       } else if (storage->tag == Storage_Tag_Memory) {
-        const Memory_Location *location = &storage->Memory.location;
+        Memory_Location location = storage->Memory.location;
         bool can_have_zero_displacement = true;
-        switch(location->tag) {
+        switch(location.tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
             r_m = 0b101;
             break;
+          }
+          case Memory_Location_Tag_Stack: {
+            // Turn the stack operand into an indirect access and let the code below handle it
+            location = (Memory_Location) {
+              .tag = Memory_Location_Tag_Indirect,
+              .Indirect = {
+                .base_register = Register_SP,
+                // :OversizedStackOffsets @Hack
+                // This displacement is not actually used, but needs to be large to force
+                // the selection of Mod_32 encoding
+                .offset = 0xFFFF,
+              },
+            };
+            // fallthrough
           }
           case Memory_Location_Tag_Indirect: {
             // Right now the compiler does not support SIB scale other than 1.
@@ -155,13 +169,13 @@ eager_encode_instruction_assembly(
             enum { Sib_Scale_1 = 0b00, Sib_Scale_2 = 0b01, Sib_Scale_4 = 0b10, Sib_Scale_8 = 0b11,};
             enum { Sib_Index_None = 0b100,};
             u8 sib_scale_bits = Sib_Scale_1;
-            Register base = storage->Memory.location.Indirect.base_register;
+            Register base = location.Indirect.base_register;
             // TODO enable this when the compiler makes use of indexed access
             /*
-            if (storage->Memory.location.Indirect.maybe_index_register.has_value) {
+            if (location.Indirect.maybe_index_register.has_value) {
               needs_sib = true;
               r_m = 0b0100; // SIB
-              Register sib_index = storage->Memory.location.Indirect.maybe_index_register.index;
+              Register sib_index = location.Indirect.maybe_index_register.index;
               sib_byte = (
                 ((sib_scale_bits & 0b11) << 6) |
                 ((sib_index & 0b111) << 3) |
@@ -191,11 +205,8 @@ eager_encode_instruction_assembly(
             if (base == Register_BP || base == Register_R13) {
               can_have_zero_displacement = false;
             }
-            displacement = s64_to_s32(storage->Memory.location.Indirect.offset);
+            displacement = s64_to_s32(location.Indirect.offset);
             break;
-          }
-          case Memory_Location_Tag_Stack: {
-            panic("Stack locations must be resolved beforehand");
           }
         }
         // :RipRelativeEncoding
@@ -256,6 +267,9 @@ eager_encode_instruction_assembly(
   Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
   s32 patch_count = 0;
 
+  Instruction_Stack_Patch stack_patch = {0};
+  bool has_stack_patch = false;
+
   // Write out displacement
   if (mod_r_m_storage_index != -1 && mod != MOD_Register) {
     const Storage *storage = &instruction->Assembly.operands[mod_r_m_storage_index];
@@ -271,8 +285,7 @@ eager_encode_instruction_assembly(
         };
         u8 empty_patch_bytes[4] = {0};
         instruction_bytes_append_bytes(&result.Bytes, empty_patch_bytes, countof(empty_patch_bytes));
-        break;
-      }
+      } break;
       case Memory_Location_Tag_Indirect: {
         if (mod == MOD_Displacement_s32) {
           instruction_bytes_append_bytes(&result.Bytes, (u8 *)&displacement, sizeof(displacement));
@@ -282,11 +295,21 @@ eager_encode_instruction_assembly(
         } else {
           assert(mod == MOD_Displacement_0);
         }
-        break;
-      }
+      } break;
       case Memory_Location_Tag_Stack: {
-        panic("Stack locations must be resolved beforehand");
-      }
+        stack_patch = (Instruction_Stack_Patch){
+          .stack_area = location->Stack.area,
+          .offset_in_previous_instruction = result.Bytes.length,
+        };
+        has_stack_patch = true;
+
+        // :OversizedStackOffsets
+        // Currently stack offsets are always encoded as 4 bytes which is inefficient
+        // to solve this we would need to encode the instruction twice and then choose
+        // the right one when the size of the stack is known.
+        s32 stack_offset = location->Stack.offset;
+        instruction_bytes_append_bytes(&result.Bytes, (u8 *)&stack_offset, sizeof(stack_offset));
+      } break;
     }
   }
 
@@ -325,6 +348,15 @@ eager_encode_instruction_assembly(
     dyn_array_push(*instructions, instruction->source_range, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
+      .source_range = instruction->source_range,
+      .compiler_source_location = instruction->compiler_source_location,
+    });
+  }
+
+  if (has_stack_patch) {
+    dyn_array_push(*instructions, instruction->source_range, (Instruction) {
+      .tag = Instruction_Tag_Stack_Patch,
+      .Stack_Patch = stack_patch,
       .source_range = instruction->source_range,
       .compiler_source_location = instruction->compiler_source_location,
     });
@@ -745,18 +777,8 @@ push_eagerly_encoded_instruction(
   instruction.source_range = source_range;
   if (instruction.tag == Instruction_Tag_Assembly) {
     const Instruction_Encoding *encoding = encoding_match(&instruction);
-    u32 storage_count = countof(instruction.Assembly.operands);
-    bool has_stack_operands = false;
-    for (u32 i = 0; i < storage_count; ++i) {
-      const Storage *storage = &instruction.Assembly.operands[i];
-      if (storage->tag == Storage_Tag_Memory && storage->Memory.location.tag == Memory_Location_Tag_Stack) {
-        has_stack_operands = true;
-      }
-    }
-    if (!has_stack_operands) {
-      eager_encode_instruction_assembly(instructions, &instruction, encoding);
-      return;
-    }
+    eager_encode_instruction_assembly(instructions, &instruction, encoding);
+    return;
   }
   dyn_array_push(*instructions, instruction);
 }
@@ -802,8 +824,8 @@ encode_instruction(
       return;
     }
     case Instruction_Tag_Stack_Patch: {
-      panic("Expected stack patching to happen before");
-      break;
+      // Handled in :StackPatch
+      return;
     }
     case Instruction_Tag_Assembly: {
       // Handled below
