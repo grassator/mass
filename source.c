@@ -957,20 +957,19 @@ static inline Value *
 scope_lookup_force(
   Execution_Context *context,
   const Scope *scope,
-  Slice name,
+  const Symbol *symbol,
   const Source_Range *lookup_range
 ) {
-  s32 hash = Scope_Map__hash(name);
   Scope_Entry *entry = 0;
   for (; scope; scope = scope->parent) {
-    entry = scope_lookup_shallow_hashed(scope, hash, name);
+    entry = scope_lookup_shallow_hashed(scope, symbol->hash, symbol->name);
     if (entry) break;
   }
 
   if (!entry) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Undefined_Variable,
-      .Undefined_Variable = { .name = name },
+      .Undefined_Variable = { .name = symbol->name },
       .source_range = *lookup_range,
     });
     return 0;
@@ -1093,29 +1092,11 @@ token_make_symbol(
     cache_map = hash_map_make(Symbol_Map);
   }
 
-  const Symbol *symbol = 0;;
-  if (name.length == 1) {
-    switch(name.bytes[0]) {
-      case ';': {
-        static const Symbol symbol_semicolon = {
-          .type = Symbol_Type_Operator_Like,
-          .name = slice_literal_fields(";"),
-        };
-        symbol = &symbol_semicolon;
-      } break;
-      case ',': {
-        static const Symbol symbol_semicolon = {
-          .type = Symbol_Type_Operator_Like,
-          .name = slice_literal_fields(","),
-        };
-        symbol = &symbol_semicolon;
-      } break;
-    }
-  }
-
+  s32 hash = Symbol_Map__hash(name);
+  const Symbol *symbol = 0;
   if (!symbol) {
     // Symbol type is derived from name anyway so it does not need to be part of the key
-    Symbol **cache_entry = hash_map_get(cache_map, name);
+    Symbol **cache_entry = hash_map_get_by_hash(cache_map, hash, name);
     if (cache_entry) {
       symbol = *cache_entry;
     }
@@ -1125,9 +1106,10 @@ token_make_symbol(
     *heap_symbol = (Symbol){
       .type = type,
       .name = name,
+      .hash = hash,
     };
     symbol = heap_symbol;
-    hash_map_set(cache_map, name, heap_symbol);
+    hash_map_set_by_hash(cache_map, hash, name, heap_symbol);
   }
   return value_init(
     allocator_allocate(allocator, Value),
@@ -1549,8 +1531,7 @@ token_parse_single(
       }
     }
   } else if(value_is_symbol(value)) {
-    Slice name = value_as_symbol(value)->name;
-    return scope_lookup_force(context, context->scope, name, &value->source_range);
+    return scope_lookup_force(context, context->scope, value_as_symbol(value), &value->source_range);
   }
   return value;
 }
@@ -4974,7 +4955,8 @@ mass_handle_dot_operator(
       });
       return 0;
     }
-    Slice field_name = value_as_symbol(rhs)->name;
+    const Symbol *field_symbol = value_as_symbol(rhs);
+    Slice field_name = field_symbol->name;
     if (lhs_forced_descriptor == &descriptor_scope) {
       if (!value_is_non_lazy_static(lhs)) {
         context_error(context, (Mass_Error) {
@@ -4984,7 +4966,7 @@ mass_handle_dot_operator(
         return 0;
       }
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(context, module_scope, field_name, &args_view.source_range);
+      Value *lookup = scope_lookup_force(context, module_scope, field_symbol, &args_view.source_range);
       if (!lookup) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
@@ -5808,18 +5790,19 @@ token_parse_statement_label(
     goto err;
   }
 
-  Value *symbol = value_view_get(rest, 0);
-  Slice name = value_as_symbol(symbol)->name;
+  Value *symbol_token = value_view_get(rest, 0);
+  Source_Range source_range = symbol_token->source_range;
+  const Symbol *symbol = value_as_symbol(symbol_token);
+  Slice name = symbol->name;
 
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   Value *value;
   if (scope_lookup(context->scope, name)) {
-    value = scope_lookup_force(context, context->scope, name, &symbol->source_range);
+    value = scope_lookup_force(context, context->scope, symbol, &source_range);
   } else {
     Scope *label_scope = context->scope;
 
-    Source_Range source_range = symbol->source_range;
     Label_Index *label = allocator_allocate(context->allocator, Label_Index);
     *label = make_label(context->program, &context->program->memory.code, name);
     value = value_init(

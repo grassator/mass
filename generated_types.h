@@ -514,7 +514,7 @@ const char *symbol_type_name(Symbol_Type value) {
 
 typedef struct Symbol {
   Symbol_Type type;
-  u32 _type_padding;
+  s32 hash;
   Slice name;
 } Symbol;
 typedef dyn_array_type(Symbol) Array_Symbol;
@@ -2617,9 +2617,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("_type_padding"),
-    .descriptor = &descriptor_u32,
-    .Base_Relative.offset = offsetof(Symbol, _type_padding),
+    .name = slice_literal_fields("hash"),
+    .descriptor = &descriptor_s32,
+    .Base_Relative.offset = offsetof(Symbol, hash),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

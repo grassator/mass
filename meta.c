@@ -1138,7 +1138,7 @@ main(void) {
 
   push_type(type_struct("Symbol", (Struct_Item[]){
     { "Symbol_Type", "type" },
-    { "u32", "_type_padding" },
+    { "s32", "hash" },
     { "Slice", "name" },
   }));
 

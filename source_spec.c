@@ -90,9 +90,15 @@ test_program_source_base(
     } break;
   }
   MASS_ON_ERROR(*context->result) return 0;
+  Slice id_slice = slice_from_c_string(id);
+  Symbol symbol = {
+    .type = Symbol_Type_Id_Like,
+    .hash = Symbol_Map__hash(id_slice),
+    .name = id_slice,
+  };
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(
-    &test_context,test_context.module->own_scope, slice_from_c_string(id), &COMPILER_SOURCE_RANGE
+    &test_context,test_context.module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
   );
   if (value) {
     if (value->descriptor == &descriptor_overload_set) {
