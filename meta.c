@@ -1793,6 +1793,11 @@ main(void) {
     { "void *", "payload" },
   }));
 
+  push_type(type_hash_map("Symbol_Map", {
+    .key_type = "Slice",
+    .value_type = "Symbol *",
+  }));
+
   push_type(type_hash_map("Scope_Map", {
     .key_type = "Slice",
     .value_type = "Scope_Entry *",

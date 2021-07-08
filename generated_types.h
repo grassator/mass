@@ -273,6 +273,8 @@ typedef dyn_array_type(const Calling_Convention *) Array_Const_Calling_Conventio
 typedef u64 (*Token_Statement_Matcher_Proc)
   (Execution_Context * context, Value_View view, Lazy_Value * out_lazy_value, void * payload);
 
+typedef struct Symbol_Map Symbol_Map;
+
 typedef struct Scope_Map Scope_Map;
 
 typedef struct Macro_Replacement_Map Macro_Replacement_Map;
@@ -1761,6 +1763,7 @@ typedef struct Calling_Convention {
 } Calling_Convention;
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
+hash_map_slice_template(Symbol_Map, Symbol *)
 hash_map_slice_template(Scope_Map, Scope_Entry *)
 hash_map_slice_template(Macro_Replacement_Map, Value_View)
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
@@ -2252,6 +2255,7 @@ static Descriptor descriptor_array_calling_convention_ptr;
 static Descriptor descriptor_calling_convention_pointer;
 static Descriptor descriptor_calling_convention_pointer_pointer;
 static Descriptor descriptor_token_statement_matcher_proc;
+MASS_DEFINE_OPAQUE_C_TYPE(symbol_map, Symbol_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(scope_map, Scope_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(macro_replacement_map, Macro_Replacement_Map);
 MASS_DEFINE_OPAQUE_C_TYPE(jit_import_library_handle_map, Jit_Import_Library_Handle_Map);

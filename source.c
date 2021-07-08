@@ -1087,11 +1087,48 @@ token_make_symbol(
   Symbol_Type type,
   Source_Range source_range
 ) {
-  Symbol *symbol = allocator_allocate(allocator, Symbol);
-  *symbol = (Symbol){
-    .type = type,
-    .name = name,
-  };
+
+  static Symbol_Map *cache_map = 0;
+  if (!cache_map) {
+    cache_map = hash_map_make(Symbol_Map);
+  }
+
+  const Symbol *symbol = 0;;
+  if (name.length == 1) {
+    switch(name.bytes[0]) {
+      case ';': {
+        static const Symbol symbol_semicolon = {
+          .type = Symbol_Type_Operator_Like,
+          .name = slice_literal_fields(";"),
+        };
+        symbol = &symbol_semicolon;
+      } break;
+      case ',': {
+        static const Symbol symbol_semicolon = {
+          .type = Symbol_Type_Operator_Like,
+          .name = slice_literal_fields(","),
+        };
+        symbol = &symbol_semicolon;
+      } break;
+    }
+  }
+
+  if (!symbol) {
+    // Symbol type is derived from name anyway so it does not need to be part of the key
+    Symbol **cache_entry = hash_map_get(cache_map, name);
+    if (cache_entry) {
+      symbol = *cache_entry;
+    }
+  }
+  if (!symbol) {
+    Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
+    *heap_symbol = (Symbol){
+      .type = type,
+      .name = name,
+    };
+    symbol = heap_symbol;
+    hash_map_set(cache_map, name, heap_symbol);
+  }
   return value_init(
     allocator_allocate(allocator, Value),
     &descriptor_symbol, storage_static(symbol), source_range
@@ -1195,7 +1232,7 @@ typedef struct {
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
-void
+static inline void
 tokenizer_maybe_push_fake_semicolon(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
@@ -6431,9 +6468,9 @@ program_parse(
 
   Performance_Counter perf = system_performance_counter_start();
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
-  if (0) {
+  if (1) {
     u64 usec = system_performance_counter_end(&perf);
-    printf("Tokenizer took %"PRIu64" usec\n", usec);
+    printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
 
   Value *block_result = token_parse_block_view(context, tokens);
