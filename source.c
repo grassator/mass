@@ -1089,7 +1089,7 @@ token_make_symbol(
 
   static Symbol_Map *cache_map = 0;
   if (!cache_map) {
-    cache_map = hash_map_make(Symbol_Map);
+    cache_map = hash_map_make(Symbol_Map, .initial_capacity = 256);
   }
 
   s32 hash = Symbol_Map__hash(name);
@@ -1102,7 +1102,8 @@ token_make_symbol(
     }
   }
   if (!symbol) {
-    Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
+    // FIXME for some reason using non-default allocator here makes Linux unhappy
+    Symbol *heap_symbol = allocator_allocate(allocator_default, Symbol);
     *heap_symbol = (Symbol){
       .type = type,
       .name = name,
@@ -1111,6 +1112,7 @@ token_make_symbol(
     symbol = heap_symbol;
     hash_map_set_by_hash(cache_map, hash, name, heap_symbol);
   }
+
   return value_init(
     allocator_allocate(allocator, Value),
     &descriptor_symbol, storage_static(symbol), source_range
@@ -6531,7 +6533,7 @@ program_module_from_file(
     fixed_buffer_append_slice(absolute_path, extension);
     file_path = fixed_buffer_as_slice(absolute_path);
   }
-  Fixed_Buffer *buffer = fixed_buffer_from_file(file_path, .allocator = allocator_system);
+  Fixed_Buffer *buffer = fixed_buffer_from_file(file_path);
   if (!buffer) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Open,
