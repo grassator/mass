@@ -360,7 +360,7 @@ move_value(
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
       register_release(builder, temp.Register.index);
     } else {
-      push_instruction(instructions, *source_range,
+      push_eagerly_encoded_instruction(instructions, *source_range,
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, adjusted_source}}});
     }
     return;

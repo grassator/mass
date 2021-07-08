@@ -18,7 +18,7 @@ typedef enum {
 static inline void
 instruction_bytes_append_bytes(
   Instruction_Bytes *instruction,
-  u8 *bytes,
+  const u8 *bytes,
   u64 length
 ) {
   assert(instruction->length + length <= countof(instruction->memory));
@@ -308,12 +308,8 @@ eager_encode_instruction_assembly(
           //.patch_target = patch_target,
         //});
     } else if (storage->tag == Storage_Tag_Static) {
-      panic("Does this even happen?");
-      //Slice slice = {
-        //.bytes = storage_static_as_c_type_internal(storage, storage->byte_size),
-        //.length = storage->byte_size,
-      //};
-      //virtual_memory_buffer_append_slice(buffer, slice);
+      const u8 *bytes = storage_static_as_c_type_internal(storage, storage->byte_size);
+      instruction_bytes_append_bytes(&result->Bytes, bytes, storage->byte_size);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }
