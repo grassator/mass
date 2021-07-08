@@ -305,7 +305,6 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
-    <Item Name="or">or</Item>
     <Item Name="Symbol" Condition="tag == Token_Pattern_Tag_Symbol">Symbol</Item>
     <Item Name="Group" Condition="tag == Token_Pattern_Tag_Group">Group</Item>
     <Item Name="String" Condition="tag == Token_Pattern_Tag_String">String</Item>

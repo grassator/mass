@@ -1146,7 +1146,7 @@ const Token_Pattern token_pattern_semicolon = {
 };
 
 static inline bool
-value_match_single(
+value_match(
   const Value *value,
   const Token_Pattern *pattern
 ) {
@@ -1181,17 +1181,6 @@ value_match_single(
     }
   }
   return true;
-}
-
-static inline bool
-value_match(
-  const Value *value,
-  const Token_Pattern *pattern
-) {
-  for (; pattern; pattern = pattern->or) {
-    if (value_match_single(value, pattern)) return true;
-  }
-  return false;
 }
 
 static inline bool

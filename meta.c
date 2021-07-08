@@ -1148,7 +1148,7 @@ main(void) {
     { "Value_View", "children" },
   }));
 
-  push_type(add_common_fields(type_union("Token_Pattern", (Struct_Type[]){
+  push_type(type_union("Token_Pattern", (Struct_Type[]){
     struct_empty("Invalid"),
     struct_empty("Any"),
     struct_fields("Symbol", (Struct_Item[]){
@@ -1160,8 +1160,6 @@ main(void) {
     struct_fields("String", (Struct_Item[]){
       { "Slice", "slice" },
     }),
-  }), (Struct_Item[]){
-    { "Token_Pattern *", "or" },
   }));
 
   push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){

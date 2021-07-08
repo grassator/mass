@@ -546,7 +546,6 @@ typedef struct Token_Pattern_String {
 typedef struct Token_Pattern {
   Token_Pattern_Tag tag;
   char _tag_padding[4];
-  Token_Pattern * or;
   union {
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
@@ -2697,12 +2696,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern, Token_Pattern,
     .name = slice_literal_fields("tag"),
     .descriptor = &descriptor_token_pattern_tag,
     .Base_Relative.offset = offsetof(Token_Pattern, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("or"),
-    .descriptor = &descriptor_token_pattern_pointer,
-    .Base_Relative.offset = offsetof(Token_Pattern, or),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
