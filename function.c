@@ -242,7 +242,7 @@ move_value(
       .byte_size = 8,
       .Register.index = source->Register.index,
     };
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
+    push_eagerly_encoded_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
       .Assembly = {mov, {temp_full_register, source_full_register}}
     });
     push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,

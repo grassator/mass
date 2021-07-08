@@ -15,7 +15,321 @@ typedef enum {
   REX_B = 0b01000001, // Extension of the ModR/M r/m field, SIB base field, or Opcode reg field
 } REX_BYTE;
 
-void
+
+static Instruction
+eager_encode_instruction_assembly(
+  const Instruction *instruction,
+  const Instruction_Encoding *encoding,
+  u32 storage_count
+) {
+  Instruction result = {
+    .tag = Instruction_Tag_Bytes,
+    .Bytes = {0},
+    .source_range = instruction->source_range,
+    .compiler_source_location = instruction->compiler_source_location,
+  };
+  u8 *byte_cursor = result.Bytes.memory;
+  #define PUSH_BYTE(_BYTE_)\
+    do {\
+      assert(byte_cursor - result.Bytes.memory < countof(result.Bytes.memory));\
+      *byte_cursor = (_BYTE_);\
+      byte_cursor++;\
+    } while(0)
+
+  #define PUSH_U32(_SOURCE_)\
+    do {\
+      u32 source = (_SOURCE_);\
+      assert(byte_cursor + sizeof(source) - result.Bytes.memory <= countof(result.Bytes.memory));\
+      u8 bytes[sizeof(source)];\
+      memcpy(bytes, &source, sizeof(source));\
+      for (u64 i = 0; i < sizeof(source); ++i) { PUSH_BYTE(bytes[i]); }\
+    } while(0)
+
+
+  assert(instruction->tag == Instruction_Tag_Assembly);
+
+  s8 mod_r_m_storage_index = -1;
+  u8 reg_or_op_code = 0;
+  u8 rex_byte = 0;
+  bool needs_16_bit_prefix = false;
+  u8 r_m = 0;
+  u8 mod = MOD_Register;
+  u8 op_code[4] = {
+    encoding->op_code[0],
+    encoding->op_code[1],
+    encoding->op_code[2],
+    encoding->op_code[3],
+  };
+  bool needs_sib = false;
+  u8 sib_byte = 0;
+  s32 displacement = 0;
+
+  for (u8 storage_index = 0; storage_index < storage_count; ++storage_index) {
+    const Storage *storage = &instruction->Assembly.operands[storage_index];
+    const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
+
+    if (storage->byte_size == 2) {
+      needs_16_bit_prefix = true;
+    }
+
+    if (
+      storage->byte_size == 8 &&
+      !(
+        operand_encoding->type == Operand_Encoding_Type_Xmm ||
+        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+      )
+    ) {
+      rex_byte |= REX_W;
+    }
+
+    if (storage->tag == Storage_Tag_Register) {
+      assert(storage->Register.offset_in_bits == 0);
+
+      if (storage->byte_size == 1) {
+        // :64bitMode8BitOperations
+        // These registers are inaccessible in 32bit mode and AH, BH, CH, and DH
+        // are targeted instead. To solve this we force REX prefix.
+        if (
+          storage->Register.index == Register_SI ||
+          storage->Register.index == Register_DI ||
+          storage->Register.index == Register_SP ||
+          storage->Register.index == Register_BP
+        ) {
+          rex_byte |= REX;
+        }
+      }
+
+      if (operand_encoding->type == Operand_Encoding_Type_Register) {
+        if (encoding->extension_type == Instruction_Extension_Type_Plus_Register) {
+          op_code[3] += storage->Register.index & 0b111;
+          if (storage->Register.index & 0b1000) {
+            rex_byte |= REX_B;
+          }
+        } else {
+          assert(encoding->extension_type != Instruction_Extension_Type_Op_Code);
+          reg_or_op_code = storage->Register.index;
+          if (storage->Register.index & 0b1000) {
+            rex_byte |= REX_R;
+          }
+        }
+      }
+    }
+
+    if (
+      storage->tag == Storage_Tag_Xmm &&
+      operand_encoding->type == Operand_Encoding_Type_Xmm &&
+      encoding->extension_type == Instruction_Extension_Type_Register
+    ) {
+      reg_or_op_code = storage->Register.index;
+    }
+
+    if(
+      operand_encoding->type == Operand_Encoding_Type_Memory ||
+      operand_encoding->type == Operand_Encoding_Type_Register_Memory ||
+      operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+    ) {
+      if (mod_r_m_storage_index != -1) {
+        panic("Multiple MOD R/M operands are not supported in an instruction");
+      }
+      mod_r_m_storage_index = storage_index;
+      if (storage->tag == Storage_Tag_Register) {
+        r_m = storage->Register.index;
+        mod = MOD_Register;
+      } else if (storage->tag == Storage_Tag_Xmm) {
+        r_m = storage->Register.index;
+        mod = MOD_Register;
+      } else if (storage->tag == Storage_Tag_Memory) {
+        const Memory_Location *location = &storage->Memory.location;
+        bool can_have_zero_displacement = true;
+        switch(location->tag) {
+          case Memory_Location_Tag_Instruction_Pointer_Relative: {
+            r_m = 0b101;
+            break;
+          }
+          case Memory_Location_Tag_Indirect: {
+            // Right now the compiler does not support SIB scale other than 1.
+            // From what I can tell there are two reasons that only matter in *extremely*
+            // performance-sensitive code which probably would be written by hand anyway:
+            // 1) `add rax, 8` is three bytes longer than `inc rax`. With current instruction
+            //    cache sizes it is very unlikely to be problematic.
+            // 2) Loop uses the same index for arrays of values of different sizes that could
+            //    be represented with SIB scale. In cases of extreme register pressure this
+            //    can cause spilling. To avoid that we could try to use temporary shifts
+            //    to adjust the offset between different indexes, but it is not implemented ATM.
+            enum { Sib_Scale_1 = 0b00, Sib_Scale_2 = 0b01, Sib_Scale_4 = 0b10, Sib_Scale_8 = 0b11,};
+            enum { Sib_Index_None = 0b100,};
+            u8 sib_scale_bits = Sib_Scale_1;
+            Register base = storage->Memory.location.Indirect.base_register;
+            // TODO enable this when the compiler makes use of indexed access
+            /*
+            if (storage->Memory.location.Indirect.maybe_index_register.has_value) {
+              needs_sib = true;
+              r_m = 0b0100; // SIB
+              Register sib_index = storage->Memory.location.Indirect.maybe_index_register.index;
+              sib_byte = (
+                ((sib_scale_bits & 0b11) << 6) |
+                ((sib_index & 0b111) << 3) |
+                ((base & 0b111) << 0)
+              );
+              if (sib_index & 0b1000) {
+                rex_byte |= REX_X;
+              }
+            } else
+            */
+            if (base == Register_SP || base == Register_R12) {
+              // [RSP + X] and [R12 + X] always needs to be encoded as SIB because
+              // 0b100 register index in MOD R/M is occupied by SIB byte indicator
+              needs_sib = true;
+              r_m = 0b0100; // SIB
+              sib_byte = (
+                ((sib_scale_bits & 0b11) << 6) |
+                ((Sib_Index_None & 0b111) << 3) |
+                ((base & 0b111) << 0)
+              );
+            } else {
+              r_m = base;
+            }
+            // :RipRelativeEncoding
+            // 0b101 value is occupied RIP-relative encoding indicator
+            // when mod is 00, so for the (RBP / R13) always use disp8 (mod 01)
+            if (base == Register_BP || base == Register_R13) {
+              can_have_zero_displacement = false;
+            }
+            displacement = s64_to_s32(storage->Memory.location.Indirect.offset);
+            break;
+          }
+          case Memory_Location_Tag_Stack: {
+            panic("Stack locations must be resolved beforehand");
+          }
+        }
+        // :RipRelativeEncoding
+        if (can_have_zero_displacement && displacement == 0) {
+          mod = MOD_Displacement_0;
+        } else if (s32_fits_into_s8(displacement)) {
+          mod = MOD_Displacement_s8;
+        } else {
+          mod = MOD_Displacement_s32;
+        }
+      } else {
+        panic("Unsupported operand type");
+      }
+    }
+  }
+
+  if (encoding->extension_type == Instruction_Extension_Type_Op_Code) {
+    reg_or_op_code = encoding->op_code_extension;
+  }
+
+  if (r_m & 0b1000) {
+    rex_byte |= REX_B;
+  }
+
+  if (needs_16_bit_prefix) {
+    PUSH_BYTE(0x66);
+  }
+
+  if (rex_byte) {
+    PUSH_BYTE(rex_byte);
+  }
+
+  if (op_code[0]) {
+    PUSH_BYTE(op_code[0]);
+  }
+  if (op_code[1]) {
+    PUSH_BYTE(op_code[1]);
+  }
+  if (op_code[2]) {
+    PUSH_BYTE(op_code[2]);
+  }
+  PUSH_BYTE(op_code[3]);
+
+  if (mod_r_m_storage_index != -1) {
+    u8 mod_r_m = (
+      (mod << 6) |
+      ((reg_or_op_code & 0b111) << 3) |
+      ((r_m & 0b111))
+    );
+    PUSH_BYTE(mod_r_m);
+  }
+
+  if (needs_sib) {
+    PUSH_BYTE(sib_byte);
+  }
+
+  // Write out displacement
+  if (mod_r_m_storage_index != -1 && mod != MOD_Register) {
+    const Storage *storage = &instruction->Assembly.operands[mod_r_m_storage_index];
+    assert (storage->tag == Storage_Tag_Memory);
+    const Memory_Location *location = &storage->Memory.location;
+    switch(location->tag) {
+      case Memory_Location_Tag_Instruction_Pointer_Relative: {
+        panic("TODO");
+        //Label_Index label_index =
+          //storage->Memory.location.Instruction_Pointer_Relative.label_index;
+        //// :StorageNormalization
+        //s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
+        //// :AfterInstructionPatch
+        //mod_r_m_patch_info =
+          //dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+            //.target_label_index = label_index,
+            //.from = {.section = &program->memory.code},
+            //.patch_target = patch_target,
+          //});
+        break;
+      }
+      case Memory_Location_Tag_Indirect: {
+        if (mod == MOD_Displacement_s32) {
+          PUSH_U32(displacement);
+        } else if (mod == MOD_Displacement_s8) {
+          PUSH_BYTE(s32_to_s8(displacement));
+        } else {
+          assert(mod == MOD_Displacement_0);
+        }
+        break;
+      }
+      case Memory_Location_Tag_Stack: {
+        panic("Stack locations must be resolved beforehand");
+      }
+    }
+  }
+
+  // Write out immediate operand(s?)
+  for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
+    const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
+    if (operand_encoding->type != Operand_Encoding_Type_Immediate) {
+      continue;
+    }
+    const Storage *storage = &instruction->Assembly.operands[storage_index];
+    if (storage_is_label(storage)) {
+      panic("TODO");
+      //Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
+      //s32 *patch_target = virtual_memory_buffer_allocate_unaligned(buffer, s32);
+      //// :AfterInstructionPatch
+      //immediate_label_patch_info =
+        //dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+          //.target_label_index = label_index,
+          //.from = {.section = &program->memory.code},
+          //.patch_target = patch_target,
+        //});
+    } else if (storage->tag == Storage_Tag_Static) {
+      panic("Does this even happen?");
+      //Slice slice = {
+        //.bytes = storage_static_as_c_type_internal(storage, storage->byte_size),
+        //.length = storage->byte_size,
+      //};
+      //virtual_memory_buffer_append_slice(buffer, slice);
+    } else {
+      panic("Unexpected mismatched operand type for immediate encoding.");
+    }
+  }
+
+  result.Bytes.length = s64_to_u8(byte_cursor - result.Bytes.memory);
+  result.encoded_byte_size = result.Bytes.length;
+
+  return result;
+}
+
+static void
 encode_instruction_assembly(
   Program *program,
   Virtual_Memory_Buffer *buffer,
@@ -320,55 +634,17 @@ encode_instruction_assembly(
   }
 }
 
-void
-encode_instruction(
-  Program *program,
-  Virtual_Memory_Buffer *buffer,
-  Instruction *instruction
+static const Instruction_Encoding *
+encoding_match(
+  const Instruction *instruction
 ) {
-  switch(instruction->tag) {
-    case Instruction_Tag_Label: {
-      Label *label = program_get_label(program, instruction->Label.index);
-      assert(!label->resolved);
-      label->section = &program->memory.code;
-      label->offset_in_section = u64_to_u32(buffer->occupied);
-      label->resolved = true;
-      instruction->encoded_byte_size = 0;
-      return;
-    }
-    case Instruction_Tag_Bytes: {
-      Slice slice = {
-        .bytes = (char *)instruction->Bytes.memory,
-        .length = instruction->Bytes.length,
-      };
-      virtual_memory_buffer_append_slice(buffer, slice);
-      return;
-    }
-    case Instruction_Tag_Label_Patch: {
-      Instruction_Label_Patch *label_patch = &instruction->Label_Patch;
-      u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset;
-      dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
-        .target_label_index = instruction->Label_Patch.label_index,
-        .from = {
-          .section = &program->memory.code,
-          .offset_in_section = u64_to_u32(buffer->occupied),
-        },
-        .patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer),
-      });
-      return;
-    }
-    case Instruction_Tag_Assembly: {
-      // Handled below
-      break;
-    }
-  }
-
+  assert(instruction->tag == Instruction_Tag_Assembly);
   u32 storage_count = countof(instruction->Assembly.operands);
   for (u32 index = 0; index < instruction->Assembly.mnemonic->encoding_count; ++index) {
     const Instruction_Encoding *encoding = &instruction->Assembly.mnemonic->encoding_list[index];
     for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
-      Storage *storage = &instruction->Assembly.operands[storage_index];
+      const Storage *storage = &instruction->Assembly.operands[storage_index];
       u32 encoding_size = s32_to_u32(operand_encoding->size);
 
       if (operand_encoding->size != Operand_Size_Any) {
@@ -451,11 +727,85 @@ encode_instruction(
       encoding = 0;
       break;
     }
+    if (encoding) return encoding;
+  }
+  return 0;
+}
 
-    if (encoding) {
-      encode_instruction_assembly(program, buffer, instruction, encoding, storage_count);
+static inline void
+push_eagerly_encoded_instruction(
+  Array_Instruction *instructions,
+  const Source_Range source_range,
+  Instruction instruction
+) {
+  instruction.source_range = source_range;
+  if (instruction.tag == Instruction_Tag_Assembly) {
+    const Instruction_Encoding *encoding = encoding_match(&instruction);
+    u32 storage_count = countof(instruction.Assembly.operands);
+    bool has_stack_operands = false;
+    for (u32 i = 0; i < storage_count; ++i) {
+      const Storage *storage = &instruction.Assembly.operands[i];
+      if (storage->tag == Storage_Tag_Memory && storage->Memory.location.tag == Memory_Location_Tag_Stack) {
+        has_stack_operands = true;
+      }
+    }
+    if (!has_stack_operands) {
+      Instruction encoded = eager_encode_instruction_assembly(&instruction, encoding, storage_count);
+      dyn_array_push(*instructions, encoded);
       return;
     }
+  }
+  dyn_array_push(*instructions, instruction);
+}
+
+void
+encode_instruction(
+  Program *program,
+  Virtual_Memory_Buffer *buffer,
+  Instruction *instruction
+) {
+  switch(instruction->tag) {
+    case Instruction_Tag_Label: {
+      Label *label = program_get_label(program, instruction->Label.index);
+      assert(!label->resolved);
+      label->section = &program->memory.code;
+      label->offset_in_section = u64_to_u32(buffer->occupied);
+      label->resolved = true;
+      instruction->encoded_byte_size = 0;
+      return;
+    }
+    case Instruction_Tag_Bytes: {
+      Slice slice = {
+        .bytes = (char *)instruction->Bytes.memory,
+        .length = instruction->Bytes.length,
+      };
+      virtual_memory_buffer_append_slice(buffer, slice);
+      return;
+    }
+    case Instruction_Tag_Label_Patch: {
+      Instruction_Label_Patch *label_patch = &instruction->Label_Patch;
+      u64 patch_offset_in_buffer = buffer->occupied + label_patch->offset;
+      dyn_array_push(program->patch_info_array, (Label_Location_Diff_Patch_Info) {
+        .target_label_index = instruction->Label_Patch.label_index,
+        .from = {
+          .section = &program->memory.code,
+          .offset_in_section = u64_to_u32(buffer->occupied),
+        },
+        .patch_target = (s32 *)(buffer->memory + patch_offset_in_buffer),
+      });
+      return;
+    }
+    case Instruction_Tag_Assembly: {
+      // Handled below
+      break;
+    }
+  }
+
+  u32 storage_count = countof(instruction->Assembly.operands);
+  const Instruction_Encoding *encoding = encoding_match(instruction);
+  if (encoding) {
+    encode_instruction_assembly(program, buffer, instruction, encoding, storage_count);
+    return;
   }
   const Compiler_Source_Location *compiler_location = &instruction->compiler_source_location;
   printf(

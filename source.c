@@ -705,7 +705,7 @@ assign_integers(
         (Instruction) {
           .tag = Instruction_Tag_Assembly,
           .Assembly = {movsx, {adjusted_source, source->storage}}
-         }
+        }
       );
     } else {
       push_instruction(
@@ -3621,7 +3621,7 @@ call_function_overload(
       instructions, *source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, instance->storage}}}
     );
-    push_instruction(
+    push_eagerly_encoded_instruction(
       instructions, *source_range,
       (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {reg}}}
     );
@@ -4042,7 +4042,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
 
-      push_instruction(
+      push_eagerly_encoded_instruction(
         &builder->code_block.instructions, result_range,
         (Instruction) {
           .tag = Instruction_Tag_Assembly,
@@ -6440,7 +6440,7 @@ program_parse(
 
   Performance_Counter perf = system_performance_counter_start();
   MASS_TRY(tokenize(context->compilation, &context->module->source_file, &tokens));
-  if (1) {
+  if (0) {
     u64 usec = system_performance_counter_end(&perf);
     printf("Tokenizer took %"PRIu64" µs\n", usec);
   }
