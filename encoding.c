@@ -137,24 +137,19 @@ eager_encode_instruction_assembly(
       } else if (storage->tag == Storage_Tag_Memory) {
         Memory_Location location = storage->Memory.location;
         bool can_have_zero_displacement = true;
+        enum Sib_Scale { Sib_Scale_1 = 0b00, Sib_Scale_2 = 0b01, Sib_Scale_4 = 0b10, Sib_Scale_8 = 0b11,};
+        enum { Sib_Index_None = 0b100,};
         switch(location.tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
             r_m = 0b101;
             break;
           }
           case Memory_Location_Tag_Stack: {
-            // Turn the stack operand into an indirect access and let the code below handle it
-            location = (Memory_Location) {
-              .tag = Memory_Location_Tag_Indirect,
-              .Indirect = {
-                .base_register = Register_SP,
-                // :OversizedStackOffsets @Hack
-                // This displacement is not actually used, but needs to be large to force
-                // the selection of Mod_32 encoding
-                .offset = 0xFFFF,
-              },
-            };
-            // fallthrough
+            needs_sib = true;
+            r_m = 0b0100; // SIB
+            sib_byte = (((Sib_Index_None & 0b111) << 3) | Register_SP);
+            mod = MOD_Displacement_s32;
+            break;
           }
           case Memory_Location_Tag_Indirect: {
             // Right now the compiler does not support SIB scale other than 1.
@@ -166,9 +161,7 @@ eager_encode_instruction_assembly(
             //    be represented with SIB scale. In cases of extreme register pressure this
             //    can cause spilling. To avoid that we could try to use temporary shifts
             //    to adjust the offset between different indexes, but it is not implemented ATM.
-            enum { Sib_Scale_1 = 0b00, Sib_Scale_2 = 0b01, Sib_Scale_4 = 0b10, Sib_Scale_8 = 0b11,};
-            enum { Sib_Index_None = 0b100,};
-            u8 sib_scale_bits = Sib_Scale_1;
+            enum Sib_Scale sib_scale_bits = Sib_Scale_1;
             Register base = location.Indirect.base_register;
             // TODO enable this when the compiler makes use of indexed access
             /*
@@ -206,16 +199,16 @@ eager_encode_instruction_assembly(
               can_have_zero_displacement = false;
             }
             displacement = s64_to_s32(location.Indirect.offset);
+            // :RipRelativeEncoding
+            if (can_have_zero_displacement && displacement == 0) {
+              mod = MOD_Displacement_0;
+            } else if (s32_fits_into_s8(displacement)) {
+              mod = MOD_Displacement_s8;
+            } else {
+              mod = MOD_Displacement_s32;
+            }
             break;
           }
-        }
-        // :RipRelativeEncoding
-        if (can_have_zero_displacement && displacement == 0) {
-          mod = MOD_Displacement_0;
-        } else if (s32_fits_into_s8(displacement)) {
-          mod = MOD_Displacement_s8;
-        } else {
-          mod = MOD_Displacement_s32;
         }
       } else {
         panic("Unsupported operand type");
