@@ -10,11 +10,11 @@ ensure_function_instance(
   Value *fn_value
 );
 
-Value *
+static inline Value *
 reserve_stack(
-  Allocator *allocator,
-  Function_Builder *fn,
-  Descriptor *descriptor,
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Descriptor *descriptor,
   Source_Range source_range
 );
 

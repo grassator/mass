@@ -142,7 +142,6 @@ type_value_for_descriptor(
 Value void_value = {
   .descriptor = &descriptor_void,
   .storage = { .tag = Storage_Tag_None },
-  .compiler_source_location = COMPILER_SOURCE_LOCATION_GLOBAL_FIELDS,
 };
 
 static inline bool

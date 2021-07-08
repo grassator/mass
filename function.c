@@ -15,22 +15,16 @@ reserve_stack_storage(
   return storage_stack(-builder->stack_reserve, raw_byte_size, Stack_Area_Local);
 }
 
-Value *
-reserve_stack_internal(
-  Compiler_Source_Location compiler_source_location,
+static inline Value *
+reserve_stack(
   Execution_Context *context,
   Function_Builder *builder,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
   Storage storage = reserve_stack_storage(builder, descriptor_byte_size(descriptor));
-  return value_make_internal(
-    compiler_source_location, context, descriptor, storage, source_range
-  );
+  return value_make(context, descriptor, storage, source_range);
 }
-
-#define reserve_stack(...)\
-  reserve_stack_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static const u64 registers_that_can_be_temp = (
   // FIXME this should be all registers except for RSP

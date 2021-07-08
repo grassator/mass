@@ -1273,7 +1273,6 @@ typedef struct Value {
   Storage storage;
   u64 is_temporary;
   Source_Range source_range;
-  Compiler_Source_Location compiler_source_location;
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
@@ -4102,12 +4101,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value, Value,
     .name = slice_literal_fields("source_range"),
     .descriptor = &descriptor_source_range,
     .Base_Relative.offset = offsetof(Value, source_range),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("compiler_source_location"),
-    .descriptor = &descriptor_compiler_source_location,
-    .Base_Relative.offset = offsetof(Value, compiler_source_location),
   },
 );
 MASS_DEFINE_TYPE_VALUE(value);

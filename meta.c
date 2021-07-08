@@ -1537,7 +1537,6 @@ main(void) {
     { "Storage", "storage" },
     { "u64", "is_temporary" },
     { "Source_Range", "source_range" },
-    { "Compiler_Source_Location", "compiler_source_location" },
   })));
 
   push_type(type_enum("Expected_Result_Storage", (Enum_Type_Item[]){

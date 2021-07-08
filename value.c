@@ -1099,8 +1099,7 @@ instruction_equal(
 }
 
 static inline Value *
-value_init_internal(
-  Compiler_Source_Location compiler_source_location,
+value_init(
   Value *result,
   const Descriptor *descriptor,
   Storage storage,
@@ -1110,35 +1109,24 @@ value_init_internal(
     .descriptor = descriptor,
     .storage = storage,
     .source_range = source_range,
-    .compiler_source_location = compiler_source_location,
   };
   return result;
 }
 
-#define value_init(...) value_init_internal(\
-  COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
-)
-
 static inline Value *
-value_make_internal(
-  Compiler_Source_Location compiler_source_location,
+value_make(
   Execution_Context *context,
   const Descriptor *descriptor,
   Storage storage,
   Source_Range source_range
 ) {
-  return value_init_internal(
-    compiler_source_location,
+  return value_init(
     allocator_allocate(context->allocator, Value),
     descriptor,
     storage,
     source_range
   );
 }
-
-#define value_make(...) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, ##__VA_ARGS__\
-)
 
 static inline Value *
 value_number_literal(
@@ -1210,8 +1198,7 @@ allocate_section_memory(
 }
 
 static inline Value *
-value_global_internal(
-  Compiler_Source_Location compiler_source_location,
+value_global(
   Execution_Context *context,
   Descriptor *descriptor,
   Source_Range source_range
@@ -1222,12 +1209,8 @@ value_global_internal(
   u64 alignment = descriptor_byte_alignment(descriptor);
 
   Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-  return value_make_internal(
-    compiler_source_location, context, descriptor, data_label32(label_index, byte_size), source_range
-  );
+  return value_make(context, descriptor, data_label32(label_index, byte_size), source_range);
 }
-#define value_global(...)\
-  value_global_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Storage
 storage_indirect(
@@ -1258,96 +1241,76 @@ storage_eflags(
 }
 
 // TODO consider adding explicit boolean descriptor type
-#define value_from_compare(_allocator_, _compare_type_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, _allocator_, &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
+#define value_from_compare(_allocator_, _compare_type_, _SOURCE_RANGE_) value_make(\
+  (_allocator_), &descriptor_s8, storage_eflags(_compare_type_), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_s64, imm64((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s32, imm32((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_s32, imm32((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s16, imm16((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_s16, imm16((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_s8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_s8, imm8((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_s8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_s8, imm8((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u64, imm64((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u64(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_u64, imm64((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u32, imm32((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u32(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_u32, imm32((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u16, imm16((_integer_)), (_SOURCE_RANGE_)\
+#define value_from_u16(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_u16, imm16((_integer_)), (_SOURCE_RANGE_)\
 )
 
-#define value_from_u8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make_internal(\
-  COMPILER_SOURCE_LOCATION, (_CONTEXT_), &descriptor_u8, imm8((_integer_), (_SOURCE_RANGE_)\
+#define value_from_u8(_CONTEXT_, _integer_, _SOURCE_RANGE_) value_make(\
+  (_CONTEXT_), &descriptor_u8, imm8((_integer_), (_SOURCE_RANGE_)\
 )
 
 static inline Value *
-value_from_signed_immediate_internal(
-  Compiler_Source_Location location,
+value_from_signed_immediate(
   Execution_Context *context,
   s64 value,
   Source_Range source_range
 ) {
   if (s64_fits_into_s8(value)) {
-    return value_make_internal(
-      location, context, &descriptor_s8, imm8((s8)value), source_range
-    );
+    return value_make(context, &descriptor_s8, imm8((s8)value), source_range);
   }
   if (s64_fits_into_s16(value)) {
-    return value_make_internal(
-      location, context, &descriptor_s16, imm16((s16)value), source_range
-    );
+    return value_make(context, &descriptor_s16, imm16((s16)value), source_range);
   }
   if (s64_fits_into_s32(value)) {
-    return value_make_internal(
-      location, context, &descriptor_s32, imm32((s32)value), source_range
-    );
+    return value_make(context, &descriptor_s32, imm32((s32)value), source_range);
   }
-  return value_make_internal(
-    location, context, &descriptor_s64, imm64(value), source_range
-  );
+  return value_make(context, &descriptor_s64, imm64(value), source_range);
 }
-#define value_from_signed_immediate(...)\
-  value_from_signed_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
 value_from_unsigned_immediate_internal(
-  Compiler_Source_Location location,
   Execution_Context *context,
   u64 value,
   Source_Range source_range
 ) {
   if (u64_fits_into_u8(value)) {
-    return value_make_internal(
-      location, context, &descriptor_u8, imm8((u8)value), source_range
-    );
+    return value_make(context, &descriptor_u8, imm8((u8)value), source_range);
   }
   if (u64_fits_into_u16(value)) {
-    return value_make_internal(
-      location, context, &descriptor_u16, imm16((u16)value), source_range
-    );
+    return value_make(context, &descriptor_u16, imm16((u16)value), source_range);
   }
   if (u64_fits_into_u32(value)) {
-    return value_make_internal(
-      location, context, &descriptor_u32, imm32((u32)value), source_range
-    );
+    return value_make(context, &descriptor_u32, imm32((u32)value), source_range);
   }
-  return value_make_internal(
-    location, context, &descriptor_u64, imm64(value), source_range
-  );
+  return value_make(context, &descriptor_u64, imm64(value), source_range);
 }
 #define value_from_unsigned_immediate(...)\
   value_from_unsigned_immediate_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
@@ -1376,25 +1339,18 @@ storage_register_for_descriptor(
 }
 
 static inline Value *
-value_register_for_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
+value_register_for_descriptor(
   Execution_Context *context,
   Register reg,
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  return value_make_internal(
-    compiler_source_location, context, descriptor,
-    storage_register_for_descriptor(reg, descriptor),
-    source_range
-  );
+  Storage storage = storage_register_for_descriptor(reg, descriptor);
+  return value_make(context, descriptor, storage, source_range);
 }
-#define value_register_for_descriptor(...)\
-  value_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline Value *
-value_temporary_acquire_indirect_for_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
+value_temporary_acquire_indirect_for_descriptor(
   Execution_Context *context,
   Function_Builder *builder,
   Register reg,
@@ -1402,21 +1358,14 @@ value_temporary_acquire_indirect_for_descriptor_internal(
   Source_Range source_range
 ) {
   register_acquire(builder, reg);
-  Value *value = value_make_internal(
-    compiler_source_location, context, descriptor,
-    storage_indirect(descriptor_byte_size(descriptor), reg),
-    source_range
-  );
+  Storage storage = storage_indirect(descriptor_byte_size(descriptor), reg);
+  Value *value = value_make(context, descriptor, storage, source_range);
   value->is_temporary = true;
   return value;
 }
 
-#define value_temporary_acquire_indirect_for_descriptor(...)\
-  value_temporary_acquire_indirect_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
-
 static inline Value *
-value_temporary_acquire_register_for_descriptor_internal(
-  Compiler_Source_Location compiler_source_location,
+value_temporary_acquire_register_for_descriptor(
   Execution_Context *context,
   Function_Builder *builder,
   Register reg,
@@ -1424,17 +1373,11 @@ value_temporary_acquire_register_for_descriptor_internal(
   Source_Range source_range
 ) {
   register_acquire(builder, reg);
-  Value *value = value_make_internal(
-    compiler_source_location, context, descriptor,
-    storage_register_for_descriptor(reg, descriptor),
-    source_range
-  );
+  Storage storage = storage_register_for_descriptor(reg, descriptor);
+  Value *value = value_make(context, descriptor, storage, source_range);
   value->is_temporary = true;
   return value;
 }
-
-#define value_temporary_acquire_register_for_descriptor(...)\
-  value_temporary_acquire_register_for_descriptor_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline void
 value_release_if_temporary(
@@ -1530,8 +1473,7 @@ descriptor_array_of(
 }
 
 static inline Value *
-value_global_c_string_from_slice_internal(
-  Compiler_Source_Location compiler_source_location,
+value_global_c_string_from_slice(
   Execution_Context *context,
   Slice slice,
   Source_Range source_range
@@ -1539,15 +1481,12 @@ value_global_c_string_from_slice_internal(
   u32 length = u64_to_u32(slice.length + 1);
   Descriptor *descriptor = descriptor_array_of(context->allocator, &descriptor_u8, length);
 
-  Value *string_value =
-    value_global_internal(compiler_source_location, context, descriptor, source_range);
+  Value *string_value = value_global(context, descriptor, source_range);
   s8 *memory = rip_value_pointer(context->program, string_value);
   memcpy(memory, slice.bytes, slice.length);
   memory[length - 1] = 0;
   return string_value;
 }
-#define value_global_c_string_from_slice(...)\
-  value_global_c_string_from_slice_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 static inline void
 function_info_init(
