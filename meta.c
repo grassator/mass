@@ -1382,11 +1382,6 @@ main(void) {
     { "u64", "encoded_byte_size" },
   }));
 
-  push_type(meta_number_literal("INSTRUCTION_BYTES_NO_LABEL", {
-    .bits = 255,
-    .negative = false,
-  }));
-
   push_type(type_struct("Code_Block", (Struct_Item[]){
     { "Label_Index", "start_label" },
     { "Label_Index", "end_label" },
