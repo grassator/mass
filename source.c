@@ -5665,12 +5665,20 @@ token_parse_block_view(
 
   if (!children_view.length) return &void_value;
 
-  Array_Value_Ptr lazy_statements = dyn_array_make(Array_Value_Ptr);
+  Value *block_result = &void_value;
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+  Array_Value_Ptr temp_lazy_statements = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
 
   u64 match_length = 0;
   Token_Statement_Matcher_In_Scopes_Params scope_params = { .start_scope = context->scope };
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
-    MASS_ON_ERROR(*context->result) return 0;
+    MASS_ON_ERROR(*context->result) goto defer;
     Value_View rest = value_view_rest(&children_view, start_index);
     // Skipping over empty statements
     if (value_match(value_view_get(rest, 0), &token_pattern_semicolon)) {
@@ -5682,7 +5690,7 @@ token_parse_block_view(
       .descriptor = &descriptor_void,
     };
     match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, &scope_params);
-    MASS_ON_ERROR(*context->result) return 0;
+    MASS_ON_ERROR(*context->result) goto defer;
 
     if (match_length) {
       // If the statement did not assign a proc that means that it does not need
@@ -5692,19 +5700,16 @@ token_parse_block_view(
         Value_View matched_view = value_view_slice(&rest, 0, match_length);
         Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
         *lazy_value_storage = lazy_value;
-        Value *lazy_statement = value_init(
-          allocator_allocate(context->allocator, Value),
-          &descriptor_lazy_value,
-          storage_static(lazy_value_storage),
-          matched_view.source_range
-        );
-        dyn_array_push(lazy_statements, lazy_statement);
+        Value *lazy_statement = allocator_allocate(context->allocator, Value);
+        Storage storage = storage_static(lazy_value_storage);
+        value_init(lazy_statement, &descriptor_lazy_value, storage, matched_view.source_range);
+        dyn_array_push(temp_lazy_statements, lazy_statement);
       }
       continue;
     }
     Value *parse_result =
       token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
-    dyn_array_push(lazy_statements, parse_result);
+    dyn_array_push(temp_lazy_statements, parse_result);
 
     if (match_length) continue;
     Value *token = value_view_get(rest, 0);
@@ -5712,19 +5717,21 @@ token_parse_block_view(
       .tag = Mass_Error_Tag_Parse,
       .source_range = token->source_range,
     });
-    return 0;
+    goto defer;
   }
 
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*context->result) goto defer;
 
-  u64 statement_count = dyn_array_length(lazy_statements);
+  u64 statement_count = dyn_array_length(temp_lazy_statements);
   if (statement_count) {
-    Value *last_result = *dyn_array_last(lazy_statements);
+    Value *last_result = *dyn_array_last(temp_lazy_statements);
     const Descriptor *last_descriptor = value_or_lazy_value_descriptor(last_result);
     if (statement_count == 1) {
-      dyn_array_destroy(lazy_statements);
       return last_result;
     } else {
+      Array_Value_Ptr lazy_statements;
+      dyn_array_copy_from_temp(Array_Value_Ptr, context, &lazy_statements, temp_lazy_statements);
+
       void *payload;
       PACK_AS_VOID_POINTER(payload, lazy_statements);
 
@@ -5733,9 +5740,12 @@ token_parse_block_view(
       );
     }
   } else {
-    dyn_array_destroy(lazy_statements);
-    return &void_value;
+    block_result = &void_value;
   }
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+  return block_result;
 }
 
 static inline Value *
