@@ -327,10 +327,23 @@ PRELUDE_MAP_FLOAT_TYPES(PRELUDE_PROCESS_TYPE)
   slong_t: slong_t_abs,\
   f32: f32_abs, f64: f64_abs)((x))
 
+#define PRELUDE_ALIGN_INTERNAL(X, ALIGN)\
+  (((X) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)
+
 #define PRELUDE_PROCESS_TYPE(_type_)\
-  static inline _type_ _type_##_align(_type_ x, _type_ align) { return ((x + align - 1) / align) * align; }
+  static inline _type_ _type_##_align(_type_ x, _type_ align) {\
+    switch(align) {\
+      case 1: return x;\
+      case 2: return PRELUDE_ALIGN_INTERNAL(x, 2);\
+      case 4: return PRELUDE_ALIGN_INTERNAL(x, 4);\
+      case 8: return PRELUDE_ALIGN_INTERNAL(x, 8);\
+      case 16: return PRELUDE_ALIGN_INTERNAL(x, 16);\
+      default: return PRELUDE_ALIGN_INTERNAL(x, align);\
+    }\
+  }
 PRELUDE_MAP_INTEGER_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
+#undef PRELUDE_ALIGN_INTERNAL
 
 static inline f32 f32_align(f32 x, f32 align) { return ceilf(x / align) * align; }
 static inline f64 f64_align(f64 x, f64 align) { return ceil(x / align) * align; }
@@ -2684,10 +2697,8 @@ virtual_memory_buffer_allocate_bytes(
   u64 alignment
 ) {
   u64 aligned_occupied = buffer->occupied;
-  if (alignment != 1) {
-    aligned_occupied = u64_align(aligned_occupied, alignment);
-    byte_size = u64_align(byte_size, alignment);
-  }
+  aligned_occupied = u64_align(aligned_occupied, alignment);
+  byte_size = u64_align(byte_size, alignment);
   assert(buffer->capacity >= byte_size + aligned_occupied);
   buffer->occupied = aligned_occupied;
   void *result = buffer->memory + buffer->occupied;
