@@ -188,31 +188,21 @@ win32_print_stack(
   s64 runtime_function_index = win32_get_function_index_from_address(instruction_address, jit);
   if (runtime_function_index < 0) {
     // TODO adjust instruction address to point to the start of the function
-    printf("  stopped at external code at %016llX\n", instruction_address);
+    printf("  stopped at external code at 0x%016llX\n", instruction_address);
     return;
   }
-  Program_Memory *memory = &jit->program->memory;
-  Virtual_Memory_Buffer *code_buffer = &memory->code.buffer;
+
+  const Instruction *instruction = win32_instruction_for_address(instruction_address, jit);
+  if (instruction) {
+    printf("  at ");
+    source_range_print_start_position(&instruction->source_range);
+  }
 
   Win32_Jit_Info *info = jit->platform_specific_payload;
   Function_Builder *builder = dyn_array_get(jit->program->functions, runtime_function_index);
   RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, runtime_function_index);
   const UNWIND_INFO *unwind_info =
-    win32_unwind_info_for_function(&memory->ro_data, function);
-
-  u64 absolute_function_begin_address = (u64)code_buffer->memory + function->BeginAddress;
-  u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
-
-  u64 current_offset = unwind_info->SizeOfProlog;
-  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    if (instruction->tag != Instruction_Tag_Bytes) continue;
-    current_offset += instruction->Bytes.length;
-    if (current_offset == relative_instruction_byte_offset) {
-      printf("  at ");
-      source_range_print_start_position(&instruction->source_range);
-    }
-  }
+    win32_unwind_info_for_function(&jit->program->memory.ro_data, function);
 
   // Function prolog pushes the registers which changes RSP and we need to account for that
   u32 register_push_count = win32_unwind_info_pushed_register_count(unwind_info);
