@@ -793,8 +793,7 @@ typedef struct Memory_Location_Instruction_Pointer_Relative {
 } Memory_Location_Instruction_Pointer_Relative;
 typedef struct Memory_Location_Indirect {
   Register base_register;
-  u32 _base_register_padding;
-  s64 offset;
+  s32 offset;
 } Memory_Location_Indirect;
 typedef struct Memory_Location_Stack {
   Stack_Area area;
@@ -3062,14 +3061,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_location_indirect, Memory_Location_Indirect
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("_base_register_padding"),
-    .descriptor = &descriptor_u32,
-    .Base_Relative.offset = offsetof(Memory_Location_Indirect, _base_register_padding),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("offset"),
-    .descriptor = &descriptor_s64,
+    .descriptor = &descriptor_s32,
     .Base_Relative.offset = offsetof(Memory_Location_Indirect, offset),
   },
 );

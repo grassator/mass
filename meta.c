@@ -1300,8 +1300,7 @@ main(void) {
     }),
     struct_fields("Indirect", (Struct_Item[]){
       { "Register", "base_register" },
-      { "u32", "_base_register_padding" },
-      { "s64", "offset" },
+      { "s32", "offset" },
     }),
     struct_fields("Stack", (Struct_Item[]){
       { "Stack_Area", "area" },
