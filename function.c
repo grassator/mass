@@ -813,9 +813,10 @@ ensure_function_instance(
 
   value_force_exact(&body_context, builder, return_value, parse_result);
 
-  push_instruction(
-    &builder->code_block.instructions, return_value->source_range,
-    (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+  push_label(
+    &builder->code_block.instructions,
+    return_value->source_range,
+    builder->code_block.end_label
   );
 
   const Storage *callee_return_storage = &call_setup->callee_return_value->storage;

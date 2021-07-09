@@ -3279,9 +3279,10 @@ mass_macro_lazy_proc(
     result_value = value_force(context, builder, expected_result, body_value);
     MASS_ON_ERROR(*context->result) return 0;
 
-    push_instruction(
-      &builder->code_block.instructions, body_value->source_range,
-      (Instruction) { .tag = Instruction_Tag_Label, .Label.index = builder->code_block.end_label }
+    push_label(
+      &builder->code_block.instructions,
+      body_value->source_range,
+      builder->code_block.end_label
     );
   }
   builder->code_block.end_label = saved_return_label;
@@ -5134,19 +5135,14 @@ mass_handle_if_expression_lazy_proc(
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {code_label32(after_label), 0, 0}}}
   );
 
-  push_instruction(
-    &builder->code_block.instructions, *dummy_range,
-    (Instruction) {.tag = Instruction_Tag_Label, .Label.index = else_label}
-  );
+
+  push_label(&builder->code_block.instructions, *dummy_range, else_label);
 
   Expected_Result expected_else = expected_result_from_value(result_value);
   result_value = value_force(context, builder, &expected_else, else_);
   MASS_ON_ERROR(*context->result) return 0;
 
-  push_instruction(
-    &builder->code_block.instructions, *dummy_range,
-    (Instruction) {.tag = Instruction_Tag_Label, .Label.index = after_label}
-  );
+  push_label(&builder->code_block.instructions, *dummy_range, after_label);
 
   return result_value;
 }
@@ -5757,13 +5753,8 @@ mass_handle_label_lazy_proc(
     return 0;
   }
 
-  push_instruction(
-    &builder->code_block.instructions, source_range,
-    (Instruction) {
-      .tag = Instruction_Tag_Label,
-      .Label.index = *storage_static_as_c_type(&label_value->storage, Label_Index),
-    }
-  );
+  Label_Index label_index = *storage_static_as_c_type(&label_value->storage, Label_Index);
+  push_label(&builder->code_block.instructions, source_range, label_index);
 
   return expected_result_validate(expected_result, &void_value);
 }

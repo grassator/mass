@@ -52,6 +52,18 @@ instruction_add_source_location_internal(
     push_eagerly_encoded_instruction((_array_ptr_), to_push);\
   } while (0)
 
+#define push_label(_array_ptr_, _location_, ...)\
+  do {\
+    Label_Index push_index = (__VA_ARGS__);\
+    Instruction to_push = (Instruction) {\
+      .tag = Instruction_Tag_Label,\
+      .Label = {.index = push_index},\
+      .source_range = (_location_),\
+      .compiler_source_location = COMPILER_SOURCE_LOCATION,\
+    };\
+    dyn_array_push(*(_array_ptr_), to_push);\
+  } while (0)
+
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     const Expected_Result *fold_result = (_result_);\
