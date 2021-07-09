@@ -44,16 +44,16 @@ instruction_add_source_location_internal(
 #define instruction_add_compiler_location(...)\
   instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-#define push_label(_array_ptr_, _location_, ...)\
+#define push_label(_CODE_BLOCK_, _LOCATION_, ...)\
   do {\
     Label_Index push_index = (__VA_ARGS__);\
     Instruction to_push = (Instruction) {\
       .tag = Instruction_Tag_Label,\
       .Label = {.index = push_index},\
-      .source_range = (_location_),\
+      .source_range = (_LOCATION_),\
       .compiler_source_location = COMPILER_SOURCE_LOCATION,\
     };\
-    dyn_array_push(*(_array_ptr_), to_push);\
+    dyn_array_push((_CODE_BLOCK_)->instructions, to_push);\
   } while (0)
 
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\

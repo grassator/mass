@@ -731,12 +731,12 @@ assign_integers(
     if (descriptor_is_signed_integer(source->descriptor)) {
       assert(!descriptor_is_unsigned_integer(target->descriptor));
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, source->source_range,
+        &builder->code_block, source->source_range,
         &(Instruction_Assembly){movsx, {adjusted_source, source->storage}}
       );
     } else {
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, source->source_range,
+        &builder->code_block, source->source_range,
         &(Instruction_Assembly){movzx, {adjusted_source, source->storage}}
       );
     }
@@ -3299,7 +3299,7 @@ mass_macro_lazy_proc(
     MASS_ON_ERROR(*context->result) return 0;
 
     push_label(
-      &builder->code_block.instructions,
+      &builder->code_block,
       body_value->source_range,
       builder->code_block.end_label
     );
@@ -3401,7 +3401,6 @@ call_function_overload(
   Value *to_call = payload->overload;
   Array_Value_Ptr arguments = payload->args;
 
-  Array_Instruction *instructions = &builder->code_block.instructions;
   Value *instance = ensure_function_instance(context, to_call);
   MASS_ON_ERROR(*context->result) return 0;
   assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
@@ -3613,7 +3612,7 @@ call_function_overload(
     });
 
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){mov, {saved->stack, saved->reg}}
     );
   }
@@ -3640,17 +3639,17 @@ call_function_overload(
     Register temp_reg = register_acquire_temp(builder);
     Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){mov, {reg, instance->storage}}
     );
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){call, {reg}}
     );
     register_release(builder, temp_reg);
   } else {
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){call, {instance->storage}}
     );
   }
@@ -3671,7 +3670,7 @@ call_function_overload(
 
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){mov, {saved->reg, saved->stack}}
     );
   }
@@ -3972,7 +3971,7 @@ storage_load_index_address(
     );
 
     push_eagerly_encoded_assembly(
-      &builder->code_block.instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){imul, {new_base->storage, reg_byte_size_value->storage}}
     );
     value_release_if_temporary(builder, reg_byte_size_value);
@@ -3996,7 +3995,7 @@ storage_load_index_address(
     }
 
     push_eagerly_encoded_assembly(
-      &builder->code_block.instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){add, {new_base->storage, temp_value->storage}}
     );
     value_release_if_temporary(builder, temp_value);
@@ -4063,7 +4062,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
 
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, result_range,
+        &builder->code_block, result_range,
         &(Instruction_Assembly){mnemonic, {temp_lhs->storage, temp_rhs->storage}}
       );
       value_release_if_temporary(builder, temp_rhs);
@@ -4116,7 +4115,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, result_range,
+        &builder->code_block, result_range,
         &(Instruction_Assembly){mnemonic, {temp_b->storage}}
       );
       register_release_maybe_restore(builder, &maybe_saved_rdx);
@@ -4127,7 +4126,6 @@ mass_handle_arithmetic_operation_lazy_proc(
     case Mass_Arithmetic_Operator_Divide:
     case Mass_Arithmetic_Operator_Remainder: {
       Allocator *allocator = context->allocator;
-      Array_Instruction *instructions = &builder->code_block.instructions;
       u64 byte_size = descriptor_byte_size(descriptor);
 
       if (payload->operator == Mass_Arithmetic_Operator_Divide) {
@@ -4180,25 +4178,27 @@ mass_handle_arithmetic_operation_lazy_proc(
           case 1: widen = cbw; break;
         }
         assert(widen);
-        push_eagerly_encoded_assembly(instructions, result_range, &(Instruction_Assembly){widen});
         push_eagerly_encoded_assembly(
-          instructions, result_range, &(Instruction_Assembly){idiv, {temp_divisor->storage}}
+          &builder->code_block, result_range, &(Instruction_Assembly){widen}
+        );
+        push_eagerly_encoded_assembly(
+          &builder->code_block, result_range, &(Instruction_Assembly){idiv, {temp_divisor->storage}}
         );
       } else {
         if (byte_size == 1) {
           Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
           push_eagerly_encoded_assembly(
-            instructions, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
+            &builder->code_block, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
           push_eagerly_encoded_assembly(
-            instructions, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
+            &builder->code_block, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
           );
         }
         push_eagerly_encoded_assembly(
-          instructions, result_range, &(Instruction_Assembly){x64_div, {temp_divisor->storage}}
+          &builder->code_block, result_range, &(Instruction_Assembly){x64_div, {temp_divisor->storage}}
         );
       }
 
@@ -4207,7 +4207,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           // :64bitMode8BitOperations
           // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
           // This is not optimal, but it should do for now.
-          dyn_array_push(*instructions, (Instruction) {
+          dyn_array_push(builder->code_block.instructions, (Instruction) {
             .tag = Instruction_Tag_Bytes,
             .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
             .source_range = result_range,
@@ -4451,7 +4451,7 @@ mass_handle_comparison_operation_lazy_proc(
   MASS_ON_ERROR(*context->result) return 0;
 
   push_eagerly_encoded_assembly(
-    &builder->code_block.instructions, *source_range,
+    &builder->code_block, *source_range,
     &(Instruction_Assembly){cmp, {temp_a->storage, temp_b->storage}}
   );
 
@@ -5151,17 +5151,17 @@ mass_handle_if_expression_lazy_proc(
     make_label(context->program, &context->program->memory.code, slice_literal("if end"));
 
   push_eagerly_encoded_assembly(
-    &builder->code_block.instructions, *dummy_range,
+    &builder->code_block, *dummy_range,
     &(Instruction_Assembly){jmp, {code_label32(after_label)}}
   );
 
-  push_label(&builder->code_block.instructions, *dummy_range, else_label);
+  push_label(&builder->code_block, *dummy_range, else_label);
 
   Expected_Result expected_else = expected_result_from_value(result_value);
   result_value = value_force(context, builder, &expected_else, else_);
   MASS_ON_ERROR(*context->result) return 0;
 
-  push_label(&builder->code_block.instructions, *dummy_range, after_label);
+  push_label(&builder->code_block, *dummy_range, after_label);
 
   return result_value;
 }
@@ -5757,7 +5757,7 @@ mass_handle_label_lazy_proc(
   }
 
   Label_Index label_index = *storage_static_as_c_type(&label_value->storage, Label_Index);
-  push_label(&builder->code_block.instructions, source_range, label_index);
+  push_label(&builder->code_block, source_range, label_index);
 
   return expected_result_validate(expected_result, &void_value);
 }
@@ -5828,7 +5828,7 @@ mass_handle_explicit_return_lazy_proc(
   Storage return_label = code_label32(builder->code_block.end_label);
 
   push_eagerly_encoded_assembly(
-    &builder->code_block.instructions,
+    &builder->code_block,
     builder->return_value->source_range,
     &(Instruction_Assembly) {jmp, {return_label}}
   );

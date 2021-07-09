@@ -88,7 +88,7 @@ register_acquire_maybe_save_if_already_acquired(
   result.saved = true;
 
   push_eagerly_encoded_assembly(
-    &builder->code_block.instructions, *source_range,
+    &builder->code_block, *source_range,
     &(Instruction_Assembly){mov, {
       storage_register_for_descriptor(result.saved_index, &descriptor_s64),
       storage_register_for_descriptor(reg_index, &descriptor_s64),
@@ -105,7 +105,7 @@ register_release_maybe_restore(
 ) {
   if (maybe_saved_register->saved) {
     push_eagerly_encoded_assembly(
-      &builder->code_block.instructions, *maybe_saved_register->source_range,
+      &builder->code_block, *maybe_saved_register->source_range,
       &(Instruction_Assembly){mov, {
         storage_register_for_descriptor(maybe_saved_register->index, &descriptor_s64),
         storage_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
@@ -125,7 +125,6 @@ move_value(
   const Storage *target,
   const Storage *source
 ) {
-  Array_Instruction *instructions = &builder->code_block.instructions;
   if (target == source) return;
   if (storage_equal(target, source)) return;
 
@@ -140,11 +139,11 @@ move_value(
     assert(target_size == source_size);
     if (target_size == 4) {
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){movss, {*target, *source}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){movss, {*target, *source}}
       );
     } else if (target_size == 8) {
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){movsd, {*target, *source}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){movsd, {*target, *source}}
       );
     } else {
       panic("Internal Error: XMM operand of unexpected size");
@@ -165,63 +164,63 @@ move_value(
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){sete, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){sete, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Not_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setne, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setne, {temp, *source}}
         );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setb, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setb, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setbe, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setbe, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){seta, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){seta, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setae, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setae, {temp, *source}}
         );
         break;
       }
 
       case Compare_Type_Signed_Less: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setl, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setl, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setle, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setle, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Signed_Greater: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setg, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setg, {temp, *source}}
         );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
         push_eagerly_encoded_assembly(
-          instructions, *source_range, &(Instruction_Assembly){setge, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setge, {temp, *source}}
         );
         break;
       }
@@ -234,10 +233,10 @@ move_value(
       Storage resized_temp = temp;
       resized_temp.byte_size = target->byte_size;
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){movsx, {resized_temp, temp}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){movsx, {resized_temp, temp}}
       );
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){mov, {*target, resized_temp}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, resized_temp}}
       );
       register_release(builder, temp.Register.index);
     }
@@ -257,11 +256,11 @@ move_value(
       .Register.index = source->Register.index,
     };
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
     );
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
     );
 
@@ -293,11 +292,11 @@ move_value(
     // Clear bits from the target register
     {
       push_eagerly_encoded_assembly(
-        instructions, *source_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
       );
       push_eagerly_encoded_assembly(
-        instructions, *source_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
       );
     }
@@ -305,7 +304,7 @@ move_value(
     // Prepare new bits from the source register
     {
       push_eagerly_encoded_assembly(
-        instructions, *source_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
       );
       Storage right_size_temp = temp_full_register;
@@ -313,7 +312,7 @@ move_value(
       move_value(allocator, builder, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
         push_eagerly_encoded_assembly(
-          instructions, *source_range,
+          &builder->code_block, *source_range,
           &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
         );
       }
@@ -321,7 +320,7 @@ move_value(
 
     // Merge new bits into the target register
     push_eagerly_encoded_assembly(
-      instructions, *source_range,
+      &builder->code_block, *source_range,
       &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
     );
     register_release(builder, temp_full_register.Register.index);
@@ -334,7 +333,7 @@ move_value(
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){xor, {*target, *target}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){xor, {*target, *target}}
       );
       return;
     }
@@ -376,15 +375,15 @@ move_value(
         .Register.index = register_acquire_temp(builder),
       };
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
       );
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){mov, {*target, temp}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, temp}}
       );
       register_release(builder, temp.Register.index);
     } else {
       push_eagerly_encoded_assembly(
-        instructions, *source_range, &(Instruction_Assembly){mov, {*target, adjusted_source}}
+        &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, adjusted_source}}
       );
     }
     return;
@@ -405,7 +404,7 @@ move_value(
   }
 
   push_eagerly_encoded_assembly(
-    instructions, *source_range, &(Instruction_Assembly){mov, {*target, *source}}
+    &builder->code_block, *source_range, &(Instruction_Assembly){mov, {*target, *source}}
   );
 }
 
@@ -520,7 +519,7 @@ make_if(
         default: assert(!"Unsupported comparison"); break;
       }
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, *source_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){mnemonic, {code_label32(label), value->storage}}
       );
     } else {
@@ -532,7 +531,7 @@ make_if(
           move_value(context->allocator, builder, source_range, &test_storage, &value->storage);
         }
         push_eagerly_encoded_assembly(
-          &builder->code_block.instructions, *source_range,
+          &builder->code_block, *source_range,
           &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
         );
         if (is_packed) register_release(builder, test_storage.Register.index);
@@ -540,12 +539,12 @@ make_if(
         u64 byte_size = descriptor_byte_size(value->descriptor);
         if (byte_size == 4 || byte_size == 8) {
           push_eagerly_encoded_assembly(
-            &builder->code_block.instructions, *source_range,
+            &builder->code_block, *source_range,
             &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
           );
         } else if (byte_size == 1) {
           push_eagerly_encoded_assembly(
-            &builder->code_block.instructions, *source_range,
+            &builder->code_block, *source_range,
             &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
           );
         } else {
@@ -554,7 +553,7 @@ make_if(
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
       push_eagerly_encoded_assembly(
-        &builder->code_block.instructions, *source_range,
+        &builder->code_block, *source_range,
         &(Instruction_Assembly){jz, {code_label32(label), eflags->storage}}
       );
     }
@@ -604,7 +603,7 @@ load_address(
     : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
   push_eagerly_encoded_assembly(
-    &builder->code_block.instructions, *source_range,
+    &builder->code_block, *source_range,
     &(Instruction_Assembly){lea, {temp_storage, source}}
   );
 
@@ -800,7 +799,7 @@ ensure_function_instance(
   value_force_exact(&body_context, builder, return_value, parse_result);
 
   push_label(
-    &builder->code_block.instructions,
+    &builder->code_block,
     return_value->source_range,
     builder->code_block.end_label
   );
@@ -815,7 +814,7 @@ ensure_function_instance(
     Storage caller_register_storage =
       storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
     push_eagerly_encoded_assembly(
-      &builder->code_block.instructions, return_value->source_range,
+      &builder->code_block, return_value->source_range,
       &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
     );
   }
@@ -903,11 +902,11 @@ program_init_startup_code(
   for (u64 i = 0; i < relocation_count; ++i) {
     Relocation *relocation = dyn_array_get(program->relocations, i);
     push_eagerly_encoded_assembly(
-      &builder.code_block.instructions, source_range,
+      &builder.code_block, source_range,
       &(Instruction_Assembly){lea, {register_a, relocation->address_of}}
     );
     push_eagerly_encoded_assembly(
-      &builder.code_block.instructions, source_range,
+      &builder.code_block, source_range,
       &(Instruction_Assembly){mov, {relocation->patch_at, register_a}}
     );
   }
@@ -917,13 +916,13 @@ program_init_startup_code(
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
     Value *instance = ensure_function_instance(context, fn);
     push_eagerly_encoded_assembly(
-      &builder.code_block.instructions, source_range,
+      &builder.code_block, source_range,
       &(Instruction_Assembly){call, {instance->storage}}
     );
   }
   Value *entry_instance = ensure_function_instance(context, program->entry_point);
   push_eagerly_encoded_assembly(
-    &builder.code_block.instructions, source_range,
+    &builder.code_block, source_range,
     &(Instruction_Assembly){jmp, {entry_instance->storage}}
   );
 

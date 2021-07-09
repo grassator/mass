@@ -444,7 +444,7 @@ encode_and_write_assembly(
 static inline void
 push_eagerly_encoded_assembly_internal(
   Compiler_Source_Location compiler_source_location,
-  Array_Instruction *instructions,
+  Code_Block *code_block,
   Source_Range source_range,
   const Instruction_Assembly *assembly
 ) {
@@ -469,7 +469,7 @@ push_eagerly_encoded_assembly_internal(
   }
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
 
-  dyn_array_push(*instructions, (Instruction) {
+  dyn_array_push(code_block->instructions, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = result.bytes,
     .source_range = source_range,
@@ -478,7 +478,7 @@ push_eagerly_encoded_assembly_internal(
 
   // Stack patch MUST go before label patches as it might change the size of the instruction
   if (result.has_stack_patch) {
-    dyn_array_push(*instructions, (Instruction) {
+    dyn_array_push(code_block->instructions, (Instruction) {
       .tag = Instruction_Tag_Stack_Patch,
       .Stack_Patch = result.maybe_stack_patch,
       .source_range = source_range,
@@ -487,7 +487,7 @@ push_eagerly_encoded_assembly_internal(
   }
 
   for (s32 i = 0; i < result.label_patch_count; i += 1) {
-    dyn_array_push(*instructions, (Instruction) {
+    dyn_array_push(code_block->instructions, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = result.label_patches[i],
       .source_range = source_range,
