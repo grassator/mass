@@ -50,15 +50,15 @@ source_file_offset_to_position(
 ) {
   // Binary search in lines
   s64 left_bound = 0;
-  s64 right_bound = dyn_array_length(file->lines) - 1;
+  s64 right_bound = dyn_array_length(file->line_offsets) - 1;
   s64 line_index = 0;
   u64 line_offset = 0;
   while (left_bound <= right_bound) {
     line_index = left_bound + (right_bound - left_bound) / 2;
-    u32 line_from = *dyn_array_get(file->lines, line_index);
-    u32 line_to = line_index + 1 >= (s64)dyn_array_length(file->lines)
+    u32 line_from = *dyn_array_get(file->line_offsets, line_index);
+    u32 line_to = line_index + 1 >= (s64)dyn_array_length(file->line_offsets)
       ? u64_to_u32(file->text.length)
-      : *dyn_array_get(file->lines, line_index + 1);
+      : *dyn_array_get(file->line_offsets, line_index + 1);
     if (offset < line_from) {
       right_bound = line_index - 1;
     } else if (offset >= line_to) {
@@ -80,7 +80,7 @@ void
 source_range_print_start_position(
   const Source_Range *source_range
 ) {
-  if (!source_range->file || !dyn_array_is_initialized(source_range->file->lines)) {
+  if (!source_range->file || !dyn_array_is_initialized(source_range->file->line_offsets)) {
     printf(":(0:0)\n");
     return;
   }

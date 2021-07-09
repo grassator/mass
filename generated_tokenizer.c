@@ -23,9 +23,9 @@ tokenize(
   }
 
   const Allocator *allocator = compilation->allocator;
-  assert(!dyn_array_is_initialized(file->lines));
-  file->lines = dyn_array_make(Array_u32, .capacity = file->text.length / 40);
-  dyn_array_push(file->lines, 0);
+  assert(!dyn_array_is_initialized(file->line_offsets));
+  file->line_offsets = dyn_array_make(Array_u32, .capacity = file->text.length / 40);
+  dyn_array_push(file->line_offsets, 0);
 
   Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
   Array_Tokenizer_Parent parent_stack =
@@ -220,7 +220,7 @@ yy7:
 yy8:
 #line 133 "tokenizer.re.c"
   {
-        dyn_array_push(file->lines, u64_to_u32(offset));
+        dyn_array_push(file->line_offsets, u64_to_u32(offset));
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
           allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()

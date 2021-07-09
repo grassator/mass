@@ -434,7 +434,7 @@ typedef dyn_array_type(Source_Position) Array_Source_Position;
 typedef struct Source_File {
   Slice path;
   Slice text;
-  Array_u32 lines;
+  Array_u32 line_offsets;
 } Source_File;
 typedef dyn_array_type(Source_File) Array_Source_File;
 
@@ -2475,9 +2475,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_file, Source_File,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("lines"),
+    .name = slice_literal_fields("line_offsets"),
     .descriptor = &descriptor_array_u32,
-    .Base_Relative.offset = offsetof(Source_File, lines),
+    .Base_Relative.offset = offsetof(Source_File, line_offsets),
   },
 );
 MASS_DEFINE_TYPE_VALUE(source_file);
