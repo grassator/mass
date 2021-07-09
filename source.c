@@ -2801,30 +2801,36 @@ token_process_function_literal(
   bool previous_argument_has_default_value = false;
   if (args_view.length == 0) return fn_info;
 
-  fn_info->parameters = dyn_array_make(
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+  Array_Function_Parameter temp_params = dyn_array_make(
     Array_Function_Parameter,
-    .allocator = context->allocator,
-    .capacity = 4
+    .allocator = context->temp_allocator,
+    .capacity = 32,
   );
 
   for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
     Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
     Function_Parameter arg = token_match_argument(&arg_context, arg_view, fn_info);
-    MASS_ON_ERROR(*context->result) return 0;
-    dyn_array_push(fn_info->parameters, arg);
+    MASS_ON_ERROR(*context->result) goto defer;
+    dyn_array_push(temp_params, arg);
     if (previous_argument_has_default_value) {
       if (!arg.maybe_default_expression.length ) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
           .source_range = return_types->source_range,
         });
-        return 0;
+        goto defer;
       }
     } else {
       previous_argument_has_default_value = !!arg.maybe_default_expression.length;
     }
   }
+  dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
 
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
   return fn_info;
 }
 
