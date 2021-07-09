@@ -700,20 +700,14 @@ assign_integers(
 
     if (descriptor_is_signed_integer(source->descriptor)) {
       assert(!descriptor_is_unsigned_integer(target->descriptor));
-      push_instruction(
+      push_eagerly_encoded_assembly(
         &builder->code_block.instructions, source->source_range,
-        (Instruction) {
-          .tag = Instruction_Tag_Assembly,
-          .Assembly = {movsx, {adjusted_source, source->storage}}
-        }
+        &(Instruction_Assembly){movsx, {adjusted_source, source->storage}}
       );
     } else {
-      push_instruction(
+      push_eagerly_encoded_assembly(
         &builder->code_block.instructions, source->source_range,
-        (Instruction) {
-          .tag = Instruction_Tag_Assembly,
-          .Assembly = {movzx, {adjusted_source, source->storage}}
-         }
+        &(Instruction_Assembly){movzx, {adjusted_source, source->storage}}
       );
     }
   }
@@ -3593,10 +3587,10 @@ call_function_overload(
       .stack = reserve_stack_storage(builder, descriptor_byte_size(&descriptor_void_pointer)),
     });
 
-    push_instruction(instructions, *source_range, (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {saved->stack, saved->reg}}
-    });
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){mov, {saved->stack, saved->reg}}
+    );
   }
 
   register_release_bitset(builder, saved_registers_bitset);
@@ -3620,20 +3614,19 @@ call_function_overload(
   if (instance->storage.tag == Storage_Tag_Static) {
     Register temp_reg = register_acquire_temp(builder);
     Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
-    push_instruction(
+    push_eagerly_encoded_assembly(
       instructions, *source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {reg, instance->storage}}}
+      &(Instruction_Assembly){mov, {reg, instance->storage}}
     );
-    push_eagerly_encoded_instruction(instructions, (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {call, {reg}},
-      .source_range = *source_range,
-    });
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){call, {reg}}
+    );
     register_release(builder, temp_reg);
   } else {
-    push_instruction(
+    push_eagerly_encoded_assembly(
       instructions, *source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {instance->storage, 0, 0}}}
+      &(Instruction_Assembly){call, {instance->storage}}
     );
   }
 
@@ -3652,10 +3645,10 @@ call_function_overload(
   builder->register_occupied_bitset &= ~return_value_bitset;
 
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
-    push_instruction(instructions, *source_range, (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {saved->reg, saved->stack}}
-    });
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){mov, {saved->reg, saved->stack}}
+    );
   }
 
   register_acquire_bitset(builder, saved_registers_bitset);
@@ -3953,12 +3946,9 @@ storage_load_index_address(
       &reg_byte_size_value->storage, &byte_size_value->storage
     );
 
-    push_instruction(
+    push_eagerly_encoded_assembly(
       &builder->code_block.instructions, *source_range,
-      (Instruction) {
-        .tag = Instruction_Tag_Assembly,
-        .Assembly = {imul, {new_base->storage, reg_byte_size_value->storage}}
-      }
+      &(Instruction_Assembly){imul, {new_base->storage, reg_byte_size_value->storage}}
     );
     value_release_if_temporary(builder, reg_byte_size_value);
   }
@@ -3979,9 +3969,10 @@ storage_load_index_address(
       assert(target->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
       load_address(context, builder, source_range, temp_value, target->storage);
     }
-    push_instruction(
+
+    push_eagerly_encoded_assembly(
       &builder->code_block.instructions, *source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {new_base->storage, temp_value->storage}}}
+      &(Instruction_Assembly){add, {new_base->storage, temp_value->storage}}
     );
     value_release_if_temporary(builder, temp_value);
   }
@@ -4100,9 +4091,9 @@ mass_handle_arithmetic_operation_lazy_proc(
       MASS_ON_ERROR(*context->result) return 0;
 
       const X64_Mnemonic *mnemonic = descriptor_is_signed_integer(descriptor) ? imul : mul;
-      push_instruction(
+      push_eagerly_encoded_assembly(
         &builder->code_block.instructions, result_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mnemonic, {temp_b->storage}}}
+        &(Instruction_Assembly){mnemonic, {temp_b->storage}}
       );
       register_release_maybe_restore(builder, &maybe_saved_rdx);
 
@@ -4165,21 +4156,26 @@ mass_handle_arithmetic_operation_lazy_proc(
           case 1: widen = cbw; break;
         }
         assert(widen);
-        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {widen}});
-        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {idiv, {temp_divisor->storage}}});
+        push_eagerly_encoded_assembly(instructions, result_range, &(Instruction_Assembly){widen});
+        push_eagerly_encoded_assembly(
+          instructions, result_range, &(Instruction_Assembly){idiv, {temp_divisor->storage}}
+        );
       } else {
         if (byte_size == 1) {
           Storage reg_ax = storage_register_for_descriptor(Register_A, &descriptor_s16);
-          push_instruction(
-            instructions, result_range,
-            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movzx, {reg_ax, temp_dividend->storage}}}
+          push_eagerly_encoded_assembly(
+            instructions, result_range, &(Instruction_Assembly){movzx, {reg_ax, temp_dividend->storage}}
           );
         } else {
           // We need to zero-extend A to D which means just clearing D register
           Storage reg_d = storage_register_for_descriptor(Register_D, &descriptor_s64);
-          push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {xor, {reg_d, reg_d}}});
+          push_eagerly_encoded_assembly(
+            instructions, result_range, &(Instruction_Assembly){xor, {reg_d, reg_d}}
+          );
         }
-        push_instruction(instructions, result_range, (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {x64_div, {temp_divisor->storage}}});
+        push_eagerly_encoded_assembly(
+          instructions, result_range, &(Instruction_Assembly){x64_div, {temp_divisor->storage}}
+        );
       }
 
       if (payload->operator == Mass_Arithmetic_Operator_Remainder) {
@@ -4187,13 +4183,12 @@ mass_handle_arithmetic_operation_lazy_proc(
           // :64bitMode8BitOperations
           // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
           // This is not optimal, but it should do for now.
-          push_instruction(
-            instructions, result_range,
-            (Instruction) {
-              .tag = Instruction_Tag_Bytes,
-              .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
-            }
-          );
+          dyn_array_push(*instructions, (Instruction) {
+            .tag = Instruction_Tag_Bytes,
+            .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
+            .source_range = result_range,
+            .compiler_source_location = COMPILER_SOURCE_LOCATION,
+          });
         } else {
           Storage reg_d = storage_register_for_descriptor(Register_D, descriptor);
           move_value(context->allocator, builder, &result_range, &temp_dividend->storage, &reg_d);
@@ -4431,9 +4426,9 @@ mass_handle_comparison_operation_lazy_proc(
 
   MASS_ON_ERROR(*context->result) return 0;
 
-  push_instruction(
+  push_eagerly_encoded_assembly(
     &builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {temp_a->storage, temp_b->storage, 0}}}
+    &(Instruction_Assembly){cmp, {temp_a->storage, temp_b->storage}}
   );
 
   Value *comparison_value = value_from_compare(context, compare_type, *source_range);
@@ -5130,11 +5125,11 @@ mass_handle_if_expression_lazy_proc(
 
   Label_Index after_label =
     make_label(context->program, &context->program->memory.code, slice_literal("if end"));
-  push_instruction(
-    &builder->code_block.instructions, *dummy_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {code_label32(after_label), 0, 0}}}
-  );
 
+  push_eagerly_encoded_assembly(
+    &builder->code_block.instructions, *dummy_range,
+    &(Instruction_Assembly){jmp, {code_label32(after_label)}}
+  );
 
   push_label(&builder->code_block.instructions, *dummy_range, else_label);
 
@@ -5927,17 +5922,22 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     }
   }
 
-  push_instruction(
-    &builder->code_block.instructions, args_token->source_range,
-    (Instruction) { .tag = Instruction_Tag_Bytes, .Bytes = bytes, .scope = context->scope, }
-  );
+  dyn_array_push(builder->code_block.instructions, (Instruction) {
+    .tag = Instruction_Tag_Bytes,
+    .Bytes = bytes,
+    .scope = context->scope,
+    .source_range = args_token->source_range,
+    .compiler_source_location = COMPILER_SOURCE_LOCATION,
+  });
 
   for (s32 i = 0; i < patch_count; i += 1) {
     patches[i].offset -= bytes.length;
-    push_instruction(
-      &builder->code_block.instructions, args_token->source_range,
-      (Instruction) { .tag = Instruction_Tag_Label_Patch, .Label_Patch = patches[i] }
-    );
+    dyn_array_push(builder->code_block.instructions, (Instruction) {
+      .tag = Instruction_Tag_Label_Patch,
+      .Label_Patch = patches[i],
+      .source_range = args_token->source_range,
+      .compiler_source_location = COMPILER_SOURCE_LOCATION,
+    });
   }
 
   return expected_result_validate(expected_result, &void_value);

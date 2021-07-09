@@ -44,14 +44,6 @@ instruction_add_source_location_internal(
 #define instruction_add_compiler_location(...)\
   instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
-#define push_instruction(_array_ptr_, _location_, ...)\
-  do {\
-    Instruction to_push = (__VA_ARGS__);\
-    to_push.source_range = (_location_);\
-    to_push.compiler_source_location = COMPILER_SOURCE_LOCATION;\
-    push_eagerly_encoded_instruction((_array_ptr_), to_push);\
-  } while (0)
-
 #define push_label(_array_ptr_, _location_, ...)\
   do {\
     Label_Index push_index = (__VA_ARGS__);\

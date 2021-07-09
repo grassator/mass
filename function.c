@@ -87,12 +87,12 @@ register_acquire_maybe_save_if_already_acquired(
   register_acquire(builder, result.saved_index);
   result.saved = true;
 
-  push_instruction(
+  push_eagerly_encoded_assembly(
     &builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {
+    &(Instruction_Assembly){mov, {
       storage_register_for_descriptor(result.saved_index, &descriptor_s64),
-      storage_register_for_descriptor(reg_index, &descriptor_s64)
-    }}}
+      storage_register_for_descriptor(reg_index, &descriptor_s64),
+    }}
   );
 
   return result;
@@ -104,12 +104,12 @@ register_release_maybe_restore(
   const Maybe_Saved_Register *maybe_saved_register
 ) {
   if (maybe_saved_register->saved) {
-    push_instruction(
+    push_eagerly_encoded_assembly(
       &builder->code_block.instructions, *maybe_saved_register->source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {
+      &(Instruction_Assembly){mov, {
         storage_register_for_descriptor(maybe_saved_register->index, &descriptor_s64),
         storage_register_for_descriptor(maybe_saved_register->saved_index, &descriptor_s64),
-      }}}
+      }}
     );
     register_release(builder, maybe_saved_register->saved_index);
   } else {
@@ -139,11 +139,13 @@ move_value(
   if (target->tag == Storage_Tag_Xmm || source->tag == Storage_Tag_Xmm) {
     assert(target_size == source_size);
     if (target_size == 4) {
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movss, {*target, *source, 0}}});
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){movss, {*target, *source}}
+      );
     } else if (target_size == 8) {
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsd, {*target, *source, 0}}});
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){movsd, {*target, *source}}
+      );
     } else {
       panic("Internal Error: XMM operand of unexpected size");
     }
@@ -162,55 +164,65 @@ move_value(
     }
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {sete, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){sete, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Not_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setne, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setne, {temp, *source}}
+        );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setb, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setb, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setbe, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setbe, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Unsigned_Above: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {seta, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){seta, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setae, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setae, {temp, *source}}
+        );
         break;
       }
 
       case Compare_Type_Signed_Less: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setl, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setl, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setle, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setle, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Signed_Greater: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setg, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setg, {temp, *source}}
+        );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
-        push_instruction(instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {setge, {temp, *source}}});
+        push_eagerly_encoded_assembly(
+          instructions, *source_range, &(Instruction_Assembly){setge, {temp, *source}}
+        );
         break;
       }
       default: {
@@ -221,10 +233,12 @@ move_value(
       assert(temp.tag == Storage_Tag_Register);
       Storage resized_temp = temp;
       resized_temp.byte_size = target->byte_size;
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {movsx, {resized_temp, temp}}});
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, resized_temp}}});
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){movsx, {resized_temp, temp}}
+      );
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){mov, {*target, resized_temp}}
+      );
       register_release(builder, temp.Register.index);
     }
     return;
@@ -242,14 +256,14 @@ move_value(
       .byte_size = 8,
       .Register.index = source->Register.index,
     };
-    push_eagerly_encoded_instruction(instructions, (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {temp_full_register, source_full_register}},
-      .source_range = *source_range,
-    });
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
-    });
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){mov, {temp_full_register, source_full_register}}
+    );
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
+    );
 
     Storage right_size_temp = temp_full_register;
     right_size_temp.byte_size = source->byte_size;
@@ -278,34 +292,38 @@ move_value(
 
     // Clear bits from the target register
     {
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {mov, {temp_full_register, imm64(clear_mask)}}
-      });
-
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {and, {target_full_register, temp_full_register}}
-      });
+      push_eagerly_encoded_assembly(
+        instructions, *source_range,
+        &(Instruction_Assembly){mov, {temp_full_register, imm64(clear_mask)}}
+      );
+      push_eagerly_encoded_assembly(
+        instructions, *source_range,
+        &(Instruction_Assembly){and, {target_full_register, temp_full_register}}
+      );
     }
 
     // Prepare new bits from the source register
     {
-      push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-        .Assembly = {xor, {temp_full_register, temp_full_register}}
-      });
+      push_eagerly_encoded_assembly(
+        instructions, *source_range,
+        &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
+      );
       Storage right_size_temp = temp_full_register;
       right_size_temp.byte_size = source->byte_size;
       move_value(allocator, builder, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
-        push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-          .Assembly = {shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
-        });
+        push_eagerly_encoded_assembly(
+          instructions, *source_range,
+          &(Instruction_Assembly){shl, {temp_full_register, imm8((u8)target->Register.offset_in_bits)}}
+        );
       }
     }
 
     // Merge new bits into the target register
-    push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {or, {target_full_register, temp_full_register}}
-    });
+    push_eagerly_encoded_assembly(
+      instructions, *source_range,
+      &(Instruction_Assembly){or, {target_full_register, temp_full_register}}
+    );
     register_release(builder, temp_full_register.Register.index);
     return;
   }
@@ -315,8 +333,9 @@ move_value(
     s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {xor, {*target, *target}}});
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){xor, {*target, *target}}
+      );
       return;
     }
     Storage adjusted_source;
@@ -356,17 +375,17 @@ move_value(
         .byte_size = adjusted_source.byte_size,
         .Register.index = register_acquire_temp(builder),
       };
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {temp, adjusted_source}}});
-      push_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){mov, {temp, adjusted_source}}
+      );
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){mov, {*target, temp}}
+      );
       register_release(builder, temp.Register.index);
     } else {
-      push_eagerly_encoded_instruction(instructions, (Instruction) {
-        .tag = Instruction_Tag_Assembly,
-        .Assembly = {mov, {*target, adjusted_source}},
-        .source_range = *source_range,
-      });
+      push_eagerly_encoded_assembly(
+        instructions, *source_range, &(Instruction_Assembly){mov, {*target, adjusted_source}}
+      );
     }
     return;
   }
@@ -385,8 +404,9 @@ move_value(
     return;
   }
 
-  push_instruction(instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
+  push_eagerly_encoded_assembly(
+    instructions, *source_range, &(Instruction_Assembly){mov, {*target, *source}}
+  );
 }
 
 static inline u32
@@ -483,63 +503,26 @@ make_if(
 
   if (!is_always_true) {
     if (value->storage.tag == Storage_Tag_Eflags) {
+      const X64_Mnemonic *mnemonic = 0;
       switch(value->storage.Eflags.compare_type) {
-        case Compare_Type_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jne, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Not_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {je, {code_label32(label), value->storage, 0}}});
-          break;
-        }
+        case Compare_Type_Equal: mnemonic = jne; break;
+        case Compare_Type_Not_Equal: mnemonic = je; break;
 
-        case Compare_Type_Unsigned_Below: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jae, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Unsigned_Below_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ja, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Unsigned_Above: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jbe, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Unsigned_Above_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jb, {code_label32(label), value->storage, 0}}});
-          break;
-        }
+        case Compare_Type_Unsigned_Below: mnemonic = jae; break;
+        case Compare_Type_Unsigned_Below_Equal: mnemonic = ja; break;
+        case Compare_Type_Unsigned_Above: mnemonic = jbe; break;
+        case Compare_Type_Unsigned_Above_Equal: mnemonic = jb; break;
 
-        case Compare_Type_Signed_Less: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jge, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Signed_Less_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jg, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Signed_Greater: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jle, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        case Compare_Type_Signed_Greater_Equal: {
-          push_instruction(&builder->code_block.instructions, *source_range,
-          (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jl, {code_label32(label), value->storage, 0}}});
-          break;
-        }
-        default: {
-          assert(!"Unsupported comparison");
-        }
+        case Compare_Type_Signed_Less: mnemonic = jge; break;
+        case Compare_Type_Signed_Less_Equal: mnemonic = jg; break;
+        case Compare_Type_Signed_Greater: mnemonic = jle; break;
+        case Compare_Type_Signed_Greater_Equal: mnemonic = jl; break;
+        default: assert(!"Unsupported comparison"); break;
       }
+      push_eagerly_encoded_assembly(
+        &builder->code_block.instructions, *source_range,
+        &(Instruction_Assembly){mnemonic, {code_label32(label), value->storage}}
+      );
     } else {
       if (value->storage.tag == Storage_Tag_Register) {
         Storage test_storage = value->storage;
@@ -548,29 +531,32 @@ make_if(
           test_storage = storage_register_for_descriptor(register_acquire_temp(builder), value->descriptor);
           move_value(context->allocator, builder, source_range, &test_storage, &value->storage);
         }
-        push_instruction(&builder->code_block.instructions, *source_range, (Instruction) {.tag = Instruction_Tag_Assembly,
-          .Assembly = {x64_test, {test_storage, test_storage}}
-        });
+        push_eagerly_encoded_assembly(
+          &builder->code_block.instructions, *source_range,
+          &(Instruction_Assembly){x64_test, {test_storage, test_storage}}
+        );
         if (is_packed) register_release(builder, test_storage.Register.index);
       } else {
         u64 byte_size = descriptor_byte_size(value->descriptor);
         if (byte_size == 4 || byte_size == 8) {
-          push_instruction(
+          push_eagerly_encoded_assembly(
             &builder->code_block.instructions, *source_range,
-            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm32(0), 0}}}
+            &(Instruction_Assembly){cmp, {value->storage, imm32(0)}}
           );
         } else if (byte_size == 1) {
-          push_instruction(
+          push_eagerly_encoded_assembly(
             &builder->code_block.instructions, *source_range,
-            (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {cmp, {value->storage, imm8(0), 0}}}
+            &(Instruction_Assembly){cmp, {value->storage, imm8(0)}}
           );
         } else {
           assert(!"Unsupported value inside `if`");
         }
       }
       Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
-      push_instruction(&builder->code_block.instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jz, {code_label32(label), eflags->storage, 0}}});
+      push_eagerly_encoded_assembly(
+        &builder->code_block.instructions, *source_range,
+        &(Instruction_Assembly){jz, {code_label32(label), eflags->storage}}
+      );
     }
   }
   return label;
@@ -617,9 +603,9 @@ load_address(
     ? result_value->storage
     : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
-  push_instruction(
+  push_eagerly_encoded_assembly(
     &builder->code_block.instructions, *source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {temp_storage, source, 0}}}
+    &(Instruction_Assembly){lea, {temp_storage, source}}
   );
 
   if (!can_reuse_result_as_temp) {
@@ -828,10 +814,10 @@ ensure_function_instance(
       storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
     Storage caller_register_storage =
       storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
-    push_instruction(&builder->code_block.instructions, return_value->source_range, (Instruction) {
-      .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {caller_register_storage, callee_register_storage}}
-    });
+    push_eagerly_encoded_assembly(
+      &builder->code_block.instructions, return_value->source_range,
+      &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
+    );
   }
 
   calling_convention_x86_64_common_end_proc(program, builder);
@@ -916,13 +902,13 @@ program_init_startup_code(
   u64 relocation_count = dyn_array_length(program->relocations);
   for (u64 i = 0; i < relocation_count; ++i) {
     Relocation *relocation = dyn_array_get(program->relocations, i);
-    push_instruction(
+    push_eagerly_encoded_assembly(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {lea, {register_a, relocation->address_of, 0}}}
+      &(Instruction_Assembly){lea, {register_a, relocation->address_of}}
     );
-    push_instruction(
+    push_eagerly_encoded_assembly(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {relocation->patch_at, register_a, 0}}}
+      &(Instruction_Assembly){mov, {relocation->patch_at, register_a}}
     );
   }
 
@@ -930,15 +916,15 @@ program_init_startup_code(
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
     Value *instance = ensure_function_instance(context, fn);
-    push_instruction(
+    push_eagerly_encoded_assembly(
       &builder.code_block.instructions, source_range,
-      (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {call, {instance->storage, 0, 0}}}
+      &(Instruction_Assembly){call, {instance->storage}}
     );
   }
   Value *entry_instance = ensure_function_instance(context, program->entry_point);
-  push_instruction(
+  push_eagerly_encoded_assembly(
     &builder.code_block.instructions, source_range,
-    (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {entry_instance->storage, 0, 0}}}
+    &(Instruction_Assembly){jmp, {entry_instance->storage}}
   );
 
   program->entry_point = function;
