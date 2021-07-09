@@ -500,14 +500,6 @@ win32_program_jit(
   Virtual_Memory_Buffer *code_buffer = &memory->code.buffer;
   Virtual_Memory_Buffer *ro_data_buffer = &memory->ro_data.buffer;
 
-  // Memory protection works on per-page level so with incremental JIT there are two options:
-  // 1. Waste memory every time we do JIT due to padding to page size.
-  // 2. Switch memory back to writable before new writes.
-  // On Windows options 2 is preferable, however some unix-like system disallow multiple
-  // transitions between writable and executable so might have to resort to 1 there.
-  u64 code_protected_size = win32_buffer_ensure_last_page_is_writable(code_buffer);
-  u64 ro_data_protected_size = win32_buffer_ensure_last_page_is_writable(ro_data_buffer);
-
   Win32_Jit_Info *info;
   if (jit->platform_specific_payload) {
     dyn_array_clear(jit->program->patch_info_array);
@@ -548,66 +540,88 @@ win32_program_jit(
   ));
 
   u64 function_count = dyn_array_length(program->functions);
-  assert(dyn_array_length(info->function_table) == jit->previous_counts.functions);
-  dyn_array_reserve_uninitialized(info->function_table, function_count);
+  if (jit->previous_counts.functions != function_count) {
+    assert(dyn_array_length(info->function_table) == jit->previous_counts.functions);
+    dyn_array_reserve_uninitialized(info->function_table, function_count);
+    // Memory protection works on per-page level so with incremental JIT there are two options:
+    // 1. Waste memory every time we do JIT due to padding to page size.
+    // 2. Switch memory back to writable before new writes.
+    // On Windows options 2 is preferable, however some unix-like system disallow multiple
+    // transitions between writable and executable so might have to resort to 1 there.
+    u64 code_protected_size = win32_buffer_ensure_last_page_is_writable(code_buffer);
 
-  // Encode newly added functions
-  for (u64 i = jit->previous_counts.functions; i < function_count; ++i) {
-    Function_Builder *builder = dyn_array_get(program->functions, i);
-    Function_Layout layout;
+    // Encode newly added functions
+    for (u64 i = jit->previous_counts.functions; i < function_count; ++i) {
+      Function_Builder *builder = dyn_array_get(program->functions, i);
+      Function_Layout layout;
 
-    fn_encode(program, code_buffer, builder, &layout);
+      fn_encode(program, code_buffer, builder, &layout);
 
-    RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
-    UNWIND_INFO *unwind_info = win32_init_runtime_info_for_function(
-      builder, &layout, function, &memory->ro_data
-    );
-    // Handler (if present) must immediately follow the unwind info struct
-    {
-      unwind_info->Flags |= UNW_FLAG_EHANDLER;
-      u64 offset = virtual_memory_buffer_append_u32(
-        &memory->ro_data.buffer, info->trampoline_rva
+      RUNTIME_FUNCTION *function = dyn_array_get(info->function_table, i);
+      UNWIND_INFO *unwind_info = win32_init_runtime_info_for_function(
+        builder, &layout, function, &memory->ro_data
       );
-      assert(offset % sizeof(DWORD) == 0);
-      // :ExceptionDataAlignment
-      // This data might end up misaligned on 64 bit OSes because UNWIND_INFO
-      // as well as trampoline_rva are both 32-bit aligned while exception
-      // data contains addresses which are 64 bits. Whether it is misaligned or
-      // not would depend on the count of unwind codes so the best we can do is
-      // to just mark the struct as packed and let the compiler deal with
-      // potentially misaligned reads and writes.
-      Win32_Exception_Data *exception_data = virtual_memory_buffer_allocate_bytes(
-        &memory->ro_data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
-      );
-      *exception_data = (Win32_Exception_Data) {
-        .builder = builder,
-        .jit = jit,
-      };
+      // Handler (if present) must immediately follow the unwind info struct
+      {
+        unwind_info->Flags |= UNW_FLAG_EHANDLER;
+        u64 offset = virtual_memory_buffer_append_u32(
+          &memory->ro_data.buffer, info->trampoline_rva
+        );
+        assert(offset % sizeof(DWORD) == 0);
+        // :ExceptionDataAlignment
+        // This data might end up misaligned on 64 bit OSes because UNWIND_INFO
+        // as well as trampoline_rva are both 32-bit aligned while exception
+        // data contains addresses which are 64 bits. Whether it is misaligned or
+        // not would depend on the count of unwind codes so the best we can do is
+        // to just mark the struct as packed and let the compiler deal with
+        // potentially misaligned reads and writes.
+        Win32_Exception_Data *exception_data = virtual_memory_buffer_allocate_bytes(
+          &memory->ro_data.buffer, sizeof(Win32_Exception_Data), sizeof(DWORD)
+        );
+        *exception_data = (Win32_Exception_Data) {
+          .builder = builder,
+          .jit = jit,
+        };
+      }
     }
-  }
-  jit->previous_counts.functions = function_count;
+    jit->previous_counts.functions = function_count;
 
-  // After all the functions are encoded we should know all the offsets
-  // and can patch all the label locations
-  program_patch_labels(program);
+    // After all the functions are encoded we should know all the offsets
+    // and can patch all the label locations
+    program_patch_labels(program);
 
-  // Setup permissions for read-only data segment
-  win32_section_protect_from(&memory->ro_data, ro_data_protected_size);
-
-  // Setup permissions for the code segment
-  {
-    win32_section_protect_from(&memory->code, code_protected_size);
-    u64 size_to_flush = memory->code.buffer.occupied - code_protected_size;
-    if (size_to_flush) {
-      if (!FlushInstructionCache(
-        GetCurrentProcess(),
-        code_buffer->memory + code_protected_size,
-        size_to_flush
-      )) {
-        panic("Unable to flush instruction cache");
+    // Setup permissions for the code segment
+    {
+      win32_section_protect_from(&memory->code, code_protected_size);
+      u64 size_to_flush = memory->code.buffer.occupied - code_protected_size;
+      if (size_to_flush) {
+        if (!FlushInstructionCache(
+          GetCurrentProcess(),
+          code_buffer->memory + code_protected_size,
+          size_to_flush
+        )) {
+          panic("Unable to flush instruction cache");
+        }
       }
     }
   }
+
+  {
+    // Keep all the pages of read-only segment read-only protected
+    // The last page is kept writable as unprotecting it for every JIT attempt can be
+    // prohibitable expensive - easily end up with a 100% increase in compilation time.
+    u64 page_size = memory_page_size();
+    u64 current_full_pages = memory->ro_data.buffer.occupied / page_size;
+    if (jit->previous_counts.protected_ro_data_page_count < current_full_pages) {
+      DWORD flags = win32_section_permissions_to_virtual_protect_flags(memory->ro_data.permissions);
+      u64 pages_to_protect = current_full_pages - jit->previous_counts.protected_ro_data_page_count;
+      u64 size_to_protect = pages_to_protect * page_size;
+      u64 from = jit->previous_counts.protected_ro_data_page_count * page_size;
+      VirtualProtect(memory->ro_data.buffer.memory + from, size_to_protect, flags, &(DWORD){0});
+      jit->previous_counts.protected_ro_data_page_count = current_full_pages;
+    }
+  }
+
 
   program_jit_resolve_relocations(jit);
   program_jit_call_startup_functions(jit);

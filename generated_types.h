@@ -1787,6 +1787,7 @@ typedef struct Jit_Counters {
   u64 imports;
   u64 startup;
   u64 relocations;
+  u64 protected_ro_data_page_count;
 } Jit_Counters;
 typedef dyn_array_type(Jit_Counters) Array_Jit_Counters;
 
@@ -5148,6 +5149,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(jit_counters, Jit_Counters,
     .name = slice_literal_fields("relocations"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Jit_Counters, relocations),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("protected_ro_data_page_count"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Jit_Counters, protected_ro_data_page_count),
   },
 );
 MASS_DEFINE_TYPE_VALUE(jit_counters);

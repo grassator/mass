@@ -1821,6 +1821,7 @@ main(void) {
     { "u64", "imports" },
     { "u64", "startup" },
     { "u64", "relocations" },
+    { "u64", "protected_ro_data_page_count" },
   }));
 
   push_type(type_struct("Jit", (Struct_Item[]){
