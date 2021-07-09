@@ -49,7 +49,7 @@ instruction_add_source_location_internal(
     Instruction to_push = (__VA_ARGS__);\
     to_push.source_range = (_location_);\
     to_push.compiler_source_location = COMPILER_SOURCE_LOCATION;\
-    dyn_array_push(*(_array_ptr_), to_push);\
+    push_eagerly_encoded_instruction((_array_ptr_), to_push);\
   } while (0)
 
 #define encode_instruction_with_compiler_location(_program_, _buffer_, ...)\
