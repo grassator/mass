@@ -1359,11 +1359,12 @@ main(void) {
     { "u64", "line_number" },
   }));
 
+  push_type(type_struct("Instruction_Assembly", (Struct_Item[]){
+    { "const X64_Mnemonic *", "mnemonic" },
+    { "Storage", "operands", 3 },
+  }));
+
   push_type(add_common_fields(type_union("Instruction", (Struct_Type[]){
-    struct_fields("Assembly", (Struct_Item[]){
-      { "const X64_Mnemonic *", "mnemonic" },
-      { "Storage", "operands", 3 },
-    }),
     struct_fields("Label", (Struct_Item[]){
       { "Label_Index", "index" },
     }),

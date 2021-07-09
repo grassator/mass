@@ -115,30 +115,6 @@ calling_convention_x86_64_common_end_proc(
   Instruction *previous = 0;
   DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
     switch(instruction->tag) {
-      case Instruction_Tag_Assembly: {
-        Instruction_Assembly *assembly = &instruction->Assembly;
-        for (u8 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
-          Storage *storage = &assembly->operands[storage_index];
-          if (storage->tag != Storage_Tag_Memory) continue;
-          Memory_Location *location = &storage->Memory.location;
-          switch(location->tag) {
-            case Memory_Location_Tag_Stack: {
-              Memory_Location_Stack stack = location->Stack;
-              *storage = storage_indirect(storage->byte_size, Register_SP);
-              storage->Memory.location.Indirect.offset =
-                calling_convention_x86_64_adjust_stack_offset(
-                  stack.area, stack.offset, builder->stack_reserve, argument_stack_base
-                );
-              break;
-            }
-            case Memory_Location_Tag_Instruction_Pointer_Relative:
-            case Memory_Location_Tag_Indirect: {
-              // Nothing to do
-              break;
-            }
-          }
-        }
-      } break;
       case Instruction_Tag_Label:
       case Instruction_Tag_Label_Patch: {
         // Nothing to do

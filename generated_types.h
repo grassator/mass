@@ -119,6 +119,10 @@ typedef struct Compiler_Source_Location Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location *) Array_Compiler_Source_Location_Ptr;
 typedef dyn_array_type(const Compiler_Source_Location *) Array_Const_Compiler_Source_Location_Ptr;
 
+typedef struct Instruction_Assembly Instruction_Assembly;
+typedef dyn_array_type(Instruction_Assembly *) Array_Instruction_Assembly_Ptr;
+typedef dyn_array_type(const Instruction_Assembly *) Array_Const_Instruction_Assembly_Ptr;
+
 typedef struct Instruction Instruction;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
@@ -970,18 +974,19 @@ typedef struct Compiler_Source_Location {
 } Compiler_Source_Location;
 typedef dyn_array_type(Compiler_Source_Location) Array_Compiler_Source_Location;
 
-typedef enum {
-  Instruction_Tag_Assembly = 0,
-  Instruction_Tag_Label = 1,
-  Instruction_Tag_Bytes = 2,
-  Instruction_Tag_Label_Patch = 3,
-  Instruction_Tag_Stack_Patch = 4,
-} Instruction_Tag;
-
 typedef struct Instruction_Assembly {
   const X64_Mnemonic * mnemonic;
   Storage operands[3];
 } Instruction_Assembly;
+typedef dyn_array_type(Instruction_Assembly) Array_Instruction_Assembly;
+
+typedef enum {
+  Instruction_Tag_Label = 0,
+  Instruction_Tag_Bytes = 1,
+  Instruction_Tag_Label_Patch = 2,
+  Instruction_Tag_Stack_Patch = 3,
+} Instruction_Tag;
+
 typedef struct Instruction_Label {
   Label_Index index;
 } Instruction_Label;
@@ -1005,18 +1010,12 @@ typedef struct Instruction {
   Scope * scope;
   u64 encoded_byte_size;
   union {
-    Instruction_Assembly Assembly;
     Instruction_Label Label;
     Instruction_Bytes Bytes;
     Instruction_Label_Patch Label_Patch;
     Instruction_Stack_Patch Stack_Patch;
   };
 } Instruction;
-static inline Instruction_Assembly *
-instruction_as_assembly(Instruction *instruction) {
-  assert(instruction->tag == Instruction_Tag_Assembly);
-  return &instruction->Assembly;
-}
 static inline Instruction_Label *
 instruction_as_label(Instruction *instruction) {
   assert(instruction->tag == Instruction_Tag_Label);
@@ -2063,6 +2062,11 @@ static Descriptor descriptor_array_compiler_source_location;
 static Descriptor descriptor_array_compiler_source_location_ptr;
 static Descriptor descriptor_compiler_source_location_pointer;
 static Descriptor descriptor_compiler_source_location_pointer_pointer;
+static Descriptor descriptor_instruction_assembly;
+static Descriptor descriptor_array_instruction_assembly;
+static Descriptor descriptor_array_instruction_assembly_ptr;
+static Descriptor descriptor_instruction_assembly_pointer;
+static Descriptor descriptor_instruction_assembly_pointer_pointer;
 static Descriptor descriptor_instruction;
 static Descriptor descriptor_array_instruction;
 static Descriptor descriptor_array_instruction_ptr;
@@ -3378,17 +3382,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compiler_source_location, Compiler_Source_Location
   },
 );
 MASS_DEFINE_TYPE_VALUE(compiler_source_location);
-/*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_ptr, Array_Instruction_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_instruction, Array_Instruction)
-MASS_DEFINE_OPAQUE_C_TYPE(instruction_tag, Instruction_Tag)
-static C_Enum_Item instruction_tag_items[] = {
-{ .name = slice_literal_fields("Assembly"), .value = 0 },
-{ .name = slice_literal_fields("Label"), .value = 1 },
-{ .name = slice_literal_fields("Bytes"), .value = 2 },
-{ .name = slice_literal_fields("Label_Patch"), .value = 3 },
-{ .name = slice_literal_fields("Stack_Patch"), .value = 4 },
-};
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly_ptr, Array_Instruction_Assembly_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_assembly, Array_Instruction_Assembly)
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3404,6 +3399,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_assembly, Instruction_Assembly,
   },
 );
 MASS_DEFINE_TYPE_VALUE(instruction_assembly);
+/*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_ptr, Array_Instruction_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction, Array_Instruction)
+MASS_DEFINE_OPAQUE_C_TYPE(instruction_tag, Instruction_Tag)
+static C_Enum_Item instruction_tag_items[] = {
+{ .name = slice_literal_fields("Label"), .value = 0 },
+{ .name = slice_literal_fields("Bytes"), .value = 1 },
+{ .name = slice_literal_fields("Label_Patch"), .value = 2 },
+{ .name = slice_literal_fields("Stack_Patch"), .value = 3 },
+};
 MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_label, Instruction_Label,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3488,12 +3493,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
     .name = slice_literal_fields("encoded_byte_size"),
     .descriptor = &descriptor_u64,
     .Base_Relative.offset = offsetof(Instruction, encoded_byte_size),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Assembly"),
-    .descriptor = &descriptor_instruction_assembly,
-    .Base_Relative.offset = offsetof(Instruction, Assembly),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

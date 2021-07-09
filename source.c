@@ -4037,11 +4037,10 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       const X64_Mnemonic *mnemonic = payload->operator == Mass_Arithmetic_Operator_Add ? add : sub;
 
-      push_eagerly_encoded_instruction(&builder->code_block.instructions, (Instruction) {
-        .tag = Instruction_Tag_Assembly,
-        .Assembly = {mnemonic, {temp_lhs->storage, temp_rhs->storage}},
-        .source_range = result_range,
-      });
+      push_eagerly_encoded_assembly(
+        &builder->code_block.instructions, result_range,
+        &(Instruction_Assembly){mnemonic, {temp_lhs->storage, temp_rhs->storage}}
+      );
       value_release_if_temporary(builder, temp_rhs);
 
       // temp_a is used as a result so it is intentionnaly not released
@@ -5819,11 +5818,11 @@ mass_handle_explicit_return_lazy_proc(
   MASS_ON_ERROR(assign(context, builder, builder->return_value, parse_result)) return 0;
   Storage return_label = code_label32(builder->code_block.end_label);
 
-  push_eagerly_encoded_instruction(&builder->code_block.instructions, (Instruction) {
-    .tag = Instruction_Tag_Assembly,
-    .Assembly = {jmp, {return_label, 0, 0}},
-    .source_range = builder->return_value->source_range,
-  });
+  push_eagerly_encoded_assembly(
+    &builder->code_block.instructions,
+    builder->return_value->source_range,
+    &(Instruction_Assembly) {jmp, {return_label}}
+  );
 
   return expected_result_validate(expected_result, &void_value);
 }

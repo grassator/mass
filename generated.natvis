@@ -793,6 +793,33 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Array_Instruction_Assembly">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Instruction_Assembly_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Instruction_Assembly_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
 <Type Name="Array_Instruction">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -821,9 +848,6 @@
   </Expand>
 </Type>
 <Type Name="Instruction">
-  <DisplayString Condition="tag == Instruction_Tag_Assembly">
-    Assembly { Assembly }
-  </DisplayString>
   <DisplayString Condition="tag == Instruction_Tag_Label">
     Label { Label }
   </DisplayString>
@@ -842,7 +866,6 @@
     <Item Name="source_range">source_range</Item>
     <Item Name="scope">scope</Item>
     <Item Name="encoded_byte_size">encoded_byte_size</Item>
-    <Item Name="Assembly" Condition="tag == Instruction_Tag_Assembly">Assembly</Item>
     <Item Name="Label" Condition="tag == Instruction_Tag_Label">Label</Item>
     <Item Name="Bytes" Condition="tag == Instruction_Tag_Bytes">Bytes</Item>
     <Item Name="Label_Patch" Condition="tag == Instruction_Tag_Label_Patch">Label_Patch</Item>

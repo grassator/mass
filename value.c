@@ -1033,54 +1033,13 @@ storage_equal(
   return false;
 }
 
-bool
+static inline bool
 instruction_equal(
   const Instruction *a,
   const Instruction *b
 ) {
   if (a->tag != b->tag) return false;
   switch(a->tag) {
-    case Instruction_Tag_Assembly: {
-      if (a->Assembly.mnemonic != b->Assembly.mnemonic) return false;
-      for (u64 i = 0; i < countof(a->Assembly.operands); ++i) {
-        const Storage *a_storage = &a->Assembly.operands[i];
-        const Storage *b_storage = &b->Assembly.operands[i];
-        if (a_storage->tag != b_storage->tag) return false;
-        // FIXME Use immediates instead of static storage for instructions
-        if (a_storage->tag == Storage_Tag_Static) {
-          assert(a_storage->byte_size == b_storage->byte_size);
-          assert(a_storage->Static.memory.tag == b_storage->Static.memory.tag);
-
-          switch(a_storage->Static.memory.tag) {
-            case Static_Memory_Tag_U8: {
-              return a_storage->Static.memory.U8.value == b_storage->Static.memory.U8.value;
-            }
-            case Static_Memory_Tag_U16: {
-              return a_storage->Static.memory.U16.value == b_storage->Static.memory.U16.value;
-            }
-            case Static_Memory_Tag_U32: {
-              return a_storage->Static.memory.U32.value == b_storage->Static.memory.U32.value;
-            }
-            case Static_Memory_Tag_U64: {
-              return a_storage->Static.memory.U64.value == b_storage->Static.memory.U64.value;
-            }
-            case Static_Memory_Tag_Heap: {
-              return memcmp(
-                a_storage->Static.memory.Heap.pointer,
-                b_storage->Static.memory.Heap.pointer,
-                a_storage->byte_size
-              ) == 0;
-            }
-            default: {
-              panic("Unexpected Static_Memory_Tag");
-              return false;
-            }
-          }
-        }
-        if (!storage_equal(a_storage, b_storage)) return false;
-      }
-      break;
-    }
     case Instruction_Tag_Label: {
       return a->Label.index.value == b->Label.index.value;
     }
