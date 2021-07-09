@@ -754,6 +754,24 @@ push_eagerly_encoded_assembly_internal(
   const Instruction_Assembly *assembly
 ) {
   const Instruction_Encoding *encoding = encoding_match(assembly);
+  if (!encoding) {
+    printf(
+      "Added in compiler at %s:%"PRIu64" (fn: %s)\n",
+      compiler_source_location.filename,
+      compiler_source_location.line_number,
+      compiler_source_location.function_name
+    );
+    printf("Source code at ");
+    source_range_print_start_position(&source_range);
+    printf("%s", assembly->mnemonic->name);
+    for (u32 storage_index = 0; storage_index < countof(assembly->operands); ++storage_index) {
+      const Storage *storage = &assembly->operands[storage_index];
+      printf(" ");
+      print_storage(storage);
+    }
+    printf("\n");
+    assert(!"Did not find acceptable encoding");
+  }
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
 
   dyn_array_push(*instructions, (Instruction) {
@@ -855,22 +873,5 @@ encode_instruction(
     encode_instruction_assembly(program, buffer, instruction, encoding, storage_count);
     return;
   }
-  const Compiler_Source_Location *compiler_location = &instruction->compiler_source_location;
-  printf(
-    "Added in compiler at %s:%"PRIu64" (fn: %s)\n",
-    compiler_location->filename,
-    compiler_location->line_number,
-    compiler_location->function_name
-  );
-  const Source_Range *source_range = &instruction->source_range;
-  printf("Source code at ");
-  source_range_print_start_position(source_range);
-  printf("%s", instruction->Assembly.mnemonic->name);
-  for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
-    Storage *storage = &instruction->Assembly.operands[storage_index];
-    printf(" ");
-    print_storage(storage);
-  }
-  printf("\n");
-  assert(!"Did not find acceptable encoding");
+  assert(false);
 }
