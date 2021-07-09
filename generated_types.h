@@ -1170,6 +1170,7 @@ typedef struct Macro {
 typedef dyn_array_type(Macro) Array_Macro;
 
 typedef struct Token_Statement_Matcher {
+  const Token_Statement_Matcher * previous;
   Token_Statement_Matcher_Proc proc;
   void * payload;
 } Token_Statement_Matcher;
@@ -1216,7 +1217,7 @@ typedef struct Scope {
   const Scope * parent;
   Scope_Map * map;
   Array_Macro_Ptr macros;
-  Array_Token_Statement_Matcher statement_matchers;
+  const Token_Statement_Matcher * statement_matcher;
 } Scope;
 typedef dyn_array_type(Scope) Array_Scope;
 
@@ -3856,6 +3857,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_token_statement_matcher, Array_Token_Statement_M
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("previous"),
+    .descriptor = &descriptor_token_statement_matcher_pointer,
+    .Base_Relative.offset = offsetof(Token_Statement_Matcher, previous),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("proc"),
     .descriptor = &descriptor_token_statement_matcher_proc,
     .Base_Relative.offset = offsetof(Token_Statement_Matcher, proc),
@@ -3981,9 +3988,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("statement_matchers"),
-    .descriptor = &descriptor_array_token_statement_matcher,
-    .Base_Relative.offset = offsetof(Scope, statement_matchers),
+    .name = slice_literal_fields("statement_matcher"),
+    .descriptor = &descriptor_token_statement_matcher_pointer,
+    .Base_Relative.offset = offsetof(Scope, statement_matcher),
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope);

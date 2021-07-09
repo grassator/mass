@@ -1478,6 +1478,7 @@ main(void) {
   }));
 
   push_type(type_struct("Token_Statement_Matcher", (Struct_Item[]){
+    { "const Token_Statement_Matcher *", "previous" },
     { "Token_Statement_Matcher_Proc", "proc" },
     { "void *", "payload" },
   }));
@@ -1503,7 +1504,7 @@ main(void) {
     { "const Scope *", "parent" },
     { "Scope_Map *", "map" },
     { "Array_Macro_Ptr", "macros" },
-    { "Array_Token_Statement_Matcher", "statement_matchers" },
+    { "const Token_Statement_Matcher *", "statement_matcher" },
   }));
 
   push_type(type_struct("Overload_Set", (Struct_Item[]){

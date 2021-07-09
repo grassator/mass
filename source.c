@@ -237,6 +237,32 @@ scope_maybe_find_common_ancestor(
   return 0;
 }
 
+typedef struct {
+  const Scope *start_scope;
+  const Scope *end_scope;
+} Token_Statement_Matcher_In_Scopes_Params;
+
+static u64
+token_statement_matcher_in_scopes(
+  Execution_Context *context,
+  Value_View view,
+  Lazy_Value *out_lazy_value,
+  Token_Statement_Matcher_In_Scopes_Params *payload
+) {
+  const Scope *it_scope = payload->start_scope;
+  for (; it_scope != payload->end_scope; it_scope = it_scope->parent) {
+    // Do a reverse iteration because we want statements that are defined later
+    // to have higher precedence when parsing
+    const Token_Statement_Matcher *matcher = it_scope->statement_matcher;
+    for (; matcher; matcher = matcher->previous) {
+      u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+      MASS_ON_ERROR(*context->result) return 0;
+      if (match_length) return match_length;
+    }
+  }
+  return 0;
+}
+
 static inline Scope *
 scope_flatten_till_internal(
   const Allocator *allocator,
@@ -250,9 +276,6 @@ scope_flatten_till_internal(
   if (scope != till) {
     if (dyn_array_is_initialized(scope->macros)) {
       macro_count += dyn_array_length(scope->macros);
-    }
-    if (dyn_array_is_initialized(scope->statement_matchers)) {
-      statement_matcher_count += dyn_array_length(scope->statement_matchers);
     }
     if (scope->map) {
       scope_entry_count += scope->map->occupied;
@@ -268,11 +291,6 @@ scope_flatten_till_internal(
         Array_Macro_Ptr, .capacity = macro_count, .allocator = allocator
       );
     }
-    if (statement_matcher_count) {
-      result->statement_matchers = dyn_array_make(
-        Array_Token_Statement_Matcher, .capacity = statement_matcher_count, .allocator = allocator
-      );
-    }
     return result;
   }
 
@@ -282,11 +300,6 @@ scope_flatten_till_internal(
   if (dyn_array_is_initialized(scope->macros)) {
     for (u64 i = 0; i < dyn_array_length(scope->macros); ++i) {
       dyn_array_push(result->macros, *dyn_array_get(scope->macros, i));
-    }
-  }
-  if (dyn_array_is_initialized(scope->statement_matchers)) {
-    for (u64 i = 0; i < dyn_array_length(scope->statement_matchers); ++i) {
-      dyn_array_push(result->statement_matchers, *dyn_array_get(scope->statement_matchers, i));
     }
   }
 
@@ -307,7 +320,24 @@ scope_flatten_till(
   const Scope *scope,
   const Scope *till
 ) {
-  return scope_flatten_till_internal(allocator, scope, till, 0, 0, 0);
+  Scope *result = scope_flatten_till_internal(allocator, scope, till, 0, 0, 0);
+
+  Token_Statement_Matcher_In_Scopes_Params *payload =
+    allocator_allocate(allocator, Token_Statement_Matcher_In_Scopes_Params);
+  *payload = (Token_Statement_Matcher_In_Scopes_Params) {
+    .start_scope = scope,
+    .end_scope = till,
+  };
+  Token_Statement_Matcher *using_matcher =
+    allocator_allocate(allocator, Token_Statement_Matcher);
+  *using_matcher = (Token_Statement_Matcher) {
+    .proc = token_statement_matcher_in_scopes,
+    .payload = payload,
+  };
+  assert(!result->statement_matcher);
+  result->statement_matcher = using_matcher;
+
+  return result;
 }
 
 static void
@@ -2529,14 +2559,14 @@ token_parse_syntax_definition(
     .scope = context->scope
   };
   if (statement) {
-    if (!dyn_array_is_initialized(context->scope->statement_matchers)) {
-      context->scope->statement_matchers =
-        dyn_array_make(Array_Token_Statement_Matcher, .allocator = context->allocator);
-    }
-    dyn_array_push(context->scope->statement_matchers, (Token_Statement_Matcher){
+    Token_Statement_Matcher *matcher =
+      allocator_allocate(context->allocator, Token_Statement_Matcher);
+    *matcher = (Token_Statement_Matcher){
+      .previous = context->scope->statement_matcher,
       .proc = token_parse_macro_statement,
       .payload = macro,
-    });
+    };
+    context->scope->statement_matcher = matcher;
   } else {
     scope_add_macro(context->scope, macro);
   }
@@ -5576,6 +5606,7 @@ token_parse_block_view(
   Array_Value_Ptr lazy_statements = dyn_array_make(Array_Value_Ptr);
 
   u64 match_length = 0;
+  Token_Statement_Matcher_In_Scopes_Params scope_params = { .start_scope = context->scope };
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) return 0;
     Value_View rest = value_view_rest(&children_view, start_index);
@@ -5588,55 +5619,38 @@ token_parse_block_view(
       .context = *context,
       .descriptor = &descriptor_void,
     };
-    for (
-      const Scope *statement_matcher_scope = context->scope;
-      statement_matcher_scope;
-      statement_matcher_scope = statement_matcher_scope->parent
-    ) {
-      if (!dyn_array_is_initialized(statement_matcher_scope->statement_matchers)) {
-        continue;
-      }
-      const Array_Token_Statement_Matcher *matchers = &statement_matcher_scope->statement_matchers;
-      // Do a reverse iteration because we want statements that are defined later
-      // to have higher precedence when parsing
-      for (u64 i = dyn_array_length(*matchers) ; i > 0; --i) {
-        Token_Statement_Matcher *matcher = dyn_array_get(*matchers, i - 1);
-        match_length = matcher->proc(context, rest, &lazy_value, matcher->payload);
-        MASS_ON_ERROR(*context->result) return 0;
-        if (match_length) {
-          // If the statement did not assign a proc that means that it does not need
-          // to output any instructions and there is nothing to force.
-          if (lazy_value.proc) {
-            assert(lazy_value.descriptor);
-            Value_View matched_view = value_view_slice(&rest, 0, match_length);
-            Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
-            *lazy_value_storage = lazy_value;
-            Value *lazy_statement = value_init(
-              allocator_allocate(context->allocator, Value),
-              &descriptor_lazy_value,
-              storage_static(lazy_value_storage),
-              matched_view.source_range
-            );
-            dyn_array_push(lazy_statements, lazy_statement);
-          }
-          goto next_loop;
-        }
-      }
-    }
+    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, &scope_params);
+    MASS_ON_ERROR(*context->result) return 0;
 
+    if (match_length) {
+      // If the statement did not assign a proc that means that it does not need
+      // to output any instructions and there is nothing to force.
+      if (lazy_value.proc) {
+        assert(lazy_value.descriptor);
+        Value_View matched_view = value_view_slice(&rest, 0, match_length);
+        Lazy_Value *lazy_value_storage = allocator_allocate(context->allocator, Lazy_Value);
+        *lazy_value_storage = lazy_value;
+        Value *lazy_statement = value_init(
+          allocator_allocate(context->allocator, Value),
+          &descriptor_lazy_value,
+          storage_static(lazy_value_storage),
+          matched_view.source_range
+        );
+        dyn_array_push(lazy_statements, lazy_statement);
+      }
+      continue;
+    }
     Value *parse_result =
       token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
     dyn_array_push(lazy_statements, parse_result);
 
-    if (!match_length) {
-      Value *token = value_view_get(rest, 0);
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = token->source_range,
-      });
-      return 0;
-    }
-    next_loop:;
+    if (match_length) continue;
+    Value *token = value_view_get(rest, 0);
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = token->source_range,
+    });
+    return 0;
   }
 
   MASS_ON_ERROR(*context->result) return 0;
@@ -6398,22 +6412,21 @@ scope_define_builtins(
   );
 
   {
-    Array_Token_Statement_Matcher matchers =
-      dyn_array_make(Array_Token_Statement_Matcher, .allocator = allocator);
+    static const Token_Statement_Matcher default_statement_matchers[] = {
+      {.previous = 0,                              .proc = token_parse_constant_definitions},
+      {.previous = &default_statement_matchers[0], .proc = token_parse_explicit_return},
+      {.previous = &default_statement_matchers[1], .proc = token_parse_definition},
+      {.previous = &default_statement_matchers[2], .proc = token_parse_definition_and_assignment_statements},
+      {.previous = &default_statement_matchers[3], .proc = token_parse_assignment},
+      {.previous = &default_statement_matchers[4], .proc = token_parse_inline_machine_code_bytes},
+      {.previous = &default_statement_matchers[5], .proc = token_parse_statement_label},
+      {.previous = &default_statement_matchers[6], .proc = token_parse_statement_using},
+      {.previous = &default_statement_matchers[7], .proc = token_parse_syntax_definition},
+      {.previous = &default_statement_matchers[8], .proc = token_parse_operator_definition},
+      {.previous = &default_statement_matchers[9], .proc = token_parse_exports},
+    };
 
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_constant_definitions});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_explicit_return});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_definition_and_assignment_statements});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_assignment});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_inline_machine_code_bytes});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_label});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_statement_using});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_syntax_definition});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_operator_definition});
-    dyn_array_push(matchers, (Token_Statement_Matcher){token_parse_exports});
-
-    scope->statement_matchers = matchers;
+    scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
   }
 }
 
