@@ -300,14 +300,10 @@
   <DisplayString Condition="tag == Token_Pattern_Tag_Group">
     Group { Group }
   </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_String">
-    String { String }
-  </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="Symbol" Condition="tag == Token_Pattern_Tag_Symbol">Symbol</Item>
     <Item Name="Group" Condition="tag == Token_Pattern_Tag_Group">Group</Item>
-    <Item Name="String" Condition="tag == Token_Pattern_Tag_String">String</Item>
   </Expand>
 </Type>
 <Type Name="Array_Section">

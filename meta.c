@@ -1157,9 +1157,6 @@ main(void) {
     struct_fields("Group", (Struct_Item[]){
       { "Group_Tag", "tag" },
     }),
-    struct_fields("String", (Struct_Item[]){
-      { "Slice", "slice" },
-    }),
   }));
 
   push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){

@@ -1145,14 +1145,6 @@ value_match(
       }
       return true;
     }
-    case Token_Pattern_Tag_String: {
-      if (!value_is_slice(value)) return false;
-      if (pattern->String.slice.length) {
-        const Slice *slice = value_as_slice(value);
-        if (!slice_equal(pattern->String.slice, *slice)) return false;
-      }
-      return true;
-    }
     case Token_Pattern_Tag_Group: {
       if (!value_is_group(value)) return false;
       return value_as_group(value)->tag == pattern->Group.tag;
@@ -1166,7 +1158,9 @@ value_match_symbol(
   Value *token,
   Slice name
 ) {
-  return value_match(token, &(Token_Pattern){.tag = Token_Pattern_Tag_Symbol, .Symbol.name = name});
+  if (!value_is_symbol(token)) return false;
+  if (!name.length) return true;
+  return slice_equal(value_as_symbol(token)->name, name);
 }
 
 static inline bool
@@ -1174,7 +1168,8 @@ value_match_group(
   Value *token,
   Group_Tag tag
 ) {
-  return value_match(token, &(Token_Pattern){.tag = Token_Pattern_Tag_Group, .Group.tag = tag});
+  if (!value_is_group(token)) return false;
+  return value_as_group(token)->tag == tag;
 }
 
 static inline Value_View
