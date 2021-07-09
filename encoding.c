@@ -142,6 +142,7 @@ eager_encode_instruction_assembly(
         switch(location.tag) {
           case Memory_Location_Tag_Instruction_Pointer_Relative: {
             r_m = 0b101;
+            mod = 0b00;
             break;
           }
           case Memory_Location_Tag_Stack: {
@@ -765,6 +766,9 @@ push_eagerly_encoded_instruction(
   Instruction instruction
 ) {
   if (instruction.tag == Instruction_Tag_Assembly) {
+    if (instruction.Assembly.mnemonic == lea) {
+      //DebugBreak();
+    }
     const Instruction_Encoding *encoding = encoding_match(&instruction);
     eager_encode_instruction_assembly(instructions, &instruction, encoding);
     return;
