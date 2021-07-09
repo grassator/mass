@@ -524,7 +524,7 @@ win32_program_jit(
     info = allocator_allocate(allocator_default, Win32_Jit_Info);
     *info = (Win32_Jit_Info) {
       .trampoline_rva = memory->code.base_rva + make_trampoline(
-        program, code_buffer, (u64)win32_program_test_exception_handler
+        code_buffer, (u64)win32_program_test_exception_handler
       ),
       .function_table = dyn_array_make(
         Array_RUNTIME_FUNCTION, .allocator = allocator_system, .capacity = 128,

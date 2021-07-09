@@ -94,6 +94,19 @@ program_set_label_offset(
   label->offset_in_section = offset_in_section;
 }
 
+static inline void
+program_resolve_label(
+  Program *program,
+  Virtual_Memory_Buffer *buffer,
+  Label_Index label_index
+) {
+  Label *label = program_get_label(program, label_index);
+  assert(!label->resolved);
+  label->section = &program->memory.code;
+  label->offset_in_section = u64_to_u32(buffer->occupied);
+  label->resolved = true;
+}
+
 static void
 program_patch_labels(
   Program *program

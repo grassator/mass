@@ -389,21 +389,14 @@ move_value(
     (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, *source}}});
 }
 
-u32
+static inline u32
 make_trampoline(
-  Program *program,
   Virtual_Memory_Buffer *buffer,
   s64 address
 ) {
   u32 result = u64_to_u32(buffer->occupied);
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {rax, imm64(address)}}}
-  );
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {jmp, {rax}}}
-  );
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {mov, {rax, imm64(address)}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {jmp, {rax}});
   return result;
 }
 
@@ -427,12 +420,7 @@ fn_encode(
   s64 code_base_rva = label->section->base_rva;
   out_layout->begin_rva = u64_to_u32(code_base_rva + buffer->occupied);
   Storage stack_size_operand = imm_auto_8_or_32(out_layout->stack_reserve);
-  encode_instruction_with_compiler_location(
-    program, buffer, &(Instruction) {
-      .tag = Instruction_Tag_Label,
-      .Label.index = label_index
-    }
-  );
+  program_resolve_label(program, buffer, label_index);
 
   // :RegisterPushPop
   // :Win32UnwindCodes Must match what happens in the unwind code generation
@@ -444,18 +432,12 @@ fn_encode(
         out_layout->volatile_register_push_offsets[push_index++] =
           u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
-        encode_instruction_with_compiler_location(
-          program, buffer,
-          &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {push, {to_save}}}
-        );
+        encode_and_write_assembly(buffer, &(Instruction_Assembly) {push, {to_save}});
       }
     }
   }
 
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {sub, {rsp, stack_size_operand}}}
-  );
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {sub, {rsp, stack_size_operand}});
   out_layout->stack_allocation_offset_in_prolog =
     u64_to_u8(code_base_rva + buffer->occupied -out_layout->begin_rva);
   out_layout->size_of_prolog =
@@ -466,10 +448,7 @@ fn_encode(
     encode_instruction(program, buffer, instruction);
   }
 
-  encode_instruction_with_compiler_location(
-    program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {add, {rsp, stack_size_operand}}}
-  );
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {add, {rsp, stack_size_operand}});
 
   // :RegisterPushPop
   // Pop non-volatile registers (in original order)
@@ -477,15 +456,12 @@ fn_encode(
     if (register_bitset_get(builder->register_used_bitset, reg_index)) {
       if (!register_bitset_get(builder->register_volatile_bitset, reg_index)) {
         Storage to_save = storage_register_for_descriptor(reg_index, &descriptor_s64);
-        encode_instruction_with_compiler_location(
-          program, buffer, &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {pop, {to_save}}}
-        );
+        encode_and_write_assembly(buffer, &(Instruction_Assembly) {pop, {to_save}});
       }
     }
   }
 
-  encode_instruction_with_compiler_location(program, buffer,
-    &(Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {ret, {0}}});
+  encode_and_write_assembly(buffer, &(Instruction_Assembly) {ret});
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 }
 

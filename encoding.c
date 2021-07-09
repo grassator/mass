@@ -1,4 +1,5 @@
 #include "value.h"
+#include "program.h"
 
 typedef enum {
   MOD_Displacement_0   = 0b00,
@@ -636,15 +637,14 @@ encode_instruction_assembly(
 
 static const Instruction_Encoding *
 encoding_match(
-  const Instruction *instruction
+  const Instruction_Assembly *assembly
 ) {
-  assert(instruction->tag == Instruction_Tag_Assembly);
-  u32 storage_count = countof(instruction->Assembly.operands);
-  for (u32 index = 0; index < instruction->Assembly.mnemonic->encoding_count; ++index) {
-    const Instruction_Encoding *encoding = &instruction->Assembly.mnemonic->encoding_list[index];
+  u32 storage_count = countof(assembly->operands);
+  for (u32 index = 0; index < assembly->mnemonic->encoding_count; ++index) {
+    const Instruction_Encoding *encoding = &assembly->mnemonic->encoding_list[index];
     for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
-      const Storage *storage = &instruction->Assembly.operands[storage_index];
+      const Storage *storage = &assembly->operands[storage_index];
       u32 encoding_size = s32_to_u32(operand_encoding->size);
 
       if (operand_encoding->size != Operand_Size_Any) {
@@ -733,12 +733,26 @@ encoding_match(
 }
 
 static inline void
+encode_and_write_assembly(
+  Virtual_Memory_Buffer *buffer,
+  const Instruction_Assembly *assembly
+) {
+  const Instruction_Encoding *encoding = encoding_match(assembly);
+  Eager_Encoding_Result result =
+    eager_encode_instruction_assembly(assembly, encoding);
+  assert(!result.has_stack_patch);
+  assert(!result.label_patch_count);
+  Slice bytes = {.bytes = result.bytes.memory, .length = result.bytes.length};
+  virtual_memory_buffer_append_slice(buffer, bytes);
+}
+
+static inline void
 push_eagerly_encoded_instruction(
   Array_Instruction *instructions,
   Instruction instruction
 ) {
   if (instruction.tag == Instruction_Tag_Assembly) {
-    const Instruction_Encoding *encoding = encoding_match(&instruction);
+    const Instruction_Encoding *encoding = encoding_match(&instruction.Assembly);
     Eager_Encoding_Result result =
       eager_encode_instruction_assembly(&instruction.Assembly, encoding);
 
@@ -780,11 +794,7 @@ encode_instruction(
 ) {
   switch(instruction->tag) {
     case Instruction_Tag_Label: {
-      Label *label = program_get_label(program, instruction->Label.index);
-      assert(!label->resolved);
-      label->section = &program->memory.code;
-      label->offset_in_section = u64_to_u32(buffer->occupied);
-      label->resolved = true;
+      program_resolve_label(program, buffer, instruction->Label.index);
       instruction->encoded_byte_size = 0;
       return;
     }
@@ -823,7 +833,7 @@ encode_instruction(
   }
 
   u32 storage_count = countof(instruction->Assembly.operands);
-  const Instruction_Encoding *encoding = encoding_match(instruction);
+  const Instruction_Encoding *encoding = encoding_match(&instruction->Assembly);
   if (encoding) {
     encode_instruction_assembly(program, buffer, instruction, encoding, storage_count);
     return;

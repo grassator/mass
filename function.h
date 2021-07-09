@@ -52,14 +52,6 @@ instruction_add_source_location_internal(
     push_eagerly_encoded_instruction((_array_ptr_), to_push);\
   } while (0)
 
-#define encode_instruction_with_compiler_location(_program_, _buffer_, ...)\
-  encode_instruction(\
-    (_program_),\
-    (_buffer_),\
-    instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, (__VA_ARGS__))\
-  )
-
-// TODO properly support unsigned numbers
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
   do {\
     const Expected_Result *fold_result = (_result_);\
@@ -95,7 +87,6 @@ instruction_add_source_location_internal(
 
 static u32
 make_trampoline(
-  Program *program,
   Virtual_Memory_Buffer *buffer,
   s64 address
 );

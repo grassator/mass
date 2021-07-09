@@ -15,6 +15,13 @@ program_deinit(
   Program *program
 );
 
+static inline void
+program_resolve_label(
+  Program *program,
+  Virtual_Memory_Buffer *buffer,
+  Label_Index label_index
+);
+
 static void
 program_set_label_offset(
   Program *program,
