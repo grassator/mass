@@ -168,12 +168,14 @@ win32_instruction_for_address(
   u64 relative_instruction_byte_offset = instruction_address - absolute_function_begin_address;
 
   u64 current_offset = unwind_info->SizeOfProlog;
-  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    if (instruction->tag != Instruction_Tag_Bytes) continue;
-    current_offset += instruction->Bytes.length;
-    if (current_offset == relative_instruction_byte_offset) {
-      return instruction;
+  for (Instruction_Bucket *bucket = builder->code_block.first_bucket; bucket; bucket = bucket->next) {
+    for (u64 i = 0; i < bucket->length; ++i) {
+      Instruction *instruction = &bucket->items[i];
+      if (instruction->tag != Instruction_Tag_Bytes) continue;
+      current_offset += instruction->Bytes.length;
+      if (current_offset == relative_instruction_byte_offset) {
+        return instruction;
+      }
     }
   }
   return 0;

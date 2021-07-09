@@ -113,42 +113,45 @@ calling_convention_x86_64_common_end_proc(
 
   // Adjust stack locations
   Instruction *previous = 0;
-  DYN_ARRAY_FOREACH (Instruction, instruction, builder->code_block.instructions) {
-    switch(instruction->tag) {
-      case Instruction_Tag_Label:
-      case Instruction_Tag_Label_Patch: {
-        // Nothing to do
-      } break;
-      case Instruction_Tag_Bytes: {
-        // Handled below
-      } break;
-      // :StackPatch
-      case Instruction_Tag_Stack_Patch: {
-        assert(previous->tag == Instruction_Tag_Bytes);
-        Instruction_Stack_Patch *patch = &instruction->Stack_Patch;
-        u8 *mod_r_m = previous->Bytes.memory + patch->mod_r_m_offset_in_previous_instruction;
-        u8 mod_r_m_byte_size = 1;
-        u8 sib_byte_size = 1;
-        s32 *displacement = (s32 *)(mod_r_m + mod_r_m_byte_size + sib_byte_size);
-        *displacement = calling_convention_x86_64_adjust_stack_offset(
-          patch->stack_area, *displacement, builder->stack_reserve, argument_stack_base
-        );
-        // :OversizedStackOffsets
-        // Patch the instruction to have a smaller size displacement if it fits
-        if (s32_fits_into_s8(*displacement)) {
-          // overwrite MOD part with MOD_8
-          *mod_r_m &= 0b00111111;
-          *mod_r_m |= MOD_Displacement_s8 << 6;
-          // Move the remaining bytes 3 positions to the left
-          s8 *remainder_bytes = (s8 *)displacement + sizeof(s32);
-          s8 *instruction_end = previous->Bytes.memory + previous->Bytes.length;
-          s64 remainder_length = instruction_end - remainder_bytes;
-          memmove((s8 *)displacement + 1, remainder_bytes, remainder_length);
-          previous->Bytes.length -= sizeof(s32) - sizeof(s8);
-        }
-      } break;
+  for (Instruction_Bucket *bucket = builder->code_block.first_bucket; bucket; bucket = bucket->next) {
+    for (u64 i = 0; i < bucket->length; ++i) {
+      Instruction *instruction = &bucket->items[i];
+      switch(instruction->tag) {
+        case Instruction_Tag_Label:
+        case Instruction_Tag_Label_Patch: {
+          // Nothing to do
+        } break;
+        case Instruction_Tag_Bytes: {
+          // Handled below
+        } break;
+        // :StackPatch
+        case Instruction_Tag_Stack_Patch: {
+          assert(previous->tag == Instruction_Tag_Bytes);
+          Instruction_Stack_Patch *patch = &instruction->Stack_Patch;
+          u8 *mod_r_m = previous->Bytes.memory + patch->mod_r_m_offset_in_previous_instruction;
+          u8 mod_r_m_byte_size = 1;
+          u8 sib_byte_size = 1;
+          s32 *displacement = (s32 *)(mod_r_m + mod_r_m_byte_size + sib_byte_size);
+          *displacement = calling_convention_x86_64_adjust_stack_offset(
+            patch->stack_area, *displacement, builder->stack_reserve, argument_stack_base
+          );
+          // :OversizedStackOffsets
+          // Patch the instruction to have a smaller size displacement if it fits
+          if (s32_fits_into_s8(*displacement)) {
+            // overwrite MOD part with MOD_8
+            *mod_r_m &= 0b00111111;
+            *mod_r_m |= MOD_Displacement_s8 << 6;
+            // Move the remaining bytes 3 positions to the left
+            s8 *remainder_bytes = (s8 *)displacement + sizeof(s32);
+            s8 *instruction_end = previous->Bytes.memory + previous->Bytes.length;
+            s64 remainder_length = instruction_end - remainder_bytes;
+            memmove((s8 *)displacement + 1, remainder_bytes, remainder_length);
+            previous->Bytes.length -= sizeof(s32) - sizeof(s8);
+          }
+        } break;
+      }
+      previous = instruction;
     }
-    previous = instruction;
   }
 }
 

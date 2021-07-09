@@ -462,9 +462,11 @@ fn_encode(
   out_layout->size_of_prolog =
     u64_to_u8(code_base_rva + buffer->occupied - out_layout->begin_rva);
 
-  for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
-    Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    encode_instruction(program, buffer, instruction);
+  for (Instruction_Bucket *bucket = builder->code_block.first_bucket; bucket; bucket = bucket->next) {
+    for (u64 i = 0; i < bucket->length; ++i) {
+      Instruction *instruction = &bucket->items[i];
+      encode_instruction(program, buffer, instruction);
+    }
   }
 
   encode_and_write_assembly(buffer, &(Instruction_Assembly) {add, {rsp, stack_size_operand}});
@@ -759,9 +761,9 @@ ensure_function_instance(
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
     .code_block = {
+      .allocator = context->allocator,
       .start_label = call_label,
       .end_label = make_label(program, &program->memory.code, end_label_name),
-      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
 
@@ -889,9 +891,9 @@ program_init_startup_code(
   Function_Builder builder = (Function_Builder){
     .function = fn_info,
     .code_block = {
+      .allocator = context->allocator,
       .start_label = fn_label,
       .end_label = make_label(program, &program->memory.code, slice_literal("__startup end")),
-      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
   };
 

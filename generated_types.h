@@ -127,6 +127,10 @@ typedef struct Instruction Instruction;
 typedef dyn_array_type(Instruction *) Array_Instruction_Ptr;
 typedef dyn_array_type(const Instruction *) Array_Const_Instruction_Ptr;
 
+typedef struct Instruction_Bucket Instruction_Bucket;
+typedef dyn_array_type(Instruction_Bucket *) Array_Instruction_Bucket_Ptr;
+typedef dyn_array_type(const Instruction_Bucket *) Array_Const_Instruction_Bucket_Ptr;
+
 typedef struct Code_Block Code_Block;
 typedef dyn_array_type(Code_Block *) Array_Code_Block_Ptr;
 typedef dyn_array_type(const Code_Block *) Array_Const_Code_Block_Ptr;
@@ -1025,10 +1029,19 @@ instruction_as_stack_patch(Instruction *instruction) {
   return &instruction->Stack_Patch;
 }
 typedef dyn_array_type(Instruction) Array_Instruction;
+typedef struct Instruction_Bucket {
+  Instruction items[15];
+  u64 length;
+  Instruction_Bucket * next;
+} Instruction_Bucket;
+typedef dyn_array_type(Instruction_Bucket) Array_Instruction_Bucket;
+
 typedef struct Code_Block {
+  const Allocator * allocator;
   Label_Index start_label;
   Label_Index end_label;
-  Array_Instruction instructions;
+  Instruction_Bucket * first_bucket;
+  Instruction_Bucket * last_bucket;
 } Code_Block;
 typedef dyn_array_type(Code_Block) Array_Code_Block;
 
@@ -2072,6 +2085,11 @@ static Descriptor descriptor_array_instruction;
 static Descriptor descriptor_array_instruction_ptr;
 static Descriptor descriptor_instruction_pointer;
 static Descriptor descriptor_instruction_pointer_pointer;
+static Descriptor descriptor_instruction_bucket;
+static Descriptor descriptor_array_instruction_bucket;
+static Descriptor descriptor_array_instruction_bucket_ptr;
+static Descriptor descriptor_instruction_bucket_pointer;
+static Descriptor descriptor_instruction_bucket_pointer_pointer;
 static Descriptor descriptor_code_block;
 static Descriptor descriptor_array_code_block;
 static Descriptor descriptor_array_code_block_ptr;
@@ -2435,6 +2453,7 @@ static Descriptor descriptor_slice_pointer_pointer;
 static Descriptor descriptor_register_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Register, 2, &descriptor_register);
 static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3, &descriptor_storage);
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
+static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
 static Descriptor descriptor_slice_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Slice, 2, &descriptor_slice);
 static Descriptor descriptor_overload_set_pointer_16 = MASS_DESCRIPTOR_STATIC_ARRAY(const Overload_Set *, 16, &descriptor_overload_set_pointer);
@@ -3493,9 +3512,38 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
 );
 MASS_DEFINE_TYPE_VALUE(instruction);
 /*union struct end*/
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_bucket_ptr, Array_Instruction_Bucket_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_instruction_bucket, Array_Instruction_Bucket)
+MASS_DEFINE_STRUCT_DESCRIPTOR(instruction_bucket, Instruction_Bucket,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("items"),
+    .descriptor = &descriptor_instruction_15,
+    .Base_Relative.offset = offsetof(Instruction_Bucket, items),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("length"),
+    .descriptor = &descriptor_u64,
+    .Base_Relative.offset = offsetof(Instruction_Bucket, length),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("next"),
+    .descriptor = &descriptor_instruction_bucket_pointer,
+    .Base_Relative.offset = offsetof(Instruction_Bucket, next),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(instruction_bucket);
 MASS_DEFINE_OPAQUE_C_TYPE(array_code_block_ptr, Array_Code_Block_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_code_block, Array_Code_Block)
 MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("allocator"),
+    .descriptor = &descriptor_allocator_pointer,
+    .Base_Relative.offset = offsetof(Code_Block, allocator),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("start_label"),
@@ -3510,9 +3558,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_block, Code_Block,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("instructions"),
-    .descriptor = &descriptor_array_instruction,
-    .Base_Relative.offset = offsetof(Code_Block, instructions),
+    .name = slice_literal_fields("first_bucket"),
+    .descriptor = &descriptor_instruction_bucket_pointer,
+    .Base_Relative.offset = offsetof(Code_Block, first_bucket),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("last_bucket"),
+    .descriptor = &descriptor_instruction_bucket_pointer,
+    .Base_Relative.offset = offsetof(Code_Block, last_bucket),
   },
 );
 MASS_DEFINE_TYPE_VALUE(code_block);

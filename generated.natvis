@@ -867,6 +867,33 @@
     <Item Name="Stack_Patch" Condition="tag == Instruction_Tag_Stack_Patch">Stack_Patch</Item>
   </Expand>
 </Type>
+<Type Name="Array_Instruction_Bucket">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Instruction_Bucket_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Instruction_Bucket_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
 <Type Name="Array_Code_Block">
   <Expand>
     <Item Name="[length]">data->length</Item>

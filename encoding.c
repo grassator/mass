@@ -442,6 +442,25 @@ encode_and_write_assembly(
 }
 
 static inline void
+push_instruction(
+  Code_Block *code_block,
+  Instruction instruction
+) {
+  if (!code_block->first_bucket) {
+    code_block->first_bucket =
+      allocator_allocate(code_block->allocator, Instruction_Bucket);
+    code_block->last_bucket = code_block->first_bucket;
+  }
+  if (code_block->last_bucket->length >= countof(code_block->last_bucket->items)) {
+    Instruction_Bucket *next =
+      allocator_allocate(code_block->allocator, Instruction_Bucket);
+    code_block->last_bucket->next = next;
+    code_block->last_bucket = next;
+  }
+  code_block->last_bucket->items[code_block->last_bucket->length++] = instruction;
+}
+
+static inline void
 push_eagerly_encoded_assembly_internal(
   Compiler_Source_Location compiler_source_location,
   Code_Block *code_block,
@@ -469,7 +488,7 @@ push_eagerly_encoded_assembly_internal(
   }
   Eager_Encoding_Result result = eager_encode_instruction_assembly(assembly, encoding);
 
-  dyn_array_push(code_block->instructions, (Instruction) {
+  push_instruction(code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = result.bytes,
     .source_range = source_range,
@@ -478,7 +497,7 @@ push_eagerly_encoded_assembly_internal(
 
   // Stack patch MUST go before label patches as it might change the size of the instruction
   if (result.has_stack_patch) {
-    dyn_array_push(code_block->instructions, (Instruction) {
+    push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Stack_Patch,
       .Stack_Patch = result.maybe_stack_patch,
       .source_range = source_range,
@@ -487,7 +506,7 @@ push_eagerly_encoded_assembly_internal(
   }
 
   for (s32 i = 0; i < result.label_patch_count; i += 1) {
-    dyn_array_push(code_block->instructions, (Instruction) {
+    push_instruction(code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = result.label_patches[i],
       .source_range = source_range,

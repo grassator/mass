@@ -2838,9 +2838,9 @@ compile_time_eval(
     .function = &fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .code_block = {
+      .allocator = context->allocator,
       .start_label = eval_label_index,
       .end_label = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval_end")),
-      .instructions = dyn_array_make(Array_Instruction, .allocator = context->allocator),
     },
     .source = source_from_source_range(source_range),
   };
@@ -2852,7 +2852,7 @@ compile_time_eval(
   }
   const Descriptor *result_descriptor = value_or_lazy_value_descriptor(expression_result_value);
   // Lazy evaluation should not generate any instructions
-  assert(!dyn_array_length(eval_builder.code_block.instructions));
+  assert(!eval_builder.code_block.first_bucket);
 
   Expected_Result expected_result = expected_result_any(result_descriptor);
   Value *forced_value = value_force(
@@ -2862,7 +2862,7 @@ compile_time_eval(
 
   // If we didn't generate any instructions there is no point
   // actually running the code, we can just take the resulting value
-  if (!dyn_array_length(eval_builder.code_block.instructions)) {
+  if (!eval_builder.code_block.first_bucket) {
     return forced_value;
   }
 
@@ -4207,7 +4207,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           // :64bitMode8BitOperations
           // The encoder does not support access to AH so we hardcode byte of `mov AL, AH`
           // This is not optimal, but it should do for now.
-          dyn_array_push(builder->code_block.instructions, (Instruction) {
+          push_instruction(&builder->code_block, (Instruction) {
             .tag = Instruction_Tag_Bytes,
             .Bytes = {.memory = {0x88, 0xe0}, .length = 2},
             .source_range = result_range,
@@ -5930,7 +5930,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     }
   }
 
-  dyn_array_push(builder->code_block.instructions, (Instruction) {
+  push_instruction(&builder->code_block, (Instruction) {
     .tag = Instruction_Tag_Bytes,
     .Bytes = bytes,
     .scope = context->scope,
@@ -5940,7 +5940,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 
   for (s32 i = 0; i < patch_count; i += 1) {
     patches[i].offset -= bytes.length;
-    dyn_array_push(builder->code_block.instructions, (Instruction) {
+    push_instruction(&builder->code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
       .source_range = args_token->source_range,

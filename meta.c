@@ -1382,10 +1382,18 @@ main(void) {
     { "Scope *", "scope" },
   }));
 
+  push_type(type_struct("Instruction_Bucket", (Struct_Item[]){
+    { "Instruction", "items", 15},
+    { "u64", "length" },
+    { "Instruction_Bucket *", "next" },
+  }));
+
   push_type(type_struct("Code_Block", (Struct_Item[]){
+    { "const Allocator *", "allocator" },
     { "Label_Index", "start_label" },
     { "Label_Index", "end_label" },
-    { "Array_Instruction", "instructions" },
+    { "Instruction_Bucket *", "first_bucket" },
+    { "Instruction_Bucket *", "last_bucket" },
   }));
 
   push_type(type_struct("Function_Builder", (Struct_Item[]){

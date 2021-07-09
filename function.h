@@ -53,7 +53,7 @@ instruction_add_source_location_internal(
       .source_range = (_LOCATION_),\
       .compiler_source_location = COMPILER_SOURCE_LOCATION,\
     };\
-    dyn_array_push((_CODE_BLOCK_)->instructions, to_push);\
+    push_instruction((_CODE_BLOCK_), to_push);\
   } while (0)
 
 #define maybe_constant_fold(_context_, _builder_, _loc_, _result_, _a_, _b_, _operator_)\
