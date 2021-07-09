@@ -26,22 +26,20 @@ instruction_bytes_append_bytes(
   instruction->length += u64_to_u8(length);
 }
 
-static void
+typedef struct {
+  bool has_stack_patch;
+  u8 label_patch_count;
+  Instruction_Bytes bytes;
+  Instruction_Stack_Patch maybe_stack_patch;
+  Instruction_Label_Patch label_patches[2];
+} Eager_Encoding_Result;
+
+static Eager_Encoding_Result
 eager_encode_instruction_assembly(
-  Array_Instruction *instructions,
-  const Instruction *instruction,
+  const Instruction_Assembly *assembly,
   const Instruction_Encoding *encoding
 ) {
-  assert(instruction->tag == Instruction_Tag_Assembly);
-
-  Instruction result = (Instruction){
-    .tag = Instruction_Tag_Bytes,
-    .Bytes = {0},
-    .source_range = instruction->source_range,
-    .compiler_source_location = instruction->compiler_source_location,
-  };
-
-  assert(instruction->tag == Instruction_Tag_Assembly);
+  Eager_Encoding_Result result = {0};
 
   s8 mod_r_m_storage_index = -1;
   u8 reg_or_op_code = 0;
@@ -59,9 +57,9 @@ eager_encode_instruction_assembly(
   u8 sib_byte = 0;
   s32 displacement = 0;
 
-  u32 storage_count = countof(instruction->Assembly.operands);
+  u32 storage_count = countof(assembly->operands);
   for (u8 storage_index = 0; storage_index < storage_count; ++storage_index) {
-    const Storage *storage = &instruction->Assembly.operands[storage_index];
+    const Storage *storage = &assembly->operands[storage_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
 
     if (storage->byte_size == 2) {
@@ -226,80 +224,75 @@ eager_encode_instruction_assembly(
   }
 
   if (needs_16_bit_prefix) {
-    instruction_bytes_append_bytes(&result.Bytes, &(u8){0x66}, 1);
+    instruction_bytes_append_bytes(&result.bytes, &(u8){0x66}, 1);
   }
 
   if (rex_byte) {
-    instruction_bytes_append_bytes(&result.Bytes, &rex_byte, 1);
+    instruction_bytes_append_bytes(&result.bytes, &rex_byte, 1);
   }
 
   if (op_code[0]) {
-    instruction_bytes_append_bytes(&result.Bytes, &op_code[0], 1);
+    instruction_bytes_append_bytes(&result.bytes, &op_code[0], 1);
   }
   if (op_code[1]) {
-    instruction_bytes_append_bytes(&result.Bytes, &op_code[1], 1);
+    instruction_bytes_append_bytes(&result.bytes, &op_code[1], 1);
   }
   if (op_code[2]) {
-    instruction_bytes_append_bytes(&result.Bytes, &op_code[2], 1);
+    instruction_bytes_append_bytes(&result.bytes, &op_code[2], 1);
   }
-  instruction_bytes_append_bytes(&result.Bytes, &op_code[3], 1);
+  instruction_bytes_append_bytes(&result.bytes, &op_code[3], 1);
 
-  Instruction_Stack_Patch stack_patch = {
-    .mod_r_m_offset_in_previous_instruction = result.Bytes.length,
+  result.maybe_stack_patch = (Instruction_Stack_Patch) {
+    .mod_r_m_offset_in_previous_instruction = result.bytes.length,
   };
-  bool has_stack_patch = false;
   if (mod_r_m_storage_index != -1) {
     u8 mod_r_m = (
       (mod << 6) |
       ((reg_or_op_code & 0b111) << 3) |
       ((r_m & 0b111))
     );
-    instruction_bytes_append_bytes(&result.Bytes, &mod_r_m, 1);
+    instruction_bytes_append_bytes(&result.bytes, &mod_r_m, 1);
   }
 
   if (needs_sib) {
-    instruction_bytes_append_bytes(&result.Bytes, &sib_byte, 1);
+    instruction_bytes_append_bytes(&result.bytes, &sib_byte, 1);
   }
-
-  enum {MAX_PATCH_COUNT = 2};
-  Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
-  s32 patch_count = 0;
 
   // Write out displacement
   if (mod_r_m_storage_index != -1 && mod != MOD_Register) {
-    const Storage *storage = &instruction->Assembly.operands[mod_r_m_storage_index];
+    const Storage *storage = &assembly->operands[mod_r_m_storage_index];
     assert (storage->tag == Storage_Tag_Memory);
     const Memory_Location *location = &storage->Memory.location;
     switch(location->tag) {
       case Memory_Location_Tag_Instruction_Pointer_Relative: {
         Label_Index label_index = location->Instruction_Pointer_Relative.label_index;
-        u8 offset_in_instruction = result.Bytes.length;
-        patches[patch_count++] = (Instruction_Label_Patch){
+        u8 offset_in_instruction = result.bytes.length;
+        result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
           .offset = offset_in_instruction,
           .label_index = label_index
         };
         u8 empty_patch_bytes[4] = {0};
-        instruction_bytes_append_bytes(&result.Bytes, empty_patch_bytes, countof(empty_patch_bytes));
+        instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
       } break;
       case Memory_Location_Tag_Indirect: {
         if (mod == MOD_Displacement_s32) {
-          instruction_bytes_append_bytes(&result.Bytes, (u8 *)&displacement, sizeof(displacement));
+          instruction_bytes_append_bytes(&result.bytes, (u8 *)&displacement, sizeof(displacement));
         } else if (mod == MOD_Displacement_s8) {
           u8 byte = (u8)s32_to_s8(displacement);
-          instruction_bytes_append_bytes(&result.Bytes, &byte, sizeof(byte));
+          instruction_bytes_append_bytes(&result.bytes, &byte, sizeof(byte));
         } else {
           assert(mod == MOD_Displacement_0);
         }
       } break;
       case Memory_Location_Tag_Stack: {
-        stack_patch.stack_area = location->Stack.area;
-        has_stack_patch = true;
+        result.maybe_stack_patch.stack_area = location->Stack.area;
+        result.has_stack_patch = true;
 
         // :OversizedStackOffsets
         // Here we reserve full 4 bytes for stack offset but it might be patched
         // to a smaller size when total stack size is known
         s32 stack_offset = location->Stack.offset;
-        instruction_bytes_append_bytes(&result.Bytes, (u8 *)&stack_offset, sizeof(stack_offset));
+        instruction_bytes_append_bytes(&result.bytes, (u8 *)&stack_offset, sizeof(stack_offset));
       } break;
     }
   }
@@ -310,51 +303,30 @@ eager_encode_instruction_assembly(
     if (operand_encoding->type != Operand_Encoding_Type_Immediate) {
       continue;
     }
-    const Storage *storage = &instruction->Assembly.operands[storage_index];
+    const Storage *storage = &assembly->operands[storage_index];
     if (storage_is_label(storage)) {
       Label_Index label_index = storage->Memory.location.Instruction_Pointer_Relative.label_index;
-      u8 offset_in_instruction = result.Bytes.length;
-      patches[patch_count++] = (Instruction_Label_Patch){
+      u8 offset_in_instruction = result.bytes.length;
+      result.label_patches[result.label_patch_count++] = (Instruction_Label_Patch){
         .offset = offset_in_instruction,
         .label_index = label_index
       };
       u8 empty_patch_bytes[4] = {0};
-      instruction_bytes_append_bytes(&result.Bytes, empty_patch_bytes, countof(empty_patch_bytes));
+      instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
     } else if (storage->tag == Storage_Tag_Static) {
       const u8 *bytes = storage_static_as_c_type_internal(storage, storage->byte_size);
-      instruction_bytes_append_bytes(&result.Bytes, bytes, storage->byte_size);
+      instruction_bytes_append_bytes(&result.bytes, bytes, storage->byte_size);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }
   }
 
-  // It is important to push instruction all at once here to make sure array
-  // doesn't get resized invalidating the pointer to one of the instructions
-  // that still needs to be updated like the patch offsets below.
-  dyn_array_push(*instructions, result);
-
-  // Stack patch MUST go before label patches as it might change the size of the instruction
-  if (has_stack_patch) {
-    dyn_array_push(*instructions, instruction->source_range, (Instruction) {
-      .tag = Instruction_Tag_Stack_Patch,
-      .Stack_Patch = stack_patch,
-      .source_range = instruction->source_range,
-      .compiler_source_location = instruction->compiler_source_location,
-    });
+  assert(result.label_patch_count <= countof(result.label_patches));
+  for (u8 i = 0; i < result.label_patch_count; i += 1) {
+    result.label_patches[i].offset -= result.bytes.length;
   }
 
-  assert(patch_count <= MAX_PATCH_COUNT);
-  for (s32 i = 0; i < patch_count; i += 1) {
-    patches[i].offset -= result.Bytes.length;
-    dyn_array_push(*instructions, instruction->source_range, (Instruction) {
-      .tag = Instruction_Tag_Label_Patch,
-      .Label_Patch = patches[i],
-      .source_range = instruction->source_range,
-      .compiler_source_location = instruction->compiler_source_location,
-    });
-  }
-
-  result.encoded_byte_size = result.Bytes.length;
+  return result;
 }
 
 static void
@@ -766,11 +738,35 @@ push_eagerly_encoded_instruction(
   Instruction instruction
 ) {
   if (instruction.tag == Instruction_Tag_Assembly) {
-    if (instruction.Assembly.mnemonic == lea) {
-      //DebugBreak();
-    }
     const Instruction_Encoding *encoding = encoding_match(&instruction);
-    eager_encode_instruction_assembly(instructions, &instruction, encoding);
+    Eager_Encoding_Result result =
+      eager_encode_instruction_assembly(&instruction.Assembly, encoding);
+
+    dyn_array_push(*instructions, (Instruction) {
+      .tag = Instruction_Tag_Bytes,
+      .Bytes = result.bytes,
+      .source_range = instruction.source_range,
+      .compiler_source_location = instruction.compiler_source_location,
+    });
+
+    // Stack patch MUST go before label patches as it might change the size of the instruction
+    if (result.has_stack_patch) {
+      dyn_array_push(*instructions, (Instruction) {
+        .tag = Instruction_Tag_Stack_Patch,
+        .Stack_Patch = result.maybe_stack_patch,
+        .source_range = instruction.source_range,
+        .compiler_source_location = instruction.compiler_source_location,
+      });
+    }
+
+    for (s32 i = 0; i < result.label_patch_count; i += 1) {
+      dyn_array_push(*instructions, (Instruction) {
+        .tag = Instruction_Tag_Label_Patch,
+        .Label_Patch = result.label_patches[i],
+        .source_range = instruction.source_range,
+        .compiler_source_location = instruction.compiler_source_location,
+      });
+    }
     return;
   }
   dyn_array_push(*instructions, instruction);
