@@ -3755,31 +3755,38 @@ token_handle_function_call(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
+  Value *call_return_value = 0;
+  Temp_Mark temp_mark = context_temp_mark(context);
+
   if(!value_match_group(args_token, Group_Tag_Paren)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_token->source_range,
       .detailed_message = "Expected a list of arguments in ()",
     });
-    return 0;
+    goto defer;
   }
 
   Value *target_expression = token_parse_single(context, target_token);
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*context->result) goto defer;
 
-  Array_Value_Ptr args = dyn_array_make(Array_Value_Ptr);
-  token_match_call_arguments(context, args_token, &args);
-  MASS_ON_ERROR(*context->result) return 0;
+  Array_Value_Ptr temp_args = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
+  token_match_call_arguments(context, args_token, &temp_args);
+  MASS_ON_ERROR(*context->result) goto defer;
 
   if (target_expression->descriptor == &descriptor_macro_capture) {
-    u64 arg_count = dyn_array_length(args);
+    u64 arg_count = dyn_array_length(temp_args);
     Macro_Capture *capture = storage_static_as_c_type(&target_expression->storage, Macro_Capture);
     Execution_Context capture_context = *context;
     capture_context.scope = capture->scope;
     if (arg_count == 0) {
       // Nothing to do
     } else if (arg_count == 1) {
-      Value *scope_arg = *dyn_array_get(args, 0);
+      Value *scope_arg = *dyn_array_get(temp_args, 0);
       if (scope_arg->descriptor != &descriptor_scope) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
@@ -3787,33 +3794,37 @@ token_handle_function_call(
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
           .detailed_message = "Macro capture can only accept an optional Scope argument",
         });
-        return 0;
+        goto defer;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
       context_merge_in_scope(&capture_context, argument_scope);
     } else {
+      Array_Value_Ptr error_args;
+      dyn_array_copy_from_temp(Array_Value_Ptr, context, &error_args, temp_args);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = target_token->source_range,
-        .No_Matching_Overload = { .target = target_expression, .arguments = args },
+        .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
         .detailed_message = "Macro capture can only accept an optional Scope argument"
       });
-      return 0;
+      goto defer;
     }
     return token_parse_block_view(&capture_context, capture->view);
   }
 
-  Overload_Match match = mass_match_overload(target_expression, args);
+  Overload_Match match = mass_match_overload(target_expression, temp_args);
 
   Value *overload;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
+      Array_Value_Ptr error_args;
+      dyn_array_copy_from_temp(Array_Value_Ptr, context, &error_args, temp_args);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = source_range,
-        .No_Matching_Overload = { .target = target_expression, .arguments = args },
+        .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
       });
-      return 0;
+      goto defer;
     }
     case Overload_Match_Tag_Undecidable: {
       context_error(context, (Mass_Error) {
@@ -3821,7 +3832,7 @@ token_handle_function_call(
         .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
         .source_range = source_range,
       });
-      return 0;
+      goto defer;
     }
     case Overload_Match_Tag_Found: {
       overload = match.Found.value;
@@ -3834,7 +3845,7 @@ token_handle_function_call(
     }
   }
 
-  MASS_ON_ERROR(*context->result) return 0;
+  MASS_ON_ERROR(*context->result) goto defer;
   assert(overload);
 
   const Function_Info *info = maybe_function_info_from_value(overload);
@@ -3850,7 +3861,7 @@ token_handle_function_call(
     // will end up here as well. Indirect calls are allowed so we do not need a full stack
     const Value *saved_call_target = context->current_compile_time_function_call_target;
     context->current_compile_time_function_call_target = temp_overload;
-    Value *result;
+    Value *result = 0;
     if (info->flags & Descriptor_Function_Flags_Intrinsic) {
       Jit *jit = &context->compilation->jit;
       Execution_Context eval_context = *context;
@@ -3859,12 +3870,12 @@ token_handle_function_call(
       eval_context.scope = context->scope;
 
       Value *instance = ensure_function_instance(&eval_context, overload);
-      MASS_ON_ERROR(*eval_context.result) return 0;
+      MASS_ON_ERROR(*eval_context.result) goto defer;
 
       Mass_Result jit_result = program_jit(context->compilation, jit);
       MASS_ON_ERROR(jit_result) {
         context_error(context, jit_result.Error.error);
-        return 0;
+        goto defer;
       }
       fn_type_opaque jitted_code;
       if (storage_is_label(&instance->storage)) {
@@ -3879,7 +3890,7 @@ token_handle_function_call(
       // @Volatile :IntrinsicFunctionSignature
       Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
         (Value *(*)(Execution_Context *, Value_View))jitted_code;
-      Value_View args_view = value_view_from_value_array(args, &args_token->source_range);
+      Value_View args_view = value_view_from_value_array(temp_args, &args_token->source_range);
       result = jitted_intrinsic(&eval_context, args_view);
 
       // The value that comes out of an intrinsic is consider to originate in the same
@@ -3898,12 +3909,18 @@ token_handle_function_call(
       result = compile_time_eval(context, fake_eval_view);
     }
     context->current_compile_time_function_call_target = saved_call_target;
-    return result;
+    call_return_value = result;
+    goto defer;
   }
 
   if (info->flags & Descriptor_Function_Flags_Macro) {
-    return mass_handle_macro_call(context, overload, args, source_range);
+    call_return_value = mass_handle_macro_call(context, overload, temp_args, source_range);
+    goto defer;
   }
+
+  // Need to copy the args here because they will be used later in the lazy value
+  Array_Value_Ptr args;
+  dyn_array_copy_from_temp(Array_Value_Ptr, context, &args, temp_args);
 
   Mass_Function_Call_Lazy_Payload *call_payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
@@ -3913,9 +3930,13 @@ token_handle_function_call(
     .source_range = source_range,
   };
 
-  return mass_make_lazy_value(
+  call_return_value = mass_make_lazy_value(
     context, source_range, call_payload, info->returns.descriptor, call_function_overload
   );
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+  return call_return_value;
 }
 
 static Storage

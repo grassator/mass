@@ -63,6 +63,26 @@ context_temp_reset(
   compilation_temp_reset(context->compilation);
 }
 
+#define dyn_array_copy_from_temp(_TYPE_, _CONTEXT_, _TARGET_, _SOURCE_)\
+  do {\
+    _TYPE_ copy_source = (_SOURCE_);\
+    u64 copy_count = dyn_array_length(copy_source);\
+    if (copy_count) {\
+      _TYPE_ copy_target = dyn_array_make(\
+        _TYPE_,\
+        .allocator = (_CONTEXT_)->allocator,\
+        .capacity = copy_count,\
+      );\
+      copy_target.data->length = copy_target.data->capacity;\
+      s8 *first = (s8 *)(dyn_array_get(copy_source, 0));\
+      s8 *past_last = (s8 *)(dyn_array_last(copy_source) + 1);\
+      memcpy(dyn_array_raw(copy_target), first, past_last - first);\
+      *(_TARGET_) = copy_target;\
+    } else {\
+      *(_TARGET_) = dyn_array_static_empty(_TYPE_);\
+    }\
+  } while(0)
+
 static inline bool
 storage_is_stack(
   const Storage *operand
