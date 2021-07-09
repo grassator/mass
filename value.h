@@ -7,7 +7,7 @@
 static const Source_File COMPILER_SOURCE_FILE = {
   .path = slice_literal_fields("__mass_compiler__"),
   .text = {0},
-  .line_ranges = {&dyn_array_zero_items},
+  .lines = {&dyn_array_zero_items},
 };
 
 static const Source_Range COMPILER_SOURCE_RANGE = {
