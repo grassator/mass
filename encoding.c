@@ -762,10 +762,8 @@ encoding_match(
 static inline void
 push_eagerly_encoded_instruction(
   Array_Instruction *instructions,
-  const Source_Range source_range,
   Instruction instruction
 ) {
-  instruction.source_range = source_range;
   if (instruction.tag == Instruction_Tag_Assembly) {
     const Instruction_Encoding *encoding = encoding_match(&instruction);
     eager_encode_instruction_assembly(instructions, &instruction, encoding);

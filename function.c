@@ -242,8 +242,10 @@ move_value(
       .byte_size = 8,
       .Register.index = source->Register.index,
     };
-    push_eagerly_encoded_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
-      .Assembly = {mov, {temp_full_register, source_full_register}}
+    push_eagerly_encoded_instruction(instructions, (Instruction) {
+      .tag = Instruction_Tag_Assembly,
+      .Assembly = {mov, {temp_full_register, source_full_register}},
+      .source_range = *source_range,
     });
     push_instruction(instructions, *source_range, (Instruction) { .tag = Instruction_Tag_Assembly,
       .Assembly = {shr, {temp_full_register, imm8((u8)source->Register.offset_in_bits)}}
@@ -360,8 +362,11 @@ move_value(
         (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, temp}}});
       register_release(builder, temp.Register.index);
     } else {
-      push_eagerly_encoded_instruction(instructions, *source_range,
-        (Instruction) {.tag = Instruction_Tag_Assembly, .Assembly = {mov, {*target, adjusted_source}}});
+      push_eagerly_encoded_instruction(instructions, (Instruction) {
+        .tag = Instruction_Tag_Assembly,
+        .Assembly = {mov, {*target, adjusted_source}},
+        .source_range = *source_range,
+      });
     }
     return;
   }

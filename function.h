@@ -45,13 +45,12 @@ instruction_add_source_location_internal(
   instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, __VA_ARGS__)
 
 #define push_instruction(_array_ptr_, _location_, ...)\
-  dyn_array_push(\
-    *(_array_ptr_),\
-    *instruction_add_source_location_internal(\
-      (_location_), \
-      instruction_add_compiler_location_internal(COMPILER_SOURCE_LOCATION, &(__VA_ARGS__))\
-    )\
-  )
+  do {\
+    Instruction to_push = (__VA_ARGS__);\
+    to_push.source_range = (_location_);\
+    to_push.compiler_source_location = COMPILER_SOURCE_LOCATION;\
+    dyn_array_push(*(_array_ptr_), to_push);\
+  } while (0)
 
 #define encode_instruction_with_compiler_location(_program_, _buffer_, ...)\
   encode_instruction(\
