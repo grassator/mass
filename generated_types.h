@@ -1416,14 +1416,31 @@ typedef struct Function_Return {
 } Function_Return;
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
+typedef enum {
+  Function_Parameter_Tag_Runtime = 0,
+  Function_Parameter_Tag_Exact_Static = 1,
+} Function_Parameter_Tag;
+
+typedef struct Function_Parameter_Exact_Static {
+  Storage storage;
+} Function_Parameter_Exact_Static;
 typedef struct Function_Parameter {
+  Function_Parameter_Tag tag;
+  char _tag_padding[4];
   Slice name;
   const Descriptor * descriptor;
   Source_Range source_range;
   Value_View maybe_default_expression;
+  union {
+    Function_Parameter_Exact_Static Exact_Static;
+  };
 } Function_Parameter;
+static inline Function_Parameter_Exact_Static *
+function_parameter_as_exact_static(Function_Parameter *function_parameter) {
+  assert(function_parameter->tag == Function_Parameter_Tag_Exact_Static);
+  return &function_parameter->Exact_Static;
+}
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
-
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
   Descriptor_Function_Flags_Macro = 1,
@@ -4417,9 +4434,30 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_return);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter_ptr, Array_Function_Parameter_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
+MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_tag, Function_Parameter_Tag)
+static C_Enum_Item function_parameter_tag_items[] = {
+{ .name = slice_literal_fields("Runtime"), .value = 0 },
+{ .name = slice_literal_fields("Exact_Static"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_exact_static, Function_Parameter_Exact_Static,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("storage"),
+    .descriptor = &descriptor_storage,
+    .Base_Relative.offset = offsetof(Function_Parameter_Exact_Static, storage),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_parameter_exact_static);
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("tag"),
+    .descriptor = &descriptor_function_parameter_tag,
+    .Base_Relative.offset = offsetof(Function_Parameter, tag),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("name"),
@@ -4444,8 +4482,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .descriptor = &descriptor_value_view,
     .Base_Relative.offset = offsetof(Function_Parameter, maybe_default_expression),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Exact_Static"),
+    .descriptor = &descriptor_function_parameter_exact_static,
+    .Base_Relative.offset = offsetof(Function_Parameter, Exact_Static),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(function_parameter);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },

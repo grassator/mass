@@ -1622,7 +1622,12 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_struct("Function_Parameter", (Struct_Item[]){
+  push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
+    struct_empty("Runtime"),
+    struct_fields("Exact_Static", (Struct_Item[]){
+      { "Storage", "storage" },
+    }),
+  }), (Struct_Item[]){
     { "Slice", "name" },
     { "const Descriptor *", "descriptor" },
     { "Source_Range", "source_range" },

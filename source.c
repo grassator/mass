@@ -1832,9 +1832,44 @@ token_match_argument(
   if (context->result->tag != Mass_Result_Tag_Success) return arg;
 
   Value_View default_expression;
+  Value_View static_expression;
   Value_View definition;
   Value *equals;
   bool is_inferred_type = false;
+
+  if (token_maybe_split_on_operator(
+    view, slice_literal("::"), &definition, &static_expression, &equals
+  )) {
+    if (static_expression.length == 0) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = equals->source_range,
+        .detailed_message = "Expected an expression after `::`"
+      });
+      goto err;
+    }
+    // TODO @CopyPaste
+    if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = definition.source_range,
+        .detailed_message = "Expected an argument name",
+      });
+      goto err;
+    }
+    Value *name_token = value_view_get(definition, 0);
+    Value *static_value = compile_time_eval(context, static_expression);
+    MASS_ON_ERROR(*context->result) goto err;
+    return (Function_Parameter) {
+      .tag = Function_Parameter_Tag_Exact_Static,
+      .Exact_Static = {
+        .storage = static_value->storage,
+      },
+      .name = value_as_symbol(name_token)->name,
+      .descriptor = static_value->descriptor,
+      .source_range = definition.source_range,
+    };
+  }
 
   if (token_maybe_split_on_operator(
     view, slice_literal("="), &definition, &default_expression, &equals
@@ -1914,6 +1949,7 @@ token_match_argument(
   }
 
   arg = (Function_Parameter) {
+    .tag = Function_Parameter_Tag_Runtime,
     .name = value_as_symbol(name_token)->name,
     .descriptor = descriptor,
     .maybe_default_expression = default_expression,
@@ -3512,7 +3548,6 @@ call_function_overload(
       target_arg_registers_are_free &&
       target_item->descriptor->tag != Descriptor_Tag_Reference_To
     );
-
 
     bool can_use_source_registers = false;
     u64 source_registers_bitset = 0;

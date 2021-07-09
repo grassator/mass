@@ -939,33 +939,35 @@ storage_static_equal_internal(
   return true;
 }
 
-bool
+static bool
 storage_static_equal(
-  const Value *a,
-  const Value *b
+  const Descriptor *a_descriptor,
+  const Storage *a_storage,
+  const Descriptor *b_descriptor,
+  const Storage *b_storage
 ) {
-  assert(a->storage.tag == Storage_Tag_Static);
-  assert(b->storage.tag == Storage_Tag_Static);
-  assert(a->storage.byte_size == b->storage.byte_size);
-  assert(descriptor_byte_size(a->descriptor) == a->storage.byte_size);
-  assert(a->storage.Static.memory.tag == b->storage.Static.memory.tag);
-  switch(a->storage.Static.memory.tag) {
+  assert(a_storage->tag == Storage_Tag_Static);
+  assert(b_storage->tag == Storage_Tag_Static);
+  assert(a_storage->byte_size == b_storage->byte_size);
+  assert(descriptor_byte_size(a_descriptor) == a_storage->byte_size);
+  assert(a_storage->Static.memory.tag == b_storage->Static.memory.tag);
+  switch(a_storage->Static.memory.tag) {
     case Static_Memory_Tag_U8: {
-      return a->storage.Static.memory.U8.value == b->storage.Static.memory.U8.value;
+      return a_storage->Static.memory.U8.value == b_storage->Static.memory.U8.value;
     }
     case Static_Memory_Tag_U16: {
-      return a->storage.Static.memory.U16.value == b->storage.Static.memory.U16.value;
+      return a_storage->Static.memory.U16.value == b_storage->Static.memory.U16.value;
     }
     case Static_Memory_Tag_U32: {
-      return a->storage.Static.memory.U32.value == b->storage.Static.memory.U32.value;
+      return a_storage->Static.memory.U32.value == b_storage->Static.memory.U32.value;
     }
     case Static_Memory_Tag_U64: {
-      return a->storage.Static.memory.U64.value == b->storage.Static.memory.U64.value;
+      return a_storage->Static.memory.U64.value == b_storage->Static.memory.U64.value;
     }
     case Static_Memory_Tag_Heap: {
       return storage_static_equal_internal(
-        a->descriptor, a->storage.Static.memory.Heap.pointer,
-        b->descriptor, b->storage.Static.memory.Heap.pointer
+        a_descriptor, a_storage->Static.memory.Heap.pointer,
+        b_descriptor, b_storage->Static.memory.Heap.pointer
       );
     }
     default: {
@@ -973,6 +975,14 @@ storage_static_equal(
       return false;
     }
   }
+}
+
+static bool
+storage_static_equal_values(
+  const Value *a,
+  const Value *b
+) {
+  return storage_static_equal(a->descriptor, &a->storage, b->descriptor, &b->storage);
 }
 
 static inline bool

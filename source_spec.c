@@ -685,6 +685,18 @@ spec("source") {
       check(size == 4);
     }
 
+    it("should prefer exact static value overload") {
+      s64(*checker)() = (s64(*)())test_program_inline_source_function(
+        "checker", &test_context,
+        "foo :: fn(type :: s32) -> (s64) { 42 }\n"
+        "foo :: fn(type : Type) -> (s64) { 21 }\n"
+        "checker :: fn() -> (s64) { foo(s32) }\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      s64 actual = checker();
+      check(actual == 42);
+    }
+
     it("should report an overload overlap") {
       test_program_inline_source_base(
         "test", &test_context,
