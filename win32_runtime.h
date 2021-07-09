@@ -170,7 +170,8 @@ win32_instruction_for_address(
   u64 current_offset = unwind_info->SizeOfProlog;
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    current_offset += instruction->encoded_byte_size;
+    if (instruction->tag != Instruction_Tag_Bytes) continue;
+    current_offset += instruction->Bytes.length;
     if (current_offset == relative_instruction_byte_offset) {
       return instruction;
     }
@@ -205,7 +206,8 @@ win32_print_stack(
   u64 current_offset = unwind_info->SizeOfProlog;
   for (u64 i = 0; i < dyn_array_length(builder->code_block.instructions); ++i) {
     Instruction *instruction = dyn_array_get(builder->code_block.instructions, i);
-    current_offset += instruction->encoded_byte_size;
+    if (instruction->tag != Instruction_Tag_Bytes) continue;
+    current_offset += instruction->Bytes.length;
     if (current_offset == relative_instruction_byte_offset) {
       printf("  at ");
       source_range_print_start_position(&instruction->source_range);

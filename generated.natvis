@@ -865,7 +865,6 @@
     <Item Name="compiler_source_location">compiler_source_location</Item>
     <Item Name="source_range">source_range</Item>
     <Item Name="scope">scope</Item>
-    <Item Name="encoded_byte_size">encoded_byte_size</Item>
     <Item Name="Label" Condition="tag == Instruction_Tag_Label">Label</Item>
     <Item Name="Bytes" Condition="tag == Instruction_Tag_Bytes">Bytes</Item>
     <Item Name="Label_Patch" Condition="tag == Instruction_Tag_Label_Patch">Label_Patch</Item>

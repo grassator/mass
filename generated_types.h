@@ -1008,7 +1008,6 @@ typedef struct Instruction {
   Compiler_Source_Location compiler_source_location;
   Source_Range source_range;
   Scope * scope;
-  u64 encoded_byte_size;
   union {
     Instruction_Label Label;
     Instruction_Bytes Bytes;
@@ -3487,12 +3486,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(instruction, Instruction,
     .name = slice_literal_fields("scope"),
     .descriptor = &descriptor_scope_pointer,
     .Base_Relative.offset = offsetof(Instruction, scope),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("encoded_byte_size"),
-    .descriptor = &descriptor_u64,
-    .Base_Relative.offset = offsetof(Instruction, encoded_byte_size),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

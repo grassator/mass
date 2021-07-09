@@ -508,7 +508,6 @@ encode_instruction(
   switch(instruction->tag) {
     case Instruction_Tag_Label: {
       program_resolve_label(program, buffer, instruction->Label.index);
-      instruction->encoded_byte_size = 0;
       return;
     }
     case Instruction_Tag_Bytes: {
@@ -516,7 +515,6 @@ encode_instruction(
         .bytes = (char *)instruction->Bytes.memory,
         .length = instruction->Bytes.length,
       };
-      instruction->encoded_byte_size = instruction->Bytes.length;
       virtual_memory_buffer_append_slice(buffer, slice);
       return;
     }

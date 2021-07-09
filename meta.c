@@ -1384,7 +1384,6 @@ main(void) {
     { "Compiler_Source_Location", "compiler_source_location" },
     { "Source_Range", "source_range" },
     { "Scope *", "scope" },
-    { "u64", "encoded_byte_size" },
   }));
 
   push_type(type_struct("Code_Block", (Struct_Item[]){
