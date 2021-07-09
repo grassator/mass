@@ -82,6 +82,10 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Error_File_Too_Large"), type_mass_error_file_too_large_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Error_Dynamic_Library_Load"), type_mass_error_dynamic_library_load_value
   );
   scope_define_value(

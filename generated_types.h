@@ -1551,19 +1551,20 @@ typedef enum {
   Mass_Error_Tag_Expected_Static = 5,
   Mass_Error_Tag_Integer_Range = 6,
   Mass_Error_Tag_File_Open = 7,
-  Mass_Error_Tag_Dynamic_Library_Load = 8,
-  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 9,
-  Mass_Error_Tag_Unexpected_Token = 10,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 11,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 12,
-  Mass_Error_Tag_Undefined_Variable = 13,
-  Mass_Error_Tag_Redifinition = 14,
-  Mass_Error_Tag_Unknown_Field = 15,
-  Mass_Error_Tag_Invalid_Identifier = 16,
-  Mass_Error_Tag_Type_Mismatch = 17,
-  Mass_Error_Tag_Epoch_Mismatch = 18,
-  Mass_Error_Tag_No_Matching_Overload = 19,
-  Mass_Error_Tag_Undecidable_Overload = 20,
+  Mass_Error_Tag_File_Too_Large = 8,
+  Mass_Error_Tag_Dynamic_Library_Load = 9,
+  Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 10,
+  Mass_Error_Tag_Unexpected_Token = 11,
+  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 12,
+  Mass_Error_Tag_Operator_Prefix_Conflict = 13,
+  Mass_Error_Tag_Undefined_Variable = 14,
+  Mass_Error_Tag_Redifinition = 15,
+  Mass_Error_Tag_Unknown_Field = 16,
+  Mass_Error_Tag_Invalid_Identifier = 17,
+  Mass_Error_Tag_Type_Mismatch = 18,
+  Mass_Error_Tag_Epoch_Mismatch = 19,
+  Mass_Error_Tag_No_Matching_Overload = 20,
+  Mass_Error_Tag_Undecidable_Overload = 21,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -1579,6 +1580,9 @@ typedef struct Mass_Error_Integer_Range {
 typedef struct Mass_Error_File_Open {
   Slice path;
 } Mass_Error_File_Open;
+typedef struct Mass_Error_File_Too_Large {
+  Slice path;
+} Mass_Error_File_Too_Large;
 typedef struct Mass_Error_Dynamic_Library_Load {
   Slice library_name;
 } Mass_Error_Dynamic_Library_Load;
@@ -1633,6 +1637,7 @@ typedef struct Mass_Error {
     Mass_Error_Circular_Dependency Circular_Dependency;
     Mass_Error_Integer_Range Integer_Range;
     Mass_Error_File_Open File_Open;
+    Mass_Error_File_Too_Large File_Too_Large;
     Mass_Error_Dynamic_Library_Load Dynamic_Library_Load;
     Mass_Error_Dynamic_Library_Symbol_Not_Found Dynamic_Library_Symbol_Not_Found;
     Mass_Error_Unexpected_Token Unexpected_Token;
@@ -1666,6 +1671,11 @@ static inline Mass_Error_File_Open *
 mass_error_as_file_open(Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_File_Open);
   return &mass_error->File_Open;
+}
+static inline Mass_Error_File_Too_Large *
+mass_error_as_file_too_large(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_File_Too_Large);
+  return &mass_error->File_Too_Large;
 }
 static inline Mass_Error_Dynamic_Library_Load *
 mass_error_as_dynamic_library_load(Mass_Error *mass_error) {
@@ -4664,19 +4674,20 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Expected_Static"), .value = 5 },
 { .name = slice_literal_fields("Integer_Range"), .value = 6 },
 { .name = slice_literal_fields("File_Open"), .value = 7 },
-{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 8 },
-{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 9 },
-{ .name = slice_literal_fields("Unexpected_Token"), .value = 10 },
-{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 11 },
-{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 12 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 13 },
-{ .name = slice_literal_fields("Redifinition"), .value = 14 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 15 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 16 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 17 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 18 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 19 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 20 },
+{ .name = slice_literal_fields("File_Too_Large"), .value = 8 },
+{ .name = slice_literal_fields("Dynamic_Library_Load"), .value = 9 },
+{ .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 10 },
+{ .name = slice_literal_fields("Unexpected_Token"), .value = 11 },
+{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 12 },
+{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 13 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 14 },
+{ .name = slice_literal_fields("Redifinition"), .value = 15 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 16 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 17 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 18 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 19 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 20 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 21 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {
@@ -4720,6 +4731,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_file_open, Mass_Error_File_Open,
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_file_open);
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_file_too_large, Mass_Error_File_Too_Large,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("path"),
+    .descriptor = &descriptor_slice,
+    .Base_Relative.offset = offsetof(Mass_Error_File_Too_Large, path),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(mass_error_file_too_large);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_dynamic_library_load, Mass_Error_Dynamic_Library_Load,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4918,6 +4938,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
     .name = slice_literal_fields("File_Open"),
     .descriptor = &descriptor_mass_error_file_open,
     .Base_Relative.offset = offsetof(Mass_Error, File_Open),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("File_Too_Large"),
+    .descriptor = &descriptor_mass_error_file_too_large,
+    .Base_Relative.offset = offsetof(Mass_Error, File_Too_Large),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

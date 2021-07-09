@@ -11,6 +11,15 @@ tokenize(
   Source_File *file,
   Value_View *out_tokens
 ) {
+  Slice input = file->text;
+  if (input.length > UINT32_MAX) {
+    return mass_error((Mass_Error) {
+      .tag = Mass_Error_Tag_File_Too_Large,
+      .File_Too_Large = { .path = file->path },
+      .source_range = { .file = file, .offsets = {.from = UINT32_MAX, .to = UINT32_MAX} },
+    });
+  }
+
   const Allocator *allocator = compilation->allocator;
   assert(!dyn_array_is_initialized(file->line_ranges));
   file->line_ranges = dyn_array_make(Array_Range_u64, .capacity = file->text.length / 40);
@@ -22,7 +31,6 @@ tokenize(
     dyn_array_make(Array_Tokenizer_Parent, .capacity = 16);
 
   Mass_Result result = {.tag = Mass_Result_Tag_Success};
-  Slice input = file->text;
 
   Fixed_Buffer *string_buffer = fixed_buffer_make(.capacity = 4096);
 

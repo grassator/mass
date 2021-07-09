@@ -181,6 +181,11 @@ mass_error_to_string(
       APPEND_LITERAL("Can not open file ");
       APPEND_SLICE(error->File_Open.path);
     } break;
+    case Mass_Error_Tag_File_Too_Large: {
+      APPEND_LITERAL("File ");
+      APPEND_SLICE(error->File_Too_Large.path);
+      APPEND_LITERAL(" is larger than 4GB");
+    } break;
     case Mass_Error_Tag_Expected_Static: {
       APPEND_LITERAL("Expected value to be static (compile-time known)");
     } break;

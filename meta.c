@@ -1703,6 +1703,9 @@ main(void) {
     struct_fields("File_Open", (Struct_Item[]){
       { "Slice", "path" },
     }),
+    struct_fields("File_Too_Large", (Struct_Item[]){
+      { "Slice", "path" },
+    }),
     struct_fields("Dynamic_Library_Load", (Struct_Item[]){
       { "Slice", "library_name" },
     }),

@@ -1732,6 +1732,9 @@
   <DisplayString Condition="tag == Mass_Error_Tag_File_Open">
     File_Open { File_Open }
   </DisplayString>
+  <DisplayString Condition="tag == Mass_Error_Tag_File_Too_Large">
+    File_Too_Large { File_Too_Large }
+  </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Dynamic_Library_Load">
     Dynamic_Library_Load { Dynamic_Library_Load }
   </DisplayString>
@@ -1780,6 +1783,7 @@
     <Item Name="Circular_Dependency" Condition="tag == Mass_Error_Tag_Circular_Dependency">Circular_Dependency</Item>
     <Item Name="Integer_Range" Condition="tag == Mass_Error_Tag_Integer_Range">Integer_Range</Item>
     <Item Name="File_Open" Condition="tag == Mass_Error_Tag_File_Open">File_Open</Item>
+    <Item Name="File_Too_Large" Condition="tag == Mass_Error_Tag_File_Too_Large">File_Too_Large</Item>
     <Item Name="Dynamic_Library_Load" Condition="tag == Mass_Error_Tag_Dynamic_Library_Load">Dynamic_Library_Load</Item>
     <Item Name="Dynamic_Library_Symbol_Not_Found" Condition="tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found">Dynamic_Library_Symbol_Not_Found</Item>
     <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>

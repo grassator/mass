@@ -394,6 +394,16 @@ spec("source") {
       check(error->source_range.offsets.from == 4);
       check(error->source_range.offsets.to == 4);
     }
+
+    it("should report a failure when encountering a mismatched brace that") {
+      Value_View tokens;
+      Source_File source_file = {test_file_name, (Slice){.bytes = 0, .length = 1llu << 33}};
+      Mass_Result result = tokenize(test_context.compilation, &source_file, &tokens);
+      check(result.tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &result.Error.error;
+      check(error->tag == Mass_Error_Tag_File_Too_Large);
+      spec_check_slice(error->File_Too_Large.path, test_file_name);
+    }
   }
 
   #ifdef _WIN32
