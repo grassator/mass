@@ -1297,7 +1297,7 @@ tokenizer_group_end(
     return false;
   }
 
-  parent_value->source_range.offsets.to = offset;
+  parent_value->source_range.offsets.to = u64_to_u32(offset);
   Source_Range children_range = parent_value->source_range;
   children_range.offsets.to -= 1;
   children_range.offsets.from += 1;

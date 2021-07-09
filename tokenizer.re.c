@@ -42,7 +42,13 @@ tokenize(
     slice_sub(input, token_start_offset, offset)
 
   #define TOKENIZER_CURRENT_RANGE()\
-    (Source_Range){ .file = file, .offsets = {.from = token_start_offset, .to = offset}}
+    (Source_Range){\
+      .file = file,\
+      .offsets = {\
+        .from = u64_to_u32(token_start_offset),\
+        .to = u64_to_u32(offset),\
+      }\
+    }
 
   #define TOKENIZER_PUSH_LITERAL(_BASE_, _SLICE_)\
     dyn_array_push(stack, \
@@ -58,7 +64,7 @@ tokenize(
           .Unexpected_Token = { .expected = (_EXPECTED_SLICE_), },\
           .source_range = {\
             .file = file,\
-            .offsets = {.from = offset - 1, .to = offset - 1},\
+            .offsets = {.from = u64_to_u32(offset) - 1, .to = u64_to_u32(offset) - 1},\
           }\
         }\
       };\
@@ -172,7 +178,10 @@ tokenize(
 
   done:
   if (result.tag == Mass_Result_Tag_Success) {
-    Source_Range children_range = { .file = file, .offsets = {.from = 0, .to = file->text.length} };
+    Source_Range children_range = {
+      .file = file,
+      .offsets = {.from = 0, .to = u64_to_u32(input.length)},
+    };
     *out_tokens = temp_token_array_into_value_view(
       allocator, dyn_array_raw(stack), dyn_array_length(stack), children_range
     );

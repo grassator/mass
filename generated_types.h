@@ -440,7 +440,7 @@ typedef dyn_array_type(Source_File) Array_Source_File;
 
 typedef struct Source_Range {
   const Source_File * file;
-  Range_u64 offsets;
+  Range_u32 offsets;
 } Source_Range;
 typedef dyn_array_type(Source_Range) Array_Source_Range;
 
@@ -2502,7 +2502,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("offsets"),
-    .descriptor = &descriptor_range_u64,
+    .descriptor = &descriptor_range_u32,
     .Base_Relative.offset = offsetof(Source_Range, offsets),
   },
 );

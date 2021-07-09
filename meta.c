@@ -1093,7 +1093,7 @@ main(void) {
 
   push_type(type_struct("Source_Range", (Struct_Item[]){
     { "const Source_File *", "file" },
-    { "Range_u64", "offsets" },
+    { "Range_u32", "offsets" },
   }));
 
   push_type(add_common_fields(type_union("Module_Export", (Struct_Type[]){

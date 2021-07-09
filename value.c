@@ -39,7 +39,8 @@ source_from_source_range(
   const Source_Range *source_range
 ) {
   if (!source_range->file) return (Slice){0};
-  return slice_sub_range(source_range->file->text, source_range->offsets);
+  Range_u64 offsets = {source_range->offsets.from, source_range->offsets.to};
+  return slice_sub_range(source_range->file->text,offsets);
 }
 
 static Source_Position
