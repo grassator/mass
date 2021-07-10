@@ -54,28 +54,25 @@ false :: 0
 
 mass :: import("mass")
 
-Arithmetic_Proc :: fn(
-  ctx : &mass.Execution_Context,
-  view : mass.Value_View
-) -> (&mass.Value)
+arithmetic_overloads :: {
+  macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
+    template :: macro(type : Type) {
+      macro add(x : type, y : type) -> (type) { impl(x, y) }
+    }
+    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
+      f :: template(t64)
+      f :: template(t32)
+      f :: template(t16)
+      f :: template(t8)
+      f
+    }
 
-arithmetic_overloads :: macro(impl : Arithmetic_Proc) {
-  template :: macro(type : Type) {
-    macro add(x : type, y : type) -> (type) { impl(x, y) }
-  }
-  expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
-    f :: template(t64)
-    f :: template(t32)
-    f :: template(t16)
-    f :: template(t8)
+    // TODO this should produce a Number_Literal
+    f :: macro add(x : Number_Literal, y : Number_Literal) -> s64 { impl(x, y) }
+    f :: expand(s64, s32, s16, s8)
+    f :: expand(u64, u32, u16, u8)
     f
   }
-
-  // TODO this should produce a Number_Literal
-  f :: macro add(x : Number_Literal, y : Number_Literal) -> s64 { impl(x, y) }
-  f :: expand(s64, s32, s16, s8)
-  f :: expand(u64, u32, u16, u8)
-  f
 }
 
 add :: arithmetic_overloads(mass.add)
