@@ -786,7 +786,7 @@ PRELUDE_MAP_NUMERIC_TYPES(PRELUDE_PROCESS_TYPE)
 #undef PRELUDE_PROCESS_TYPE
 
 struct Bucket_Array_Make_Options {
-  void *_dummy;
+  void *_count_reset;
   const Allocator *allocator;
 };
 
@@ -797,7 +797,7 @@ bucket_array_alloc_internal(
   u64 item_byte_size,
   u64 initial_bucket_tail_capacity
 ) {
-  const Allocator *allocator = options->allocator ? options->allocator : allocator_default;
+  const Allocator *allocator = options->allocator;
   u64 allocation_size =
     sizeof(Bucket_Array_Internal) +
     sizeof(Bucket_Array_Bucket_Internal) * initial_bucket_tail_capacity;
@@ -892,7 +892,8 @@ bucket_array_destroy_internal(
   ((_array_type_) {\
     .internal = bucket_array_alloc_internal(\
       &((struct Bucket_Array_Make_Options){\
-        ._dummy = 0,\
+        .allocator = allocator_default,\
+        ._count_reset = 0,\
         __VA_ARGS__\
       }),\
       sizeof(*((_array_type_ *) 0)->typed->bucket_tail[0].items),\
@@ -985,13 +986,15 @@ dyn_array_realloc_internal(
 
 static Dyn_Array_Internal dyn_array_static_empty_internal = {
   .allocator = &allocator_static,
+  .items = 0,
+  .length = 0,
 };
 
 #define dyn_array_static_empty(_TYPE_)\
   (_TYPE_){.internal = &dyn_array_static_empty_internal}
 
 struct Dyn_Array_Make_Options {
-  void *_dummy;
+  void *_count_reset;
   u64 capacity;
   const Allocator *allocator;
 };
@@ -1001,11 +1004,14 @@ dyn_array_alloc_internal(
   struct Dyn_Array_Make_Options *options,
   u64 item_byte_size
 ) {
-  u64 capacity = options->capacity ? options->capacity : 16;
-  u64 new_allocation_size = sizeof(Dyn_Array_Internal) + item_byte_size * capacity;
-  const Allocator *allocator = options->allocator ? options->allocator : allocator_default;
-  Dyn_Array_Internal *result = allocator_allocate_bytes(allocator, new_allocation_size, 16);
-  *result = (Dyn_Array_Internal){ .allocator = allocator, .capacity = capacity };
+  u64 new_allocation_size = sizeof(Dyn_Array_Internal) + item_byte_size * options->capacity;
+  Dyn_Array_Internal *result = allocator_allocate_bytes(
+    options->allocator, new_allocation_size, 16
+  );
+  *result = (Dyn_Array_Internal) {
+    .allocator = options->allocator,
+    .capacity = options->capacity,
+  };
   return result;
 }
 
@@ -1090,7 +1096,9 @@ dyn_array_reserve_uninitialized_internal(
   ((_array_type_) {\
     .internal = dyn_array_alloc_internal(\
       &(struct Dyn_Array_Make_Options) {\
-        ._dummy = 0,\
+        .allocator = allocator_default,\
+        .capacity = 16,\
+        ._count_reset = 0,\
         __VA_ARGS__\
       },\
       dyn_array_item_size(_array_type_)\
@@ -2697,8 +2705,10 @@ virtual_memory_buffer_allocate_bytes(
   u64 alignment
 ) {
   u64 aligned_occupied = buffer->occupied;
-  aligned_occupied = u64_align(aligned_occupied, alignment);
-  byte_size = u64_align(byte_size, alignment);
+  if (alignment != 1) {
+    aligned_occupied = u64_align(aligned_occupied, alignment);
+    byte_size = u64_align(byte_size, alignment);
+  }
   assert(buffer->capacity >= byte_size + aligned_occupied);
   buffer->occupied = aligned_occupied;
   void *result = buffer->memory + buffer->occupied;
@@ -2825,7 +2835,7 @@ typedef struct {
 static_assert_type_alignment(Fixed_Buffer, 16);
 
 struct Fixed_Buffer_Make_Options {
-  void *_dummy;
+  void *_count_reset;
   u64 capacity;
   const Allocator *allocator;
 };
@@ -2834,18 +2844,16 @@ static inline Fixed_Buffer *
 fixed_buffer_make_internal(
   struct Fixed_Buffer_Make_Options *options
 ) {
-  u64 capacity = options->capacity ? options->capacity : (256 - sizeof(Fixed_Buffer));
-  const Allocator *allocator = options->allocator ? options->allocator : allocator_default;
-  u64 allocation_size = sizeof(Fixed_Buffer) + capacity;
+  u64 allocation_size = sizeof(Fixed_Buffer) + options->capacity;
   Fixed_Buffer *buffer = allocator_allocate_bytes(
-    allocator,
+    options->allocator,
     allocation_size,
     _Alignof(Fixed_Buffer)
   );
   memset(buffer, 0, allocation_size);
   *buffer = (Fixed_Buffer) {
-    .allocator = allocator,
-    .capacity = capacity,
+    .allocator = options->allocator,
+    .capacity = options->capacity,
     .occupied = 0,
     .last_allocation = 0,
   };
@@ -2854,7 +2862,9 @@ fixed_buffer_make_internal(
 
 #define fixed_buffer_make(...)\
   fixed_buffer_make_internal(&(struct Fixed_Buffer_Make_Options) {\
-    ._dummy = 0,\
+    .allocator = allocator_default,\
+    .capacity = 256 - sizeof(Fixed_Buffer),\
+    ._count_reset = 0,\
     __VA_ARGS__\
   })
 
@@ -3243,7 +3253,7 @@ bucket_buffer_push_bucket_internal(
 }
 
 struct Bucket_Buffer_Make_Options {
-  void *_dummy;
+  void *_count_reset;
   u64 bucket_capacity;
   const Allocator *allocator;
 };
@@ -3253,13 +3263,11 @@ bucket_buffer_init_internal(
   Bucket_Buffer *internal,
   struct Bucket_Buffer_Make_Options *options
 ) {
-  u64 default_bucket_size = options->bucket_capacity ? options->bucket_capacity : 4096;
-  const Allocator *allocator = options->allocator ? options->allocator : allocator_default;
   *internal = (Bucket_Buffer) {
-    .allocator = allocator,
+    .allocator = options->allocator,
     .occupied = 0,
     .buckets = dyn_array_make(Array_Bucket_Buffer_Bucket, 16),
-    .default_bucket_size = default_bucket_size,
+    .default_bucket_size = options->bucket_capacity,
   };
   bucket_buffer_push_bucket_internal(internal, internal->default_bucket_size);
   return internal;
@@ -3269,14 +3277,15 @@ static inline Bucket_Buffer *
 bucket_buffer_make_internal(
   struct Bucket_Buffer_Make_Options *options
 ) {
-  const Allocator *allocator = options->allocator ? options->allocator : allocator_default;
-  Bucket_Buffer *internal = allocator_allocate(allocator, Bucket_Buffer);
+  Bucket_Buffer *internal = allocator_allocate(options->allocator, Bucket_Buffer);
   return bucket_buffer_init_internal(internal, options);
 }
 
 #define bucket_buffer_options(...)\
   &(struct Bucket_Buffer_Make_Options) {\
-    ._dummy = 0,\
+    .allocator = allocator_default,\
+    .bucket_capacity = 4096,\
+    ._count_reset = 0,\
     __VA_ARGS__\
   }
 
@@ -3653,7 +3662,7 @@ hash_map_resize(
 }
 
 struct Hash_Map_Make_Options {
-  void *_dummy;
+  void *_count_reset;
   const Allocator *allocator;
   u64 initial_capacity;
 };
@@ -3667,12 +3676,10 @@ struct Hash_Map_Make_Options {
   _hash_map_type_##__make(\
     struct Hash_Map_Make_Options *options\
   ) {\
-    const Allocator *allocator = options->allocator ? options->allocator : allocator_default;\
-    _hash_map_type_ *map = allocator_allocate(allocator, _hash_map_type_);\
-    u64 initial_capacity = options->initial_capacity ? options->initial_capacity : 32;\
+    _hash_map_type_ *map = allocator_allocate(options->allocator, _hash_map_type_);\
     u32 capacity_power_of_2 = 1;\
     u64 capacity = 2;\
-    while(capacity < initial_capacity) {\
+    while(capacity < options->initial_capacity) {\
       capacity_power_of_2 += 1;\
       capacity = capacity << 1;\
     }\
@@ -3680,12 +3687,12 @@ struct Hash_Map_Make_Options {
     u64 entry_array_byte_size = entry_byte_size * capacity;\
     *map = (_hash_map_type_) {\
       .methods = _hash_map_type_##__methods,\
-      .allocator = allocator,\
+      .allocator = options->allocator,\
       .capacity_power_of_2 = capacity_power_of_2,\
       .capacity = capacity,\
       .hash_mask = u64_to_s32(capacity - 1),\
       .occupied = 0,\
-      .entries = allocator_allocate_bytes(allocator, entry_array_byte_size, 16),\
+      .entries = allocator_allocate_bytes(options->allocator, entry_array_byte_size, 16),\
     };\
     memset(map->entries, 0, entry_array_byte_size);\
     return map;\
@@ -3794,7 +3801,9 @@ struct Hash_Map_Make_Options {
 #define hash_map_make(_hash_map_type_, ...)\
   _hash_map_type_##__make(\
     &(struct Hash_Map_Make_Options) {\
-      ._dummy = 0,\
+      .allocator = allocator_default,\
+      .initial_capacity = 32,\
+      ._count_reset = 0,\
       __VA_ARGS__\
     }\
   )
