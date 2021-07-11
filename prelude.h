@@ -986,8 +986,8 @@ dyn_array_realloc_internal(
 
 static Dyn_Array_Internal dyn_array_static_empty_internal = {
   .allocator = &allocator_static,
-  .items = 0,
   .length = 0,
+  .items = {0},
 };
 
 #define dyn_array_static_empty(_TYPE_)\
@@ -3182,7 +3182,7 @@ fixed_buffer_from_file_internal(
 
   char *file_path_null_terminated =
     slice_to_c_string(allocator_default, file_path);
-  FILE *file_handle = fopen(file_path_null_terminated, "r");
+  FILE *file_handle = fopen(file_path_null_terminated, "rb");
 
   struct stat st;
   bool stat_success = stat(file_path_null_terminated, &st) == 0;

@@ -142,8 +142,8 @@ calling_convention_x86_64_common_end_proc(
             *mod_r_m &= 0b00111111;
             *mod_r_m |= MOD_Displacement_s8 << 6;
             // Move the remaining bytes 3 positions to the left
-            s8 *remainder_bytes = (s8 *)displacement + sizeof(s32);
-            s8 *instruction_end = previous->Bytes.memory + previous->Bytes.length;
+            u8 *remainder_bytes = (u8 *)displacement + sizeof(s32);
+            u8 *instruction_end = previous->Bytes.memory + previous->Bytes.length;
             s64 remainder_length = instruction_end - remainder_bytes;
             memmove((s8 *)displacement + 1, remainder_bytes, remainder_length);
             previous->Bytes.length -= sizeof(s32) - sizeof(s8);

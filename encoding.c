@@ -437,7 +437,7 @@ encode_and_write_assembly(
     eager_encode_instruction_assembly(assembly, encoding);
   assert(!result.has_stack_patch);
   assert(!result.label_patch_count);
-  Slice bytes = {.bytes = result.bytes.memory, .length = result.bytes.length};
+  Slice bytes = {.bytes = (char *)result.bytes.memory, .length = result.bytes.length};
   virtual_memory_buffer_append_slice(buffer, bytes);
 }
 
