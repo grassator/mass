@@ -5521,32 +5521,14 @@ token_parse_expression(
       : Operator_Fixity_Infix | Operator_Fixity_Postfix;
 
     Value *value = value_view_get(view, i);
-    if (value_is_group(value)) {
-      const Group *group = value_as_group(value);
-      switch (group->tag) {
-        case Group_Tag_Paren: {
-          if (!is_previous_an_operator) {
-            if (!token_handle_operator(
-              context, view, &value_stack, &operator_stack, slice_literal("()"),
-              value->source_range, Operator_Fixity_Infix
-            )) goto defer;
-          }
-          break;
-        }
-        case Group_Tag_Square:
-        case Group_Tag_Curly: {
-          // Nothing special to do for now?
-          break;
-        }
-      }
-      dyn_array_push(value_stack, value);
-      is_previous_an_operator = false;
-    } else if (value_is_symbol(value)) {
+
+    if (end_pattern && value_match(value, end_pattern)) {
+      matched_length = i + 1;
+      goto drain;
+    }
+
+    if (value_is_symbol(value)) {
       Slice symbol_name = value_as_symbol(value)->name;
-      if (end_pattern && value_match(value, end_pattern)) {
-        matched_length = i + 1;
-        goto drain;
-      }
 
       Scope_Entry *scope_entry = scope_lookup(context->scope, symbol_name);
       if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
@@ -5555,14 +5537,33 @@ token_parse_expression(
           symbol_name, value->source_range, fixity_mask
         )) goto defer;
         is_previous_an_operator = true;
-      } else {
-        is_previous_an_operator = false;
-        dyn_array_push(value_stack, value);
+        continue;
       }
-    } else {
-      dyn_array_push(value_stack, value);
-      is_previous_an_operator = false;
     }
+
+    if (
+      !is_previous_an_operator &&
+      value_is_group(value) &&
+      value_as_group(value)->tag == Group_Tag_Paren
+    ) {
+      if (!token_handle_operator(
+        context, view, &value_stack, &operator_stack, slice_literal("()"),
+        value->source_range, Operator_Fixity_Infix
+      )) goto defer;
+      is_previous_an_operator = true;
+    }
+
+    if (!is_previous_an_operator) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = value->source_range,
+        .detailed_message = "Expected an operator",
+      });
+      goto defer;
+    }
+
+    dyn_array_push(value_stack, value);
+    is_previous_an_operator = false;
   }
 
   drain:
