@@ -16,6 +16,10 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Symbol"), type_symbol_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("External_Symbol"), type_external_symbol_value
   );
   scope_define_value(

@@ -138,6 +138,10 @@ mass_error_to_string(
     } break;
     case Mass_Error_Tag_Parse: {
       APPEND_LITERAL("Unable to parse the expression");
+      if (error->detailed_message.length) {
+        APPEND_LITERAL(": ");
+        APPEND_SLICE(error->detailed_message);
+      }
     } break;
     case Mass_Error_Tag_Unexpected_Token: {
       APPEND_LITERAL("Unexpected token");

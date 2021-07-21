@@ -4760,6 +4760,58 @@ mass_handle_paren_operator(
 }
 
 static Value *
+mass_handle_apply_operator(
+  Execution_Context *context,
+  Value_View args_view,
+  void *unused_payload
+) {
+  Value *lhs_value = value_view_get(args_view, 0);
+  Value *rhs_value = value_view_get(args_view, 1);
+
+  Source_Range source_range = args_view.source_range;
+  Value *apply_symbol =
+    token_make_symbol(context->allocator, slice_literal("apply"), Symbol_Type_Id_Like, source_range);
+  Scope_Entry *apply_entry = scope_lookup(context->scope, slice_literal("apply"));
+  if (!apply_entry || apply_entry->tag != Scope_Entry_Tag_Value) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = rhs_value->source_range,
+      .detailed_message = "Expected an operator"
+    });
+    return 0;
+  }
+
+  Execution_Context apply_context = *context;
+  apply_context.scope = scope_make(context->allocator, context->scope);
+
+  Value *comma =
+    token_make_symbol(context->allocator, slice_literal(","), Symbol_Type_Operator_Like, source_range);
+  Value *lhs_id =
+    token_make_symbol(context->allocator, slice_literal("lhs"), Symbol_Type_Id_Like, source_range);
+  scope_define_value(context->scope, VALUE_STATIC_EPOCH, source_range, slice_literal("lhs"), lhs_value);
+  Value *rhs_id =
+    token_make_symbol(context->allocator, slice_literal("rhs"), Symbol_Type_Id_Like, source_range);
+  scope_define_value(context->scope, VALUE_STATIC_EPOCH, source_range, slice_literal("rhs"), rhs_value);
+  Value_View fake_args = {
+    .values = (Value *[]){lhs_id, comma, rhs_id},
+    .length = 3,
+    .source_range = source_range,
+  };
+  Group fake_parens = {
+    .tag = Group_Tag_Paren,
+    .children = fake_args,
+  };
+  Value *paren_value = value_make(context, &descriptor_group, storage_static(&fake_parens), source_range);
+
+  Value_View fake_eval_view = {
+    .values = (Value *[]){ apply_symbol, paren_value },
+    .length = 2,
+    .source_range = source_range,
+  };
+  return compile_time_eval(&apply_context, fake_eval_view);
+}
+
+static Value *
 mass_handle_reflect_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -5553,16 +5605,13 @@ token_parse_expression(
       is_previous_an_operator = true;
     }
 
-    if (!is_previous_an_operator) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = value->source_range,
-        .detailed_message = "Expected an operator",
-      });
-      goto defer;
-    }
-
     dyn_array_push(value_stack, value);
+    if (!is_previous_an_operator) {
+      if (!token_handle_operator(
+        context, view, &value_stack, &operator_stack, slice_literal(" "),
+        value->source_range, Operator_Fixity_Infix
+      )) goto defer;
+    }
     is_previous_an_operator = false;
   }
 
@@ -6450,6 +6499,13 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_paren_operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal(" "), allocator_make(allocator, Operator,
+    .precedence = 20,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
+    .argument_count = 2,
+    .handler = mass_handle_apply_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("@"), allocator_make(allocator, Operator,
     .precedence = 20,

@@ -1325,6 +1325,17 @@ spec("source") {
       s64 actual = checker();
       check(actual == 0b111);
     }
+
+    it("should support defining a custom 'empty space' operator handler") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "mass :: import(\"mass\")\n"
+        "apply :: fn(symbol : Number_Literal, literal : Number_Literal) -> (Number_Literal) { literal }\n"
+        "checker :: fn() -> (s64) { 21 42 }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Compile Time Execution") {

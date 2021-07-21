@@ -1136,11 +1136,11 @@ main(void) {
     { "Operator_Like", 2 },
   }));
 
-  push_type(type_struct("Symbol", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Symbol", (Struct_Item[]){
     { "Symbol_Type", "type" },
     { "s32", "hash" },
     { "Slice", "name" },
-  }));
+  })));
 
   push_type(type_struct("Group", (Struct_Item[]){
     { "Group_Tag", "tag" },
