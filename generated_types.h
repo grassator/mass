@@ -1585,6 +1585,7 @@ typedef enum {
   Mass_Error_Tag_Epoch_Mismatch = 19,
   Mass_Error_Tag_No_Matching_Overload = 20,
   Mass_Error_Tag_Undecidable_Overload = 21,
+  Mass_Error_Tag_Non_Function_Overload = 22,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -4762,6 +4763,7 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Epoch_Mismatch"), .value = 19 },
 { .name = slice_literal_fields("No_Matching_Overload"), .value = 20 },
 { .name = slice_literal_fields("Undecidable_Overload"), .value = 21 },
+{ .name = slice_literal_fields("Non_Function_Overload"), .value = 22 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {

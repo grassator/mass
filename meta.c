@@ -1760,6 +1760,7 @@ main(void) {
       { "Value *", "a" },
       { "Value *", "b" },
     }),
+    struct_empty("Non_Function_Overload"),
   }), (Struct_Item[]){
     { "Slice", "detailed_message" },
     { "Source_Range", "source_range" },

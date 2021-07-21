@@ -709,6 +709,17 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Undecidable_Overload);
     }
 
+    it("should report an error when trying to overload a non-function") {
+      test_program_inline_source_base(
+        "overload", &test_context,
+        "overload :: 42\n"
+        "overload :: 21\n"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Non_Function_Overload);
+    }
+
     it("should support default arguments") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "test", &test_context,

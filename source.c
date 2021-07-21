@@ -890,11 +890,6 @@ assign(
   return *context->result;
 }
 
-static Value *
-scope_entry_force_value(
-  Scope_Entry *entry
-);
-
 static inline Value *
 value_wrap_in_overload_set(
   Scope *scope,
@@ -937,6 +932,7 @@ value_force_lazy_static(
 
 static Value *
 scope_entry_force_value(
+  Execution_Context *context,
   Scope_Entry *entry
 ) {
   assert(entry->tag == Scope_Entry_Tag_Value);
@@ -969,7 +965,11 @@ scope_entry_force_value(
         overload->descriptor != &descriptor_function_literal &&
         overload->descriptor != &descriptor_overload_set
       ) {
-        panic("TODO user error for trying to overload something strange");
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Non_Function_Overload,
+          .source_range = overload->source_range,
+        });
+        return 0;
       }
     }
   }
@@ -1005,7 +1005,7 @@ scope_lookup_force(
     });
     return 0;
   }
-  return scope_entry_force_value(entry);
+  return scope_entry_force_value(context, entry);
 }
 
 static inline void

@@ -237,6 +237,11 @@ mass_error_to_string(
       APPEND_LITERAL("\n  ");
       mass_error_append_function_signature_string(result, overloads->b);
     } break;
+    case Mass_Error_Tag_Non_Function_Overload: {
+      APPEND_LITERAL("Trying to define a non-function overload ");
+      Slice source = source_from_source_range(&error->source_range);
+      APPEND_SLICE(source);
+    } break;
     case Mass_Error_Tag_No_Matching_Overload: {
       // TODO provide better error message with argument types
       APPEND_LITERAL("Could not find matching overload for call ");
