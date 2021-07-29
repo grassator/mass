@@ -4755,6 +4755,10 @@ mass_handle_apply_operator(
   Value *rhs_value = value_view_get(operands_view, 1);
   Source_Range source_range = operands_view.source_range;
 
+  if (value_match_group(rhs_value, Group_Tag_Paren)) {
+    return mass_handle_paren_operator(context, operands_view, 0);
+  }
+
   if (rhs_value->descriptor == &descriptor_value_view) {
     Value_View args_view = *storage_static_as_c_type(&rhs_value->storage, Value_View);
     return token_handle_function_call(context, lhs_value, args_view, source_range);
@@ -5526,25 +5530,13 @@ token_parse_expression(
       }
     }
 
-    if (
-      !is_previous_an_operator &&
-      value_is_group(value) &&
-      value_as_group(value)->tag == Group_Tag_Paren
-    ) {
-      if (!token_handle_operator(
-        context, view, &value_stack, &operator_stack, slice_literal("()"),
-        value->source_range, Operator_Fixity_Infix
-      )) goto defer;
-      is_previous_an_operator = true;
-    }
-
-    dyn_array_push(value_stack, value);
     if (!is_previous_an_operator) {
       if (!token_handle_operator(
         context, view, &value_stack, &operator_stack, slice_literal(" "),
         value->source_range, Operator_Fixity_Infix
       )) goto defer;
     }
+    dyn_array_push(value_stack, value);
     is_previous_an_operator = false;
   }
 
@@ -6425,13 +6417,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_dot_operator,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("()"), allocator_make(allocator, Operator,
-    .precedence = 20,
-    .fixity = Operator_Fixity_Infix,
-    .associativity = Operator_Associativity_Left,
-    .argument_count = 2,
-    .handler = mass_handle_paren_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal(" "), allocator_make(allocator, Operator,
     .precedence = 20,
