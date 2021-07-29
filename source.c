@@ -4755,14 +4755,11 @@ mass_handle_apply_operator(
   Value *rhs_value = value_view_get(operands_view, 1);
   Source_Range source_range = operands_view.source_range;
 
-  // TODO use a more general mechanism for this
   if (rhs_value->descriptor == &descriptor_value_view) {
     Value_View args_view = *storage_static_as_c_type(&rhs_value->storage, Value_View);
     return token_handle_function_call(context, lhs_value, args_view, source_range);
   }
 
-  Value *apply_symbol =
-    token_make_symbol(context->allocator, slice_literal("apply"), Symbol_Type_Id_Like, source_range);
   Scope_Entry *apply_entry = scope_lookup(context->scope, slice_literal("apply"));
   if (!apply_entry || apply_entry->tag != Scope_Entry_Tag_Value) {
     context_error(context, (Mass_Error) {
@@ -4773,34 +4770,8 @@ mass_handle_apply_operator(
     return 0;
   }
 
-  Execution_Context apply_context = *context;
-  apply_context.scope = scope_make(context->allocator, context->scope);
-
-  Value *comma =
-    token_make_symbol(context->allocator, slice_literal(","), Symbol_Type_Operator_Like, source_range);
-  Value *lhs_id =
-    token_make_symbol(context->allocator, slice_literal("lhs"), Symbol_Type_Id_Like, source_range);
-  scope_define_value(context->scope, VALUE_STATIC_EPOCH, source_range, slice_literal("lhs"), lhs_value);
-  Value *rhs_id =
-    token_make_symbol(context->allocator, slice_literal("rhs"), Symbol_Type_Id_Like, source_range);
-  scope_define_value(context->scope, VALUE_STATIC_EPOCH, source_range, slice_literal("rhs"), rhs_value);
-  Value_View fake_args = {
-    .values = (Value *[]){lhs_id, comma, rhs_id},
-    .length = 3,
-    .source_range = source_range,
-  };
-  Group fake_parens = {
-    .tag = Group_Tag_Paren,
-    .children = fake_args,
-  };
-  Value *paren_value = value_make(context, &descriptor_group, storage_static(&fake_parens), source_range);
-
-  Value_View fake_eval_view = {
-    .values = (Value *[]){ apply_symbol, paren_value },
-    .length = 2,
-    .source_range = source_range,
-  };
-  return compile_time_eval(&apply_context, fake_eval_view);
+  Value *apply_function = scope_entry_force_value(context, apply_entry);
+  return token_handle_function_call(context, apply_function, operands_view, source_range);
 }
 
 static Value *
