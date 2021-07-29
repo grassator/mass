@@ -57,7 +57,7 @@ mass :: import("mass")
 arithmetic_overloads :: {
   macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
     template :: macro(type : Type) {
-      macro(x : type, y : type) -> (type) { impl(x, y) }
+      @fn(x : type, y : type) -> (type) impl
     }
     expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
       f :: template(t64)

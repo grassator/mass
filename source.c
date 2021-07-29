@@ -3728,6 +3728,51 @@ mass_match_overload(
 }
 
 static Value *
+mass_intrinsic_call(
+  Execution_Context *context,
+  Value *overload,
+  Value_View args_view
+) {
+  Jit *jit = &context->compilation->jit;
+  Execution_Context eval_context = *context;
+  eval_context.flags &= ~Execution_Context_Flags_Global;
+  eval_context.program = jit->program;
+  eval_context.scope = context->scope;
+
+  Value *instance = ensure_function_instance(&eval_context, overload);
+  MASS_ON_ERROR(*eval_context.result) return 0;
+
+  Mass_Result jit_result = program_jit(context->compilation, jit);
+  MASS_ON_ERROR(jit_result) {
+    context_error(context, jit_result.Error.error);
+    return 0;
+  }
+  fn_type_opaque jitted_code;
+  if (storage_is_label(&instance->storage)) {
+    Label_Index jit_label_index =
+      instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
+    jitted_code = c_function_from_label(jit->program, jit_label_index);
+  } else {
+    u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
+    jitted_code = (fn_type_opaque)absolute_address;
+  }
+
+  // @Volatile :IntrinsicFunctionSignature
+  Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
+    (Value *(*)(Execution_Context *, Value_View))jitted_code;
+  Value *result = jitted_intrinsic(&eval_context, args_view);
+
+  // The value that comes out of an intrinsic is consider to originate in the same
+  // epoch as the function, which is true since we evaluate right at this point.
+  if (result && result->descriptor == &descriptor_lazy_value) {
+    // TODO get rid of this cast somehow
+    Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
+    lazy->epoch = context->epoch;
+  }
+  return result;
+}
+
+static Value *
 token_handle_function_call(
   Execution_Context *context,
   Value *target_expression,
@@ -3817,52 +3862,26 @@ token_handle_function_call(
     context->current_compile_time_function_call_target = temp_overload;
     Value *result = 0;
     if (info->flags & Descriptor_Function_Flags_Intrinsic) {
-      Jit *jit = &context->compilation->jit;
-      Execution_Context eval_context = *context;
-      eval_context.flags &= ~Execution_Context_Flags_Global;
-      eval_context.program = jit->program;
-      eval_context.scope = context->scope;
-
-      Value *instance = ensure_function_instance(&eval_context, overload);
-      MASS_ON_ERROR(*eval_context.result) return 0;
-
-      Mass_Result jit_result = program_jit(context->compilation, jit);
-      MASS_ON_ERROR(jit_result) {
-        context_error(context, jit_result.Error.error);
-        return 0;
-      }
-      fn_type_opaque jitted_code;
-      if (storage_is_label(&instance->storage)) {
-        Label_Index jit_label_index =
-          instance->storage.Memory.location.Instruction_Pointer_Relative.label_index;
-        jitted_code = c_function_from_label(jit->program, jit_label_index);
-      } else {
-        u64 absolute_address = storage_static_value_up_to_u64(&instance->storage);
-        jitted_code = (fn_type_opaque)absolute_address;
-      }
-
-      // @Volatile :IntrinsicFunctionSignature
-      Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
-        (Value *(*)(Execution_Context *, Value_View))jitted_code;
-      result = jitted_intrinsic(&eval_context, args_view);
-
-      // The value that comes out of an intrinsic is consider to originate in the same
-      // epoch as the function, which is true since we evaluate right at this point.
-      if (result && result->descriptor == &descriptor_lazy_value) {
-        // TODO get rid of this cast somehow
-        Lazy_Value *lazy = (Lazy_Value *)storage_static_as_c_type(&result->storage, Lazy_Value);
-        lazy->epoch = context->epoch;
-      }
+      result = mass_intrinsic_call(context, overload, args_view);
     } else {
-      Value *fake_args_token = value_make(
-        context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
-      );
-      Value_View fake_eval_view = {
-        .values = (Value *[]){temp_overload, fake_args_token},
-        .length = 2,
-        .source_range = source_range,
-      };
-      result = compile_time_eval(context, fake_eval_view);
+      if (overload->descriptor == &descriptor_function_literal) {
+        const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+        const Function_Info *body_info = maybe_function_info_from_value(literal->body);
+        if (body_info && body_info->flags & Descriptor_Function_Flags_Intrinsic) {
+          result = mass_intrinsic_call(context, literal->body, args_view);
+        }
+      }
+      if (!result) {
+        Value *fake_args_token = value_make(
+          context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
+        );
+        Value_View fake_eval_view = {
+          .values = (Value *[]){temp_overload, fake_args_token},
+          .length = 2,
+          .source_range = source_range,
+        };
+        result = compile_time_eval(context, fake_eval_view);
+      }
     }
     context->current_compile_time_function_call_target = saved_call_target;
     return result;
