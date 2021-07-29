@@ -4896,28 +4896,6 @@ mass_handle_reify_operator(
 }
 
 static Value *
-mass_handle_get_execution_context_lazy_proc(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Source_Range *source_range
-) {
-  if (!context_is_compile_time_eval(context)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Epoch_Mismatch,
-      .source_range = *source_range,
-      .detailed_message = slice_literal("@context can only be used inside of compile time eval"),
-    });
-    return 0;
-  }
-  Execution_Context **context_pointer = &context;
-  return expected_result_ensure_value_or_temp(context, builder, expected_result, value_make(
-    context, &descriptor_execution_context_pointer, storage_static(context_pointer), *source_range
-  ));
-}
-
-
-static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4930,16 +4908,6 @@ mass_handle_at_operator(
     return value_init(
       allocator_allocate(context->allocator, Value),
       &descriptor_scope, storage_static(context->scope), body_range
-    );
-  } else if (value_match_symbol(body, slice_literal("context"))) {
-    Source_Range *payload = allocator_allocate(context->allocator, Source_Range);
-    *payload = args_view.source_range;
-    return mass_make_lazy_value(
-      context,
-      args_view.source_range,
-      payload,
-      &descriptor_execution_context_pointer,
-      mass_handle_get_execution_context_lazy_proc
     );
   } else if (value_match_symbol(body, slice_literal("source_range"))) {
     Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);

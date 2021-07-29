@@ -1407,16 +1407,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should report an error when trying to access the context at runtime") {
-      test_program_inline_source_base(
-        "checker", &test_context,
-        "checker :: fn() -> () { @context; }"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Epoch_Mismatch);
-    }
-
     it("should be able to use if / else statement at the top level") {
       test_program_inline_source_base(
         "DUMMY", &test_context,
