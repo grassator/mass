@@ -330,8 +330,8 @@ static Value * mass_address_of
 static Value * mass_compile_time_error
   (Execution_Context * context, Value_View args);
 
-static Scope mass_import
-  (Slice name, Execution_Context * context);
+static Value * mass_import
+  (Execution_Context * context, Value_View args);
 
 static Number_Literal mass_number_literal_logical_shift_left
   (Number_Literal input, Number_Literal shift);

@@ -238,12 +238,11 @@ global_scope_define_exports(
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("args", &descriptor_value_view)
   );
-  MASS_FN_ARG_DEFAULT_EXPRESSION(mass_import_context__default_expression, "@context")
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
-    mass_import, "import", &descriptor_scope,
-    MASS_FN_ARG("name", &descriptor_slice),
-    MASS_FN_ARG_WITH_DEFAULT("context", mass_import_context__default_expression, &descriptor_execution_context_pointer)
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_import, "import", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

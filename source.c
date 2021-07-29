@@ -2447,37 +2447,46 @@ mass_normalize_import_path(
   return slice_normalize_path(allocator, normalized_slashes);
 }
 
-static Scope
+static Value *
 mass_import(
-  Slice file_path,
-  Execution_Context *context
+  Execution_Context *context,
+  Value_View args
 ) {
+  if (args.length != 1) goto parse_err;
+  Value *file_path_value = value_view_get(args, 0);
+  if (file_path_value->descriptor != &descriptor_slice) goto parse_err;
+  Slice file_path = *storage_static_as_c_type(&file_path_value->storage, Slice);
+
   Module *module;
   if (slice_equal(file_path, slice_literal("mass"))) {
-    return *context->compilation->compiler_module.export.scope;
-  }
-
-  file_path = mass_normalize_import_path(context->allocator, file_path);
-  Module **module_pointer = hash_map_get(context->compilation->module_map, file_path);
-  if (module_pointer) {
-    module = *module_pointer;
+    module = &context->compilation->compiler_module;
   } else {
-    const Scope *root_scope = context->compilation->root_scope;
-    Scope *module_scope = scope_make(context->allocator, root_scope);
-    module = program_module_from_file(context, file_path, module_scope);
-    Mass_Result module_result = program_import_module(context, module);
-    MASS_ON_ERROR(module_result) {
-      *context->result = module_result;
-      return (Scope){0};
+    file_path = mass_normalize_import_path(context->allocator, file_path);
+    Module **module_pointer = hash_map_get(context->compilation->module_map, file_path);
+    if (module_pointer) {
+      module = *module_pointer;
+    } else {
+      const Scope *root_scope = context->compilation->root_scope;
+      Scope *module_scope = scope_make(context->allocator, root_scope);
+      module = program_module_from_file(context, file_path, module_scope);
+      Mass_Result module_result = program_import_module(context, module);
+      MASS_ON_ERROR(module_result) {
+        *context->result = module_result;
+        return 0;
+      }
+      hash_map_set(context->compilation->module_map, file_path, module);
     }
-    hash_map_set(context->compilation->module_map, file_path, module);
   }
 
-  if (!module->export.scope) {
-    return (Scope){0};
-  }
+  return value_make(context, &descriptor_scope, storage_static(module->export.scope), args.source_range);
 
-  return *module->export.scope;
+  parse_err:
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Parse,
+    .source_range = args.source_range,
+    .detailed_message ="import() expects a single string argument"
+  });
+  return 0;
 }
 
 static u64
