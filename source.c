@@ -5528,15 +5528,17 @@ token_parse_expression(
 
   Temp_Mark temp_mark = context_temp_mark(context);
 
+  u64 capacity = u64_min(view.length, 128);
+
   Array_Value_Ptr value_stack = dyn_array_make(
     Array_Value_Ptr,
     .allocator = context->temp_allocator,
-    .capacity = view.length,
+    .capacity = capacity,
   );
   Array_Operator_Stack_Entry operator_stack = dyn_array_make(
     Array_Operator_Stack_Entry,
     .allocator = context->temp_allocator,
-    .capacity = view.length,
+    .capacity = capacity,
   );
 
   bool is_previous_an_operator = true;
