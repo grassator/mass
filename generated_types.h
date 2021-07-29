@@ -327,6 +327,9 @@ static Mass_Result tokenize
 static Value * mass_address_of
   (Execution_Context * context, Value_View args);
 
+static Value * mass_compile_time_error
+  (Execution_Context * context, Value_View args);
+
 static Scope mass_import
   (Slice name, Execution_Context * context);
 
@@ -2355,6 +2358,7 @@ static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_address_of;
+static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_number_literal_logical_shift_left;
 static Descriptor descriptor_mass_number_literal_logical_shift_right;

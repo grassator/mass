@@ -232,6 +232,12 @@ global_scope_define_exports(
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("args", &descriptor_value_view)
   );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
   MASS_FN_ARG_DEFAULT_EXPRESSION(mass_import_context__default_expression, "@context")
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,

@@ -1918,6 +1918,7 @@ main(void) {
   })));
 
   export_global_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
+  export_global_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
 
   export_global_custom_name("import", push_type(
     type_function(Compile_Time, "mass_import", "Scope", (Argument_Type[]){
