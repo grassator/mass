@@ -1840,10 +1840,11 @@ same_value_type_or_can_implicitly_move_cast(
     for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
       const Function_Parameter *param = dyn_array_get(info->parameters, 0);
       Value *arg = allocator_allocate(temp_allocator, Value);
-      value_init(arg, param->descriptor, storage_none, COMPILER_SOURCE_RANGE);
+      value_init(arg, param->descriptor, storage_none, param->source_range);
       dyn_array_push(temp_args, arg);
     }
-    Overload_Match match = mass_match_overload(source, temp_args);
+    Value_View args_view = value_view_from_value_array(temp_args, &COMPILER_SOURCE_RANGE);
+    Overload_Match match = mass_match_overload(source, args_view);
 
     bool result;
     switch(match.tag) {

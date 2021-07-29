@@ -63,6 +63,103 @@ context_temp_reset(
   compilation_temp_reset(context->compilation);
 }
 
+
+
+static inline Value_View
+value_view_single(
+  Value **value
+) {
+  return (Value_View) {
+    .values = value,
+    .length = 1,
+    .source_range = (*value)->source_range,
+  };
+}
+
+static inline Value *
+value_view_peek(
+  Value_View view,
+  u64 index
+) {
+  return index < view.length ? view.values[index] : 0;
+}
+
+static inline Value *
+value_view_get(
+  Value_View view,
+  u64 index
+) {
+  Value *result = value_view_peek(view, index);
+  assert(result);
+  return result;
+}
+
+static inline Value *
+value_view_last(
+  Value_View view
+) {
+  assert(view.length);
+  return value_view_get(view, view.length - 1);
+}
+
+static Value_View
+value_view_slice(
+  const Value_View *view,
+  u64 start_index,
+  u64 end_index
+) {
+  assert(end_index <= view->length);
+  assert(start_index <= end_index);
+
+  Source_Range source_range = view->source_range;
+  source_range.offsets.to = end_index == view->length
+    ? view->source_range.offsets.to
+    : view->values[end_index]->source_range.offsets.from;
+  source_range.offsets.from = start_index == end_index
+    ? source_range.offsets.to
+    : view->values[start_index]->source_range.offsets.from;
+
+  assert(source_range.offsets.from <= source_range.offsets.to);
+
+  return (Value_View) {
+    .values = view->values + start_index,
+    .length = end_index - start_index,
+    .source_range = source_range,
+  };
+}
+
+static inline Value_View
+value_view_rest(
+  const Value_View *view,
+  u64 index
+) {
+  return value_view_slice(view, index, view->length);
+}
+
+static inline Value_View
+value_view_from_value_array(
+  Array_Value_Ptr value_array,
+  const Source_Range *source_range
+) {
+  return (Value_View) {
+    .values = dyn_array_raw(value_array),
+    .length = dyn_array_length(value_array),
+    .source_range = *source_range
+  };
+}
+
+static inline Array_Value_Ptr
+value_view_to_value_array(
+  const Allocator *allocator,
+  Value_View view
+) {
+  Array_Value_Ptr result = dyn_array_make(Array_Value_Ptr, .allocator = allocator, .capacity = view.length);
+  for (u64 i = 0; i < view.length; ++i) {
+    dyn_array_push(result, value_view_get(view, i));
+  }
+  return result;
+}
+
 #define dyn_array_copy_from_temp(_TYPE_, _CONTEXT_, _TARGET_, _SOURCE_)\
   do {\
     _TYPE_ copy_source = (_SOURCE_);\

@@ -12,6 +12,7 @@ value_from_exact_expected_result(
   return expected_result->Exact.value;
 }
 
+
 static inline const Descriptor *
 expected_result_descriptor(
   const Expected_Result *expected_result
@@ -121,89 +122,6 @@ expected_result_validate(
     }
   }
   return actual_value;
-}
-
-static inline Value_View
-value_view_single(
-  Value **value
-) {
-  return (Value_View) {
-    .values = value,
-    .length = 1,
-    .source_range = (*value)->source_range,
-  };
-}
-
-static inline Value *
-value_view_peek(
-  Value_View view,
-  u64 index
-) {
-  return index < view.length ? view.values[index] : 0;
-}
-
-static inline Value *
-value_view_get(
-  Value_View view,
-  u64 index
-) {
-  Value *result = value_view_peek(view, index);
-  assert(result);
-  return result;
-}
-
-static inline Value *
-value_view_last(
-  Value_View view
-) {
-  assert(view.length);
-  return value_view_get(view, view.length - 1);
-}
-
-static Value_View
-value_view_slice(
-  const Value_View *view,
-  u64 start_index,
-  u64 end_index
-) {
-  assert(end_index <= view->length);
-  assert(start_index <= end_index);
-
-  Source_Range source_range = view->source_range;
-  source_range.offsets.to = end_index == view->length
-    ? view->source_range.offsets.to
-    : view->values[end_index]->source_range.offsets.from;
-  source_range.offsets.from = start_index == end_index
-    ? source_range.offsets.to
-    : view->values[start_index]->source_range.offsets.from;
-
-  assert(source_range.offsets.from <= source_range.offsets.to);
-
-  return (Value_View) {
-    .values = view->values + start_index,
-    .length = end_index - start_index,
-    .source_range = source_range,
-  };
-}
-
-static inline Value_View
-value_view_rest(
-  const Value_View *view,
-  u64 index
-) {
-  return value_view_slice(view, index, view->length);
-}
-
-static inline Value_View
-value_view_from_value_array(
-  Array_Value_Ptr value_array,
-  const Source_Range *source_range
-) {
-  return (Value_View) {
-    .values = dyn_array_raw(value_array),
-    .length = dyn_array_length(value_array),
-    .source_range = *source_range
-  };
 }
 
 static inline Scope *
@@ -2196,11 +2114,12 @@ token_handle_user_defined_operator_proc(
 }
 
 static inline Value *
-mass_make_lazy_value(
+mass_make_lazy_value_with_epoch(
   Execution_Context *context,
   Source_Range source_range,
   void *payload,
   const Descriptor *descriptor,
+  u64 epoch,
   Lazy_Value_Proc proc
 ) {
   Lazy_Value *lazy = allocator_allocate(context->allocator, Lazy_Value);
@@ -2209,11 +2128,24 @@ mass_make_lazy_value(
     .descriptor = descriptor,
     .proc = proc,
     .payload = payload,
-    .epoch = context->epoch,
+    .epoch = epoch,
   };
   return value_init(
     allocator_allocate(context->allocator, Value),
     &descriptor_lazy_value, storage_static(lazy), source_range
+  );
+}
+
+static inline Value *
+mass_make_lazy_value(
+  Execution_Context *context,
+  Source_Range source_range,
+  void *payload,
+  const Descriptor *descriptor,
+  Lazy_Value_Proc proc
+) {
+  return mass_make_lazy_value_with_epoch(
+    context, source_range, payload, descriptor, context->epoch, proc
   );
 }
 
@@ -3365,7 +3297,7 @@ static inline Value *
 mass_handle_macro_call(
   Execution_Context *context,
   Value *overload,
-  Array_Value_Ptr args,
+  Value_View args_view,
   Source_Range source_range
 ) {
   assert(overload->descriptor == &descriptor_function_literal);
@@ -3382,7 +3314,7 @@ mass_handle_macro_call(
     Function_Parameter *arg = dyn_array_get(literal->info->parameters, i);
     if (arg->name.length) {
       Value *arg_value;
-      if (i >= dyn_array_length(args)) {
+      if (i >= args_view.length) {
         // We should catch the missing default expression in the matcher
         Value_View default_expression = arg->maybe_default_expression;
         assert(default_expression.length);
@@ -3390,7 +3322,7 @@ mass_handle_macro_call(
         arg_context.scope = body_scope;
         arg_value = token_parse_expression(&arg_context, default_expression, &(u64){0}, 0);
       } else {
-        arg_value = *dyn_array_get(args, i);
+        arg_value = value_view_get(args_view, i);
       }
 
       arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
@@ -3398,7 +3330,6 @@ mass_handle_macro_call(
       scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->name, arg_value);
     }
   }
-  dyn_array_destroy(args);
 
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
@@ -3740,7 +3671,7 @@ struct Overload_Match_State {
 static void
 mass_match_overload_candidate(
   Value *candidate,
-  Array_Value_Ptr args,
+  Value_View args,
   struct Overload_Match_State *match,
   struct Overload_Match_State *best_conflict_match
 ) {
@@ -3775,7 +3706,7 @@ mass_match_overload_candidate(
 static Overload_Match
 mass_match_overload(
   Value *value,
-  Array_Value_Ptr args
+  Value_View args
 ) {
   struct Overload_Match_State match = { .score = -1 };
   struct Overload_Match_State best_conflict_match = match;
@@ -3799,44 +3730,20 @@ mass_match_overload(
 static Value *
 token_handle_function_call(
   Execution_Context *context,
-  Value *target_token,
-  Value *args_token,
+  Value *target_expression,
+  Value_View args_view,
   Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  Value *call_return_value = 0;
-  Temp_Mark temp_mark = context_temp_mark(context);
-
-  if(!value_match_group(args_token, Group_Tag_Paren)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
-      .detailed_message = "Expected a list of arguments in ()",
-    });
-    goto defer;
-  }
-
-  Value *target_expression = token_parse_single(context, target_token);
-  MASS_ON_ERROR(*context->result) goto defer;
-
-  Array_Value_Ptr temp_args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->temp_allocator,
-    .capacity = 32,
-  );
-  token_match_call_arguments(context, args_token, &temp_args);
-  MASS_ON_ERROR(*context->result) goto defer;
-
   if (target_expression->descriptor == &descriptor_macro_capture) {
-    u64 arg_count = dyn_array_length(temp_args);
     Macro_Capture *capture = storage_static_as_c_type(&target_expression->storage, Macro_Capture);
     Execution_Context capture_context = *context;
     capture_context.scope = capture->scope;
-    if (arg_count == 0) {
+    if (args_view.length == 0) {
       // Nothing to do
-    } else if (arg_count == 1) {
-      Value *scope_arg = *dyn_array_get(temp_args, 0);
+    } else if (args_view.length == 1) {
+      Value *scope_arg = value_view_get(args_view, 0);
       if (scope_arg->descriptor != &descriptor_scope) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Type_Mismatch,
@@ -3844,37 +3751,35 @@ token_handle_function_call(
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
           .detailed_message = "Macro capture can only accept an optional Scope argument",
         });
-        goto defer;
+        return 0;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
       context_merge_in_scope(&capture_context, argument_scope);
     } else {
-      Array_Value_Ptr error_args;
-      dyn_array_copy_from_temp(Array_Value_Ptr, context, &error_args, temp_args);
+      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
-        .source_range = target_token->source_range,
+        .source_range = source_range,
         .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
         .detailed_message = "Macro capture can only accept an optional Scope argument"
       });
-      goto defer;
+      return 0;
     }
     return token_parse_block_view(&capture_context, capture->view);
   }
 
-  Overload_Match match = mass_match_overload(target_expression, temp_args);
+  Overload_Match match = mass_match_overload(target_expression, args_view);
 
   Value *overload;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
-      Array_Value_Ptr error_args;
-      dyn_array_copy_from_temp(Array_Value_Ptr, context, &error_args, temp_args);
+      Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = source_range,
         .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
       });
-      goto defer;
+      return 0;
     }
     case Overload_Match_Tag_Undecidable: {
       context_error(context, (Mass_Error) {
@@ -3882,7 +3787,7 @@ token_handle_function_call(
         .Undecidable_Overload = { match.Undecidable.a, match.Undecidable.b },
         .source_range = source_range,
       });
-      goto defer;
+      return 0;
     }
     case Overload_Match_Tag_Found: {
       overload = match.Found.value;
@@ -3895,7 +3800,7 @@ token_handle_function_call(
     }
   }
 
-  MASS_ON_ERROR(*context->result) goto defer;
+  MASS_ON_ERROR(*context->result) return 0;
   assert(overload);
 
   const Function_Info *info = maybe_function_info_from_value(overload);
@@ -3905,8 +3810,7 @@ token_handle_function_call(
   ) {
     // It is important to create a new value with the range of the original expression,
     // otherwise Value_View slicing will not work correctly
-    Source_Range temp_range = target_token->source_range;
-    Value *temp_overload = value_make(context, overload->descriptor, overload->storage, temp_range);
+    Value *temp_overload = value_make(context, overload->descriptor, overload->storage, source_range);
     // This is necessary to avoid infinite recursion as the compile_time_eval called below
     // will end up here as well. Indirect calls are allowed so we do not need a full stack
     const Value *saved_call_target = context->current_compile_time_function_call_target;
@@ -3920,12 +3824,12 @@ token_handle_function_call(
       eval_context.scope = context->scope;
 
       Value *instance = ensure_function_instance(&eval_context, overload);
-      MASS_ON_ERROR(*eval_context.result) goto defer;
+      MASS_ON_ERROR(*eval_context.result) return 0;
 
       Mass_Result jit_result = program_jit(context->compilation, jit);
       MASS_ON_ERROR(jit_result) {
         context_error(context, jit_result.Error.error);
-        goto defer;
+        return 0;
       }
       fn_type_opaque jitted_code;
       if (storage_is_label(&instance->storage)) {
@@ -3940,7 +3844,6 @@ token_handle_function_call(
       // @Volatile :IntrinsicFunctionSignature
       Value *(*jitted_intrinsic)(Execution_Context *, Value_View) =
         (Value *(*)(Execution_Context *, Value_View))jitted_code;
-      Value_View args_view = value_view_from_value_array(temp_args, &args_token->source_range);
       result = jitted_intrinsic(&eval_context, args_view);
 
       // The value that comes out of an intrinsic is consider to originate in the same
@@ -3951,38 +3854,82 @@ token_handle_function_call(
         lazy->epoch = context->epoch;
       }
     } else {
+      Value *fake_args_token = value_make(
+        context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
+      );
       Value_View fake_eval_view = {
-        .values = (Value *[]){temp_overload, args_token},
+        .values = (Value *[]){temp_overload, fake_args_token},
         .length = 2,
         .source_range = source_range,
       };
       result = compile_time_eval(context, fake_eval_view);
     }
     context->current_compile_time_function_call_target = saved_call_target;
-    call_return_value = result;
-    goto defer;
+    return result;
   }
 
   if (info->flags & Descriptor_Function_Flags_Macro) {
-    call_return_value = mass_handle_macro_call(context, overload, temp_args, source_range);
-    goto defer;
+    return mass_handle_macro_call(context, overload, args_view, source_range);
   }
-
-  // Need to copy the args here because they will be used later in the lazy value
-  Array_Value_Ptr args;
-  dyn_array_copy_from_temp(Array_Value_Ptr, context, &args, temp_args);
 
   Mass_Function_Call_Lazy_Payload *call_payload =
     allocator_allocate(context->allocator, Mass_Function_Call_Lazy_Payload);
   *call_payload = (Mass_Function_Call_Lazy_Payload){
     .overload = overload,
-    .args = args,
+    .args = value_view_to_value_array(context->allocator, args_view),
     .source_range = source_range,
   };
 
-  call_return_value = mass_make_lazy_value(
+  return mass_make_lazy_value(
     context, source_range, call_payload, info->returns.descriptor, call_function_overload
   );
+}
+
+static Value *
+token_handle_parsed_function_call(
+  Execution_Context *context,
+  Value *target_token,
+  Value *args_token,
+  Source_Range source_range
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  Value *call_return_value = 0;
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+  Value *target_expression = token_parse_single(context, target_token);
+  MASS_ON_ERROR(*context->result) goto defer;
+
+  Value_View args_view;
+  if(value_match_group(args_token, Group_Tag_Paren)) {
+    Array_Value_Ptr temp_args = dyn_array_make(
+      Array_Value_Ptr,
+      .allocator = context->temp_allocator,
+      .capacity = 32,
+    );
+    token_match_call_arguments(context, args_token, &temp_args);
+    MASS_ON_ERROR(*context->result) goto defer;
+    args_view = value_view_from_value_array(temp_args, &source_range);
+  } else if (args_token->descriptor == &descriptor_value_view) {
+    if (!value_is_non_lazy_static(args_token)) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Expected_Static,
+        .source_range = args_token->source_range,
+        .detailed_message = "Expected a static Value_View",
+      });
+      goto defer;
+    }
+    args_view = *storage_static_as_c_type(&args_token->storage, Value_View);
+  } else {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_token->source_range,
+      .detailed_message = "Expected a list of arguments in ()",
+    });
+    goto defer;
+  }
+
+  call_return_value = token_handle_function_call(context, target_expression, args_view, source_range);
 
   defer:
   context_temp_reset_to_mark(context, temp_mark);
@@ -4794,20 +4741,26 @@ mass_handle_paren_operator(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
     );
   } else {
-    return token_handle_function_call(context, target, args_token, args_view.source_range);
+    return token_handle_parsed_function_call(context, target, args_token, args_view.source_range);
   }
 }
 
 static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
-  Value_View args_view,
+  Value_View operands_view,
   void *unused_payload
 ) {
-  Value *lhs_value = value_view_get(args_view, 0);
-  Value *rhs_value = value_view_get(args_view, 1);
+  Value *lhs_value = value_view_get(operands_view, 0);
+  Value *rhs_value = value_view_get(operands_view, 1);
+  Source_Range source_range = operands_view.source_range;
 
-  Source_Range source_range = args_view.source_range;
+  // TODO use a more general mechanism for this
+  if (rhs_value->descriptor == &descriptor_value_view) {
+    Value_View args_view = *storage_static_as_c_type(&rhs_value->storage, Value_View);
+    return token_handle_function_call(context, lhs_value, args_view, source_range);
+  }
+
   Value *apply_symbol =
     token_make_symbol(context->allocator, slice_literal("apply"), Symbol_Type_Id_Like, source_range);
   Scope_Entry *apply_entry = scope_lookup(context->scope, slice_literal("apply"));

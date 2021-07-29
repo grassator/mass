@@ -835,7 +835,7 @@ calculate_arguments_match_score(
   const Function_Info *descriptor,
   // TODO this should accept a memory layout and be able to do a position and named matching
   // :ScoreMemoryLayout
-  Array_Value_Ptr arguments
+  Value_View args_view
 ) {
   enum {
     Score_Exact_Static = 1000 * 1000 * 1000,
@@ -843,17 +843,17 @@ calculate_arguments_match_score(
     Score_Exact_Default = 1000,
     Score_Cast = 1,
   };
-  assert(dyn_array_length(arguments) < 1000);
+  assert(args_view.length < 1000);
   s64 score = 0;
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     Value *source_arg = 0;
     const Descriptor *source_descriptor;
-    if (arg_index >= dyn_array_length(arguments)) {
+    if (arg_index >= args_view.length) {
       if (!param->maybe_default_expression.length) return -1;
       source_descriptor = param->descriptor;
     } else {
-      source_arg = *dyn_array_get(arguments, arg_index);
+      source_arg = value_view_get(args_view, arg_index);
       source_descriptor = value_or_lazy_value_descriptor(source_arg);
     }
     switch(param->tag) {
