@@ -937,14 +937,25 @@ spec("source") {
     }
 
     it("should be able to have user-defined intrinsics") {
-      s64 (*checker)(Spec_Callback foo) =
-        (s64 (*)(Spec_Callback))test_program_inline_source_function(
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "my_intrinsic :: @fn() -> (Number_Literal) @intrinsic { \\42 }\n"
           "checker :: fn() -> (s64) { my_intrinsic() }"
         );
       check(spec_check_mass_result(test_context.result));
-      check(checker(spec_callback) == 42);
+      check(checker() == 42);
+    }
+
+    it("should report an error when a non-compile-time fn has an intrinsic body") {
+      test_program_inline_source_base(
+        "checker", &test_context,
+        "my_intrinsic :: fn() -> (Number_Literal) @intrinsic { \\42 }\n"
+        "checker :: fn() -> (s64) { my_intrinsic() }"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Parse);
     }
   }
 

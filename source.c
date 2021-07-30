@@ -3772,6 +3772,14 @@ mass_intrinsic_call(
   return result;
 }
 
+static bool
+value_is_intrinsic(
+  Value *value
+) {
+  const Function_Info *info = maybe_function_info_from_value(value);
+  return !!(info && info->flags & Descriptor_Function_Flags_Intrinsic);
+}
+
 static Value *
 token_handle_function_call(
   Execution_Context *context,
@@ -3866,8 +3874,7 @@ token_handle_function_call(
     } else {
       if (overload->descriptor == &descriptor_function_literal) {
         const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
-        const Function_Info *body_info = maybe_function_info_from_value(literal->body);
-        if (body_info && body_info->flags & Descriptor_Function_Flags_Intrinsic) {
+        if (value_is_intrinsic(literal->body)) {
           result = mass_intrinsic_call(context, literal->body, args_view);
         }
       }
@@ -5442,6 +5449,14 @@ token_parse_function_literal(
     fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
   }
   if (body_value) {
+    if (value_is_intrinsic(body_value) && !(fn_info->flags & Descriptor_Function_Flags_Compile_Time)) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = body_value->source_range,
+        .detailed_message = "A function literal with the intrinsic body must be marked compile time"
+      });
+      return 0;
+    }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
       .info = fn_info,
