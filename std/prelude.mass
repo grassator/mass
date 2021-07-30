@@ -68,7 +68,7 @@ arithmetic_overloads :: {
     }
 
     // TODO this should produce a Number_Literal
-    f :: macro add(x : Number_Literal, y : Number_Literal) -> s64 { impl(x, y) }
+    f :: @fn(x : Number_Literal, y : Number_Literal) -> (s64) impl
     f :: expand(s64, s32, s16, s8)
     f :: expand(u64, u32, u16, u8)
     f
