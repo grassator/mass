@@ -13,7 +13,7 @@ typedef struct {
   s64 y;
 } Test_128bit;
 
-bool
+static bool
 spec_check_mass_result(
   const Mass_Result *result
 ) {
@@ -40,19 +40,7 @@ static s64 spec_callback() { return 42; }
     }\
   } while(0)
 
-static Compilation test_compilation = {0};
-static Execution_Context test_context = {0};
-static Slice test_file_name = slice_literal_fields("_test_.mass");
-static Module test_module = {0};
-static Jit test_jit;
-
-static inline void
-test_init_module(
-  Slice source
-) {
-  program_module_init(&test_module, test_file_name, source, test_context.scope);
-  test_context.module = &test_module;
-}
+static const Slice test_file_name = slice_literal_fields("_test_.mass");
 
 typedef enum {
   Test_Program_Source_Tag_Inline,
@@ -74,19 +62,21 @@ test_program_source_base(
   Test_Program_Source source
 ) {
   Module *prelude_module = program_module_from_file(
-    &test_context, slice_literal("std/prelude"), test_context.scope
+    context, slice_literal("std/prelude"), context->scope
   );
-  test_context.module = prelude_module;
-  Mass_Result result = program_import_module(&test_context, prelude_module);
+  Module test_module = {0};
+  context->module = prelude_module;
+  Mass_Result result = program_import_module(context, prelude_module);
   MASS_ON_ERROR(result) return 0;
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
-      test_init_module(source.text);
+      program_module_init(&test_module, test_file_name, source.text, context->scope);
+      context->module = &test_module;
       program_parse(context);
     } break;
     case Test_Program_Source_Tag_File: {
-      Module *module = program_module_from_file(&test_context, source.path, test_context.scope);
-      program_import_module(&test_context, module);
+      Module *module = program_module_from_file(context, source.path, context->scope);
+      program_import_module(context, module);
     } break;
   }
   MASS_ON_ERROR(*context->result) return 0;
@@ -98,7 +88,7 @@ test_program_source_base(
   };
   // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(
-    &test_context,test_context.module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
+    context, context->module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
   );
   if (value) {
     if (value->descriptor == &descriptor_overload_set) {
@@ -122,6 +112,7 @@ test_program_source_function(
   Value *value = test_program_source_base(function_id, context, source);
   MASS_ON_ERROR(*context->result) return 0;
   if (!value) return 0;
+  static Jit test_jit;
   jit_init(&test_jit, context->program);
   Mass_Result jit_result = program_jit(context->compilation, &test_jit);
   MASS_ON_ERROR(jit_result) {
@@ -170,7 +161,7 @@ test_program_external_source_base(
   });
 }
 
-fn_type_opaque
+static fn_type_opaque
 test_program_external_source_function(
   const char *function_id,
   Execution_Context *context,
@@ -182,8 +173,10 @@ test_program_external_source_function(
   });
 }
 
-
 spec("source") {
+  static Compilation test_compilation = {0};
+  static Execution_Context test_context = {0};
+
   before_each() {
     compilation_init(&test_compilation, host_calling_convention());
     test_context = execution_context_from_compilation(&test_compilation);
