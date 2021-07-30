@@ -61,24 +61,21 @@ test_program_source_base(
   Execution_Context *context,
   Test_Program_Source source
 ) {
-  Module *prelude_module = program_module_from_file(
-    context, slice_literal("std/prelude"), context->scope
-  );
-  Module test_module = {0};
-  context->module = prelude_module;
-  Mass_Result result = program_import_module(context, prelude_module);
+  Mass_Result result =
+    program_load_file_module_into_root_scope(context, slice_literal("std/prelude"));
   MASS_ON_ERROR(result) return 0;
+
+  Module *test_module = 0;
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
-      program_module_init(&test_module, test_file_name, source.text, context->scope);
-      context->module = &test_module;
-      program_parse(context);
+      test_module = allocator_allocate(context->allocator, Module);
+      program_module_init(test_module, test_file_name, source.text, context->scope);
     } break;
     case Test_Program_Source_Tag_File: {
-      Module *module = program_module_from_file(context, source.path, context->scope);
-      program_import_module(context, module);
+      test_module = program_module_from_file(context, source.path, context->scope);
     } break;
   }
+  program_import_module(context, test_module);
   MASS_ON_ERROR(*context->result) return 0;
   Slice id_slice = slice_from_c_string(id);
   Symbol symbol = {
@@ -86,9 +83,8 @@ test_program_source_base(
     .hash = Symbol_Map__hash(id_slice),
     .name = id_slice,
   };
-  // FIXME lookup main in exported scope
   Value *value = scope_lookup_force(
-    context, context->module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
+    context, test_module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
   );
   if (value) {
     if (value->descriptor == &descriptor_overload_set) {

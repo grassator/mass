@@ -98,11 +98,8 @@ int main(s32 argc, char **argv) {
   compilation_init(&compilation, calling_convention);
   Execution_Context context = execution_context_from_compilation(&compilation);
 
-  Module *prelude_module = program_module_from_file(
-    &context, slice_literal("std/prelude"), context.scope
-  );
-  context.module = prelude_module;
-  Mass_Result result = program_import_module(&context, prelude_module);
+  Mass_Result result =
+    program_load_file_module_into_root_scope(&context, slice_literal("std/prelude"));
   if(result.tag != Mass_Result_Tag_Success) {
     return mass_cli_print_error(&result.Error.error);
   }

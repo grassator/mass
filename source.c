@@ -6726,3 +6726,12 @@ program_import_module(
   return *context->result;
 }
 
+static Mass_Result
+program_load_file_module_into_root_scope(
+  Execution_Context *context,
+  Slice file_path
+) {
+  Module *module = program_module_from_file(context, file_path, context->compilation->root_scope);
+  return program_import_module(context, module);
+}
+
