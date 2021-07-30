@@ -30,19 +30,19 @@ syntax statement("while" ..@condition {}@body) {
 }
 
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
-  pre();
-  label _loop_start;
-  label placeholder _loop_post;
-  label placeholder _loop_done;
+  pre()
+  label _loop_start
+  label placeholder _loop_post
+  label placeholder _loop_done
   syntax statement("break") { goto _loop_done }
   syntax statement("continue") { goto _loop_post }
   if condition() {
-    body(@scope);
-    label _loop_post;
-    post();
-    goto _loop_start;
+    body(@scope)
+    label _loop_post
+    post()
+    goto _loop_start
   }
-  label _loop_end;
+  label _loop_end
 }
 
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
