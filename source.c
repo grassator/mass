@@ -5327,7 +5327,8 @@ mass_make_fake_function_literal(
 static Value *
 token_parse_intrinsic_literal(
   Execution_Context *context,
-  Value_View view
+  Value_View view,
+  const Function_Info *info
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5343,8 +5344,64 @@ token_parse_intrinsic_literal(
     return 0;
   }
 
+  const u64 tokens_per_argument = 8;
+  Array_Value_Ptr wrapped_body_children = dyn_array_make(
+    Array_Value_Ptr,
+    .allocator = context->allocator,
+    .capacity = tokens_per_argument * dyn_array_length(info->parameters),
+  );
+
+  // TODO would be nice to somehow make it non syntax-dependent
+  // This adds local definitions for each of the arguments
+  Value *arguments_symbol = token_make_symbol(
+    context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, view.source_range
+  );
+  Value *values_symbol = token_make_symbol(
+    context->allocator, slice_literal("values"), Symbol_Type_Id_Like, view.source_range
+  );
+  Value *colon_equal_symbol = token_make_symbol(
+    context->allocator, slice_literal(":="), Symbol_Type_Operator_Like, view.source_range
+  );
+  Value *dot_symbol = token_make_symbol(
+    context->allocator, slice_literal("."), Symbol_Type_Operator_Like, view.source_range
+  );
+  Value *semicolon_symbol = token_make_symbol(
+    context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, view.source_range
+  );
+  for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
+    Function_Parameter *param = dyn_array_get(info->parameters, param_index);
+    Value *param_name_symbol = token_make_symbol(
+      context->allocator, param->name, Symbol_Type_Id_Like, view.source_range
+    );
+    dyn_array_push(wrapped_body_children, param_name_symbol);
+    dyn_array_push(wrapped_body_children, colon_equal_symbol);
+    dyn_array_push(wrapped_body_children, arguments_symbol);
+    dyn_array_push(wrapped_body_children, dot_symbol);
+    dyn_array_push(wrapped_body_children, values_symbol);
+    dyn_array_push(wrapped_body_children, dot_symbol);
+    Number_Literal *literal = allocator_allocate(context->allocator, Number_Literal);
+    *literal = (Number_Literal){.base = Number_Base_10, .bits = param_index};
+    Value *literal_value = value_make(
+      context, &descriptor_number_literal, storage_static(literal), view.source_range
+    );
+    dyn_array_push(wrapped_body_children, literal_value);
+    dyn_array_push(wrapped_body_children, semicolon_symbol);
+  }
+  assert(dyn_array_length(wrapped_body_children) % tokens_per_argument == 0);
+
+
+  dyn_array_push(wrapped_body_children, body);
+
+  Group *wrapped_body_group = allocator_allocate(context->allocator, Group);
+  wrapped_body_group->tag = Group_Tag_Curly;
+  wrapped_body_group->children = value_view_from_value_array(wrapped_body_children, &body->source_range);
+
+  Value *wrapped_body_value = value_make(
+    context, &descriptor_group, storage_static(wrapped_body_group), body->source_range
+  );
+
   Function_Literal *literal = mass_make_fake_function_literal(
-    context, body, &descriptor_value_pointer, &keyword->source_range
+    context, wrapped_body_value, &descriptor_value_pointer, &keyword->source_range
   );
 
   // @Volatile :IntrinsicFunctionSignature
@@ -5413,7 +5470,7 @@ token_parse_function_literal(
   bool body_is_literal = false;
   Value_View rest = value_view_rest(&view, peek_index);
 
-  Value *body_value = token_parse_intrinsic_literal(context, rest);
+  Value *body_value = token_parse_intrinsic_literal(context, rest, fn_info);
   MASS_ON_ERROR(*context->result) return 0;
   if (!body_value) {
     if (rest.length == 1) {

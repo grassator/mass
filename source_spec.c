@@ -959,6 +959,18 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to be able to access arguments by names in user-defined intrinsics") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "my_intrinsic :: @fn(a : Number_Literal, b : Number_Literal) -> (Number_Literal)"
+            "@intrinsic { b }\n"
+          "checker :: fn() -> (s64) { my_intrinsic(21, 42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
