@@ -154,7 +154,8 @@ token_parse_block(
 static Module *
 program_module_from_file(
   Execution_Context *context,
-  Slice file_path
+  Slice file_path,
+  Scope *scope
 );
 
 static Mass_Result
