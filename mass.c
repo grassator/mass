@@ -21,6 +21,7 @@ mass_cli_print_usage() {
     "  mass [flags] source_code.mass\n\n"
     "Flags:\n"
     "  --run              Run code in JIT mode\n"
+    "  --output           <path>\n"
     "  --binary-format    [pe32:cli, pe32:gui]\n"
     "    Set output binary executable format;"
     #ifdef _WIN32
@@ -51,10 +52,16 @@ int main(s32 argc, char **argv) {
 
   Mass_Cli_Mode mode = Mass_Cli_Mode_Compile;
   char *raw_file_path = 0;
+  char *raw_output_path = 0;
   for (s32 i = 1; i < argc; ++i) {
     char *arg = argv[i];
     if (strcmp(arg, "--run") == 0) {
       mode = Mass_Cli_Mode_Run;
+    } else if (strcmp(arg, "--output") == 0) {
+      if (++i >= argc) {
+        return mass_cli_print_usage();
+      }
+      raw_output_path = argv[i];
     } else if (strcmp(arg, "--binary-format") == 0) {
       if (++i >= argc) {
         return mass_cli_print_usage();
@@ -130,16 +137,20 @@ int main(s32 argc, char **argv) {
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
-      Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("/"));
-      Slice base_name = *dyn_array_pop(parts);
       Fixed_Buffer *path_buffer = fixed_buffer_make(allocator_default, .capacity = 16 * 1024 * 1024);
-      fixed_buffer_append_slice(path_buffer, slice_literal("build/"));
-      Slice extension = slice_literal(".mass");
-      if (slice_ends_with(base_name, extension)) {
-        base_name.length -= extension.length;
+      if (raw_output_path) {
+        fixed_buffer_append_slice(path_buffer, slice_from_c_string(raw_output_path));
+      } else {
+        Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("/"));
+        Slice base_name = *dyn_array_pop(parts);
+        dyn_array_destroy(parts);
+        Slice extension = slice_literal(".mass");
+        if (slice_ends_with(base_name, extension)) {
+          base_name.length -= extension.length;
+        }
+        fixed_buffer_append_slice(path_buffer, base_name);
+        fixed_buffer_append_slice(path_buffer, slice_literal(".exe"));
       }
-      fixed_buffer_append_slice(path_buffer, base_name);
-      fixed_buffer_append_slice(path_buffer, slice_literal(".exe"));
       write_executable(fixed_buffer_as_slice(path_buffer), &context, win32_executable_type);
       fixed_buffer_destroy(path_buffer);
       break;
