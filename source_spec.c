@@ -2036,7 +2036,7 @@ spec("source") {
         "ExitProcess :: fn(status : s32) -> (s64) external(\"kernel32.dll\", \"ExitProcess\")"
       );
       check(spec_check_mass_result(test_context.result));
-      write_executable("build/test_parsed.exe", &test_context, Executable_Type_Cli);
+      write_executable(slice_literal("build/test_parsed.exe"), &test_context, Executable_Type_Cli);
     }
 
     it("should parse and write an executable that prints Hello, world!") {
@@ -2046,7 +2046,7 @@ spec("source") {
         "main", &test_context, "fixtures/hello_world"
       );
       check(spec_check_mass_result(test_context.result));
-      write_executable("build/hello_world.exe", &test_context, Executable_Type_Cli);
+      write_executable(slice_literal("build/hello_world.exe"), &test_context, Executable_Type_Cli);
     }
 
     xit("should parse and write an executable with a lot of constant folding") {
@@ -2057,7 +2057,7 @@ spec("source") {
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build/folding.exe", &test_context, Executable_Type_Cli);
+      write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
 
     xit("should parse and write an executable with a lot of print statements") {
@@ -2068,7 +2068,7 @@ spec("source") {
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build/print.exe", &test_context, Executable_Type_Cli);
+      write_executable(slice_literal("build/print.exe"), &test_context, Executable_Type_Cli);
     }
   }
 
@@ -2091,7 +2091,7 @@ spec("source") {
       check(test_program->entry_point);
       ensure_function_instance(&test_context, test_program->entry_point);
       check(spec_check_mass_result(test_context.result));
-      write_executable("build/relocations.exe", &test_context, Executable_Type_Cli);
+      write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }
   }
 

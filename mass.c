@@ -132,19 +132,16 @@ int main(s32 argc, char **argv) {
     case Mass_Cli_Mode_Compile: {
       Array_Slice parts = slice_split_by_slice(allocator_default, file_path, slice_literal("/"));
       Slice base_name = *dyn_array_pop(parts);
-      Bucket_Buffer *path_builder = bucket_buffer_make();
-      bucket_buffer_append_slice(path_builder, slice_literal("build/"));
+      Fixed_Buffer *path_buffer = fixed_buffer_make(allocator_default, .capacity = 16 * 1024 * 1024);
+      fixed_buffer_append_slice(path_buffer, slice_literal("build/"));
       Slice extension = slice_literal(".mass");
       if (slice_ends_with(base_name, extension)) {
         base_name.length -= extension.length;
       }
-      bucket_buffer_append_slice(path_builder, base_name);
-      bucket_buffer_append_slice(path_builder, slice_literal(".exe"));
-      bucket_buffer_append_u8(path_builder, 0);
-      Fixed_Buffer *path_buffer =
-        bucket_buffer_to_fixed_buffer(allocator_default, path_builder); // @Leak
-      write_executable((char *)path_buffer->memory, &context, win32_executable_type);
-      bucket_buffer_destroy(path_builder);
+      fixed_buffer_append_slice(path_buffer, base_name);
+      fixed_buffer_append_slice(path_buffer, slice_literal(".exe"));
+      write_executable(fixed_buffer_as_slice(path_buffer), &context, win32_executable_type);
+      fixed_buffer_destroy(path_buffer);
       break;
     }
     case Mass_Cli_Mode_Run: {

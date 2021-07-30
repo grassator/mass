@@ -308,7 +308,7 @@ pe32_checksum(
 
 void
 write_executable(
-  const char *file_path,
+  Slice file_path,
   Execution_Context *context,
   Executable_Type executable_type
 ) {
@@ -528,8 +528,9 @@ write_executable(
   pe32_checksum(exe_buffer, optional_header);
 
   /////////
-
-  FILE* file = PRAGMA_WARN_WRAP("warning (disable: 4996)", fopen(file_path, "wb"));
+  char *file_path_c_string = slice_to_c_string(allocator_default, file_path);
+  FILE* file = PRAGMA_WARN_WRAP("warning (disable: 4996)", fopen(file_path_c_string, "wb"));
+  allocator_deallocate(allocator_default, file_path_c_string, file_path.length + 1);
   assert(file);
   fwrite(exe_buffer->memory, 1, exe_buffer->occupied, file);
   fclose(file);
