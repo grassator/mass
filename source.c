@@ -5327,8 +5327,7 @@ mass_make_fake_function_literal(
 static Value *
 token_parse_intrinsic_literal(
   Execution_Context *context,
-  Value_View view,
-  u64 *matched_length
+  Value_View view
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5336,7 +5335,13 @@ token_parse_intrinsic_literal(
   Token_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
   Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
   Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
-  *matched_length = peek_index;
+  if (peek_index != view.length) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = value_view_rest(&view, peek_index).source_range,
+    });
+    return 0;
+  }
 
   Function_Literal *literal = mass_make_fake_function_literal(
     context, body, &descriptor_value_pointer, &keyword->source_range
@@ -5362,7 +5367,6 @@ token_parse_intrinsic_literal(
   literal->info->flags |= Descriptor_Function_Flags_Compile_Time;
   literal->info->flags |= Descriptor_Function_Flags_Intrinsic;
 
-  *matched_length = peek_index;
   return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
 }
 
@@ -5401,21 +5405,29 @@ token_parse_function_literal(
     );
   }
 
+  Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
+  Value_View args_view = value_as_group(args)->children;
+  Function_Info *fn_info = token_process_function_literal(context, args_view, returns);
+  MASS_ON_ERROR(*context->result) return 0;
+
+  bool body_is_literal = false;
   Value_View rest = value_view_rest(&view, peek_index);
 
-  Value *body_value = 0;
-  bool body_is_literal = false;
-  if (rest.length == 1) {
-    Value *maybe_body = value_view_get(rest, 0);
-    if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
-      body_value = maybe_body;
-      body_is_literal = true;
-    } else {
-      body_value = token_parse_single(context, maybe_body);
+  Value *body_value = token_parse_intrinsic_literal(context, rest);
+  MASS_ON_ERROR(*context->result) return 0;
+  if (!body_value) {
+    if (rest.length == 1) {
+      Value *maybe_body = value_view_get(rest, 0);
+      if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
+        body_value = maybe_body;
+        body_is_literal = true;
+      } else {
+        body_value = token_parse_single(context, maybe_body);
+      }
+    } else if (rest.length) {
+      body_value = token_parse_expression(context, rest, &(u64){0}, 0);
+      MASS_ON_ERROR(*context->result) return 0;
     }
-  } else if (rest.length) {
-    body_value = token_parse_expression(context, rest, &(u64){0}, 0);
-    MASS_ON_ERROR(*context->result) return 0;
   }
 
   if (is_macro) {
@@ -5437,10 +5449,6 @@ token_parse_function_literal(
   }
 
   *matched_length = view.length;
-  Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Value_View args_view = value_as_group(args)->children;
-  Function_Info *fn_info = token_process_function_literal(context, args_view, returns);
-  MASS_ON_ERROR(*context->result) return 0;
 
   if(is_macro) {
     fn_info->flags |= Descriptor_Function_Flags_Macro;
@@ -5516,8 +5524,7 @@ token_parse_expression(
   static Expression_Matcher_Proc expression_matchers[] = {
     token_parse_macros,
     token_parse_if_expression,
-    token_parse_function_literal,
-    token_parse_intrinsic_literal
+    token_parse_function_literal
   };
 
   for (u64 i = 0; ; ++i) {

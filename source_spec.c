@@ -950,7 +950,7 @@ spec("source") {
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
-        "my_intrinsic :: fn() -> (Number_Literal) @intrinsic { \\42 }\n"
+        "my_intrinsic :: fn() -> (Number_Literal) intrinsic { \\42 }\n"
         "checker :: fn() -> (s64) { my_intrinsic() }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
