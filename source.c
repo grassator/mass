@@ -1374,19 +1374,18 @@ value_ensure_type(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
-  if (value->descriptor != &descriptor_type) {
+  if (value->descriptor != &descriptor_descriptor_pointer) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = source_range,
       .Type_Mismatch = {
-        .expected = &descriptor_type,
+        .expected = &descriptor_descriptor_pointer,
         .actual = value->descriptor,
       },
     });
     return 0;
   }
-  const Descriptor *descriptor = storage_static_as_c_type(&value->storage, Descriptor);
-  return descriptor;
+  return *storage_static_as_c_type(&value->storage, const Descriptor *);
 }
 
 static inline Value_View
@@ -2575,17 +2574,6 @@ token_match_struct_field(
   return true;
 }
 
-static Descriptor
-mass_bit_type(
-  u64 bit_size
-) {
-  return (Descriptor) {
-    .tag = Descriptor_Tag_Opaque,
-    .bit_size = bit_size,
-    .bit_alignment = bit_size, // TODO allow to set a different alignment
-  };
-}
-
 static Value *
 token_process_c_struct_definition(
   Execution_Context *context,
@@ -3058,7 +3046,7 @@ token_handle_cast(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = it.view.source_range,
-      .Type_Mismatch = { .expected = &descriptor_type, .actual = target_descriptor },
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = target_descriptor },
     });
     return 0;
   }
@@ -4289,8 +4277,8 @@ mass_handle_arithmetic_operation(
   const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
 
   if (operator == Mass_Arithmetic_Operator_Multiply) {
-    bool lhs_is_type = lhs_descriptor == &descriptor_type;
-    bool rhs_is_type = rhs_descriptor == &descriptor_type;
+    bool lhs_is_type = lhs_descriptor == &descriptor_descriptor_pointer;
+    bool rhs_is_type = rhs_descriptor == &descriptor_descriptor_pointer;
     if (lhs_is_type || rhs_is_type) {
       Value *type_expression = lhs_is_type ? lhs : rhs;
       const Descriptor *item_type;
@@ -4298,8 +4286,8 @@ mass_handle_arithmetic_operation(
         Value_View type_view = value_view_single(&type_expression);
         Value *static_type = compile_time_eval(context, type_view);
         MASS_ON_ERROR(*context->result) return 0;
-        assert(static_type->descriptor == &descriptor_type);
-        item_type = storage_static_as_c_type(&static_type->storage, Descriptor);
+        assert(static_type->descriptor == &descriptor_descriptor_pointer);
+        item_type = value_ensure_type(context, static_type, arguments.source_range);
       }
       Value *number_expression = lhs_is_type ? rhs : lhs;
       s64 length;
@@ -4328,7 +4316,10 @@ mass_handle_arithmetic_operation(
         }
       }
       Descriptor *array_descriptor = descriptor_array_of(context->allocator, item_type, length);
-      return value_make(context, &descriptor_type, storage_static(array_descriptor), arguments.source_range);
+      return value_make(
+        context, &descriptor_descriptor_pointer,
+        storage_static_inline(&array_descriptor), arguments.source_range
+      );
     }
   }
 
@@ -4615,8 +4606,8 @@ token_handle_type_of(
   // TODO consider adding a const static values to avoid the cast
   result = value_init(
     allocator_allocate(context->allocator, Value),
-    &descriptor_type,
-    storage_static((Descriptor *)descriptor),
+    &descriptor_descriptor_pointer,
+    storage_static_inline(&descriptor),
     args_token->source_range
   );
 
@@ -4690,10 +4681,12 @@ mass_address_of(
   Value *pointee = value_view_get(args, 0);
   // This is the support for using `&u32` in types
   // TODO move this to the std/prelude.mass somehow
-  if (context_is_compile_time_eval(context) && pointee->descriptor == &descriptor_type) {
-    const Descriptor *type = storage_static_as_c_type(&pointee->storage, Descriptor);
+  if (context_is_compile_time_eval(context) && pointee->descriptor == &descriptor_descriptor_pointer) {
+    const Descriptor *type = value_ensure_type(context, pointee, args.source_range);
     Descriptor *descriptor = descriptor_pointer_to(context->allocator, type);
-    pointer = value_make(context, &descriptor_type, storage_static(descriptor), pointee->source_range);
+    pointer = value_make(
+      context, &descriptor_descriptor_pointer, storage_static_inline(&descriptor), pointee->source_range
+    );
   } else {
     const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
     const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
@@ -5535,7 +5528,7 @@ token_parse_function_literal(
     );
     return value_init(
       allocator_allocate(context->allocator, Value),
-      &descriptor_type, storage_static(fn_descriptor), view.source_range
+      &descriptor_descriptor_pointer, storage_static_inline(&fn_descriptor), view.source_range
     );
   }
 }
@@ -6430,7 +6423,8 @@ scope_define_enum(
   Scope *enum_scope = scope_make(allocator, 0);
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
-    const Descriptor *enum_descriptor = storage_static_as_c_type(&enum_type_value->storage, Descriptor);
+    const Descriptor *enum_descriptor =
+      *storage_static_as_c_type(&enum_type_value->storage, const Descriptor *);
     Value *item_value = value_init(
       allocator_allocate(allocator, Value),
       enum_descriptor, storage_static(&it->value), source_range
@@ -6547,12 +6541,6 @@ scope_define_builtins(
       .handler_payload = (void*)(s64)comparisons[i].type,
     )));
   }
-
-  MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
-    mass_bit_type, "bit_type", &descriptor_type,
-    MASS_FN_ARG("bit_size", &descriptor_u64),
-  );
 
   {
     static const Token_Statement_Matcher default_statement_matchers[] = {

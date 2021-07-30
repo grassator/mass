@@ -100,6 +100,19 @@ maybe_function_info_from_value(
 );
 
 static void
+mass_error_append_descriptor(
+  Fixed_Buffer *result,
+  const Descriptor *descriptor
+) {
+  if (descriptor->tag == Descriptor_Tag_Pointer_To) {
+    APPEND_LITERAL("&");
+    mass_error_append_descriptor(result, descriptor->Pointer_To.descriptor);
+    return;
+  }
+  APPEND_SLICE(descriptor->name);
+}
+
+static void
 mass_error_append_function_signature_string(
   Fixed_Buffer *result,
   Value *value
@@ -114,10 +127,10 @@ mass_error_append_function_signature_string(
     else APPEND_LITERAL(", ");
     APPEND_SLICE(arg->name);
     APPEND_LITERAL(" : ");
-    APPEND_SLICE(arg->descriptor->name);
+    mass_error_append_descriptor(result, arg->descriptor);
   }
   APPEND_LITERAL(") -> (");
-  APPEND_SLICE(info->returns.descriptor->name);
+  mass_error_append_descriptor(result, info->returns.descriptor);
   APPEND_LITERAL(")");
 }
 
@@ -212,9 +225,9 @@ mass_error_to_string(
     case Mass_Error_Tag_Type_Mismatch: {
       Mass_Error_Type_Mismatch const *mismatch = &error->Type_Mismatch;
       APPEND_LITERAL("Type mismatch: expected ");
-      APPEND_SLICE(mismatch->expected->name);
+      mass_error_append_descriptor(result, mismatch->expected);
       APPEND_LITERAL(", got ");
-      APPEND_SLICE(mismatch->actual->name);
+      mass_error_append_descriptor(result, mismatch->actual);
     } break;
     case Mass_Error_Tag_Integer_Range: {
       APPEND_LITERAL("Value does not fit into integer of type ");

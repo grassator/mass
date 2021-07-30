@@ -56,10 +56,10 @@ mass :: import("mass")
 
 arithmetic_overloads :: {
   macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
-    template :: macro(type : Type) {
+    template :: macro(type : &Type) {
       @fn(x : type, y : type) -> (type) impl
     }
-    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
+    expand :: macro(t64 : &Type, t32 : &Type, t16 : &Type, t8  : &Type) {
       f :: template(t64)
       f :: template(t32)
       f :: template(t16)
@@ -87,7 +87,7 @@ bitwise_or :: mass.number_literal_bitwise_or
 bitwise_and :: mass.number_literal_bitwise_and
 
 // TODO Turn this into a compile-time functions implemented here instead of the compiler
-multiply :: macro array(type : Type, count : Number_Literal) { mass.multiply(type, count) }
+multiply :: macro array(type : &Type, count : Number_Literal) { mass.multiply(type, count) }
 
 operator 10 (x + y) { add(x, y) }
 operator 10 (x - y) { subtract(x, y) }
@@ -123,13 +123,4 @@ negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
   literal.negative = if literal.negative then false else true
   literal
 }
-
-
-
-
-
-
-
-
-
 

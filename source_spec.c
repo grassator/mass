@@ -831,7 +831,7 @@ spec("source") {
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Type_Mismatch);
-      check(error->Type_Mismatch.expected == &descriptor_type);
+      check(error->Type_Mismatch.expected == &descriptor_descriptor_pointer);
       check(error->Type_Mismatch.actual == &descriptor_function_literal);
     }
 
@@ -1804,18 +1804,6 @@ spec("source") {
   }
 
   describe("User-defined Types") {
-    it("should be able to parse fixed-bit sized type definitions") {
-      fn_type_opaque checker = test_program_inline_source_function(
-        "test", &test_context,
-        "int8 :: bit_type(8);"
-        "test :: fn() -> () {"
-          "x : int8;"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      checker();
-    }
-
     it("should be able to parse struct definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,

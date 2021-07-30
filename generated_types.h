@@ -1934,6 +1934,7 @@ _Pragma("warning (pop)")
 static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_descriptor;
+static Descriptor descriptor_descriptor_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
 MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 static Descriptor descriptor_source_position;

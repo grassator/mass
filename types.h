@@ -72,17 +72,16 @@
 
 #define MASS_TYPE_VALUE(_DESCRIPTOR_)\
   (Value) {\
-    .descriptor = &descriptor_type,\
+    .descriptor = &descriptor_descriptor_pointer,\
     .storage = {\
       .tag = Storage_Tag_Static,\
-      .byte_size = sizeof(Descriptor),\
-      .Static.memory = {.tag = Static_Memory_Tag_Heap, .Heap.pointer = (_DESCRIPTOR_)},\
+      .byte_size = sizeof(Descriptor *),\
+      .Static.memory = {.tag = Static_Memory_Tag_U64, .U64 = {(u64)(_DESCRIPTOR_)}},\
     },\
   }
 
 #define MASS_DEFINE_TYPE_VALUE(_NAME_)\
-  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);\
-  static Value *type_##_NAME_##_pointer_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_##_pointer)
+  static Value *type_##_NAME_##_value = &MASS_TYPE_VALUE(&descriptor_##_NAME_);
 
 #define MASS_DEFINE_OPAQUE_TYPE(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_)\
   MASS_DEFINE_OPAQUE_DESCRIPTOR(_NAME_, _BIT_SIZE_, _BIT_ALIGNMENT_);\
@@ -160,8 +159,6 @@ typedef struct {
   Slice name;
   s32 value;
 } C_Enum_Item;
-
-#define descriptor_type descriptor_descriptor
 
 #include "generated_types.h"
 
