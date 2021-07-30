@@ -2398,9 +2398,7 @@ mass_import(
     if (module_pointer) {
       module = *module_pointer;
     } else {
-      const Scope *root_scope = context->compilation->root_scope;
-      Scope *module_scope = scope_make(context->allocator, root_scope);
-      module = program_module_from_file(context, file_path, module_scope);
+      module = program_module_from_file(context, file_path);
       Mass_Result module_result = program_import_module(context, module);
       MASS_ON_ERROR(module_result) {
         *context->result = module_result;
@@ -6646,29 +6644,28 @@ program_absolute_path(
   return result_buffer;
 }
 
-static inline void
-program_module_init(
-  Module *module,
-  Slice file_path,
-  Slice text,
-  Scope *scope
-) {
-  *module = (Module) {
-    .source_file = {
-      .path = file_path,
-      .text = text,
-    },
-    .own_scope = scope,
-  };
-}
-
-static Module *
-program_module_from_file(
+static inline Module *
+program_module_from_inline_source(
   Execution_Context *context,
   Slice file_path,
-  Scope *scope
+  Slice text
 ) {
-  Slice extension = slice_literal(".mass");
+  Module *module = allocator_allocate(context->allocator, Module);
+  const Scope *root_scope = context->compilation->root_scope;
+  Scope *module_scope = scope_make(context->allocator, root_scope);
+  *module = (Module) {
+    .source_file = { .path = file_path, .text = text },
+    .own_scope = module_scope,
+  };
+  return module;
+}
+
+static Fixed_Buffer *
+program_load_module_text(
+  Execution_Context *context,
+  Slice file_path
+) {
+  static const Slice extension = slice_literal_fields(".mass");
   Fixed_Buffer *absolute_path = program_absolute_path(file_path);
 
   if (!slice_ends_with(fixed_buffer_as_slice(absolute_path), extension)) {
@@ -6685,10 +6682,17 @@ program_module_from_file(
     });
     return 0;
   }
+  return buffer;
+}
 
-  Module *module = allocator_allocate(context->allocator, Module);
-  program_module_init(module, file_path, fixed_buffer_as_slice(buffer), scope);
-  return module;
+static Module *
+program_module_from_file(
+  Execution_Context *context,
+  Slice file_path
+) {
+  Fixed_Buffer *buffer = program_load_module_text(context, file_path);
+  if (!buffer) return 0;
+  return program_module_from_inline_source(context, file_path, fixed_buffer_as_slice(buffer));
 }
 
 static Mass_Result
@@ -6736,5 +6740,25 @@ program_import_module(
     }
   }
   return *context->result;
+}
+
+static Mass_Result
+program_import_module_into_root_scope(
+  Execution_Context *context,
+  Slice file_path
+) {
+  Fixed_Buffer *buffer = program_load_module_text(context, file_path);
+  MASS_TRY(*context->result);
+
+  Slice text = fixed_buffer_as_slice(buffer);
+  Module *module = allocator_allocate(context->allocator, Module);
+  *module = (Module) {
+    .source_file = { .path = file_path, .text = text },
+    .own_scope = context->compilation->root_scope,
+  };
+  Execution_Context import_context = execution_context_from_compilation(context->compilation);
+  import_context.module = module;
+  import_context.scope = module->own_scope;
+  return program_parse(&import_context);
 }
 
