@@ -1916,6 +1916,30 @@ token_match_return_type(
   return returns;
 }
 
+static inline bool
+storage_is_indirect(
+  const Storage *storage
+) {
+  if (storage->tag != Storage_Tag_Memory) return false;
+  return storage->Memory.location.tag == Memory_Location_Tag_Indirect;
+}
+
+static inline bool
+storage_occupies_same_memory(
+  const Storage *a,
+  const Storage *b
+) {
+  if (storage_equal(a, b)) return true;
+  if (a->tag == Storage_Tag_Register) {
+    if (!storage_is_indirect(b)) return false;
+    return a->Register.index == b->Memory.location.Indirect.base_register;
+  }
+  if (b->tag == Storage_Tag_Register) {
+    return storage_occupies_same_memory(b, a);
+  }
+  return false;
+}
+
 static PRELUDE_NO_DISCARD Value *
 expected_result_ensure_value_or_temp(
   Execution_Context *context,
@@ -1928,9 +1952,10 @@ expected_result_ensure_value_or_temp(
     case Expected_Result_Tag_Exact: {
       Value *result_value = value_from_exact_expected_result(expected_result);
       MASS_ON_ERROR(assign(context, builder, result_value, value)) return 0;
+      // @Hack there should be a better and more robust way to do this
       if (
         value->storage.tag != Storage_Tag_Static &&
-        !storage_equal(&result_value->storage, &value->storage)
+        !storage_occupies_same_memory(&result_value->storage, &value->storage)
       ) {
         value_release_if_temporary(builder, value);
       }
@@ -4070,7 +4095,7 @@ mass_handle_arithmetic_operation_lazy_proc(
       // Try to reuse result_value if we can
       // TODO should be able to reuse memory and register operands
       Value *temp_lhs = value_temporary_acquire_register_for_descriptor(
-        context, builder, register_find_available(builder, 0), descriptor, result_range
+        context, builder, register_find_available(builder, 0), descriptor, lhs->source_range
       );
 
       Expected_Result expected_a = expected_result_from_value(temp_lhs);
@@ -4078,7 +4103,7 @@ mass_handle_arithmetic_operation_lazy_proc(
 
       // TODO This can be optimized in cases where one of the operands is an immediate
       Value *temp_rhs = value_temporary_acquire_register_for_descriptor(
-        context, builder, register_find_available(builder, 0), descriptor, result_range
+        context, builder, register_find_available(builder, 0), descriptor, rhs->source_range
       );
       Expected_Result expected_b = expected_result_from_value(temp_rhs);
       temp_rhs = value_force(context, builder, &expected_b, payload->rhs);
