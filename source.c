@@ -2109,7 +2109,7 @@ token_handle_user_defined_operator_proc(
 
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
-  return token_parse_block(&body_context, operator->body);
+  return token_parse_expression(&body_context, operator->body, &(u64){0}, 0);
 }
 
 static inline Value *
@@ -2275,22 +2275,16 @@ token_parse_operator_definition(
     goto err;
   }
 
-  Token_Maybe_Match(body_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
-
-  if (!body_token) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = precedence_source_range,
-      .detailed_message ="Operator definition must have a macro body in {} following the pattern"
-    });
-    goto err;
-  }
+  u64 body_length = 0;
+  Value_View rest = value_view_rest(&view, peek_index);
+  Value_View body_view = value_view_match_till_end_of_statement(rest, &body_length);
+  peek_index += body_length;
 
   Value_View definition = value_as_group(pattern_token)->children;
 
   user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *user_defined_operator = (User_Defined_Operator) {
-    .body = body_token,
+    .body = body_view,
     .scope = context->scope,
   };
 

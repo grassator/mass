@@ -91,7 +91,7 @@ bitwise_and :: mass.number_literal_bitwise_and
 // TODO Turn this into a compile-time functions implemented here instead of the compiler
 multiply :: macro array(type : &Type, count : Number_Literal) { mass.multiply(type, count) }
 
-operator 10 (x + y) { add(x, y) }
+operator 10 (x + y) add(x, y)
 operator 10 (x - y) { subtract(x, y) }
 
 operator 15 (x * y) { multiply(x, y) }

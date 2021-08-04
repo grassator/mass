@@ -1141,7 +1141,7 @@ typedef struct User_Defined_Operator {
   Operator_Fixity fixity;
   u32 argument_count;
   Slice argument_names[2];
-  Value * body;
+  Value_View body;
   Scope * scope;
 } User_Defined_Operator;
 typedef dyn_array_type(User_Defined_Operator) Array_User_Defined_Operator;
@@ -3815,7 +3815,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(user_defined_operator, User_Defined_Operator,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("body"),
-    .descriptor = &descriptor_value_pointer,
+    .descriptor = &descriptor_value_view,
     .Base_Relative.offset = offsetof(User_Defined_Operator, body),
   },
   {
