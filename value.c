@@ -1749,8 +1749,8 @@ execution_context_from_compilation(
 
 static inline bool
 same_value_type(
-  Value *a,
-  Value *b
+  const Value *a,
+  const Value *b
 ) {
   return same_type(a->descriptor, b->descriptor);
 }

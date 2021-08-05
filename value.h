@@ -337,8 +337,8 @@ same_type(
 
 static inline bool
 same_value_type(
-  Value *a,
-  Value *b
+  const Value *a,
+  const Value *b
 );
 
 static void
