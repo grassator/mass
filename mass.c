@@ -137,7 +137,8 @@ int main(s32 argc, char **argv) {
 
   switch(mode) {
     case Mass_Cli_Mode_Compile: {
-      Fixed_Buffer *path_buffer = fixed_buffer_make(allocator_default, .capacity = 16 * 1024 * 1024);
+      Fixed_Buffer *path_buffer =
+        fixed_buffer_make(.allocator = allocator_default, .capacity = 16 * 1024 * 1024);
       if (raw_output_path) {
         fixed_buffer_append_slice(path_buffer, slice_from_c_string(raw_output_path));
       } else {
