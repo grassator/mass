@@ -4894,13 +4894,6 @@ mass_handle_at_operator(
       allocator_allocate(context->allocator, Value),
       &descriptor_scope, storage_static(context->scope), body_range
     );
-  } else if (value_match_symbol(body, slice_literal("source_range"))) {
-    Source_Range *source_range = allocator_allocate(context->allocator, Source_Range);
-    *source_range = args_view.source_range;
-    return value_init(
-      allocator_allocate(context->allocator, Value),
-      &descriptor_source_range, storage_static(source_range), body_range
-    );
   } else if (value_match_group(body, Group_Tag_Paren)) {
     return compile_time_eval(context, value_as_group(body)->children);
   } else if (value_match_group(body, Group_Tag_Curly)) {
