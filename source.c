@@ -1097,6 +1097,9 @@ value_match(
       if (!value_is_group(value)) return false;
       return value_as_group(value)->tag == pattern->Group.tag;
     }
+    case Token_Pattern_Tag_Or: {
+      return value_match(value, pattern->Or.a) || value_match(value, pattern->Or.b);
+    }
   }
   return true;
 }

@@ -1157,6 +1157,10 @@ main(void) {
     struct_fields("Group", (Struct_Item[]){
       { "Group_Tag", "tag" },
     }),
+    struct_fields("Or", (Struct_Item[]){
+      { "const Token_Pattern *", "a" },
+      { "const Token_Pattern *", "b" },
+    }),
   }));
 
   push_type(type_enum("Section_Permissions", (Enum_Type_Item[]){

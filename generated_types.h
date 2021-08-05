@@ -561,6 +561,7 @@ typedef enum {
   Token_Pattern_Tag_Any = 1,
   Token_Pattern_Tag_Symbol = 2,
   Token_Pattern_Tag_Group = 3,
+  Token_Pattern_Tag_Or = 4,
 } Token_Pattern_Tag;
 
 typedef struct Token_Pattern_Symbol {
@@ -569,12 +570,17 @@ typedef struct Token_Pattern_Symbol {
 typedef struct Token_Pattern_Group {
   Group_Tag tag;
 } Token_Pattern_Group;
+typedef struct Token_Pattern_Or {
+  const Token_Pattern * a;
+  const Token_Pattern * b;
+} Token_Pattern_Or;
 typedef struct Token_Pattern {
   Token_Pattern_Tag tag;
   char _tag_padding[4];
   union {
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Group Group;
+    Token_Pattern_Or Or;
   };
 } Token_Pattern;
 static inline Token_Pattern_Symbol *
@@ -586,6 +592,11 @@ static inline Token_Pattern_Group *
 token_pattern_as_group(Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Group);
   return &token_pattern->Group;
+}
+static inline Token_Pattern_Or *
+token_pattern_as_or(Token_Pattern *token_pattern) {
+  assert(token_pattern->tag == Token_Pattern_Tag_Or);
+  return &token_pattern->Or;
 }
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
 typedef enum Section_Permissions {
@@ -2743,6 +2754,7 @@ static C_Enum_Item token_pattern_tag_items[] = {
 { .name = slice_literal_fields("Any"), .value = 1 },
 { .name = slice_literal_fields("Symbol"), .value = 2 },
 { .name = slice_literal_fields("Group"), .value = 3 },
+{ .name = slice_literal_fields("Or"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_symbol, Token_Pattern_Symbol,
   {
@@ -2762,6 +2774,21 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_group, Token_Pattern_Group,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_pattern_group);
+MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_or, Token_Pattern_Or,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("a"),
+    .descriptor = &descriptor_token_pattern_pointer,
+    .Base_Relative.offset = offsetof(Token_Pattern_Or, a),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("b"),
+    .descriptor = &descriptor_token_pattern_pointer,
+    .Base_Relative.offset = offsetof(Token_Pattern_Or, b),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(token_pattern_or);
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern, Token_Pattern,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2780,6 +2807,12 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern, Token_Pattern,
     .name = slice_literal_fields("Group"),
     .descriptor = &descriptor_token_pattern_group,
     .Base_Relative.offset = offsetof(Token_Pattern, Group),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .name = slice_literal_fields("Or"),
+    .descriptor = &descriptor_token_pattern_or,
+    .Base_Relative.offset = offsetof(Token_Pattern, Or),
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_pattern);
