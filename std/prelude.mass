@@ -48,16 +48,16 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
-Type :: mass.Descriptor
+Type :: PRELUDE_MASS.Descriptor
 String :: Slice
 bool :: s8
 true :: 1
 false :: 0
 
-mass :: import("mass")
+PRELUDE_MASS :: import("mass")
 
 arithmetic_overloads :: {
-  macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
+  macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
     template :: macro(type : &Type) {
       @fn(x : type, y : type) -> (type) impl
     }
@@ -77,14 +77,14 @@ arithmetic_overloads :: {
   }
 }
 
-add :: arithmetic_overloads(mass.add)
-subtract :: arithmetic_overloads(mass.subtract)
-multiply :: arithmetic_overloads(mass.multiply)
-divide :: arithmetic_overloads(mass.divide)
-remainder :: arithmetic_overloads(mass.remainder)
+add :: arithmetic_overloads(PRELUDE_MASS.add)
+subtract :: arithmetic_overloads(PRELUDE_MASS.subtract)
+multiply :: arithmetic_overloads(PRELUDE_MASS.multiply)
+divide :: arithmetic_overloads(PRELUDE_MASS.divide)
+remainder :: arithmetic_overloads(PRELUDE_MASS.remainder)
 
 comparison_overloads :: {
-  macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
+  macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
     template :: macro(type : &Type) {
       @fn(x : type, y : type) -> bool impl
     }
@@ -103,20 +103,20 @@ comparison_overloads :: {
   }
 }
 
-less :: comparison_overloads(mass.less)
-less_equal :: comparison_overloads(mass.less_equal)
-greater :: comparison_overloads(mass.greater)
-greater_equal :: comparison_overloads(mass.greater_equal)
-equal :: comparison_overloads(mass.equal)
-not_equal :: comparison_overloads(mass.not_equal)
+less :: comparison_overloads(PRELUDE_MASS.less)
+less_equal :: comparison_overloads(PRELUDE_MASS.less_equal)
+greater :: comparison_overloads(PRELUDE_MASS.greater)
+greater_equal :: comparison_overloads(PRELUDE_MASS.greater_equal)
+equal :: comparison_overloads(PRELUDE_MASS.equal)
+not_equal :: comparison_overloads(PRELUDE_MASS.not_equal)
 
-logical_shift_left :: mass.number_literal_logical_shift_left
-logical_shift_right :: mass.number_literal_logical_shift_right
-bitwise_or :: mass.number_literal_bitwise_or
-bitwise_and :: mass.number_literal_bitwise_and
+logical_shift_left :: PRELUDE_MASS.number_literal_logical_shift_left
+logical_shift_right :: PRELUDE_MASS.number_literal_logical_shift_right
+bitwise_or :: PRELUDE_MASS.number_literal_bitwise_or
+bitwise_and :: PRELUDE_MASS.number_literal_bitwise_and
 
 // TODO Turn this into a compile-time functions implemented here instead of the compiler
-multiply :: macro array(type : &Type, count : Number_Literal) { mass.multiply(type, count) }
+multiply :: macro array(type : &Type, count : Number_Literal) { PRELUDE_MASS.multiply(type, count) }
 
 operator 7 (x == y) equal(x, y)
 operator 7 (x != y) not_equal(x, y)
