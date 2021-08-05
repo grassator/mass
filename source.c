@@ -1374,7 +1374,7 @@ value_ensure_type(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
-  if (value->descriptor != &descriptor_descriptor_pointer) {
+  if (!same_type(value->descriptor, &descriptor_descriptor_pointer)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = source_range,
@@ -4294,56 +4294,6 @@ mass_handle_arithmetic_operation(
   MASS_ON_ERROR(*context->result) return 0;
   Mass_Arithmetic_Operator operator = (Mass_Arithmetic_Operator)(u64)operator_payload;
 
-  const Descriptor *lhs_descriptor = value_or_lazy_value_descriptor(lhs);
-  const Descriptor *rhs_descriptor = value_or_lazy_value_descriptor(rhs);
-
-  if (operator == Mass_Arithmetic_Operator_Multiply) {
-    bool lhs_is_type = lhs_descriptor == &descriptor_descriptor_pointer;
-    bool rhs_is_type = rhs_descriptor == &descriptor_descriptor_pointer;
-    if (lhs_is_type || rhs_is_type) {
-      Value *type_expression = lhs_is_type ? lhs : rhs;
-      const Descriptor *item_type;
-      {
-        Value_View type_view = value_view_single(&type_expression);
-        Value *static_type = compile_time_eval(context, type_view);
-        MASS_ON_ERROR(*context->result) return 0;
-        assert(static_type->descriptor == &descriptor_descriptor_pointer);
-        item_type = value_ensure_type(context, static_type, arguments.source_range);
-      }
-      Value *number_expression = lhs_is_type ? rhs : lhs;
-      s64 length;
-      {
-        Value_View number_view = value_view_single(&number_expression);
-        Value *static_number = compile_time_eval(context, number_view);
-        MASS_ON_ERROR(*context->result) return 0;
-        static_number = maybe_coerce_number_literal_to_integer(context, static_number, &descriptor_s64);
-        if (!descriptor_is_integer(static_number->descriptor)) {
-          // FIXME :GenericIntegerType
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Type_Mismatch,
-            .source_range = static_number->source_range,
-            .Type_Mismatch = { .expected = &descriptor_s64, .actual = static_number->descriptor },
-          });
-          return 0;
-        }
-        length = storage_static_value_up_to_s64(&static_number->storage);
-        if (length < 0) {
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Parse, // TODO make a better error type. Maybe "Range"?
-            .source_range = static_number->source_range,
-            .detailed_message = "Array size can not be negative",
-          });
-          return 0;
-        }
-      }
-      Descriptor *array_descriptor = descriptor_array_of(context->allocator, item_type, length);
-      return value_make(
-        context, &descriptor_descriptor_pointer,
-        storage_static_inline(&array_descriptor), arguments.source_range
-      );
-    }
-  }
-
   const Descriptor *descriptor = large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
 
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
@@ -4906,6 +4856,24 @@ mass_handle_at_operator(
     });
     return 0;
   }
+}
+
+static inline Value *
+mass_allocate(
+  Execution_Context *context,
+  Value_View args_view
+) {
+  assert(args_view.length == 1);
+  assert(context_is_compile_time_eval(context));
+  const Descriptor *descriptor =
+    value_ensure_type(context, value_view_get(args_view, 0), args_view.source_range);
+  MASS_ON_ERROR(*context->result) return 0;
+  void *memory = allocator_allocate_bytes(
+    context->allocator, descriptor_byte_size(descriptor), descriptor_byte_alignment(descriptor)
+  );
+  return value_make(
+    context, &descriptor_descriptor_pointer, storage_static_inline(&memory), args_view.source_range
+  );
 }
 
 static inline Memory_Layout_Item *

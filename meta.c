@@ -1917,6 +1917,7 @@ main(void) {
     { "Value_View *", "out_tokens" },
   })));
 
+  export_global_custom_name("allocate", push_type(type_intrinsic("mass_allocate")));
   export_global_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
   export_global_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
   export_global_custom_name("import", push_type(type_intrinsic("mass_import")));

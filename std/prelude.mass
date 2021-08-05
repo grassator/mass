@@ -115,8 +115,18 @@ logical_shift_right :: PRELUDE_MASS.number_literal_logical_shift_right
 bitwise_or :: PRELUDE_MASS.number_literal_bitwise_or
 bitwise_and :: PRELUDE_MASS.number_literal_bitwise_and
 
-// TODO Turn this into a compile-time functions implemented here instead of the compiler
-multiply :: macro array(type : &Type, count : Number_Literal) { PRELUDE_MASS.multiply(type, count) }
+Array :: @fn(item : &Type, length : u64) -> (&Type) {
+  mass :: import("mass")
+  t := mass.allocate(Type)
+  t.tag = mass.Descriptor_Tag.Fixed_Size_Array
+  t.bit_size = item.bit_size * length
+  t.bit_alignment = item.bit_alignment
+  t.Fixed_Size_Array.item = item
+  t.Fixed_Size_Array.length = length
+  t
+}
+
+multiply :: Array
 
 operator 7 (x == y) equal(x, y)
 operator 7 (x != y) not_equal(x, y)
