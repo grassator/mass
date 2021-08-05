@@ -1957,6 +1957,12 @@ main(void) {
   DEFINE_ARITHMETIC(multiply);
   DEFINE_ARITHMETIC(divide);
   DEFINE_ARITHMETIC(remainder);
+  DEFINE_ARITHMETIC(less);
+  DEFINE_ARITHMETIC(greater);
+  DEFINE_ARITHMETIC(less_equal);
+  DEFINE_ARITHMETIC(greater_equal);
+  DEFINE_ARITHMETIC(equal);
+  DEFINE_ARITHMETIC(not_equal);
 
   // Standard C types
   set_flags(push_type(type_c_opaque("char")), Meta_Type_Flags_No_C_Type);

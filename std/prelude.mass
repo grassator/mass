@@ -83,6 +83,33 @@ multiply :: arithmetic_overloads(mass.multiply)
 divide :: arithmetic_overloads(mass.divide)
 remainder :: arithmetic_overloads(mass.remainder)
 
+comparison_overloads :: {
+  macro(impl : fn(ctx : &mass.Execution_Context, view : mass.Value_View ) -> (&mass.Value)) {
+    template :: macro(type : &Type) {
+      @fn(x : type, y : type) -> bool impl
+    }
+    expand :: macro(t64 : &Type, t32 : &Type, t16 : &Type, t8  : &Type) {
+      f :: template(t64)
+      f :: template(t32)
+      f :: template(t16)
+      f :: template(t8)
+      f
+    }
+
+    f :: @fn(x : Number_Literal, y : Number_Literal) -> bool impl
+    f :: expand(s64, s32, s16, s8)
+    f :: expand(u64, u32, u16, u8)
+    f
+  }
+}
+
+less :: comparison_overloads(mass.less)
+less_equal :: comparison_overloads(mass.less_equal)
+greater :: comparison_overloads(mass.greater)
+greater_equal :: comparison_overloads(mass.greater_equal)
+equal :: comparison_overloads(mass.equal)
+not_equal :: comparison_overloads(mass.not_equal)
+
 logical_shift_left :: mass.number_literal_logical_shift_left
 logical_shift_right :: mass.number_literal_logical_shift_right
 bitwise_or :: mass.number_literal_bitwise_or
@@ -91,20 +118,28 @@ bitwise_and :: mass.number_literal_bitwise_and
 // TODO Turn this into a compile-time functions implemented here instead of the compiler
 multiply :: macro array(type : &Type, count : Number_Literal) { mass.multiply(type, count) }
 
+operator 7 (x == y) equal(x, y)
+operator 7 (x != y) not_equal(x, y)
+
+operator 8 (x < y) less(x, y)
+operator 8 (x > y) greater(x, y)
+operator 8 (x <= y) less_equal(x, y)
+operator 8 (x >= y) greater_equal(x, y)
+
 operator 10 (x + y) add(x, y)
-operator 10 (x - y) { subtract(x, y) }
+operator 10 (x - y) subtract(x, y)
 
-operator 15 (x * y) { multiply(x, y) }
-operator 15 (x / y) { divide(x, y) }
-operator 15 (x % y) { remainder(x, y) }
+operator 15 (x * y) multiply(x, y)
+operator 15 (x / y) divide(x, y)
+operator 15 (x % y) remainder(x, y)
 
-operator 16 (- x) { negate(x) }
-operator 16 (& x) { address_of(x) }
+operator 16 (- x) negate(x)
+operator 16 (& x) address_of(x)
 
-operator 15 (x << y) { logical_shift_left(x, y) }
-operator 15 (x >> y) { logical_shift_right(x, y) }
-operator 15 (x | y) { bitwise_or(x, y) }
-operator 15 (x & y) { bitwise_and(x, y) }
+operator 15 (x << y) logical_shift_left(x, y)
+operator 15 (x >> y) logical_shift_right(x, y)
+operator 15 (x | y) bitwise_or(x, y)
+operator 15 (x & y) bitwise_and(x, y)
 
 static_assert :: macro(condition : bool, message : String) {
   @{if condition == false { compile_time_error("Static Assert Failed", message) }}

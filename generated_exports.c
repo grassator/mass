@@ -210,6 +210,42 @@ compiler_scope_define_exports(
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("args", &descriptor_value_view)
   );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_less, "less", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_greater, "greater", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_less_equal, "less_equal", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_greater_equal, "greater_equal", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_equal, "equal", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_not_equal, "not_equal", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
 }
 
 static void

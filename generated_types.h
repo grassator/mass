@@ -360,6 +360,24 @@ static Value * mass_divide
 static Value * mass_remainder
   (Execution_Context * context, Value_View args);
 
+static Value * mass_less
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_greater
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_less_equal
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_greater_equal
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_equal
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_not_equal
+  (Execution_Context * context, Value_View args);
+
 typedef dyn_array_type(char *) Array_char_Ptr;
 typedef dyn_array_type(const char *) Array_Const_char_Ptr;
 
@@ -2370,6 +2388,12 @@ static Descriptor descriptor_mass_subtract;
 static Descriptor descriptor_mass_multiply;
 static Descriptor descriptor_mass_divide;
 static Descriptor descriptor_mass_remainder;
+static Descriptor descriptor_mass_less;
+static Descriptor descriptor_mass_greater;
+static Descriptor descriptor_mass_less_equal;
+static Descriptor descriptor_mass_greater_equal;
+static Descriptor descriptor_mass_equal;
+static Descriptor descriptor_mass_not_equal;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
 static Descriptor descriptor_char_pointer;

@@ -4549,6 +4549,25 @@ mass_handle_comparison_operation(
   }
 }
 
+static inline Value *mass_less(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Less);
+}
+static inline Value *mass_greater(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Greater);
+}
+static inline Value *mass_less_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Less_Equal);
+}
+static inline Value *mass_greater_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Signed_Greater_Equal);
+}
+static inline Value *mass_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Equal);
+}
+static inline Value *mass_not_equal(Execution_Context *context, Value_View arguments) {
+  return mass_handle_comparison_operation(context, arguments, (void*)Compare_Type_Not_Equal);
+}
+
 static Value *
 mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
@@ -6542,25 +6561,6 @@ scope_define_builtins(
     .argument_count = 1,
     .handler = mass_handle_at_operator,
   )));
-
-  struct { Slice symbol; u32 precedence; Compare_Type type; } comparisons[] = {
-    { .symbol = slice_literal("<"),  .precedence = 8, .type = Compare_Type_Signed_Less },
-    { .symbol = slice_literal(">"),  .precedence = 8, .type = Compare_Type_Signed_Greater },
-    { .symbol = slice_literal("<="), .precedence = 8, .type = Compare_Type_Signed_Less_Equal },
-    { .symbol = slice_literal(">="), .precedence = 8, .type = Compare_Type_Signed_Greater_Equal },
-    { .symbol = slice_literal("=="), .precedence = 7, .type = Compare_Type_Equal },
-    { .symbol = slice_literal("!="), .precedence = 7, .type = Compare_Type_Not_Equal },
-  };
-
-  for (u64 i = 0; i < countof(comparisons); ++i) {
-    MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, comparisons[i].symbol, allocator_make(allocator, Operator,
-      .precedence = comparisons[i].precedence,
-      .fixity = Operator_Fixity_Infix,
-      .argument_count = 2,
-      .handler = mass_handle_comparison_operation,
-      .handler_payload = (void*)(s64)comparisons[i].type,
-    )));
-  }
 
   {
     static const Token_Statement_Matcher default_statement_matchers[] = {
