@@ -461,8 +461,39 @@ x86_64_system_v_classify(
       return classification;
     }
     case Descriptor_Tag_Fixed_Size_Array: {
-      panic("TODO implement array classification");
-      break;
+      const Descriptor_Fixed_Size_Array *array = &descriptor->Fixed_Size_Array;
+      u64 item_byte_size = descriptor_byte_size(array->item);
+
+      Memory_Layout_Item stack_items[16] = {0};
+
+      // If the array is too long or too large in bytes it goes to memory.
+      // This check is not part of the algorithm but allows to simplify
+      // checking the rest as the size of the fake struct becomes bounded
+      if (array->length > countof(stack_items) || item_byte_size * array->length > 8 * eightbyte) {
+        return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+      }
+
+      // Turning fixed size array into a fake struct
+      // TODO @Speed use some kind of "item iterator" instead of this
+      Descriptor fake_struct = {
+        .tag = Descriptor_Tag_Struct,
+        .bit_size = descriptor->bit_size,
+        .bit_alignment = descriptor->bit_alignment,
+        .Struct.memory_layout.items = dyn_array_make(
+          Array_Memory_Layout_Item, .allocator = allocator_default, .capacity = array->length
+        ),
+      };
+      for (u64 i = 0; i < array->length; ++i) {
+        dyn_array_push(fake_struct.Struct.memory_layout.items, (Memory_Layout_Item){
+          .tag = Memory_Layout_Item_Tag_Base_Relative,
+          .descriptor = array->item,
+          .Base_Relative.offset = i * item_byte_size,
+        });
+      }
+      System_V_Classification result = x86_64_system_v_classify(allocator, &fake_struct);
+      result.descriptor = descriptor;
+      dyn_array_destroy(fake_struct.Struct.memory_layout.items);
+      return result;
     }
   }
   panic("Unexpected descriptor tag");

@@ -5011,7 +5011,6 @@ mass_handle_array_access_lazy_proc(
     if (storage.tag != Storage_Tag_Static) array_element_value->is_temporary = true;
   } else {
     assert(array->descriptor->tag == Descriptor_Tag_Fixed_Size_Array);
-    assert(array->storage.tag == Storage_Tag_Memory);
 
     const Descriptor *item_descriptor = array->descriptor->Fixed_Size_Array.item;
 

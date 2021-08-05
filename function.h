@@ -121,10 +121,6 @@ load_address(
   Storage storage
 );
 
-static Array_Value_Ptr empty_value_array = {
-  .internal = &(Dyn_Array_Internal){.allocator = &allocator_static},
-};
-
 // Register bitset manipulation
 
 

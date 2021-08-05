@@ -1888,7 +1888,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    #ifdef _WIN32
     it("should support passing register-sized arrays in larger structs into the function") {
       s32(*checker)() = (s32(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -1906,7 +1905,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
-    #endif
 
     it("should auto-dereference pointers to struct on field access") {
       s64(*checker)(Test_128bit*) = (s64(*)(Test_128bit*))test_program_inline_source_function(
