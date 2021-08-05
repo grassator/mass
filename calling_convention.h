@@ -282,6 +282,66 @@ x86_64_system_v_memory_layout_item_for_classification(
 // TODO verify this implementation against GCC
 // https://github.com/gcc-mirror/gcc/blob/master/gcc/config/i386/i386.c#L2080
 
+typedef enum {
+  System_V_Aggregate_Iterator_Tag_Struct,
+  System_V_Aggregate_Iterator_Tag_Array,
+} System_V_Aggregate_Iterator_Tag;
+
+typedef struct {
+  System_V_Aggregate_Iterator_Tag tag;
+  const Descriptor *aggregate;
+  const Descriptor *item;
+  u64 offset;
+  u64 next_index;
+} System_V_Aggregate_Iterator;
+
+static inline u64
+system_v_item_iterator_count(
+  const System_V_Aggregate_Iterator *it
+) {
+  switch(it->tag) {
+    case System_V_Aggregate_Iterator_Tag_Struct: {
+      assert(it->aggregate->tag == Descriptor_Tag_Struct);
+      return dyn_array_length(it->aggregate->Struct.memory_layout.items);
+    }
+    case System_V_Aggregate_Iterator_Tag_Array: {
+      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);
+      return it->aggregate->Fixed_Size_Array.length;
+    }
+  }
+  panic("UNEXPECTED System_V_Aggregate_Iterator_Tag");
+  return 0;
+}
+
+static inline bool
+system_v_item_iterator_next(
+  System_V_Aggregate_Iterator *it
+) {
+  u64 item_count = system_v_item_iterator_count(it);
+  if (it->next_index >= item_count) return false;
+  switch(it->tag) {
+    case System_V_Aggregate_Iterator_Tag_Struct: {
+      assert(it->aggregate->tag == Descriptor_Tag_Struct);
+      const Memory_Layout_Item *item =
+        dyn_array_get(it->aggregate->Struct.memory_layout.items, it->next_index);
+      it->item = item->descriptor;
+      assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
+      it->offset = item->Base_Relative.offset;
+    } break;
+    case System_V_Aggregate_Iterator_Tag_Array: {
+      assert(it->aggregate->tag == Descriptor_Tag_Fixed_Size_Array);
+      it->item = it->aggregate->Fixed_Size_Array.item;
+      it->offset = descriptor_byte_size(it->item) * it->next_index;
+    } break;
+    default: {
+      panic("UNEXPECTED System_V_Aggregate_Iterator_Tag");
+      return false;
+    }
+  }
+  it->next_index += 1;
+  return true;
+}
+
 static System_V_Classification
 x86_64_system_v_classify(
   const Allocator *allocator,
@@ -289,25 +349,25 @@ x86_64_system_v_classify(
 );
 
 static System_V_Classification
-x86_64_system_v_classify_struct_like(
+x86_64_system_v_classify_aggregate(
   const Allocator *allocator,
-  const Descriptor *descriptor
+  System_V_Aggregate_Iterator *it
 ) {
-  assert(descriptor->tag == Descriptor_Tag_Struct);
-  u64 byte_size = descriptor_byte_size(descriptor);
+  u64 byte_size = descriptor_byte_size(it->aggregate);
   u64 eightbyte = 8;
+
   bool has_unaligned = false; // FIXME calculate this
   // 1. If the size of an object is larger than eight eightbytes,
   // or it contains unaligned fields, it has class MEMORY
   if (byte_size > 8 * eightbyte || has_unaligned) {
-    return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
+    return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = it->aggregate };
   }
   // 2. If a C++ object is non-trivial for the purpose of calls, as specified in the
   // C++ ABI 13, it is passed by invisible reference (the object is replaced in the
   // parameter list by a pointer that has class INTEGER)
   bool is_c_plus_plus_non_trivial = false; // TODO allow to specify / detect this
   if (is_c_plus_plus_non_trivial) {
-    descriptor = descriptor_reference_to(allocator, descriptor);
+    const Descriptor *descriptor = descriptor_reference_to(allocator, it->aggregate);
     return (System_V_Classification){ .class = SYSTEM_V_INTEGER, .descriptor = descriptor };
   }
 
@@ -315,13 +375,11 @@ x86_64_system_v_classify_struct_like(
   // separately. Each eightbyte gets initialized to class NO_CLASS.
   SYSTEM_V_ARGUMENT_CLASS eightbyte_class = SYSTEM_V_NO_CLASS;
 
-  Array_Memory_Layout_Item struct_items = descriptor->Struct.memory_layout.items;
-
   // TODO use a temp allocator
   Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
     Array_SYSTEM_V_ARGUMENT_CLASS,
     .allocator = allocator,
-    .capacity = dyn_array_length(struct_items),
+    .capacity = system_v_item_iterator_count(it),
   );
 
   // 4. Each field of an object is classified recursively so that always two fields are
@@ -330,15 +388,12 @@ x86_64_system_v_classify_struct_like(
   u64 last_offset = 0;
   u64 last_eightbyte_offset = 0;
   u64 struct_eightbyte_count = 0;
-  DYN_ARRAY_FOREACH(Memory_Layout_Item, item, struct_items) {
-    assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
-    u64 offset = item->Base_Relative.offset;
-
-    u64 field_eightbyte_count = (offset - last_eightbyte_offset) / eightbyte;
+  while(system_v_item_iterator_next(it)) {
+    u64 field_eightbyte_count = (it->offset - last_eightbyte_offset) / eightbyte;
     if (field_eightbyte_count >= 1) {
       dyn_array_push(eightbyte_classes, eightbyte_class);
       eightbyte_class = SYSTEM_V_NO_CLASS;
-      last_eightbyte_offset = offset;
+      last_eightbyte_offset = it->offset;
       struct_eightbyte_count += field_eightbyte_count;
     }
 
@@ -346,14 +401,14 @@ x86_64_system_v_classify_struct_like(
     //       which unlike the Memory_Layout can not specify arbitrary offsets
     //       and overlaps. So we might have to convert to that representation
     //       or do some really fancy tracking of overlaps (unions).
-    if (offset < last_offset) {
+    if (it->offset < last_offset) {
       panic("FIXME support unions");
     } else {
-      last_offset = offset + descriptor_byte_size(item->descriptor);
+      last_offset = it->offset + descriptor_byte_size(it->item);
     }
 
     System_V_Classification field_classification =
-      x86_64_system_v_classify(allocator, item->descriptor);
+      x86_64_system_v_classify(allocator, it->item);
     SYSTEM_V_ARGUMENT_CLASS field_class = field_classification.class;
     // 4(a) If both classes are equal, this is the resulting class.
     if (eightbyte_class == field_class) {
@@ -439,7 +494,7 @@ x86_64_system_v_classify_struct_like(
   dyn_array_destroy(eightbyte_classes);
 
   System_V_Classification classification = {
-    .descriptor = descriptor,
+    .descriptor = it->aggregate,
     .eightbyte_count = struct_eightbyte_count,
     .class = struct_class,
   };
@@ -475,42 +530,18 @@ x86_64_system_v_classify(
       break;
     }
     case Descriptor_Tag_Struct: {
-      return x86_64_system_v_classify_struct_like(allocator, descriptor);
+      System_V_Aggregate_Iterator it = {
+        .tag = System_V_Aggregate_Iterator_Tag_Struct,
+        .aggregate = descriptor,
+      };
+      return x86_64_system_v_classify_aggregate(allocator, &it);
     }
     case Descriptor_Tag_Fixed_Size_Array: {
-      const Descriptor_Fixed_Size_Array *array = &descriptor->Fixed_Size_Array;
-      u64 item_byte_size = descriptor_byte_size(array->item);
-
-      Memory_Layout_Item stack_items[16] = {0};
-
-      // If the array is too long or too large in bytes it goes to memory.
-      // This check is not part of the algorithm but allows to simplify
-      // checking the rest as the size of the fake struct becomes bounded
-      if (array->length > countof(stack_items) || item_byte_size * array->length > 8 * eightbyte) {
-        return (System_V_Classification){ .class = SYSTEM_V_MEMORY, .descriptor = descriptor };
-      }
-
-      // Turning fixed size array into a fake struct
-      // TODO @Speed use some kind of "item iterator" instead of this
-      Descriptor fake_struct = {
-        .tag = Descriptor_Tag_Struct,
-        .bit_size = descriptor->bit_size,
-        .bit_alignment = descriptor->bit_alignment,
-        .Struct.memory_layout.items = dyn_array_make(
-          Array_Memory_Layout_Item, .allocator = allocator_default, .capacity = array->length
-        ),
+      System_V_Aggregate_Iterator it = {
+        .tag = System_V_Aggregate_Iterator_Tag_Array,
+        .aggregate = descriptor,
       };
-      for (u64 i = 0; i < array->length; ++i) {
-        dyn_array_push(fake_struct.Struct.memory_layout.items, (Memory_Layout_Item){
-          .tag = Memory_Layout_Item_Tag_Base_Relative,
-          .descriptor = array->item,
-          .Base_Relative.offset = i * item_byte_size,
-        });
-      }
-      System_V_Classification result = x86_64_system_v_classify(allocator, &fake_struct);
-      result.descriptor = descriptor;
-      dyn_array_destroy(fake_struct.Struct.memory_layout.items);
-      return result;
+      return x86_64_system_v_classify_aggregate(allocator, &it);
     }
   }
   panic("Unexpected descriptor tag");
