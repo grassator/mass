@@ -161,6 +161,18 @@ compiler_scope_define_exports(
     MASS_FN_ARG("out_tokens", &descriptor_value_view_pointer)
   );
   MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_allocate, "allocate", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
+    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
+    MASS_FN_ARG("args", &descriptor_value_view)
+  );
+  MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
     mass_number_literal_logical_shift_left, "number_literal_logical_shift_left", &descriptor_number_literal,
     MASS_FN_ARG("input", &descriptor_number_literal),
@@ -268,19 +280,7 @@ global_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
-    mass_allocate, "allocate", &descriptor_value_pointer,
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("args", &descriptor_value_view)
-  );
-  MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
     mass_address_of, "address_of", &descriptor_value_pointer,
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("args", &descriptor_value_view)
-  );
-  MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
-    mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("args", &descriptor_value_view)
   );

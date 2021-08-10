@@ -324,16 +324,16 @@ typedef dyn_array_type(const X64_Mnemonic *) Array_Const_X64_Mnemonic_Ptr;
 static Mass_Result tokenize
   (Compilation * compilation, Source_File * file, Value_View * out_tokens);
 
-static Value * mass_allocate
-  (Execution_Context * context, Value_View args);
-
 static Value * mass_address_of
   (Execution_Context * context, Value_View args);
 
-static Value * mass_compile_time_error
+static Value * mass_import
   (Execution_Context * context, Value_View args);
 
-static Value * mass_import
+static Value * mass_allocate
+  (Execution_Context * context, Value_View args);
+
+static Value * mass_compile_time_error
   (Execution_Context * context, Value_View args);
 
 static Number_Literal mass_number_literal_logical_shift_left
@@ -2386,10 +2386,10 @@ static Descriptor descriptor_array_x64_mnemonic_ptr;
 static Descriptor descriptor_x64_mnemonic_pointer;
 static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
-static Descriptor descriptor_mass_allocate;
 static Descriptor descriptor_mass_address_of;
-static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_mass_import;
+static Descriptor descriptor_mass_allocate;
+static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_mass_number_literal_logical_shift_left;
 static Descriptor descriptor_mass_number_literal_logical_shift_right;
 static Descriptor descriptor_mass_number_literal_bitwise_or;
