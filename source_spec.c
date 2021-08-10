@@ -971,7 +971,7 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_Parse);
     }
 
-    xit("should support referencing the type of one argument in the return type") {
+    it("should support referencing the type of one argument in the return type") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,

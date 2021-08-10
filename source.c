@@ -3694,12 +3694,23 @@ ensure_parameter_descriptors(
   // TODO avoid this const cast
   Function_Info *mutable_info = (Function_Info *)info;
   Execution_Context *context = &mutable_info->context;
+
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     if (!param->declaration.descriptor) {
       assert(param->maybe_type_expression.length);
       param->declaration.descriptor =
         token_match_type(context, param->maybe_type_expression);
       MASS_ON_ERROR(*context->result) return;
+      Source_Range source_range = param->declaration.source_range;
+      Value *param_value =
+        value_make(context, param->declaration.descriptor, storage_none, source_range);
+      scope_define_value(
+        context->scope,
+        VALUE_STATIC_EPOCH,
+        source_range,
+        param->declaration.name,
+        param_value
+      );
     }
   }
   if (!info->returns.declaration.descriptor) {
