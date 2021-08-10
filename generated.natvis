@@ -1575,9 +1575,7 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
-    <Item Name="name">name</Item>
-    <Item Name="descriptor">descriptor</Item>
-    <Item Name="source_range">source_range</Item>
+    <Item Name="declaration">declaration</Item>
     <Item Name="maybe_default_expression">maybe_default_expression</Item>
     <Item Name="Exact_Static" Condition="tag == Function_Parameter_Tag_Exact_Static">Exact_Static</Item>
   </Expand>

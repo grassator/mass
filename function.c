@@ -851,18 +851,18 @@ calculate_arguments_match_score(
     const Descriptor *source_descriptor;
     if (arg_index >= args_view.length) {
       if (!param->maybe_default_expression.length) return -1;
-      source_descriptor = param->descriptor;
+      source_descriptor = param->declaration.descriptor;
     } else {
       source_arg = value_view_get(args_view, arg_index);
       source_descriptor = value_or_lazy_value_descriptor(source_arg);
     }
     switch(param->tag) {
       case Function_Parameter_Tag_Runtime: {
-        if (same_type(param->descriptor, source_descriptor)) {
+        if (same_type(param->declaration.descriptor, source_descriptor)) {
           score += Score_Exact_Type;
         } else if (
-          (source_arg && same_value_type_or_can_implicitly_move_cast(param->descriptor, source_arg)) ||
-          same_type_or_can_implicitly_move_cast(param->descriptor, source_descriptor)
+          (source_arg && same_value_type_or_can_implicitly_move_cast(param->declaration.descriptor, source_arg)) ||
+          same_type_or_can_implicitly_move_cast(param->declaration.descriptor, source_descriptor)
         ) {
           score += Score_Cast;
         } else {
@@ -872,7 +872,7 @@ calculate_arguments_match_score(
       case Function_Parameter_Tag_Exact_Static: {
         if (!source_arg || !value_is_non_lazy_static(source_arg)) return -1;
         if (!storage_static_equal(
-          param->descriptor, &param->Exact_Static.storage,
+          param->declaration.descriptor, &param->Exact_Static.storage,
           source_arg->descriptor, &source_arg->storage
         )) return -1;
         score += Score_Exact_Static;

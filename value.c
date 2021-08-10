@@ -125,9 +125,9 @@ mass_error_append_function_signature_string(
   DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
-    APPEND_SLICE(arg->name);
+    APPEND_SLICE(arg->declaration.name);
     APPEND_LITERAL(" : ");
-    mass_error_append_descriptor(result, arg->descriptor);
+    mass_error_append_descriptor(result, arg->declaration.descriptor);
   }
   APPEND_LITERAL(") -> (");
   mass_error_append_descriptor(result, info->returns.descriptor);
@@ -387,7 +387,7 @@ same_type(
       for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
         Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
         Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
-        if(!same_type(a_arg->descriptor, b_arg->descriptor)) return false;
+        if(!same_type(a_arg->declaration.descriptor, b_arg->declaration.descriptor)) return false;
       }
       return true;
     }
@@ -1853,7 +1853,7 @@ same_value_type_or_can_implicitly_move_cast(
     for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
       const Function_Parameter *param = dyn_array_get(info->parameters, 0);
       Value *arg = allocator_allocate(temp_allocator, Value);
-      value_init(arg, param->descriptor, storage_none, param->source_range);
+      value_init(arg, param->declaration.descriptor, storage_none, param->declaration.source_range);
       dyn_array_push(temp_args, arg);
     }
     Value_View args_view = value_view_from_value_array(temp_args, &COMPILER_SOURCE_RANGE);

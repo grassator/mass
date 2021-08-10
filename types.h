@@ -92,9 +92,12 @@
 
 #define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
   {\
-    .name = slice_literal_fields(_NAME_),\
-    .descriptor = (_DESCRIPTOR_),\
-    .source_range = COMPILER_SOURCE_RANGE,\
+    .tag = Function_Parameter_Tag_Runtime,\
+    .declaration = {\
+      .name = slice_literal_fields(_NAME_),\
+      .descriptor = (_DESCRIPTOR_),\
+      .source_range = COMPILER_SOURCE_RANGE,\
+    },\
   }
 
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
@@ -110,10 +113,13 @@
 
 #define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _VIEW_, _DESCRIPTOR_)\
   {\
-    .name = slice_literal_fields(_NAME_),\
-    .descriptor = (_DESCRIPTOR_),\
+    .tag = Function_Parameter_Runtime,\
+    .declaration = {\
+      .name = slice_literal_fields(_NAME_),\
+      .descriptor = (_DESCRIPTOR_),\
+      .source_range = COMPILER_SOURCE_RANGE,\
+    },\
     .maybe_default_expression = (_VIEW_),\
-    .source_range = COMPILER_SOURCE_RANGE,\
   }
 
 #define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\

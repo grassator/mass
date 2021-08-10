@@ -648,11 +648,11 @@ calling_convention_x86_64_system_v_call_setup_proc(
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, param->descriptor);
+      x86_64_system_v_classify(allocator_default, param->declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
-      &registers, &classification, param->name, &stack_offset
+      &registers, &classification, param->declaration.name, &stack_offset
     );
 
     dyn_array_push(result.arguments_layout.items, struct_item);
@@ -746,11 +746,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     Memory_Layout_Item item = {
       .flags = Memory_Layout_Item_Flags_None,
-      .declaration = {
-        .name = param->name,
-        .descriptor = param->descriptor,
-        .source_range = param->source_range,
-      },
+      .declaration = param->declaration,
     };
 
     u64 byte_size = descriptor_byte_size(item.declaration.descriptor);

@@ -1636,9 +1636,7 @@ main(void) {
       { "Storage", "storage" },
     }),
   }), (Struct_Item[]){
-    { "Slice", "name" },
-    { "const Descriptor *", "descriptor" },
-    { "Source_Range", "source_range" },
+    { "Declaration", "declaration" },
     { "Value_View", "maybe_default_expression" },
   }));
 

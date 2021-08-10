@@ -1785,9 +1785,11 @@ token_match_argument(
       .Exact_Static = {
         .storage = static_value->storage,
       },
-      .name = value_as_symbol(name_token)->name,
-      .descriptor = static_value->descriptor,
-      .source_range = definition.source_range,
+      .declaration = {
+        .name = value_as_symbol(name_token)->name,
+        .descriptor = static_value->descriptor,
+        .source_range = definition.source_range,
+      },
     };
   }
 
@@ -1870,10 +1872,12 @@ token_match_argument(
 
   arg = (Function_Parameter) {
     .tag = Function_Parameter_Tag_Runtime,
-    .name = value_as_symbol(name_token)->name,
-    .descriptor = descriptor,
     .maybe_default_expression = default_expression,
-    .source_range = definition.source_range,
+    .declaration = {
+      .name = value_as_symbol(name_token)->name,
+      .descriptor = descriptor,
+      .source_range = definition.source_range,
+    },
   };
 
   err:
@@ -3325,7 +3329,7 @@ mass_handle_macro_call(
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
     Function_Parameter *arg = dyn_array_get(literal->info->parameters, i);
-    if (arg->name.length) {
+    if (arg->declaration.name.length) {
       Value *arg_value;
       if (i >= args_view.length) {
         // We should catch the missing default expression in the matcher
@@ -3338,9 +3342,9 @@ mass_handle_macro_call(
         arg_value = value_view_get(args_view, i);
       }
 
-      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->descriptor);
+      arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->declaration.descriptor);
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
-      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->name, arg_value);
+      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->declaration.name, arg_value);
     }
   }
 
@@ -5369,7 +5373,7 @@ token_parse_intrinsic_literal(
   for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
     Function_Parameter *param = dyn_array_get(info->parameters, param_index);
     Value *param_name_symbol = token_make_symbol(
-      context->allocator, param->name, Symbol_Type_Id_Like, view.source_range
+      context->allocator, param->declaration.name, Symbol_Type_Id_Like, view.source_range
     );
     dyn_array_push(wrapped_body_children, param_name_symbol);
     dyn_array_push(wrapped_body_children, colon_equal_symbol);
@@ -5410,14 +5414,18 @@ token_parse_intrinsic_literal(
     .capacity = 2
   );
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
-    .name = slice_literal("context"),
-    .descriptor = &descriptor_execution_context_pointer,
-    .source_range = keyword->source_range,
+    .declaration = {
+      .name = slice_literal("context"),
+      .descriptor = &descriptor_execution_context_pointer,
+      .source_range = keyword->source_range,
+    },
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
-    .name = slice_literal("arguments"),
-    .descriptor = &descriptor_value_view,
-    .source_range = keyword->source_range,
+    .declaration = {
+      .name = slice_literal("arguments"),
+      .descriptor = &descriptor_value_view,
+      .source_range = keyword->source_range,
+    },
   });
   literal->info->flags |= Descriptor_Function_Flags_Compile_Time;
   literal->info->flags |= Descriptor_Function_Flags_Intrinsic;

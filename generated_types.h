@@ -1460,9 +1460,7 @@ typedef struct Function_Parameter_Exact_Static {
 typedef struct Function_Parameter {
   Function_Parameter_Tag tag;
   char _tag_padding[4];
-  Slice name;
-  const Descriptor * descriptor;
-  Source_Range source_range;
+  Declaration declaration;
   Value_View maybe_default_expression;
   union {
     Function_Parameter_Exact_Static Exact_Static;
@@ -4992,26 +4990,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_slice,
-      .name = slice_literal_fields("name"),
+      .descriptor = &descriptor_declaration,
+      .name = slice_literal_fields("declaration"),
     },
-    .Base_Relative.offset = offsetof(Function_Parameter, name),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_descriptor_pointer,
-      .name = slice_literal_fields("descriptor"),
-    },
-    .Base_Relative.offset = offsetof(Function_Parameter, descriptor),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_source_range,
-      .name = slice_literal_fields("source_range"),
-    },
-    .Base_Relative.offset = offsetof(Function_Parameter, source_range),
+    .Base_Relative.offset = offsetof(Function_Parameter, declaration),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
