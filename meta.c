@@ -1649,12 +1649,17 @@ main(void) {
     { "Intrinsic", 1 << 3},
   }));
 
+  push_type(type_struct("Function_Return", (Struct_Item[]){
+    { "Declaration", "declaration" },
+    { "Value_View", "maybe_type_expression" },
+  }));
+
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Function_Parameter", "parameters" },
     { "Execution_Context", "context" },
-    { "Declaration", "returns" },
+    { "Function_Return", "returns" },
   }));
 
   push_type(type_struct("Function_Literal", (Struct_Item[]){

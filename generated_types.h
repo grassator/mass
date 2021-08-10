@@ -239,6 +239,10 @@ typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Paramete
 
 typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
 
+typedef struct Function_Return Function_Return;
+typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
+typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
+
 typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
@@ -1490,12 +1494,18 @@ const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   return 0;
 };
 
+typedef struct Function_Return {
+  Declaration declaration;
+  Value_View maybe_type_expression;
+} Function_Return;
+typedef dyn_array_type(Function_Return) Array_Function_Return;
+
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
   Array_Function_Parameter parameters;
   Execution_Context context;
-  Declaration returns;
+  Function_Return returns;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
@@ -2290,6 +2300,11 @@ static Descriptor descriptor_array_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
 static Descriptor descriptor_descriptor_function_flags_pointer;
 static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
+static Descriptor descriptor_function_return;
+static Descriptor descriptor_array_function_return;
+static Descriptor descriptor_array_function_return_ptr;
+static Descriptor descriptor_function_return_pointer;
+static Descriptor descriptor_function_return_pointer_pointer;
 static Descriptor descriptor_function_info;
 static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
@@ -5033,6 +5048,27 @@ static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("Compile_Time"), .value = 4 },
 { .name = slice_literal_fields("Intrinsic"), .value = 8 },
 };
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_declaration,
+      .name = slice_literal_fields("declaration"),
+    },
+    .Base_Relative.offset = offsetof(Function_Return, declaration),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_value_view,
+      .name = slice_literal_fields("maybe_type_expression"),
+    },
+    .Base_Relative.offset = offsetof(Function_Return, maybe_type_expression),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_return);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
@@ -5071,7 +5107,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_declaration,
+      .descriptor = &descriptor_function_return,
       .name = slice_literal_fields("returns"),
     },
     .Base_Relative.offset = offsetof(Function_Info, returns),

@@ -1881,13 +1881,13 @@ token_match_argument(
   return arg;
 }
 
-static Declaration
+static Function_Return
 token_match_return_type(
   Execution_Context *context,
   Value_View view
 ) {
-  Declaration returns = {
-    .source_range = view.source_range,
+  Function_Return returns = {
+    .declaration.source_range = view.source_range,
   };
   if (context->result->tag != Mass_Result_Tag_Success) return returns;
 
@@ -1910,10 +1910,12 @@ token_match_return_type(
       });
       goto err;
     }
-    returns.descriptor = token_match_type(context, rhs);
-    returns.name = value_as_symbol(value_view_get(lhs, 0))->name;
+
+    returns.maybe_type_expression = rhs;
+    returns.declaration.source_range = rhs.source_range,
+    returns.declaration.name = value_as_symbol(value_view_get(lhs, 0))->name;
   } else {
-    returns.descriptor = token_match_type(context, view);
+    returns.maybe_type_expression = view;
   }
 
   err:
@@ -2762,7 +2764,7 @@ token_process_function_literal(
     }
     Value_View return_types_view = return_types_group->children;
     if (return_types_view.length == 0) {
-      fn_info->returns = (Declaration) { .descriptor = &descriptor_void, };
+      fn_info->returns = (Function_Return) { .declaration.descriptor = &descriptor_void, };
     } else {
       Value_View_Split_Iterator it = { .view = return_types_view };
 
@@ -2781,7 +2783,9 @@ token_process_function_literal(
       }
     }
   } else {
-    fn_info->returns = token_match_return_type(&arg_context, value_view_single(&return_types));
+    fn_info->returns = token_match_return_type(
+      &arg_context, value_view_make_single(context->allocator, return_types)
+    );
   }
   MASS_ON_ERROR(*context->result) return 0;
 
@@ -3353,14 +3357,14 @@ mass_handle_macro_call(
 
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
   if (
-    literal->info->returns.descriptor &&
-    !same_type_or_can_implicitly_move_cast(literal->info->returns.descriptor, return_descriptor)
+    literal->info->returns.declaration.descriptor &&
+    !same_type_or_can_implicitly_move_cast(literal->info->returns.declaration.descriptor, return_descriptor)
   ) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = body_value->source_range,
       .Type_Mismatch = {
-        .expected = literal->info->returns.descriptor,
+        .expected = literal->info->returns.declaration.descriptor,
         .actual = return_descriptor,
       },
     });
@@ -3405,7 +3409,7 @@ call_function_overload(
   const Function_Info *fn_info = instance_descriptor->info;
 
   Value *fn_return_value = instance_descriptor->call_setup.caller_return_value;
-  if (fn_info->returns.descriptor != &descriptor_void) {
+  if (fn_info->returns.declaration.descriptor != &descriptor_void) {
     fn_return_value->is_temporary = true;
   }
 
@@ -3687,15 +3691,22 @@ static void
 ensure_parameter_descriptors(
   const Function_Info *info
 ) {
+  // TODO avoid this const cast
+  Function_Info *mutable_info = (Function_Info *)info;
+  Execution_Context *context = &mutable_info->context;
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     if (!param->declaration.descriptor) {
       assert(param->maybe_type_expression.length);
-      // TODO avoid this const cast
-      Execution_Context *context = (Execution_Context *)&info->context;
       param->declaration.descriptor =
         token_match_type(context, param->maybe_type_expression);
       MASS_ON_ERROR(*context->result) return;
     }
+  }
+  if (!info->returns.declaration.descriptor) {
+    assert(info->returns.maybe_type_expression.length);
+    mutable_info->returns.declaration.descriptor =
+      token_match_type(context, info->returns.maybe_type_expression);
+    MASS_ON_ERROR(*context->result) return;
   }
 }
 
@@ -3717,6 +3728,12 @@ mass_match_overload_candidate(
 
     s64 score = -1;
     if (overload_info) {
+      if (candidate->descriptor == &descriptor_function_literal) {
+        const Function_Literal *literal = storage_static_as_c_type(&candidate->storage, Function_Literal);
+        if (literal->is_generic) {
+          panic("fdasfasdf");
+        }
+      }
       ensure_parameter_descriptors(overload_info);
 
       if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
@@ -3941,7 +3958,7 @@ token_handle_function_call(
   };
 
   return mass_make_lazy_value(
-    context, source_range, call_payload, info->returns.descriptor, call_function_overload
+    context, source_range, call_payload, info->returns.declaration.descriptor, call_function_overload
   );
 }
 
@@ -4561,7 +4578,7 @@ mass_handle_startup_call_lazy_proc(
     storage_static_as_c_type(&startup_function->storage, Function_Literal);
 
   if (dyn_array_length(literal->info->parameters)) goto err;
-  if (literal->info->returns.descriptor != &descriptor_void) goto err;
+  if (literal->info->returns.declaration.descriptor != &descriptor_void) goto err;
 
   ensure_function_instance(context, startup_function);
   dyn_array_push(context->program->startup_functions, startup_function);
@@ -5332,9 +5349,11 @@ mass_make_fake_function_literal(
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, &function_context);
-  fn_info->returns = (Declaration) {
-    .descriptor = returns,
-    .source_range = *source_range,
+  fn_info->returns = (Function_Return) {
+    .declaration = {
+      .descriptor = returns,
+      .source_range = *source_range,
+    },
   };
 
   Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);

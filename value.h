@@ -63,8 +63,6 @@ context_temp_reset(
   compilation_temp_reset(context->compilation);
 }
 
-
-
 static inline Value_View
 value_view_single(
   Value **value
@@ -73,6 +71,20 @@ value_view_single(
     .values = value,
     .length = 1,
     .source_range = (*value)->source_range,
+  };
+}
+
+static inline Value_View
+value_view_make_single(
+  const Allocator *allocator,
+  Value *value
+) {
+  Value **values = allocator_allocate(allocator, Value *);
+  values[0] = value;
+  return (Value_View) {
+    .values = values,
+    .length = 1,
+    .source_range = value->source_range,
   };
 }
 

@@ -560,7 +560,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   Function_Call_Setup result = {
     .calling_convention = &calling_convention_x86_64_system_v,
   };
-  if (function->returns.descriptor == &descriptor_void) {
+  if (function->returns.declaration.descriptor == &descriptor_void) {
     result.callee_return_value = &void_value;
     result.caller_return_value = &void_value;
   } else {
@@ -581,26 +581,26 @@ calling_convention_x86_64_system_v_call_setup_proc(
     };
 
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, function->returns.descriptor);
+      x86_64_system_v_classify(allocator_default, function->returns.declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
       result.caller_return_value = value_init(
         allocator_allocate(allocator, Value),
-        function->returns.descriptor,
-        storage_indirect(descriptor_byte_size(function->returns.descriptor), Register_A),
-        function->returns.source_range
+        function->returns.declaration.descriptor,
+        storage_indirect(descriptor_byte_size(function->returns.declaration.descriptor), Register_A),
+        function->returns.declaration.source_range
       );
       result.callee_return_value = value_init(
         allocator_allocate(allocator, Value),
-        function->returns.descriptor,
-        storage_indirect(descriptor_byte_size(function->returns.descriptor), Register_DI),
-        function->returns.source_range
+        function->returns.declaration.descriptor,
+        storage_indirect(descriptor_byte_size(function->returns.declaration.descriptor), Register_DI),
+        function->returns.declaration.source_range
       );
     } else {
       u64 stack_offset = 0;
       Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
-        &registers, &classification, function->returns.name, &stack_offset
+        &registers, &classification, function->returns.declaration.name, &stack_offset
       );
       assert(item.tag == Memory_Layout_Item_Tag_Absolute);
 
@@ -608,7 +608,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
         allocator_allocate(allocator, Value),
         item.declaration.descriptor,
         item.Absolute.storage,
-        function->returns.source_range
+        function->returns.declaration.source_range
       );
       result.callee_return_value = common_return_value;
       result.caller_return_value = common_return_value;
@@ -660,14 +660,14 @@ calling_convention_x86_64_system_v_call_setup_proc(
   result.parameters_stack_size = u64_to_u32(u64_align(stack_offset, 8));
 
   if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
-    const Descriptor *reference = descriptor_reference_to(allocator, function->returns.descriptor);
+    const Descriptor *reference = descriptor_reference_to(allocator, function->returns.declaration.descriptor);
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .declaration = {
         .name = {0}, // Defining return value name happens separately
         .descriptor = reference,
-        .source_range = function->returns.source_range,
+        .source_range = function->returns.declaration.source_range,
       },
       .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
     });
@@ -684,43 +684,43 @@ calling_convention_x86_64_windows_call_setup_proc(
   Function_Call_Setup result = {
     .calling_convention = &calling_convention_x86_64_windows,
   };
-  if (function->returns.descriptor == &descriptor_void) {
+  if (function->returns.declaration.descriptor == &descriptor_void) {
     result.callee_return_value = &void_value;
     result.caller_return_value = &void_value;
   } else {
-    if (descriptor_is_float(function->returns.descriptor)) {
+    if (descriptor_is_float(function->returns.declaration.descriptor)) {
       Value *common_return_value = value_init(
         allocator_allocate(allocator, Value),
-        function->returns.descriptor,
-        storage_register_for_descriptor(Register_Xmm0, function->returns.descriptor),
-        function->returns.source_range
+        function->returns.declaration.descriptor,
+        storage_register_for_descriptor(Register_Xmm0, function->returns.declaration.descriptor),
+        function->returns.declaration.source_range
       );
       result.callee_return_value = common_return_value;
       result.caller_return_value = common_return_value;
     } else {
-      if (descriptor_byte_size(function->returns.descriptor) > 8) {
+      if (descriptor_byte_size(function->returns.declaration.descriptor) > 8) {
         result.flags |= Function_Call_Setup_Flags_Indirect_Return;
         const Descriptor *reference =
-          descriptor_reference_to(allocator, function->returns.descriptor);
+          descriptor_reference_to(allocator, function->returns.declaration.descriptor);
 
         result.caller_return_value = value_init(
           allocator_allocate(allocator, Value),
           reference,
           storage_register_for_descriptor(Register_A, reference),
-          function->returns.source_range
+          function->returns.declaration.source_range
         );
         result.callee_return_value = value_init(
           allocator_allocate(allocator, Value),
           reference,
           storage_register_for_descriptor(Register_C, reference),
-          function->returns.source_range
+          function->returns.declaration.source_range
         );
       } else {
         Value *common_return_value = value_init(
           allocator_allocate(allocator, Value),
-          function->returns.descriptor,
-          storage_register_for_descriptor(Register_A, function->returns.descriptor),
-          function->returns.source_range
+          function->returns.declaration.descriptor,
+          storage_register_for_descriptor(Register_A, function->returns.declaration.descriptor),
+          function->returns.declaration.source_range
         );
         result.callee_return_value = common_return_value;
         result.caller_return_value = common_return_value;
@@ -772,14 +772,14 @@ calling_convention_x86_64_windows_call_setup_proc(
 
   if (result.flags & Function_Call_Setup_Flags_Indirect_Return) {
     const Descriptor *return_descriptor =
-      descriptor_reference_to(allocator, function->returns.descriptor);
+      descriptor_reference_to(allocator, function->returns.declaration.descriptor);
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
       .declaration = {
         .name = {0}, // Defining return value name happens separately
         .descriptor = return_descriptor,
-        .source_range = function->returns.source_range,
+        .source_range = function->returns.declaration.source_range,
       },
       .Absolute = { .storage = storage_register_for_descriptor(Register_C, return_descriptor), },
     });

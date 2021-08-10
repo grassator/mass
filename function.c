@@ -785,8 +785,14 @@ ensure_function_instance(
   }
 
   // Return value can be named in which case it should be accessible in the fn body
-  if (function->returns.name.length) {
-    scope_define_value(body_scope, body_context.epoch, return_value->source_range, function->returns.name, return_value);
+  if (function->returns.declaration.name.length) {
+    scope_define_value(
+      body_scope,
+      body_context.epoch,
+      return_value->source_range,
+      function->returns.declaration.name,
+      return_value
+    );
   }
   Value *parse_result = 0;
   if (value_is_group(literal->body)) {

@@ -133,7 +133,7 @@
   Function_Info *function = allocator_allocate(allocator, Function_Info);\
   *function = (Function_Info){\
     .flags = (_FLAGS_),\
-    .returns.descriptor = (_RETURN_DESCRIPTOR_),\
+    .returns.declaration.descriptor = (_RETURN_DESCRIPTOR_),\
     .parameters = parameters,\
     .context = {\
       .scope = scope,\
