@@ -773,9 +773,9 @@ ensure_function_instance(
     Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Received_Argument);
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
-      Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
-      if (item->name.length) {
-        scope_define_value(body_scope, body_context.epoch, item->source_range, item->name, arg_value);
+      Value *arg_value = value_make(&body_context, item->declaration.descriptor, storage, item->declaration.source_range);
+      if (item->declaration.name.length) {
+        scope_define_value(body_scope, body_context.epoch, item->declaration.source_range, item->declaration.name, arg_value);
       }
       mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
     }
