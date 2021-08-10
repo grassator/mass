@@ -2758,6 +2758,9 @@ token_process_function_literal(
         param.declaration.name,
         fake_argument
       );
+      if (param.tag == Function_Parameter_Tag_Generic) {
+        fn_info->flags |= Descriptor_Function_Flags_Generic;
+      }
     }
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
   }

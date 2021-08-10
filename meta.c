@@ -1646,6 +1646,7 @@ main(void) {
     { "Macro", 1 << 0 },
     { "Compile_Time", 1 << 2 },
     { "Intrinsic", 1 << 3},
+    { "Generic", 1 << 4},
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){
