@@ -2721,6 +2721,37 @@ token_process_function_literal(
   arg_context.scope = function_scope;
   arg_context.epoch = function_epoch;
 
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+  if (args_view.length != 0) {
+    bool previous_argument_has_default_value = false;
+
+    Array_Function_Parameter temp_params = dyn_array_make(
+      Array_Function_Parameter,
+      .allocator = context->temp_allocator,
+      .capacity = 32,
+    );
+
+    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
+      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+      Function_Parameter arg = token_match_argument(&arg_context, arg_view, fn_info);
+      MASS_ON_ERROR(*context->result) goto defer;
+      dyn_array_push(temp_params, arg);
+      if (previous_argument_has_default_value) {
+        if (!arg.maybe_default_expression.length ) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
+            .source_range = return_types->source_range,
+          });
+          goto defer;
+        }
+      } else {
+        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
+      }
+    }
+    dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
+  }
+
   if (value_is_group(return_types)) {
     const Group *return_types_group = value_as_group(return_types);
     if (return_types_group->tag != Group_Tag_Paren) {
@@ -2755,37 +2786,6 @@ token_process_function_literal(
     fn_info->returns = token_match_return_type(&arg_context, value_view_single(&return_types));
   }
   MASS_ON_ERROR(*context->result) return 0;
-
-  bool previous_argument_has_default_value = false;
-  if (args_view.length == 0) return fn_info;
-
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-
-  Array_Function_Parameter temp_params = dyn_array_make(
-    Array_Function_Parameter,
-    .allocator = context->temp_allocator,
-    .capacity = 32,
-  );
-
-  for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
-    Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-    Function_Parameter arg = token_match_argument(&arg_context, arg_view, fn_info);
-    MASS_ON_ERROR(*context->result) goto defer;
-    dyn_array_push(temp_params, arg);
-    if (previous_argument_has_default_value) {
-      if (!arg.maybe_default_expression.length ) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
-          .source_range = return_types->source_range,
-        });
-        goto defer;
-      }
-    } else {
-      previous_argument_has_default_value = !!arg.maybe_default_expression.length;
-    }
-  }
-  dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
 
   defer:
   context_temp_reset_to_mark(context, temp_mark);
