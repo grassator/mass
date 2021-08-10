@@ -1451,7 +1451,8 @@ typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
 
 typedef enum {
   Function_Parameter_Tag_Runtime = 0,
-  Function_Parameter_Tag_Exact_Static = 1,
+  Function_Parameter_Tag_Generic = 1,
+  Function_Parameter_Tag_Exact_Static = 2,
 } Function_Parameter_Tag;
 
 typedef struct Function_Parameter_Exact_Static {
@@ -4965,7 +4966,8 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
 MASS_DEFINE_OPAQUE_C_TYPE(function_parameter_tag, Function_Parameter_Tag)
 static C_Enum_Item function_parameter_tag_items[] = {
 { .name = slice_literal_fields("Runtime"), .value = 0 },
-{ .name = slice_literal_fields("Exact_Static"), .value = 1 },
+{ .name = slice_literal_fields("Generic"), .value = 1 },
+{ .name = slice_literal_fields("Exact_Static"), .value = 2 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter_exact_static, Function_Parameter_Exact_Static,
   {

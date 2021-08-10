@@ -1632,6 +1632,7 @@ main(void) {
 
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),
+    struct_empty("Generic"),
     struct_fields("Exact_Static", (Struct_Item[]){
       { "Storage", "storage" },
     }),

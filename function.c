@@ -877,6 +877,9 @@ calculate_arguments_match_score(
         )) return -1;
         score += Score_Exact_Static;
       } break;
+      case Function_Parameter_Tag_Generic: {
+        score += Score_Cast; // TODO consider if implicit casts actually have a higher priority
+      } break;
     }
   }
   return score;

@@ -970,6 +970,28 @@ spec("source") {
       Mass_Error *error = &test_context.result->Error.error;
       check(error->tag == Mass_Error_Tag_Parse);
     }
+
+    it("should support referencing the type of one argument in the return type") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "identity :: fn(x : s64) -> (type_of(x)) { x }\n"
+          "checker :: fn() -> (s64) { identity(42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    xit("should support templated parameters") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "checker :: fn() -> (s64) { identity(42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Assignment") {

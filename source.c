@@ -1823,6 +1823,7 @@ token_match_argument(
 
   const Descriptor *descriptor;
   Value *name_token;
+  bool generic = false;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
       context_error(context, (Mass_Error) {
@@ -1841,15 +1842,11 @@ token_match_argument(
     Value_View type_expression;
     Value_View name_tokens;
     Value *operator;
-    if (!token_maybe_split_on_operator(
+    generic = !token_maybe_split_on_operator(
       definition, slice_literal(":"), &name_tokens, &type_expression, &operator
-    )) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = definition.source_range,
-        .detailed_message = "Expected an expression after `:`",
-      });
-      goto err;
+    );
+    if (generic) {
+      name_tokens = definition;
     }
     if (name_tokens.length == 0) {
       context_error(context, (Mass_Error) {
@@ -1867,11 +1864,11 @@ token_match_argument(
       });
       goto err;
     }
-    descriptor = token_match_type(context, type_expression);
+    descriptor = generic ? 0 : token_match_type(context, type_expression);
   }
 
   arg = (Function_Parameter) {
-    .tag = Function_Parameter_Tag_Runtime,
+    .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
     .maybe_default_expression = default_expression,
     .declaration = {
       .name = value_as_symbol(name_token)->name,
@@ -2717,11 +2714,13 @@ token_process_function_literal(
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, function_scope);
 
+  Scope *temp_argument_scope = scope_make(context->allocator, function_scope);
   Execution_Context arg_context = *context;
-  arg_context.scope = function_scope;
+  arg_context.scope = temp_argument_scope;
   arg_context.epoch = function_epoch;
 
   Temp_Mark temp_mark = context_temp_mark(context);
+
 
   if (args_view.length != 0) {
     bool previous_argument_has_default_value = false;
@@ -2733,12 +2732,12 @@ token_process_function_literal(
     );
 
     for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
-      Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-      Function_Parameter arg = token_match_argument(&arg_context, arg_view, fn_info);
+      Value_View param_view = token_split_next(&it, &token_pattern_comma_operator);
+      Function_Parameter param = token_match_argument(&arg_context, param_view, fn_info);
       MASS_ON_ERROR(*context->result) goto defer;
-      dyn_array_push(temp_params, arg);
+      dyn_array_push(temp_params, param);
       if (previous_argument_has_default_value) {
-        if (!arg.maybe_default_expression.length ) {
+        if (!param.maybe_default_expression.length ) {
           context_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
             .source_range = return_types->source_range,
@@ -2746,8 +2745,19 @@ token_process_function_literal(
           goto defer;
         }
       } else {
-        previous_argument_has_default_value = !!arg.maybe_default_expression.length;
+        previous_argument_has_default_value = !!param.maybe_default_expression.length;
       }
+
+      Value *fake_argument = value_make(
+        context, param.declaration.descriptor, storage_none, param.declaration.source_range
+      );
+      scope_define_value(
+        temp_argument_scope,
+        VALUE_STATIC_EPOCH,
+        param.declaration.source_range,
+        param.declaration.name,
+        fake_argument
+      );
     }
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
   }
