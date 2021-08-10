@@ -233,10 +233,6 @@ typedef struct Memory_Layout Memory_Layout;
 typedef dyn_array_type(Memory_Layout *) Array_Memory_Layout_Ptr;
 typedef dyn_array_type(const Memory_Layout *) Array_Const_Memory_Layout_Ptr;
 
-typedef struct Function_Return Function_Return;
-typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
-typedef dyn_array_type(const Function_Return *) Array_Const_Function_Return_Ptr;
-
 typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
@@ -1453,13 +1449,6 @@ typedef struct Memory_Layout {
 } Memory_Layout;
 typedef dyn_array_type(Memory_Layout) Array_Memory_Layout;
 
-typedef struct Function_Return {
-  Slice name;
-  const Descriptor * descriptor;
-  Source_Range source_range;
-} Function_Return;
-typedef dyn_array_type(Function_Return) Array_Function_Return;
-
 typedef enum {
   Function_Parameter_Tag_Runtime = 0,
   Function_Parameter_Tag_Exact_Static = 1,
@@ -1506,7 +1495,7 @@ typedef struct Function_Info {
   u32 _flags_padding;
   Array_Function_Parameter parameters;
   Scope * scope;
-  Function_Return returns;
+  Declaration returns;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
@@ -2290,11 +2279,6 @@ static Descriptor descriptor_array_memory_layout;
 static Descriptor descriptor_array_memory_layout_ptr;
 static Descriptor descriptor_memory_layout_pointer;
 static Descriptor descriptor_memory_layout_pointer_pointer;
-static Descriptor descriptor_function_return;
-static Descriptor descriptor_array_function_return;
-static Descriptor descriptor_array_function_return_ptr;
-static Descriptor descriptor_function_return_pointer;
-static Descriptor descriptor_function_return_pointer_pointer;
 static Descriptor descriptor_function_parameter;
 static Descriptor descriptor_array_function_parameter;
 static Descriptor descriptor_array_function_parameter_ptr;
@@ -4977,35 +4961,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(memory_layout, Memory_Layout,
   },
 );
 MASS_DEFINE_TYPE_VALUE(memory_layout);
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
-MASS_DEFINE_STRUCT_DESCRIPTOR(function_return, Function_Return,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_slice,
-      .name = slice_literal_fields("name"),
-    },
-    .Base_Relative.offset = offsetof(Function_Return, name),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_descriptor_pointer,
-      .name = slice_literal_fields("descriptor"),
-    },
-    .Base_Relative.offset = offsetof(Function_Return, descriptor),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_source_range,
-      .name = slice_literal_fields("source_range"),
-    },
-    .Base_Relative.offset = offsetof(Function_Return, source_range),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(function_return);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter_ptr, Array_Function_Parameter_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_parameter, Array_Function_Parameter)
@@ -5122,7 +5077,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_function_return,
+      .descriptor = &descriptor_declaration,
       .name = slice_literal_fields("returns"),
     },
     .Base_Relative.offset = offsetof(Function_Info, returns),

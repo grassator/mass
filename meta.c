@@ -1630,12 +1630,6 @@ main(void) {
     { "Array_Memory_Layout_Item", "items" },
   }));
 
-  push_type(type_struct("Function_Return", (Struct_Item[]){
-    { "Slice", "name" },
-    { "const Descriptor *", "descriptor" },
-    { "Source_Range", "source_range" },
-  }));
-
   push_type(add_common_fields(type_union("Function_Parameter", (Struct_Type[]){
     struct_empty("Runtime"),
     struct_fields("Exact_Static", (Struct_Item[]){
@@ -1660,7 +1654,7 @@ main(void) {
     { "u32", "_flags_padding" },
     { "Array_Function_Parameter", "parameters" },
     { "Scope *", "scope" },
-    { "Function_Return", "returns" },
+    { "Declaration", "returns" },
   }));
 
   push_type(type_struct("Function_Literal", (Struct_Item[]){

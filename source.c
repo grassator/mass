@@ -1880,12 +1880,12 @@ token_match_argument(
   return arg;
 }
 
-static Function_Return
+static Declaration
 token_match_return_type(
   Execution_Context *context,
   Value_View view
 ) {
-  Function_Return returns = {
+  Declaration returns = {
     .source_range = view.source_range,
   };
   if (context->result->tag != Mass_Result_Tag_Success) return returns;
@@ -2729,7 +2729,7 @@ token_process_function_literal(
     }
     Value_View return_types_view = return_types_group->children;
     if (return_types_view.length == 0) {
-      fn_info->returns = (Function_Return) { .descriptor = &descriptor_void, };
+      fn_info->returns = (Declaration) { .descriptor = &descriptor_void, };
     } else {
       Value_View_Split_Iterator it = { .view = return_types_view };
 
@@ -5309,7 +5309,7 @@ mass_make_fake_function_literal(
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
   function_info_init(fn_info, function_scope);
-  fn_info->returns = (Function_Return) {
+  fn_info->returns = (Declaration) {
     .descriptor = returns,
     .source_range = *source_range,
   };
