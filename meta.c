@@ -1638,6 +1638,7 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Declaration", "declaration" },
+    { "Value_View", "maybe_type_expression" },
     { "Value_View", "maybe_default_expression" },
   }));
 
@@ -1646,18 +1647,18 @@ main(void) {
     { "Macro", 1 << 0 },
     { "Compile_Time", 1 << 2 },
     { "Intrinsic", 1 << 3},
-    { "Generic", 1 << 4},
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){
     { "Descriptor_Function_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Array_Function_Parameter", "parameters" },
-    { "Scope *", "scope" },
+    { "Execution_Context", "context" },
     { "Declaration", "returns" },
   }));
 
   push_type(type_struct("Function_Literal", (Struct_Item[]){
+    { "u64", "is_generic" },
     { "Function_Info *", "info" },
     { "Value *", "body" },
     { "Value *", "runtime_instance"},

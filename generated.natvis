@@ -1579,6 +1579,7 @@
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="declaration">declaration</Item>
+    <Item Name="maybe_type_expression">maybe_type_expression</Item>
     <Item Name="maybe_default_expression">maybe_default_expression</Item>
     <Item Name="Exact_Static" Condition="tag == Function_Parameter_Tag_Exact_Static">Exact_Static</Item>
   </Expand>

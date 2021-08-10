@@ -1497,11 +1497,11 @@ value_global_c_string_from_slice(
 static inline void
 function_info_init(
   Function_Info *info,
-  Scope *scope
+  const Execution_Context *context
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .scope = scope,
+    .context = *context,
     .returns = {.descriptor = &descriptor_void},
   };
 }

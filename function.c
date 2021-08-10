@@ -729,6 +729,9 @@ ensure_function_instance(
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
+  ensure_parameter_descriptors(function);
+  MASS_ON_ERROR(*context->result) return 0;
+
   const Descriptor *instance_descriptor = descriptor_function_instance(
     context->allocator, fn_name, function, calling_convention
   );
@@ -746,7 +749,7 @@ ensure_function_instance(
     value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
 
   Execution_Context body_context = *context;
-  Scope *body_scope = scope_make(context->allocator, function->scope);
+  Scope *body_scope = scope_make(context->allocator, function->context.scope);
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.epoch = get_new_epoch();
@@ -891,7 +894,7 @@ program_init_startup_code(
 ) {
   Program *program = context->program;
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, 0 /* scope */);
+  function_info_init(fn_info, context);
   const Calling_Convention *calling_convention =
     context->compilation->runtime_program->default_calling_convention;
   Slice fn_name = slice_literal("__startup");

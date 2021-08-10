@@ -1462,6 +1462,7 @@ typedef struct Function_Parameter {
   Function_Parameter_Tag tag;
   char _tag_padding[4];
   Declaration declaration;
+  Value_View maybe_type_expression;
   Value_View maybe_default_expression;
   union {
     Function_Parameter_Exact_Static Exact_Static;
@@ -1478,7 +1479,6 @@ typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_Macro = 1,
   Descriptor_Function_Flags_Compile_Time = 4,
   Descriptor_Function_Flags_Intrinsic = 8,
-  Descriptor_Function_Flags_Generic = 16,
 } Descriptor_Function_Flags;
 
 const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
@@ -1486,7 +1486,6 @@ const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   if (value == 1) return "Descriptor_Function_Flags_Macro";
   if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
   if (value == 8) return "Descriptor_Function_Flags_Intrinsic";
-  if (value == 16) return "Descriptor_Function_Flags_Generic";
   assert(!"Unexpected value for enum Descriptor_Function_Flags");
   return 0;
 };
@@ -1495,12 +1494,13 @@ typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
   Array_Function_Parameter parameters;
-  Scope * scope;
+  Execution_Context context;
   Declaration returns;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
 typedef struct Function_Literal {
+  u64 is_generic;
   Function_Info * info;
   Value * body;
   Value * runtime_instance;
@@ -5003,6 +5003,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
       .descriptor = &descriptor_value_view,
+      .name = slice_literal_fields("maybe_type_expression"),
+    },
+    .Base_Relative.offset = offsetof(Function_Parameter, maybe_type_expression),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_value_view,
       .name = slice_literal_fields("maybe_default_expression"),
     },
     .Base_Relative.offset = offsetof(Function_Parameter, maybe_default_expression),
@@ -5024,7 +5032,6 @@ static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("Macro"), .value = 1 },
 { .name = slice_literal_fields("Compile_Time"), .value = 4 },
 { .name = slice_literal_fields("Intrinsic"), .value = 8 },
-{ .name = slice_literal_fields("Generic"), .value = 16 },
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info_ptr, Array_Function_Info_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_info, Array_Function_Info)
@@ -5056,10 +5063,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_scope_pointer,
-      .name = slice_literal_fields("scope"),
+      .descriptor = &descriptor_execution_context,
+      .name = slice_literal_fields("context"),
     },
-    .Base_Relative.offset = offsetof(Function_Info, scope),
+    .Base_Relative.offset = offsetof(Function_Info, context),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5074,6 +5081,14 @@ MASS_DEFINE_TYPE_VALUE(function_info);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u64,
+      .name = slice_literal_fields("is_generic"),
+    },
+    .Base_Relative.offset = offsetof(Function_Literal, is_generic),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {

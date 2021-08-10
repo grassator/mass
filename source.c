@@ -1821,8 +1821,9 @@ token_match_argument(
     default_expression = (Value_View){0};
   }
 
-  const Descriptor *descriptor;
+  const Descriptor *descriptor = 0;
   Value *name_token;
+  Value_View maybe_type_expression = {0};
   bool generic = false;
   if (is_inferred_type) {
     if (definition.length != 1 || !value_is_symbol(value_view_get(definition, 0))) {
@@ -1839,11 +1840,10 @@ token_match_argument(
     descriptor = value_or_lazy_value_descriptor(parsed_default_expression);
     if (value_is_static_number_literal(parsed_default_expression)) descriptor = &descriptor_s64;
   } else {
-    Value_View type_expression;
     Value_View name_tokens;
     Value *operator;
     generic = !token_maybe_split_on_operator(
-      definition, slice_literal(":"), &name_tokens, &type_expression, &operator
+      definition, slice_literal(":"), &name_tokens, &maybe_type_expression, &operator
     );
     if (generic) {
       name_tokens = definition;
@@ -1864,12 +1864,12 @@ token_match_argument(
       });
       goto err;
     }
-    descriptor = generic ? 0 : token_match_type(context, type_expression);
   }
 
   arg = (Function_Parameter) {
     .tag = generic ? Function_Parameter_Tag_Generic : Function_Parameter_Tag_Runtime,
     .maybe_default_expression = default_expression,
+    .maybe_type_expression = maybe_type_expression,
     .declaration = {
       .name = value_as_symbol(name_token)->name,
       .descriptor = descriptor,
@@ -2711,13 +2711,12 @@ token_process_function_literal(
   u64 function_epoch = get_new_epoch();
   Scope *function_scope = scope_make(context->allocator, context->scope);
 
-  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_scope);
-
-  Scope *temp_argument_scope = scope_make(context->allocator, function_scope);
   Execution_Context arg_context = *context;
-  arg_context.scope = temp_argument_scope;
+  arg_context.scope = function_scope;
   arg_context.epoch = function_epoch;
+
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, &arg_context);
 
   Temp_Mark temp_mark = context_temp_mark(context);
 
@@ -2746,20 +2745,6 @@ token_process_function_literal(
         }
       } else {
         previous_argument_has_default_value = !!param.maybe_default_expression.length;
-      }
-
-      Value *fake_argument = value_make(
-        context, param.declaration.descriptor, storage_none, param.declaration.source_range
-      );
-      scope_define_value(
-        temp_argument_scope,
-        VALUE_STATIC_EPOCH,
-        param.declaration.source_range,
-        param.declaration.name,
-        fake_argument
-      );
-      if (param.tag == Function_Parameter_Tag_Generic) {
-        fn_info->flags |= Descriptor_Function_Flags_Generic;
       }
     }
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
@@ -2843,7 +2828,7 @@ compile_time_eval(
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
-  function_info_init(&fn_info, eval_context.scope);
+  function_info_init(&fn_info, &eval_context);
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
@@ -3337,7 +3322,7 @@ mass_handle_macro_call(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, literal->info->scope);
+  Scope *body_scope = scope_make(context->allocator, literal->info->context.scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
@@ -3454,7 +3439,7 @@ call_function_overload(
     .capacity = 32,
   );
 
-  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
+  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->context.scope);
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
   u64 all_used_arguments_register_bitset = 0;
@@ -3699,6 +3684,22 @@ struct Overload_Match_State {
 };
 
 static void
+ensure_parameter_descriptors(
+  const Function_Info *info
+) {
+  DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
+    if (!param->declaration.descriptor) {
+      assert(param->maybe_type_expression.length);
+      // TODO avoid this const cast
+      Execution_Context *context = (Execution_Context *)&info->context;
+      param->declaration.descriptor =
+        token_match_type(context, param->maybe_type_expression);
+      MASS_ON_ERROR(*context->result) return;
+    }
+  }
+}
+
+static void
 mass_match_overload_candidate(
   Value *candidate,
   Value_View args,
@@ -3713,8 +3714,11 @@ mass_match_overload_candidate(
     }
   } else {
     const Function_Info *overload_info = maybe_function_info_from_value(candidate);
+
     s64 score = -1;
     if (overload_info) {
+      ensure_parameter_descriptors(overload_info);
+
       if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
         score = 0;
       } else {
@@ -5323,9 +5327,11 @@ mass_make_fake_function_literal(
   const Source_Range *source_range
 ) {
   Scope *function_scope = scope_make(context->allocator, context->scope);
+  Execution_Context function_context = *context;
+  function_context.scope = function_scope;
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, function_scope);
+  function_info_init(fn_info, &function_context);
   fn_info->returns = (Declaration) {
     .descriptor = returns,
     .source_range = *source_range,
@@ -5486,6 +5492,14 @@ token_parse_function_literal(
   Function_Info *fn_info = token_process_function_literal(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
+  bool is_generic = false;
+  DYN_ARRAY_FOREACH(Function_Parameter, param, fn_info->parameters) {
+    if (param->tag == Function_Parameter_Tag_Generic) {
+      is_generic = true;
+      break;
+    }
+  }
+
   bool body_is_literal = false;
   Value_View rest = value_view_rest(&view, peek_index);
 
@@ -5543,11 +5557,13 @@ token_parse_function_literal(
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
+      .is_generic = is_generic,
       .info = fn_info,
       .body = body_value,
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
+    ensure_parameter_descriptors(fn_info);
     // TODO It might be better to just store Function_Info here and not the instance
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;

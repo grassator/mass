@@ -46,6 +46,11 @@ maybe_coerce_number_literal_to_integer(
   const Descriptor *target_descriptor
 );
 
+static void
+ensure_parameter_descriptors(
+  const Function_Info *info
+);
+
 static Overload_Match
 mass_match_overload(
   Value *value,
