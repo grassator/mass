@@ -93,7 +93,7 @@ test_program_source_base(
       value = *dyn_array_get(set->items, 0);
     }
     if (value->descriptor == &descriptor_function_literal) {
-      ensure_function_instance(context, value);
+      ensure_function_instance(context, value, (Value_View){0});
     }
   }
   return value;
@@ -982,12 +982,12 @@ spec("source") {
       check(checker() == 42);
     }
 
-    xit("should support templated parameters") {
+    it("should support templated parameters") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
           "identity :: fn(x) -> (type_of(x)) { x }\n"
-          "checker :: fn() -> (s64) { identity(42) }"
+          "checker :: fn() -> (s64) { x := 42; identity(x) }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -2093,7 +2093,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/folding"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/folding.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2104,7 +2104,7 @@ spec("source") {
         "main", &test_context, "../compile-time-benchmark/print"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/print.exe"), &test_context, Executable_Type_Cli);
     }
@@ -2127,7 +2127,7 @@ spec("source") {
         "main", &test_context, "fixtures/relocations"
       );
       check(test_program->entry_point);
-      ensure_function_instance(&test_context, test_program->entry_point);
+      ensure_function_instance(&test_context, test_program->entry_point, (Value_View){0});
       check(spec_check_mass_result(test_context.result));
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }

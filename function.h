@@ -7,7 +7,8 @@
 static Value *
 ensure_function_instance(
   Execution_Context *context,
-  Value *fn_value
+  Value *fn_value,
+  Value_View args
 );
 
 static inline Value *

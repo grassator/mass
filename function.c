@@ -703,7 +703,8 @@ function_return_value_register_from_storage(
 static Value *
 ensure_function_instance(
   Execution_Context *context,
-  Value *fn_value
+  Value *fn_value,
+  Value_View args
 ) {
   if (fn_value->descriptor->tag == Descriptor_Tag_Function_Instance) {
     return fn_value;
@@ -713,7 +714,7 @@ ensure_function_instance(
   assert(descriptor == &descriptor_function_literal);
   // TODO figure out how to avoid the const cast here
   Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
-  Function_Info *function = literal->info;
+  Function_Info *function = (Function_Info *)maybe_function_info_from_value(fn_value, args);
 
   assert(!(function->flags & Descriptor_Function_Flags_Macro));
   Value **cached_instance = context_is_compile_time_eval(context)
@@ -941,13 +942,13 @@ program_init_startup_code(
 
   for (u64 i = 0; i < dyn_array_length(context->program->startup_functions); ++i) {
     Value *fn = *dyn_array_get(context->program->startup_functions, i);
-    Value *instance = ensure_function_instance(context, fn);
+    Value *instance = ensure_function_instance(context, fn, (Value_View){0});
     push_eagerly_encoded_assembly(
       &builder.code_block, source_range,
       &(Instruction_Assembly){call, {instance->storage}}
     );
   }
-  Value *entry_instance = ensure_function_instance(context, program->entry_point);
+  Value *entry_instance = ensure_function_instance(context, program->entry_point, (Value_View){0});
   push_eagerly_encoded_assembly(
     &builder.code_block, source_range,
     &(Instruction_Assembly){jmp, {entry_instance->storage}}

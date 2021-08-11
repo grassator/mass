@@ -3402,7 +3402,8 @@ call_function_overload(
   Value *to_call = payload->overload;
   Array_Value_Ptr arguments = payload->args;
 
-  Value *instance = ensure_function_instance(context, to_call);
+  Value_View args_view = value_view_from_value_array(arguments, source_range);
+  Value *instance = ensure_function_instance(context, to_call, args_view);
   MASS_ON_ERROR(*context->result) return 0;
   assert(instance->descriptor->tag == Descriptor_Tag_Function_Instance);
   const Descriptor_Function_Instance *instance_descriptor = &instance->descriptor->Function_Instance;
@@ -3693,30 +3694,36 @@ ensure_parameter_descriptors(
 ) {
   // TODO avoid this const cast
   Function_Info *mutable_info = (Function_Info *)info;
-  Execution_Context *context = &mutable_info->context;
+  Execution_Context temp_context = mutable_info->context;
+  Execution_Context *context = &temp_context;
+  context->scope = scope_make(allocator_default, context->scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
+    assert(param->tag != Function_Parameter_Tag_Generic);
     if (!param->declaration.descriptor) {
       assert(param->maybe_type_expression.length);
       param->declaration.descriptor =
         token_match_type(context, param->maybe_type_expression);
       MASS_ON_ERROR(*context->result) return;
-      Source_Range source_range = param->declaration.source_range;
-      Value *param_value =
-        value_make(context, param->declaration.descriptor, storage_none, source_range);
-      scope_define_value(
-        context->scope,
-        VALUE_STATIC_EPOCH,
-        source_range,
-        param->declaration.name,
-        param_value
-      );
     }
+    Source_Range source_range = param->declaration.source_range;
+    // FIXME @Leak
+    Value *param_value =
+      value_init(allocator_allocate(allocator_default, Value), param->declaration.descriptor, storage_none, source_range);
+    assert(param->declaration.descriptor != &descriptor_overload_set);
+    scope_define_value(
+      context->scope,
+      VALUE_STATIC_EPOCH,
+      source_range,
+      param->declaration.name,
+      param_value
+    );
   }
   if (!info->returns.declaration.descriptor) {
     assert(info->returns.maybe_type_expression.length);
     mutable_info->returns.declaration.descriptor =
       token_match_type(context, info->returns.maybe_type_expression);
+    assert(mutable_info->returns.declaration.descriptor);
     MASS_ON_ERROR(*context->result) return;
   }
 }
@@ -3735,16 +3742,10 @@ mass_match_overload_candidate(
       mass_match_overload_candidate(overload, args, match, best_conflict_match);
     }
   } else {
-    const Function_Info *overload_info = maybe_function_info_from_value(candidate);
+    const Function_Info *overload_info = maybe_function_info_from_value(candidate, args);
 
     s64 score = -1;
     if (overload_info) {
-      if (candidate->descriptor == &descriptor_function_literal) {
-        const Function_Literal *literal = storage_static_as_c_type(&candidate->storage, Function_Literal);
-        if (literal->is_generic) {
-          panic("fdasfasdf");
-        }
-      }
       ensure_parameter_descriptors(overload_info);
 
       if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
@@ -3801,7 +3802,7 @@ mass_intrinsic_call(
   eval_context.program = jit->program;
   eval_context.scope = context->scope;
 
-  Value *instance = ensure_function_instance(&eval_context, overload);
+  Value *instance = ensure_function_instance(&eval_context, overload, (Value_View){0});
   MASS_ON_ERROR(*eval_context.result) return 0;
 
   Mass_Result jit_result = program_jit(context->compilation, jit);
@@ -3838,7 +3839,7 @@ static bool
 value_is_intrinsic(
   Value *value
 ) {
-  const Function_Info *info = maybe_function_info_from_value(value);
+  const Function_Info *info = maybe_function_info_from_value(value, (Value_View){0});
   return !!(info && info->flags & Descriptor_Function_Flags_Intrinsic);
 }
 
@@ -3918,7 +3919,7 @@ token_handle_function_call(
   MASS_ON_ERROR(*context->result) return 0;
   assert(overload);
 
-  const Function_Info *info = maybe_function_info_from_value(overload);
+  const Function_Info *info = maybe_function_info_from_value(overload, args_view);
   if (
     overload != context->current_compile_time_function_call_target &&
     info && (info->flags & Descriptor_Function_Flags_Compile_Time)
@@ -3968,6 +3969,7 @@ token_handle_function_call(
     .source_range = source_range,
   };
 
+  ensure_parameter_descriptors(info);
   return mass_make_lazy_value(
     context, source_range, call_payload, info->returns.declaration.descriptor, call_function_overload
   );
@@ -4591,7 +4593,7 @@ mass_handle_startup_call_lazy_proc(
   if (dyn_array_length(literal->info->parameters)) goto err;
   if (literal->info->returns.declaration.descriptor != &descriptor_void) goto err;
 
-  ensure_function_instance(context, startup_function);
+  ensure_function_instance(context, startup_function, (Value_View){0});
   dyn_array_push(context->program->startup_functions, startup_function);
 
   return expected_result_validate(expected_result, &void_value);
@@ -6330,7 +6332,7 @@ token_define_global_variable(
       Value *startup_function = value_make(
         context, &descriptor_function_literal, storage_static(startup_literal), value->source_range
       );
-      ensure_function_instance(context, startup_function);
+      ensure_function_instance(context, startup_function, (Value_View){0});
       dyn_array_push(context->program->startup_functions, startup_function);
     }
   }
