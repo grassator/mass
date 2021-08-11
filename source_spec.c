@@ -1557,6 +1557,17 @@ spec("source") {
       check(error->Type_Mismatch.actual == &descriptor_slice);
     }
 
+    it("should support macro paramaters without type assertions") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "identity :: macro(x) { x }\n"
+          "checker :: fn() -> (s64) { identity(42) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to define and use a syntax macro without a capture") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "checker", &test_context,
