@@ -3746,8 +3746,6 @@ mass_match_overload_candidate(
 
     s64 score = -1;
     if (overload_info) {
-      ensure_parameter_descriptors(overload_info);
-
       if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
         score = 0;
       } else {

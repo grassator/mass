@@ -1565,30 +1565,40 @@ c_function_from_label(
 }
 
 static const Function_Info *
+function_literal_info_for_args(
+  const Function_Literal *literal,
+  Value_View args
+) {
+  if (!literal->is_generic) return literal->info;
+  // FIXME @Leak
+  Function_Info *specialized_info = allocator_allocate(allocator_default, Function_Info);
+  *specialized_info = *literal->info;
+  specialized_info->parameters = dyn_array_make(Array_Function_Parameter,
+    .capacity = dyn_array_length(literal->info->parameters)
+  );
+  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
+    Function_Parameter *specialized_param =
+      dyn_array_push(specialized_info->parameters, *param);
+    if(param->tag == Function_Parameter_Tag_Generic) {
+      specialized_param->tag = Function_Parameter_Tag_Runtime;
+      specialized_param->declaration.descriptor =
+        value_or_lazy_value_descriptor(value_view_get(args, arg_index));
+    }
+  }
+  return specialized_info;
+}
+
+static const Function_Info *
 maybe_function_info_from_value(
   Value *value,
   Value_View args
 ) {
   if (value->descriptor == &descriptor_function_literal) {
     const Function_Literal *literal = storage_static_as_c_type(&value->storage, Function_Literal);
-    if (!literal->is_generic) return literal->info;
-    // FIXME @Leak
-    Function_Info *specialized_info = allocator_allocate(allocator_default, Function_Info);
-    *specialized_info = *literal->info;
-    specialized_info->parameters = dyn_array_make(Array_Function_Parameter,
-      .capacity = dyn_array_length(literal->info->parameters)
-    );
-    for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
-      const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
-      Function_Parameter *specialized_param =
-        dyn_array_push(specialized_info->parameters, *param);
-      if(param->tag == Function_Parameter_Tag_Generic) {
-        specialized_param->tag = Function_Parameter_Tag_Runtime;
-        specialized_param->declaration.descriptor =
-          value_or_lazy_value_descriptor(value_view_get(args, arg_index));
-      }
-    }
-    return specialized_info;
+    const Function_Info *literal_info = function_literal_info_for_args(literal, args);
+    ensure_parameter_descriptors(literal_info);
+    return literal_info;
   } else {
     const Descriptor *descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(value));
