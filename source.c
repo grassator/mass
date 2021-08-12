@@ -3597,11 +3597,9 @@ struct Overload_Match_State {
 
 static void
 ensure_parameter_descriptors(
-  const Function_Info *info
+  Function_Info *info
 ) {
-  // TODO avoid this const cast
-  Function_Info *mutable_info = (Function_Info *)info;
-  Execution_Context temp_context = mutable_info->context;
+  Execution_Context temp_context = info->context;
   Execution_Context *context = &temp_context;
   context->scope = scope_make(allocator_default, context->scope);
 
@@ -3628,9 +3626,9 @@ ensure_parameter_descriptors(
   }
   if (!info->returns.declaration.descriptor) {
     assert(info->returns.maybe_type_expression.length);
-    mutable_info->returns.declaration.descriptor =
+    info->returns.declaration.descriptor =
       token_match_type(context, info->returns.maybe_type_expression);
-    assert(mutable_info->returns.declaration.descriptor);
+    assert(info->returns.declaration.descriptor);
     MASS_ON_ERROR(*context->result) return;
   }
 }
