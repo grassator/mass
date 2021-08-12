@@ -3828,6 +3828,9 @@ token_handle_function_call(
     }
   }
 
+  const Function_Literal *maybe_literal = 0;
+  if (value_is_function_literal(overload)) maybe_literal = value_as_function_literal(overload);
+
   MASS_ON_ERROR(*context->result) return 0;
   if (
     overload != context->current_compile_time_function_call_target &&
@@ -3840,17 +3843,13 @@ token_handle_function_call(
     // will end up here as well. Indirect calls are allowed so we do not need a full stack
     const Value *saved_call_target = context->current_compile_time_function_call_target;
     context->current_compile_time_function_call_target = temp_overload;
-    Value *result = 0;
+    Value *result;
     if (info->flags & Descriptor_Function_Flags_Intrinsic) {
       result = mass_intrinsic_call(context, overload, args_view);
     } else {
-      if (value_is_function_literal(overload)) {
-        const Function_Literal *literal = value_as_function_literal(overload);
-        if (value_is_intrinsic(literal->body)) {
-          result = mass_intrinsic_call(context, literal->body, args_view);
-        }
-      }
-      if (!result) {
+      if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
+        result = mass_intrinsic_call(context, maybe_literal->body, args_view);
+      } else {
         Value *fake_args_token = value_make(
           context, &descriptor_value_view, storage_static(&args_view), args_view.source_range
         );
@@ -3866,11 +3865,8 @@ token_handle_function_call(
     return result;
   }
 
-  if (value_is_function_literal(overload)) {
-    const Function_Literal *literal = value_as_function_literal(overload);
-    if (literal->flags & Function_Literal_Flags_Macro) {
-      return mass_handle_macro_call(context, overload, args_view, source_range);
-    }
+  if (maybe_literal && (maybe_literal->flags & Function_Literal_Flags_Macro)) {
+    return mass_handle_macro_call(context, overload, args_view, source_range);
   }
 
   Mass_Function_Call_Lazy_Payload *call_payload =
