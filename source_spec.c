@@ -614,26 +614,6 @@ spec("source") {
       check(actual == 42);
     }
 
-    it("should be able to parse and run a s64 -> s64 function") {
-      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
-        "foo", &test_context,
-        "foo :: fn(x : s64) -> (s64) { x }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(42) == 42);
-    }
-
-    it("should be able to parse and run multiple function definitions") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "proxy", &test_context,
-        "proxy :: fn() -> (s32) { plus(1, 2); plus(40, 2) }\n"
-        "plus :: fn(x : s32, y : s32) -> (s32) { x + y }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      s32 answer = checker();
-      check(answer == 42);
-    }
-
     it("should be able to define a local function") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
