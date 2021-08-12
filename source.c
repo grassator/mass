@@ -3658,13 +3658,11 @@ mass_match_overload_candidate(
   } else {
     const Function_Info *overload_info = maybe_function_info_from_value(candidate, args);
 
-    s64 score = -1;
-    if (overload_info) {
-      if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
-        score = 0;
-      } else {
-        score = calculate_arguments_match_score(overload_info, args);
-      }
+    s64 score;
+    if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
+      score = 0;
+    } else {
+      score = calculate_arguments_match_score(overload_info, args);
     }
     if (score > match->score) {
       match->info = overload_info;
