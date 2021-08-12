@@ -1417,7 +1417,11 @@ value_release_if_temporary(
       }
       break;
     }
-    case Storage_Tag_Unpacked:
+    case Storage_Tag_Unpacked: {
+      register_release(builder, value->storage.Unpacked.registers[0]);
+      register_release(builder, value->storage.Unpacked.registers[1]);
+      break;
+    }
     case Storage_Tag_Any:
     case Storage_Tag_None:
     case Storage_Tag_Eflags:
