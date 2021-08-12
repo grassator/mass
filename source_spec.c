@@ -972,6 +972,19 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should multiple calls to a function with templates parameters") {
+      u64 (*checker)() =
+        (u64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "checker :: fn() -> (u64) {\n"
+            "string := identity(\"foo\"); string.length + identity(cast(u64, 39))\n"
+          "}"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Assignment") {
