@@ -110,11 +110,8 @@ mass_error_append_descriptor(
 static void
 mass_error_append_function_signature_string(
   Fixed_Buffer *result,
-  Value *value
+  const Function_Info *info
 ) {
-  const Function_Info *info = maybe_function_info_from_value(value, (Value_View){0});
-
-  APPEND_SLICE(value->descriptor->name);
   APPEND_LITERAL("(");
   bool first = true;
   DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {

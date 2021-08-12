@@ -3592,6 +3592,7 @@ call_function_overload(
 
 struct Overload_Match_State {
   Value *value;
+  const Function_Info *info;
   s64 score;
 };
 
@@ -3658,11 +3659,13 @@ mass_match_overload_candidate(
       }
     }
     if (score > match->score) {
+      match->info = overload_info;
       match->value = candidate;
       match->score = score;
     } else {
       if (score == match->score && score > best_conflict_match->score) {
         *best_conflict_match = *match;
+        match->info = overload_info;
         match->value = candidate;
       }
     }
@@ -3684,12 +3687,15 @@ mass_match_overload(
   if (match.score == best_conflict_match.score) {
     return (Overload_Match){
       .tag = Overload_Match_Tag_Undecidable,
-      .Undecidable = { match.value, best_conflict_match.value },
+      .Undecidable = { match.info, best_conflict_match.info },
     };
   }
   return (Overload_Match){
     .tag = Overload_Match_Tag_Found,
-    .Found = {match.value},
+    .Found = {
+      .value = match.value,
+      .info = match.info,
+    },
   };
 }
 
@@ -3790,6 +3796,7 @@ token_handle_function_call(
   Overload_Match match = mass_match_overload(target_expression, args_view);
 
   Value *overload;
+  const Function_Info *info;
   switch(match.tag) {
     case Overload_Match_Tag_No_Match: {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
@@ -3810,19 +3817,18 @@ token_handle_function_call(
     }
     case Overload_Match_Tag_Found: {
       overload = match.Found.value;
+      info = match.Found.info;
       break;
     }
     default: {
       overload = 0;
+      info = 0;
       panic("Unexpected Overload_Match_Tag");
       break;
     }
   }
 
   MASS_ON_ERROR(*context->result) return 0;
-  assert(overload);
-
-  const Function_Info *info = maybe_function_info_from_value(overload, args_view);
   if (
     overload != context->current_compile_time_function_call_target &&
     info && (info->flags & Descriptor_Function_Flags_Compile_Time)

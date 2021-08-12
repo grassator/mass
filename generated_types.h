@@ -1294,11 +1294,12 @@ typedef enum {
 } Overload_Match_Tag;
 
 typedef struct Overload_Match_Undecidable {
-  Value * a;
-  Value * b;
+  const Function_Info * a;
+  const Function_Info * b;
 } Overload_Match_Undecidable;
 typedef struct Overload_Match_Found {
   Value * value;
+  const Function_Info * info;
 } Overload_Match_Found;
 typedef struct Overload_Match {
   Overload_Match_Tag tag;
@@ -1703,8 +1704,8 @@ typedef struct Mass_Error_No_Matching_Overload {
   Array_Value_Ptr arguments;
 } Mass_Error_No_Matching_Overload;
 typedef struct Mass_Error_Undecidable_Overload {
-  Value * a;
-  Value * b;
+  const Function_Info * a;
+  const Function_Info * b;
 } Mass_Error_Undecidable_Overload;
 typedef struct Mass_Error {
   Mass_Error_Tag tag;
@@ -4611,7 +4612,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_undecidable, Overload_Match_Undecid
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_value_pointer,
+      .descriptor = &descriptor_function_info_pointer,
       .name = slice_literal_fields("a"),
     },
     .Base_Relative.offset = offsetof(Overload_Match_Undecidable, a),
@@ -4619,7 +4620,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_undecidable, Overload_Match_Undecid
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_value_pointer,
+      .descriptor = &descriptor_function_info_pointer,
       .name = slice_literal_fields("b"),
     },
     .Base_Relative.offset = offsetof(Overload_Match_Undecidable, b),
@@ -4634,6 +4635,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(overload_match_found, Overload_Match_Found,
       .name = slice_literal_fields("value"),
     },
     .Base_Relative.offset = offsetof(Overload_Match_Found, value),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_function_info_pointer,
+      .name = slice_literal_fields("info"),
+    },
+    .Base_Relative.offset = offsetof(Overload_Match_Found, info),
   },
 );
 MASS_DEFINE_TYPE_VALUE(overload_match_found);
@@ -5674,7 +5683,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undeci
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_value_pointer,
+      .descriptor = &descriptor_function_info_pointer,
       .name = slice_literal_fields("a"),
     },
     .Base_Relative.offset = offsetof(Mass_Error_Undecidable_Overload, a),
@@ -5682,7 +5691,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undecidable_overload, Mass_Error_Undeci
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_value_pointer,
+      .descriptor = &descriptor_function_info_pointer,
       .name = slice_literal_fields("b"),
     },
     .Base_Relative.offset = offsetof(Mass_Error_Undecidable_Overload, b),
