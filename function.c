@@ -426,8 +426,6 @@ fn_encode(
   const Function_Builder *builder,
   Function_Layout *out_layout
 ) {
-  assert(!(builder->function->flags & Descriptor_Function_Flags_Macro));
-
   Label_Index label_index = builder->code_block.start_label;
   Label *label = program_get_label(program, label_index);
   assert(!label->resolved);
@@ -714,9 +712,8 @@ ensure_function_instance(
   assert(descriptor == &descriptor_function_literal);
   // TODO figure out how to avoid the const cast here
   Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
-  Function_Info *function = (Function_Info *)maybe_function_info_from_value(fn_value, args);
+  assert(!(literal->flags & Function_Literal_Flags_Macro));
 
-  assert(!(function->flags & Descriptor_Function_Flags_Macro));
   Value **cached_instance = context_is_compile_time_eval(context)
     ? &literal->compile_time_instance
     : &literal->runtime_instance;
@@ -730,6 +727,7 @@ ensure_function_instance(
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
+  Function_Info *function = (Function_Info *)maybe_function_info_from_value(fn_value, args);
   ensure_parameter_descriptors(function);
   MASS_ON_ERROR(*context->result) return 0;
 

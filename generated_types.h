@@ -1482,16 +1482,14 @@ function_parameter_as_exact_static(Function_Parameter *function_parameter) {
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
 typedef enum Descriptor_Function_Flags {
   Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Macro = 1,
-  Descriptor_Function_Flags_Compile_Time = 4,
-  Descriptor_Function_Flags_Intrinsic = 8,
+  Descriptor_Function_Flags_Compile_Time = 2,
+  Descriptor_Function_Flags_Intrinsic = 4,
 } Descriptor_Function_Flags;
 
 const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
   if (value == 0) return "Descriptor_Function_Flags_None";
-  if (value == 1) return "Descriptor_Function_Flags_Macro";
-  if (value == 4) return "Descriptor_Function_Flags_Compile_Time";
-  if (value == 8) return "Descriptor_Function_Flags_Intrinsic";
+  if (value == 2) return "Descriptor_Function_Flags_Compile_Time";
+  if (value == 4) return "Descriptor_Function_Flags_Intrinsic";
   assert(!"Unexpected value for enum Descriptor_Function_Flags");
   return 0;
 };
@@ -1514,11 +1512,13 @@ typedef dyn_array_type(Function_Info) Array_Function_Info;
 typedef enum Function_Literal_Flags {
   Function_Literal_Flags_None = 0,
   Function_Literal_Flags_Generic = 1,
+  Function_Literal_Flags_Macro = 2,
 } Function_Literal_Flags;
 
 const char *function_literal_flags_name(Function_Literal_Flags value) {
   if (value == 0) return "Function_Literal_Flags_None";
   if (value == 1) return "Function_Literal_Flags_Generic";
+  if (value == 2) return "Function_Literal_Flags_Macro";
   assert(!"Unexpected value for enum Function_Literal_Flags");
   return 0;
 };
@@ -5064,9 +5064,8 @@ MASS_DEFINE_TYPE_VALUE(function_parameter);
 MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
 static C_Enum_Item descriptor_function_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Macro"), .value = 1 },
-{ .name = slice_literal_fields("Compile_Time"), .value = 4 },
-{ .name = slice_literal_fields("Intrinsic"), .value = 8 },
+{ .name = slice_literal_fields("Compile_Time"), .value = 2 },
+{ .name = slice_literal_fields("Intrinsic"), .value = 4 },
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return_ptr, Array_Function_Return_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_return, Array_Function_Return)
@@ -5138,6 +5137,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(function_literal_flags, Function_Literal_Flags)
 static C_Enum_Item function_literal_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Generic"), .value = 1 },
+{ .name = slice_literal_fields("Macro"), .value = 2 },
 };
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)

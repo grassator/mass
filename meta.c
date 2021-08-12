@@ -1644,9 +1644,8 @@ main(void) {
 
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
     { "None", 0 },
-    { "Macro", 1 << 0 },
-    { "Compile_Time", 1 << 2 },
-    { "Intrinsic", 1 << 3},
+    { "Compile_Time", 1 << 1 },
+    { "Intrinsic", 1 << 2},
   }));
 
   push_type(type_struct("Function_Return", (Struct_Item[]){
@@ -1665,6 +1664,7 @@ main(void) {
   push_type(type_enum("Function_Literal_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Generic", 1 << 0 },
+    { "Macro", 1 << 1 },
   }));
 
   push_type(type_struct("Function_Literal", (Struct_Item[]){

@@ -3321,7 +3321,7 @@ mass_handle_macro_call(
 ) {
   assert(overload->descriptor == &descriptor_function_literal);
   const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
-  assert(literal->info->flags & Descriptor_Function_Flags_Macro);
+  assert(literal->flags & Function_Literal_Flags_Macro);
 
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
@@ -3955,8 +3955,11 @@ token_handle_function_call(
     return result;
   }
 
-  if (info->flags & Descriptor_Function_Flags_Macro) {
-    return mass_handle_macro_call(context, overload, args_view, source_range);
+  if (overload->descriptor == &descriptor_function_literal) {
+    const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+    if (literal->flags & Function_Literal_Flags_Macro) {
+      return mass_handle_macro_call(context, overload, args_view, source_range);
+    }
   }
 
   Mass_Function_Call_Lazy_Payload *call_payload =
@@ -5570,9 +5573,6 @@ token_parse_function_literal(
 
   *matched_length = view.length;
 
-  if(is_macro) {
-    fn_info->flags |= Descriptor_Function_Flags_Macro;
-  }
   if (at) {
     fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
   }
@@ -5585,9 +5585,12 @@ token_parse_function_literal(
       });
       return 0;
     }
+    Function_Literal_Flags flags = Function_Literal_Flags_None;
+    if (is_generic) flags |= Function_Literal_Flags_Generic;
+    if (is_macro) flags |= Function_Literal_Flags_Macro;
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
-      .flags = is_generic ? Function_Literal_Flags_Generic : Function_Literal_Flags_None,
+      .flags = flags,
       .info = fn_info,
       .body = body_value,
     };
