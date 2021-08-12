@@ -3602,7 +3602,9 @@ ensure_parameter_descriptors(
   Function_Info *info
 ) {
   Execution_Context temp_context = *context;
-  temp_context.scope = scope_make(allocator_default, temp_context.scope);
+  Temp_Mark temp_mark = context_temp_mark(&temp_context);
+
+  temp_context.scope = scope_make(temp_context.temp_allocator, temp_context.scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     assert(param->tag != Function_Parameter_Tag_Generic);
@@ -3610,12 +3612,15 @@ ensure_parameter_descriptors(
       assert(param->maybe_type_expression.length);
       param->declaration.descriptor =
         token_match_type(&temp_context, param->maybe_type_expression);
-      MASS_ON_ERROR(*temp_context.result) return;
+      MASS_ON_ERROR(*temp_context.result) goto err;
     }
     Source_Range source_range = param->declaration.source_range;
-    // FIXME @Leak
-    Value *param_value =
-      value_make(&temp_context, param->declaration.descriptor, storage_none, source_range);
+    Value *param_value = value_init(
+      allocator_allocate(temp_context.temp_allocator, Value),
+      param->declaration.descriptor,
+      storage_none,
+      source_range
+    );
     assert(param->declaration.descriptor != &descriptor_overload_set);
     scope_define_value(
       temp_context.scope,
@@ -3630,8 +3635,11 @@ ensure_parameter_descriptors(
     info->returns.declaration.descriptor =
       token_match_type(&temp_context, info->returns.maybe_type_expression);
     assert(info->returns.declaration.descriptor);
-    MASS_ON_ERROR(*temp_context.result) return;
+    MASS_ON_ERROR(*temp_context.result) goto err;
   }
+
+  err:
+  context_temp_reset_to_mark(&temp_context, temp_mark);
 }
 
 static void
