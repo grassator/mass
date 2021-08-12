@@ -1568,11 +1568,13 @@ function_literal_info_for_args(
   Value_View args
 ) {
   if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
-  // FIXME @Leak
-  Function_Info *specialized_info = allocator_allocate(allocator_default, Function_Info);
+  const Execution_Context *context = &literal->context;
+  // FIXME cache these info structs
+  Function_Info *specialized_info = allocator_allocate(context->allocator, Function_Info);
   *specialized_info = *literal->info;
   specialized_info->parameters = dyn_array_make(Array_Function_Parameter,
-    .capacity = dyn_array_length(literal->info->parameters)
+    .allocator = context->allocator,
+    .capacity = dyn_array_length(literal->info->parameters),
   );
   for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
     const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
