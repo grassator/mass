@@ -5587,7 +5587,7 @@ token_parse_function_literal(
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
-      .is_generic = is_generic,
+      .flags = is_generic ? Function_Literal_Flags_Generic : Function_Literal_Flags_None,
       .info = fn_info,
       .body = body_value,
     };

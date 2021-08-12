@@ -1662,8 +1662,14 @@ main(void) {
     { "Function_Return", "returns" },
   }));
 
+  push_type(type_enum("Function_Literal_Flags", (Enum_Type_Item[]){
+    { "None", 0 },
+    { "Generic", 1 << 0 },
+  }));
+
   push_type(type_struct("Function_Literal", (Struct_Item[]){
-    { "u64", "is_generic" },
+    { "Function_Literal_Flags", "flags"},
+    { "u32", "_flags_padding"},
     { "Function_Info *", "info" },
     { "Value *", "body" },
     { "Value *", "runtime_instance"},

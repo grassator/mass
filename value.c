@@ -1569,7 +1569,7 @@ function_literal_info_for_args(
   const Function_Literal *literal,
   Value_View args
 ) {
-  if (!literal->is_generic) return literal->info;
+  if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
   // FIXME @Leak
   Function_Info *specialized_info = allocator_allocate(allocator_default, Function_Info);
   *specialized_info = *literal->info;

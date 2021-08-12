@@ -247,6 +247,8 @@ typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
+typedef enum Function_Literal_Flags Function_Literal_Flags;
+
 typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
@@ -1509,8 +1511,21 @@ typedef struct Function_Info {
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
 
+typedef enum Function_Literal_Flags {
+  Function_Literal_Flags_None = 0,
+  Function_Literal_Flags_Generic = 1,
+} Function_Literal_Flags;
+
+const char *function_literal_flags_name(Function_Literal_Flags value) {
+  if (value == 0) return "Function_Literal_Flags_None";
+  if (value == 1) return "Function_Literal_Flags_Generic";
+  assert(!"Unexpected value for enum Function_Literal_Flags");
+  return 0;
+};
+
 typedef struct Function_Literal {
-  u64 is_generic;
+  Function_Literal_Flags flags;
+  u32 _flags_padding;
   Function_Info * info;
   Value * body;
   Value * runtime_instance;
@@ -2310,6 +2325,11 @@ static Descriptor descriptor_array_function_info;
 static Descriptor descriptor_array_function_info_ptr;
 static Descriptor descriptor_function_info_pointer;
 static Descriptor descriptor_function_info_pointer_pointer;
+static Descriptor descriptor_function_literal_flags;
+static Descriptor descriptor_array_function_literal_flags;
+static Descriptor descriptor_array_function_literal_flags_ptr;
+static Descriptor descriptor_function_literal_flags_pointer;
+static Descriptor descriptor_function_literal_flags_pointer_pointer;
 static Descriptor descriptor_function_literal;
 static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
@@ -5114,16 +5134,29 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_info);
+MASS_DEFINE_OPAQUE_C_TYPE(function_literal_flags, Function_Literal_Flags)
+static C_Enum_Item function_literal_flags_items[] = {
+{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Generic"), .value = 1 },
+};
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_u64,
-      .name = slice_literal_fields("is_generic"),
+      .descriptor = &descriptor_function_literal_flags,
+      .name = slice_literal_fields("flags"),
     },
-    .Base_Relative.offset = offsetof(Function_Literal, is_generic),
+    .Base_Relative.offset = offsetof(Function_Literal, flags),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u32,
+      .name = slice_literal_fields("_flags_padding"),
+    },
+    .Base_Relative.offset = offsetof(Function_Literal, _flags_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
