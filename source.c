@@ -2702,98 +2702,6 @@ token_process_c_struct_definition(
   return 0;
 }
 
-static Function_Info *
-token_process_function_literal(
-  Execution_Context *context,
-  Value_View args_view,
-  Value *return_types
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 function_epoch = get_new_epoch();
-  Scope *function_scope = scope_make(context->allocator, context->scope);
-
-  Execution_Context arg_context = *context;
-  arg_context.scope = function_scope;
-  arg_context.epoch = function_epoch;
-
-  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, &arg_context);
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-
-
-  if (args_view.length != 0) {
-    bool previous_argument_has_default_value = false;
-
-    Array_Function_Parameter temp_params = dyn_array_make(
-      Array_Function_Parameter,
-      .allocator = context->temp_allocator,
-      .capacity = 32,
-    );
-
-    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
-      Value_View param_view = token_split_next(&it, &token_pattern_comma_operator);
-      Function_Parameter param = token_match_argument(&arg_context, param_view, fn_info);
-      MASS_ON_ERROR(*context->result) goto defer;
-      dyn_array_push(temp_params, param);
-      if (previous_argument_has_default_value) {
-        if (!param.maybe_default_expression.length ) {
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
-            .source_range = return_types->source_range,
-          });
-          goto defer;
-        }
-      } else {
-        previous_argument_has_default_value = !!param.maybe_default_expression.length;
-      }
-    }
-    dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
-  }
-
-  if (value_is_group(return_types)) {
-    const Group *return_types_group = value_as_group(return_types);
-    if (return_types_group->tag != Group_Tag_Paren) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .detailed_message = "Return type can only be a type name or a parenthesized list",
-        .source_range = return_types->source_range,
-      });
-      return 0;
-    }
-    Value_View return_types_view = return_types_group->children;
-    if (return_types_view.length == 0) {
-      fn_info->returns = (Function_Return) { .declaration.descriptor = &descriptor_void, };
-    } else {
-      Value_View_Split_Iterator it = { .view = return_types_view };
-
-      for (u64 i = 0; !it.done; ++i) {
-        if (i > 0) {
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Unimplemented,
-            .detailed_message = "Multiple return types are not supported at the moment",
-            .source_range = return_types->source_range,
-          });
-          return 0;
-        }
-        Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
-
-        fn_info->returns = token_match_return_type(&arg_context, arg_view);
-      }
-    }
-  } else {
-    fn_info->returns = token_match_return_type(
-      &arg_context, value_view_make_single(context->allocator, return_types)
-    );
-  }
-  MASS_ON_ERROR(*context->result) return 0;
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-  return fn_info;
-}
-
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
 static inline u64
@@ -5481,6 +5389,98 @@ token_parse_intrinsic_literal(
   literal->info->flags |= Descriptor_Function_Flags_Intrinsic;
 
   return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
+}
+
+static Function_Info *
+token_process_function_literal(
+  Execution_Context *context,
+  Value_View args_view,
+  Value *return_types
+) {
+  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+
+  u64 function_epoch = get_new_epoch();
+  Scope *function_scope = scope_make(context->allocator, context->scope);
+
+  Execution_Context arg_context = *context;
+  arg_context.scope = function_scope;
+  arg_context.epoch = function_epoch;
+
+  Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
+  function_info_init(fn_info, &arg_context);
+
+  Temp_Mark temp_mark = context_temp_mark(context);
+
+
+  if (args_view.length != 0) {
+    bool previous_argument_has_default_value = false;
+
+    Array_Function_Parameter temp_params = dyn_array_make(
+      Array_Function_Parameter,
+      .allocator = context->temp_allocator,
+      .capacity = 32,
+    );
+
+    for (Value_View_Split_Iterator it = { .view = args_view }; !it.done;) {
+      Value_View param_view = token_split_next(&it, &token_pattern_comma_operator);
+      Function_Parameter param = token_match_argument(&arg_context, param_view, fn_info);
+      MASS_ON_ERROR(*context->result) goto defer;
+      dyn_array_push(temp_params, param);
+      if (previous_argument_has_default_value) {
+        if (!param.maybe_default_expression.length ) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Non_Trailing_Default_Argument,
+            .source_range = return_types->source_range,
+          });
+          goto defer;
+        }
+      } else {
+        previous_argument_has_default_value = !!param.maybe_default_expression.length;
+      }
+    }
+    dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
+  }
+
+  if (value_is_group(return_types)) {
+    const Group *return_types_group = value_as_group(return_types);
+    if (return_types_group->tag != Group_Tag_Paren) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .detailed_message = "Return type can only be a type name or a parenthesized list",
+        .source_range = return_types->source_range,
+      });
+      return 0;
+    }
+    Value_View return_types_view = return_types_group->children;
+    if (return_types_view.length == 0) {
+      fn_info->returns = (Function_Return) { .declaration.descriptor = &descriptor_void, };
+    } else {
+      Value_View_Split_Iterator it = { .view = return_types_view };
+
+      for (u64 i = 0; !it.done; ++i) {
+        if (i > 0) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Unimplemented,
+            .detailed_message = "Multiple return types are not supported at the moment",
+            .source_range = return_types->source_range,
+          });
+          return 0;
+        }
+        Value_View arg_view = token_split_next(&it, &token_pattern_comma_operator);
+
+        fn_info->returns = token_match_return_type(&arg_context, arg_view);
+      }
+    }
+  } else {
+    fn_info->returns = token_match_return_type(
+      &arg_context, value_view_make_single(context->allocator, return_types)
+    );
+  }
+  MASS_ON_ERROR(*context->result) return 0;
+
+  defer:
+  context_temp_reset_to_mark(context, temp_mark);
+  return fn_info;
 }
 
 static Value *
