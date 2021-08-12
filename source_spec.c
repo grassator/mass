@@ -985,6 +985,18 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
     }
+
+    it("should correctly discard templated functions with less parameters than arguments") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "weird_plus :: fn(x) -> (type_of(x)) { x }\n"
+          "weird_plus :: fn(x : s64, y : s64) -> (s64) { x + y }\n"
+          "checker :: fn() -> (s64) { weird_plus(39, 3); }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
   }
 
   describe("Assignment") {

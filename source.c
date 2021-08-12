@@ -3656,13 +3656,23 @@ mass_match_overload_candidate(
       mass_match_overload_candidate(overload, args, match, best_conflict_match);
     }
   } else {
-    const Function_Info *overload_info = maybe_function_info_from_value(candidate, args);
-
+    const Function_Info *overload_info = 0;
     s64 score;
-    if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
-      score = 0;
+
+    // This case is an optimization for generic functions as it avoids creation of
+    // a specialized Function_Info that would be discarded just based on argument count.
+    if (
+      value_is_function_literal(candidate) &&
+      args.length > dyn_array_length(value_as_function_literal(candidate)->info->parameters)
+    ) {
+      score = -1;
     } else {
-      score = calculate_arguments_match_score(overload_info, args);
+      overload_info = maybe_function_info_from_value(candidate, args);
+      if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
+        score = 0;
+      } else {
+        score = calculate_arguments_match_score(overload_info, args);
+      }
     }
     if (score > match->score) {
       match->info = overload_info;
