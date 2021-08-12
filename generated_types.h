@@ -249,6 +249,10 @@ typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
 typedef enum Function_Literal_Flags Function_Literal_Flags;
 
+typedef struct Function_Specialization Function_Specialization;
+typedef dyn_array_type(Function_Specialization *) Array_Function_Specialization_Ptr;
+typedef dyn_array_type(const Function_Specialization *) Array_Const_Function_Specialization_Ptr;
+
 typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
@@ -1524,6 +1528,12 @@ const char *function_literal_flags_name(Function_Literal_Flags value) {
   return 0;
 };
 
+typedef struct Function_Specialization {
+  Array_Const_Descriptor_Ptr descriptors;
+  Function_Info * info;
+} Function_Specialization;
+typedef dyn_array_type(Function_Specialization) Array_Function_Specialization;
+
 typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
@@ -1531,6 +1541,7 @@ typedef struct Function_Literal {
   Function_Info * info;
   Value * body;
   Array_Value_Ptr instances;
+  Array_Function_Specialization specializations;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
@@ -2012,6 +2023,7 @@ static Descriptor descriptor_source_range_pointer_pointer;
 static Descriptor descriptor_module_export;
 static Descriptor descriptor_array_module_export;
 static Descriptor descriptor_array_module_export_ptr;
+static Descriptor descriptor_array_const_module_export_ptr;
 static Descriptor descriptor_module_export_pointer;
 static Descriptor descriptor_module_export_pointer_pointer;
 static Descriptor descriptor_module;
@@ -2027,6 +2039,7 @@ static Descriptor descriptor_parse_error_pointer_pointer;
 static Descriptor descriptor_group_tag;
 static Descriptor descriptor_array_group_tag;
 static Descriptor descriptor_array_group_tag_ptr;
+static Descriptor descriptor_array_const_group_tag_ptr;
 static Descriptor descriptor_group_tag_pointer;
 static Descriptor descriptor_group_tag_pointer_pointer;
 static Descriptor descriptor_value_view;
@@ -2037,6 +2050,7 @@ static Descriptor descriptor_value_view_pointer_pointer;
 static Descriptor descriptor_symbol_type;
 static Descriptor descriptor_array_symbol_type;
 static Descriptor descriptor_array_symbol_type_ptr;
+static Descriptor descriptor_array_const_symbol_type_ptr;
 static Descriptor descriptor_symbol_type_pointer;
 static Descriptor descriptor_symbol_type_pointer_pointer;
 static Descriptor descriptor_symbol;
@@ -2052,11 +2066,13 @@ static Descriptor descriptor_group_pointer_pointer;
 static Descriptor descriptor_token_pattern;
 static Descriptor descriptor_array_token_pattern;
 static Descriptor descriptor_array_token_pattern_ptr;
+static Descriptor descriptor_array_const_token_pattern_ptr;
 static Descriptor descriptor_token_pattern_pointer;
 static Descriptor descriptor_token_pattern_pointer_pointer;
 static Descriptor descriptor_section_permissions;
 static Descriptor descriptor_array_section_permissions;
 static Descriptor descriptor_array_section_permissions_ptr;
+static Descriptor descriptor_array_const_section_permissions_ptr;
 static Descriptor descriptor_section_permissions_pointer;
 static Descriptor descriptor_section_permissions_pointer_pointer;
 static Descriptor descriptor_section;
@@ -2072,6 +2088,7 @@ static Descriptor descriptor_program_memory_pointer_pointer;
 static Descriptor descriptor_register;
 static Descriptor descriptor_array_register;
 static Descriptor descriptor_array_register_ptr;
+static Descriptor descriptor_array_const_register_ptr;
 static Descriptor descriptor_register_pointer;
 static Descriptor descriptor_register_pointer_pointer;
 static Descriptor descriptor_label_index;
@@ -2092,6 +2109,7 @@ static Descriptor descriptor_label_location_diff_patch_info_pointer_pointer;
 static Descriptor descriptor_number_base;
 static Descriptor descriptor_array_number_base;
 static Descriptor descriptor_array_number_base_ptr;
+static Descriptor descriptor_array_const_number_base_ptr;
 static Descriptor descriptor_number_base_pointer;
 static Descriptor descriptor_number_base_pointer_pointer;
 static Descriptor descriptor_number_literal;
@@ -2122,26 +2140,31 @@ static Descriptor descriptor_import_library_pointer_pointer;
 static Descriptor descriptor_compare_type;
 static Descriptor descriptor_array_compare_type;
 static Descriptor descriptor_array_compare_type_ptr;
+static Descriptor descriptor_array_const_compare_type_ptr;
 static Descriptor descriptor_compare_type_pointer;
 static Descriptor descriptor_compare_type_pointer_pointer;
 static Descriptor descriptor_stack_area;
 static Descriptor descriptor_array_stack_area;
 static Descriptor descriptor_array_stack_area_ptr;
+static Descriptor descriptor_array_const_stack_area_ptr;
 static Descriptor descriptor_stack_area_pointer;
 static Descriptor descriptor_stack_area_pointer_pointer;
 static Descriptor descriptor_memory_location;
 static Descriptor descriptor_array_memory_location;
 static Descriptor descriptor_array_memory_location_ptr;
+static Descriptor descriptor_array_const_memory_location_ptr;
 static Descriptor descriptor_memory_location_pointer;
 static Descriptor descriptor_memory_location_pointer_pointer;
 static Descriptor descriptor_static_memory;
 static Descriptor descriptor_array_static_memory;
 static Descriptor descriptor_array_static_memory_ptr;
+static Descriptor descriptor_array_const_static_memory_ptr;
 static Descriptor descriptor_static_memory_pointer;
 static Descriptor descriptor_static_memory_pointer_pointer;
 static Descriptor descriptor_storage;
 static Descriptor descriptor_array_storage;
 static Descriptor descriptor_array_storage_ptr;
+static Descriptor descriptor_array_const_storage_ptr;
 static Descriptor descriptor_storage_pointer;
 static Descriptor descriptor_storage_pointer_pointer;
 static Descriptor descriptor_relocation;
@@ -2162,6 +2185,7 @@ static Descriptor descriptor_instruction_assembly_pointer_pointer;
 static Descriptor descriptor_instruction;
 static Descriptor descriptor_array_instruction;
 static Descriptor descriptor_array_instruction_ptr;
+static Descriptor descriptor_array_const_instruction_ptr;
 static Descriptor descriptor_instruction_pointer;
 static Descriptor descriptor_instruction_pointer_pointer;
 static Descriptor descriptor_instruction_bucket;
@@ -2182,16 +2206,19 @@ static Descriptor descriptor_function_builder_pointer_pointer;
 static Descriptor descriptor_function_parameter_mode;
 static Descriptor descriptor_array_function_parameter_mode;
 static Descriptor descriptor_array_function_parameter_mode_ptr;
+static Descriptor descriptor_array_const_function_parameter_mode_ptr;
 static Descriptor descriptor_function_parameter_mode_pointer;
 static Descriptor descriptor_function_parameter_mode_pointer_pointer;
 static Descriptor descriptor_operator_fixity;
 static Descriptor descriptor_array_operator_fixity;
 static Descriptor descriptor_array_operator_fixity_ptr;
+static Descriptor descriptor_array_const_operator_fixity_ptr;
 static Descriptor descriptor_operator_fixity_pointer;
 static Descriptor descriptor_operator_fixity_pointer_pointer;
 static Descriptor descriptor_operator_associativity;
 static Descriptor descriptor_array_operator_associativity;
 static Descriptor descriptor_array_operator_associativity_ptr;
+static Descriptor descriptor_array_const_operator_associativity_ptr;
 static Descriptor descriptor_operator_associativity_pointer;
 static Descriptor descriptor_operator_associativity_pointer_pointer;
 static Descriptor descriptor_function_layout;
@@ -2202,6 +2229,7 @@ static Descriptor descriptor_function_layout_pointer_pointer;
 static Descriptor descriptor_execution_context_flags;
 static Descriptor descriptor_array_execution_context_flags;
 static Descriptor descriptor_array_execution_context_flags_ptr;
+static Descriptor descriptor_array_const_execution_context_flags_ptr;
 static Descriptor descriptor_execution_context_flags_pointer;
 static Descriptor descriptor_execution_context_flags_pointer_pointer;
 static Descriptor descriptor_execution_context;
@@ -2222,6 +2250,7 @@ static Descriptor descriptor_operator_pointer_pointer;
 static Descriptor descriptor_macro_pattern;
 static Descriptor descriptor_array_macro_pattern;
 static Descriptor descriptor_array_macro_pattern_ptr;
+static Descriptor descriptor_array_const_macro_pattern_ptr;
 static Descriptor descriptor_macro_pattern_pointer;
 static Descriptor descriptor_macro_pattern_pointer_pointer;
 static Descriptor descriptor_macro;
@@ -2237,6 +2266,7 @@ static Descriptor descriptor_token_statement_matcher_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
+static Descriptor descriptor_array_const_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
 static Descriptor descriptor_scope;
@@ -2257,6 +2287,7 @@ static Descriptor descriptor_overload_set_iterator_pointer_pointer;
 static Descriptor descriptor_overload_match;
 static Descriptor descriptor_array_overload_match;
 static Descriptor descriptor_array_overload_match_ptr;
+static Descriptor descriptor_array_const_overload_match_ptr;
 static Descriptor descriptor_overload_match_pointer;
 static Descriptor descriptor_overload_match_pointer_pointer;
 static Descriptor descriptor_declaration;
@@ -2272,11 +2303,13 @@ static Descriptor descriptor_value_pointer_pointer;
 static Descriptor descriptor_expected_result_storage;
 static Descriptor descriptor_array_expected_result_storage;
 static Descriptor descriptor_array_expected_result_storage_ptr;
+static Descriptor descriptor_array_const_expected_result_storage_ptr;
 static Descriptor descriptor_expected_result_storage_pointer;
 static Descriptor descriptor_expected_result_storage_pointer_pointer;
 static Descriptor descriptor_expected_result;
 static Descriptor descriptor_array_expected_result;
 static Descriptor descriptor_array_expected_result_ptr;
+static Descriptor descriptor_array_const_expected_result_ptr;
 static Descriptor descriptor_expected_result_pointer;
 static Descriptor descriptor_expected_result_pointer_pointer;
 static Descriptor descriptor_lazy_value_proc;
@@ -2294,11 +2327,13 @@ static Descriptor descriptor_mass_handle_operator_proc;
 static Descriptor descriptor_memory_layout_item_flags;
 static Descriptor descriptor_array_memory_layout_item_flags;
 static Descriptor descriptor_array_memory_layout_item_flags_ptr;
+static Descriptor descriptor_array_const_memory_layout_item_flags_ptr;
 static Descriptor descriptor_memory_layout_item_flags_pointer;
 static Descriptor descriptor_memory_layout_item_flags_pointer_pointer;
 static Descriptor descriptor_memory_layout_item;
 static Descriptor descriptor_array_memory_layout_item;
 static Descriptor descriptor_array_memory_layout_item_ptr;
+static Descriptor descriptor_array_const_memory_layout_item_ptr;
 static Descriptor descriptor_memory_layout_item_pointer;
 static Descriptor descriptor_memory_layout_item_pointer_pointer;
 static Descriptor descriptor_memory_layout;
@@ -2309,11 +2344,13 @@ static Descriptor descriptor_memory_layout_pointer_pointer;
 static Descriptor descriptor_function_parameter;
 static Descriptor descriptor_array_function_parameter;
 static Descriptor descriptor_array_function_parameter_ptr;
+static Descriptor descriptor_array_const_function_parameter_ptr;
 static Descriptor descriptor_function_parameter_pointer;
 static Descriptor descriptor_function_parameter_pointer_pointer;
 static Descriptor descriptor_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags;
 static Descriptor descriptor_array_descriptor_function_flags_ptr;
+static Descriptor descriptor_array_const_descriptor_function_flags_ptr;
 static Descriptor descriptor_descriptor_function_flags_pointer;
 static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
 static Descriptor descriptor_function_return;
@@ -2329,8 +2366,14 @@ static Descriptor descriptor_function_info_pointer_pointer;
 static Descriptor descriptor_function_literal_flags;
 static Descriptor descriptor_array_function_literal_flags;
 static Descriptor descriptor_array_function_literal_flags_ptr;
+static Descriptor descriptor_array_const_function_literal_flags_ptr;
 static Descriptor descriptor_function_literal_flags_pointer;
 static Descriptor descriptor_function_literal_flags_pointer_pointer;
+static Descriptor descriptor_function_specialization;
+static Descriptor descriptor_array_function_specialization;
+static Descriptor descriptor_array_function_specialization_ptr;
+static Descriptor descriptor_function_specialization_pointer;
+static Descriptor descriptor_function_specialization_pointer_pointer;
 static Descriptor descriptor_function_literal;
 static Descriptor descriptor_array_function_literal;
 static Descriptor descriptor_array_function_literal_ptr;
@@ -2339,6 +2382,7 @@ static Descriptor descriptor_function_literal_pointer_pointer;
 static Descriptor descriptor_function_call_setup_flags;
 static Descriptor descriptor_array_function_call_setup_flags;
 static Descriptor descriptor_array_function_call_setup_flags_ptr;
+static Descriptor descriptor_array_const_function_call_setup_flags_ptr;
 static Descriptor descriptor_function_call_setup_flags_pointer;
 static Descriptor descriptor_function_call_setup_flags_pointer_pointer;
 static Descriptor descriptor_function_call_setup;
@@ -2349,16 +2393,19 @@ static Descriptor descriptor_function_call_setup_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
+static Descriptor descriptor_array_const_descriptor_ptr;
 static Descriptor descriptor_descriptor_pointer;
 static Descriptor descriptor_descriptor_pointer_pointer;
 static Descriptor descriptor_mass_error;
 static Descriptor descriptor_array_mass_error;
 static Descriptor descriptor_array_mass_error_ptr;
+static Descriptor descriptor_array_const_mass_error_ptr;
 static Descriptor descriptor_mass_error_pointer;
 static Descriptor descriptor_mass_error_pointer_pointer;
 static Descriptor descriptor_mass_result;
 static Descriptor descriptor_array_mass_result;
 static Descriptor descriptor_array_mass_result_ptr;
+static Descriptor descriptor_array_const_mass_result_ptr;
 static Descriptor descriptor_mass_result_pointer;
 static Descriptor descriptor_mass_result_pointer_pointer;
 static Descriptor descriptor_program;
@@ -2397,16 +2444,19 @@ static Descriptor descriptor_compilation_pointer_pointer;
 static Descriptor descriptor_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type;
 static Descriptor descriptor_array_instruction_extension_type_ptr;
+static Descriptor descriptor_array_const_instruction_extension_type_ptr;
 static Descriptor descriptor_instruction_extension_type_pointer;
 static Descriptor descriptor_instruction_extension_type_pointer_pointer;
 static Descriptor descriptor_operand_encoding_type;
 static Descriptor descriptor_array_operand_encoding_type;
 static Descriptor descriptor_array_operand_encoding_type_ptr;
+static Descriptor descriptor_array_const_operand_encoding_type_ptr;
 static Descriptor descriptor_operand_encoding_type_pointer;
 static Descriptor descriptor_operand_encoding_type_pointer_pointer;
 static Descriptor descriptor_operand_size;
 static Descriptor descriptor_array_operand_size;
 static Descriptor descriptor_array_operand_size_ptr;
+static Descriptor descriptor_array_const_operand_size_ptr;
 static Descriptor descriptor_operand_size_pointer;
 static Descriptor descriptor_operand_size_pointer_pointer;
 static Descriptor descriptor_operand_encoding;
@@ -2446,50 +2496,74 @@ static Descriptor descriptor_mass_equal;
 static Descriptor descriptor_mass_not_equal;
 static Descriptor descriptor_char;
 static Descriptor descriptor_array_char;
+static Descriptor descriptor_array_char_ptr;
+static Descriptor descriptor_array_const_char_ptr;
 static Descriptor descriptor_char_pointer;
 static Descriptor descriptor_char_pointer_pointer;
 static Descriptor descriptor_int;
 static Descriptor descriptor_array_int;
+static Descriptor descriptor_array_int_ptr;
+static Descriptor descriptor_array_const_int_ptr;
 static Descriptor descriptor_int_pointer;
 static Descriptor descriptor_int_pointer_pointer;
 static Descriptor descriptor_u8;
 static Descriptor descriptor_array_u8;
+static Descriptor descriptor_array_u8_ptr;
+static Descriptor descriptor_array_const_u8_ptr;
 static Descriptor descriptor_u8_pointer;
 static Descriptor descriptor_u8_pointer_pointer;
 static Descriptor descriptor_u16;
 static Descriptor descriptor_array_u16;
+static Descriptor descriptor_array_u16_ptr;
+static Descriptor descriptor_array_const_u16_ptr;
 static Descriptor descriptor_u16_pointer;
 static Descriptor descriptor_u16_pointer_pointer;
 static Descriptor descriptor_u32;
 static Descriptor descriptor_array_u32;
+static Descriptor descriptor_array_u32_ptr;
+static Descriptor descriptor_array_const_u32_ptr;
 static Descriptor descriptor_u32_pointer;
 static Descriptor descriptor_u32_pointer_pointer;
 static Descriptor descriptor_u64;
 static Descriptor descriptor_array_u64;
+static Descriptor descriptor_array_u64_ptr;
+static Descriptor descriptor_array_const_u64_ptr;
 static Descriptor descriptor_u64_pointer;
 static Descriptor descriptor_u64_pointer_pointer;
 static Descriptor descriptor_s8;
 static Descriptor descriptor_array_s8;
+static Descriptor descriptor_array_s8_ptr;
+static Descriptor descriptor_array_const_s8_ptr;
 static Descriptor descriptor_s8_pointer;
 static Descriptor descriptor_s8_pointer_pointer;
 static Descriptor descriptor_s16;
 static Descriptor descriptor_array_s16;
+static Descriptor descriptor_array_s16_ptr;
+static Descriptor descriptor_array_const_s16_ptr;
 static Descriptor descriptor_s16_pointer;
 static Descriptor descriptor_s16_pointer_pointer;
 static Descriptor descriptor_s32;
 static Descriptor descriptor_array_s32;
+static Descriptor descriptor_array_s32_ptr;
+static Descriptor descriptor_array_const_s32_ptr;
 static Descriptor descriptor_s32_pointer;
 static Descriptor descriptor_s32_pointer_pointer;
 static Descriptor descriptor_s64;
 static Descriptor descriptor_array_s64;
+static Descriptor descriptor_array_s64_ptr;
+static Descriptor descriptor_array_const_s64_ptr;
 static Descriptor descriptor_s64_pointer;
 static Descriptor descriptor_s64_pointer_pointer;
 static Descriptor descriptor_f32;
 static Descriptor descriptor_array_f32;
+static Descriptor descriptor_array_f32_ptr;
+static Descriptor descriptor_array_const_f32_ptr;
 static Descriptor descriptor_f32_pointer;
 static Descriptor descriptor_f32_pointer_pointer;
 static Descriptor descriptor_f64;
 static Descriptor descriptor_array_f64;
+static Descriptor descriptor_array_f64_ptr;
+static Descriptor descriptor_array_const_f64_ptr;
 static Descriptor descriptor_f64_pointer;
 static Descriptor descriptor_f64_pointer_pointer;
 static Descriptor descriptor_range_u8;
@@ -5148,6 +5222,27 @@ static C_Enum_Item function_literal_flags_items[] = {
 { .name = slice_literal_fields("Generic"), .value = 1 },
 { .name = slice_literal_fields("Macro"), .value = 2 },
 };
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization_ptr, Array_Function_Specialization_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_specialization, Array_Function_Specialization)
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_specialization, Function_Specialization,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_array_const_descriptor_ptr,
+      .name = slice_literal_fields("descriptors"),
+    },
+    .Base_Relative.offset = offsetof(Function_Specialization, descriptors),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_function_info_pointer,
+      .name = slice_literal_fields("info"),
+    },
+    .Base_Relative.offset = offsetof(Function_Specialization, info),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_specialization);
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal_ptr, Array_Function_Literal_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_literal, Array_Function_Literal)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
@@ -5198,6 +5293,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
       .name = slice_literal_fields("instances"),
     },
     .Base_Relative.offset = offsetof(Function_Literal, instances),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_array_function_specialization,
+      .name = slice_literal_fields("specializations"),
+    },
+    .Base_Relative.offset = offsetof(Function_Literal, specializations),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);

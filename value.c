@@ -1573,24 +1573,62 @@ function_literal_info_for_args(
 ) {
   if (!(literal->flags & Function_Literal_Flags_Generic)) return literal->info;
   const Execution_Context *context = &literal->context;
-  // FIXME cache these info structs
+
+  // FIXME @ConstCast avoid this
+  Function_Literal *mutable_literal = (Function_Literal *)literal;
+
+  if (!dyn_array_is_initialized(mutable_literal->specializations)) {
+    mutable_literal->specializations = dyn_array_make(
+      Array_Function_Specialization,
+      .capacity = 4,
+      .allocator = context->allocator,
+    );
+  }
+
+  DYN_ARRAY_FOREACH(Function_Specialization, specialization, mutable_literal->specializations) {
+    for (u64 i = 0; i < dyn_array_length(specialization->descriptors); ++i) {
+      const Descriptor *cached_descriptor = *dyn_array_get(specialization->descriptors, i);
+      const Descriptor *actual_descriptor = value_or_lazy_value_descriptor(value_view_get(args, i));
+      if (!same_type(cached_descriptor, actual_descriptor)) goto not_matched;
+    }
+    return specialization->info;
+    not_matched:;
+  }
+
   Function_Info *specialized_info = allocator_allocate(context->allocator, Function_Info);
-  *specialized_info = *literal->info;
+  *specialized_info = *mutable_literal->info;
   specialized_info->parameters = dyn_array_make(Array_Function_Parameter,
     .allocator = context->allocator,
-    .capacity = dyn_array_length(literal->info->parameters),
+    .capacity = dyn_array_length(mutable_literal->info->parameters),
   );
-  for (u64 arg_index = 0; arg_index < dyn_array_length(literal->info->parameters); ++arg_index) {
-    const Function_Parameter *param = dyn_array_get(literal->info->parameters, arg_index);
+
+  Array_Const_Descriptor_Ptr cache_descriptors = dyn_array_make(
+    Array_Const_Descriptor_Ptr,
+    .capacity = args.length,
+    .allocator = context->allocator,
+  );
+
+  for (u64 arg_index = 0; arg_index < dyn_array_length(mutable_literal->info->parameters); ++arg_index) {
+    const Function_Parameter *param = dyn_array_get(mutable_literal->info->parameters, arg_index);
     Function_Parameter *specialized_param =
       dyn_array_push(specialized_info->parameters, *param);
+    const Descriptor *actual_descriptor =
+      value_or_lazy_value_descriptor(value_view_get(args, arg_index));
+    // In the presence of implicit casts it is unclear if this should use declared types or not.
+    // On one hand with actual types we might generate identical copies, on the other hand
+    // searching for a match becomes faster. Do not know what is better.
+    dyn_array_push(cache_descriptors, actual_descriptor);
     if(param->tag == Function_Parameter_Tag_Generic) {
       specialized_param->tag = Function_Parameter_Tag_Runtime;
-      specialized_param->declaration.descriptor =
-        value_or_lazy_value_descriptor(value_view_get(args, arg_index));
+      specialized_param->declaration.descriptor = actual_descriptor;
     }
   }
-  ensure_parameter_descriptors(&literal->context, specialized_info);
+  ensure_parameter_descriptors(&mutable_literal->context, specialized_info);
+  dyn_array_push(mutable_literal->specializations, (Function_Specialization) {
+    .descriptors = cache_descriptors,
+    .info = specialized_info,
+  });
+
   return specialized_info;
 }
 

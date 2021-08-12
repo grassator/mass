@@ -973,7 +973,18 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should multiple calls to a function with templates parameters") {
+    it("should support calls to a templated function with same typed parameters") {
+      s64 (*checker)() =
+        (s64 (*)())test_program_inline_source_function(
+          "checker", &test_context,
+          "identity :: fn(x) -> (type_of(x)) { x }\n"
+          "checker :: fn() -> (s64) { identity(cast(s64, 39)) + identity(cast(s64, 3)) }"
+        );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should support calls to a templated function with differently typed parameters") {
       u64 (*checker)() =
         (u64 (*)())test_program_inline_source_function(
           "checker", &test_context,

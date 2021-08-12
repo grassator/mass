@@ -708,6 +708,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_const_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -717,6 +718,7 @@ print_mass_descriptor_and_type_forward_declaration(
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_const_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -725,6 +727,8 @@ print_mass_descriptor_and_type_forward_declaration(
       char *lowercase_name = strtolower(type->name);
       fprintf(file, "static Descriptor descriptor_%s;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_array_%s;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_%s_ptr;\n", lowercase_name);
+      fprintf(file, "static Descriptor descriptor_array_const_%s_ptr;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer;\n", lowercase_name);
       fprintf(file, "static Descriptor descriptor_%s_pointer_pointer;\n", lowercase_name);
       break;
@@ -1543,7 +1547,7 @@ main(void) {
     }),
     struct_fields("Found", (Struct_Item[]){
       { "Value *", "value" },
-      { "const Function_Info *", "info" },
+      { "const Function_Info *", "info" }
     }),
   }));
 
@@ -1668,6 +1672,11 @@ main(void) {
     { "Macro", 1 << 1 },
   }));
 
+  push_type(type_struct("Function_Specialization", (Struct_Item[]){
+    { "Array_Const_Descriptor_Ptr", "descriptors" },
+    { "Function_Info *", "info" },
+  }));
+
   push_type(type_struct("Function_Literal", (Struct_Item[]){
     { "Function_Literal_Flags", "flags"},
     { "u32", "_flags_padding"},
@@ -1675,6 +1684,7 @@ main(void) {
     { "Function_Info *", "info" },
     { "Value *", "body" },
     { "Array_Value_Ptr", "instances"},
+    { "Array_Function_Specialization", "specializations"},
   }));
 
   push_type(type_enum("Function_Call_Setup_Flags", (Enum_Type_Item[]){
