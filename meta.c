@@ -1672,8 +1672,7 @@ main(void) {
     { "u32", "_flags_padding"},
     { "Function_Info *", "info" },
     { "Value *", "body" },
-    { "Value *", "runtime_instance"},
-    { "Value *", "compile_time_instance"},
+    { "Array_Value_Ptr", "instances"},
   }));
 
   push_type(type_enum("Function_Call_Setup_Flags", (Enum_Type_Item[]){
@@ -1693,7 +1692,7 @@ main(void) {
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
-      { "Function_Info *", "info" },
+      { "const Function_Info *", "info" },
       { "Function_Call_Setup", "call_setup"},
     }),
     struct_fields("Fixed_Size_Array", (Struct_Item[]){

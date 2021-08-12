@@ -1528,8 +1528,7 @@ typedef struct Function_Literal {
   u32 _flags_padding;
   Function_Info * info;
   Value * body;
-  Value * runtime_instance;
-  Value * compile_time_instance;
+  Array_Value_Ptr instances;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
@@ -1565,7 +1564,7 @@ typedef enum {
 } Descriptor_Tag;
 
 typedef struct Descriptor_Function_Instance {
-  Function_Info * info;
+  const Function_Info * info;
   Function_Call_Setup call_setup;
 } Descriptor_Function_Instance;
 typedef struct Descriptor_Fixed_Size_Array {
@@ -5177,18 +5176,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_value_pointer,
-      .name = slice_literal_fields("runtime_instance"),
+      .descriptor = &descriptor_array_value_ptr,
+      .name = slice_literal_fields("instances"),
     },
-    .Base_Relative.offset = offsetof(Function_Literal, runtime_instance),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_value_pointer,
-      .name = slice_literal_fields("compile_time_instance"),
-    },
-    .Base_Relative.offset = offsetof(Function_Literal, compile_time_instance),
+    .Base_Relative.offset = offsetof(Function_Literal, instances),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);

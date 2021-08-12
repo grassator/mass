@@ -713,42 +713,57 @@ ensure_function_instance(
   // TODO figure out how to avoid the const cast here
   Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
   assert(!(literal->flags & Function_Literal_Flags_Macro));
-
-  Value **cached_instance = context_is_compile_time_eval(context)
-    ? &literal->compile_time_instance
-    : &literal->runtime_instance;
-
-  if (cached_instance[0]) return cached_instance[0];
+  const Function_Info *fn_info = maybe_function_info_from_value(fn_value, args);
+  ensure_parameter_descriptors(fn_info);
 
   Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;
+
+  if (!dyn_array_is_initialized(literal->instances)) {
+    literal->instances = dyn_array_make(
+      Array_Value_Ptr,
+      .allocator = context->allocator,
+      .capacity = 4
+    );
+  }
+
+  for (u64 i = 0; i < dyn_array_length(literal->instances); ++i) {
+    Value *instance_value = *dyn_array_get(literal->instances, i);
+    assert(instance_value->descriptor->tag == Descriptor_Tag_Function_Instance);
+    const Descriptor_Function_Instance *instance = &instance_value->descriptor->Function_Instance;
+    if (instance->info != fn_info) continue;
+    if (instance->call_setup.calling_convention != calling_convention) {
+      continue;
+    }
+    return instance_value;
+  }
 
   Slice fn_name = fn_value->descriptor->name.length
     ? fn_value->descriptor->name
     : slice_literal("__anonymous__");
 
-  Function_Info *function = (Function_Info *)maybe_function_info_from_value(fn_value, args);
-  ensure_parameter_descriptors(function);
   MASS_ON_ERROR(*context->result) return 0;
 
   const Descriptor *instance_descriptor = descriptor_function_instance(
-    context->allocator, fn_name, function, calling_convention
+    context->allocator, fn_name, fn_info, calling_convention
   );
 
   if (value_is_external_symbol(literal->body)) {
     const External_Symbol *symbol = storage_static_as_c_type(&literal->body->storage, External_Symbol);
     Storage storage = import_symbol(context, symbol->library_name, symbol->symbol_name);
-    *cached_instance = value_make(context, instance_descriptor, storage, fn_value->source_range);
-    return cached_instance[0];
+    Value *cached_instance = value_make(context, instance_descriptor, storage, fn_value->source_range);
+    dyn_array_push(literal->instances, cached_instance);
+    return cached_instance;
   }
 
   Label_Index call_label = make_label(program, &program->memory.code, fn_name);
   // It is important to cache the label here for recursive calls
-  *cached_instance =
+  Value *cached_instance =
     value_make(context, instance_descriptor, code_label32(call_label), fn_value->source_range);
+  dyn_array_push(literal->instances, cached_instance);
 
   Execution_Context body_context = *context;
-  Scope *body_scope = scope_make(context->allocator, function->context.scope);
+  Scope *body_scope = scope_make(context->allocator, fn_info->context.scope);
   body_context.flags &= ~Execution_Context_Flags_Global;
   body_context.scope = body_scope;
   body_context.epoch = get_new_epoch();
@@ -759,7 +774,7 @@ ensure_function_instance(
   Value *return_value = instance_descriptor->Function_Instance.call_setup.callee_return_value;
 
   Function_Builder *builder = &(Function_Builder){
-    .function = function,
+    .function = fn_info,
     .register_volatile_bitset = calling_convention->register_volatile_bitset,
     .return_value = return_value,
     .code_block = {
@@ -784,12 +799,12 @@ ensure_function_instance(
   }
 
   // Return value can be named in which case it should be accessible in the fn body
-  if (function->returns.declaration.name.length) {
+  if (fn_info->returns.declaration.name.length) {
     scope_define_value(
       body_scope,
       body_context.epoch,
       return_value->source_range,
-      function->returns.declaration.name,
+      fn_info->returns.declaration.name,
       return_value
     );
   }
@@ -834,7 +849,7 @@ ensure_function_instance(
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);
 
-  return *cached_instance;
+  return cached_instance;
 }
 
 

@@ -1505,7 +1505,7 @@ static inline Descriptor *
 descriptor_function_instance(
   const Allocator *allocator,
   Slice name,
-  Function_Info *info,
+  const Function_Info *info,
   const Calling_Convention *calling_convention
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
