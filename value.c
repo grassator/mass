@@ -1903,41 +1903,12 @@ same_value_type_or_can_implicitly_move_cast(
     source->descriptor == &descriptor_overload_set &&
     target->tag == Descriptor_Tag_Function_Instance
   ) {
-    const Function_Info *info = target->Function_Instance.info;
-
-    // @Hack :ScoreMemoryLayout
-    Bucket_Buffer *temp_buffer = bucket_buffer_make();
-    Allocator *temp_allocator = bucket_buffer_allocator_init(temp_buffer, &(Allocator){0});
-    Array_Value_Ptr temp_args = dyn_array_make(
-      Array_Value_Ptr,
-      .capacity = dyn_array_length(info->parameters),
-      .allocator = temp_allocator,
-    );
-
-    for (u64 arg_index = 0; arg_index < dyn_array_length(info->parameters); ++arg_index) {
-      const Function_Parameter *param = dyn_array_get(info->parameters, 0);
-      Value *arg = allocator_allocate(temp_allocator, Value);
-      value_init(arg, param->declaration.descriptor, storage_none, param->declaration.source_range);
-      dyn_array_push(temp_args, arg);
+    const Overload_Set *set = storage_static_as_c_type(&source->storage, Overload_Set);
+    for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
+      Value *overload = *dyn_array_get(set->items, i);
+      if (same_value_type_or_can_implicitly_move_cast(target, overload)) return true;
     }
-    Value_View args_view = value_view_from_value_array(temp_args, &COMPILER_SOURCE_RANGE);
-    Overload_Match match = mass_match_overload(source, args_view);
-
-    bool result;
-    switch(match.tag) {
-      default:
-      case Overload_Match_Tag_No_Match:
-      case Overload_Match_Tag_Undecidable: {
-        result = false;
-      }
-      case Overload_Match_Tag_Found: {
-        result = true;
-        break;
-      }
-    }
-
-    bucket_buffer_destroy(temp_buffer);
-    return result;
+    return false;
   }
   if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer

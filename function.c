@@ -853,8 +853,6 @@ ensure_function_instance(
 static s64
 calculate_arguments_match_score(
   const Function_Info *descriptor,
-  // TODO this should accept a memory layout and be able to do a position and named matching
-  // :ScoreMemoryLayout
   Value_View args_view
 ) {
   enum {
