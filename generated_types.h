@@ -1503,8 +1503,8 @@ typedef dyn_array_type(Function_Return) Array_Function_Return;
 typedef struct Function_Info {
   Descriptor_Function_Flags flags;
   u32 _flags_padding;
+  Scope * scope;
   Array_Function_Parameter parameters;
-  Execution_Context context;
   Function_Return returns;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
@@ -1526,6 +1526,7 @@ const char *function_literal_flags_name(Function_Literal_Flags value) {
 typedef struct Function_Literal {
   Function_Literal_Flags flags;
   u32 _flags_padding;
+  Execution_Context context;
   Function_Info * info;
   Value * body;
   Array_Value_Ptr instances;
@@ -5109,18 +5110,18 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_array_function_parameter,
-      .name = slice_literal_fields("parameters"),
+      .descriptor = &descriptor_scope_pointer,
+      .name = slice_literal_fields("scope"),
     },
-    .Base_Relative.offset = offsetof(Function_Info, parameters),
+    .Base_Relative.offset = offsetof(Function_Info, scope),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_execution_context,
-      .name = slice_literal_fields("context"),
+      .descriptor = &descriptor_array_function_parameter,
+      .name = slice_literal_fields("parameters"),
     },
-    .Base_Relative.offset = offsetof(Function_Info, context),
+    .Base_Relative.offset = offsetof(Function_Info, parameters),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -5156,6 +5157,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
       .name = slice_literal_fields("_flags_padding"),
     },
     .Base_Relative.offset = offsetof(Function_Literal, _flags_padding),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_execution_context,
+      .name = slice_literal_fields("context"),
+    },
+    .Base_Relative.offset = offsetof(Function_Literal, context),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

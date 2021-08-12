@@ -48,6 +48,7 @@ maybe_coerce_number_literal_to_integer(
 
 static void
 ensure_parameter_descriptors(
+  const Execution_Context *context,
   Function_Info *info
 );
 

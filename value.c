@@ -1493,11 +1493,11 @@ value_global_c_string_from_slice(
 static inline void
 function_info_init(
   Function_Info *info,
-  const Execution_Context *context
+  Scope *scope
 ) {
   *info = (Function_Info) {
     .parameters = (Array_Function_Parameter){&dyn_array_zero_items},
-    .context = *context,
+    .scope = scope,
     .returns.declaration = {.descriptor = &descriptor_void},
   };
 }
@@ -1587,7 +1587,7 @@ function_literal_info_for_args(
         value_or_lazy_value_descriptor(value_view_get(args, arg_index));
     }
   }
-  ensure_parameter_descriptors(specialized_info);
+  ensure_parameter_descriptors(&literal->context, specialized_info);
   return specialized_info;
 }
 

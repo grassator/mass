@@ -2740,7 +2740,7 @@ compile_time_eval(
 
   static Slice eval_name = slice_literal_fields("$compile_time_eval$");
   Function_Info fn_info;
-  function_info_init(&fn_info, &eval_context);
+  function_info_init(&fn_info, eval_context.scope);
 
   const Calling_Convention *calling_convention = jit->program->default_calling_convention;
   Label_Index eval_label_index = make_label(jit->program, &jit->program->memory.code, slice_literal("compile_time_eval"));
@@ -3233,7 +3233,7 @@ mass_handle_macro_call(
   // We make a nested scope based on function's original scope
   // instead of current scope for hygiene reasons. I.e. function body
   // should not have access to locals inside the call scope.
-  Scope *body_scope = scope_make(context->allocator, literal->info->context.scope);
+  Scope *body_scope = scope_make(context->allocator, literal->info->scope);
 
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
@@ -3351,7 +3351,7 @@ call_function_overload(
     .capacity = 32,
   );
 
-  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->context.scope);
+  Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
   Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
 
   u64 all_used_arguments_register_bitset = 0;
@@ -3597,27 +3597,27 @@ struct Overload_Match_State {
 
 static void
 ensure_parameter_descriptors(
+  const Execution_Context *context,
   Function_Info *info
 ) {
-  Execution_Context temp_context = info->context;
-  Execution_Context *context = &temp_context;
-  context->scope = scope_make(allocator_default, context->scope);
+  Execution_Context temp_context = *context;
+  temp_context.scope = scope_make(allocator_default, temp_context.scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
     assert(param->tag != Function_Parameter_Tag_Generic);
     if (!param->declaration.descriptor) {
       assert(param->maybe_type_expression.length);
       param->declaration.descriptor =
-        token_match_type(context, param->maybe_type_expression);
-      MASS_ON_ERROR(*context->result) return;
+        token_match_type(&temp_context, param->maybe_type_expression);
+      MASS_ON_ERROR(*temp_context.result) return;
     }
     Source_Range source_range = param->declaration.source_range;
     // FIXME @Leak
     Value *param_value =
-      value_init(allocator_allocate(allocator_default, Value), param->declaration.descriptor, storage_none, source_range);
+      value_make(&temp_context, param->declaration.descriptor, storage_none, source_range);
     assert(param->declaration.descriptor != &descriptor_overload_set);
     scope_define_value(
-      context->scope,
+      temp_context.scope,
       VALUE_STATIC_EPOCH,
       source_range,
       param->declaration.name,
@@ -3627,9 +3627,9 @@ ensure_parameter_descriptors(
   if (!info->returns.declaration.descriptor) {
     assert(info->returns.maybe_type_expression.length);
     info->returns.declaration.descriptor =
-      token_match_type(context, info->returns.maybe_type_expression);
+      token_match_type(&temp_context, info->returns.maybe_type_expression);
     assert(info->returns.declaration.descriptor);
-    MASS_ON_ERROR(*context->result) return;
+    MASS_ON_ERROR(*temp_context.result) return;
   }
 }
 
@@ -5265,7 +5265,7 @@ mass_make_fake_function_literal(
   function_context.scope = function_scope;
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, &function_context);
+  function_info_init(fn_info, function_scope);
   fn_info->returns = (Function_Return) {
     .declaration = {
       .descriptor = returns,
@@ -5277,6 +5277,7 @@ mass_make_fake_function_literal(
   *literal = (Function_Literal){
     .info = fn_info,
     .body = body,
+    .context = *context,
   };
   return literal;
 }
@@ -5404,7 +5405,7 @@ function_info_from_parameters_and_return_type(
   arg_context.epoch = function_epoch;
 
   Function_Info *fn_info = allocator_allocate(context->allocator, Function_Info);
-  function_info_init(fn_info, &arg_context);
+  function_info_init(fn_info, function_scope);
 
   Temp_Mark temp_mark = context_temp_mark(context);
 
@@ -5583,17 +5584,18 @@ token_parse_function_literal(
     }
     if (is_macro) flags |= Function_Literal_Flags_Macro;
     if (!(flags & Function_Literal_Flags_Generic)) {
-      ensure_parameter_descriptors(fn_info);
+      ensure_parameter_descriptors(context, fn_info);
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
       .flags = flags,
       .info = fn_info,
       .body = body_value,
+      .context = *context,
     };
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
-    ensure_parameter_descriptors(fn_info);
+    ensure_parameter_descriptors(context, fn_info);
     // TODO It might be better to just store Function_Info here and not the instance
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
