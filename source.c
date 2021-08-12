@@ -3319,8 +3319,7 @@ mass_handle_macro_call(
   Value_View args_view,
   Source_Range source_range
 ) {
-  assert(overload->descriptor == &descriptor_function_literal);
-  const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+  const Function_Literal *literal = value_as_function_literal(overload);
   assert(literal->flags & Function_Literal_Flags_Macro);
 
   // We make a nested scope based on function's original scope
@@ -3933,8 +3932,8 @@ token_handle_function_call(
     if (info->flags & Descriptor_Function_Flags_Intrinsic) {
       result = mass_intrinsic_call(context, overload, args_view);
     } else {
-      if (overload->descriptor == &descriptor_function_literal) {
-        const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+      if (value_is_function_literal(overload)) {
+        const Function_Literal *literal = value_as_function_literal(overload);
         if (value_is_intrinsic(literal->body)) {
           result = mass_intrinsic_call(context, literal->body, args_view);
         }
@@ -3955,8 +3954,8 @@ token_handle_function_call(
     return result;
   }
 
-  if (overload->descriptor == &descriptor_function_literal) {
-    const Function_Literal *literal = storage_static_as_c_type(&overload->storage, Function_Literal);
+  if (value_is_function_literal(overload)) {
+    const Function_Literal *literal = value_as_function_literal(overload);
     if (literal->flags & Function_Literal_Flags_Macro) {
       return mass_handle_macro_call(context, overload, args_view, source_range);
     }
@@ -4588,8 +4587,7 @@ mass_handle_startup_call_lazy_proc(
   MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *descriptor = startup_function->descriptor;
   if (descriptor != &descriptor_function_literal) goto err;
-  const Function_Literal *literal =
-    storage_static_as_c_type(&startup_function->storage, Function_Literal);
+  const Function_Literal *literal = value_as_function_literal(startup_function);
 
   if (dyn_array_length(literal->info->parameters)) goto err;
   if (literal->info->returns.declaration.descriptor != &descriptor_void) goto err;

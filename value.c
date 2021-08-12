@@ -310,6 +310,7 @@ storage_static_as_c_type_internal(
     return storage_static_as_c_type(&value->storage, _C_TYPE_);\
   }
 
+DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Group, group)
@@ -1594,8 +1595,8 @@ maybe_function_info_from_value(
   Value *value,
   Value_View args
 ) {
-  if (value->descriptor == &descriptor_function_literal) {
-    const Function_Literal *literal = storage_static_as_c_type(&value->storage, Function_Literal);
+  if (value_is_function_literal(value)) {
+    const Function_Literal *literal = value_as_function_literal(value);
     const Function_Info *literal_info = function_literal_info_for_args(literal, args);
     ensure_parameter_descriptors(literal_info);
     return literal_info;

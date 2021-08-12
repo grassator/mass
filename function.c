@@ -708,12 +708,10 @@ ensure_function_instance(
     return fn_value;
   }
 
-  const Descriptor *descriptor = fn_value->descriptor;
-  assert(descriptor == &descriptor_function_literal);
   // TODO figure out how to avoid the const cast here
-  Function_Literal *literal = (Function_Literal *)storage_static_as_c_type(&fn_value->storage, Function_Literal);
+  Function_Literal *literal = (Function_Literal *)value_as_function_literal(fn_value);
   assert(!(literal->flags & Function_Literal_Flags_Macro));
-  const Function_Info *fn_info = maybe_function_info_from_value(fn_value, args);
+  const Function_Info *fn_info = function_literal_info_for_args(literal, args);
   ensure_parameter_descriptors(fn_info);
 
   Program *program = context->program;
