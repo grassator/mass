@@ -712,7 +712,6 @@ ensure_function_instance(
   Function_Literal *literal = (Function_Literal *)value_as_function_literal(fn_value);
   assert(!(literal->flags & Function_Literal_Flags_Macro));
   const Function_Info *fn_info = function_literal_info_for_args(literal, args);
-  ensure_parameter_descriptors(fn_info);
 
   Program *program = context->program;
   const Calling_Convention *calling_convention = program->default_calling_convention;

@@ -3877,7 +3877,6 @@ token_handle_function_call(
     .source_range = source_range,
   };
 
-  ensure_parameter_descriptors(info);
   return mass_make_lazy_value(
     context, source_range, call_payload, info->returns.declaration.descriptor, call_function_overload
   );
