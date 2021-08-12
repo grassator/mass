@@ -4564,7 +4564,6 @@ token_handle_type_of(
   Value *expression = *dyn_array_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
 
-  // TODO consider adding a const static values to avoid the cast
   result = value_init(
     allocator_allocate(context->allocator, Value),
     &descriptor_descriptor_pointer,
