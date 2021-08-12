@@ -1587,6 +1587,7 @@ function_literal_info_for_args(
         value_or_lazy_value_descriptor(value_view_get(args, arg_index));
     }
   }
+  ensure_parameter_descriptors(specialized_info);
   return specialized_info;
 }
 
@@ -1597,9 +1598,7 @@ maybe_function_info_from_value(
 ) {
   if (value_is_function_literal(value)) {
     const Function_Literal *literal = value_as_function_literal(value);
-    const Function_Info *literal_info = function_literal_info_for_args(literal, args);
-    ensure_parameter_descriptors(literal_info);
-    return literal_info;
+    return function_literal_info_for_args(literal, args);
   } else {
     const Descriptor *descriptor =
       maybe_unwrap_pointer_descriptor(value_or_lazy_value_descriptor(value));

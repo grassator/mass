@@ -5392,7 +5392,7 @@ token_parse_intrinsic_literal(
 }
 
 static Function_Info *
-token_process_function_literal(
+function_info_from_parameters_and_return_type(
   Execution_Context *context,
   Value_View args_view,
   Value *return_types
@@ -5520,16 +5520,9 @@ token_parse_function_literal(
 
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
   Value_View args_view = value_as_group(args)->children;
-  Function_Info *fn_info = token_process_function_literal(context, args_view, returns);
+  Function_Info *fn_info =
+    function_info_from_parameters_and_return_type(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
-
-  bool is_generic = false;
-  DYN_ARRAY_FOREACH(Function_Parameter, param, fn_info->parameters) {
-    if (param->tag == Function_Parameter_Tag_Generic) {
-      is_generic = true;
-      break;
-    }
-  }
 
   bool body_is_literal = false;
   Value_View rest = value_view_rest(&view, peek_index);
@@ -5584,8 +5577,17 @@ token_parse_function_literal(
       return 0;
     }
     Function_Literal_Flags flags = Function_Literal_Flags_None;
-    if (is_generic) flags |= Function_Literal_Flags_Generic;
+
+    DYN_ARRAY_FOREACH(Function_Parameter, param, fn_info->parameters) {
+      if (param->tag == Function_Parameter_Tag_Generic) {
+        flags |= Function_Literal_Flags_Generic;
+        break;
+      }
+    }
     if (is_macro) flags |= Function_Literal_Flags_Macro;
+    if (!(flags & Function_Literal_Flags_Generic)) {
+      ensure_parameter_descriptors(fn_info);
+    }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
       .flags = flags,
