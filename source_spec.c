@@ -2013,8 +2013,6 @@ spec("source") {
       check(checker(1, 2, 3, 4, 5, 6, test_128bit) == 42);
     }
 
-    #if defined(_WIN32)
-    // FIXME this breaks on Linux
     it("should be able to access fields of a returned struct") {
       u64(*checker)() = (u64(*)())test_program_inline_source_function(
         "checker", &test_context,
@@ -2024,7 +2022,6 @@ spec("source") {
       check(spec_check_mass_result(test_context.result));
       check(checker() == 3);
     }
-    #endif
   }
 
   describe("Unsigned Integers") {

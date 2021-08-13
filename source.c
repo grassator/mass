@@ -3570,7 +3570,9 @@ call_function_overload(
   // This is awkward that we need to manually clear return bitset because
   // it *might* be set depending on whether the expected result it a temp.
   // The whole thing feels a bit fishy but not sure what is the fix.
-  builder->register_occupied_bitset &= ~return_value_bitset;
+  if (expected_result->tag == Expected_Result_Tag_Exact) {
+    builder->register_occupied_bitset &= ~return_value_bitset;
+  }
 
   DYN_ARRAY_FOREACH(Saved_Register, saved, stack_saved_registers) {
     push_eagerly_encoded_assembly(
