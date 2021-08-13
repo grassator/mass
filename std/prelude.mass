@@ -55,6 +55,30 @@ false :: 0
 
 PRELUDE_MASS :: import("mass")
 
+operator 7 (x == y) equal(x, y)
+operator 7 (x != y) not_equal(x, y)
+
+operator 8 (x < y) less(x, y)
+operator 8 (x > y) greater(x, y)
+operator 8 (x <= y) less_equal(x, y)
+operator 8 (x >= y) greater_equal(x, y)
+
+operator 10 (x + y) add(x, y)
+operator 10 (x - y) subtract(x, y)
+
+operator 15 (x * y) multiply(x, y)
+operator 15 (x / y) divide(x, y)
+operator 15 (x % y) remainder(x, y)
+
+operator 16 (- x) negate(x)
+operator 16 (& x) address_of(x)
+
+operator 15 (x << y) logical_shift_left(x, y)
+operator 15 (x >> y) logical_shift_right(x, y)
+operator 15 (x | y) bitwise_or(x, y)
+operator 15 (x & y) bitwise_and(x, y)
+address_of :: PRELUDE_MASS.address_of
+
 arithmetic_overloads :: {
   macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
     template :: macro(type : Type) {
@@ -125,29 +149,6 @@ Array :: @fn(item : Type, length : u64) -> (Type) {
 }
 
 multiply :: Array
-
-operator 7 (x == y) equal(x, y)
-operator 7 (x != y) not_equal(x, y)
-
-operator 8 (x < y) less(x, y)
-operator 8 (x > y) greater(x, y)
-operator 8 (x <= y) less_equal(x, y)
-operator 8 (x >= y) greater_equal(x, y)
-
-operator 10 (x + y) add(x, y)
-operator 10 (x - y) subtract(x, y)
-
-operator 15 (x * y) multiply(x, y)
-operator 15 (x / y) divide(x, y)
-operator 15 (x % y) remainder(x, y)
-
-operator 16 (- x) negate(x)
-operator 16 (& x) address_of(x)
-
-operator 15 (x << y) logical_shift_left(x, y)
-operator 15 (x >> y) logical_shift_right(x, y)
-operator 15 (x | y) bitwise_or(x, y)
-operator 15 (x & y) bitwise_and(x, y)
 
 compile_time_error :: @fn(name : String, description : String) -> () PRELUDE_MASS.compile_time_error
 
