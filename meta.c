@@ -108,6 +108,18 @@ typedef struct {
   };
 } Meta_Type;
 
+char *
+strtolower(
+  const char *str
+) {
+  size_t length = strlen(str) + 1;
+  char *result = memcpy(malloc(length), str, length);
+  for(size_t i = 0; result[i]; i++){
+    result[i] = (char)tolower(result[i]);
+  }
+  return result;
+}
+
 void
 print_c_type_forward_declaration(
   FILE *file,
@@ -125,7 +137,23 @@ print_c_type_forward_declaration(
     case Meta_Type_Tag_Enum: {
       name = 0;
       if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
-        fprintf(file, "typedef enum %s %s;\n", type->name, type->name);
+        name = type->name;
+        fprintf(file, "typedef enum %s {\n", type->name);
+        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
+          Enum_Type_Item *item = &type->enum_.items[i];
+          fprintf(file, "  %s_%s = %d,\n", type->name, item->name, item->value);
+        }
+        fprintf(file, "} %s;\n\n", type->name);
+
+        char *lowercase_name = strtolower(type->name);
+        fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->name);
+        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
+          Enum_Type_Item *item = &type->enum_.items[i];
+          fprintf(file, "  if (value == %d) return \"%s_%s\";\n", item->value, type->name, item->name);
+        }
+        fprintf(file, "  assert(!\"Unexpected value for enum %s\");\n", type->name);
+        fprintf(file, "  return 0;\n");
+        fprintf(file, "};\n\n");
       }
       break;
     }
@@ -183,18 +211,6 @@ print_c_type_forward_declaration(
   fprintf(file, "\n");
 }
 
-char *
-strtolower(
-  const char *str
-) {
-  size_t length = strlen(str) + 1;
-  char *result = memcpy(malloc(length), str, length);
-  for(size_t i = 0; result[i]; i++){
-    result[i] = (char)tolower(result[i]);
-  }
-  return result;
-}
-
 void
 print_c_struct(
   FILE *file,
@@ -243,24 +259,7 @@ print_c_type(
       break;
     }
     case Meta_Type_Tag_Enum: {
-      if (!(type->flags & Meta_Type_Flags_No_C_Type)) {
-        fprintf(file, "typedef enum %s {\n", type->name);
-        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-          Enum_Type_Item *item = &type->enum_.items[i];
-          fprintf(file, "  %s_%s = %d,\n", type->name, item->name, item->value);
-        }
-        fprintf(file, "} %s;\n\n", type->name);
-
-        char *lowercase_name = strtolower(type->name);
-        fprintf(file, "const char *%s_name(%s value) {\n", lowercase_name, type->name);
-        for (uint64_t i = 0; i < type->enum_.item_count; ++i) {
-          Enum_Type_Item *item = &type->enum_.items[i];
-          fprintf(file, "  if (value == %d) return \"%s_%s\";\n", item->value, type->name, item->name);
-        }
-        fprintf(file, "  assert(!\"Unexpected value for enum %s\");\n", type->name);
-        fprintf(file, "  return 0;\n");
-        fprintf(file, "};\n\n");
-      }
+      // Handled in forward declarations
       break;
     }
     case Meta_Type_Tag_Tagged_Union: {

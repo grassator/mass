@@ -29,13 +29,41 @@ typedef struct Parse_Error Parse_Error;
 typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
 typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
 
-typedef enum Group_Tag Group_Tag;
+typedef enum Group_Tag {
+  Group_Tag_Paren = 1,
+  Group_Tag_Square = 2,
+  Group_Tag_Curly = 3,
+} Group_Tag;
+
+const char *group_tag_name(Group_Tag value) {
+  if (value == 1) return "Group_Tag_Paren";
+  if (value == 2) return "Group_Tag_Square";
+  if (value == 3) return "Group_Tag_Curly";
+  assert(!"Unexpected value for enum Group_Tag");
+  return 0;
+};
+
+typedef dyn_array_type(Group_Tag *) Array_Group_Tag_Ptr;
+typedef dyn_array_type(const Group_Tag *) Array_Const_Group_Tag_Ptr;
 
 typedef struct Value_View Value_View;
 typedef dyn_array_type(Value_View *) Array_Value_View_Ptr;
 typedef dyn_array_type(const Value_View *) Array_Const_Value_View_Ptr;
 
-typedef enum Symbol_Type Symbol_Type;
+typedef enum Symbol_Type {
+  Symbol_Type_Id_Like = 1,
+  Symbol_Type_Operator_Like = 2,
+} Symbol_Type;
+
+const char *symbol_type_name(Symbol_Type value) {
+  if (value == 1) return "Symbol_Type_Id_Like";
+  if (value == 2) return "Symbol_Type_Operator_Like";
+  assert(!"Unexpected value for enum Symbol_Type");
+  return 0;
+};
+
+typedef dyn_array_type(Symbol_Type *) Array_Symbol_Type_Ptr;
+typedef dyn_array_type(const Symbol_Type *) Array_Const_Symbol_Type_Ptr;
 
 typedef struct Symbol Symbol;
 typedef dyn_array_type(Symbol *) Array_Symbol_Ptr;
@@ -49,7 +77,22 @@ typedef struct Token_Pattern Token_Pattern;
 typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
 typedef dyn_array_type(const Token_Pattern *) Array_Const_Token_Pattern_Ptr;
 
-typedef enum Section_Permissions Section_Permissions;
+typedef enum Section_Permissions {
+  Section_Permissions_Read = 1,
+  Section_Permissions_Write = 2,
+  Section_Permissions_Execute = 4,
+} Section_Permissions;
+
+const char *section_permissions_name(Section_Permissions value) {
+  if (value == 1) return "Section_Permissions_Read";
+  if (value == 2) return "Section_Permissions_Write";
+  if (value == 4) return "Section_Permissions_Execute";
+  assert(!"Unexpected value for enum Section_Permissions");
+  return 0;
+};
+
+typedef dyn_array_type(Section_Permissions *) Array_Section_Permissions_Ptr;
+typedef dyn_array_type(const Section_Permissions *) Array_Const_Section_Permissions_Ptr;
 
 typedef struct Section Section;
 typedef dyn_array_type(Section *) Array_Section_Ptr;
@@ -59,7 +102,80 @@ typedef struct Program_Memory Program_Memory;
 typedef dyn_array_type(Program_Memory *) Array_Program_Memory_Ptr;
 typedef dyn_array_type(const Program_Memory *) Array_Const_Program_Memory_Ptr;
 
-typedef enum Register Register;
+typedef enum Register {
+  Register_A = 0,
+  Register_C = 1,
+  Register_D = 2,
+  Register_B = 3,
+  Register_SP = 4,
+  Register_BP = 5,
+  Register_SI = 6,
+  Register_DI = 7,
+  Register_R8 = 8,
+  Register_R9 = 9,
+  Register_R10 = 10,
+  Register_R11 = 11,
+  Register_R12 = 12,
+  Register_R13 = 13,
+  Register_R14 = 14,
+  Register_R15 = 15,
+  Register_Xmm0 = 16,
+  Register_Xmm1 = 17,
+  Register_Xmm2 = 18,
+  Register_Xmm3 = 19,
+  Register_Xmm4 = 20,
+  Register_Xmm5 = 21,
+  Register_Xmm6 = 22,
+  Register_Xmm7 = 23,
+  Register_Xmm8 = 24,
+  Register_Xmm9 = 25,
+  Register_Xmm10 = 26,
+  Register_Xmm11 = 27,
+  Register_Xmm12 = 28,
+  Register_Xmm13 = 29,
+  Register_Xmm14 = 30,
+  Register_Xmm15 = 31,
+} Register;
+
+const char *register_name(Register value) {
+  if (value == 0) return "Register_A";
+  if (value == 1) return "Register_C";
+  if (value == 2) return "Register_D";
+  if (value == 3) return "Register_B";
+  if (value == 4) return "Register_SP";
+  if (value == 5) return "Register_BP";
+  if (value == 6) return "Register_SI";
+  if (value == 7) return "Register_DI";
+  if (value == 8) return "Register_R8";
+  if (value == 9) return "Register_R9";
+  if (value == 10) return "Register_R10";
+  if (value == 11) return "Register_R11";
+  if (value == 12) return "Register_R12";
+  if (value == 13) return "Register_R13";
+  if (value == 14) return "Register_R14";
+  if (value == 15) return "Register_R15";
+  if (value == 16) return "Register_Xmm0";
+  if (value == 17) return "Register_Xmm1";
+  if (value == 18) return "Register_Xmm2";
+  if (value == 19) return "Register_Xmm3";
+  if (value == 20) return "Register_Xmm4";
+  if (value == 21) return "Register_Xmm5";
+  if (value == 22) return "Register_Xmm6";
+  if (value == 23) return "Register_Xmm7";
+  if (value == 24) return "Register_Xmm8";
+  if (value == 25) return "Register_Xmm9";
+  if (value == 26) return "Register_Xmm10";
+  if (value == 27) return "Register_Xmm11";
+  if (value == 28) return "Register_Xmm12";
+  if (value == 29) return "Register_Xmm13";
+  if (value == 30) return "Register_Xmm14";
+  if (value == 31) return "Register_Xmm15";
+  assert(!"Unexpected value for enum Register");
+  return 0;
+};
+
+typedef dyn_array_type(Register *) Array_Register_Ptr;
+typedef dyn_array_type(const Register *) Array_Const_Register_Ptr;
 
 typedef struct Label_Index Label_Index;
 typedef dyn_array_type(Label_Index *) Array_Label_Index_Ptr;
@@ -73,7 +189,22 @@ typedef struct Label_Location_Diff_Patch_Info Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info *) Array_Label_Location_Diff_Patch_Info_Ptr;
 typedef dyn_array_type(const Label_Location_Diff_Patch_Info *) Array_Const_Label_Location_Diff_Patch_Info_Ptr;
 
-typedef enum Number_Base Number_Base;
+typedef enum Number_Base {
+  Number_Base_2 = 2,
+  Number_Base_10 = 10,
+  Number_Base_16 = 16,
+} Number_Base;
+
+const char *number_base_name(Number_Base value) {
+  if (value == 2) return "Number_Base_2";
+  if (value == 10) return "Number_Base_10";
+  if (value == 16) return "Number_Base_16";
+  assert(!"Unexpected value for enum Number_Base");
+  return 0;
+};
+
+typedef dyn_array_type(Number_Base *) Array_Number_Base_Ptr;
+typedef dyn_array_type(const Number_Base *) Array_Const_Number_Base_Ptr;
 
 typedef struct Number_Literal Number_Literal;
 typedef dyn_array_type(Number_Literal *) Array_Number_Literal_Ptr;
@@ -95,9 +226,53 @@ typedef struct Import_Library Import_Library;
 typedef dyn_array_type(Import_Library *) Array_Import_Library_Ptr;
 typedef dyn_array_type(const Import_Library *) Array_Const_Import_Library_Ptr;
 
-typedef enum Compare_Type Compare_Type;
+typedef enum Compare_Type {
+  Compare_Type_Equal = 1,
+  Compare_Type_Not_Equal = 2,
+  Compare_Type_Unsigned_Below = 3,
+  Compare_Type_Unsigned_Below_Equal = 4,
+  Compare_Type_Unsigned_Above = 5,
+  Compare_Type_Unsigned_Above_Equal = 6,
+  Compare_Type_Signed_Less = 7,
+  Compare_Type_Signed_Less_Equal = 8,
+  Compare_Type_Signed_Greater = 9,
+  Compare_Type_Signed_Greater_Equal = 10,
+} Compare_Type;
 
-typedef enum Stack_Area Stack_Area;
+const char *compare_type_name(Compare_Type value) {
+  if (value == 1) return "Compare_Type_Equal";
+  if (value == 2) return "Compare_Type_Not_Equal";
+  if (value == 3) return "Compare_Type_Unsigned_Below";
+  if (value == 4) return "Compare_Type_Unsigned_Below_Equal";
+  if (value == 5) return "Compare_Type_Unsigned_Above";
+  if (value == 6) return "Compare_Type_Unsigned_Above_Equal";
+  if (value == 7) return "Compare_Type_Signed_Less";
+  if (value == 8) return "Compare_Type_Signed_Less_Equal";
+  if (value == 9) return "Compare_Type_Signed_Greater";
+  if (value == 10) return "Compare_Type_Signed_Greater_Equal";
+  assert(!"Unexpected value for enum Compare_Type");
+  return 0;
+};
+
+typedef dyn_array_type(Compare_Type *) Array_Compare_Type_Ptr;
+typedef dyn_array_type(const Compare_Type *) Array_Const_Compare_Type_Ptr;
+
+typedef enum Stack_Area {
+  Stack_Area_Local = 0,
+  Stack_Area_Received_Argument = 1,
+  Stack_Area_Call_Target_Argument = 2,
+} Stack_Area;
+
+const char *stack_area_name(Stack_Area value) {
+  if (value == 0) return "Stack_Area_Local";
+  if (value == 1) return "Stack_Area_Received_Argument";
+  if (value == 2) return "Stack_Area_Call_Target_Argument";
+  assert(!"Unexpected value for enum Stack_Area");
+  return 0;
+};
+
+typedef dyn_array_type(Stack_Area *) Array_Stack_Area_Ptr;
+typedef dyn_array_type(const Stack_Area *) Array_Const_Stack_Area_Ptr;
 
 typedef struct Memory_Location Memory_Location;
 typedef dyn_array_type(Memory_Location *) Array_Memory_Location_Ptr;
@@ -139,17 +314,71 @@ typedef struct Function_Builder Function_Builder;
 typedef dyn_array_type(Function_Builder *) Array_Function_Builder_Ptr;
 typedef dyn_array_type(const Function_Builder *) Array_Const_Function_Builder_Ptr;
 
-typedef enum Function_Parameter_Mode Function_Parameter_Mode;
+typedef enum Function_Parameter_Mode {
+  Function_Parameter_Mode_Call = 0,
+  Function_Parameter_Mode_Body = 1,
+} Function_Parameter_Mode;
 
-typedef enum Operator_Fixity Operator_Fixity;
+const char *function_parameter_mode_name(Function_Parameter_Mode value) {
+  if (value == 0) return "Function_Parameter_Mode_Call";
+  if (value == 1) return "Function_Parameter_Mode_Body";
+  assert(!"Unexpected value for enum Function_Parameter_Mode");
+  return 0;
+};
 
-typedef enum Operator_Associativity Operator_Associativity;
+typedef dyn_array_type(Function_Parameter_Mode *) Array_Function_Parameter_Mode_Ptr;
+typedef dyn_array_type(const Function_Parameter_Mode *) Array_Const_Function_Parameter_Mode_Ptr;
+
+typedef enum Operator_Fixity {
+  Operator_Fixity_Infix = 1,
+  Operator_Fixity_Prefix = 2,
+  Operator_Fixity_Postfix = 4,
+} Operator_Fixity;
+
+const char *operator_fixity_name(Operator_Fixity value) {
+  if (value == 1) return "Operator_Fixity_Infix";
+  if (value == 2) return "Operator_Fixity_Prefix";
+  if (value == 4) return "Operator_Fixity_Postfix";
+  assert(!"Unexpected value for enum Operator_Fixity");
+  return 0;
+};
+
+typedef dyn_array_type(Operator_Fixity *) Array_Operator_Fixity_Ptr;
+typedef dyn_array_type(const Operator_Fixity *) Array_Const_Operator_Fixity_Ptr;
+
+typedef enum Operator_Associativity {
+  Operator_Associativity_Left = 0,
+  Operator_Associativity_Right = 1,
+} Operator_Associativity;
+
+const char *operator_associativity_name(Operator_Associativity value) {
+  if (value == 0) return "Operator_Associativity_Left";
+  if (value == 1) return "Operator_Associativity_Right";
+  assert(!"Unexpected value for enum Operator_Associativity");
+  return 0;
+};
+
+typedef dyn_array_type(Operator_Associativity *) Array_Operator_Associativity_Ptr;
+typedef dyn_array_type(const Operator_Associativity *) Array_Const_Operator_Associativity_Ptr;
 
 typedef struct Function_Layout Function_Layout;
 typedef dyn_array_type(Function_Layout *) Array_Function_Layout_Ptr;
 typedef dyn_array_type(const Function_Layout *) Array_Const_Function_Layout_Ptr;
 
-typedef enum Execution_Context_Flags Execution_Context_Flags;
+typedef enum Execution_Context_Flags {
+  Execution_Context_Flags_None = 0,
+  Execution_Context_Flags_Global = 1,
+} Execution_Context_Flags;
+
+const char *execution_context_flags_name(Execution_Context_Flags value) {
+  if (value == 0) return "Execution_Context_Flags_None";
+  if (value == 1) return "Execution_Context_Flags_Global";
+  assert(!"Unexpected value for enum Execution_Context_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Execution_Context_Flags *) Array_Execution_Context_Flags_Ptr;
+typedef dyn_array_type(const Execution_Context_Flags *) Array_Const_Execution_Context_Flags_Ptr;
 
 typedef struct Execution_Context Execution_Context;
 typedef dyn_array_type(Execution_Context *) Array_Execution_Context_Ptr;
@@ -203,7 +432,30 @@ typedef struct Value Value;
 typedef dyn_array_type(Value *) Array_Value_Ptr;
 typedef dyn_array_type(const Value *) Array_Const_Value_Ptr;
 
-typedef enum Expected_Result_Storage Expected_Result_Storage;
+typedef enum Expected_Result_Storage {
+  Expected_Result_Storage_None = 0,
+  Expected_Result_Storage_Static = 1,
+  Expected_Result_Storage_Memory = 2,
+  Expected_Result_Storage_Register = 4,
+  Expected_Result_Storage_Xmm = 8,
+  Expected_Result_Storage_Eflags = 16,
+  Expected_Result_Storage_Unpacked = 32,
+} Expected_Result_Storage;
+
+const char *expected_result_storage_name(Expected_Result_Storage value) {
+  if (value == 0) return "Expected_Result_Storage_None";
+  if (value == 1) return "Expected_Result_Storage_Static";
+  if (value == 2) return "Expected_Result_Storage_Memory";
+  if (value == 4) return "Expected_Result_Storage_Register";
+  if (value == 8) return "Expected_Result_Storage_Xmm";
+  if (value == 16) return "Expected_Result_Storage_Eflags";
+  if (value == 32) return "Expected_Result_Storage_Unpacked";
+  assert(!"Unexpected value for enum Expected_Result_Storage");
+  return 0;
+};
+
+typedef dyn_array_type(Expected_Result_Storage *) Array_Expected_Result_Storage_Ptr;
+typedef dyn_array_type(const Expected_Result_Storage *) Array_Const_Expected_Result_Storage_Ptr;
 
 typedef struct Expected_Result Expected_Result;
 typedef dyn_array_type(Expected_Result *) Array_Expected_Result_Ptr;
@@ -223,7 +475,20 @@ typedef dyn_array_type(const Lazy_Static_Value *) Array_Const_Lazy_Static_Value_
 typedef Value * (*Mass_Handle_Operator_Proc)
   (Execution_Context * context, Value_View view, void * payload);
 
-typedef enum Memory_Layout_Item_Flags Memory_Layout_Item_Flags;
+typedef enum Memory_Layout_Item_Flags {
+  Memory_Layout_Item_Flags_None = 0,
+  Memory_Layout_Item_Flags_Uninitialized = 1,
+} Memory_Layout_Item_Flags;
+
+const char *memory_layout_item_flags_name(Memory_Layout_Item_Flags value) {
+  if (value == 0) return "Memory_Layout_Item_Flags_None";
+  if (value == 1) return "Memory_Layout_Item_Flags_Uninitialized";
+  assert(!"Unexpected value for enum Memory_Layout_Item_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Memory_Layout_Item_Flags *) Array_Memory_Layout_Item_Flags_Ptr;
+typedef dyn_array_type(const Memory_Layout_Item_Flags *) Array_Const_Memory_Layout_Item_Flags_Ptr;
 
 typedef struct Memory_Layout_Item Memory_Layout_Item;
 typedef dyn_array_type(Memory_Layout_Item *) Array_Memory_Layout_Item_Ptr;
@@ -237,7 +502,22 @@ typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
 
-typedef enum Descriptor_Function_Flags Descriptor_Function_Flags;
+typedef enum Descriptor_Function_Flags {
+  Descriptor_Function_Flags_None = 0,
+  Descriptor_Function_Flags_Compile_Time = 2,
+  Descriptor_Function_Flags_Intrinsic = 4,
+} Descriptor_Function_Flags;
+
+const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
+  if (value == 0) return "Descriptor_Function_Flags_None";
+  if (value == 2) return "Descriptor_Function_Flags_Compile_Time";
+  if (value == 4) return "Descriptor_Function_Flags_Intrinsic";
+  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Descriptor_Function_Flags *) Array_Descriptor_Function_Flags_Ptr;
+typedef dyn_array_type(const Descriptor_Function_Flags *) Array_Const_Descriptor_Function_Flags_Ptr;
 
 typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
@@ -247,7 +527,22 @@ typedef struct Function_Info Function_Info;
 typedef dyn_array_type(Function_Info *) Array_Function_Info_Ptr;
 typedef dyn_array_type(const Function_Info *) Array_Const_Function_Info_Ptr;
 
-typedef enum Function_Literal_Flags Function_Literal_Flags;
+typedef enum Function_Literal_Flags {
+  Function_Literal_Flags_None = 0,
+  Function_Literal_Flags_Generic = 1,
+  Function_Literal_Flags_Macro = 2,
+} Function_Literal_Flags;
+
+const char *function_literal_flags_name(Function_Literal_Flags value) {
+  if (value == 0) return "Function_Literal_Flags_None";
+  if (value == 1) return "Function_Literal_Flags_Generic";
+  if (value == 2) return "Function_Literal_Flags_Macro";
+  assert(!"Unexpected value for enum Function_Literal_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Function_Literal_Flags *) Array_Function_Literal_Flags_Ptr;
+typedef dyn_array_type(const Function_Literal_Flags *) Array_Const_Function_Literal_Flags_Ptr;
 
 typedef struct Function_Specialization Function_Specialization;
 typedef dyn_array_type(Function_Specialization *) Array_Function_Specialization_Ptr;
@@ -257,7 +552,20 @@ typedef struct Function_Literal Function_Literal;
 typedef dyn_array_type(Function_Literal *) Array_Function_Literal_Ptr;
 typedef dyn_array_type(const Function_Literal *) Array_Const_Function_Literal_Ptr;
 
-typedef enum Function_Call_Setup_Flags Function_Call_Setup_Flags;
+typedef enum Function_Call_Setup_Flags {
+  Function_Call_Setup_Flags_None = 0,
+  Function_Call_Setup_Flags_Indirect_Return = 1,
+} Function_Call_Setup_Flags;
+
+const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
+  if (value == 0) return "Function_Call_Setup_Flags_None";
+  if (value == 1) return "Function_Call_Setup_Flags_Indirect_Return";
+  assert(!"Unexpected value for enum Function_Call_Setup_Flags");
+  return 0;
+};
+
+typedef dyn_array_type(Function_Call_Setup_Flags *) Array_Function_Call_Setup_Flags_Ptr;
+typedef dyn_array_type(const Function_Call_Setup_Flags *) Array_Const_Function_Call_Setup_Flags_Ptr;
 
 typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
@@ -313,11 +621,74 @@ typedef struct Compilation Compilation;
 typedef dyn_array_type(Compilation *) Array_Compilation_Ptr;
 typedef dyn_array_type(const Compilation *) Array_Const_Compilation_Ptr;
 
-typedef enum Instruction_Extension_Type Instruction_Extension_Type;
+typedef enum Instruction_Extension_Type {
+  Instruction_Extension_Type_None = 0,
+  Instruction_Extension_Type_Register = 1,
+  Instruction_Extension_Type_Op_Code = 2,
+  Instruction_Extension_Type_Plus_Register = 3,
+} Instruction_Extension_Type;
 
-typedef enum Operand_Encoding_Type Operand_Encoding_Type;
+const char *instruction_extension_type_name(Instruction_Extension_Type value) {
+  if (value == 0) return "Instruction_Extension_Type_None";
+  if (value == 1) return "Instruction_Extension_Type_Register";
+  if (value == 2) return "Instruction_Extension_Type_Op_Code";
+  if (value == 3) return "Instruction_Extension_Type_Plus_Register";
+  assert(!"Unexpected value for enum Instruction_Extension_Type");
+  return 0;
+};
 
-typedef enum Operand_Size Operand_Size;
+typedef dyn_array_type(Instruction_Extension_Type *) Array_Instruction_Extension_Type_Ptr;
+typedef dyn_array_type(const Instruction_Extension_Type *) Array_Const_Instruction_Extension_Type_Ptr;
+
+typedef enum Operand_Encoding_Type {
+  Operand_Encoding_Type_None = 0,
+  Operand_Encoding_Type_Eflags = 1,
+  Operand_Encoding_Type_Register = 2,
+  Operand_Encoding_Type_Register_A = 3,
+  Operand_Encoding_Type_Register_Memory = 4,
+  Operand_Encoding_Type_Xmm = 5,
+  Operand_Encoding_Type_Xmm_Memory = 6,
+  Operand_Encoding_Type_Memory = 7,
+  Operand_Encoding_Type_Immediate = 8,
+} Operand_Encoding_Type;
+
+const char *operand_encoding_type_name(Operand_Encoding_Type value) {
+  if (value == 0) return "Operand_Encoding_Type_None";
+  if (value == 1) return "Operand_Encoding_Type_Eflags";
+  if (value == 2) return "Operand_Encoding_Type_Register";
+  if (value == 3) return "Operand_Encoding_Type_Register_A";
+  if (value == 4) return "Operand_Encoding_Type_Register_Memory";
+  if (value == 5) return "Operand_Encoding_Type_Xmm";
+  if (value == 6) return "Operand_Encoding_Type_Xmm_Memory";
+  if (value == 7) return "Operand_Encoding_Type_Memory";
+  if (value == 8) return "Operand_Encoding_Type_Immediate";
+  assert(!"Unexpected value for enum Operand_Encoding_Type");
+  return 0;
+};
+
+typedef dyn_array_type(Operand_Encoding_Type *) Array_Operand_Encoding_Type_Ptr;
+typedef dyn_array_type(const Operand_Encoding_Type *) Array_Const_Operand_Encoding_Type_Ptr;
+
+typedef enum Operand_Size {
+  Operand_Size_Any = 0,
+  Operand_Size_8 = 1,
+  Operand_Size_16 = 2,
+  Operand_Size_32 = 4,
+  Operand_Size_64 = 8,
+} Operand_Size;
+
+const char *operand_size_name(Operand_Size value) {
+  if (value == 0) return "Operand_Size_Any";
+  if (value == 1) return "Operand_Size_8";
+  if (value == 2) return "Operand_Size_16";
+  if (value == 4) return "Operand_Size_32";
+  if (value == 8) return "Operand_Size_64";
+  assert(!"Unexpected value for enum Operand_Size");
+  return 0;
+};
+
+typedef dyn_array_type(Operand_Size *) Array_Operand_Size_Ptr;
+typedef dyn_array_type(const Operand_Size *) Array_Const_Operand_Size_Ptr;
 
 typedef struct Operand_Encoding Operand_Encoding;
 typedef dyn_array_type(Operand_Encoding *) Array_Operand_Encoding_Ptr;
@@ -519,38 +890,12 @@ typedef struct Parse_Error {
 } Parse_Error;
 typedef dyn_array_type(Parse_Error) Array_Parse_Error;
 
-typedef enum Group_Tag {
-  Group_Tag_Paren = 1,
-  Group_Tag_Square = 2,
-  Group_Tag_Curly = 3,
-} Group_Tag;
-
-const char *group_tag_name(Group_Tag value) {
-  if (value == 1) return "Group_Tag_Paren";
-  if (value == 2) return "Group_Tag_Square";
-  if (value == 3) return "Group_Tag_Curly";
-  assert(!"Unexpected value for enum Group_Tag");
-  return 0;
-};
-
 typedef struct Value_View {
   Value * * values;
   u64 length;
   Source_Range source_range;
 } Value_View;
 typedef dyn_array_type(Value_View) Array_Value_View;
-
-typedef enum Symbol_Type {
-  Symbol_Type_Id_Like = 1,
-  Symbol_Type_Operator_Like = 2,
-} Symbol_Type;
-
-const char *symbol_type_name(Symbol_Type value) {
-  if (value == 1) return "Symbol_Type_Id_Like";
-  if (value == 2) return "Symbol_Type_Operator_Like";
-  assert(!"Unexpected value for enum Symbol_Type");
-  return 0;
-};
 
 typedef struct Symbol {
   Symbol_Type type;
@@ -609,20 +954,6 @@ token_pattern_as_or(Token_Pattern *token_pattern) {
   return &token_pattern->Or;
 }
 typedef dyn_array_type(Token_Pattern) Array_Token_Pattern;
-typedef enum Section_Permissions {
-  Section_Permissions_Read = 1,
-  Section_Permissions_Write = 2,
-  Section_Permissions_Execute = 4,
-} Section_Permissions;
-
-const char *section_permissions_name(Section_Permissions value) {
-  if (value == 1) return "Section_Permissions_Read";
-  if (value == 2) return "Section_Permissions_Write";
-  if (value == 4) return "Section_Permissions_Execute";
-  assert(!"Unexpected value for enum Section_Permissions");
-  return 0;
-};
-
 typedef struct Section {
   Virtual_Memory_Buffer buffer;
   Slice name;
@@ -638,78 +969,6 @@ typedef struct Program_Memory {
   Section ro_data;
 } Program_Memory;
 typedef dyn_array_type(Program_Memory) Array_Program_Memory;
-
-typedef enum Register {
-  Register_A = 0,
-  Register_C = 1,
-  Register_D = 2,
-  Register_B = 3,
-  Register_SP = 4,
-  Register_BP = 5,
-  Register_SI = 6,
-  Register_DI = 7,
-  Register_R8 = 8,
-  Register_R9 = 9,
-  Register_R10 = 10,
-  Register_R11 = 11,
-  Register_R12 = 12,
-  Register_R13 = 13,
-  Register_R14 = 14,
-  Register_R15 = 15,
-  Register_Xmm0 = 16,
-  Register_Xmm1 = 17,
-  Register_Xmm2 = 18,
-  Register_Xmm3 = 19,
-  Register_Xmm4 = 20,
-  Register_Xmm5 = 21,
-  Register_Xmm6 = 22,
-  Register_Xmm7 = 23,
-  Register_Xmm8 = 24,
-  Register_Xmm9 = 25,
-  Register_Xmm10 = 26,
-  Register_Xmm11 = 27,
-  Register_Xmm12 = 28,
-  Register_Xmm13 = 29,
-  Register_Xmm14 = 30,
-  Register_Xmm15 = 31,
-} Register;
-
-const char *register_name(Register value) {
-  if (value == 0) return "Register_A";
-  if (value == 1) return "Register_C";
-  if (value == 2) return "Register_D";
-  if (value == 3) return "Register_B";
-  if (value == 4) return "Register_SP";
-  if (value == 5) return "Register_BP";
-  if (value == 6) return "Register_SI";
-  if (value == 7) return "Register_DI";
-  if (value == 8) return "Register_R8";
-  if (value == 9) return "Register_R9";
-  if (value == 10) return "Register_R10";
-  if (value == 11) return "Register_R11";
-  if (value == 12) return "Register_R12";
-  if (value == 13) return "Register_R13";
-  if (value == 14) return "Register_R14";
-  if (value == 15) return "Register_R15";
-  if (value == 16) return "Register_Xmm0";
-  if (value == 17) return "Register_Xmm1";
-  if (value == 18) return "Register_Xmm2";
-  if (value == 19) return "Register_Xmm3";
-  if (value == 20) return "Register_Xmm4";
-  if (value == 21) return "Register_Xmm5";
-  if (value == 22) return "Register_Xmm6";
-  if (value == 23) return "Register_Xmm7";
-  if (value == 24) return "Register_Xmm8";
-  if (value == 25) return "Register_Xmm9";
-  if (value == 26) return "Register_Xmm10";
-  if (value == 27) return "Register_Xmm11";
-  if (value == 28) return "Register_Xmm12";
-  if (value == 29) return "Register_Xmm13";
-  if (value == 30) return "Register_Xmm14";
-  if (value == 31) return "Register_Xmm15";
-  assert(!"Unexpected value for enum Register");
-  return 0;
-};
 
 typedef struct Label_Index {
   const Program * program;
@@ -731,20 +990,6 @@ typedef struct Label_Location_Diff_Patch_Info {
   s32 * patch_target;
 } Label_Location_Diff_Patch_Info;
 typedef dyn_array_type(Label_Location_Diff_Patch_Info) Array_Label_Location_Diff_Patch_Info;
-
-typedef enum Number_Base {
-  Number_Base_2 = 2,
-  Number_Base_10 = 10,
-  Number_Base_16 = 16,
-} Number_Base;
-
-const char *number_base_name(Number_Base value) {
-  if (value == 2) return "Number_Base_2";
-  if (value == 10) return "Number_Base_10";
-  if (value == 16) return "Number_Base_16";
-  assert(!"Unexpected value for enum Number_Base");
-  return 0;
-};
 
 typedef struct Number_Literal {
   Number_Base base;
@@ -778,48 +1023,6 @@ typedef struct Import_Library {
   Array_Import_Symbol symbols;
 } Import_Library;
 typedef dyn_array_type(Import_Library) Array_Import_Library;
-
-typedef enum Compare_Type {
-  Compare_Type_Equal = 1,
-  Compare_Type_Not_Equal = 2,
-  Compare_Type_Unsigned_Below = 3,
-  Compare_Type_Unsigned_Below_Equal = 4,
-  Compare_Type_Unsigned_Above = 5,
-  Compare_Type_Unsigned_Above_Equal = 6,
-  Compare_Type_Signed_Less = 7,
-  Compare_Type_Signed_Less_Equal = 8,
-  Compare_Type_Signed_Greater = 9,
-  Compare_Type_Signed_Greater_Equal = 10,
-} Compare_Type;
-
-const char *compare_type_name(Compare_Type value) {
-  if (value == 1) return "Compare_Type_Equal";
-  if (value == 2) return "Compare_Type_Not_Equal";
-  if (value == 3) return "Compare_Type_Unsigned_Below";
-  if (value == 4) return "Compare_Type_Unsigned_Below_Equal";
-  if (value == 5) return "Compare_Type_Unsigned_Above";
-  if (value == 6) return "Compare_Type_Unsigned_Above_Equal";
-  if (value == 7) return "Compare_Type_Signed_Less";
-  if (value == 8) return "Compare_Type_Signed_Less_Equal";
-  if (value == 9) return "Compare_Type_Signed_Greater";
-  if (value == 10) return "Compare_Type_Signed_Greater_Equal";
-  assert(!"Unexpected value for enum Compare_Type");
-  return 0;
-};
-
-typedef enum Stack_Area {
-  Stack_Area_Local = 0,
-  Stack_Area_Received_Argument = 1,
-  Stack_Area_Call_Target_Argument = 2,
-} Stack_Area;
-
-const char *stack_area_name(Stack_Area value) {
-  if (value == 0) return "Stack_Area_Local";
-  if (value == 1) return "Stack_Area_Received_Argument";
-  if (value == 2) return "Stack_Area_Call_Target_Argument";
-  assert(!"Unexpected value for enum Stack_Area");
-  return 0;
-};
 
 typedef enum {
   Memory_Location_Tag_Instruction_Pointer_Relative = 0,
@@ -1103,44 +1306,6 @@ typedef struct Function_Builder {
 } Function_Builder;
 typedef dyn_array_type(Function_Builder) Array_Function_Builder;
 
-typedef enum Function_Parameter_Mode {
-  Function_Parameter_Mode_Call = 0,
-  Function_Parameter_Mode_Body = 1,
-} Function_Parameter_Mode;
-
-const char *function_parameter_mode_name(Function_Parameter_Mode value) {
-  if (value == 0) return "Function_Parameter_Mode_Call";
-  if (value == 1) return "Function_Parameter_Mode_Body";
-  assert(!"Unexpected value for enum Function_Parameter_Mode");
-  return 0;
-};
-
-typedef enum Operator_Fixity {
-  Operator_Fixity_Infix = 1,
-  Operator_Fixity_Prefix = 2,
-  Operator_Fixity_Postfix = 4,
-} Operator_Fixity;
-
-const char *operator_fixity_name(Operator_Fixity value) {
-  if (value == 1) return "Operator_Fixity_Infix";
-  if (value == 2) return "Operator_Fixity_Prefix";
-  if (value == 4) return "Operator_Fixity_Postfix";
-  assert(!"Unexpected value for enum Operator_Fixity");
-  return 0;
-};
-
-typedef enum Operator_Associativity {
-  Operator_Associativity_Left = 0,
-  Operator_Associativity_Right = 1,
-} Operator_Associativity;
-
-const char *operator_associativity_name(Operator_Associativity value) {
-  if (value == 0) return "Operator_Associativity_Left";
-  if (value == 1) return "Operator_Associativity_Right";
-  assert(!"Unexpected value for enum Operator_Associativity");
-  return 0;
-};
-
 typedef struct Function_Layout {
   s32 stack_reserve;
   u8 stack_allocation_offset_in_prolog;
@@ -1151,18 +1316,6 @@ typedef struct Function_Layout {
   u8 volatile_register_push_offsets[16];
 } Function_Layout;
 typedef dyn_array_type(Function_Layout) Array_Function_Layout;
-
-typedef enum Execution_Context_Flags {
-  Execution_Context_Flags_None = 0,
-  Execution_Context_Flags_Global = 1,
-} Execution_Context_Flags;
-
-const char *execution_context_flags_name(Execution_Context_Flags value) {
-  if (value == 0) return "Execution_Context_Flags_None";
-  if (value == 1) return "Execution_Context_Flags_Global";
-  assert(!"Unexpected value for enum Execution_Context_Flags");
-  return 0;
-};
 
 typedef struct Execution_Context {
   Allocator * allocator;
@@ -1339,28 +1492,6 @@ typedef struct Value {
 } Value;
 typedef dyn_array_type(Value) Array_Value;
 
-typedef enum Expected_Result_Storage {
-  Expected_Result_Storage_None = 0,
-  Expected_Result_Storage_Static = 1,
-  Expected_Result_Storage_Memory = 2,
-  Expected_Result_Storage_Register = 4,
-  Expected_Result_Storage_Xmm = 8,
-  Expected_Result_Storage_Eflags = 16,
-  Expected_Result_Storage_Unpacked = 32,
-} Expected_Result_Storage;
-
-const char *expected_result_storage_name(Expected_Result_Storage value) {
-  if (value == 0) return "Expected_Result_Storage_None";
-  if (value == 1) return "Expected_Result_Storage_Static";
-  if (value == 2) return "Expected_Result_Storage_Memory";
-  if (value == 4) return "Expected_Result_Storage_Register";
-  if (value == 8) return "Expected_Result_Storage_Xmm";
-  if (value == 16) return "Expected_Result_Storage_Eflags";
-  if (value == 32) return "Expected_Result_Storage_Unpacked";
-  assert(!"Unexpected value for enum Expected_Result_Storage");
-  return 0;
-};
-
 typedef enum {
   Expected_Result_Tag_Exact = 0,
   Expected_Result_Tag_Flexible = 1,
@@ -1409,18 +1540,6 @@ typedef struct Lazy_Static_Value {
   u64 resolving;
 } Lazy_Static_Value;
 typedef dyn_array_type(Lazy_Static_Value) Array_Lazy_Static_Value;
-
-typedef enum Memory_Layout_Item_Flags {
-  Memory_Layout_Item_Flags_None = 0,
-  Memory_Layout_Item_Flags_Uninitialized = 1,
-} Memory_Layout_Item_Flags;
-
-const char *memory_layout_item_flags_name(Memory_Layout_Item_Flags value) {
-  if (value == 0) return "Memory_Layout_Item_Flags_None";
-  if (value == 1) return "Memory_Layout_Item_Flags_Uninitialized";
-  assert(!"Unexpected value for enum Memory_Layout_Item_Flags");
-  return 0;
-};
 
 typedef enum {
   Memory_Layout_Item_Tag_Absolute = 0,
@@ -1485,20 +1604,6 @@ function_parameter_as_exact_static(Function_Parameter *function_parameter) {
   return &function_parameter->Exact_Static;
 }
 typedef dyn_array_type(Function_Parameter) Array_Function_Parameter;
-typedef enum Descriptor_Function_Flags {
-  Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Compile_Time = 2,
-  Descriptor_Function_Flags_Intrinsic = 4,
-} Descriptor_Function_Flags;
-
-const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
-  if (value == 0) return "Descriptor_Function_Flags_None";
-  if (value == 2) return "Descriptor_Function_Flags_Compile_Time";
-  if (value == 4) return "Descriptor_Function_Flags_Intrinsic";
-  assert(!"Unexpected value for enum Descriptor_Function_Flags");
-  return 0;
-};
-
 typedef struct Function_Return {
   Declaration declaration;
   Value_View maybe_type_expression;
@@ -1513,20 +1618,6 @@ typedef struct Function_Info {
   Function_Return returns;
 } Function_Info;
 typedef dyn_array_type(Function_Info) Array_Function_Info;
-
-typedef enum Function_Literal_Flags {
-  Function_Literal_Flags_None = 0,
-  Function_Literal_Flags_Generic = 1,
-  Function_Literal_Flags_Macro = 2,
-} Function_Literal_Flags;
-
-const char *function_literal_flags_name(Function_Literal_Flags value) {
-  if (value == 0) return "Function_Literal_Flags_None";
-  if (value == 1) return "Function_Literal_Flags_Generic";
-  if (value == 2) return "Function_Literal_Flags_Macro";
-  assert(!"Unexpected value for enum Function_Literal_Flags");
-  return 0;
-};
 
 typedef struct Function_Specialization {
   Array_Const_Descriptor_Ptr descriptors;
@@ -1544,18 +1635,6 @@ typedef struct Function_Literal {
   Array_Function_Specialization specializations;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
-
-typedef enum Function_Call_Setup_Flags {
-  Function_Call_Setup_Flags_None = 0,
-  Function_Call_Setup_Flags_Indirect_Return = 1,
-} Function_Call_Setup_Flags;
-
-const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
-  if (value == 0) return "Function_Call_Setup_Flags_None";
-  if (value == 1) return "Function_Call_Setup_Flags_Indirect_Return";
-  assert(!"Unexpected value for enum Function_Call_Setup_Flags");
-  return 0;
-};
 
 typedef struct Function_Call_Setup {
   Function_Call_Setup_Flags flags;
@@ -1908,66 +1987,6 @@ typedef struct Compilation {
   Mass_Result * result;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
-
-typedef enum Instruction_Extension_Type {
-  Instruction_Extension_Type_None = 0,
-  Instruction_Extension_Type_Register = 1,
-  Instruction_Extension_Type_Op_Code = 2,
-  Instruction_Extension_Type_Plus_Register = 3,
-} Instruction_Extension_Type;
-
-const char *instruction_extension_type_name(Instruction_Extension_Type value) {
-  if (value == 0) return "Instruction_Extension_Type_None";
-  if (value == 1) return "Instruction_Extension_Type_Register";
-  if (value == 2) return "Instruction_Extension_Type_Op_Code";
-  if (value == 3) return "Instruction_Extension_Type_Plus_Register";
-  assert(!"Unexpected value for enum Instruction_Extension_Type");
-  return 0;
-};
-
-typedef enum Operand_Encoding_Type {
-  Operand_Encoding_Type_None = 0,
-  Operand_Encoding_Type_Eflags = 1,
-  Operand_Encoding_Type_Register = 2,
-  Operand_Encoding_Type_Register_A = 3,
-  Operand_Encoding_Type_Register_Memory = 4,
-  Operand_Encoding_Type_Xmm = 5,
-  Operand_Encoding_Type_Xmm_Memory = 6,
-  Operand_Encoding_Type_Memory = 7,
-  Operand_Encoding_Type_Immediate = 8,
-} Operand_Encoding_Type;
-
-const char *operand_encoding_type_name(Operand_Encoding_Type value) {
-  if (value == 0) return "Operand_Encoding_Type_None";
-  if (value == 1) return "Operand_Encoding_Type_Eflags";
-  if (value == 2) return "Operand_Encoding_Type_Register";
-  if (value == 3) return "Operand_Encoding_Type_Register_A";
-  if (value == 4) return "Operand_Encoding_Type_Register_Memory";
-  if (value == 5) return "Operand_Encoding_Type_Xmm";
-  if (value == 6) return "Operand_Encoding_Type_Xmm_Memory";
-  if (value == 7) return "Operand_Encoding_Type_Memory";
-  if (value == 8) return "Operand_Encoding_Type_Immediate";
-  assert(!"Unexpected value for enum Operand_Encoding_Type");
-  return 0;
-};
-
-typedef enum Operand_Size {
-  Operand_Size_Any = 0,
-  Operand_Size_8 = 1,
-  Operand_Size_16 = 2,
-  Operand_Size_32 = 4,
-  Operand_Size_64 = 8,
-} Operand_Size;
-
-const char *operand_size_name(Operand_Size value) {
-  if (value == 0) return "Operand_Size_Any";
-  if (value == 1) return "Operand_Size_8";
-  if (value == 2) return "Operand_Size_16";
-  if (value == 4) return "Operand_Size_32";
-  if (value == 8) return "Operand_Size_64";
-  assert(!"Unexpected value for enum Operand_Size");
-  return 0;
-};
 
 typedef struct Operand_Encoding {
   Operand_Encoding_Type type;
