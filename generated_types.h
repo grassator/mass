@@ -1985,6 +1985,7 @@ typedef struct Compilation {
   Scope * root_scope;
   Program * runtime_program;
   Mass_Result * result;
+  Symbol_Map * symbol_cache_map;
 } Compilation;
 typedef dyn_array_type(Compilation) Array_Compilation;
 
@@ -6309,6 +6310,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(compilation, Compilation,
       .name = slice_literal_fields("result"),
     },
     .Base_Relative.offset = offsetof(Compilation, result),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_symbol_map_pointer,
+      .name = slice_literal_fields("symbol_cache_map"),
+    },
+    .Base_Relative.offset = offsetof(Compilation, symbol_cache_map),
   },
 );
 MASS_DEFINE_TYPE_VALUE(compilation);

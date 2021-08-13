@@ -5,11 +5,12 @@ set -e
 # This also works inline: CC=clang ./build.sh
 CC="${CC:-cc}"
 
-FLAGS="-std=c11 -g -O0 -pthread -Wno-incompatible-pointer-types"
+FLAGS="-std=c11 -g -O0 -pthread -Wno-incompatible-pointer-types "
 
 if [[ $($CC -v 2>&1) == *"clang version"* ]]
 then
-  FLAGS="$FLAGS -Wno-tautological-constant-out-of-range-compare -Wno-initializer-overrides"
+  SANITIZE="-fsanitize=address -fno-omit-frame-pointer -fno-common"
+  FLAGS="$FLAGS $SANITIZE -Wno-tautological-constant-out-of-range-compare -Wno-initializer-overrides"
 fi
 
 rm -rf build

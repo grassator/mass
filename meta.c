@@ -1893,6 +1893,7 @@ main(void) {
     { "Scope *", "root_scope" },
     { "Program *", "runtime_program" },
     { "Mass_Result *", "result" },
+    { "Symbol_Map *", "symbol_cache_map" },
   }));
 
   push_type(type_enum("Instruction_Extension_Type", (Enum_Type_Item[]){
