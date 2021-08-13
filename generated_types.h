@@ -776,6 +776,12 @@ typedef dyn_array_type(const char *) Array_Const_char_Ptr;
 typedef dyn_array_type(int *) Array_int_Ptr;
 typedef dyn_array_type(const int *) Array_Const_int_Ptr;
 
+typedef dyn_array_type(Allocator *) Array_Allocator_Ptr;
+typedef dyn_array_type(const Allocator *) Array_Const_Allocator_Ptr;
+
+typedef dyn_array_type(Virtual_Memory_Buffer *) Array_Virtual_Memory_Buffer_Ptr;
+typedef dyn_array_type(const Virtual_Memory_Buffer *) Array_Const_Virtual_Memory_Buffer_Ptr;
+
 typedef dyn_array_type(u8 *) Array_u8_Ptr;
 typedef dyn_array_type(const u8 *) Array_Const_u8_Ptr;
 
@@ -2050,6 +2056,10 @@ typedef dyn_array_type(char) Array_char;
 
 typedef dyn_array_type(int) Array_int;
 
+typedef dyn_array_type(Allocator) Array_Allocator;
+
+typedef dyn_array_type(Virtual_Memory_Buffer) Array_Virtual_Memory_Buffer;
+
 _Pragma("warning (pop)")
 
 // Mass Type Reflection
@@ -2058,8 +2068,6 @@ static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_descriptor_pointer;
-MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);
-MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);
 static Descriptor descriptor_source_position;
 static Descriptor descriptor_array_source_position;
 static Descriptor descriptor_array_source_position_ptr;
@@ -2572,6 +2580,18 @@ static Descriptor descriptor_array_int_ptr;
 static Descriptor descriptor_array_const_int_ptr;
 static Descriptor descriptor_int_pointer;
 static Descriptor descriptor_int_pointer_pointer;
+static Descriptor descriptor_allocator;
+static Descriptor descriptor_array_allocator;
+static Descriptor descriptor_array_allocator_ptr;
+static Descriptor descriptor_array_const_allocator_ptr;
+static Descriptor descriptor_allocator_pointer;
+static Descriptor descriptor_allocator_pointer_pointer;
+static Descriptor descriptor_virtual_memory_buffer;
+static Descriptor descriptor_array_virtual_memory_buffer;
+static Descriptor descriptor_array_virtual_memory_buffer_ptr;
+static Descriptor descriptor_array_const_virtual_memory_buffer_ptr;
+static Descriptor descriptor_virtual_memory_buffer_pointer;
+static Descriptor descriptor_virtual_memory_buffer_pointer_pointer;
 static Descriptor descriptor_u8;
 static Descriptor descriptor_array_u8;
 static Descriptor descriptor_array_u8_ptr;
@@ -6553,6 +6573,10 @@ MASS_DEFINE_OPAQUE_C_TYPE(char, char)
 MASS_DEFINE_OPAQUE_C_TYPE(array_char, Array_char)
 MASS_DEFINE_OPAQUE_C_TYPE(int, int)
 MASS_DEFINE_OPAQUE_C_TYPE(array_int, Array_int)
+MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator)
+MASS_DEFINE_OPAQUE_C_TYPE(array_allocator, Array_Allocator)
+MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer)
+MASS_DEFINE_OPAQUE_C_TYPE(array_virtual_memory_buffer, Array_Virtual_Memory_Buffer)
 MASS_DEFINE_OPAQUE_C_TYPE(u8, u8)
 MASS_DEFINE_OPAQUE_C_TYPE(array_u8, Array_u8)
 MASS_DEFINE_OPAQUE_C_TYPE(u16, u16)

@@ -2014,6 +2014,8 @@ main(void) {
   set_flags(push_type(type_c_opaque("int")), Meta_Type_Flags_No_C_Type);
 
   // Prelude Types
+  set_flags(export_compiler_custom_name("Allocator", push_type(type_c_opaque("Allocator"))), Meta_Type_Flags_No_C_Type);
+  set_flags(push_type(type_c_opaque("Virtual_Memory_Buffer")), Meta_Type_Flags_No_C_Type);
   #define PROCESS_PRELUDE_TYPES(F)\
     F(u8) F(u16) F(u32) F(u64)\
     F(s8) F(s16) F(s32) F(s64)\
@@ -2085,10 +2087,6 @@ main(void) {
       // The descriptor of descriptors needs to be forward declared
       fprintf(file, "static Descriptor descriptor_descriptor;\n");
       fprintf(file, "static Descriptor descriptor_descriptor_pointer;\n");
-
-      // Also need to define built-in types
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(allocator, Allocator);\n");
-      fprintf(file, "MASS_DEFINE_OPAQUE_C_TYPE(virtual_memory_buffer, Virtual_Memory_Buffer);\n");
 
       for (uint32_t i = 0; i < type_count; ++i) {
         print_mass_descriptor_and_type_forward_declaration(file, &types[i]);
