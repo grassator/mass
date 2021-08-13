@@ -5557,7 +5557,7 @@ token_parse_function_literal(
         body_value = token_parse_single(context, maybe_body);
       }
     } else if (rest.length) {
-      body_value = token_parse_expression(context, rest, &(u64){0}, 0);
+      body_value = compile_time_eval(context, rest);
       MASS_ON_ERROR(*context->result) return 0;
     }
   }

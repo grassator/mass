@@ -109,7 +109,7 @@ remainder :: arithmetic_overloads(PRELUDE_MASS.remainder)
 comparison_overloads :: {
   macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
     template :: macro(type : Type) {
-      @fn(x : type, y : type) -> bool impl
+      @fn(x : type, y : type) -> (bool) impl
     }
     expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
       f :: template(t64)
@@ -119,7 +119,7 @@ comparison_overloads :: {
       f
     }
 
-    f :: @fn(x : Number_Literal, y : Number_Literal) -> bool impl
+    f :: @fn(x : Number_Literal, y : Number_Literal) -> (bool) impl
     f :: expand(s64, s32, s16, s8)
     f :: expand(u64, u32, u16, u8)
     f
@@ -138,7 +138,7 @@ logical_shift_right :: PRELUDE_MASS.number_literal_logical_shift_right
 bitwise_or :: PRELUDE_MASS.number_literal_bitwise_or
 bitwise_and :: PRELUDE_MASS.number_literal_bitwise_and
 
-Array :: @fn(item : Type, length : u64) -> (Type) {
+Array :: fn(item : Type, length : u64) -> (Type) {
   mass :: PRELUDE_MASS
   byte_size :: mass.Descriptor.bit_size * 8
   byte_alignment :: mass.Descriptor.bit_alignment * 8
@@ -159,7 +159,7 @@ static_assert :: macro(condition : bool, message : String) {
   @{if condition == false { compile_time_error("Static Assert Failed", message) }}
 }
 
-external :: @fn(
+external :: fn(
   library_name : String,
   symbol_name : String
 ) -> (
@@ -170,7 +170,7 @@ external :: @fn(
   result
 }
 
-syscall :: @fn(
+syscall :: fn(
   number : s64
 ) -> (
   result : PRELUDE_MASS.Syscall
