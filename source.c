@@ -4851,24 +4851,6 @@ mass_handle_at_operator(
   }
 }
 
-static inline Value *
-mass_allocate(
-  Execution_Context *context,
-  Value_View args_view
-) {
-  assert(args_view.length == 1);
-  assert(context_is_compile_time_eval(context));
-  const Descriptor *descriptor =
-    value_ensure_type(context, value_view_get(args_view, 0), args_view.source_range);
-  MASS_ON_ERROR(*context->result) return 0;
-  void *memory = allocator_allocate_bytes(
-    context->allocator, descriptor_byte_size(descriptor), descriptor_byte_alignment(descriptor)
-  );
-  return value_make(
-    context, &descriptor_descriptor_pointer, storage_static_inline(&memory), args_view.source_range
-  );
-}
-
 static inline Memory_Layout_Item *
 struct_find_field_by_name(
   const Descriptor *descriptor,
@@ -6595,6 +6577,16 @@ module_compiler_init(
   };
 
   compiler_scope_define_exports(compilation, scope);
+  Value *allocator_value = value_init(
+    allocator_allocate(allocator, Value),
+    &descriptor_allocator_pointer,
+    storage_static_inline(&allocator),
+    COMPILER_SOURCE_RANGE
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("allocator"), allocator_value
+  );
 
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None,

@@ -172,15 +172,16 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
-    mass_allocate, "allocate", &descriptor_value_pointer,
+    mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
     MASS_FN_ARG("context", &descriptor_execution_context_pointer),
     MASS_FN_ARG("args", &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
-    mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("args", &descriptor_value_view)
+    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
+    allocator_allocate_bytes, "allocator_allocate_bytes", &descriptor_void_pointer,
+    MASS_FN_ARG("allocator", &descriptor_allocator_pointer),
+    MASS_FN_ARG("byte_size", &descriptor_u64),
+    MASS_FN_ARG("byte_alignment", &descriptor_u64)
   );
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,

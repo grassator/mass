@@ -140,7 +140,9 @@ bitwise_and :: PRELUDE_MASS.number_literal_bitwise_and
 
 Array :: @fn(item : Type, length : u64) -> (Type) {
   mass :: PRELUDE_MASS
-  t := mass.allocate(mass.Descriptor)
+  byte_size :: mass.Descriptor.bit_size * 8
+  byte_alignment :: mass.Descriptor.bit_alignment * 8
+  t : Type = mass.allocator_allocate_bytes(mass.allocator, byte_size, byte_alignment)
   t.tag = mass.Descriptor_Tag.Fixed_Size_Array
   t.bit_size = item.bit_size * length
   t.bit_alignment = item.bit_alignment

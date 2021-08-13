@@ -1963,8 +1963,15 @@ main(void) {
   export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
   export_global_custom_name("import", push_type(type_intrinsic("mass_import")));
 
-  export_compiler_custom_name("allocate", push_type(type_intrinsic("mass_allocate")));
   export_compiler_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
+
+  export_compiler_custom_name("allocator_allocate_bytes", push_type(
+    type_function(Compile_Time, "allocator_allocate_bytes", "void *", (Argument_Type[]){
+      { "const Allocator *", "allocator" },
+      { "u64", "byte_size" },
+      { "u64", "byte_alignment" },
+    })
+  ));
 
   export_compiler_custom_name("number_literal_logical_shift_left", push_type(
     type_function(Compile_Time, "mass_number_literal_logical_shift_left", "Number_Literal", (Argument_Type[]){
