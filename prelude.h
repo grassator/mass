@@ -657,16 +657,13 @@ const Allocator *allocator_system = &(Allocator){
 };
 
 static inline void *
-allocator_allocate_bytes_internal(
+allocator_allocate_bytes(
   const Allocator *allocator,
   u64 size_in_bytes,
   u64 alignment
 ) {
   return allocator->allocate(allocator->handle, size_in_bytes, alignment);
 }
-
-#define allocator_allocate_bytes(...)\
-  allocator_allocate_bytes_internal(__VA_ARGS__)
 
 #define allocator_allocate(_allocator_, _type_)\
   (_type_ *)allocator_allocate_bytes((_allocator_), sizeof(_type_), _Alignof(_type_))
