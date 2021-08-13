@@ -714,8 +714,7 @@ ensure_function_instance(
   const Function_Info *fn_info = function_literal_info_for_args(literal, args);
 
   Program *program = context->program;
-  const Calling_Convention *calling_convention = literal->calling_convention;
-  if (!calling_convention) calling_convention = program->default_calling_convention;
+  const Calling_Convention *calling_convention = program->default_calling_convention;
 
   if (!dyn_array_is_initialized(literal->instances)) {
     literal->instances = dyn_array_make(
@@ -814,51 +813,35 @@ ensure_function_instance(
     parse_result = token_parse_block_view(&body_context, *view);
   } else if (literal->body->descriptor == &descriptor_lazy_value) {
     parse_result = literal->body;
-  } else if (literal->body->descriptor == &descriptor_syscall) {
-    // Handled below
   } else {
     panic("Unexpected function body type");
   }
   MASS_ON_ERROR(*context->result) return 0;
 
-  if (literal->body->descriptor == &descriptor_syscall) {
-    s64 syscall_number = storage_static_as_c_type(&literal->body->storage, Syscall)->number;
-    Storage syscal_number_storage = storage_register_for_descriptor(Register_A, &descriptor_s64);
+  value_force_exact(&body_context, builder, return_value, parse_result);
+
+  push_label(
+    &builder->code_block,
+    return_value->source_range,
+    builder->code_block.end_label
+  );
+
+  const Storage *callee_return_storage = &call_setup->callee_return_value->storage;
+  const Storage *caller_return_storage = &call_setup->caller_return_value->storage;
+  if (!storage_equal(callee_return_storage, caller_return_storage)) {
+    Register caller_register = function_return_value_register_from_storage(caller_return_storage);
+    Register callee_register = function_return_value_register_from_storage(callee_return_storage);
+    Storage callee_register_storage =
+      storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
+    Storage caller_register_storage =
+      storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
     push_eagerly_encoded_assembly(
-      &builder->code_block, literal->body->source_range,
-      &(Instruction_Assembly){mov, {syscal_number_storage, imm64(syscall_number)}}
+      &builder->code_block, return_value->source_range,
+      &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
     );
-    push_eagerly_encoded_assembly(
-      &builder->code_block, literal->body->source_range,
-      &(Instruction_Assembly){syscall}
-    );
-    value_force_exact(&body_context, builder, return_value, call_setup->caller_return_value);
-  } else {
-    value_force_exact(&body_context, builder, return_value, parse_result);
-
-    push_label(
-      &builder->code_block,
-      return_value->source_range,
-      builder->code_block.end_label
-    );
-
-    const Storage *callee_return_storage = &call_setup->callee_return_value->storage;
-    const Storage *caller_return_storage = &call_setup->caller_return_value->storage;
-    if (!storage_equal(callee_return_storage, caller_return_storage)) {
-      Register caller_register = function_return_value_register_from_storage(caller_return_storage);
-      Register callee_register = function_return_value_register_from_storage(callee_return_storage);
-      Storage callee_register_storage =
-        storage_register_for_descriptor(callee_register, &descriptor_void_pointer);
-      Storage caller_register_storage =
-        storage_register_for_descriptor(caller_register, &descriptor_void_pointer);
-      push_eagerly_encoded_assembly(
-        &builder->code_block, return_value->source_range,
-        &(Instruction_Assembly){mov, {caller_register_storage, callee_register_storage}}
-      );
-    }
-
-    calling_convention_x86_64_common_end_proc(program, builder);
   }
+
+  calling_convention_x86_64_common_end_proc(program, builder);
 
   // Only push the builder at the end to avoid problems in nested JIT compiles
   dyn_array_push(program->functions, *builder);

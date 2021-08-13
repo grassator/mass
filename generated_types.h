@@ -571,6 +571,10 @@ const char *function_call_setup_flags_name(Function_Call_Setup_Flags value) {
 typedef dyn_array_type(Function_Call_Setup_Flags *) Array_Function_Call_Setup_Flags_Ptr;
 typedef dyn_array_type(const Function_Call_Setup_Flags *) Array_Const_Function_Call_Setup_Flags_Ptr;
 
+typedef struct Function_Call_Jump Function_Call_Jump;
+typedef dyn_array_type(Function_Call_Jump *) Array_Function_Call_Jump_Ptr;
+typedef dyn_array_type(const Function_Call_Jump *) Array_Const_Function_Call_Jump_Ptr;
+
 typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
@@ -1642,13 +1646,34 @@ typedef struct Function_Literal {
   Value * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
-  const Calling_Convention * calling_convention;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
+typedef enum {
+  Function_Call_Jump_Tag_Call = 0,
+  Function_Call_Jump_Tag_Syscall = 1,
+} Function_Call_Jump_Tag;
+
+typedef struct Function_Call_Jump_Syscall {
+  s64 number;
+} Function_Call_Jump_Syscall;
+typedef struct Function_Call_Jump {
+  Function_Call_Jump_Tag tag;
+  char _tag_padding[4];
+  union {
+    Function_Call_Jump_Syscall Syscall;
+  };
+} Function_Call_Jump;
+static inline Function_Call_Jump_Syscall *
+function_call_jump_as_syscall(Function_Call_Jump *function_call_jump) {
+  assert(function_call_jump->tag == Function_Call_Jump_Tag_Syscall);
+  return &function_call_jump->Syscall;
+}
+typedef dyn_array_type(Function_Call_Jump) Array_Function_Call_Jump;
 typedef struct Function_Call_Setup {
   Function_Call_Setup_Flags flags;
   u32 parameters_stack_size;
+  Function_Call_Jump jump;
   const Calling_Convention * calling_convention;
   Memory_Layout arguments_layout;
   Value * caller_return_value;
@@ -2420,6 +2445,12 @@ static Descriptor descriptor_array_function_call_setup_flags_ptr;
 static Descriptor descriptor_array_const_function_call_setup_flags_ptr;
 static Descriptor descriptor_function_call_setup_flags_pointer;
 static Descriptor descriptor_function_call_setup_flags_pointer_pointer;
+static Descriptor descriptor_function_call_jump;
+static Descriptor descriptor_array_function_call_jump;
+static Descriptor descriptor_array_function_call_jump_ptr;
+static Descriptor descriptor_array_const_function_call_jump_ptr;
+static Descriptor descriptor_function_call_jump_pointer;
+static Descriptor descriptor_function_call_jump_pointer_pointer;
 static Descriptor descriptor_function_call_setup;
 static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
@@ -5350,14 +5381,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
     },
     .Base_Relative.offset = offsetof(Function_Literal, specializations),
   },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_calling_convention_pointer,
-      .name = slice_literal_fields("calling_convention"),
-    },
-    .Base_Relative.offset = offsetof(Function_Literal, calling_convention),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);
 MASS_DEFINE_OPAQUE_C_TYPE(function_call_setup_flags, Function_Call_Setup_Flags)
@@ -5365,6 +5388,45 @@ static C_Enum_Item function_call_setup_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Indirect_Return"), .value = 1 },
 };
+/*union struct start */
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_jump_ptr, Array_Function_Call_Jump_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_jump, Array_Function_Call_Jump)
+MASS_DEFINE_OPAQUE_C_TYPE(function_call_jump_tag, Function_Call_Jump_Tag)
+static C_Enum_Item function_call_jump_tag_items[] = {
+{ .name = slice_literal_fields("Call"), .value = 0 },
+{ .name = slice_literal_fields("Syscall"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_jump_syscall, Function_Call_Jump_Syscall,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_s64,
+      .name = slice_literal_fields("number"),
+    },
+    .Base_Relative.offset = offsetof(Function_Call_Jump_Syscall, number),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_call_jump_syscall);
+MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_jump, Function_Call_Jump,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .name = slice_literal_fields("tag"),
+      .descriptor = &descriptor_function_call_jump_tag,
+    },
+    .Base_Relative.offset = offsetof(Function_Call_Jump, tag),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .name = slice_literal_fields("Syscall"),
+      .descriptor = &descriptor_function_call_jump_syscall,
+    },
+    .Base_Relative.offset = offsetof(Function_Call_Jump, Syscall),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(function_call_jump);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup_ptr, Array_Function_Call_Setup_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_function_call_setup, Array_Function_Call_Setup)
 MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
@@ -5383,6 +5445,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
       .name = slice_literal_fields("parameters_stack_size"),
     },
     .Base_Relative.offset = offsetof(Function_Call_Setup, parameters_stack_size),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_function_call_jump,
+      .name = slice_literal_fields("jump"),
+    },
+    .Base_Relative.offset = offsetof(Function_Call_Setup, jump),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

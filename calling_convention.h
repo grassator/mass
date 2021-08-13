@@ -577,6 +577,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
+    .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {
@@ -701,6 +702,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
+    .jump = {.tag = Function_Call_Jump_Tag_Syscall},
     .calling_convention = &calling_convention_x86_64_system_v,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {
@@ -780,6 +782,7 @@ calling_convention_x86_64_windows_call_setup_proc(
   const Function_Info *function
 ) {
   Function_Call_Setup result = {
+    .jump = {.tag = Function_Call_Jump_Tag_Call},
     .calling_convention = &calling_convention_x86_64_windows,
   };
   if (function->returns.declaration.descriptor == &descriptor_void) {

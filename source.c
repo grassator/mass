@@ -3539,23 +3539,40 @@ call_function_overload(
     call_setup->parameters_stack_size
   );
 
-  if (instance->storage.tag == Storage_Tag_Static) {
-    Register temp_reg = register_acquire_temp(builder);
-    Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){mov, {reg, instance->storage}}
-    );
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){call, {reg}}
-    );
-    register_release(builder, temp_reg);
-  } else {
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){call, {instance->storage}}
-    );
+
+  switch(call_setup->jump.tag) {
+    case Function_Call_Jump_Tag_Call: {
+      if (instance->storage.tag == Storage_Tag_Static) {
+        Register temp_reg = register_acquire_temp(builder);
+        Storage reg = storage_register_for_descriptor(temp_reg, &descriptor_void_pointer);
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){mov, {reg, instance->storage}}
+        );
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){call, {reg}}
+        );
+        register_release(builder, temp_reg);
+      } else {
+        push_eagerly_encoded_assembly(
+          &builder->code_block, *source_range,
+          &(Instruction_Assembly){call, {instance->storage}}
+        );
+      }
+    } break;
+    case Function_Call_Jump_Tag_Syscall: {
+      assert(instance->storage.tag == Storage_Tag_None);
+      Storage syscal_number_storage = storage_register_for_descriptor(Register_A, &descriptor_s64);
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){mov, {syscal_number_storage, imm64(call_setup->jump.Syscall.number)}}
+      );
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){syscall}
+      );
+    } break;
   }
 
   register_release_bitset(builder, argument_register_bitset | temp_register_argument_bitset);
@@ -5586,7 +5603,26 @@ token_parse_function_literal(
   if (at) {
     fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
   }
-  if (body_value) {
+  bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
+  if (is_syscall) {
+    ensure_parameter_descriptors(context, fn_info);
+    // TODO support this on non-Linux systems
+    Descriptor *fn_descriptor = descriptor_function_instance(
+      context->allocator, name, fn_info, &calling_convention_x86_64_system_v_syscall
+    );
+    // TODO this patching after the fact feels awkward and brittle
+    if (is_syscall) {
+      s64 syscall_number = storage_static_as_c_type(&body_value->storage, Syscall)->number;
+      assert(fn_descriptor->tag == Descriptor_Tag_Function_Instance);
+      assert(fn_descriptor->Function_Instance.call_setup.jump.tag == Function_Call_Jump_Tag_Syscall);
+      fn_descriptor->Function_Instance.call_setup.jump.Syscall.number = syscall_number;
+    }
+
+    return value_init(
+      allocator_allocate(context->allocator, Value),
+      fn_descriptor, storage_none, view.source_range
+    );
+  } else if (body_value) {
     if (value_is_intrinsic(body_value) && !(fn_info->flags & Descriptor_Function_Flags_Compile_Time)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
@@ -5614,19 +5650,15 @@ token_parse_function_literal(
       .body = body_value,
       .context = *context,
     };
-    if (body_value->descriptor == &descriptor_syscall) {
-      // FIXME figure out how to handle this on windows
-      literal->calling_convention = &calling_convention_x86_64_system_v_syscall;
-    }
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
     ensure_parameter_descriptors(context, fn_info);
-    // TODO It might be better to just store Function_Info here and not the instance
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
     Descriptor *fn_descriptor = descriptor_function_instance(
       context->allocator, name, fn_info, calling_convention
     );
+
     return value_init(
       allocator_allocate(context->allocator, Value),
       &descriptor_descriptor_pointer, storage_static_inline(&fn_descriptor), view.source_range
