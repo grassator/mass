@@ -87,7 +87,7 @@
     #define thread_local __thread
   #endif
 #else
-  #include <threads.h>
+  #define thread_local _Thread_local
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -211,7 +211,7 @@ static inline u64
 atomic_u64_increment(
   Atomic_u64 *value
 ) {
-  #ifdef _MSC_VER
+  #if defined(_MSC_VER) && !defined(__clang__)
   return InterlockedIncrement64(&value->raw);
   #else
   return ++value->raw;
@@ -222,7 +222,7 @@ static inline u64
 atomic_u64_decrement(
   Atomic_u64 *value
 ) {
-  #ifdef _MSC_VER
+  #if defined(_MSC_VER) && !defined(__clang__)
   return InterlockedDecrement64(&value->raw);
   #else
   return --value->raw;
@@ -234,7 +234,7 @@ atomic_u64_exchange(
   Atomic_u64 *value,
   u64 new_value
 ) {
-  #ifdef _MSC_VER
+  #if defined(_MSC_VER) && !defined(__clang__)
   return InterlockedExchange64(&value->raw, new_value);
   #else
   return atomic_exchange(&value->raw, new_value);
@@ -245,7 +245,7 @@ static inline u64
 atomic_u64_load(
   Atomic_u64 *value
 ) {
-  #ifdef _MSC_VER
+  #if defined(_MSC_VER) && !defined(__clang__)
   return InterlockedCompareExchange64(&value->raw, 0, 0);
   #else
   return atomic_load(&value->raw);
@@ -3597,6 +3597,7 @@ typedef struct {
     /* Needs to be synced with Hash_Map_Entry_Bookkeeping and is provided for convinence */\
     union {\
       bool occupied;\
+      bool tombstone;\
       Hash_Map_Entry_Bookkeeping bookkeeping;\
     };\
     _key_type_ key;\
