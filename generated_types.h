@@ -725,6 +725,9 @@ static Value * mass_compile_time_error
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
+static Descriptor * descriptor_pointer_to
+  (const Allocator * allocator, const Descriptor * descriptor);
+
 static Number_Literal mass_number_literal_logical_shift_left
   (Number_Literal input, Number_Literal shift);
 
@@ -2553,6 +2556,7 @@ static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
+static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_mass_number_literal_logical_shift_left;
 static Descriptor descriptor_mass_number_literal_logical_shift_right;
 static Descriptor descriptor_mass_number_literal_bitwise_or;

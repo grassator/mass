@@ -1966,10 +1966,17 @@ main(void) {
   export_compiler_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
 
   export_compiler_custom_name("allocator_allocate_bytes", push_type(
-    type_function(Compile_Time, "allocator_allocate_bytes", "void *", (Argument_Type[]){
+    type_function(Default, "allocator_allocate_bytes", "void *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
       { "u64", "byte_size" },
       { "u64", "byte_alignment" },
+    })
+  ));
+
+  export_compiler_custom_name("descriptor_pointer_to", push_type(
+    type_function(Default, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
+      { "const Allocator *", "allocator" },
+      { "const Descriptor *", "descriptor" },
     })
   ));
 

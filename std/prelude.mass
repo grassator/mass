@@ -77,6 +77,10 @@ operator 15 (x << y) logical_shift_left(x, y)
 operator 15 (x >> y) logical_shift_right(x, y)
 operator 15 (x | y) bitwise_or(x, y)
 operator 15 (x & y) bitwise_and(x, y)
+
+address_of :: macro(type : Type) -> (Type) {
+  PRELUDE_MASS.descriptor_pointer_to(PRELUDE_MASS.allocator, type)
+}
 address_of :: PRELUDE_MASS.address_of
 
 arithmetic_overloads :: {

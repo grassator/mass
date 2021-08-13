@@ -4662,22 +4662,11 @@ mass_address_of(
   }
 
   Value *pointee = value_view_get(args, 0);
-  // This is the support for using `&u32` in types
-  // TODO move this to the std/prelude.mass somehow
-  if (context_is_compile_time_eval(context) && pointee->descriptor == &descriptor_descriptor_pointer) {
-    const Descriptor *type = value_ensure_type(context, pointee, args.source_range);
-    Descriptor *descriptor = descriptor_pointer_to(context->allocator, type);
-    pointer = value_make(
-      context, &descriptor_descriptor_pointer, storage_static_inline(&descriptor), pointee->source_range
-    );
-  } else {
-    const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
-    const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
-    pointer = mass_make_lazy_value(
-      context, args.source_range, pointee, descriptor, mass_handle_address_of_lazy_proc
-    );
-  }
-
+  const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
+  const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
+  pointer = mass_make_lazy_value(
+    context, args.source_range, pointee, descriptor, mass_handle_address_of_lazy_proc
+  );
   return pointer;
 }
 
