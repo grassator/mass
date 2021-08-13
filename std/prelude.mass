@@ -48,7 +48,6 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
-Type :: PRELUDE_MASS.Descriptor
 String :: Slice
 bool :: s8
 true :: 1
@@ -58,10 +57,10 @@ PRELUDE_MASS :: import("mass")
 
 arithmetic_overloads :: {
   macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
-    template :: macro(type : &Type) {
+    template :: macro(type : Type) {
       @fn(x : type, y : type) -> (type) impl
     }
-    expand :: macro(t64 : &Type, t32 : &Type, t16 : &Type, t8  : &Type) {
+    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
       f :: template(t64)
       f :: template(t32)
       f :: template(t16)
@@ -85,10 +84,10 @@ remainder :: arithmetic_overloads(PRELUDE_MASS.remainder)
 
 comparison_overloads :: {
   macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
-    template :: macro(type : &Type) {
+    template :: macro(type : Type) {
       @fn(x : type, y : type) -> bool impl
     }
-    expand :: macro(t64 : &Type, t32 : &Type, t16 : &Type, t8  : &Type) {
+    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
       f :: template(t64)
       f :: template(t32)
       f :: template(t16)
@@ -115,10 +114,9 @@ logical_shift_right :: PRELUDE_MASS.number_literal_logical_shift_right
 bitwise_or :: PRELUDE_MASS.number_literal_bitwise_or
 bitwise_and :: PRELUDE_MASS.number_literal_bitwise_and
 
-Array :: @fn(item : &Type, length : u64) -> (&Type) {
-  mass :: import("mass")
-  t := mass.allocate(Type)
-  t.tag = mass.Descriptor_Tag.Fixed_Size_Array
+Array :: @fn(item : Type, length : u64) -> (Type) {
+  t := PRELUDE_MASS.allocate(Type)
+  t.tag = PRELUDE_MASS.Descriptor_Tag.Fixed_Size_Array
   t.bit_size = item.bit_size * length
   t.bit_alignment = item.bit_alignment
   t.Fixed_Size_Array.item = item

@@ -6619,6 +6619,10 @@ scope_define_builtins(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("void"), type_void_value
   );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Type"), type_descriptor_pointer_value
+  );
 
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
