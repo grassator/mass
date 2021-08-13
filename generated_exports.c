@@ -24,6 +24,10 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    slice_literal("Syscall"), type_syscall_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     slice_literal("Execution_Context"), type_execution_context_value
   );
   scope_define_value(

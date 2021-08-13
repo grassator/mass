@@ -2169,6 +2169,25 @@ spec("source") {
       write_executable(slice_literal("build/relocations.exe"), &test_context, Executable_Type_Cli);
     }
   }
+  #if defined(__linux__)
+  describe("Syscall") {
+    it("should be able to print out a string") {
+      void(*checker)(void) = (void(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "STDOUT_FILENO :: 1\n"
+        "SYS_WRITE :: 1\n"
+        "write :: fn(descriptor : s32, buffer : &u8, size : u64) "
+          "-> (s32) syscall(SYS_WRITE)\n"
+        "checker :: fn() -> () {\n"
+          "hello :: \"Hello, world!\\n\"\n"
+          "write(STDOUT_FILENO, hello.bytes, hello.length) \n"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      checker();
+    }
+  }
+  #endif
 
   describe("External (DLL Imports)") {
     #if defined(__linux__)

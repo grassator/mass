@@ -41,6 +41,25 @@ static const Calling_Convention calling_convention_x86_64_system_v = {
   ),
 };
 
+static Function_Call_Setup
+calling_convention_x86_64_system_v_syscall_setup_proc(
+  const Allocator *allocator,
+  const Function_Info *function
+);
+
+static const Calling_Convention calling_convention_x86_64_system_v_syscall = {
+  .call_setup_proc = calling_convention_x86_64_system_v_syscall_setup_proc,
+  .register_volatile_bitset = (
+    // Arguments
+    (1llu << Register_DI) | (1llu << Register_SI) | (1llu << Register_D) |
+    (1llu << Register_R10) | (1llu << Register_R8) | (1llu << Register_R9) |
+    // Return
+    (1llu << Register_A) |
+    // Other
+    (1llu << Register_C) | (1llu << Register_R11)
+  ),
+};
+
 #endif // CALLING_CONVENTION_H
 
 static void
@@ -672,6 +691,85 @@ calling_convention_x86_64_system_v_call_setup_proc(
       .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
     });
   }
+
+  return result;
+}
+
+static Function_Call_Setup
+calling_convention_x86_64_system_v_syscall_setup_proc(
+  const Allocator *allocator,
+  const Function_Info *function
+) {
+  Function_Call_Setup result = {
+    .calling_convention = &calling_convention_x86_64_system_v,
+  };
+  if (function->returns.declaration.descriptor == &descriptor_void) {
+    result.callee_return_value = &void_value;
+    result.caller_return_value = &void_value;
+  } else {
+    // FIXME provide user error? or should it be handled earlier?
+    assert(function->returns.declaration.descriptor == &descriptor_s32);
+
+    Value *common_return_value = value_init(
+      allocator_allocate(allocator, Value),
+      &descriptor_s32,
+      storage_register_for_descriptor(Register_A, &descriptor_s32),
+      function->returns.declaration.source_range
+    );
+    result.callee_return_value = common_return_value;
+    result.caller_return_value = common_return_value;
+  }
+
+  // TODO consider if actual syscall number should be handled here?
+  static const Register general_registers[] = {
+    Register_DI, Register_SI, Register_D, Register_R10, Register_R8, Register_R9
+  };
+
+  System_V_Register_State registers = {
+    .general = {
+      .items = general_registers,
+      .count = countof(general_registers),
+      .index = 0,
+    },
+    .vector = {0},
+  };
+
+  result.arguments_layout = (Memory_Layout){
+    .items = dyn_array_make(
+      Array_Memory_Layout_Item,
+      .allocator = allocator,
+      .capacity = dyn_array_length(function->parameters),
+    ),
+  };
+
+  u64 stack_offset = 0;
+  DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
+    assert(param->tag != Function_Parameter_Tag_Exact_Static);
+
+    System_V_Classification classification =
+      x86_64_system_v_classify(allocator, param->declaration.descriptor);
+    // TODO figure out how item 6. Only values of class INTEGER or class MEMORY are passed to the kernel.
+    //      can be understood together with the item 4. System-calls are limited to six arguments,
+    //      no argument is passed directly on the stack. While in user space MEMORY class arguments
+    //      are passed on the stack.
+    if (classification.class != SYSTEM_V_INTEGER) {
+      // FIXME user error
+      assert("Unsupported system V argument class in a syscall");
+    }
+    if (registers.general.index + classification.eightbyte_count > registers.general.count) {
+      assert("System V syscall support no more than 6 arguments");
+    }
+
+    Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
+      &registers, &classification, param->declaration.name, &stack_offset
+    );
+    // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
+    dyn_array_push(result.arguments_layout.items, struct_item);
+  }
+
+  assert(stack_offset == 0);
+
+  assert(!(result.flags & Function_Call_Setup_Flags_Indirect_Return));
 
   return result;
 }

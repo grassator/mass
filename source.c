@@ -5614,6 +5614,10 @@ token_parse_function_literal(
       .body = body_value,
       .context = *context,
     };
+    if (body_value->descriptor == &descriptor_syscall) {
+      // FIXME figure out how to handle this on windows
+      literal->calling_convention = &calling_convention_x86_64_system_v_syscall;
+    }
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
     ensure_parameter_descriptors(context, fn_info);

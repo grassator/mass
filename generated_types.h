@@ -218,6 +218,10 @@ typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
 
+typedef struct Syscall Syscall;
+typedef dyn_array_type(Syscall *) Array_Syscall_Ptr;
+typedef dyn_array_type(const Syscall *) Array_Const_Syscall_Ptr;
+
 typedef struct Import_Symbol Import_Symbol;
 typedef dyn_array_type(Import_Symbol *) Array_Import_Symbol_Ptr;
 typedef dyn_array_type(const Import_Symbol *) Array_Const_Import_Symbol_Ptr;
@@ -1012,6 +1016,11 @@ typedef struct External_Symbol {
 } External_Symbol;
 typedef dyn_array_type(External_Symbol) Array_External_Symbol;
 
+typedef struct Syscall {
+  s64 number;
+} Syscall;
+typedef dyn_array_type(Syscall) Array_Syscall;
+
 typedef struct Import_Symbol {
   Slice name;
   Label_Index label32;
@@ -1633,6 +1642,7 @@ typedef struct Function_Literal {
   Value * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
+  const Calling_Convention * calling_convention;
 } Function_Literal;
 typedef dyn_array_type(Function_Literal) Array_Function_Literal;
 
@@ -2147,6 +2157,11 @@ static Descriptor descriptor_array_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
 static Descriptor descriptor_external_symbol_pointer;
 static Descriptor descriptor_external_symbol_pointer_pointer;
+static Descriptor descriptor_syscall;
+static Descriptor descriptor_array_syscall;
+static Descriptor descriptor_array_syscall_ptr;
+static Descriptor descriptor_syscall_pointer;
+static Descriptor descriptor_syscall_pointer_pointer;
 static Descriptor descriptor_import_symbol;
 static Descriptor descriptor_array_import_symbol;
 static Descriptor descriptor_array_import_symbol_ptr;
@@ -3309,6 +3324,19 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(external_symbol);
+MASS_DEFINE_OPAQUE_C_TYPE(array_syscall_ptr, Array_Syscall_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_syscall, Array_Syscall)
+MASS_DEFINE_STRUCT_DESCRIPTOR(syscall, Syscall,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_s64,
+      .name = slice_literal_fields("number"),
+    },
+    .Base_Relative.offset = offsetof(Syscall, number),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(syscall);
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol_ptr, Array_Import_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_import_symbol, Array_Import_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(import_symbol, Import_Symbol,
@@ -5321,6 +5349,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
       .name = slice_literal_fields("specializations"),
     },
     .Base_Relative.offset = offsetof(Function_Literal, specializations),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_calling_convention_pointer,
+      .name = slice_literal_fields("calling_convention"),
+    },
+    .Base_Relative.offset = offsetof(Function_Literal, calling_convention),
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_literal);

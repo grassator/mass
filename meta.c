@@ -1271,6 +1271,10 @@ main(void) {
     { "Slice", "symbol_name" },
   })));
 
+  export_compiler(push_type(type_struct("Syscall", (Struct_Item[]){
+    { "s64", "number" },
+  })));
+
   push_type(type_struct("Import_Symbol", (Struct_Item[]){
     { "Slice", "name" },
     { "Label_Index", "label32" },
@@ -1684,6 +1688,7 @@ main(void) {
     { "Value *", "body" },
     { "Array_Value_Ptr", "instances"},
     { "Array_Function_Specialization", "specializations"},
+    { "const Calling_Convention *", "calling_convention" },
   }));
 
   push_type(type_enum("Function_Call_Setup_Flags", (Enum_Type_Item[]){

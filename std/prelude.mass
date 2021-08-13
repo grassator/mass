@@ -161,10 +161,19 @@ external :: @fn(
   library_name : String,
   symbol_name : String
 ) -> (
-  result : import("mass").External_Symbol
+  result : PRELUDE_MASS.External_Symbol
 ) {
   result.library_name = library_name
   result.symbol_name = symbol_name
+  result
+}
+
+syscall :: @fn(
+  number : s64
+) -> (
+  result : PRELUDE_MASS.Syscall
+) {
+  result.number = number
   result
 }
 
