@@ -382,7 +382,7 @@ x86_64_system_v_classify_aggregate(
   // TODO use a temp allocator
   Array_SYSTEM_V_ARGUMENT_CLASS eightbyte_classes = dyn_array_make(
     Array_SYSTEM_V_ARGUMENT_CLASS,
-    .allocator = allocator,
+    .allocator = allocator_default,
     .capacity = system_v_item_iterator_count(it),
   );
 
@@ -581,7 +581,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     };
 
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, function->returns.declaration.descriptor);
+      x86_64_system_v_classify(allocator, function->returns.declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
@@ -648,7 +648,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
   DYN_ARRAY_FOREACH(Function_Parameter, param, function->parameters) {
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     System_V_Classification classification =
-      x86_64_system_v_classify(allocator_default, param->declaration.descriptor);
+      x86_64_system_v_classify(allocator, param->declaration.descriptor);
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
