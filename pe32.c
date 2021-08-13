@@ -287,7 +287,7 @@ pe32_checksum(
   for (; chunk != chunk_end; ++chunk) {
     // Checksum does not include itself so need to skip over 4 bytes
     // where it will be written to in the output file
-    if (chunk == &header->CheckSum) continue;
+    if (chunk == (void *)&header->CheckSum) continue;
     checksum = (checksum & 0xffffffff) + (*chunk) + (checksum >> 32);
     if (checksum > (1llu << 32)) {
       checksum = (checksum & 0xffffffff) + (checksum >> 32);
