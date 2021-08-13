@@ -27,8 +27,8 @@ win32_section_permissions_to_virtual_protect_flags(
 
 typedef struct {
   // :ExceptionDataAlignment
-  _Alignas(DWORD) const Function_Builder *builder;
-  _Alignas(DWORD) Jit *jit;
+  const Function_Builder *builder;
+  Jit *jit;
 } Win32_Exception_Data;
 
 void
