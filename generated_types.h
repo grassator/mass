@@ -1427,7 +1427,18 @@ typedef struct Scope_Entry {
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
 
 hash_map_slice_template(Operator_Map, Operator *)
+typedef enum {
+  Scope_Tag_Default = 0,
+  Scope_Tag_Using = 1,
+} Scope_Tag;
+
+typedef struct Scope_Using {
+  const Scope * scope;
+  u64 common_ancestor_id;
+} Scope_Using;
 typedef struct Scope {
+  Scope_Tag tag;
+  char _tag_padding[4];
   const Allocator * allocator;
   u64 id;
   const Scope * parent;
@@ -1436,9 +1447,16 @@ typedef struct Scope {
   Operator_Map * infix_or_suffix_operator_map;
   Array_Macro_Ptr macros;
   const Token_Statement_Matcher * statement_matcher;
+  union {
+    Scope_Using Using;
+  };
 } Scope;
+static inline Scope_Using *
+scope_as_using(Scope *scope) {
+  assert(scope->tag == Scope_Tag_Using);
+  return &scope->Using;
+}
 typedef dyn_array_type(Scope) Array_Scope;
-
 typedef struct Overload_Set {
   Array_Value_Ptr items;
 } Overload_Set;
@@ -2320,6 +2338,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(operator_map, Operator_Map);
 static Descriptor descriptor_scope;
 static Descriptor descriptor_array_scope;
 static Descriptor descriptor_array_scope_ptr;
+static Descriptor descriptor_array_const_scope_ptr;
 static Descriptor descriptor_scope_pointer;
 static Descriptor descriptor_scope_pointer_pointer;
 static Descriptor descriptor_overload_set;
@@ -4607,9 +4626,42 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   },
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry);
+/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope, Array_Scope)
+MASS_DEFINE_OPAQUE_C_TYPE(scope_tag, Scope_Tag)
+static C_Enum_Item scope_tag_items[] = {
+{ .name = slice_literal_fields("Default"), .value = 0 },
+{ .name = slice_literal_fields("Using"), .value = 1 },
+};
+MASS_DEFINE_STRUCT_DESCRIPTOR(scope_using, Scope_Using,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_scope_pointer,
+      .name = slice_literal_fields("scope"),
+    },
+    .Base_Relative.offset = offsetof(Scope_Using, scope),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u64,
+      .name = slice_literal_fields("common_ancestor_id"),
+    },
+    .Base_Relative.offset = offsetof(Scope_Using, common_ancestor_id),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(scope_using);
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .name = slice_literal_fields("tag"),
+      .descriptor = &descriptor_scope_tag,
+    },
+    .Base_Relative.offset = offsetof(Scope, tag),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
@@ -4674,8 +4726,17 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
     },
     .Base_Relative.offset = offsetof(Scope, statement_matcher),
   },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .name = slice_literal_fields("Using"),
+      .descriptor = &descriptor_scope_using,
+    },
+    .Base_Relative.offset = offsetof(Scope, Using),
+  },
 );
 MASS_DEFINE_TYPE_VALUE(scope);
+/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_overload_set_ptr, Array_Overload_Set_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_overload_set, Array_Overload_Set)
 MASS_DEFINE_STRUCT_DESCRIPTOR(overload_set, Overload_Set,

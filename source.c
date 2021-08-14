@@ -155,120 +155,53 @@ scope_maybe_find_common_ancestor(
   return 0;
 }
 
-typedef struct {
-  const Scope *start_scope;
-  const Scope *end_scope;
-} Token_Statement_Matcher_In_Scopes_Params;
-
-static u64
+static inline u64
 token_statement_matcher_in_scopes(
   Execution_Context *context,
   Value_View view,
   Lazy_Value *out_lazy_value,
-  Token_Statement_Matcher_In_Scopes_Params *payload
+  const Scope *scope,
+  u64 common_ancestor_id
 ) {
-  const Scope *it_scope = payload->start_scope;
-  for (; it_scope != payload->end_scope; it_scope = it_scope->parent) {
-    // Do a reverse iteration because we want statements that are defined later
-    // to have higher precedence when parsing
-    const Token_Statement_Matcher *matcher = it_scope->statement_matcher;
-    for (; matcher; matcher = matcher->previous) {
-      u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
-      MASS_ON_ERROR(*context->result) return 0;
-      if (match_length) return match_length;
+  for (; scope && scope->id != common_ancestor_id; scope = scope->parent) {
+    switch(scope->tag) {
+      case Scope_Tag_Default: {
+        // Do a reverse iteration because we want statements that are defined later
+        // to have higher precedence when parsing
+        const Token_Statement_Matcher *matcher = scope->statement_matcher;
+        for (; matcher; matcher = matcher->previous) {
+          u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+          MASS_ON_ERROR(*context->result) return 0;
+          if (match_length) return match_length;
+        }
+      } break;
+      case Scope_Tag_Using: {
+        u64 match_length = token_statement_matcher_in_scopes(
+          context, view, out_lazy_value, scope->Using.scope, scope->Using.common_ancestor_id
+        );
+        if (match_length) return match_length;
+      } break;
+      default: {
+        panic("Unexpected scope tag");
+      } break;
     }
   }
   return 0;
 }
 
-static inline Scope *
-scope_flatten_till_internal(
-  const Allocator *allocator,
-  const Scope *scope,
-  const Scope *till,
-  u64 scope_entry_count,
-  u64 macro_count,
-  u64 statement_matcher_count
-) {
-  // On the way up we calculate how many things all levels combined contain to avoid resizes
-  if (scope != till) {
-    if (dyn_array_is_initialized(scope->macros)) {
-      macro_count += dyn_array_length(scope->macros);
-    }
-    if (scope->map) {
-      scope_entry_count += scope->map->occupied;
-    }
-  } else {
-    Scope *result = scope_make(allocator, till);
-    result->map = hash_map_make(Scope_Map,
-      .allocator = result->allocator,
-      .initial_capacity = scope_entry_count,
-    );
-    if (macro_count) {
-      result->macros = dyn_array_make(
-        Array_Macro_Ptr, .capacity = macro_count, .allocator = allocator
-      );
-    }
-    return result;
-  }
-
-  Scope *result = scope_flatten_till_internal(
-    allocator, scope->parent, till, scope_entry_count, macro_count, statement_matcher_count
-  );
-  if (dyn_array_is_initialized(scope->macros)) {
-    for (u64 i = 0; i < dyn_array_length(scope->macros); ++i) {
-      dyn_array_push(result->macros, *dyn_array_get(scope->macros, i));
-    }
-  }
-
-  if (scope->map) {
-    for (u64 i = 0; i < scope->map->capacity; ++i) {
-      Scope_Map__Entry *entry = &scope->map->entries[i];
-      if (entry->occupied) {
-        hash_map_set_by_hash(result->map, entry->bookkeeping.hash, entry->key, entry->value);
-      }
-    }
-  }
-  return result;
-}
-
-static inline Scope *
-scope_flatten_till(
-  const Allocator *allocator,
-  const Scope *scope,
-  const Scope *till
-) {
-  Scope *result = scope_flatten_till_internal(allocator, scope, till, 0, 0, 0);
-
-  Token_Statement_Matcher_In_Scopes_Params *payload =
-    allocator_allocate(allocator, Token_Statement_Matcher_In_Scopes_Params);
-  *payload = (Token_Statement_Matcher_In_Scopes_Params) {
-    .start_scope = scope,
-    .end_scope = till,
-  };
-  Token_Statement_Matcher *using_matcher =
-    allocator_allocate(allocator, Token_Statement_Matcher);
-  *using_matcher = (Token_Statement_Matcher) {
-    .proc = token_statement_matcher_in_scopes,
-    .payload = payload,
-  };
-  assert(!result->statement_matcher);
-  result->statement_matcher = using_matcher;
-
-  return result;
-}
-
 static void
 context_merge_in_scope(
   Execution_Context *context,
-  Scope *using_scope
+  Scope *scope_to_use
 ) {
   // This code injects a proxy scope that just uses the same data as the other
-  const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, using_scope);
+  const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, scope_to_use);
   assert(common_ancestor);
-  // TODO @Speed This is quite inefficient but I can't really think of something faster
-  Scope *proxy = scope_flatten_till(context->allocator, using_scope, common_ancestor);
-  proxy->parent = context->scope;
+
+  Scope *proxy = scope_make(context->allocator, context->scope);
+  proxy->tag = Scope_Tag_Using;
+  proxy->Using.scope = scope_to_use;
+  proxy->Using.common_ancestor_id = common_ancestor->id;
   Scope *new_scope = scope_make(context->allocator, proxy);
 
   // FIXME This kind of hackish, probably there is a better way
@@ -319,16 +252,39 @@ scope_lookup_shallow(
 }
 
 static inline Scope_Entry *
+scope_lookup_hashed(
+  const Scope *scope,
+  s32 hash,
+  Slice name,
+  u64 till_id
+) {
+  for (; scope && scope->id != till_id; scope = scope->parent) {
+    Scope_Entry *entry;
+    switch(scope->tag) {
+      case Scope_Tag_Default: {
+        entry = scope_lookup_shallow_hashed(scope, hash, name);
+      } break;
+      case Scope_Tag_Using: {
+        entry = scope_lookup_hashed(scope->Using.scope, hash, name, scope->Using.common_ancestor_id);
+      } break;
+      default: {
+        entry = 0;
+        panic("Unexpected scope tag");
+      } break;
+    }
+
+    if (entry) return entry;
+  }
+  return 0;
+}
+
+static inline Scope_Entry *
 scope_lookup(
   const Scope *scope,
   Slice name
 ) {
   s32 hash = Scope_Map__hash(name);
-  for (; scope; scope = scope->parent) {
-    Scope_Entry *entry = scope_lookup_shallow_hashed(scope, hash, name);
-    if (entry) return entry;
-  }
-  return 0;
+  return scope_lookup_hashed(scope, hash, name, 0);
 }
 
 static Value *
@@ -901,11 +857,7 @@ scope_lookup_force(
   const Symbol *symbol,
   const Source_Range *lookup_range
 ) {
-  Scope_Entry *entry = 0;
-  for (; scope; scope = scope->parent) {
-    entry = scope_lookup_shallow_hashed(scope, symbol->hash, symbol->name);
-    if (entry) break;
-  }
+  Scope_Entry *entry = scope_lookup_hashed(scope, symbol->hash, symbol->name, 0);
 
   if (!entry) {
     context_error(context, (Mass_Error) {
@@ -5762,7 +5714,6 @@ token_parse_block_view(
   );
 
   u64 match_length = 0;
-  Token_Statement_Matcher_In_Scopes_Params scope_params = { .start_scope = context->scope };
   for(u64 start_index = 0; start_index < children_view.length; start_index += match_length) {
     MASS_ON_ERROR(*context->result) goto defer;
     Value_View rest = value_view_rest(&children_view, start_index);
@@ -5775,7 +5726,7 @@ token_parse_block_view(
       .context = *context,
       .descriptor = &descriptor_void,
     };
-    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, &scope_params);
+    match_length = token_statement_matcher_in_scopes(context, rest, &lazy_value, context->scope, 0);
     MASS_ON_ERROR(*context->result) goto defer;
 
     if (match_length) {
