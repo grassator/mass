@@ -110,11 +110,7 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Operator_Infix_Suffix_Conflict"), type_mass_error_operator_infix_suffix_conflict_value
-  );
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Operator_Prefix_Conflict"), type_mass_error_operator_prefix_conflict_value
+    slice_literal("Error_Operator_Fixity_Conflict"), type_mass_error_operator_fixity_conflict_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,

@@ -1891,11 +1891,8 @@
   <DisplayString Condition="tag == Mass_Error_Tag_Unexpected_Token">
     Unexpected_Token { Unexpected_Token }
   </DisplayString>
-  <DisplayString Condition="tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict">
-    Operator_Infix_Suffix_Conflict { Operator_Infix_Suffix_Conflict }
-  </DisplayString>
-  <DisplayString Condition="tag == Mass_Error_Tag_Operator_Prefix_Conflict">
-    Operator_Prefix_Conflict { Operator_Prefix_Conflict }
+  <DisplayString Condition="tag == Mass_Error_Tag_Operator_Fixity_Conflict">
+    Operator_Fixity_Conflict { Operator_Fixity_Conflict }
   </DisplayString>
   <DisplayString Condition="tag == Mass_Error_Tag_Undefined_Variable">
     Undefined_Variable { Undefined_Variable }
@@ -1937,8 +1934,7 @@
     <Item Name="Dynamic_Library_Load" Condition="tag == Mass_Error_Tag_Dynamic_Library_Load">Dynamic_Library_Load</Item>
     <Item Name="Dynamic_Library_Symbol_Not_Found" Condition="tag == Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found">Dynamic_Library_Symbol_Not_Found</Item>
     <Item Name="Unexpected_Token" Condition="tag == Mass_Error_Tag_Unexpected_Token">Unexpected_Token</Item>
-    <Item Name="Operator_Infix_Suffix_Conflict" Condition="tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict">Operator_Infix_Suffix_Conflict</Item>
-    <Item Name="Operator_Prefix_Conflict" Condition="tag == Mass_Error_Tag_Operator_Prefix_Conflict">Operator_Prefix_Conflict</Item>
+    <Item Name="Operator_Fixity_Conflict" Condition="tag == Mass_Error_Tag_Operator_Fixity_Conflict">Operator_Fixity_Conflict</Item>
     <Item Name="Undefined_Variable" Condition="tag == Mass_Error_Tag_Undefined_Variable">Undefined_Variable</Item>
     <Item Name="Redifinition" Condition="tag == Mass_Error_Tag_Redifinition">Redifinition</Item>
     <Item Name="Unknown_Field" Condition="tag == Mass_Error_Tag_Unknown_Field">Unknown_Field</Item>

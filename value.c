@@ -201,14 +201,13 @@ mass_error_to_string(
     case Mass_Error_Tag_Expected_Static: {
       APPEND_LITERAL("Expected value to be static (compile-time known)");
     } break;
-    case Mass_Error_Tag_Operator_Infix_Suffix_Conflict: {
-      APPEND_LITERAL("There is already a infix or postfix operator ");
-      APPEND_SLICE(error->Operator_Infix_Suffix_Conflict.symbol);
-      APPEND_LITERAL(" defined in this scope");
-    } break;
-    case Mass_Error_Tag_Operator_Prefix_Conflict: {
-      APPEND_LITERAL("There is already a prefix operator ");
-      APPEND_SLICE(error->Operator_Infix_Suffix_Conflict.symbol);
+    case Mass_Error_Tag_Operator_Fixity_Conflict: {
+      if (error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Prefix) {
+        APPEND_LITERAL("There is already a prefix operator ");
+      } else {
+        APPEND_LITERAL("There is already a infix or postfix operator ");
+      }
+      APPEND_SLICE(error->Operator_Fixity_Conflict.symbol);
       APPEND_LITERAL(" defined in this scope");
     } break;
     case Mass_Error_Tag_Non_Trailing_Default_Argument: {

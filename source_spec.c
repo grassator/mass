@@ -1336,8 +1336,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
-      spec_check_slice(error->Operator_Infix_Suffix_Conflict.symbol, slice_literal("**"));
+      check(error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
+      check(error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Infix);
+      spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
     }
 
     it("should report an error when defining an overloaded infix and postfix operator") {
@@ -1349,8 +1350,9 @@ spec("source") {
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
-      spec_check_slice(error->Operator_Infix_Suffix_Conflict.symbol, slice_literal("**"));
+      check(error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
+      check(error->Operator_Fixity_Conflict.fixity == Operator_Fixity_Postfix);
+      spec_check_slice(error->Operator_Fixity_Conflict.symbol, slice_literal("**"));
     }
 
     it("should have a built-in compile-time shift operator") {

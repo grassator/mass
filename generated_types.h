@@ -1754,17 +1754,16 @@ typedef enum {
   Mass_Error_Tag_Dynamic_Library_Load = 9,
   Mass_Error_Tag_Dynamic_Library_Symbol_Not_Found = 10,
   Mass_Error_Tag_Unexpected_Token = 11,
-  Mass_Error_Tag_Operator_Infix_Suffix_Conflict = 12,
-  Mass_Error_Tag_Operator_Prefix_Conflict = 13,
-  Mass_Error_Tag_Undefined_Variable = 14,
-  Mass_Error_Tag_Redifinition = 15,
-  Mass_Error_Tag_Unknown_Field = 16,
-  Mass_Error_Tag_Invalid_Identifier = 17,
-  Mass_Error_Tag_Type_Mismatch = 18,
-  Mass_Error_Tag_Epoch_Mismatch = 19,
-  Mass_Error_Tag_No_Matching_Overload = 20,
-  Mass_Error_Tag_Undecidable_Overload = 21,
-  Mass_Error_Tag_Non_Function_Overload = 22,
+  Mass_Error_Tag_Operator_Fixity_Conflict = 12,
+  Mass_Error_Tag_Undefined_Variable = 13,
+  Mass_Error_Tag_Redifinition = 14,
+  Mass_Error_Tag_Unknown_Field = 15,
+  Mass_Error_Tag_Invalid_Identifier = 16,
+  Mass_Error_Tag_Type_Mismatch = 17,
+  Mass_Error_Tag_Epoch_Mismatch = 18,
+  Mass_Error_Tag_No_Matching_Overload = 19,
+  Mass_Error_Tag_Undecidable_Overload = 20,
+  Mass_Error_Tag_Non_Function_Overload = 21,
 } Mass_Error_Tag;
 
 typedef struct Mass_Error_User_Defined {
@@ -1793,12 +1792,11 @@ typedef struct Mass_Error_Dynamic_Library_Symbol_Not_Found {
 typedef struct Mass_Error_Unexpected_Token {
   Slice expected;
 } Mass_Error_Unexpected_Token;
-typedef struct Mass_Error_Operator_Infix_Suffix_Conflict {
+typedef struct Mass_Error_Operator_Fixity_Conflict {
+  Operator_Fixity fixity;
+  u32 _fixity_padding;
   Slice symbol;
-} Mass_Error_Operator_Infix_Suffix_Conflict;
-typedef struct Mass_Error_Operator_Prefix_Conflict {
-  Slice symbol;
-} Mass_Error_Operator_Prefix_Conflict;
+} Mass_Error_Operator_Fixity_Conflict;
 typedef struct Mass_Error_Undefined_Variable {
   Slice name;
   u64 is_operator;
@@ -1841,8 +1839,7 @@ typedef struct Mass_Error {
     Mass_Error_Dynamic_Library_Load Dynamic_Library_Load;
     Mass_Error_Dynamic_Library_Symbol_Not_Found Dynamic_Library_Symbol_Not_Found;
     Mass_Error_Unexpected_Token Unexpected_Token;
-    Mass_Error_Operator_Infix_Suffix_Conflict Operator_Infix_Suffix_Conflict;
-    Mass_Error_Operator_Prefix_Conflict Operator_Prefix_Conflict;
+    Mass_Error_Operator_Fixity_Conflict Operator_Fixity_Conflict;
     Mass_Error_Undefined_Variable Undefined_Variable;
     Mass_Error_Redifinition Redifinition;
     Mass_Error_Unknown_Field Unknown_Field;
@@ -1892,15 +1889,10 @@ mass_error_as_unexpected_token(Mass_Error *mass_error) {
   assert(mass_error->tag == Mass_Error_Tag_Unexpected_Token);
   return &mass_error->Unexpected_Token;
 }
-static inline Mass_Error_Operator_Infix_Suffix_Conflict *
-mass_error_as_operator_infix_suffix_conflict(Mass_Error *mass_error) {
-  assert(mass_error->tag == Mass_Error_Tag_Operator_Infix_Suffix_Conflict);
-  return &mass_error->Operator_Infix_Suffix_Conflict;
-}
-static inline Mass_Error_Operator_Prefix_Conflict *
-mass_error_as_operator_prefix_conflict(Mass_Error *mass_error) {
-  assert(mass_error->tag == Mass_Error_Tag_Operator_Prefix_Conflict);
-  return &mass_error->Operator_Prefix_Conflict;
+static inline Mass_Error_Operator_Fixity_Conflict *
+mass_error_as_operator_fixity_conflict(Mass_Error *mass_error) {
+  assert(mass_error->tag == Mass_Error_Tag_Operator_Fixity_Conflict);
+  return &mass_error->Operator_Fixity_Conflict;
 }
 static inline Mass_Error_Undefined_Variable *
 mass_error_as_undefined_variable(Mass_Error *mass_error) {
@@ -5638,17 +5630,16 @@ static C_Enum_Item mass_error_tag_items[] = {
 { .name = slice_literal_fields("Dynamic_Library_Load"), .value = 9 },
 { .name = slice_literal_fields("Dynamic_Library_Symbol_Not_Found"), .value = 10 },
 { .name = slice_literal_fields("Unexpected_Token"), .value = 11 },
-{ .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"), .value = 12 },
-{ .name = slice_literal_fields("Operator_Prefix_Conflict"), .value = 13 },
-{ .name = slice_literal_fields("Undefined_Variable"), .value = 14 },
-{ .name = slice_literal_fields("Redifinition"), .value = 15 },
-{ .name = slice_literal_fields("Unknown_Field"), .value = 16 },
-{ .name = slice_literal_fields("Invalid_Identifier"), .value = 17 },
-{ .name = slice_literal_fields("Type_Mismatch"), .value = 18 },
-{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 19 },
-{ .name = slice_literal_fields("No_Matching_Overload"), .value = 20 },
-{ .name = slice_literal_fields("Undecidable_Overload"), .value = 21 },
-{ .name = slice_literal_fields("Non_Function_Overload"), .value = 22 },
+{ .name = slice_literal_fields("Operator_Fixity_Conflict"), .value = 12 },
+{ .name = slice_literal_fields("Undefined_Variable"), .value = 13 },
+{ .name = slice_literal_fields("Redifinition"), .value = 14 },
+{ .name = slice_literal_fields("Unknown_Field"), .value = 15 },
+{ .name = slice_literal_fields("Invalid_Identifier"), .value = 16 },
+{ .name = slice_literal_fields("Type_Mismatch"), .value = 17 },
+{ .name = slice_literal_fields("Epoch_Mismatch"), .value = 18 },
+{ .name = slice_literal_fields("No_Matching_Overload"), .value = 19 },
+{ .name = slice_literal_fields("Undecidable_Overload"), .value = 20 },
+{ .name = slice_literal_fields("Non_Function_Overload"), .value = 21 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_user_defined, Mass_Error_User_Defined,
   {
@@ -5754,28 +5745,33 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_unexpected_token, Mass_Error_Unexpected
   },
 );
 MASS_DEFINE_TYPE_VALUE(mass_error_unexpected_token);
-MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_operator_infix_suffix_conflict, Mass_Error_Operator_Infix_Suffix_Conflict,
+MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_operator_fixity_conflict, Mass_Error_Operator_Fixity_Conflict,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_operator_fixity,
+      .name = slice_literal_fields("fixity"),
+    },
+    .Base_Relative.offset = offsetof(Mass_Error_Operator_Fixity_Conflict, fixity),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u32,
+      .name = slice_literal_fields("_fixity_padding"),
+    },
+    .Base_Relative.offset = offsetof(Mass_Error_Operator_Fixity_Conflict, _fixity_padding),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
       .descriptor = &descriptor_slice,
       .name = slice_literal_fields("symbol"),
     },
-    .Base_Relative.offset = offsetof(Mass_Error_Operator_Infix_Suffix_Conflict, symbol),
+    .Base_Relative.offset = offsetof(Mass_Error_Operator_Fixity_Conflict, symbol),
   },
 );
-MASS_DEFINE_TYPE_VALUE(mass_error_operator_infix_suffix_conflict);
-MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_operator_prefix_conflict, Mass_Error_Operator_Prefix_Conflict,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_slice,
-      .name = slice_literal_fields("symbol"),
-    },
-    .Base_Relative.offset = offsetof(Mass_Error_Operator_Prefix_Conflict, symbol),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(mass_error_operator_prefix_conflict);
+MASS_DEFINE_TYPE_VALUE(mass_error_operator_fixity_conflict);
 MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error_undefined_variable, Mass_Error_Undefined_Variable,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -6001,18 +5997,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(mass_error, Mass_Error,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .name = slice_literal_fields("Operator_Infix_Suffix_Conflict"),
-      .descriptor = &descriptor_mass_error_operator_infix_suffix_conflict,
+      .name = slice_literal_fields("Operator_Fixity_Conflict"),
+      .descriptor = &descriptor_mass_error_operator_fixity_conflict,
     },
-    .Base_Relative.offset = offsetof(Mass_Error, Operator_Infix_Suffix_Conflict),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .name = slice_literal_fields("Operator_Prefix_Conflict"),
-      .descriptor = &descriptor_mass_error_operator_prefix_conflict,
-    },
-    .Base_Relative.offset = offsetof(Mass_Error, Operator_Prefix_Conflict),
+    .Base_Relative.offset = offsetof(Mass_Error, Operator_Fixity_Conflict),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

@@ -971,20 +971,14 @@ scope_define_operator(
   if (*operator_map_pointer) {
     operator_entry = hash_map_get(*operator_map_pointer, name);
     if (operator_entry) {
-      // TODO change this error to provide fixity as a value
-      if (operator->fixity == Operator_Fixity_Prefix) {
-        return mass_error((Mass_Error) {
-          .tag = Mass_Error_Tag_Operator_Prefix_Conflict,
-          .source_range = source_range,
-          .Operator_Prefix_Conflict = {.symbol = name},
-        });
-      } else {
-        return mass_error((Mass_Error) {
-          .tag = Mass_Error_Tag_Operator_Infix_Suffix_Conflict,
-          .source_range = source_range,
-          .Operator_Infix_Suffix_Conflict = {.symbol = name},
-        });
-      }
+      return mass_error((Mass_Error) {
+        .tag = Mass_Error_Tag_Operator_Fixity_Conflict,
+        .source_range = source_range,
+        .Operator_Fixity_Conflict = {
+          .fixity = operator->fixity,
+          .symbol = name,
+        },
+      });
     }
   } else {
     *operator_map_pointer = hash_map_make(Operator_Map);
