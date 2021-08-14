@@ -967,6 +967,33 @@ scope_define_operator(
   Slice name,
   Operator *operator
 ) {
+  Operator_Map **operator_map_pointer = operator->fixity == Operator_Fixity_Prefix
+    ? &scope->prefix_operator_map
+    : &scope->infix_or_suffix_operator_map;
+  Operator **operator_entry = 0;
+  if (*operator_map_pointer) {
+    operator_entry = hash_map_get(*operator_map_pointer, name);
+    if (operator_entry) {
+      // TODO change this error to provide fixity as a value
+      if (operator->fixity == Operator_Fixity_Prefix) {
+        return mass_error((Mass_Error) {
+          .tag = Mass_Error_Tag_Operator_Prefix_Conflict,
+          .source_range = source_range,
+          .Operator_Prefix_Conflict = {.symbol = name},
+        });
+      } else {
+        return mass_error((Mass_Error) {
+          .tag = Mass_Error_Tag_Operator_Infix_Suffix_Conflict,
+          .source_range = source_range,
+          .Operator_Infix_Suffix_Conflict = {.symbol = name},
+        });
+      }
+    }
+  } else {
+    *operator_map_pointer = hash_map_make(Operator_Map);
+  }
+  hash_map_set(*operator_map_pointer, name, operator);
+
   Scope_Entry *current_scope_entry = scope_lookup_shallow(scope, name);
   Scope_Entry *ancestor_scope_entry = scope_lookup(scope, name);
   if (current_scope_entry) {
@@ -1019,6 +1046,35 @@ scope_define_operator(
     hash_map_set(scope->map, name, new_entry);
   }
   return mass_success();
+}
+
+static inline Operator *
+scope_lookup_operator_shallow(
+  const Scope *scope,
+  Slice name,
+  Operator_Fixity fixity
+) {
+  Operator **operator_entry = 0;
+  Operator_Map * const *operator_map_pointer = fixity == Operator_Fixity_Prefix
+    ? &scope->prefix_operator_map
+    : &scope->infix_or_suffix_operator_map;
+  if (*operator_map_pointer) {
+    operator_entry = hash_map_get(*operator_map_pointer, name);
+  }
+  return operator_entry ? *operator_entry : 0;
+}
+
+static inline Operator *
+scope_lookup_operator(
+  const Scope *scope,
+  Slice name,
+  Operator_Fixity fixity
+) {
+  for (; scope; scope = scope->parent) {
+    Operator *operator = scope_lookup_operator_shallow(scope, name, fixity);
+    if (operator) return operator;
+  }
+  return 0;
 }
 
 static inline Value *
@@ -2824,7 +2880,6 @@ compile_time_eval(
 }
 
 typedef struct {
-  Slice source;
   Source_Range source_range;
   Operator *operator;
 } Operator_Stack_Entry;
@@ -3040,41 +3095,16 @@ token_handle_operator(
   Value_View view,
   Array_Value_Ptr *stack,
   Array_Operator_Stack_Entry *operator_stack,
-  Slice new_operator,
-  Source_Range source_range,
-  Operator_Fixity fixity_mask
+  Operator *operator,
+  Source_Range source_range
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Scope_Entry *scope_entry = scope_lookup(context->scope, new_operator);
-
-  Operator *operator_entry = 0;
-
-  if (scope_entry) {
-    if (scope_entry->tag != Scope_Entry_Tag_Operator) {
-      panic("Should have only gotten here if scope entry is an operator");
-    }
-    if (fixity_mask == Operator_Fixity_Prefix) {
-      operator_entry = scope_entry->Operator.maybe_prefix;
-    } else {
-      operator_entry = scope_entry->Operator.maybe_infix_or_postfix;
-    }
-  }
-
-  if (!operator_entry) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Undefined_Variable,
-      .source_range = source_range,
-      .Undefined_Variable = { .name = new_operator, .is_operator = true },
-    });
-    return false;
-  }
 
   while (dyn_array_length(*operator_stack)) {
     Operator_Stack_Entry *last_operator = dyn_array_last(*operator_stack);
 
-    if (last_operator->operator->precedence < operator_entry->precedence) break;
-    if (last_operator->operator->precedence == operator_entry->precedence) {
+    if (last_operator->operator->precedence < operator->precedence) break;
+    if (last_operator->operator->precedence == operator->precedence) {
       if (last_operator->operator->associativity != Operator_Associativity_Left) {
         break;
       }
@@ -3086,9 +3116,8 @@ token_handle_operator(
     token_dispatch_operator(context, stack, last_operator);
   }
   dyn_array_push(*operator_stack, (Operator_Stack_Entry) {
-    .source = new_operator,
     .source_range = source_range,
-    .operator = operator_entry,
+    .operator = operator,
   });
   return true;
 }
@@ -5661,11 +5690,10 @@ token_parse_expression(
     if (value_is_symbol(value)) {
       Slice symbol_name = value_as_symbol(value)->name;
 
-      Scope_Entry *scope_entry = scope_lookup(context->scope, symbol_name);
-      if (scope_entry && scope_entry->tag == Scope_Entry_Tag_Operator) {
+      Operator *maybe_operator = scope_lookup_operator(context->scope, symbol_name, fixity_mask);
+      if (maybe_operator) {
         if (!token_handle_operator(
-          context, view, &value_stack, &operator_stack,
-          symbol_name, value->source_range, fixity_mask
+          context, view, &value_stack, &operator_stack, maybe_operator, value->source_range
         )) goto defer;
         is_previous_an_operator = true;
         continue;
@@ -5673,9 +5701,11 @@ token_parse_expression(
     }
 
     if (!is_previous_an_operator) {
+      Operator *empty_space_operator =
+        scope_lookup_operator(context->scope, slice_literal(" "), Operator_Fixity_Infix);
+      assert(empty_space_operator);
       if (!token_handle_operator(
-        context, view, &value_stack, &operator_stack, slice_literal(" "),
-        value->source_range, Operator_Fixity_Infix
+        context, view, &value_stack, &operator_stack, empty_space_operator, value->source_range
       )) goto defer;
     }
     dyn_array_push(value_stack, value);

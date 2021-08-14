@@ -1523,11 +1523,18 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
+  push_type(type_hash_map("Operator_Map", {
+    .key_type = "Slice",
+    .value_type = "Operator *",
+  }));
+
   push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "u64", "id" },
     { "const Scope *", "parent" },
     { "Scope_Map *", "map" },
+    { "Operator_Map *", "prefix_operator_map"},
+    { "Operator_Map *", "infix_or_suffix_operator_map"},
     { "Array_Macro_Ptr", "macros" },
     { "const Token_Statement_Matcher *", "statement_matcher" },
   }));

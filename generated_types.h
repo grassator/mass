@@ -412,6 +412,8 @@ typedef struct Scope_Entry Scope_Entry;
 typedef dyn_array_type(Scope_Entry *) Array_Scope_Entry_Ptr;
 typedef dyn_array_type(const Scope_Entry *) Array_Const_Scope_Entry_Ptr;
 
+typedef struct Operator_Map Operator_Map;
+
 typedef struct Scope Scope;
 typedef dyn_array_type(Scope *) Array_Scope_Ptr;
 typedef dyn_array_type(const Scope *) Array_Const_Scope_Ptr;
@@ -1450,11 +1452,14 @@ scope_entry_as_operator(Scope_Entry *scope_entry) {
   return &scope_entry->Operator;
 }
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
+hash_map_slice_template(Operator_Map, Operator *)
 typedef struct Scope {
   const Allocator * allocator;
   u64 id;
   const Scope * parent;
   Scope_Map * map;
+  Operator_Map * prefix_operator_map;
+  Operator_Map * infix_or_suffix_operator_map;
   Array_Macro_Ptr macros;
   const Token_Statement_Matcher * statement_matcher;
 } Scope;
@@ -2346,6 +2351,7 @@ static Descriptor descriptor_array_scope_entry_ptr;
 static Descriptor descriptor_array_const_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
+MASS_DEFINE_OPAQUE_C_TYPE(operator_map, Operator_Map);
 static Descriptor descriptor_scope;
 static Descriptor descriptor_array_scope;
 static Descriptor descriptor_array_scope_ptr;
@@ -4723,6 +4729,22 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
       .name = slice_literal_fields("map"),
     },
     .Base_Relative.offset = offsetof(Scope, map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_operator_map_pointer,
+      .name = slice_literal_fields("prefix_operator_map"),
+    },
+    .Base_Relative.offset = offsetof(Scope, prefix_operator_map),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_operator_map_pointer,
+      .name = slice_literal_fields("infix_or_suffix_operator_map"),
+    },
+    .Base_Relative.offset = offsetof(Scope, infix_or_suffix_operator_map),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
