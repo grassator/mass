@@ -4587,30 +4587,12 @@ mass_type_of(
 }
 
 static Value *
-token_handle_size_of(
+mass_size_of(
   Execution_Context *context,
-  Value *args_token
+  Value_View args
 ) {
-  Value *result = 0;
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_Ptr args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->temp_allocator,
-    .capacity = 16,
-  );
-  token_match_call_arguments(context, args_token, &args);
-
-  MASS_ON_ERROR(*context->result) goto defer;
-  if (dyn_array_length(args) != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
-      .detailed_message = "size_of() expects a single argument"
-    });
-    goto defer;
-  }
-  Value *expression = *dyn_array_get(args, 0);
+  assert(args.length == 1);
+  Value *expression = value_view_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
   u64 byte_size = descriptor_byte_size(descriptor);
 
@@ -4621,15 +4603,7 @@ token_handle_size_of(
     .bits = byte_size,
   };
 
-  result = value_init(
-    allocator_allocate(context->allocator, Value),
-    &descriptor_number_literal, storage_static(literal), args_token->source_range
-  );
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-
-  return result;
+  return value_make(context, &descriptor_number_literal, storage_static(literal), args.source_range);
 }
 
 static Value *
@@ -4637,15 +4611,13 @@ mass_address_of(
   Execution_Context *context,
   Value_View args
 ) {
-  Value *pointer;
   assert(args.length == 1);
   Value *pointee = value_view_get(args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
-  pointer = mass_make_lazy_value(
+  return mass_make_lazy_value(
     context, args.source_range, pointee, descriptor, mass_handle_address_of_lazy_proc
   );
-  return pointer;
 }
 
 static Value *
@@ -4699,8 +4671,6 @@ mass_handle_paren_operator(
     );
   } else if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
-  } else if (slice_equal(target_name, slice_literal("size_of"))) {
-    return token_handle_size_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("startup"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
