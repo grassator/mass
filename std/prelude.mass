@@ -78,6 +78,8 @@ operator 15 (x >> y) logical_shift_right(x, y)
 operator 15 (x | y) bitwise_or(x, y)
 operator 15 (x & y) bitwise_and(x, y)
 
+type_of :: @fn(x) -> (Type) PRELUDE_MASS.type_of
+
 Pointer_To :: macro(type : Type) -> (Type) {
   PRELUDE_MASS.descriptor_pointer_to(PRELUDE_MASS.allocator, type)
 }
