@@ -123,7 +123,7 @@ mnemonic(int3,
   encoding(0xCC, none, 0),
 );
 
-mnemonic(syscall,
+mnemonic(asm_syscall,
   encoding(0x0F05, none, 0),
 );
 
@@ -254,7 +254,7 @@ mnemonic(idiv,
   encoding(0xF7, _op_code(7), r_m64),
 );
 
-mnemonic(x64_div,
+mnemonic(asm_div,
   encoding(0xF6, _op_code(6), r_m8),
   encoding(0xF7, _op_code(6), r_m16),
   encoding(0xF7, _op_code(6), r_m32),

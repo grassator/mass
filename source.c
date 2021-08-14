@@ -3431,7 +3431,7 @@ call_function_overload(
       );
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){syscall}
+        &(Instruction_Assembly){asm_syscall}
       );
     } break;
   }
@@ -4117,7 +4117,7 @@ mass_handle_arithmetic_operation_lazy_proc(
           );
         }
         push_eagerly_encoded_assembly(
-          &builder->code_block, result_range, &(Instruction_Assembly){x64_div, {temp_divisor->storage}}
+          &builder->code_block, result_range, &(Instruction_Assembly){asm_div, {temp_divisor->storage}}
         );
       }
 
