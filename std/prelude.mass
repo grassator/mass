@@ -90,18 +90,26 @@ address_of :: Pointer_To
 // FIXME Using `address_of` instead of `Pointer_To` results in an infinite loop
 address_of :: @fn(x) -> (Pointer_To(type_of(x))) PRELUDE_MASS.address_of
 
-template_integer_overloads :: macro(template, impl) {
-  expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
-    f :: template(impl, t64)
-    f :: template(impl, t32)
-    f :: template(impl, t16)
-    f :: template(impl, t8)
-    f
-  }
+template_signed_integer_overloads :: macro(template, impl) {
+  f :: template(impl, s64)
+  f :: template(impl, s32)
+  f :: template(impl, s16)
+  f :: template(impl, s8)
+  f
+}
 
+template_unsigned_integer_overloads :: macro(template, impl) {
+  f :: template(impl, u64)
+  f :: template(impl, u32)
+  f :: template(impl, u16)
+  f :: template(impl, u8)
+  f
+}
+
+template_integer_overloads :: macro(template, impl) {
   f :: template(impl, Number_Literal)
-  f :: expand(s64, s32, s16, s8)
-  f :: expand(u64, u32, u16, u8)
+  f :: template_signed_integer_overloads(template, impl)
+  f :: template_unsigned_integer_overloads(template, impl)
   f
 }
 
