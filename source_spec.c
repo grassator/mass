@@ -1592,16 +1592,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be able to define and use a syntax macro without a capture") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "syntax (\"the\" \"answer\") 42;"
-        "checker :: fn() -> (s32) { the answer }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should be able to define and use a syntax macro matching a curly brace block") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
@@ -1620,17 +1610,6 @@ spec("source") {
       );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
-    }
-
-    it("should be able to define and use a syntax macro with a capture") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        // TODO figure out what should be the rule for subtracting unsigned integers
-        "syntax (\"negative\" .@x) (cast(s32, 0) - x());"
-        "checker :: fn() -> (s32) { negative 42 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == -42);
     }
 
     it("should be able to use a while loop") {

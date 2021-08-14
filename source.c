@@ -1364,6 +1364,7 @@ token_expect_match(
 
 #define Token_Expect_Match(_id_, ...)\
   Value *(_id_) = token_expect_match(context, view, &peek_index, &(Token_Pattern) { __VA_ARGS__ });\
+  (void)(_id_);\
   MASS_ON_ERROR(*context->result) return 0
 
 #define Token_Match(_id_, ...)\
@@ -1589,44 +1590,6 @@ token_parse_block_view(
   Execution_Context *context,
   Value_View children_view
 );
-
-static Value *
-token_parse_macros(
-  Execution_Context *context,
-  Value_View value_view,
-  u64 *match_length
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  Value *replacement = 0;
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_View match = dyn_array_make(
-    Array_Value_View,
-    .allocator = context->temp_allocator,
-    .capacity = 32,
-  );
-
-  const Scope *scope = context->scope;
-  for (;scope; scope = scope->parent) {
-    if (!dyn_array_is_initialized(scope->macros)) continue;
-    for (u64 macro_index = 0; macro_index < dyn_array_length(scope->macros); ++macro_index) {
-      Macro *macro = *dyn_array_get(scope->macros, macro_index);
-
-      dyn_array_clear(match);
-      *match_length = token_match_pattern(value_view, macro->pattern, &match, Macro_Match_Mode_Expression);
-      if (!*match_length) continue;
-      Value_View match_view = value_view_slice(&value_view, 0, *match_length);
-      replacement = token_apply_macro_syntax(context, match, macro, match_view.source_range);
-      goto defer;
-    }
-  }
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-
-  return replacement;
-}
 
 static Descriptor *
 token_match_fixed_array_type(
@@ -2037,17 +2000,6 @@ token_match_call_arguments(
   }
 }
 
-static inline void
-scope_add_macro(
-  Scope *scope,
-  Macro *macro
-) {
-  if (!dyn_array_is_initialized(scope->macros)) {
-    scope->macros = dyn_array_make(Array_Macro_Ptr);
-  }
-  dyn_array_push(scope->macros, macro);
-}
-
 static Value *
 token_handle_user_defined_operator_proc(
   Execution_Context *context,
@@ -2388,18 +2340,9 @@ token_parse_syntax_definition(
 
   u64 peek_index = 0;
   Token_Match(name, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("syntax"));
-  Token_Maybe_Match(statement, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("statement"));
+  Token_Expect_Match(statement_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("statement"));
 
-  Token_Maybe_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
-
-  if (!pattern_token) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = name->source_range,
-      .detailed_message = "Syntax definition requires a parenthesized pattern definitions"
-    });
-    goto err;
-  }
+  Token_Expect_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   Value_View replacement = value_view_match_till_end_of_statement(view, &peek_index);
   Value_View definition = value_as_group(pattern_token)->children;
@@ -2491,18 +2434,14 @@ token_parse_syntax_definition(
     .replacement = replacement,
     .scope = context->scope
   };
-  if (statement) {
-    Token_Statement_Matcher *matcher =
-      allocator_allocate(context->allocator, Token_Statement_Matcher);
-    *matcher = (Token_Statement_Matcher){
-      .previous = context->scope->statement_matcher,
-      .proc = token_parse_macro_statement,
-      .payload = macro,
-    };
-    context->scope->statement_matcher = matcher;
-  } else {
-    scope_add_macro(context->scope, macro);
-  }
+  Token_Statement_Matcher *matcher =
+    allocator_allocate(context->allocator, Token_Statement_Matcher);
+  *matcher = (Token_Statement_Matcher){
+    .previous = context->scope->statement_matcher,
+    .proc = token_parse_macro_statement,
+    .payload = macro,
+  };
+  context->scope->statement_matcher = matcher;
   return peek_index;
 
   err:
@@ -5532,7 +5471,6 @@ token_parse_expression(
   u64 matched_length = view.length;
 
   static Expression_Matcher_Proc expression_matchers[] = {
-    token_parse_macros,
     token_parse_if_expression,
     token_parse_function_literal
   };

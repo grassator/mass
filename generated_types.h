@@ -1446,7 +1446,6 @@ typedef struct Scope {
   Scope_Map * map;
   Operator_Map * prefix_operator_map;
   Operator_Map * infix_or_suffix_operator_map;
-  Array_Macro_Ptr macros;
   const Token_Statement_Matcher * statement_matcher;
 } Scope;
 typedef dyn_array_type(Scope) Array_Scope;
@@ -4711,14 +4710,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,
       .name = slice_literal_fields("infix_or_suffix_operator_map"),
     },
     .Base_Relative.offset = offsetof(Scope, infix_or_suffix_operator_map),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_array_macro_ptr,
-      .name = slice_literal_fields("macros"),
-    },
-    .Base_Relative.offset = offsetof(Scope, macros),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

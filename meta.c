@@ -1535,7 +1535,6 @@ main(void) {
     { "Scope_Map *", "map" },
     { "Operator_Map *", "prefix_operator_map"},
     { "Operator_Map *", "infix_or_suffix_operator_map"},
-    { "Array_Macro_Ptr", "macros" },
     { "const Token_Statement_Matcher *", "statement_matcher" },
   }));
 
