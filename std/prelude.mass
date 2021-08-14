@@ -184,6 +184,9 @@ syscall :: fn(
   result
 }
 
+negate :: template_signed_integer_overloads(macro(impl, type : Type) {
+  macro(x : type) -> (type) { 0 - x }
+}, ())
 negate :: @fn(literal : Number_Literal) -> (Number_Literal) {
   literal.negative = if literal.negative then false else true
   literal

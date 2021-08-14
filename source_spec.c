@@ -1259,6 +1259,15 @@ spec("source") {
       check(checker(41) == 42);
     }
 
+    it("should be able to parse and run a negation of an s64 number") {
+      s64(*checker)(s64) = (s64(*)(s64))test_program_inline_source_function(
+        "plus_one", &test_context,
+        "plus_one :: fn(x : s64) -> (s64) { -x }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker(-42) == 42);
+    }
+
     it("should be able to parse and run a sum passed to another function as an argument") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "plus", &test_context,
