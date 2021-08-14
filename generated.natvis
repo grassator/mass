@@ -1208,6 +1208,33 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Array_Scope_Using">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Scope_Using_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Scope_Using_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
 <Type Name="Array_Scope">
   <Expand>
     <Item Name="[length]">data->length</Item>
@@ -1233,26 +1260,6 @@
       <Size>data->length</Size>
       <ValuePointer>data->items</ValuePointer>
     </ArrayItems>
-  </Expand>
-</Type>
-<Type Name="Scope">
-  <DisplayString Condition="tag == Scope_Tag_Default">
-    Default
-  </DisplayString>
-  <DisplayString Condition="tag == Scope_Tag_Using">
-    Using { Using }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="allocator">allocator</Item>
-    <Item Name="id">id</Item>
-    <Item Name="parent">parent</Item>
-    <Item Name="map">map</Item>
-    <Item Name="prefix_operator_map">prefix_operator_map</Item>
-    <Item Name="infix_or_suffix_operator_map">infix_or_suffix_operator_map</Item>
-    <Item Name="macros">macros</Item>
-    <Item Name="statement_matcher">statement_matcher</Item>
-    <Item Name="Using" Condition="tag == Scope_Tag_Using">Using</Item>
   </Expand>
 </Type>
 <Type Name="Array_Overload_Set">

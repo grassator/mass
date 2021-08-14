@@ -164,26 +164,20 @@ token_statement_matcher_in_scopes(
   u64 common_ancestor_id
 ) {
   for (; scope && scope->id != common_ancestor_id; scope = scope->parent) {
-    switch(scope->tag) {
-      case Scope_Tag_Default: {
-        // Do a reverse iteration because we want statements that are defined later
-        // to have higher precedence when parsing
-        const Token_Statement_Matcher *matcher = scope->statement_matcher;
-        for (; matcher; matcher = matcher->previous) {
-          u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
-          MASS_ON_ERROR(*context->result) return 0;
-          if (match_length) return match_length;
-        }
-      } break;
-      case Scope_Tag_Using: {
-        u64 match_length = token_statement_matcher_in_scopes(
-          context, view, out_lazy_value, scope->Using.scope, scope->Using.common_ancestor_id
-        );
-        if (match_length) return match_length;
-      } break;
-      default: {
-        panic("Unexpected scope tag");
-      } break;
+    const Scope_Using *using = scope->maybe_using;
+    for (; using; using = using->next) {
+      u64 match_length = token_statement_matcher_in_scopes(
+        context, view, out_lazy_value, using->scope, using->common_ancestor_id
+      );
+      if (match_length) return match_length;
+    }
+    // Do a reverse iteration because we want statements that are defined later
+    // to have higher precedence when parsing
+    const Token_Statement_Matcher *matcher = scope->statement_matcher;
+    for (; matcher; matcher = matcher->previous) {
+      u64 match_length = matcher->proc(context, view, out_lazy_value, matcher->payload);
+      MASS_ON_ERROR(*context->result) return 0;
+      if (match_length) return match_length;
     }
   }
   return 0;
@@ -198,11 +192,14 @@ context_merge_in_scope(
   const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, scope_to_use);
   assert(common_ancestor);
 
-  Scope *proxy = scope_make(context->allocator, context->scope);
-  proxy->tag = Scope_Tag_Using;
-  proxy->Using.scope = scope_to_use;
-  proxy->Using.common_ancestor_id = common_ancestor->id;
-  Scope *new_scope = scope_make(context->allocator, proxy);
+  Scope_Using *using_entry = allocator_allocate(context->allocator, Scope_Using);
+  *using_entry = (Scope_Using) {
+    .scope = scope_to_use,
+    .common_ancestor_id = common_ancestor->id,
+    .next = context->scope->maybe_using,
+  };
+  context->scope->maybe_using = using_entry;
+  Scope *new_scope = scope_make(context->allocator, context->scope);
 
   // FIXME This kind of hackish, probably there is a better way
   if (context->module && context->module->own_scope == context->scope) {
@@ -259,20 +256,12 @@ scope_lookup_hashed(
   u64 till_id
 ) {
   for (; scope && scope->id != till_id; scope = scope->parent) {
-    Scope_Entry *entry;
-    switch(scope->tag) {
-      case Scope_Tag_Default: {
-        entry = scope_lookup_shallow_hashed(scope, hash, name);
-      } break;
-      case Scope_Tag_Using: {
-        entry = scope_lookup_hashed(scope->Using.scope, hash, name, scope->Using.common_ancestor_id);
-      } break;
-      default: {
-        entry = 0;
-        panic("Unexpected scope tag");
-      } break;
+    const Scope_Using *using = scope->maybe_using;
+    for (; using; using = using->next) {
+      Scope_Entry *entry = scope_lookup_hashed(using->scope, hash, name, using->common_ancestor_id);
+      if (entry) return entry;
     }
-
+    Scope_Entry *entry = scope_lookup_shallow_hashed(scope, hash, name);
     if (entry) return entry;
   }
   return 0;

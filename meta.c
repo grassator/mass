@@ -1521,16 +1521,17 @@ main(void) {
     .value_type = "Operator *",
   }));
 
-  push_type(add_common_fields(type_union("Scope", (Struct_Type[]){
-    struct_empty("Default"),
-    struct_fields("Using", (Struct_Item[]){
-      { "const Scope *", "scope" },
-      { "u64", "common_ancestor_id" },
-    }),
-  }), (Struct_Item[]){
+  push_type(type_struct("Scope_Using", (Struct_Item[]){
+    { "const Scope_Using *", "next" },
+    { "const Scope *", "scope" },
+    { "u64", "common_ancestor_id" },
+  }));
+
+  push_type(type_struct("Scope", (Struct_Item[]){
     { "const Allocator *", "allocator" },
     { "u64", "id" },
     { "const Scope *", "parent" },
+    { "const Scope_Using *", "maybe_using" },
     { "Scope_Map *", "map" },
     { "Operator_Map *", "prefix_operator_map"},
     { "Operator_Map *", "infix_or_suffix_operator_map"},
