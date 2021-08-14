@@ -3635,7 +3635,6 @@ ensure_parameter_descriptors(
       storage_none,
       source_range
     );
-    assert(param->declaration.descriptor != &descriptor_overload_set);
     scope_define_value(
       temp_context.scope,
       VALUE_STATIC_EPOCH,

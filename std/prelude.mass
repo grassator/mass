@@ -90,59 +90,45 @@ address_of :: Pointer_To
 // FIXME Using `address_of` instead of `Pointer_To` results in an infinite loop
 address_of :: @fn(x) -> (Pointer_To(type_of(x))) PRELUDE_MASS.address_of
 
-arithmetic_overloads :: {
-  macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
-    template :: macro(type : Type) {
-      @fn(x : type, y : type) -> (type) impl
-    }
-    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
-      f :: template(t64)
-      f :: template(t32)
-      f :: template(t16)
-      f :: template(t8)
-      f
-    }
-
-    // TODO this should produce a Number_Literal
-    f :: @fn(x : Number_Literal, y : Number_Literal) -> (s64) impl
-    f :: expand(s64, s32, s16, s8)
-    f :: expand(u64, u32, u16, u8)
+template_integer_overloads :: macro(template, impl) {
+  expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
+    f :: template(impl, t64)
+    f :: template(impl, t32)
+    f :: template(impl, t16)
+    f :: template(impl, t8)
     f
   }
+
+  f :: template(impl, Number_Literal)
+  f :: expand(s64, s32, s16, s8)
+  f :: expand(u64, u32, u16, u8)
+  f
 }
 
-add :: arithmetic_overloads(PRELUDE_MASS.add)
-subtract :: arithmetic_overloads(PRELUDE_MASS.subtract)
-multiply :: arithmetic_overloads(PRELUDE_MASS.multiply)
-divide :: arithmetic_overloads(PRELUDE_MASS.divide)
-remainder :: arithmetic_overloads(PRELUDE_MASS.remainder)
-
-comparison_overloads :: {
-  macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {
-    template :: macro(type : Type) {
-      @fn(x : type, y : type) -> (bool) impl
-    }
-    expand :: macro(t64 : Type, t32 : Type, t16 : Type, t8  : Type) {
-      f :: template(t64)
-      f :: template(t32)
-      f :: template(t16)
-      f :: template(t8)
-      f
-    }
-
-    f :: @fn(x : Number_Literal, y : Number_Literal) -> (bool) impl
-    f :: expand(s64, s32, s16, s8)
-    f :: expand(u64, u32, u16, u8)
-    f
-  }
+arithmetic_template :: macro(impl, type : Type) {
+  @fn(x : type, y : type) -> (bool) impl
+}
+// TODO support arithmetic on Number_Literal and remove this overload
+arithmetic_template :: macro(impl, type :: Number_Literal) {
+  @fn(x : Number_Literal, y : Number_Literal) -> (s64) impl
 }
 
-less :: comparison_overloads(PRELUDE_MASS.less)
-less_equal :: comparison_overloads(PRELUDE_MASS.less_equal)
-greater :: comparison_overloads(PRELUDE_MASS.greater)
-greater_equal :: comparison_overloads(PRELUDE_MASS.greater_equal)
-equal :: comparison_overloads(PRELUDE_MASS.equal)
-not_equal :: comparison_overloads(PRELUDE_MASS.not_equal)
+add :: template_integer_overloads(arithmetic_template, PRELUDE_MASS.add)
+subtract :: template_integer_overloads(arithmetic_template, PRELUDE_MASS.subtract)
+multiply :: template_integer_overloads(arithmetic_template, PRELUDE_MASS.multiply)
+divide :: template_integer_overloads(arithmetic_template, PRELUDE_MASS.divide)
+remainder :: template_integer_overloads(arithmetic_template, PRELUDE_MASS.remainder)
+
+comparison_template :: macro(impl, type : Type) {
+  @fn(x : type, y : type) -> (bool) impl
+}
+
+less :: template_integer_overloads(comparison_template, PRELUDE_MASS.less)
+less_equal :: template_integer_overloads(comparison_template, PRELUDE_MASS.less_equal)
+greater :: template_integer_overloads(comparison_template, PRELUDE_MASS.greater)
+greater_equal :: template_integer_overloads(comparison_template, PRELUDE_MASS.greater_equal)
+equal :: template_integer_overloads(comparison_template, PRELUDE_MASS.equal)
+not_equal :: template_integer_overloads(comparison_template, PRELUDE_MASS.not_equal)
 
 logical_shift_left :: PRELUDE_MASS.number_literal_logical_shift_left
 logical_shift_right :: PRELUDE_MASS.number_literal_logical_shift_right
