@@ -188,8 +188,7 @@ spec("source") {
       Scope *root_scope = scope_make(test_context.allocator, 0);
       scope_define_value(root_scope, 0, (Source_Range){0}, slice_literal("test"), test);
       Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
-      check(entry->tag == Scope_Entry_Tag_Value);
-      check(entry->Value.value == test);
+      check(entry->value == test);
     }
 
     it("should be able to lookup things from parent scopes") {
@@ -205,10 +204,8 @@ spec("source") {
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
       scope_define_value(scope_level_2, 0, (Source_Range){0}, slice_literal("test"),  level_2_test);
 
-      Scope_Entry *entry =
-        scope_lookup(scope_level_2, slice_literal("global"));
-      check(entry->tag == Scope_Entry_Tag_Value);
-      check(entry->Value.value == global);
+      Scope_Entry *entry = scope_lookup(scope_level_2, slice_literal("global"));
+      check(entry->value == global);
     }
   }
 

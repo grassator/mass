@@ -1208,22 +1208,6 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Scope_Entry">
-  <DisplayString Condition="tag == Scope_Entry_Tag_Value">
-    Value { Value }
-  </DisplayString>
-  <DisplayString Condition="tag == Scope_Entry_Tag_Operator">
-    Operator { Operator }
-  </DisplayString>
-  <Expand>
-    <Item Name="tag">tag</Item>
-    <Item Name="name">name</Item>
-    <Item Name="epoch">epoch</Item>
-    <Item Name="source_range">source_range</Item>
-    <Item Name="Value" Condition="tag == Scope_Entry_Tag_Value">Value</Item>
-    <Item Name="Operator" Condition="tag == Scope_Entry_Tag_Operator">Operator</Item>
-  </Expand>
-</Type>
 <Type Name="Array_Scope">
   <Expand>
     <Item Name="[length]">data->length</Item>

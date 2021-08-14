@@ -291,10 +291,7 @@ win32_program_test_exception_handler(
               win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
             if (instruction && instruction->scope) {
               Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_name);
-              if (scope_entry->tag != Scope_Entry_Tag_Value) {
-                panic("TODO support other scope entry types");
-              }
-              Value *value = scope_entry->Value.value;
+              Value *value = scope_entry->value;
               if (value) {
                 if (value->descriptor->name.length) {
                   // TODO print actual value

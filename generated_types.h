@@ -1417,41 +1417,15 @@ typedef struct Token_Statement_Matcher {
 } Token_Statement_Matcher;
 typedef dyn_array_type(Token_Statement_Matcher) Array_Token_Statement_Matcher;
 
-typedef enum {
-  Scope_Entry_Tag_Value = 0,
-  Scope_Entry_Tag_Operator = 1,
-} Scope_Entry_Tag;
-
-typedef struct Scope_Entry_Value {
-  u64 forced;
-  Value * value;
-} Scope_Entry_Value;
-typedef struct Scope_Entry_Operator {
-  Operator * maybe_prefix;
-  Operator * maybe_infix_or_postfix;
-} Scope_Entry_Operator;
 typedef struct Scope_Entry {
-  Scope_Entry_Tag tag;
-  char _tag_padding[4];
-  Slice name;
+  u64 forced;
   u64 epoch;
+  Value * value;
+  Slice name;
   Source_Range source_range;
-  union {
-    Scope_Entry_Value Value;
-    Scope_Entry_Operator Operator;
-  };
 } Scope_Entry;
-static inline Scope_Entry_Value *
-scope_entry_as_value(Scope_Entry *scope_entry) {
-  assert(scope_entry->tag == Scope_Entry_Tag_Value);
-  return &scope_entry->Value;
-}
-static inline Scope_Entry_Operator *
-scope_entry_as_operator(Scope_Entry *scope_entry) {
-  assert(scope_entry->tag == Scope_Entry_Tag_Operator);
-  return &scope_entry->Operator;
-}
 typedef dyn_array_type(Scope_Entry) Array_Scope_Entry;
+
 hash_map_slice_template(Operator_Map, Operator *)
 typedef struct Scope {
   const Allocator * allocator;
@@ -2348,7 +2322,6 @@ static Descriptor descriptor_token_statement_matcher_pointer_pointer;
 static Descriptor descriptor_scope_entry;
 static Descriptor descriptor_array_scope_entry;
 static Descriptor descriptor_array_scope_entry_ptr;
-static Descriptor descriptor_array_const_scope_entry_ptr;
 static Descriptor descriptor_scope_entry_pointer;
 static Descriptor descriptor_scope_entry_pointer_pointer;
 MASS_DEFINE_OPAQUE_C_TYPE(operator_map, Operator_Map);
@@ -4597,68 +4570,16 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_statement_matcher, Token_Statement_Matcher,
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_statement_matcher);
-/*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry_ptr, Array_Scope_Entry_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_entry, Array_Scope_Entry)
-MASS_DEFINE_OPAQUE_C_TYPE(scope_entry_tag, Scope_Entry_Tag)
-static C_Enum_Item scope_entry_tag_items[] = {
-{ .name = slice_literal_fields("Value"), .value = 0 },
-{ .name = slice_literal_fields("Operator"), .value = 1 },
-};
-MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry_value, Scope_Entry_Value,
+MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
       .descriptor = &descriptor_u64,
       .name = slice_literal_fields("forced"),
     },
-    .Base_Relative.offset = offsetof(Scope_Entry_Value, forced),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_value_pointer,
-      .name = slice_literal_fields("value"),
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry_Value, value),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(scope_entry_value);
-MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry_operator, Scope_Entry_Operator,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_operator_pointer,
-      .name = slice_literal_fields("maybe_prefix"),
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry_Operator, maybe_prefix),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_operator_pointer,
-      .name = slice_literal_fields("maybe_infix_or_postfix"),
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry_Operator, maybe_infix_or_postfix),
-  },
-);
-MASS_DEFINE_TYPE_VALUE(scope_entry_operator);
-MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .name = slice_literal_fields("tag"),
-      .descriptor = &descriptor_scope_entry_tag,
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_slice,
-      .name = slice_literal_fields("name"),
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry, name),
+    .Base_Relative.offset = offsetof(Scope_Entry, forced),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4671,30 +4592,29 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(scope_entry, Scope_Entry,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
+      .descriptor = &descriptor_value_pointer,
+      .name = slice_literal_fields("value"),
+    },
+    .Base_Relative.offset = offsetof(Scope_Entry, value),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_slice,
+      .name = slice_literal_fields("name"),
+    },
+    .Base_Relative.offset = offsetof(Scope_Entry, name),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
       .descriptor = &descriptor_source_range,
       .name = slice_literal_fields("source_range"),
     },
     .Base_Relative.offset = offsetof(Scope_Entry, source_range),
   },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .name = slice_literal_fields("Value"),
-      .descriptor = &descriptor_scope_entry_value,
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry, Value),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .name = slice_literal_fields("Operator"),
-      .descriptor = &descriptor_scope_entry_operator,
-    },
-    .Base_Relative.offset = offsetof(Scope_Entry, Operator),
-  },
 );
 MASS_DEFINE_TYPE_VALUE(scope_entry);
-/*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope_ptr, Array_Scope_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_scope, Array_Scope)
 MASS_DEFINE_STRUCT_DESCRIPTOR(scope, Scope,

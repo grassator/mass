@@ -1508,18 +1508,11 @@ main(void) {
     { "void *", "payload" },
   }));
 
-  push_type(add_common_fields(type_union("Scope_Entry", (Struct_Type[]){
-    struct_fields("Value", (Struct_Item[]){
-      { "u64", "forced" },
-      { "Value *", "value" },
-    }),
-    struct_fields("Operator", (Struct_Item[]){
-      { "Operator *", "maybe_prefix" },
-      { "Operator *", "maybe_infix_or_postfix" },
-    }),
-  }), (Struct_Item[]){
-    { "Slice", "name" },
+  push_type(type_struct("Scope_Entry", (Struct_Item[]){
+    { "u64", "forced" },
     { "u64", "epoch" },
+    { "Value *", "value" },
+    { "Slice", "name" },
     { "Source_Range", "source_range" },
   }));
 

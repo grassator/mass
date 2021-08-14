@@ -853,23 +853,22 @@ scope_entry_force_value(
   Execution_Context *context,
   Scope_Entry *entry
 ) {
-  assert(entry->tag == Scope_Entry_Tag_Value);
-  if (entry->Value.forced) {
-    return entry->Value.value;
+  if (entry->forced) {
+    return entry->value;
   }
 
-  if (entry->Value.value->descriptor == &descriptor_lazy_static_value) {
-    entry->Value.value = value_force_lazy_static(entry->Value.value, entry->name);
+  if (entry->value->descriptor == &descriptor_lazy_static_value) {
+    entry->value = value_force_lazy_static(entry->value, entry->name);
   }
 
   // mark the entry as "forced" and avoid extra checks and overload set iteration on each lookup
-  entry->Value.forced = true;
+  entry->forced = true;
 
-  if (!entry->Value.value) return 0;
+  if (!entry->value) return 0;
 
-  if (entry->Value.value->descriptor == &descriptor_overload_set) {
+  if (entry->value->descriptor == &descriptor_overload_set) {
 
-    const Overload_Set *set = storage_static_as_c_type(&entry->Value.value->storage, Overload_Set);
+    const Overload_Set *set = storage_static_as_c_type(&entry->value->storage, Overload_Set);
     for (u64 i = 0; i < dyn_array_length(set->items); ++i) {
       Value **overload_pointer = dyn_array_get(set->items, i);
       Value *overload = *overload_pointer;
@@ -892,7 +891,7 @@ scope_entry_force_value(
     }
   }
 
-  return entry->Value.value;
+  return entry->value;
 }
 
 static inline Value *
@@ -941,17 +940,15 @@ scope_define_value(
   s32 hash = Scope_Map__hash(name);
   Scope_Entry *it = scope_lookup_shallow_hashed(scope, hash, name);
   if (it) {
-    assert(it->tag == Scope_Entry_Tag_Value);
-    if (it->Value.value->descriptor != &descriptor_overload_set) {
-      it->Value.value = value_wrap_in_overload_set(scope, it->Value.value, name, &source_range);
+    if (it->value->descriptor != &descriptor_overload_set) {
+      it->value = value_wrap_in_overload_set(scope, it->value, name, &source_range);
     }
-    Overload_Set *set = storage_static_as_c_type(&it->Value.value->storage, Overload_Set);
+    Overload_Set *set = storage_static_as_c_type(&it->value->storage, Overload_Set);
     dyn_array_push(set->items, value);
   } else {
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
     *allocated = (Scope_Entry) {
-      .tag = Scope_Entry_Tag_Value,
-      .Value.value = value,
+      .value = value,
       .name = name,
       .epoch = epoch,
       .source_range = source_range,
@@ -993,58 +990,6 @@ scope_define_operator(
     *operator_map_pointer = hash_map_make(Operator_Map);
   }
   hash_map_set(*operator_map_pointer, name, operator);
-
-  Scope_Entry *current_scope_entry = scope_lookup_shallow(scope, name);
-  Scope_Entry *ancestor_scope_entry = scope_lookup(scope, name);
-  if (current_scope_entry) {
-    if (current_scope_entry->tag != Scope_Entry_Tag_Operator) {
-      panic("Internal Error: Found an operator-like scope entry that is not an operator");
-    }
-    Scope_Entry_Operator *operator_entry = &current_scope_entry->Operator;
-    if (operator->fixity == Operator_Fixity_Prefix) {
-      if (operator_entry->maybe_prefix) {
-        return mass_error((Mass_Error) {
-          .tag = Mass_Error_Tag_Operator_Prefix_Conflict,
-          .source_range = source_range,
-          .Operator_Prefix_Conflict = {.symbol = name},
-        });
-      } else {
-        operator_entry->maybe_prefix = operator;
-      }
-    } else {
-      if (operator_entry->maybe_infix_or_postfix) {
-        return mass_error((Mass_Error) {
-          .tag = Mass_Error_Tag_Operator_Infix_Suffix_Conflict,
-          .source_range = source_range,
-          .Operator_Infix_Suffix_Conflict = {.symbol = name},
-        });
-      } else {
-        operator_entry->maybe_infix_or_postfix = operator;
-      }
-    }
-  } else {
-    Scope_Entry *new_entry = allocator_allocate(scope->allocator, Scope_Entry);
-    *new_entry = (Scope_Entry){
-      .tag = Scope_Entry_Tag_Operator,
-      .epoch = VALUE_STATIC_EPOCH,
-      .name = name,
-      .source_range = source_range,
-    };
-    // Flatten parent operator entry into current one to avoid the need for overload iteration
-    if (ancestor_scope_entry) {
-      new_entry->Operator = ancestor_scope_entry->Operator;
-    }
-    if (operator->fixity == Operator_Fixity_Prefix) {
-      new_entry->Operator.maybe_prefix = operator;
-    } else {
-      new_entry->Operator.maybe_infix_or_postfix = operator;
-    }
-
-    if (!scope->map) {
-      scope->map = hash_map_make(Scope_Map, scope->allocator);
-    }
-    hash_map_set(scope->map, name, new_entry);
-  }
   return mass_success();
 }
 
@@ -4729,7 +4674,7 @@ mass_handle_apply_operator(
   }
 
   Scope_Entry *apply_entry = scope_lookup(context->scope, slice_literal("apply"));
-  if (!apply_entry || apply_entry->tag != Scope_Entry_Tag_Value) {
+  if (!apply_entry) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = rhs_value->source_range,
