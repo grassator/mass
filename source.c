@@ -184,7 +184,7 @@ token_statement_matcher_in_scopes(
 }
 
 static void
-context_merge_in_scope(
+use_scope(
   Execution_Context *context,
   Scope *scope_to_use
 ) {
@@ -3731,7 +3731,7 @@ token_handle_function_call(
         return 0;
       }
       Scope *argument_scope = storage_static_as_c_type(&scope_arg->storage, Scope);
-      context_merge_in_scope(&capture_context, argument_scope);
+      use_scope(&capture_context, argument_scope);
     } else {
       Array_Value_Ptr error_args = value_view_to_value_array(context->allocator, args_view);
       context_error(context, (Mass_Error) {
@@ -5829,7 +5829,7 @@ token_parse_statement_using(
   }
 
   Scope *using_scope = storage_static_as_c_type(&result->storage, Scope);
-  context_merge_in_scope(context, using_scope);
+  use_scope(context, using_scope);
 
   err:
   return peek_index;
