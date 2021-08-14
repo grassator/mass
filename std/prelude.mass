@@ -78,10 +78,15 @@ operator 15 (x >> y) logical_shift_right(x, y)
 operator 15 (x | y) bitwise_or(x, y)
 operator 15 (x & y) bitwise_and(x, y)
 
-address_of :: macro(type : Type) -> (Type) {
+Pointer_To :: macro(type : Type) -> (Type) {
   PRELUDE_MASS.descriptor_pointer_to(PRELUDE_MASS.allocator, type)
 }
-address_of :: PRELUDE_MASS.address_of
+address_of :: Pointer_To
+
+// It is technically not necessary to specify the return type here,
+// but it is nice as an extra stress to the compiler.
+// FIXME Using `address_of` instead of `Pointer_To` results in an infinite loop
+address_of :: @fn(x) -> (Pointer_To(type_of(x))) PRELUDE_MASS.address_of
 
 arithmetic_overloads :: {
   macro(impl : fn(ctx : &PRELUDE_MASS.Execution_Context, view : PRELUDE_MASS.Value_View ) -> (&PRELUDE_MASS.Value)) {

@@ -3622,7 +3622,6 @@ ensure_parameter_descriptors(
   temp_context.scope = scope_make(temp_context.temp_allocator, temp_context.scope);
 
   DYN_ARRAY_FOREACH(Function_Parameter, param, info->parameters) {
-    assert(param->tag != Function_Parameter_Tag_Generic);
     if (!param->declaration.descriptor) {
       assert(param->maybe_type_expression.length);
       param->declaration.descriptor =
@@ -5613,6 +5612,7 @@ token_parse_function_literal(
     if (is_macro) flags |= Function_Literal_Flags_Macro;
     if (!(flags & Function_Literal_Flags_Generic)) {
       ensure_parameter_descriptors(context, fn_info);
+      MASS_ON_ERROR(*context->result) return 0;
     }
     Function_Literal *literal = allocator_allocate(context->allocator, Function_Literal);
     *literal = (Function_Literal){
@@ -5624,6 +5624,8 @@ token_parse_function_literal(
     return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
   } else {
     ensure_parameter_descriptors(context, fn_info);
+    MASS_ON_ERROR(*context->result) return 0;
+
     const Calling_Convention *calling_convention =
       context->compilation->runtime_program->default_calling_convention;
     Descriptor *fn_descriptor = descriptor_function_instance(

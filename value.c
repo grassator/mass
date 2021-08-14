@@ -1619,7 +1619,7 @@ function_literal_info_for_args(
     // searching for a match becomes faster. Do not know what is better.
     dyn_array_push(cache_descriptors, actual_descriptor);
     if(param->tag == Function_Parameter_Tag_Generic) {
-      specialized_param->tag = Function_Parameter_Tag_Runtime;
+      //specialized_param->tag = Function_Parameter_Tag_Runtime;
       specialized_param->declaration.descriptor = actual_descriptor;
     }
   }
