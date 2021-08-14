@@ -3656,6 +3656,20 @@ ensure_parameter_descriptors(
   context_temp_reset_to_mark(&temp_context, temp_mark);
 }
 
+static bool
+match_overload_argument_count(
+  const Function_Info *descriptor,
+  u64 actual_count
+) {
+  if (actual_count > dyn_array_length(descriptor->parameters)) return false;
+  for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
+    Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
+    if (arg_index < actual_count) continue;
+    if (!param->maybe_default_expression.length) return false;
+  }
+  return true;
+}
+
 static void
 mass_match_overload_candidate(
   Value *candidate,
@@ -3673,11 +3687,11 @@ mass_match_overload_candidate(
     const Function_Info *overload_info = 0;
     s64 score;
 
-    // This case is an optimization for generic functions as it avoids creation of
-    // a specialized Function_Info that would be discarded just based on argument count.
+    // If the literal wouldn't match based on the number of arguments
+    // then there is no point to try to specialize it
     if (
       value_is_function_literal(candidate) &&
-      args.length > dyn_array_length(value_as_function_literal(candidate)->info->parameters)
+      !match_overload_argument_count(value_as_function_literal(candidate)->info, args.length)
     ) {
       score = -1;
     } else {

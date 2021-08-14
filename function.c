@@ -863,6 +863,7 @@ calculate_arguments_match_score(
   };
   assert(args_view.length < 1000);
   s64 score = 0;
+  if (args_view.length > dyn_array_length(descriptor->parameters)) return -1;
   for (u64 arg_index = 0; arg_index < dyn_array_length(descriptor->parameters); ++arg_index) {
     Function_Parameter *param = dyn_array_get(descriptor->parameters, arg_index);
     Value *source_arg = 0;
