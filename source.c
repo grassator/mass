@@ -4557,46 +4557,20 @@ mass_handle_address_of_lazy_proc(
 }
 
 static Value *
-token_handle_type_of(
+mass_type_of(
   Execution_Context *context,
-  Value *args_token
+  Value_View args
 ) {
-  Value *result = 0;
-
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_Ptr args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->temp_allocator,
-    .capacity = 16,
-  );
-  token_match_call_arguments(context, args_token, &args);
-
-  MASS_ON_ERROR(*context->result) goto defer;
-  if (dyn_array_length(args) != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_No_Matching_Overload,
-      .source_range = args_token->source_range,
-      .No_Matching_Overload = {
-        .target = 0, // TODO provide a proper target here
-        .arguments = args,
-      },
-    });
-    goto defer;
-  }
-  Value *expression = *dyn_array_get(args, 0);
+  assert(args.length == 1);
+  Value *expression = value_view_get(args, 0);
   const Descriptor *descriptor = value_or_lazy_value_descriptor(expression);
 
-  result = value_init(
+  return value_init(
     allocator_allocate(context->allocator, Value),
     &descriptor_descriptor_pointer,
     storage_static_inline(&descriptor),
-    args_token->source_range
+    args.source_range
   );
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-
-  return result;
 }
 
 static Value *
@@ -4651,15 +4625,7 @@ mass_address_of(
   Value_View args
 ) {
   Value *pointer;
-  if (args.length != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args.source_range,
-      .detailed_message = "address_of expects a single argument"
-    });
-    return 0;
-  }
-
+  assert(args.length == 1);
   Value *pointee = value_view_get(args, 0);
   const Descriptor *pointee_descriptor = value_or_lazy_value_descriptor(pointee);
   const Descriptor *descriptor = descriptor_pointer_to(context->allocator, pointee_descriptor);
@@ -4720,8 +4686,6 @@ mass_handle_paren_operator(
     );
   } else if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
-  } else if (slice_equal(target_name, slice_literal("type_of"))) {
-    return token_handle_type_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("size_of"))) {
     return token_handle_size_of(context, args_token);
   } else if (slice_equal(target_name, slice_literal("startup"))) {

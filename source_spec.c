@@ -849,18 +849,6 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should report an error when non-type token is being used as a type") {
-      test_program_inline_source_base(
-        "main", &test_context,
-        "main :: fn() -> () {"
-          "type_of();"
-        "}"
-      );
-      check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_No_Matching_Overload);
-    }
-
     it("should be able to get the size_of an expression") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
