@@ -1324,19 +1324,32 @@ value_ensure_type(
 }
 
 static inline Value_View
-value_view_match_till_end_of_statement(
+value_view_match_till(
   Value_View view,
-  u64 *peek_index
+  u64 *peek_index,
+  const Token_Pattern *end_pattern
 ) {
   u64 start_index = *peek_index;
+  if (!end_pattern) {
+    *peek_index = view.length;
+    return value_view_rest(&view, start_index);
+  }
   for (; *peek_index < view.length; *peek_index += 1) {
     Value *token = value_view_get(view, *peek_index);
-    if (value_match_symbol(token, slice_literal(";"))) {
+    if (value_match(token, end_pattern)) {
       *peek_index += 1;
       return value_view_slice(&view, start_index, *peek_index - 1);
     }
   }
   return value_view_slice(&view, start_index, *peek_index);
+}
+
+static inline Value_View
+value_view_match_till_end_of_statement(
+  Value_View view,
+  u64 *peek_index
+) {
+  return value_view_match_till(view, peek_index, &token_pattern_semicolon);
 }
 
 #define Token_Maybe_Match(_id_, ...)\
@@ -4995,7 +5008,8 @@ static Value *
 token_parse_if_expression(
   Execution_Context *context,
   Value_View view,
-  u64 *matched_length
+  u64 *matched_length,
+  const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5036,7 +5050,7 @@ token_parse_if_expression(
   {
     Value_View else_view = value_view_slice(&view, peek_index, view.length);
     u64 else_length;
-    payload->else_ = token_parse_expression(context, else_view, &else_length, 0);
+    payload->else_ = token_parse_expression(context, else_view, &else_length, end_pattern);
     peek_index += else_length;
   }
 
@@ -5288,7 +5302,8 @@ static Value *
 token_parse_function_literal(
   Execution_Context *context,
   Value_View view,
-  u64 *matched_length
+  u64 *matched_length,
+  const Token_Pattern *end_pattern
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
@@ -5302,6 +5317,15 @@ token_parse_function_literal(
     is_macro = true;
   }
   if (!keyword) return 0;
+
+  if (is_macro && at) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = at->source_range,
+      .detailed_message = "Function-like macro can not be marked compile time"
+    });
+    return 0;
+  }
 
   Token_Maybe_Match(maybe_name, .tag = Token_Pattern_Tag_Symbol);
   Token_Expect_Match(args, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
@@ -5325,43 +5349,24 @@ token_parse_function_literal(
     function_info_from_parameters_and_return_type(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
-  bool body_is_literal = false;
-  Value_View rest = value_view_rest(&view, peek_index);
-
-  Value *body_value = token_parse_intrinsic_literal(context, rest, fn_info);
-  MASS_ON_ERROR(*context->result) return 0;
+  Token_Maybe_Match(body_value, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
   if (!body_value) {
-    if (rest.length == 1) {
-      Value *maybe_body = value_view_get(rest, 0);
-      if (value_is_group(maybe_body) && value_as_group(maybe_body)->tag == Group_Tag_Curly) {
-        body_value = maybe_body;
-        body_is_literal = true;
-      } else {
-        body_value = token_parse_single(context, maybe_body);
-      }
-    } else if (rest.length) {
-      body_value = compile_time_eval(context, rest);
-      MASS_ON_ERROR(*context->result) return 0;
-    }
-  }
-
-  if (is_macro) {
-    if (!body_is_literal) {
+    Value_View rest = value_view_match_till(view, &peek_index, end_pattern);
+    if (is_macro) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = rest.source_range,
         .detailed_message = "Function-like macro must have a literal body in {}"
       });
       return 0;
-    } else if (at) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = at->source_range,
-        .detailed_message = "Function-like macro can not be marked compile time"
-      });
-      return 0;
+    }
+    if (rest.length) {
+      // FIXME should match as a compile time expression right away
+      body_value = token_parse_intrinsic_literal(context, rest, fn_info);
+      if (!body_value) body_value = compile_time_eval(context, rest);
     }
   }
+  MASS_ON_ERROR(*context->result) return 0;
 
   *matched_length = view.length;
 
@@ -5437,7 +5442,8 @@ token_parse_function_literal(
 typedef Value *(*Expression_Matcher_Proc)(
   Execution_Context *context,
   Value_View view,
-  u64 *out_match_length
+  u64 *out_match_length,
+  const Token_Pattern *end_pattern
 );
 
 static PRELUDE_NO_DISCARD Value *
@@ -5483,7 +5489,7 @@ token_parse_expression(
     for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
       Expression_Matcher_Proc matcher = expression_matchers[matcher_index];
       u64 match_length = 0;
-      Value *match_result = matcher(context, rest, &match_length);
+      Value *match_result = matcher(context, rest, &match_length, end_pattern);
       MASS_ON_ERROR(*context->result) goto defer;
       if (match_length) {
         assert(match_result);
