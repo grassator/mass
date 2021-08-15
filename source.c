@@ -311,7 +311,7 @@ token_value_force_immediate_integer(
           .tag = Mass_Error_Tag_Integer_Range,
           .source_range = *source_range,
           .Integer_Range = { .descriptor = target_descriptor },
-          .detailed_message = "Literal value does not fit into the target integer size",
+          .detailed_message = slice_literal("Literal value does not fit into the target integer size"),
         });
         return 0;
       }
@@ -324,7 +324,7 @@ token_value_force_immediate_integer(
           .tag = Mass_Error_Tag_Integer_Range,
           .source_range = *source_range,
           .Integer_Range = { .descriptor = target_descriptor },
-          .detailed_message = "Can not convert a negative literal to an unsigned number",
+          .detailed_message = slice_literal("Can not convert a negative literal to an unsigned number"),
         });
         return 0;
       }
@@ -543,7 +543,7 @@ large_enough_common_integer_descriptor_for_values(
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = left_value->source_range,
           .Type_Mismatch = { .expected = signed_side, .actual = other_side },
-          .detailed_message = "Could not find large enough signed integer to fit both operands"
+          .detailed_message = slice_literal("Could not find large enough signed integer to fit both operands"),
         });
         return 0;
       }
@@ -571,7 +571,7 @@ assign_integers(
       .tag = Mass_Error_Tag_Type_Mismatch,
       .source_range = target->source_range,
       .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-      .detailed_message = "Target integer is too small to fit the range of source values"
+      .detailed_message = slice_literal("Target integer is too small to fit the range of source values"),
     });
     return *context->result;
   }
@@ -737,7 +737,7 @@ assign(
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = source_range,
           .Type_Mismatch = { .expected = target->descriptor, .actual = source->descriptor },
-          .detailed_message = "Trying to assign a non-zero literal number to a pointer",
+          .detailed_message = slice_literal("Trying to assign a non-zero literal number to a pointer"),
         });
         return *context->result;
       }
@@ -748,7 +748,7 @@ assign(
         .tag = Mass_Error_Tag_Type_Mismatch,
         .source_range = source_range,
         .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
-        .detailed_message = "Trying to assign a literal number to a non-integer value",
+        .detailed_message = slice_literal("Trying to assign a literal number to a non-integer value"),
       });
       return *context->result;
     }
@@ -1748,7 +1748,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
-        .detailed_message = "Expected an expression after `::`"
+        .detailed_message = slice_literal("Expected an expression after `::`"),
       });
       goto err;
     }
@@ -1757,7 +1757,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
-        .detailed_message = "Expected an argument name",
+        .detailed_message = slice_literal("Expected an argument name"),
       });
       goto err;
     }
@@ -1784,7 +1784,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
-        .detailed_message = "Expected an expression after `=`"
+        .detailed_message = slice_literal("Expected an expression after `=`"),
       });
       goto err;
     }
@@ -1796,7 +1796,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = equals->source_range,
-        .detailed_message = "Expected an expression after `:=`"
+        .detailed_message = slice_literal("Expected an expression after `:=`"),
       });
       goto err;
     }
@@ -1814,7 +1814,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
-        .detailed_message = "Expected an argument name",
+        .detailed_message = slice_literal("Expected an argument name"),
       });
       goto err;
     }
@@ -1836,7 +1836,7 @@ token_match_argument(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = definition.source_range,
-        .detailed_message = "':' operator expects an identifier on the left hand side",
+        .detailed_message = slice_literal("':' operator expects an identifier on the left hand side"),
       });
       goto err;
     }
@@ -1883,7 +1883,7 @@ token_match_return_type(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = operator->source_range,
-        .detailed_message = "':' operator expects an identifier on the left hand side"
+        .detailed_message = slice_literal("':' operator expects an identifier on the left hand side")
       });
       goto err;
     }
@@ -2190,7 +2190,7 @@ token_parse_exports(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword_token->source_range,
-      .detailed_message = "A module can not have multiple exports statements. Original declaration at:",
+      .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
       .other_source_range = context->module->export.source_range,
     });
     goto err;
@@ -2223,7 +2223,7 @@ token_parse_exports(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = item.source_range,
-          .detailed_message = "Exports {} block must contain a comma-separated identifier list"
+          .detailed_message = slice_literal("Exports {} block must contain a comma-separated identifier list")
         });
         goto err;
       }
@@ -2255,7 +2255,7 @@ token_parse_operator_definition(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword_token->source_range,
-      .detailed_message = "'operator' keyword must be followed by a precedence number"
+      .detailed_message = slice_literal("'operator' keyword must be followed by a precedence number")
     });
     goto err;
   }
@@ -2457,7 +2457,7 @@ token_parse_syntax_definition(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = value->source_range,
-          .detailed_message = "Nested group matches are not supported in syntax declarations"
+          .detailed_message = slice_literal("Nested group matches are not supported in syntax declarations")
         });
         goto err;
       }
@@ -2503,7 +2503,7 @@ token_parse_syntax_definition(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = value->source_range,
-          .detailed_message = "@ requires a valid pattern before it"
+          .detailed_message = slice_literal("@ requires a valid pattern before it")
         });
         goto err;
       }
@@ -2512,7 +2512,7 @@ token_parse_syntax_definition(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = value->source_range,
-        .detailed_message = "Expected a string token"
+        .detailed_message = slice_literal("Expected a string token")
       });
       goto err;
     }
@@ -2572,7 +2572,7 @@ token_process_c_struct_definition(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args->source_range,
-      .detailed_message = "c_struct must be followed by ()"
+      .detailed_message = slice_literal("c_struct must be followed by ()")
     });
     goto err;
   }
@@ -2581,7 +2581,7 @@ token_process_c_struct_definition(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args->source_range,
-      .detailed_message = "c_struct expects one argument"
+      .detailed_message = slice_literal("c_struct expects one argument")
     });
     goto err;
   }
@@ -2590,7 +2590,7 @@ token_process_c_struct_definition(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args->source_range,
-      .detailed_message = "c_struct expects a {} block as the argument"
+      .detailed_message = slice_literal("c_struct expects a {} block as the argument")
     });
     goto err;
   }
@@ -2613,7 +2613,7 @@ token_process_c_struct_definition(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = field_view.source_range,
-          .detailed_message = "Invalid field definition"
+          .detailed_message = slice_literal("Invalid field definition")
         });
         return 0;
       }
@@ -2813,7 +2813,7 @@ token_handle_c_string(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_token->source_range,
-      .detailed_message = "c_string expects a single compile-time known string"
+      .detailed_message = slice_literal("c_string expects a single compile-time known string")
     });
     goto defer;
   }
@@ -2823,7 +2823,7 @@ token_handle_c_string(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_token->source_range,
-      .detailed_message = "c_string expects a single compile-time known string"
+      .detailed_message = slice_literal("c_string expects a single compile-time known string")
     });
     goto defer;
   }
@@ -2955,7 +2955,7 @@ token_handle_cast(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = it.view.source_range,
-      .detailed_message = "cast() expects two arguments"
+      .detailed_message = slice_literal("cast() expects two arguments")
     });
     return 0;
   }
@@ -2967,7 +2967,7 @@ token_handle_cast(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = it.view.source_range,
-      .detailed_message = "cast() expects two arguments"
+      .detailed_message = slice_literal("cast() expects two arguments")
     });
     return 0;
   }
@@ -3052,7 +3052,7 @@ token_parse_constant_definitions(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Unimplemented,
       .source_range = lhs.source_range,
-      .detailed_message = "Multiple assignment are not supported at the moment"
+      .detailed_message = slice_literal("Multiple assignment are not supported at the moment")
     });
     goto err;
   }
@@ -3754,7 +3754,7 @@ token_handle_function_call(
           .tag = Mass_Error_Tag_Type_Mismatch,
           .source_range = scope_arg->source_range,
           .Type_Mismatch = { .expected = &descriptor_scope, .actual = scope_arg->descriptor },
-          .detailed_message = "Macro capture can only accept an optional Scope argument",
+          .detailed_message = slice_literal("Macro capture can only accept an optional Scope argument"),
         });
         return 0;
       }
@@ -3766,7 +3766,7 @@ token_handle_function_call(
         .tag = Mass_Error_Tag_No_Matching_Overload,
         .source_range = source_range,
         .No_Matching_Overload = { .target = target_expression, .arguments = error_args },
-        .detailed_message = "Macro capture can only accept an optional Scope argument"
+        .detailed_message = slice_literal("Macro capture can only accept an optional Scope argument"),
       });
       return 0;
     }
@@ -3892,7 +3892,7 @@ token_handle_parsed_function_call(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Expected_Static,
         .source_range = args_token->source_range,
-        .detailed_message = "Expected a static Value_View",
+        .detailed_message = slice_literal("Expected a static Value_View"),
       });
       goto defer;
     }
@@ -3901,7 +3901,7 @@ token_handle_parsed_function_call(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args_token->source_range,
-      .detailed_message = "Expected a list of arguments in ()",
+      .detailed_message = slice_literal("Expected a list of arguments in ()"),
     });
     goto defer;
   }
@@ -4488,7 +4488,7 @@ mass_handle_startup_call_lazy_proc(
   context_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = args_token->source_range,
-    .detailed_message = "`startup` expects a () -> () {...} function as an argument"
+    .detailed_message = slice_literal("`startup` expects a () -> () {...} function as an argument"),
   });
   return 0;
 }
@@ -4582,7 +4582,7 @@ mass_compile_time_error(
   context_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
     .source_range = args.source_range,
-    .detailed_message = "compile_time_error() expects a two string arguments"
+    .detailed_message = slice_literal("compile_time_error() expects a two string arguments"),
   });
   return 0;
 }
@@ -4641,7 +4641,7 @@ mass_handle_apply_operator(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = rhs_value->source_range,
-      .detailed_message = "Expected an operator"
+      .detailed_message = slice_literal("Expected an operator"),
     });
     return 0;
   }
@@ -4717,7 +4717,7 @@ mass_handle_at_operator(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = body_range,
-      .detailed_message = "@ operator must be followed by an expression in () or {}"
+      .detailed_message = slice_literal("@ operator must be followed by an expression in () or {}"),
     });
     return 0;
   }
@@ -4915,7 +4915,7 @@ mass_handle_dot_operator(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
         .source_range = rhs_range,
-        .detailed_message = "Right hand side of the . operator on structs must be an identifier"
+        .detailed_message = slice_literal("Right hand side of the . operator on structs must be an identifier"),
       });
       return 0;
     }
@@ -5000,7 +5000,7 @@ mass_handle_dot_operator(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = lhs_range,
-      .detailed_message = "Left hand side of the . operator must be a struct or an array"
+      .detailed_message = slice_literal("Left hand side of the . operator must be a struct or an array"),
     });
     return 0;
   }
@@ -5022,7 +5022,7 @@ token_dispatch_operator(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = stack_entry->source_range,
-      .detailed_message = "Not enough arguments for operator",
+      .detailed_message = slice_literal("Not enough arguments for operator"),
     });
     return;
   }
@@ -5367,7 +5367,7 @@ function_info_from_parameters_and_return_type(
     if (return_types_group->tag != Group_Tag_Paren) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
-        .detailed_message = "Return type can only be a type name or a parenthesized list",
+        .detailed_message = slice_literal("Return type can only be a type name or a parenthesized list"),
         .source_range = return_types->source_range,
       });
       return 0;
@@ -5382,7 +5382,7 @@ function_info_from_parameters_and_return_type(
         if (i > 0) {
           context_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Unimplemented,
-            .detailed_message = "Multiple return types are not supported at the moment",
+            .detailed_message = slice_literal("Multiple return types are not supported at the moment"),
             .source_range = return_types->source_range,
           });
           return 0;
@@ -5428,7 +5428,7 @@ token_parse_function_literal(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = at->source_range,
-      .detailed_message = "Function-like macro can not be marked compile time"
+      .detailed_message = slice_literal("Function-like macro can not be marked compile time"),
     });
     return 0;
   }
@@ -5462,7 +5462,7 @@ token_parse_function_literal(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = rest.source_range,
-        .detailed_message = "Function-like macro must have a literal body in {}"
+        .detailed_message = slice_literal("Function-like macro must have a literal body in {}"),
       });
       return 0;
     }
@@ -5503,7 +5503,7 @@ token_parse_function_literal(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = body_value->source_range,
-        .detailed_message = "A function literal with the intrinsic body must be marked compile time"
+        .detailed_message = slice_literal("A function literal with the intrinsic body must be marked compile time"),
       });
       return 0;
     }
@@ -5899,7 +5899,7 @@ mass_handle_label_lazy_proc(
       .tag = Mass_Error_Tag_Redifinition,
       .source_range = source_range,
       .Redifinition = { .name = source, .previous_source_range = label_value->source_range },
-      .detailed_message = "Trying to redefine a non-label variable as a label",
+      .detailed_message = slice_literal("Trying to redefine a non-label variable as a label"),
     });
     return 0;
   }
@@ -6005,7 +6005,7 @@ token_parse_explicit_return(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = parse_result->source_range,
-      .detailed_message = "Explicit return from a non-void function requires a value"
+      .detailed_message = slice_literal("Explicit return from a non-void function requires a value"),
     });
     return 0;
   }
@@ -6036,7 +6036,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = args_token->source_range,
-        .detailed_message = "Expected a maximum of 15 bytes"
+        .detailed_message = slice_literal("Expected a maximum of 15 bytes"),
       });
       return 0;
     }
@@ -6052,7 +6052,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
           .source_range = args_token->source_range,
-          .detailed_message = "inline_machine_code_bytes supports no more than 2 labels"
+          .detailed_message = slice_literal("inline_machine_code_bytes supports no more than 2 labels"),
         });
         return 0;
       }
@@ -6115,7 +6115,7 @@ token_parse_inline_machine_code_bytes(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = id_token->source_range,
-      .detailed_message = "Expected and argument list in parens"
+      .detailed_message = slice_literal("Expected and argument list in parens"),
     });
     goto err;
   }
@@ -6125,7 +6125,7 @@ token_parse_inline_machine_code_bytes(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = rest.source_range,
-      .detailed_message = "Expected the end of the statement"
+      .detailed_message = slice_literal("Expected the end of the statement"),
     });
     goto err;
   }
@@ -6736,7 +6736,7 @@ program_module_from_file(
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_File_Open,
       .source_range = COMPILER_SOURCE_RANGE,
-      .detailed_message = "Unable to open the file",
+      .detailed_message = slice_literal("Unable to open the file"),
       .File_Open = {.path = file_path},
     });
     return 0;
