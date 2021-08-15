@@ -4863,6 +4863,28 @@ mass_handle_array_access_lazy_proc(
 }
 
 static Value *
+mass_make_lazy_struct_field_access(
+  Execution_Context *context,
+  Value *struct_,
+  Memory_Layout_Item *field
+) {
+  Mass_Field_Access_Lazy_Payload *lazy_payload =
+    allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
+  *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
+    .struct_ = struct_,
+    .field = field,
+  };
+
+  return mass_make_lazy_value(
+    context,
+    struct_->source_range,
+    lazy_payload,
+    field->declaration.descriptor,
+    mass_handle_field_access_lazy_proc
+  );
+}
+
+static Value *
 mass_handle_dot_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -4898,18 +4920,7 @@ mass_handle_dot_operator(
       }
       Memory_Layout_Item *field =
         dyn_array_get(unwrapped_descriptor->Struct.memory_layout.items, index);
-
-      // FIXME @CopyPaste from below
-      Mass_Field_Access_Lazy_Payload *lazy_payload =
-        allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
-      *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
-        .struct_ = lhs,
-        .field = field,
-      };
-
-      return mass_make_lazy_value(
-        context, lhs_range, lazy_payload, field->declaration.descriptor, mass_handle_field_access_lazy_proc
-      );
+      return mass_make_lazy_struct_field_access(context, lhs, field);
     }
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
@@ -4936,10 +4947,7 @@ mass_handle_dot_operator(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
-          .Unknown_Field = {
-            .name = field_name,
-            .type = lhs_forced_descriptor,
-          },
+          .Unknown_Field = { .name = field_name, .type = lhs_forced_descriptor },
         });
         return 0;
       }
@@ -4950,24 +4958,12 @@ mass_handle_dot_operator(
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
-          .Unknown_Field = {
-            .name = field_name,
-            .type = unwrapped_descriptor,
+          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor,
           },
         });
         return 0;
       }
-
-      Mass_Field_Access_Lazy_Payload *lazy_payload =
-        allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
-      *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
-        .struct_ = lhs,
-        .field = field,
-      };
-
-      return mass_make_lazy_value(
-        context, lhs_range, lazy_payload, field->declaration.descriptor, mass_handle_field_access_lazy_proc
-      );
+      return mass_make_lazy_struct_field_access(context, lhs, field);
     }
   } else if (
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
