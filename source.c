@@ -1026,7 +1026,6 @@ token_make_symbol(
     }
   }
   if (!symbol) {
-    // FIXME for some reason using non-default allocator here makes Linux unhappy
     Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
     *heap_symbol = (Symbol){
       .type = type,
@@ -1459,7 +1458,6 @@ token_parse_tuple(
 
   Value *result_value = 0;
 
-  // TODO use temp allocator
   Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
   for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
     MASS_ON_ERROR(*context->result) goto err;
