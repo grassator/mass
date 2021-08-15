@@ -1848,6 +1848,31 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to parse tuples and access their elements") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s64) {"
+          "p := [20, 22]\n"
+          "p.0 + p.1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should be able to parse struct definitions") {
+      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "test :: fn() -> (s32) {"
+          "p : Point = [20, 22]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when field name is not an identifier") {
       test_program_inline_source_base(
         "main", &test_context,

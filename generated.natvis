@@ -1796,6 +1796,33 @@
     </ArrayItems>
   </Expand>
 </Type>
+<Type Name="Array_Tuple">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Tuple_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
+<Type Name="Array_Const_Tuple_Ptr">
+  <Expand>
+    <Item Name="[length]">data->length</Item>
+    <ArrayItems>
+      <Size>data->length</Size>
+      <ValuePointer>data->items</ValuePointer>
+    </ArrayItems>
+  </Expand>
+</Type>
 <Type Name="Array_Descriptor">
   <Expand>
     <Item Name="[length]">data->length</Item>

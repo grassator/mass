@@ -615,6 +615,33 @@ assign_integers(
 }
 
 static PRELUDE_NO_DISCARD Mass_Result
+assign_tuple(
+  Execution_Context *context,
+  Function_Builder *builder,
+  Value *target,
+  Value *source
+) {
+  assert(source->descriptor == &descriptor_tuple);
+  const Tuple *tuple = storage_static_as_c_type(&source->storage, Tuple);
+  assert(target->descriptor->tag == Descriptor_Tag_Struct); // FIXME user error
+  const Memory_Layout *layout = &target->descriptor->Struct.memory_layout;
+  assert(dyn_array_length(layout->items) == dyn_array_length(tuple->items)); // FIXME user error
+
+  u64 index = 0;
+  DYN_ARRAY_FOREACH(Memory_Layout_Item, field, layout->items) {
+    Value *tuple_item = *dyn_array_get(tuple->items, index);
+    Value target_field = {
+      .descriptor = field->declaration.descriptor,
+      .storage = memory_layout_item_storage_at_index(&target->storage, layout, index),
+      .source_range = target->source_range,
+    };
+    assign(context, builder, &target_field, tuple_item);
+    index += 1;
+  }
+  return *context->result;
+}
+
+static PRELUDE_NO_DISCARD Mass_Result
 assign(
   Execution_Context *context,
   Function_Builder *builder,
@@ -632,6 +659,11 @@ assign(
 
   if (source->descriptor == &descriptor_lazy_value) {
     value_force_exact(context, builder, target, source);
+    return *context->result;
+  }
+
+  if (source->descriptor == &descriptor_tuple) {
+    assign_tuple(context, builder, target, source);
     return *context->result;
   }
 
@@ -1399,6 +1431,32 @@ token_match_type(
 );
 
 static Value *
+token_parse_tuple(
+  Execution_Context *context,
+  Value_View view
+) {
+  Value_View remaining = view;
+  u64 match_length = 0;
+
+  Value *result_value = 0;
+
+  // TODO use temp allocator
+  Array_Value_Ptr items = dyn_array_make(Array_Value_Ptr, .allocator = context->allocator);
+  for (; remaining.length; remaining = value_view_rest(&remaining, match_length)) {
+    MASS_ON_ERROR(*context->result) goto err;
+    Value *item = token_parse_expression(context, remaining, &match_length, &token_pattern_comma_operator);
+    dyn_array_push(items, item);
+  }
+  Tuple *tuple = allocator_allocate(context->allocator, Tuple);
+  *tuple = (Tuple){
+    .items = items,
+  };
+  result_value = value_make(context, &descriptor_tuple, storage_static(tuple), view.source_range);
+  err:
+  return result_value;
+}
+
+static Value *
 token_parse_single(
   Execution_Context *context,
   Value *value
@@ -1413,8 +1471,7 @@ token_parse_single(
         return token_parse_block(context, value);
       }
       case Group_Tag_Square: {
-        panic("TODO support tuples / struct literals");
-        break;
+        return token_parse_tuple(context, group->children);
       }
     }
   } else if(value_is_symbol(value)) {
@@ -4806,6 +4863,35 @@ mass_handle_dot_operator(
     unwrapped_descriptor->tag == Descriptor_Tag_Struct ||
     lhs_forced_descriptor == &descriptor_scope
   ) {
+    if (value_is_number_literal(rhs)) {
+      assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct); // FIXME user error
+      u64 index = value_as_number_literal(rhs)->bits; // TODO make a nicer wrapper
+      if (index >= dyn_array_length(unwrapped_descriptor->Struct.memory_layout.items)) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unknown_Field,
+          .source_range = rhs_range,
+          .Unknown_Field = {
+            .name = source_from_source_range(&rhs_range),
+            .type = unwrapped_descriptor,
+          },
+        });
+        return 0;
+      }
+      Memory_Layout_Item *field =
+        dyn_array_get(unwrapped_descriptor->Struct.memory_layout.items, index);
+
+      // FIXME @CopyPaste from below
+      Mass_Field_Access_Lazy_Payload *lazy_payload =
+        allocator_allocate(context->allocator, Mass_Field_Access_Lazy_Payload);
+      *lazy_payload = (Mass_Field_Access_Lazy_Payload) {
+        .struct_ = lhs,
+        .field = field,
+      };
+
+      return mass_make_lazy_value(
+        context, lhs_range, lazy_payload, field->declaration.descriptor, mass_handle_field_access_lazy_proc
+      );
+    }
     if (!value_is_symbol(rhs)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Invalid_Identifier,
@@ -4816,6 +4902,7 @@ mass_handle_dot_operator(
     }
     const Symbol *field_symbol = value_as_symbol(rhs);
     Slice field_name = field_symbol->name;
+
     if (lhs_forced_descriptor == &descriptor_scope) {
       if (!value_is_non_lazy_static(lhs)) {
         context_error(context, (Mass_Error) {
@@ -6188,6 +6275,69 @@ token_define_local_variable(
   if (descriptor == &descriptor_number_literal) {
     // x := 42 should always be initialized to s64 to avoid weird suprises
     variable_descriptor = &descriptor_s64;
+  } else if (descriptor == &descriptor_tuple) {
+    const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
+
+    u64 struct_bit_size = 0;
+    u64 struct_bit_alignment = 0;
+    Array_Memory_Layout_Item fields = dyn_array_make(
+      Array_Memory_Layout_Item,
+      .allocator = context->allocator,
+      .capacity = dyn_array_length(tuple->items),
+    );
+    for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
+      Value *item = *dyn_array_get(tuple->items, i);
+
+      char buffer[32];
+      // TODO check return type
+      int buffer_length = snprintf(buffer, countof(buffer), "%"PRIu64, i);
+      char *copy = allocator_allocate_bytes(context->allocator, buffer_length, _Alignof(char));
+      memcpy(copy, buffer, buffer_length);
+
+      Slice field_name = {.bytes = copy, .length = s32_to_u64(buffer_length)};
+      const Descriptor *field_descriptor = item->descriptor;
+      if (field_descriptor == &descriptor_number_literal) {
+        field_descriptor = &descriptor_s64;
+      }
+
+      u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
+      struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
+      u64 field_bit_offset = struct_bit_size;
+      struct_bit_size += descriptor_bit_size(field_descriptor);
+      struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
+
+      u64 field_byte_offset = u64_align(field_bit_offset, CHAR_BIT) / CHAR_BIT;
+      if (field_byte_offset * CHAR_BIT != field_bit_offset) {
+        panic("TODO support non-byte aligned sizes");
+      }
+
+      dyn_array_push(fields, (Memory_Layout_Item) {
+        .tag = Memory_Layout_Item_Tag_Base_Relative,
+        .declaration = {
+          // TODO provide source_range
+          .name = field_name,
+          .descriptor = field_descriptor,
+        },
+        .Base_Relative.offset = field_byte_offset,
+      });
+    }
+
+    struct_bit_size = u64_align(struct_bit_size, struct_bit_alignment);
+
+    Descriptor *tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
+    *tuple_descriptor = (Descriptor) {
+      .tag = Descriptor_Tag_Struct,
+      .bit_size = struct_bit_size,
+      .bit_alignment = struct_bit_alignment,
+      .Struct = {
+        .is_tuple = true,
+        .memory_layout = {
+          .items = fields,
+        }
+      },
+    };
+
+    variable_descriptor = tuple_descriptor;
   } else {
     variable_descriptor = descriptor;
   }

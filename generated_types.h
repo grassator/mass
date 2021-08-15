@@ -585,6 +585,10 @@ typedef struct Function_Call_Setup Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup *) Array_Function_Call_Setup_Ptr;
 typedef dyn_array_type(const Function_Call_Setup *) Array_Const_Function_Call_Setup_Ptr;
 
+typedef struct Tuple Tuple;
+typedef dyn_array_type(Tuple *) Array_Tuple_Ptr;
+typedef dyn_array_type(const Tuple *) Array_Const_Tuple_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -1686,6 +1690,11 @@ typedef struct Function_Call_Setup {
 } Function_Call_Setup;
 typedef dyn_array_type(Function_Call_Setup) Array_Function_Call_Setup;
 
+typedef struct Tuple {
+  Array_Value_Ptr items;
+} Tuple;
+typedef dyn_array_type(Tuple) Array_Tuple;
+
 typedef enum {
   Descriptor_Tag_Opaque = 0,
   Descriptor_Tag_Function_Instance = 1,
@@ -1704,6 +1713,7 @@ typedef struct Descriptor_Fixed_Size_Array {
   u64 length;
 } Descriptor_Fixed_Size_Array;
 typedef struct Descriptor_Struct {
+  u64 is_tuple;
   Memory_Layout memory_layout;
 } Descriptor_Struct;
 typedef struct Descriptor_Pointer_To {
@@ -2460,6 +2470,11 @@ static Descriptor descriptor_array_function_call_setup;
 static Descriptor descriptor_array_function_call_setup_ptr;
 static Descriptor descriptor_function_call_setup_pointer;
 static Descriptor descriptor_function_call_setup_pointer_pointer;
+static Descriptor descriptor_tuple;
+static Descriptor descriptor_array_tuple;
+static Descriptor descriptor_array_tuple_ptr;
+static Descriptor descriptor_tuple_pointer;
+static Descriptor descriptor_tuple_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -5499,6 +5514,19 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_call_setup, Function_Call_Setup,
   },
 );
 MASS_DEFINE_TYPE_VALUE(function_call_setup);
+MASS_DEFINE_OPAQUE_C_TYPE(array_tuple_ptr, Array_Tuple_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_tuple, Array_Tuple)
+MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_array_value_ptr,
+      .name = slice_literal_fields("items"),
+    },
+    .Base_Relative.offset = offsetof(Tuple, items),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(tuple);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)
@@ -5550,6 +5578,14 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_fixed_size_array, Descriptor_Fixed_Size
 );
 MASS_DEFINE_TYPE_VALUE(descriptor_fixed_size_array);
 MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor_struct, Descriptor_Struct,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u64,
+      .name = slice_literal_fields("is_tuple"),
+    },
+    .Base_Relative.offset = offsetof(Descriptor_Struct, is_tuple),
+  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {

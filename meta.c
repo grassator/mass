@@ -1718,6 +1718,10 @@ main(void) {
     { "Value *", "callee_return_value" },
   }));
 
+  push_type(type_struct("Tuple", (Struct_Item[]){
+    { "Array_Value_Ptr", "items"},
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
@@ -1729,6 +1733,7 @@ main(void) {
       { "u64", "length" },
     }),
     struct_fields("Struct", (Struct_Item[]){
+      { "u64", "is_tuple" },
       { "Memory_Layout", "memory_layout" },
     }),
     struct_fields("Pointer_To", (Struct_Item[]){
