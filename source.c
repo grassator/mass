@@ -6306,8 +6306,8 @@ token_define_local_variable(
       Value *item = *dyn_array_get(tuple->items, i);
 
       char buffer[32];
-      // TODO check return type
       int buffer_length = snprintf(buffer, countof(buffer), "%"PRIu64, i);
+      assert(buffer_length > 0);
       char *copy = allocator_allocate_bytes(context->allocator, buffer_length, _Alignof(char));
       memcpy(copy, buffer, buffer_length);
 
@@ -6331,9 +6331,9 @@ token_define_local_variable(
       dyn_array_push(fields, (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
         .declaration = {
-          // TODO provide source_range
           .name = field_name,
           .descriptor = field_descriptor,
+          .source_range = item->source_range,
         },
         .Base_Relative.offset = field_byte_offset,
       });
