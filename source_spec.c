@@ -1873,6 +1873,47 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should report an error when tuple is assigned to something that is not a struct") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "test :: fn() -> (s32) {"
+          "p : s32 = [20]\n"
+          "p"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+    }
+
+    it("should report an error when tuple does not have enough fields for a struct") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "test :: fn() -> (s32) {"
+          "p : Point = [20]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+    }
+
+    it("should report an error when tuple has too many fields for a struct") {
+      test_program_inline_source_base(
+        "test", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "test :: fn() -> (s32) {"
+          "p : Point = [20, 1, 1]\n"
+          "p.x + p.y"
+        "}"
+      );
+      check(test_context.result->tag == Mass_Result_Tag_Error);
+      Mass_Error *error = &test_context.result->Error.error;
+      check(error->tag == Mass_Error_Tag_Type_Mismatch);
+    }
+
     it("should report an error when field name is not an identifier") {
       test_program_inline_source_base(
         "main", &test_context,

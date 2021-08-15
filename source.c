@@ -623,9 +623,28 @@ assign_tuple(
 ) {
   assert(source->descriptor == &descriptor_tuple);
   const Tuple *tuple = storage_static_as_c_type(&source->storage, Tuple);
-  assert(target->descriptor->tag == Descriptor_Tag_Struct); // FIXME user error
+  if (target->descriptor->tag != Descriptor_Tag_Struct) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = target->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
+      .detailed_message = slice_literal("Trying to assign a tuple to something that is not a struct"),
+    });
+    return *context->result;
+  }
   const Memory_Layout *layout = &target->descriptor->Struct.memory_layout;
-  assert(dyn_array_length(layout->items) == dyn_array_length(tuple->items)); // FIXME user error
+  if ((dyn_array_length(layout->items) != dyn_array_length(tuple->items))) {
+    Slice message = dyn_array_length(layout->items) > dyn_array_length(tuple->items)
+      ? slice_literal("Tuple does not have enough fields to match the struct it is assigned to")
+      : slice_literal("Tuple has too many fields for the struct it is assigned to");
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Type_Mismatch,
+      .source_range = source->source_range,
+      .Type_Mismatch = { .expected = &descriptor_s64, .actual = source->descriptor },
+      .detailed_message = message,
+    });
+    return *context->result;
+  }
 
   u64 index = 0;
   DYN_ARRAY_FOREACH(Memory_Layout_Item, field, layout->items) {
