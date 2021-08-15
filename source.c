@@ -4905,8 +4905,10 @@ mass_handle_dot_operator(
     lhs_forced_descriptor == &descriptor_scope
   ) {
     if (value_is_number_literal(rhs)) {
+      Value *index_value = token_value_force_immediate_integer(context, rhs, &descriptor_u64);
+      MASS_ON_ERROR(*context->result) return 0;
+      u64 index = *storage_static_as_c_type(&index_value->storage, u64);
       assert(unwrapped_descriptor->tag == Descriptor_Tag_Struct); // FIXME user error
-      u64 index = value_as_number_literal(rhs)->bits; // TODO make a nicer wrapper
       if (index >= dyn_array_length(unwrapped_descriptor->Struct.memory_layout.items)) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
