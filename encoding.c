@@ -338,12 +338,6 @@ encoding_match(
         encoding = 0;
         break;
       }
-      if (
-        storage->tag == Storage_Tag_Eflags &&
-        operand_encoding->type == Operand_Encoding_Type_Eflags
-      ) {
-        continue;
-      }
 
       if (
         storage->tag == Storage_Tag_None &&

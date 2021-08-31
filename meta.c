@@ -1927,7 +1927,6 @@ main(void) {
 
   push_type(type_enum("Operand_Encoding_Type", (Enum_Type_Item[]){
     { "None", 0},
-    { "Eflags", 1},
     { "Register", 2},
     { "Register_A", 3},
     { "Register_Memory", 4},

@@ -660,7 +660,6 @@ typedef dyn_array_type(const Instruction_Extension_Type *) Array_Const_Instructi
 
 typedef enum Operand_Encoding_Type {
   Operand_Encoding_Type_None = 0,
-  Operand_Encoding_Type_Eflags = 1,
   Operand_Encoding_Type_Register = 2,
   Operand_Encoding_Type_Register_A = 3,
   Operand_Encoding_Type_Register_Memory = 4,
@@ -671,7 +670,6 @@ typedef enum Operand_Encoding_Type {
 
 const char *operand_encoding_type_name(Operand_Encoding_Type value) {
   if (value == 0) return "Operand_Encoding_Type_None";
-  if (value == 1) return "Operand_Encoding_Type_Eflags";
   if (value == 2) return "Operand_Encoding_Type_Register";
   if (value == 3) return "Operand_Encoding_Type_Register_A";
   if (value == 4) return "Operand_Encoding_Type_Register_Memory";
@@ -6451,7 +6449,6 @@ static C_Enum_Item instruction_extension_type_items[] = {
 MASS_DEFINE_OPAQUE_C_TYPE(operand_encoding_type, Operand_Encoding_Type)
 static C_Enum_Item operand_encoding_type_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Eflags"), .value = 1 },
 { .name = slice_literal_fields("Register"), .value = 2 },
 { .name = slice_literal_fields("Register_A"), .value = 3 },
 { .name = slice_literal_fields("Register_Memory"), .value = 4 },

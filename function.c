@@ -164,63 +164,63 @@ move_value(
     switch(source->Eflags.compare_type) {
       case Compare_Type_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){sete, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){sete, {temp}}
         );
         break;
       }
       case Compare_Type_Not_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setne, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setne, {temp}}
         );
         break;
       }
 
       case Compare_Type_Unsigned_Below: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setb, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setb, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Below_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setbe, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setbe, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){seta, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){seta, {temp}}
         );
         break;
       }
       case Compare_Type_Unsigned_Above_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setae, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setae, {temp}}
         );
         break;
       }
 
       case Compare_Type_Signed_Less: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setl, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setl, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Less_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setle, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setle, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Greater: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setg, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setg, {temp}}
         );
         break;
       }
       case Compare_Type_Signed_Greater_Equal: {
         push_eagerly_encoded_assembly(
-          &builder->code_block, *source_range, &(Instruction_Assembly){setge, {temp, *source}}
+          &builder->code_block, *source_range, &(Instruction_Assembly){setge, {temp}}
         );
         break;
       }
@@ -520,7 +520,7 @@ make_if(
       }
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){mnemonic, {code_label32(label), value->storage}}
+        &(Instruction_Assembly){mnemonic, {code_label32(label)}}
       );
     } else {
       if (value->storage.tag == Storage_Tag_Register) {
@@ -551,10 +551,9 @@ make_if(
           assert(!"Unsupported value inside `if`");
         }
       }
-      Value *eflags = value_from_compare(context, Compare_Type_Equal, *source_range);
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range,
-        &(Instruction_Assembly){jz, {code_label32(label), eflags->storage}}
+        &(Instruction_Assembly){jz, {code_label32(label)}}
       );
     }
   }

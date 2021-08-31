@@ -7,9 +7,6 @@
   .extension_type = Instruction_Extension_Type_Op_Code,\
   .op_code_extension = (_extension_ & 0b111),
 
-
-#define eflags  { Operand_Encoding_Type_Eflags, 8 }
-
 #define r_al  { Operand_Encoding_Type_Register_A, 8 }
 #define r_ax  { Operand_Encoding_Type_Register_A, 16 }
 #define r_eax { Operand_Encoding_Type_Register_A, 32 }
@@ -107,7 +104,6 @@ mnemonic(movsd,
   encoding(0xF20F11, _r, m64, xmm64),
 );
 
-// TODO figure out how to better deal with implicit parameters here
 mnemonic(rep_movsb,
   encoding(0xF3A4, none, 0),
 );
@@ -396,15 +392,15 @@ mnemonic(jmp,
 
 #define jcc(_value_, _suffix_)\
   mnemonic(j##_suffix_,\
-    encoding(0x70 + (_value_), none, imm8, eflags),\
-    encoding(0x0F80 + (_value_), none, imm32, eflags),\
+    encoding(0x70 + (_value_), none, imm8),\
+    encoding(0x0F80 + (_value_), none, imm32),\
   );
 ENUMERATE_CC(jcc)
 #undef jcc
 
 #define setcc(_value_, _suffix_)\
   mnemonic(set##_suffix_,\
-    encoding(0x0F90 + (_value_), none, r_m8, eflags),\
+    encoding(0x0F90 + (_value_), none, r_m8),\
   );
 ENUMERATE_CC(setcc)
 #undef setcc
