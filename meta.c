@@ -1932,7 +1932,6 @@ main(void) {
     { "Register_A", 3},
     { "Register_Memory", 4},
     { "Xmm", 5},
-    { "Xmm_Memory", 6},
     { "Memory", 7},
     { "Immediate", 8},
   }));

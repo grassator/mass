@@ -37,9 +37,7 @@
 #define imm64 { Operand_Encoding_Type_Immediate, Operand_Size_64 }
 
 #define xmm32 { Operand_Encoding_Type_Xmm, Operand_Size_32 }
-#define xmm_m32 { Operand_Encoding_Type_Xmm_Memory, Operand_Size_32 }
 #define xmm64 { Operand_Encoding_Type_Xmm, Operand_Size_64 }
-#define xmm_m64 { Operand_Encoding_Type_Xmm_Memory, Operand_Size_64 }
 
 #define encoding_operands(...) __VA_ARGS__
 
@@ -101,13 +99,13 @@ mnemonic(movzx,
 );
 
 mnemonic(movss,
-  encoding(0xF30F10, _r, xmm32, xmm_m32),
-  encoding(0xF30F11, _r, xmm_m32, xmm32),
+  encoding(0xF30F10, _r, xmm32, m32),
+  encoding(0xF30F11, _r, m32, xmm32),
 );
 
 mnemonic(movsd,
-  encoding(0xF20F10, _r, xmm64, xmm_m64),
-  encoding(0xF20F11, _r, xmm_m64, xmm64),
+  encoding(0xF20F10, _r, xmm64, m64),
+  encoding(0xF20F11, _r, m64, xmm64),
 );
 
 // TODO figure out how to better deal with implicit parameters here
@@ -196,7 +194,7 @@ mnemonic(add,
 );
 
 mnemonic(addss,
-  encoding(0xF30F58, _r, xmm32, xmm_m32),
+  encoding(0xF30F58, _r, xmm32, m32),
 );
 
 mnemonic(sub,

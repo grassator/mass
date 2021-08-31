@@ -48,12 +48,8 @@ eager_encode_instruction_assembly(
   bool needs_16_bit_prefix = false;
   u8 r_m = 0;
   u8 mod = MOD_Register;
-  u8 op_code[4] = {
-    encoding->op_code[0],
-    encoding->op_code[1],
-    encoding->op_code[2],
-    encoding->op_code[3],
-  };
+  u8 op_code[4];
+  memcpy(op_code, encoding->op_code, sizeof(op_code));
   bool needs_sib = false;
   u8 sib_byte = 0;
   s32 displacement = 0;
@@ -69,10 +65,7 @@ eager_encode_instruction_assembly(
 
     if (
       storage->byte_size == 8 &&
-      !(
-        operand_encoding->type == Operand_Encoding_Type_Xmm ||
-        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
-      )
+      operand_encoding->type != Operand_Encoding_Type_Xmm
     ) {
       rex_byte |= REX_W;
     }
@@ -115,13 +108,12 @@ eager_encode_instruction_assembly(
       operand_encoding->type == Operand_Encoding_Type_Xmm &&
       encoding->extension_type == Instruction_Extension_Type_Register
     ) {
-      reg_or_op_code = storage->Register.index;
+      reg_or_op_code = storage->Xmm.index;
     }
 
     if(
       operand_encoding->type == Operand_Encoding_Type_Memory ||
-      operand_encoding->type == Operand_Encoding_Type_Register_Memory ||
-      operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
+      operand_encoding->type == Operand_Encoding_Type_Register_Memory
     ) {
       if (mod_r_m_storage_index != -1) {
         panic("Multiple MOD R/M operands are not supported in an instruction");
@@ -395,18 +387,6 @@ encoding_match(
       if (
         storage->tag == Storage_Tag_Xmm &&
         operand_encoding->type == Operand_Encoding_Type_Xmm
-      ) {
-        continue;
-      }
-      if (
-        storage->tag == Storage_Tag_Xmm &&
-        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
-      ) {
-        continue;
-      }
-      if (
-        storage->tag == Storage_Tag_Memory &&
-        operand_encoding->type == Operand_Encoding_Type_Xmm_Memory
       ) {
         continue;
       }

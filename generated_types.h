@@ -665,7 +665,6 @@ typedef enum Operand_Encoding_Type {
   Operand_Encoding_Type_Register_A = 3,
   Operand_Encoding_Type_Register_Memory = 4,
   Operand_Encoding_Type_Xmm = 5,
-  Operand_Encoding_Type_Xmm_Memory = 6,
   Operand_Encoding_Type_Memory = 7,
   Operand_Encoding_Type_Immediate = 8,
 } Operand_Encoding_Type;
@@ -677,7 +676,6 @@ const char *operand_encoding_type_name(Operand_Encoding_Type value) {
   if (value == 3) return "Operand_Encoding_Type_Register_A";
   if (value == 4) return "Operand_Encoding_Type_Register_Memory";
   if (value == 5) return "Operand_Encoding_Type_Xmm";
-  if (value == 6) return "Operand_Encoding_Type_Xmm_Memory";
   if (value == 7) return "Operand_Encoding_Type_Memory";
   if (value == 8) return "Operand_Encoding_Type_Immediate";
   assert(!"Unexpected value for enum Operand_Encoding_Type");
@@ -6485,7 +6483,6 @@ static C_Enum_Item operand_encoding_type_items[] = {
 { .name = slice_literal_fields("Register_A"), .value = 3 },
 { .name = slice_literal_fields("Register_Memory"), .value = 4 },
 { .name = slice_literal_fields("Xmm"), .value = 5 },
-{ .name = slice_literal_fields("Xmm_Memory"), .value = 6 },
 { .name = slice_literal_fields("Memory"), .value = 7 },
 { .name = slice_literal_fields("Immediate"), .value = 8 },
 };
