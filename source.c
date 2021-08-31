@@ -654,7 +654,7 @@ assign_tuple(
       .storage = memory_layout_item_storage_at_index(&target->storage, layout, index),
       .source_range = target->source_range,
     };
-    assign(context, builder, &target_field, tuple_item);
+    MASS_TRY(assign(context, builder, &target_field, tuple_item));
     index += 1;
   }
   return *context->result;
@@ -682,8 +682,7 @@ assign(
   }
 
   if (source->descriptor == &descriptor_tuple) {
-    assign_tuple(context, builder, target, source);
-    return *context->result;
+    return assign_tuple(context, builder, target, source);
   }
 
   Source_Range source_range = target->source_range;
