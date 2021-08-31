@@ -1748,7 +1748,7 @@ main(void) {
   }), (Struct_Item[]){
     { "Slice", "name" },
     { "Bits", "bit_size" },
-    { "u64", "bit_alignment" },
+    { "Bits", "bit_alignment" },
   })));
 
   export_compiler_custom_name("Error", push_type(add_common_fields(type_union("Mass_Error", (Struct_Type[]){

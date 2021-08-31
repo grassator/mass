@@ -1711,7 +1711,7 @@ typedef struct Descriptor {
   char _tag_padding[4];
   Slice name;
   Bits bit_size;
-  u64 bit_alignment;
+  Bits bit_alignment;
   union {
     Descriptor_Function_Instance Function_Instance;
     Descriptor_Fixed_Size_Array Fixed_Size_Array;
@@ -5642,7 +5642,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_u64,
+      .descriptor = &descriptor_bits,
       .name = slice_literal_fields("bit_alignment"),
     },
     .Base_Relative.offset = offsetof(Descriptor, bit_alignment),
