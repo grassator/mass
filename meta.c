@@ -1929,7 +1929,7 @@ main(void) {
     { "None", 0},
     { "Register", 2},
     { "Register_A", 3},
-    { "Register_Memory", 4},
+    { "Register_Or_Memory", 4},
     { "Xmm", 5},
     { "Memory", 7},
     { "Immediate", 8},

@@ -17,10 +17,10 @@
 #define r32 { Operand_Encoding_Type_Register, 32 }
 #define r64 { Operand_Encoding_Type_Register, 64 }
 
-#define r_m8  { Operand_Encoding_Type_Register_Memory, 8 }
-#define r_m16 { Operand_Encoding_Type_Register_Memory, 16 }
-#define r_m32 { Operand_Encoding_Type_Register_Memory, 32 }
-#define r_m64 { Operand_Encoding_Type_Register_Memory, 64 }
+#define r_m8  { Operand_Encoding_Type_Register_Or_Memory, 8 }
+#define r_m16 { Operand_Encoding_Type_Register_Or_Memory, 16 }
+#define r_m32 { Operand_Encoding_Type_Register_Or_Memory, 32 }
+#define r_m64 { Operand_Encoding_Type_Register_Or_Memory, 64 }
 
 #define m8  { Operand_Encoding_Type_Memory, 8 }
 #define m16 { Operand_Encoding_Type_Memory, 16 }

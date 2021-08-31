@@ -113,7 +113,7 @@ eager_encode_instruction_assembly(
 
     if(
       operand_encoding->type == Operand_Encoding_Type_Memory ||
-      operand_encoding->type == Operand_Encoding_Type_Register_Memory
+      operand_encoding->type == Operand_Encoding_Type_Register_Or_Memory
     ) {
       if (mod_r_m_storage_index != -1) {
         panic("Multiple MOD R/M operands are not supported in an instruction");
@@ -360,13 +360,13 @@ encoding_match(
       }
       if (
         storage->tag == Storage_Tag_Register &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+        operand_encoding->type == Operand_Encoding_Type_Register_Or_Memory
       ) {
         continue;
       }
       if (
         storage->tag == Storage_Tag_Memory &&
-        operand_encoding->type == Operand_Encoding_Type_Register_Memory
+        operand_encoding->type == Operand_Encoding_Type_Register_Or_Memory
       ) {
         continue;
       }
