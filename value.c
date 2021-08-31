@@ -1090,7 +1090,7 @@ instruction_equal(
     }
     case Instruction_Tag_Bytes: {
       if (a->Bytes.length != b->Bytes.length) return false;
-      return !!memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length);
+      return memcmp(a->Bytes.memory, b->Bytes.memory, a->Bytes.length) == 0;
     }
   }
   return true;
