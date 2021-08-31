@@ -490,7 +490,7 @@ deduce_runtime_descriptor_for_value(
         field_descriptor = &descriptor_s64;
       }
 
-      u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
+      u64 field_bit_alignment = field_descriptor->bit_alignment;
       struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
       u64 field_bit_offset = struct_bit_size;
       struct_bit_size += field_descriptor->bit_size.as_u64;
@@ -2690,7 +2690,7 @@ token_process_c_struct_definition(
         return 0;
       }
 
-      u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
+      u64 field_bit_alignment = field_descriptor->bit_alignment;
       struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
       u64 field_bit_offset = struct_bit_size;
       struct_bit_size += field_descriptor->bit_size.as_u64;

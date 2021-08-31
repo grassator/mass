@@ -310,7 +310,7 @@ descriptor_is_integer(
   return descriptor_is_signed_integer(descriptor) || descriptor_is_unsigned_integer(descriptor);
 }
 
-bool
+static inline bool
 descriptor_is_float(
   const Descriptor *descriptor
 ) {
