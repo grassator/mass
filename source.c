@@ -1505,7 +1505,7 @@ token_expect_match(
   Token_Maybe_Match(_id_, __VA_ARGS__);\
   if (!(_id_)) return 0
 
-#define Token_Match_Operator(_id_, _op_)\
+#define Token_Match_Specific_Symbol(_id_, _op_)\
   Token_Match(_id_, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields(_op_))
 
 typedef struct {
@@ -2618,7 +2618,7 @@ token_match_struct_field(
 
   u64 peek_index = 0;
   Token_Match(symbol, .tag = Token_Pattern_Tag_Symbol);
-  Token_Match_Operator(define, ":");
+  Token_Match_Specific_Symbol(define, ":");
 
   Value_View rest = value_view_rest(&view, peek_index);
   const Descriptor *field_descriptor = token_match_type(context, rest);
@@ -6231,7 +6231,7 @@ token_parse_definition(
 
   u64 peek_index = 0;
   Token_Match(name_token, .tag = Token_Pattern_Tag_Symbol);
-  Token_Match_Operator(define, ":");
+  Token_Match_Specific_Symbol(define, ":");
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   const Descriptor *descriptor = token_match_type(context, rest);
