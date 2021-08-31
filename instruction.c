@@ -8,35 +8,35 @@
   .op_code_extension = (_extension_ & 0b111),
 
 
-#define eflags  { Operand_Encoding_Type_Eflags, Operand_Size_8 }
+#define eflags  { Operand_Encoding_Type_Eflags, 8 }
 
-#define r_al  { Operand_Encoding_Type_Register_A, Operand_Size_8 }
-#define r_ax  { Operand_Encoding_Type_Register_A, Operand_Size_16 }
-#define r_eax { Operand_Encoding_Type_Register_A, Operand_Size_32 }
-#define r_rax { Operand_Encoding_Type_Register_A, Operand_Size_64 }
+#define r_al  { Operand_Encoding_Type_Register_A, 8 }
+#define r_ax  { Operand_Encoding_Type_Register_A, 16 }
+#define r_eax { Operand_Encoding_Type_Register_A, 32 }
+#define r_rax { Operand_Encoding_Type_Register_A, 64 }
 
-#define r8  { Operand_Encoding_Type_Register, Operand_Size_8 }
-#define r16 { Operand_Encoding_Type_Register, Operand_Size_16 }
-#define r32 { Operand_Encoding_Type_Register, Operand_Size_32 }
-#define r64 { Operand_Encoding_Type_Register, Operand_Size_64 }
+#define r8  { Operand_Encoding_Type_Register, 8 }
+#define r16 { Operand_Encoding_Type_Register, 16 }
+#define r32 { Operand_Encoding_Type_Register, 32 }
+#define r64 { Operand_Encoding_Type_Register, 64 }
 
-#define r_m8  { Operand_Encoding_Type_Register_Memory, Operand_Size_8 }
-#define r_m16 { Operand_Encoding_Type_Register_Memory, Operand_Size_16 }
-#define r_m32 { Operand_Encoding_Type_Register_Memory, Operand_Size_32 }
-#define r_m64 { Operand_Encoding_Type_Register_Memory, Operand_Size_64 }
+#define r_m8  { Operand_Encoding_Type_Register_Memory, 8 }
+#define r_m16 { Operand_Encoding_Type_Register_Memory, 16 }
+#define r_m32 { Operand_Encoding_Type_Register_Memory, 32 }
+#define r_m64 { Operand_Encoding_Type_Register_Memory, 64 }
 
-#define m8  { Operand_Encoding_Type_Memory, Operand_Size_8 }
-#define m16 { Operand_Encoding_Type_Memory, Operand_Size_16 }
-#define m32 { Operand_Encoding_Type_Memory, Operand_Size_32 }
-#define m64 { Operand_Encoding_Type_Memory, Operand_Size_64 }
+#define m8  { Operand_Encoding_Type_Memory, 8 }
+#define m16 { Operand_Encoding_Type_Memory, 16 }
+#define m32 { Operand_Encoding_Type_Memory, 32 }
+#define m64 { Operand_Encoding_Type_Memory, 64 }
 
-#define imm8  { Operand_Encoding_Type_Immediate, Operand_Size_8 }
-#define imm16 { Operand_Encoding_Type_Immediate, Operand_Size_16 }
-#define imm32 { Operand_Encoding_Type_Immediate, Operand_Size_32 }
-#define imm64 { Operand_Encoding_Type_Immediate, Operand_Size_64 }
+#define imm8  { Operand_Encoding_Type_Immediate, 8 }
+#define imm16 { Operand_Encoding_Type_Immediate, 16 }
+#define imm32 { Operand_Encoding_Type_Immediate, 32 }
+#define imm64 { Operand_Encoding_Type_Immediate, 64 }
 
-#define xmm32 { Operand_Encoding_Type_Xmm, Operand_Size_32 }
-#define xmm64 { Operand_Encoding_Type_Xmm, Operand_Size_64 }
+#define xmm32 { Operand_Encoding_Type_Xmm, 32 }
+#define xmm64 { Operand_Encoding_Type_Xmm, 64 }
 
 #define encoding_operands(...) __VA_ARGS__
 

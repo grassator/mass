@@ -1936,16 +1936,9 @@ main(void) {
     { "Immediate", 8},
   }));
 
-  push_type(type_enum("Operand_Size", (Enum_Type_Item[]){
-    { "8", 1 },
-    { "16", 2 },
-    { "32", 4 },
-    { "64", 8 },
-  }));
-
   push_type(type_struct("Operand_Encoding", (Struct_Item[]){
     { "Operand_Encoding_Type", "type" },
-    { "Operand_Size", "size" },
+    { "u32", "bit_size" },
   }));
 
   push_type(type_struct("Instruction_Encoding", (Struct_Item[]){

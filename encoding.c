@@ -332,9 +332,9 @@ encoding_match(
     for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
       const Storage *storage = &assembly->operands[storage_index];
-      u32 encoding_size = s32_to_u32(operand_encoding->size);
+      u32 storage_bit_size = u64_to_u32(storage->byte_size * 8);
 
-      if (storage->byte_size != encoding_size) {
+      if (storage_bit_size != operand_encoding->bit_size) {
         encoding = 0;
         break;
       }
@@ -390,10 +390,10 @@ encoding_match(
       }
       if (operand_encoding->type == Operand_Encoding_Type_Immediate) {
         if (storage->tag == Storage_Tag_Static) {
-          assert(encoding_size == storage->byte_size);
+          assert(operand_encoding->bit_size == storage_bit_size);
           continue;
         } else if (storage_is_label(storage)) {
-          assert(encoding_size == Operand_Size_32);
+          assert(operand_encoding->bit_size == 32);
           continue;
         }
       }

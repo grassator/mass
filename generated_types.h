@@ -685,25 +685,6 @@ const char *operand_encoding_type_name(Operand_Encoding_Type value) {
 typedef dyn_array_type(Operand_Encoding_Type *) Array_Operand_Encoding_Type_Ptr;
 typedef dyn_array_type(const Operand_Encoding_Type *) Array_Const_Operand_Encoding_Type_Ptr;
 
-typedef enum Operand_Size {
-  Operand_Size_8 = 1,
-  Operand_Size_16 = 2,
-  Operand_Size_32 = 4,
-  Operand_Size_64 = 8,
-} Operand_Size;
-
-const char *operand_size_name(Operand_Size value) {
-  if (value == 1) return "Operand_Size_8";
-  if (value == 2) return "Operand_Size_16";
-  if (value == 4) return "Operand_Size_32";
-  if (value == 8) return "Operand_Size_64";
-  assert(!"Unexpected value for enum Operand_Size");
-  return 0;
-};
-
-typedef dyn_array_type(Operand_Size *) Array_Operand_Size_Ptr;
-typedef dyn_array_type(const Operand_Size *) Array_Const_Operand_Size_Ptr;
-
 typedef struct Operand_Encoding Operand_Encoding;
 typedef dyn_array_type(Operand_Encoding *) Array_Operand_Encoding_Ptr;
 typedef dyn_array_type(const Operand_Encoding *) Array_Const_Operand_Encoding_Ptr;
@@ -2029,7 +2010,7 @@ typedef dyn_array_type(Compilation) Array_Compilation;
 
 typedef struct Operand_Encoding {
   Operand_Encoding_Type type;
-  Operand_Size size;
+  u32 bit_size;
 } Operand_Encoding;
 typedef dyn_array_type(Operand_Encoding) Array_Operand_Encoding;
 
@@ -2534,12 +2515,6 @@ static Descriptor descriptor_array_operand_encoding_type_ptr;
 static Descriptor descriptor_array_const_operand_encoding_type_ptr;
 static Descriptor descriptor_operand_encoding_type_pointer;
 static Descriptor descriptor_operand_encoding_type_pointer_pointer;
-static Descriptor descriptor_operand_size;
-static Descriptor descriptor_array_operand_size;
-static Descriptor descriptor_array_operand_size_ptr;
-static Descriptor descriptor_array_const_operand_size_ptr;
-static Descriptor descriptor_operand_size_pointer;
-static Descriptor descriptor_operand_size_pointer_pointer;
 static Descriptor descriptor_operand_encoding;
 static Descriptor descriptor_array_operand_encoding;
 static Descriptor descriptor_array_operand_encoding_ptr;
@@ -6484,13 +6459,6 @@ static C_Enum_Item operand_encoding_type_items[] = {
 { .name = slice_literal_fields("Memory"), .value = 7 },
 { .name = slice_literal_fields("Immediate"), .value = 8 },
 };
-MASS_DEFINE_OPAQUE_C_TYPE(operand_size, Operand_Size)
-static C_Enum_Item operand_size_items[] = {
-{ .name = slice_literal_fields("8"), .value = 1 },
-{ .name = slice_literal_fields("16"), .value = 2 },
-{ .name = slice_literal_fields("32"), .value = 4 },
-{ .name = slice_literal_fields("64"), .value = 8 },
-};
 MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding_ptr, Array_Operand_Encoding_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_operand_encoding, Array_Operand_Encoding)
 MASS_DEFINE_STRUCT_DESCRIPTOR(operand_encoding, Operand_Encoding,
@@ -6505,10 +6473,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(operand_encoding, Operand_Encoding,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_operand_size,
-      .name = slice_literal_fields("size"),
+      .descriptor = &descriptor_u32,
+      .name = slice_literal_fields("bit_size"),
     },
-    .Base_Relative.offset = offsetof(Operand_Encoding, size),
+    .Base_Relative.offset = offsetof(Operand_Encoding, bit_size),
   },
 );
 MASS_DEFINE_TYPE_VALUE(operand_encoding);
