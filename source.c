@@ -1471,35 +1471,20 @@ value_view_match_till_end_of_statement(
   return value_view_match_till(view, peek_index, &token_pattern_semicolon);
 }
 
-static inline Value *
-token_expect_match(
-  Execution_Context *context,
-  Value_View view,
-  u64 *peek_index,
-  const Token_Pattern *pattern
-) {
-  Value *result = token_peek_match(view, *peek_index, pattern);
-  if (result) {
-    (*peek_index) += 1;
-  } else {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = value_view_slice(&view, *peek_index, *peek_index).source_range,
-    });
-  }
-  return result;
-}
-
 #define Token_Maybe_Match(_id_, ...)\
   static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
   if (_id_) (++peek_index)
 
 #define Token_Expect_Match(_id_, ...)\
-  static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
-  Value *(_id_) = token_expect_match(context, view, &peek_index, &_id_##__pattern);\
-  (void)(_id_);\
-  MASS_ON_ERROR(*context->result) return 0
+  Token_Maybe_Match(_id_, __VA_ARGS__);\
+  if (!_id_) do {\
+    context_error(context, (Mass_Error) {\
+      .tag = Mass_Error_Tag_Parse,\
+      .source_range = value_view_slice(&view, peek_index, peek_index).source_range,\
+    });\
+    return 0;\
+  } while(0)
 
 #define Token_Match(_id_, ...)\
   Token_Maybe_Match(_id_, __VA_ARGS__);\
