@@ -391,13 +391,6 @@ same_type(
 }
 
 static u64
-descriptor_bit_size(
-  const Descriptor *descriptor
-) {
-  return descriptor->bit_size;
-}
-
-static u64
 descriptor_bit_alignment(
   const Descriptor *descriptor
 ) {
@@ -408,7 +401,7 @@ static inline u64
 descriptor_byte_size(
   const Descriptor *descriptor
 ) {
-  u64 bit_size = descriptor_bit_size(descriptor);
+  u64 bit_size = descriptor->bit_size;
   u64 byte_size = (bit_size + (CHAR_BIT - 1)) / CHAR_BIT;
   if (byte_size * CHAR_BIT != bit_size) {
     panic("TODO support non-byte aligned sizes");
@@ -1461,7 +1454,7 @@ descriptor_array_of(
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   u64 item_bit_alignment = descriptor_bit_alignment(item_descriptor);
-  u64 aligned_item_size = u64_align(descriptor_bit_size(item_descriptor), item_bit_alignment);
+  u64 aligned_item_size = u64_align(item_descriptor->bit_size, item_bit_alignment);
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Fixed_Size_Array,
     .bit_size = aligned_item_size * length,

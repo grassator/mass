@@ -330,11 +330,6 @@ maybe_unwrap_pointer_descriptor(
   return descriptor;
 }
 
-static u64
-descriptor_bit_size(
-  const Descriptor *descriptor
-);
-
 static inline u64
 descriptor_byte_size(
   const Descriptor *descriptor

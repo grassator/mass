@@ -2619,7 +2619,7 @@ token_process_c_struct_definition(
       u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
       struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
       u64 field_bit_offset = struct_bit_size;
-      struct_bit_size += descriptor_bit_size(field_descriptor);
+      struct_bit_size += field_descriptor->bit_size;
       struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
 
       u64 field_byte_offset = (field_bit_offset + (CHAR_BIT - 1)) / CHAR_BIT;
@@ -6318,7 +6318,7 @@ token_define_local_variable(
       u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
       struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
       u64 field_bit_offset = struct_bit_size;
-      struct_bit_size += descriptor_bit_size(field_descriptor);
+      struct_bit_size += field_descriptor->bit_size;
       struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
 
       u64 field_byte_offset = u64_align(field_bit_offset, CHAR_BIT) / CHAR_BIT;
