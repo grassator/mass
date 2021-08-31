@@ -238,11 +238,11 @@ x86_64_system_v_memory_layout_item_for_classification(
       assert (gpr->index + classification->eightbyte_count <= gpr->count);
       if (classification->eightbyte_count == 1) {
         Register reg = gpr->items[gpr->index++];
-        storage = storage_register(reg, byte_size);
+        storage = storage_register(reg, classification->descriptor->bit_size);
       } else if (classification->eightbyte_count == 2) {
         storage = (Storage) {
           .tag = Storage_Tag_Unpacked,
-          .byte_size = byte_size,
+          .bit_size = classification->descriptor->bit_size,
           .Unpacked = {
             .registers = {
               gpr->items[gpr->index++],
@@ -259,7 +259,7 @@ x86_64_system_v_memory_layout_item_for_classification(
       assert (registers->vector.index + classification->eightbyte_count <= registers->vector.count);
       if (classification->eightbyte_count == 1) {
         Register reg = registers->vector.items[registers->vector.index++];
-        storage = storage_register(reg, byte_size);
+        storage = storage_register(reg, classification->descriptor->bit_size);
       } else {
         panic("TODO support packed vector values");
       }
@@ -605,16 +605,17 @@ calling_convention_x86_64_system_v_call_setup_proc(
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
     if (classification.class == SYSTEM_V_MEMORY) {
       result.flags |= Function_Call_Setup_Flags_Indirect_Return;
+      Bits bit_size = function->returns.declaration.descriptor->bit_size;
       result.caller_return_value = value_init(
         allocator_allocate(allocator, Value),
         function->returns.declaration.descriptor,
-        storage_indirect(descriptor_byte_size(function->returns.declaration.descriptor), Register_A),
+        storage_indirect(bit_size, Register_A),
         function->returns.declaration.source_range
       );
       result.callee_return_value = value_init(
         allocator_allocate(allocator, Value),
         function->returns.declaration.descriptor,
-        storage_indirect(descriptor_byte_size(function->returns.declaration.descriptor), Register_DI),
+        storage_indirect(bit_size, Register_DI),
         function->returns.declaration.source_range
       );
     } else {

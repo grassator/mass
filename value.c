@@ -261,9 +261,9 @@ mass_error_to_string(
 static inline const void *
 storage_static_as_c_type_internal(
   const Storage *storage,
-  u64 byte_size
+  Bits bit_size
 ) {
-  assert(storage->byte_size == byte_size);
+  assert(storage->bit_size.as_u64 == bit_size.as_u64);
   assert(storage->tag == Storage_Tag_Static);
 
   switch(storage->Static.memory.tag) {
@@ -288,7 +288,7 @@ storage_static_as_c_type_internal(
 }
 
 #define storage_static_as_c_type(_OPERAND_, _TYPE_)\
-  ((_TYPE_ *)storage_static_as_c_type_internal(_OPERAND_, sizeof(_TYPE_)))
+  ((_TYPE_ *)storage_static_as_c_type_internal(_OPERAND_, (Bits){sizeof(_TYPE_) * CHAR_BIT}))
 
 #define DEFINE_VALUE_IS_AS_HELPERS(_C_TYPE_, _SUFFIX_)\
   static inline bool\
@@ -414,15 +414,15 @@ descriptor_byte_alignment(
   return byte_alignment;
 }
 
-s64
+static inline s64
 storage_static_value_up_to_s64(
   const Storage *operand
 ) {
-  switch(operand->byte_size) {
-    case 1: return *storage_static_as_c_type(operand, s8);
-    case 2: return *storage_static_as_c_type(operand, s16);
-    case 4: return *storage_static_as_c_type(operand, s32);
-    case 8: return *storage_static_as_c_type(operand, s64);
+  switch(operand->bit_size.as_u64) {
+    case 8: return *storage_static_as_c_type(operand, s8);
+    case 16: return *storage_static_as_c_type(operand, s16);
+    case 32: return *storage_static_as_c_type(operand, s32);
+    case 64: return *storage_static_as_c_type(operand, s64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -430,15 +430,15 @@ storage_static_value_up_to_s64(
   }
 }
 
-u64
+static inline u64
 storage_static_value_up_to_u64(
   const Storage *operand
 ) {
-  switch(operand->byte_size) {
-    case 1: return *storage_static_as_c_type(operand, u8);
-    case 2: return *storage_static_as_c_type(operand, u16);
-    case 4: return *storage_static_as_c_type(operand, u32);
-    case 8: return *storage_static_as_c_type(operand, u64);
+  switch(operand->bit_size.as_u64) {
+    case 8: return *storage_static_as_c_type(operand, u8);
+    case 16: return *storage_static_as_c_type(operand, u16);
+    case 32: return *storage_static_as_c_type(operand, u32);
+    case 64: return *storage_static_as_c_type(operand, u64);
     default: {
       panic("Unsupported integer immediate size");
       return 0;
@@ -448,9 +448,9 @@ storage_static_value_up_to_u64(
 
 static void
 print_storage(
-  const Storage *operand
+  const Storage *storage
 ) {
-  switch (operand->tag) {
+  switch (storage->tag) {
     case Storage_Tag_None: {
       printf("_");
       break;
@@ -464,31 +464,29 @@ print_storage(
       break;
     }
     case Storage_Tag_Register: {
-      u64 bits = operand->byte_size * 8;
-      printf("r%"PRIu64, bits);
+      printf("r%"PRIu64, storage->bit_size.as_u64);
       break;
     }
     case Storage_Tag_Xmm: {
-      u64 bits = operand->byte_size * 8;
-      printf("xmm%"PRIu64, bits);
+      printf("xmm%"PRIu64, storage->bit_size.as_u64);
       break;
     }
     case Storage_Tag_Static: {
-      switch(operand->byte_size) {
-        case 1: {
-          printf("imm8(0x%02x)", *storage_static_as_c_type(operand, u8));
-          break;
-        }
-        case 2: {
-          printf("imm16(0x%04x)", *storage_static_as_c_type(operand, u16));
-          break;
-        }
-        case 4: {
-          printf("imm32(0x%08x)", *storage_static_as_c_type(operand, u32));
-          break;
-        }
+      switch(storage->bit_size.as_u64) {
         case 8: {
-          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(operand, u64));
+          printf("imm8(0x%02x)", *storage_static_as_c_type(storage, u8));
+          break;
+        }
+        case 16: {
+          printf("imm16(0x%04x)", *storage_static_as_c_type(storage, u16));
+          break;
+        }
+        case 32: {
+          printf("imm32(0x%08x)", *storage_static_as_c_type(storage, u32));
+          break;
+        }
+        case 64: {
+          printf("imm64(0x%016" PRIx64 ")", *storage_static_as_c_type(storage, u64));
           break;
         }
         default: {
@@ -500,10 +498,9 @@ print_storage(
     }
     case Storage_Tag_Memory: {
       // TODO print better info
-      u64 bits = operand->byte_size * 8;
-      printf("m%"PRIu64, bits);
-      if (operand->Memory.location.tag == Memory_Location_Tag_Indirect) {
-        Register reg_index = operand->Memory.location.Indirect.base_register;
+      printf("m%"PRIu64, storage->bit_size.as_u64);
+      if (storage->Memory.location.tag == Memory_Location_Tag_Indirect) {
+        Register reg_index = storage->Memory.location.Indirect.base_register;
         printf("(r%d)", reg_index);
       }
       break;
@@ -516,60 +513,60 @@ print_storage(
   }
 }
 
-#define define_register(reg_name, reg_index, reg_byte_size) \
+#define define_register(reg_name, reg_index, reg_bit_size) \
 const Storage reg_name = { \
   .tag = Storage_Tag_Register, \
-  .byte_size = (reg_byte_size), \
+  .bit_size = reg_bit_size, \
   .Register = {.index = (reg_index)}, \
 };
-define_register(al, 0b0000, 1);
+define_register(al, 0b0000, 8);
 
-define_register(rax, 0b0000, 8);
-define_register(rcx, 0b0001, 8);
-define_register(rdx, 0b0010, 8);
-define_register(rbx, 0b0011, 8);
-define_register(rsp, 0b0100, 8);
-define_register(rbp, 0b0101, 8);
-define_register(rsi, 0b0110, 8);
-define_register(rdi, 0b0111, 8);
+define_register(rax, 0b0000, 64);
+define_register(rcx, 0b0001, 64);
+define_register(rdx, 0b0010, 64);
+define_register(rbx, 0b0011, 64);
+define_register(rsp, 0b0100, 64);
+define_register(rbp, 0b0101, 64);
+define_register(rsi, 0b0110, 64);
+define_register(rdi, 0b0111, 64);
 
-define_register(eax, 0b0000, 4);
-define_register(ecx, 0b0001, 4);
-define_register(edx, 0b0010, 4);
-define_register(ebx, 0b0011, 4);
-define_register(esp, 0b0100, 4);
-define_register(ebp, 0b0101, 4);
-define_register(esi, 0b0110, 4);
-define_register(edi, 0b0111, 4);
+define_register(eax, 0b0000, 32);
+define_register(ecx, 0b0001, 32);
+define_register(edx, 0b0010, 32);
+define_register(ebx, 0b0011, 32);
+define_register(esp, 0b0100, 32);
+define_register(ebp, 0b0101, 32);
+define_register(esi, 0b0110, 32);
+define_register(edi, 0b0111, 32);
 
-define_register(r8,  0b1000, 8);
-define_register(r9,  0b1001, 8);
-define_register(r10, 0b1010, 8);
-define_register(r11, 0b1011, 8);
-define_register(r12, 0b1100, 8);
-define_register(r13, 0b1101, 8);
-define_register(r14, 0b1110, 8);
-define_register(r15, 0b1111, 8);
+define_register(r8,  0b1000, 64);
+define_register(r9,  0b1001, 64);
+define_register(r10, 0b1010, 64);
+define_register(r11, 0b1011, 64);
+define_register(r12, 0b1100, 64);
+define_register(r13, 0b1101, 64);
+define_register(r14, 0b1110, 64);
+define_register(r15, 0b1111, 64);
 
-define_register(r8d,  0b1000, 4);
-define_register(r9d,  0b1001, 4);
-define_register(r10d, 0b1010, 4);
-define_register(r11d, 0b1011, 4);
-define_register(r12d, 0b1100, 4);
-define_register(r13d, 0b1101, 4);
-define_register(r14d, 0b1110, 4);
-define_register(r15d, 0b1111, 4);
+define_register(r8d,  0b1000, 32);
+define_register(r9d,  0b1001, 32);
+define_register(r10d, 0b1010, 32);
+define_register(r11d, 0b1011, 32);
+define_register(r12d, 0b1100, 32);
+define_register(r13d, 0b1101, 32);
+define_register(r14d, 0b1110, 32);
+define_register(r15d, 0b1111, 32);
 #undef define_register
 
 #define define_xmm_register(reg_name, reg_index) \
 const Storage reg_name##_32 = { \
   .tag = Storage_Tag_Xmm, \
-  .byte_size = 4, \
+  .bit_size = {32}, \
   .Register = {.index = (reg_index)}, \
 };\
 const Storage reg_name##_64 = { \
   .tag = Storage_Tag_Xmm, \
-  .byte_size = 8, \
+  .bit_size = {64}, \
   .Register = {.index = (reg_index)}, \
 };
 define_xmm_register(xmm0, 0b000);
@@ -596,11 +593,11 @@ make_label(
 static inline Storage
 data_label32(
   Label_Index label_index,
-  u64 byte_size
+  Bits bit_size
 ) {
   return (const Storage) {
     .tag = Storage_Tag_Memory,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
       .Instruction_Pointer_Relative.label_index = label_index
@@ -614,9 +611,9 @@ code_label32(
 ) {
   return (const Storage) {
     .tag = Storage_Tag_Memory,
-    // FIXME this is set at 4 as otherwise current encoder is unhappy
+    // FIXME this is set at 32 as otherwise current encoder is unhappy
     //       about the size mismatch. It should be zero instead.
-    .byte_size = 4,
+    .bit_size = {32},
     .Memory.location = {
       .tag = Memory_Location_Tag_Instruction_Pointer_Relative,
       .Instruction_Pointer_Relative.label_index = label_index,
@@ -627,33 +624,33 @@ code_label32(
 static inline Storage
 storage_static_inline_internal(
   const void *value,
-  u64 byte_size
+  Bits bit_size
 ) {
   Storage result = {
     .tag = Storage_Tag_Static,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
   };
-  switch(byte_size) {
+  switch(bit_size.as_u64) {
     case 0: {
       result.Static.memory.tag = Static_Memory_Tag_U64;
       break;
     }
-    case 1: {
+    case 8: {
       result.Static.memory.tag = Static_Memory_Tag_U8;
       result.Static.memory.U8.value = *(u8 *)value;
       break;
     }
-    case 2: {
+    case 16: {
       result.Static.memory.tag = Static_Memory_Tag_U16;
       result.Static.memory.U16.value = *(u16 *)value;
       break;
     }
-    case 4: {
+    case 32: {
       result.Static.memory.tag = Static_Memory_Tag_U32;
       result.Static.memory.U32.value = *(u32 *)value;
       break;
     }
-    case 8: {
+    case 64: {
       result.Static.memory.tag = Static_Memory_Tag_U64;
       result.Static.memory.U64.value = *(u64 *)value;
       break;
@@ -667,16 +664,16 @@ storage_static_inline_internal(
 }
 
 #define storage_static_inline(_VALUE_)\
-  storage_static_inline_internal((_VALUE_), sizeof(*(_VALUE_)))
+  storage_static_inline_internal((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
 
 static inline Storage
 storage_static_heap(
   const void *value,
-  u64 byte_size
+  Bits bit_size
 ) {
   return (Storage){
     .tag = Storage_Tag_Static,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
     .Static = {
       .memory = {
         .tag = Static_Memory_Tag_Heap,
@@ -689,24 +686,24 @@ storage_static_heap(
 static inline Storage
 storage_static_internal(
   const void *value,
-  u64 byte_size
+  Bits bit_size
 ) {
-  if (byte_size <= 8) {
-    return storage_static_inline_internal(value, byte_size);
+  if (bit_size.as_u64 <= 64) {
+    return storage_static_inline_internal(value, bit_size);
   }
 
-  return storage_static_heap(value, byte_size);
+  return storage_static_heap(value, bit_size);
 }
 
 #define storage_static(_VALUE_)\
-  storage_static_internal((_VALUE_), sizeof(*(_VALUE_)))
+  storage_static_internal((_VALUE_), (Bits){sizeof(*(_VALUE_)) * CHAR_BIT})
 
 #define DEFINE_IMM_X(_BIT_SIZE_)\
   static inline Storage\
   imm##_BIT_SIZE_(\
     u##_BIT_SIZE_ value\
   ) {\
-    return storage_static_internal(&value, (_BIT_SIZE_) / 8);\
+    return storage_static_internal(&value, (Bits){_BIT_SIZE_});\
   }
 
 DEFINE_IMM_X(8)
@@ -747,13 +744,13 @@ imm_auto(
 static inline Storage
 storage_stack(
   s32 offset,
-  u64 byte_size,
+  Bits bit_size,
   Stack_Area area
 ) {
-  assert(byte_size);
+  assert(bit_size.as_u64);
   return (Storage) {
     .tag = Storage_Tag_Memory,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Stack,
       .Stack = {
@@ -765,13 +762,14 @@ storage_stack(
 }
 
 static inline Storage
-storage_with_offset_and_byte_size(
+storage_with_offset_and_bit_size(
   const Storage *base,
   s32 diff,
-  u64 byte_size
+  Bits bit_size
 ) {
   Storage result = *base;
-  result.byte_size = byte_size;
+  result.bit_size = bit_size;
+  u64 byte_size = bit_size.as_u64 / 8;
   switch(base->tag) {
     default:
     case Storage_Tag_Any:
@@ -802,7 +800,7 @@ storage_with_offset_and_byte_size(
       Register reg = base->Unpacked.registers[start_index];
       result = (Storage){
         .tag = Storage_Tag_Register,
-        .byte_size = byte_size,
+        .bit_size = bit_size,
         .Register = {
           .index = reg,
           .packed = byte_size != 8,
@@ -812,8 +810,8 @@ storage_with_offset_and_byte_size(
       break;
     }
     case Storage_Tag_Static: {
-      const s8 *pointer = storage_static_as_c_type_internal(base, base->byte_size);
-      result = storage_static_internal(pointer + diff, byte_size);
+      const s8 *pointer = storage_static_as_c_type_internal(base, base->bit_size);
+      result = storage_static_internal(pointer + diff, bit_size);
       break;
     }
     case Storage_Tag_Memory: {
@@ -948,8 +946,8 @@ storage_static_equal(
 ) {
   assert(a_storage->tag == Storage_Tag_Static);
   assert(b_storage->tag == Storage_Tag_Static);
-  assert(a_storage->byte_size == b_storage->byte_size);
-  assert(descriptor_byte_size(a_descriptor) == a_storage->byte_size);
+  assert(a_storage->bit_size.as_u64 == b_storage->bit_size.as_u64);
+  assert(a_descriptor->bit_size.as_u64 == a_storage->bit_size.as_u64);
   assert(a_storage->Static.memory.tag == b_storage->Static.memory.tag);
   switch(a_storage->Static.memory.tag) {
     case Static_Memory_Tag_U8: {
@@ -991,7 +989,7 @@ storage_equal(
   const Storage *b
 ) {
   if (a->tag != b->tag) return false;
-  if (a->byte_size != b->byte_size) return false;
+  if (a->bit_size.as_u64 != b->bit_size.as_u64) return false;
   switch(a->tag) {
     case Storage_Tag_Eflags: {
       return a->Eflags.compare_type == b->Eflags.compare_type;
@@ -1193,17 +1191,17 @@ value_global(
   u64 alignment = descriptor_byte_alignment(descriptor);
 
   Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-  return value_make(context, descriptor, data_label32(label_index, byte_size), source_range);
+  return value_make(context, descriptor, data_label32(label_index, descriptor->bit_size), source_range);
 }
 
 static inline Storage
 storage_indirect(
-  u64 byte_size,
+  Bits bit_size,
   Register reg
 ) {
   return (Storage){
     .tag = Storage_Tag_Memory,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
     .Memory.location = {
       .tag = Memory_Location_Tag_Indirect,
       .Indirect = {
@@ -1219,7 +1217,7 @@ storage_eflags(
 ) {
   return (Storage){
     .tag = Storage_Tag_Eflags,
-    .byte_size = 1,
+    .bit_size = {8},
     .Eflags = { .compare_type = compare_type }
   };
 }
@@ -1302,14 +1300,19 @@ value_from_unsigned_immediate_internal(
 static inline Storage
 storage_register(
   Register reg,
-  u64 byte_size
+  Bits bit_size
 ) {
-  assert(byte_size == 1 || byte_size == 2 || byte_size == 4 || byte_size == 8);
+  assert(
+    bit_size.as_u64 == 8 ||
+    bit_size.as_u64 == 16 ||
+    bit_size.as_u64 == 32 ||
+    bit_size.as_u64 == 64
+  );
 
   Storage result = {
     .tag = register_is_xmm(reg) ? Storage_Tag_Xmm : Storage_Tag_Register,
     .Register.index = reg,
-    .byte_size = byte_size,
+    .bit_size = bit_size,
   };
   return result;
 }
@@ -1319,7 +1322,7 @@ storage_register_for_descriptor(
   Register reg,
   const Descriptor *descriptor
 ) {
-  return storage_register(reg, descriptor_byte_size(descriptor));
+  return storage_register(reg, descriptor->bit_size);
 }
 
 static inline Value *
@@ -1342,7 +1345,7 @@ value_temporary_acquire_indirect_for_descriptor(
   Source_Range source_range
 ) {
   register_acquire(builder, reg);
-  Storage storage = storage_indirect(descriptor_byte_size(descriptor), reg);
+  Storage storage = storage_indirect(descriptor->bit_size, reg);
   Value *value = value_make(context, descriptor, storage, source_range);
   value->is_temporary = true;
   return value;
@@ -1428,7 +1431,7 @@ rip_value_pointer_from_label_index(
 }
 
 
-void *
+static inline void *
 rip_value_pointer(
   Program *program,
   Value *value
@@ -1678,8 +1681,8 @@ memory_layout_item_storage(
       return item->Absolute.storage;
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
-      return storage_with_offset_and_byte_size(
-        base, u64_to_s32(item->Base_Relative.offset), descriptor_byte_size(item->declaration.descriptor)
+      return storage_with_offset_and_bit_size(
+        base, u64_to_s32(item->Base_Relative.offset), item->declaration.descriptor->bit_size
       );
     }
   }

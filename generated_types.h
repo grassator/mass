@@ -1183,7 +1183,7 @@ typedef struct Storage_Unpacked {
 typedef struct Storage {
   Storage_Tag tag;
   char _tag_padding[4];
-  u64 byte_size;
+  Bits bit_size;
   union {
     Storage_Eflags Eflags;
     Storage_Register Register;
@@ -3787,10 +3787,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(storage, Storage,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_u64,
-      .name = slice_literal_fields("byte_size"),
+      .descriptor = &descriptor_bits,
+      .name = slice_literal_fields("bit_size"),
     },
-    .Base_Relative.offset = offsetof(Storage, byte_size),
+    .Base_Relative.offset = offsetof(Storage, bit_size),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

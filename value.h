@@ -219,14 +219,14 @@ memory_layout_item_storage_at_index(
 static inline Storage
 storage_stack(
   s32 offset,
-  u64 byte_size,
+  Bits bit_size,
   Stack_Area area
 );
 
 static inline Storage
 storage_register(
   Register reg,
-  u64 byte_size
+  Bits bit_size
 );
 
 static inline bool

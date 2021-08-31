@@ -192,8 +192,7 @@ import_symbol(
     });
   }
 
-  u32 byte_size = 8;
-  return data_label32(symbol->label32, byte_size);
+  return data_label32(symbol->label32, (Bits){64});
 }
 
 static Mass_Result

@@ -1360,8 +1360,7 @@ main(void) {
       { "Register", "registers", 2 },
     }),
   }), (Struct_Item[]){
-    // TODO change to bit_size
-    { "u64", "byte_size" },
+    { "Bits", "bit_size" },
   }));
 
   push_type(type_struct("Relocation", (Struct_Item[]){

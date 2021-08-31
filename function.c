@@ -6,13 +6,13 @@
 static Storage
 reserve_stack_storage(
   Function_Builder *builder,
-  u64 raw_byte_size
+  Bits bit_size
 ) {
-  s32 byte_size = u64_to_s32(raw_byte_size);
+  s32 byte_size = u64_to_s32(bit_size.as_u64 * 8);
   builder->stack_reserve = s32_align(builder->stack_reserve, byte_size);
   builder->stack_reserve += byte_size;
   // The value is negative here because the stack grows down
-  return storage_stack(-builder->stack_reserve, raw_byte_size, Stack_Area_Local);
+  return storage_stack(-builder->stack_reserve, bit_size, Stack_Area_Local);
 }
 
 static inline Value *
@@ -22,7 +22,7 @@ reserve_stack(
   const Descriptor *descriptor,
   Source_Range source_range
 ) {
-  Storage storage = reserve_stack_storage(builder, descriptor_byte_size(descriptor));
+  Storage storage = reserve_stack_storage(builder, descriptor->bit_size);
   return value_make(context, descriptor, storage, source_range);
 }
 
@@ -132,16 +132,16 @@ move_value(
     panic("Internal Error: Trying to move into Eflags");
   }
 
-  u64 target_size = target->byte_size;
-  u64 source_size = source->byte_size;
+  u64 target_bit_size = target->bit_size.as_u64;
+  u64 source_bit_size = source->bit_size.as_u64;
 
   if (target->tag == Storage_Tag_Xmm || source->tag == Storage_Tag_Xmm) {
-    assert(target_size == source_size);
-    if (target_size == 4) {
+    assert(target_bit_size == source_bit_size);
+    if (target_bit_size == 32) {
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, &(Instruction_Assembly){movss, {*target, *source}}
       );
-    } else if (target_size == 8) {
+    } else if (target_bit_size == 64) {
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, &(Instruction_Assembly){movsd, {*target, *source}}
       );
@@ -154,10 +154,10 @@ move_value(
   if (source->tag == Storage_Tag_Eflags) {
     assert(storage_is_register_or_memory(target));
     Storage temp = *target;
-    if (target->byte_size != 1) {
+    if (source_bit_size != 8) {
       temp = (Storage) {
         .tag = Storage_Tag_Register,
-        .byte_size = 1,
+        .bit_size = {8},
         .Register.index = register_acquire_temp(builder),
       };
     }
@@ -231,7 +231,7 @@ move_value(
     if (!storage_equal(&temp, target)) {
       assert(temp.tag == Storage_Tag_Register);
       Storage resized_temp = temp;
-      resized_temp.byte_size = target->byte_size;
+      resized_temp.bit_size = target->bit_size;
       push_eagerly_encoded_assembly(
         &builder->code_block, *source_range, &(Instruction_Assembly){movsx, {resized_temp, temp}}
       );
@@ -243,16 +243,16 @@ move_value(
     return;
   }
   if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
-    assert(source->byte_size <= 4);
+    assert(source_bit_size <= 32);
     assert(source->Register.offset_in_bits <= 32);
     Storage temp_full_register = {
       .tag = Storage_Tag_Register,
-      .byte_size = 8,
+      .bit_size = {64},
       .Register.index = register_acquire_temp(builder),
     };
     Storage source_full_register = {
       .tag = Storage_Tag_Register,
-      .byte_size = 8,
+      .bit_size = {64},
       .Register.index = source->Register.index,
     };
     push_eagerly_encoded_assembly(
@@ -265,27 +265,27 @@ move_value(
     );
 
     Storage right_size_temp = temp_full_register;
-    right_size_temp.byte_size = source->byte_size;
+    right_size_temp.bit_size = source->bit_size;
     move_value(allocator, builder, source_range, target, &right_size_temp);
     register_release(builder, temp_full_register.Register.index);
     return;
   }
 
   if (target->tag == Storage_Tag_Register && target->Register.packed) {
-    assert(source->byte_size <= 4);
+    assert(source_bit_size <= 32);
     assert(target->Register.offset_in_bits <= 32);
     if (source->tag == Storage_Tag_Register && source->Register.offset_in_bits != 0) {
       panic("Expected unpacking to be handled by the recursion above");
     }
-    s64 clear_mask = ~(((1ll << (source->byte_size * 8)) - 1) << target->Register.offset_in_bits);
+    s64 clear_mask = ~(((1ll << source_bit_size) - 1) << target->Register.offset_in_bits);
     Storage temp_full_register = {
       .tag = Storage_Tag_Register,
-      .byte_size = 8,
+      .bit_size = {64},
       .Register.index = register_acquire_temp(builder),
     };
     Storage target_full_register = {
       .tag = Storage_Tag_Register,
-      .byte_size = 8,
+      .bit_size = {64},
       .Register.index = target->Register.index,
     };
 
@@ -308,7 +308,7 @@ move_value(
         &(Instruction_Assembly){xor, {temp_full_register, temp_full_register}}
       );
       Storage right_size_temp = temp_full_register;
-      right_size_temp.byte_size = source->byte_size;
+      right_size_temp.bit_size = source->bit_size;
       move_value(allocator, builder, source_range, &right_size_temp, source);
       if (target->Register.offset_in_bits) {
         push_eagerly_encoded_assembly(
@@ -328,7 +328,7 @@ move_value(
   }
 
   if (source->tag == Storage_Tag_Static) {
-    assert(source->byte_size <= 8);
+    assert(source->bit_size.as_u64 <= 64);
     s64 immediate = storage_static_value_up_to_s64(source);
     if (immediate == 0 && target->tag == Storage_Tag_Register) {
       // This messes up flags register so comparisons need to be aware of this optimization
@@ -338,20 +338,20 @@ move_value(
       return;
     }
     Storage adjusted_source;
-    switch(target_size) {
-      case 1: {
+    switch(target_bit_size) {
+      case 8: {
         adjusted_source = imm8(s64_to_s8(immediate));
         break;
       }
-      case 2: {
+      case 16: {
         adjusted_source = imm16(s64_to_s16(immediate));
         break;
       }
-      case 4: {
+      case 32: {
         adjusted_source = imm32(s64_to_s32(immediate));
         break;
       }
-      case 8: {
+      case 64: {
         if (s64_fits_into_s32(immediate)) {
           adjusted_source = imm32(s64_to_s32(immediate));
         } else {
@@ -367,11 +367,11 @@ move_value(
     }
     // Because of 15 byte instruction limit on x86 there is no way to move 64bit immediate
     // to a memory location. In which case we do a move through a temp register
-    bool is_64bit_immediate = adjusted_source.byte_size == 8;
+    bool is_64bit_immediate = adjusted_source.bit_size.as_u64 == 64;
     if (is_64bit_immediate && target->tag != Storage_Tag_Register) {
       Storage temp = {
         .tag = Storage_Tag_Register,
-        .byte_size = adjusted_source.byte_size,
+        .bit_size = adjusted_source.bit_size,
         .Register.index = register_acquire_temp(builder),
       };
       push_eagerly_encoded_assembly(
@@ -389,12 +389,12 @@ move_value(
     return;
   }
 
-  assert(target_size == source_size);
+  assert(target_bit_size == source_bit_size);
 
   if (target->tag == Storage_Tag_Memory && source->tag == Storage_Tag_Memory) {
     Storage temp = {
       .tag = Storage_Tag_Register,
-      .byte_size = target->byte_size,
+      .bit_size = target->bit_size,
       .Register.index = register_acquire_temp(builder),
     };
     move_value(allocator, builder, source_range, &temp, source);
@@ -609,8 +609,8 @@ load_address(
   // This is why here we are forcing the source memory operand to be 8 bytes
   // and check that the target register is also 8 bytes in size.
   Storage adjusted_source = source;
-  adjusted_source.byte_size = 8;
-  assert(register_storage.byte_size == 8);
+  adjusted_source.bit_size.as_u64 = 64;
+  assert(register_storage.bit_size.as_u64 == 64);
 
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range,
@@ -794,7 +794,7 @@ ensure_function_instance(
   const Function_Call_Setup *call_setup = &instance_descriptor->Function_Instance.call_setup;
   {
     const Memory_Layout *arguments_layout = &call_setup->arguments_layout;
-    Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Received_Argument);
+    Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Received_Argument);
     DYN_ARRAY_FOREACH(Memory_Layout_Item, item, arguments_layout->items) {
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
       Value *arg_value = value_make(&body_context, item->declaration.descriptor, storage, item->declaration.source_range);

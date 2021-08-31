@@ -784,7 +784,7 @@
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
-    <Item Name="byte_size">byte_size</Item>
+    <Item Name="bit_size">bit_size</Item>
     <Item Name="Eflags" Condition="tag == Storage_Tag_Eflags">Eflags</Item>
     <Item Name="Register" Condition="tag == Storage_Tag_Register">Register</Item>
     <Item Name="Xmm" Condition="tag == Storage_Tag_Xmm">Xmm</Item>

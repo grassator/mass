@@ -59,12 +59,12 @@ eager_encode_instruction_assembly(
     const Storage *storage = &assembly->operands[storage_index];
     const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
 
-    if (storage->byte_size == 2) {
+    if (storage->bit_size.as_u64 == 16) {
       needs_16_bit_prefix = true;
     }
 
     if (
-      storage->byte_size == 8 &&
+      storage->bit_size.as_u64 == 64 &&
       operand_encoding->type != Operand_Encoding_Type_Xmm
     ) {
       rex_byte |= REX_W;
@@ -73,7 +73,7 @@ eager_encode_instruction_assembly(
     if (storage->tag == Storage_Tag_Register) {
       assert(storage->Register.offset_in_bits == 0);
 
-      if (storage->byte_size == 1) {
+      if (storage->bit_size.as_u64 == 8) {
         // :64bitMode8BitOperations
         // These registers are inaccessible in 32bit mode and AH, BH, CH, and DH
         // are targeted instead. To solve this we force REX prefix.
@@ -307,8 +307,8 @@ eager_encode_instruction_assembly(
       u8 empty_patch_bytes[4] = {0};
       instruction_bytes_append_bytes(&result.bytes, empty_patch_bytes, countof(empty_patch_bytes));
     } else if (storage->tag == Storage_Tag_Static) {
-      const u8 *bytes = storage_static_as_c_type_internal(storage, storage->byte_size);
-      instruction_bytes_append_bytes(&result.bytes, bytes, storage->byte_size);
+      const u8 *bytes = storage_static_as_c_type_internal(storage, storage->bit_size);
+      instruction_bytes_append_bytes(&result.bytes, bytes, storage->bit_size.as_u64 / 8);
     } else {
       panic("Unexpected mismatched operand type for immediate encoding.");
     }
@@ -332,7 +332,7 @@ encoding_match(
     for (u32 storage_index = 0; storage_index < storage_count; ++storage_index) {
       const Operand_Encoding *operand_encoding = &encoding->operands[storage_index];
       const Storage *storage = &assembly->operands[storage_index];
-      u32 storage_bit_size = u64_to_u32(storage->byte_size * 8);
+      u32 storage_bit_size = u64_to_u32(storage->bit_size.as_u64);
 
       if (storage_bit_size != operand_encoding->bit_size) {
         encoding = 0;

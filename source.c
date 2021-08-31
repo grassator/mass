@@ -293,12 +293,10 @@ token_value_force_immediate_integer(
       value_number_literal_cast_to(value, target_descriptor, &bits, &bit_size);
     switch(cast_result) {
       case Literal_Cast_Result_Success: {
-        // Always copy full value. Truncation is handled by the byte_size of the immediate
-        u64 byte_size = u64_to_u32(bit_size / 8);
         return value_init(
           allocator_allocate(context->allocator, Value),
           target_descriptor,
-          storage_static_internal(&bits, byte_size),
+          storage_static_internal(&bits, (Bits){bit_size}),
           value->source_range
         );
       }
@@ -384,11 +382,11 @@ assign_from_static(
 
       // TODO this should also be deduped
       Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-      static_pointer->storage = data_label32(label_index, byte_size);
+      static_pointer->storage = data_label32(label_index, static_pointer->descriptor->bit_size);
 
       Value static_source_value = {
         .descriptor = static_pointer->descriptor,
-        .storage = storage_static_heap(source_memory, byte_size),
+        .storage = storage_static_heap(source_memory, static_pointer->descriptor->bit_size),
         .source_range = source->source_range,
       };
 
@@ -410,9 +408,9 @@ assign_from_static(
     Label_Index label_index =
       target->storage.Memory.location.Instruction_Pointer_Relative.label_index;
     void *section_memory = rip_value_pointer_from_label_index(context->program, label_index);
-    u64 byte_size = source->storage.byte_size;
-    const void *source_memory = storage_static_as_c_type_internal(&source->storage, byte_size);
-    memcpy(section_memory, source_memory, byte_size);
+    const void *source_memory =
+      storage_static_as_c_type_internal(&source->storage, source->storage.bit_size);
+    memcpy(section_memory, source_memory, source->storage.bit_size.as_u64 / 8);
     return true;
   }
   return false;
@@ -426,11 +424,10 @@ value_indirect_from_reference(
 ) {
   assert(source->descriptor->tag == Descriptor_Tag_Reference_To);
   const Descriptor *referenced_descriptor = source->descriptor->Reference_To.descriptor;
-  u64 byte_size = descriptor_byte_size(referenced_descriptor);
   switch(source->storage.tag) {
     case Storage_Tag_Register: {
       Register reg = source->storage.Register.index;
-      Storage referenced_storage = storage_indirect(byte_size, reg);
+      Storage referenced_storage = storage_indirect(referenced_descriptor->bit_size, reg);
       return value_make(
         context, referenced_descriptor, referenced_storage, source->source_range
       );
@@ -2826,7 +2823,7 @@ compile_time_eval(
   };
 
   // Use memory-indirect addressing to copy
-  Storage out_storage = storage_indirect(result_byte_size, out_register);
+  Storage out_storage = storage_indirect(result_descriptor->bit_size, out_register);
   Value *out_value = value_make(&eval_context, result_descriptor, out_storage, view.source_range);
 
   MASS_ON_ERROR(assign(&eval_context, &eval_builder, &out_value_register, &result_address)) {
@@ -2854,7 +2851,7 @@ compile_time_eval(
   return value_init(
     allocator_allocate(context->allocator, Value),
     out_value->descriptor,
-    storage_static_internal(result, result_byte_size),
+    storage_static_internal(result, result_descriptor->bit_size),
     view.source_range
   );
 }
@@ -2978,20 +2975,20 @@ mass_handle_cast_lazy_proc(
   Value *value = value_force(context, builder, &expected_source, expression);
   MASS_ON_ERROR(*context->result) return 0;
 
-  u64 cast_to_byte_size = descriptor_byte_size(target_descriptor);
-  u64 original_byte_size = descriptor_byte_size(source_descriptor);
+  Bits cast_to_bit_size = target_descriptor->bit_size;
+  Bits original_bit_size = source_descriptor->bit_size;
 
   Value *result_value = value;
   if (value_is_static_number_literal(expression)) {
     result_value = token_value_force_immediate_integer(context, value, target_descriptor);
-  } else if (cast_to_byte_size < original_byte_size) {
+  } else if (cast_to_bit_size.as_u64 < original_bit_size.as_u64) {
     result_value = value_make(context, target_descriptor, value->storage, *source_range);
     if (result_value->storage.tag == Storage_Tag_Static) {
       // TODO this is quite awkward and unsafe. There is probably a better way
-      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_byte_size);
-      result_value->storage = storage_static_internal(memory, cast_to_byte_size);
+      void *memory = (void *)storage_static_as_c_type_internal(&value->storage, original_bit_size);
+      result_value->storage = storage_static_internal(memory, cast_to_bit_size);
     } else {
-      result_value->storage.byte_size = cast_to_byte_size;
+      result_value->storage.bit_size = cast_to_bit_size;
     }
     // TODO This is awkward and there might be a better way.
     //      It is also might be necessary to somehow mark the original value as invalid maybe?
@@ -3357,7 +3354,7 @@ call_function_overload(
   );
 
   Scope *default_arguments_scope = scope_make(context->allocator, fn_info->scope);
-  Storage stack_argument_base = storage_stack(0, 1, Stack_Area_Call_Target_Argument);
+  Storage stack_argument_base = storage_stack(0, (Bits){8}, Stack_Area_Call_Target_Argument);
 
   u64 all_used_arguments_register_bitset = 0;
   DYN_ARRAY_FOREACH(Memory_Layout_Item, target_item, call_setup->arguments_layout.items) {
@@ -3521,7 +3518,7 @@ call_function_overload(
 
     Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
       .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
-      .stack = reserve_stack_storage(builder, descriptor_byte_size(&descriptor_void_pointer)),
+      .stack = reserve_stack_storage(builder, descriptor_void_pointer.bit_size),
     });
 
     push_eagerly_encoded_assembly(
@@ -3994,12 +3991,6 @@ storage_load_index_address(
   const Descriptor *item_descriptor,
   Value *index_value
 ) {
-  // @InstructionQuality
-  // This code is very general in terms of the operands where the base
-  // or the index are stored, but it is
-
-  s32 item_byte_size = u64_to_s32(descriptor_byte_size(item_descriptor));
-
   if (target->storage.tag == Storage_Tag_Static) {
     index_value = token_value_force_immediate_integer(context, index_value, &descriptor_u64);
     MASS_ON_ERROR(*context->result) return (Storage){0};
@@ -4008,11 +3999,11 @@ storage_load_index_address(
     s8 *target_bytes = 0;
     if (target->descriptor->tag == Descriptor_Tag_Pointer_To) {
       target_bytes =
-        *(s8**)storage_static_as_c_type_internal(&target->storage, target->storage.byte_size);
+        *(s8**)storage_static_as_c_type_internal(&target->storage, target->storage.bit_size);
     } else {
       panic("TODO support more static dereferences");
     }
-    return storage_static_internal(target_bytes + index, item_byte_size);
+    return storage_static_internal(target_bytes + index, item_descriptor->bit_size);
   }
 
   // @Volatile :TemporaryRegisterForIndirectMemory
@@ -4023,8 +4014,9 @@ storage_load_index_address(
   // Move the index into the register
   move_value(context->allocator, builder, source_range, &new_base->storage, &index_value->storage);
 
-  // Multiplication by 1
-  if (item_byte_size != 1) {
+  // Multiplication by 1 byte is useless so checking it here
+  if (item_descriptor->bit_size.as_u64 != 8) {
+    u32 item_byte_size = u64_to_u32(descriptor_byte_size(item_descriptor));
     Value *byte_size_value = value_from_s32(context, item_byte_size, index_value->source_range);
 
     // Multiply index by the item byte size
@@ -4068,7 +4060,7 @@ storage_load_index_address(
     value_release_if_temporary(builder, temp_value);
   }
 
-  return storage_indirect(item_byte_size, new_base->storage.Register.index);
+  return storage_indirect(item_descriptor->bit_size, new_base->storage.Register.index);
 }
 
 typedef enum {
@@ -4855,7 +4847,7 @@ mass_handle_field_access_lazy_proc(
     }
 
     Storage pointee_storage =
-      storage_indirect(descriptor_byte_size(unwrapped_descriptor), base_storage.Register.index);
+      storage_indirect(unwrapped_descriptor->bit_size, base_storage.Register.index);
     struct_ = value_make(context, unwrapped_descriptor, pointee_storage, struct_->source_range);
     struct_->is_temporary = is_temporary;
   }
@@ -4919,8 +4911,9 @@ mass_handle_array_access_lazy_proc(
     Storage element_storage;
     if (index->storage.tag == Storage_Tag_Static) {
       s32 index_number = s64_to_s32(storage_static_value_up_to_s64(&index->storage));
-      s32 offset = index_number * s64_to_s32(item_byte_size);
-      element_storage = storage_with_offset_and_byte_size(&array->storage, offset, item_byte_size);
+      s32 offset = index_number * u64_to_s32(item_byte_size);
+      element_storage =
+        storage_with_offset_and_bit_size(&array->storage, offset, item_descriptor->bit_size);
     } else {
       // @Volatile :TemporaryRegisterForIndirectMemory
       element_storage =
@@ -6315,7 +6308,7 @@ token_define_global_variable(
     u64 alignment = descriptor_byte_alignment(descriptor);
 
     Label_Index label_index = allocate_section_memory(context->program, section, byte_size, alignment);
-    Storage global_label = data_label32(label_index, byte_size);
+    Storage global_label = data_label32(label_index, descriptor->bit_size);
     global_value = value_make(context, descriptor, global_label, expression.source_range);
 
     if (value_is_non_lazy_static(value)) {
