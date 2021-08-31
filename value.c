@@ -401,7 +401,7 @@ static inline u64
 descriptor_byte_size(
   const Descriptor *descriptor
 ) {
-  u64 bit_size = descriptor->bit_size;
+  u64 bit_size = descriptor->bit_size.as_u64;
   u64 byte_size = (bit_size + (CHAR_BIT - 1)) / CHAR_BIT;
   if (byte_size * CHAR_BIT != bit_size) {
     panic("TODO support non-byte aligned sizes");
@@ -1454,10 +1454,10 @@ descriptor_array_of(
 ) {
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   u64 item_bit_alignment = descriptor_bit_alignment(item_descriptor);
-  u64 aligned_item_size = u64_align(item_descriptor->bit_size, item_bit_alignment);
+  u64 aligned_item_size = u64_align(item_descriptor->bit_size.as_u64, item_bit_alignment);
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Fixed_Size_Array,
-    .bit_size = aligned_item_size * length,
+    .bit_size = {aligned_item_size * length},
     .bit_alignment = item_bit_alignment,
     .Fixed_Size_Array = {
       .item = item_descriptor,
@@ -1506,7 +1506,7 @@ descriptor_function_instance(
   *result = (Descriptor) {
     .tag = Descriptor_Tag_Function_Instance,
     .name = name,
-    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Function_Instance = {
       .info = info,
@@ -1524,7 +1524,7 @@ descriptor_reference_to(
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
     .tag = Descriptor_Tag_Reference_To,
-    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Pointer_To.descriptor = descriptor,
   };
@@ -1539,7 +1539,7 @@ descriptor_pointer_to(
   Descriptor *result = allocator_allocate(allocator, Descriptor);
   *result = (const Descriptor) {
     .tag = Descriptor_Tag_Pointer_To,
-    .bit_size = sizeof(void *) * CHAR_BIT,
+    .bit_size = {sizeof(void *) * CHAR_BIT},
     .bit_alignment = sizeof(void *) * CHAR_BIT,
     .Pointer_To.descriptor = descriptor,
   };
@@ -1838,7 +1838,7 @@ value_number_literal_cast_to(
 
   u64 bits = literal->bits;
   u64 max = UINT64_MAX;
-  u64 bit_size = target_descriptor->bit_size;
+  u64 bit_size = target_descriptor->bit_size.as_u64;
   if (bit_size > 64) {
     return Literal_Cast_Result_Target_Too_Big;
   }

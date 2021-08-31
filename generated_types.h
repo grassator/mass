@@ -5,6 +5,10 @@ typedef void(*fn_type_opaque)();
 
 // Forward declarations
 
+typedef struct Bits Bits;
+typedef dyn_array_type(Bits *) Array_Bits_Ptr;
+typedef dyn_array_type(const Bits *) Array_Const_Bits_Ptr;
+
 typedef struct Source_Position Source_Position;
 typedef dyn_array_type(Source_Position *) Array_Source_Position_Ptr;
 typedef dyn_array_type(const Source_Position *) Array_Const_Source_Position_Ptr;
@@ -841,6 +845,11 @@ typedef dyn_array_type(const Slice *) Array_Const_Slice_Ptr;
 
 
 // Type Definitions
+
+typedef struct Bits {
+  u64 as_u64;
+} Bits;
+typedef dyn_array_type(Bits) Array_Bits;
 
 typedef struct Source_Position {
   u64 line;
@@ -1701,7 +1710,7 @@ typedef struct Descriptor {
   Descriptor_Tag tag;
   char _tag_padding[4];
   Slice name;
-  u64 bit_size;
+  Bits bit_size;
   u64 bit_alignment;
   union {
     Descriptor_Function_Instance Function_Instance;
@@ -2044,6 +2053,11 @@ static Descriptor descriptor_void;
 static Descriptor descriptor_void_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_descriptor_pointer;
+static Descriptor descriptor_bits;
+static Descriptor descriptor_array_bits;
+static Descriptor descriptor_array_bits_ptr;
+static Descriptor descriptor_bits_pointer;
+static Descriptor descriptor_bits_pointer_pointer;
 static Descriptor descriptor_source_position;
 static Descriptor descriptor_array_source_position;
 static Descriptor descriptor_array_source_position_ptr;
@@ -2700,6 +2714,19 @@ static Descriptor descriptor_overload_set_pointer_16 = MASS_DESCRIPTOR_STATIC_AR
 static Descriptor descriptor_u8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_u8);
 static Descriptor descriptor_u8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_u8);
 static Descriptor descriptor_operand_encoding_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Operand_Encoding, 3, &descriptor_operand_encoding);
+MASS_DEFINE_OPAQUE_C_TYPE(array_bits_ptr, Array_Bits_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_bits, Array_Bits)
+MASS_DEFINE_STRUCT_DESCRIPTOR(bits, Bits,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_u64,
+      .name = slice_literal_fields("as_u64"),
+    },
+    .Base_Relative.offset = offsetof(Bits, as_u64),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(bits);
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position_ptr, Array_Source_Position_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_source_position, Array_Source_Position)
 MASS_DEFINE_STRUCT_DESCRIPTOR(source_position, Source_Position,
@@ -5607,7 +5634,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(descriptor, Descriptor,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_u64,
+      .descriptor = &descriptor_bits,
       .name = slice_literal_fields("bit_size"),
     },
     .Base_Relative.offset = offsetof(Descriptor, bit_size),

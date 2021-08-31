@@ -1088,6 +1088,9 @@ set_flags(
 
 int
 main(void) {
+  push_type(type_struct("Bits", (Struct_Item[]){
+    { "u64", "as_u64" },
+  }));
 
   push_type(type_struct("Source_Position", (Struct_Item[]){
     { "u64", "line" },
@@ -1744,7 +1747,7 @@ main(void) {
     }),
   }), (Struct_Item[]){
     { "Slice", "name" },
-    { "u64", "bit_size" },
+    { "Bits", "bit_size" },
     { "u64", "bit_alignment" },
   })));
 

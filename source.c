@@ -2693,7 +2693,7 @@ token_process_c_struct_definition(
       u64 field_bit_alignment = descriptor_bit_alignment(field_descriptor);
       struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
       u64 field_bit_offset = struct_bit_size;
-      struct_bit_size += field_descriptor->bit_size;
+      struct_bit_size += field_descriptor->bit_size.as_u64;
       struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
 
       u64 field_byte_offset = (field_bit_offset + (CHAR_BIT - 1)) / CHAR_BIT;
@@ -2718,7 +2718,7 @@ token_process_c_struct_definition(
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
-    .bit_size = struct_bit_size,
+    .bit_size = {struct_bit_size},
     .bit_alignment = struct_bit_alignment,
     .Struct = {
       .memory_layout = {

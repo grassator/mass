@@ -22,7 +22,7 @@
 #define MASS_DESCRIPTOR_STATIC_ARRAY(_C_TYPE_, _LENGTH_, ...)\
   {\
     .tag = Descriptor_Tag_Fixed_Size_Array,\
-    .bit_size = (sizeof(_C_TYPE_) * CHAR_BIT * (_LENGTH_)),\
+    .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT * (_LENGTH_)},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
     .Fixed_Size_Array = {\
       .item = (__VA_ARGS__),\
@@ -34,7 +34,7 @@
   static Descriptor descriptor_##_NAME_##_pointer = {\
     .tag = Descriptor_Tag_Pointer_To,\
     .name = slice_literal_fields(#_NAME_),\
-    .bit_size = (sizeof(void *) * CHAR_BIT),\
+    .bit_size = {sizeof(void *) * CHAR_BIT},\
     .bit_alignment = _Alignof(void *) * CHAR_BIT,\
     .Pointer_To.descriptor = &descriptor_##_NAME_,\
   }
@@ -43,7 +43,7 @@
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Opaque,\
     .name = slice_literal_fields(#_NAME_),\
-    .bit_size = (_BIT_SIZE_),\
+    .bit_size = {_BIT_SIZE_},\
     .bit_alignment = (_BIT_ALIGNMENT_),\
   };\
   MASS_DEFINE_POINTER_DESCRIPTOR(_NAME_);\
@@ -57,7 +57,7 @@
   static Descriptor descriptor_##_NAME_ = {\
     .tag = Descriptor_Tag_Struct,\
     .name = slice_literal_fields(#_NAME_),\
-    .bit_size = (sizeof(_C_TYPE_) * CHAR_BIT),\
+    .bit_size = {sizeof(_C_TYPE_) * CHAR_BIT},\
     .bit_alignment = _Alignof(_C_TYPE_) * CHAR_BIT,\
     .Struct = {\
       .memory_layout = {\
