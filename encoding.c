@@ -334,11 +334,9 @@ encoding_match(
       const Storage *storage = &assembly->operands[storage_index];
       u32 encoding_size = s32_to_u32(operand_encoding->size);
 
-      if (operand_encoding->size != Operand_Size_Any) {
-        if (storage->byte_size != encoding_size) {
-          encoding = 0;
-          break;
-        }
+      if (storage->byte_size != encoding_size) {
+        encoding = 0;
+        break;
       }
       if (
         storage->tag == Storage_Tag_Eflags &&

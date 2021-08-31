@@ -25,7 +25,6 @@
 #define r_m32 { Operand_Encoding_Type_Register_Memory, Operand_Size_32 }
 #define r_m64 { Operand_Encoding_Type_Register_Memory, Operand_Size_64 }
 
-#define m   { Operand_Encoding_Type_Memory, Operand_Size_Any }
 #define m8  { Operand_Encoding_Type_Memory, Operand_Size_8 }
 #define m16 { Operand_Encoding_Type_Memory, Operand_Size_16 }
 #define m32 { Operand_Encoding_Type_Memory, Operand_Size_32 }
@@ -114,7 +113,7 @@ mnemonic(rep_movsb,
 );
 
 mnemonic(lea,
-  encoding(0x8d, _r, r64, m),
+  encoding(0x8d, _r, r64, m64),
 );
 
 mnemonic(int3,

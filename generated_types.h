@@ -686,7 +686,6 @@ typedef dyn_array_type(Operand_Encoding_Type *) Array_Operand_Encoding_Type_Ptr;
 typedef dyn_array_type(const Operand_Encoding_Type *) Array_Const_Operand_Encoding_Type_Ptr;
 
 typedef enum Operand_Size {
-  Operand_Size_Any = 0,
   Operand_Size_8 = 1,
   Operand_Size_16 = 2,
   Operand_Size_32 = 4,
@@ -694,7 +693,6 @@ typedef enum Operand_Size {
 } Operand_Size;
 
 const char *operand_size_name(Operand_Size value) {
-  if (value == 0) return "Operand_Size_Any";
   if (value == 1) return "Operand_Size_8";
   if (value == 2) return "Operand_Size_16";
   if (value == 4) return "Operand_Size_32";
@@ -6488,7 +6486,6 @@ static C_Enum_Item operand_encoding_type_items[] = {
 };
 MASS_DEFINE_OPAQUE_C_TYPE(operand_size, Operand_Size)
 static C_Enum_Item operand_size_items[] = {
-{ .name = slice_literal_fields("Any"), .value = 0 },
 { .name = slice_literal_fields("8"), .value = 1 },
 { .name = slice_literal_fields("16"), .value = 2 },
 { .name = slice_literal_fields("32"), .value = 4 },

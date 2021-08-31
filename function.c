@@ -598,19 +598,30 @@ load_address(
   assert(source.tag == Storage_Tag_Memory);
 
   bool can_reuse_result_as_temp = result_value->storage.tag == Storage_Tag_Register;
-  Storage temp_storage = can_reuse_result_as_temp
+  Storage register_storage = can_reuse_result_as_temp
     ? result_value->storage
     : storage_register_for_descriptor(register_acquire_temp(builder), result_value->descriptor);
 
+
+  // `LEA` is a weird instruction in that the size of the operands affects
+  // what the instruction *does*, instead of describing the operands.
+  // For the purposes of this compiler we always want it to generate 64-bit
+  // effective address and then store that full address in the target register.
+  // This is why here we are forcing the source memory operand to be 8 bytes
+  // and check that the target register is also 8 bytes in size.
+  Storage adjusted_source = source;
+  adjusted_source.byte_size = 8;
+  assert(register_storage.byte_size == 8);
+
   push_eagerly_encoded_assembly(
     &builder->code_block, *source_range,
-    &(Instruction_Assembly){lea, {temp_storage, source}}
+    &(Instruction_Assembly){lea, {register_storage, adjusted_source}}
   );
 
   if (!can_reuse_result_as_temp) {
-    assert(temp_storage.tag == Storage_Tag_Register);
-    move_value(context->allocator, builder, source_range, &result_value->storage, &temp_storage);
-    register_release(builder, temp_storage.Register.index);
+    assert(register_storage.tag == Storage_Tag_Register);
+    move_value(context->allocator, builder, source_range, &result_value->storage, &register_storage);
+    register_release(builder, register_storage.Register.index);
   }
 }
 

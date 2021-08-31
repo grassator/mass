@@ -1937,7 +1937,6 @@ main(void) {
   }));
 
   push_type(type_enum("Operand_Size", (Enum_Type_Item[]){
-    { "Any", 0 },
     { "8", 1 },
     { "16", 2 },
     { "32", 4 },
