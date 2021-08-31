@@ -65,7 +65,7 @@ typedef struct {
   bool saved;
 } Maybe_Saved_Register;
 
-Maybe_Saved_Register
+static Maybe_Saved_Register
 register_acquire_maybe_save_if_already_acquired(
   Allocator *allocator,
   Function_Builder *builder,
@@ -98,7 +98,7 @@ register_acquire_maybe_save_if_already_acquired(
   return result;
 }
 
-void
+static inline void
 register_release_maybe_restore(
   Function_Builder *builder,
   const Maybe_Saved_Register *maybe_saved_register
@@ -117,7 +117,7 @@ register_release_maybe_restore(
   }
 }
 
-void
+static void
 move_value(
   Allocator *allocator,
   Function_Builder *builder,
@@ -484,7 +484,7 @@ fn_encode(
   out_layout->end_rva = u64_to_u32(code_base_rva + buffer->occupied);
 }
 
-Label_Index
+static Label_Index
 make_if(
   Execution_Context *context,
   Function_Builder *builder,

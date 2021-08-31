@@ -1471,10 +1471,6 @@ value_view_match_till_end_of_statement(
   return value_view_match_till(view, peek_index, &token_pattern_semicolon);
 }
 
-#define Token_Maybe_Match(_id_, ...)\
-  Value *(_id_) = token_peek_match(view, peek_index, &(Token_Pattern) { __VA_ARGS__ });\
-  if (_id_) (++peek_index)
-
 static inline Value *
 token_expect_match(
   Execution_Context *context,
@@ -1494,8 +1490,14 @@ token_expect_match(
   return result;
 }
 
+#define Token_Maybe_Match(_id_, ...)\
+  static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
+  Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
+  if (_id_) (++peek_index)
+
 #define Token_Expect_Match(_id_, ...)\
-  Value *(_id_) = token_expect_match(context, view, &peek_index, &(Token_Pattern) { __VA_ARGS__ });\
+  static Token_Pattern _id_##__pattern = { __VA_ARGS__ };\
+  Value *(_id_) = token_expect_match(context, view, &peek_index, &_id_##__pattern);\
   (void)(_id_);\
   MASS_ON_ERROR(*context->result) return 0
 
@@ -1504,7 +1506,7 @@ token_expect_match(
   if (!(_id_)) return 0
 
 #define Token_Match_Operator(_id_, _op_)\
-  Token_Match(_id_, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal(_op_))
+  Token_Match(_id_, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields(_op_))
 
 typedef struct {
   Slice name;
@@ -2250,7 +2252,7 @@ token_parse_exports(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   u64 peek_index = 0;
-  Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("exports"));
+  Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("exports"));
   Token_Expect_Match(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
 
   if (context->module->export.tag != Module_Export_Tag_None) {
@@ -2314,7 +2316,7 @@ token_parse_operator_definition(
   User_Defined_Operator *user_defined_operator = 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("operator"));
+  Token_Match(keyword_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("operator"));
 
   Token_Maybe_Match(precedence_token, .tag = Token_Pattern_Tag_Any);
 
@@ -2495,8 +2497,8 @@ token_parse_syntax_definition(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(name, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("syntax"));
-  Token_Expect_Match(statement_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("statement"));
+  Token_Match(name, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("syntax"));
+  Token_Expect_Match(statement_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("statement"));
 
   Token_Expect_Match(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
@@ -5180,7 +5182,7 @@ token_parse_if_expression(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("if"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("if"));
 
   Source_Range dummy_range = keyword->source_range;
 
@@ -5270,8 +5272,8 @@ token_parse_intrinsic_literal(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("intrinsic"));
+  Token_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("@"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("intrinsic"));
   Token_Expect_Match(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
   if (peek_index != view.length) {
     context_error(context, (Mass_Error) {
@@ -5477,10 +5479,10 @@ token_parse_function_literal(
 
   u64 peek_index = 0;
   bool is_macro = false;
-  Token_Maybe_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("@"));
-  Token_Maybe_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("fn"));
+  Token_Maybe_Match(at, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("@"));
+  Token_Maybe_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("fn"));
   if (!keyword) {
-    Token_Maybe_Match(macro, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("macro"));
+    Token_Maybe_Match(macro, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("macro"));
     keyword = macro;
     is_macro = true;
   }
@@ -5499,7 +5501,7 @@ token_parse_function_literal(
   Token_Expect_Match(args, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   Value *returns;
-  Token_Maybe_Match(arrow, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("->"));
+  Token_Maybe_Match(arrow, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("->"));
   if (arrow) {
     Token_Expect_Match(raw_return, .tag = Token_Pattern_Tag_Any);
     returns = raw_return;
@@ -5918,7 +5920,7 @@ token_parse_statement_using(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("using"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("using"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
   Value *result = compile_time_eval(context, rest);
@@ -5982,8 +5984,8 @@ token_parse_statement_label(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("label"));
-  Token_Maybe_Match(placeholder, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("placeholder"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("label"));
+  Token_Maybe_Match(placeholder, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("placeholder"));
 
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
 
@@ -6056,7 +6058,7 @@ token_parse_explicit_return(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("return"));
+  Token_Match(keyword, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("return"));
   Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
   bool has_return_expression = rest.length > 0;
 
@@ -6171,7 +6173,7 @@ token_parse_inline_machine_code_bytes(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
   u64 peek_index = 0;
-  Token_Match(id_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal("inline_machine_code_bytes"));
+  Token_Match(id_token, .tag = Token_Pattern_Tag_Symbol, .Symbol.name = slice_literal_fields("inline_machine_code_bytes"));
   Token_Maybe_Match(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
   if (!args_token) {
     context_error(context, (Mass_Error) {
