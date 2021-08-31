@@ -664,7 +664,6 @@ mark_occupied_registers(
       }
       break;
     }
-    case Storage_Tag_Any:
     case Storage_Tag_Static:
     case Storage_Tag_Eflags: {
       panic("Unexpected storage tag for an argument");
@@ -698,7 +697,6 @@ function_return_value_register_from_storage(
     }
     case Storage_Tag_None:
     case Storage_Tag_Unpacked:
-    case Storage_Tag_Any:
     case Storage_Tag_Static:
     case Storage_Tag_Eflags: {
       break;

@@ -761,9 +761,6 @@
   <DisplayString Condition="tag == Storage_Tag_None">
     None
   </DisplayString>
-  <DisplayString Condition="tag == Storage_Tag_Any">
-    Any
-  </DisplayString>
   <DisplayString Condition="tag == Storage_Tag_Eflags">
     Eflags { Eflags }
   </DisplayString>

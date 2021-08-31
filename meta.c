@@ -1337,7 +1337,6 @@ main(void) {
 
   push_type(add_common_fields(type_union("Storage", (Struct_Type[]){
     struct_empty("None"),
-    struct_empty("Any"),
     struct_fields("Eflags", (Struct_Item[]){
       { "Compare_Type", "compare_type" },
     }),

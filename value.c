@@ -455,10 +455,6 @@ print_storage(
       printf("_");
       break;
     }
-    case Storage_Tag_Any: {
-      printf("any");
-      break;
-    }
     case Storage_Tag_Eflags: {
       printf("eflags");
       break;
@@ -772,7 +768,6 @@ storage_with_offset_and_bit_size(
   u64 byte_size = bit_size.as_u64 / 8;
   switch(base->tag) {
     default:
-    case Storage_Tag_Any:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:
     case Storage_Tag_None: {
@@ -1037,9 +1032,6 @@ storage_equal(
         a->Register.index == b->Register.index &&
         a->Register.offset_in_bits == b->Register.offset_in_bits
       );
-    }
-    case Storage_Tag_Any: {
-      return false; // Is this the semantics I want though?
     }
     case Storage_Tag_None: {
       return true;
@@ -1410,7 +1402,6 @@ value_release_if_temporary(
       register_release(builder, value->storage.Unpacked.registers[1]);
       break;
     }
-    case Storage_Tag_Any:
     case Storage_Tag_None:
     case Storage_Tag_Eflags:
     case Storage_Tag_Static: {

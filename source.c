@@ -88,7 +88,6 @@ expected_result_validate(
       }
       switch(actual_value->storage.tag) {
         case Storage_Tag_None: break;
-        case Storage_Tag_Any: break;
         case Storage_Tag_Eflags: {
           assert(flexible->storage & Expected_Result_Storage_Eflags);
           break;
@@ -445,7 +444,6 @@ value_indirect_from_reference(
     case Storage_Tag_Unpacked:
     case Storage_Tag_Static:
     case Storage_Tag_None:
-    case Storage_Tag_Any:
     case Storage_Tag_Eflags:
     case Storage_Tag_Xmm:{
       panic("Unexpected storage for a reference");
@@ -3154,7 +3152,6 @@ register_bitset_from_storage(
       break;
     }
     default:
-    case Storage_Tag_Any:
     case Storage_Tag_Eflags: {
       panic("Internal Error: Unexpected storage type for a function argument");
       break;

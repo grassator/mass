@@ -1150,13 +1150,12 @@ static_memory_as_heap(Static_Memory *static_memory) {
 typedef dyn_array_type(Static_Memory) Array_Static_Memory;
 typedef enum {
   Storage_Tag_None = 0,
-  Storage_Tag_Any = 1,
-  Storage_Tag_Eflags = 2,
-  Storage_Tag_Register = 3,
-  Storage_Tag_Xmm = 4,
-  Storage_Tag_Static = 5,
-  Storage_Tag_Memory = 6,
-  Storage_Tag_Unpacked = 7,
+  Storage_Tag_Eflags = 1,
+  Storage_Tag_Register = 2,
+  Storage_Tag_Xmm = 3,
+  Storage_Tag_Static = 4,
+  Storage_Tag_Memory = 5,
+  Storage_Tag_Unpacked = 6,
 } Storage_Tag;
 
 typedef struct Storage_Eflags {
@@ -3677,13 +3676,12 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_storage, Array_Storage)
 MASS_DEFINE_OPAQUE_C_TYPE(storage_tag, Storage_Tag)
 static C_Enum_Item storage_tag_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
-{ .name = slice_literal_fields("Any"), .value = 1 },
-{ .name = slice_literal_fields("Eflags"), .value = 2 },
-{ .name = slice_literal_fields("Register"), .value = 3 },
-{ .name = slice_literal_fields("Xmm"), .value = 4 },
-{ .name = slice_literal_fields("Static"), .value = 5 },
-{ .name = slice_literal_fields("Memory"), .value = 6 },
-{ .name = slice_literal_fields("Unpacked"), .value = 7 },
+{ .name = slice_literal_fields("Eflags"), .value = 1 },
+{ .name = slice_literal_fields("Register"), .value = 2 },
+{ .name = slice_literal_fields("Xmm"), .value = 3 },
+{ .name = slice_literal_fields("Static"), .value = 4 },
+{ .name = slice_literal_fields("Memory"), .value = 5 },
+{ .name = slice_literal_fields("Unpacked"), .value = 6 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(storage_eflags, Storage_Eflags,
   {
