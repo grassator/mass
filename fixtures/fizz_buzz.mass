@@ -20,7 +20,6 @@ fizz_buzz :: fn() {
 
 main :: fn() {
   process :: import("std/process")
-
   fizz_buzz()
   process.exit(0)
 }

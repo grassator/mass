@@ -20,8 +20,8 @@ syntax statement("while" ..@condition {}@body) {
   label _loop_start
   label placeholder _loop_done
 
-  syntax statement("break") { goto _loop_done }
-  syntax statement("continue") { goto _loop_start }
+  break :: ~> { goto _loop_done }
+  continue :: ~> { goto _loop_start }
   if condition() {
     body(@scope)
     goto _loop_start
@@ -34,8 +34,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_start
   label placeholder _loop_post
   label placeholder _loop_done
-  syntax statement("break") { goto _loop_done }
-  syntax statement("continue") { goto _loop_post }
+  break :: ~> { goto _loop_done }
+  continue :: ~> { goto _loop_post }
   if condition() {
     body(@scope)
     label _loop_post
@@ -45,7 +45,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_end
 }
 
-syntax statement("debugger") { inline_machine_code_bytes(0xCC) }
+debugger :: ~> { inline_machine_code_bytes(0xCC) }
+
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
 
 String :: Slice
