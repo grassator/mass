@@ -150,10 +150,9 @@ Array :: fn(item : Type, length : u64) -> (Type) {
   byte_alignment :: mass.Descriptor.bit_alignment.as_u64 * 8
   t : Type = mass.allocator_allocate_bytes(mass.allocator, byte_size, byte_alignment)
   t.tag = mass.Descriptor_Tag.Fixed_Size_Array
-  t.bit_size.as_u64 = item.bit_size.as_u64 * length
+  t.bit_size = [item.bit_size.as_u64 * length]
   t.bit_alignment = item.bit_alignment
-  t.Fixed_Size_Array.item = item
-  t.Fixed_Size_Array.length = length
+  t.Fixed_Size_Array = [item, length]
   t
 }
 
