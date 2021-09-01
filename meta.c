@@ -1723,6 +1723,11 @@ main(void) {
     { "Array_Value_Ptr", "items"},
   }));
 
+  push_type(type_struct("Code_Fragment", (Struct_Item[]){
+    { "Scope *", "scope"},
+    { "Value_View", "children"},
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){

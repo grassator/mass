@@ -4699,6 +4699,27 @@ mass_handle_apply_operator(
 }
 
 static Value *
+mass_handle_fragment(
+  Execution_Context *context,
+  Value_View args_view,
+  void *unused_payload
+) {
+  assert(args_view.length == 1);
+  // TODO consider using empty space operator instead
+  Value *source_value = value_view_get(args_view, 0);
+  assert(value_is_group(source_value)); // TODO user error
+  const Group *group = value_as_group(source_value);
+  assert(group->tag == Group_Tag_Curly); // TODO user error
+  Code_Fragment *fragment = allocator_allocate(context->allocator, Code_Fragment);
+  *fragment = (Code_Fragment) {
+    .scope = context->scope,
+    .children = group->children,
+  };
+
+  return value_make(context, &descriptor_code_fragment, storage_static(fragment), args_view.source_range);
+}
+
+static Value *
 mass_handle_reflect_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -5834,6 +5855,16 @@ token_parse_block_view(
     }
     Value *parse_result =
       token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
+    MASS_ON_ERROR(*context->result) goto defer;
+
+    if (
+      parse_result->descriptor == &descriptor_code_fragment &&
+      parse_result->storage.tag == Storage_Tag_Static
+    ) {
+      // TODO consider changing the scope
+      const Code_Fragment *fragment = storage_static_as_c_type(&parse_result->storage, Code_Fragment);
+      parse_result = token_parse_block_view(context, fragment->children);
+    }
     dyn_array_push(temp_lazy_statements, parse_result);
 
     if (match_length) continue;
@@ -6563,6 +6594,13 @@ scope_define_builtins(
     slice_literal("Type"), type_descriptor_pointer_value
   );
 
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("~>"), allocator_make(allocator, Operator,
+    .precedence = 30,
+    .fixity = Operator_Fixity_Prefix,
+    .associativity = Operator_Associativity_Right,
+    .argument_count = 1,
+    .handler = mass_handle_fragment,
+  )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
     .precedence = 30,
     .fixity = Operator_Fixity_Prefix,

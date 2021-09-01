@@ -593,6 +593,10 @@ typedef struct Tuple Tuple;
 typedef dyn_array_type(Tuple *) Array_Tuple_Ptr;
 typedef dyn_array_type(const Tuple *) Array_Const_Tuple_Ptr;
 
+typedef struct Code_Fragment Code_Fragment;
+typedef dyn_array_type(Code_Fragment *) Array_Code_Fragment_Ptr;
+typedef dyn_array_type(const Code_Fragment *) Array_Const_Code_Fragment_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -1678,6 +1682,12 @@ typedef struct Tuple {
 } Tuple;
 typedef dyn_array_type(Tuple) Array_Tuple;
 
+typedef struct Code_Fragment {
+  Scope * scope;
+  Value_View children;
+} Code_Fragment;
+typedef dyn_array_type(Code_Fragment) Array_Code_Fragment;
+
 typedef enum {
   Descriptor_Tag_Opaque = 0,
   Descriptor_Tag_Function_Instance = 1,
@@ -2463,6 +2473,11 @@ static Descriptor descriptor_array_tuple;
 static Descriptor descriptor_array_tuple_ptr;
 static Descriptor descriptor_tuple_pointer;
 static Descriptor descriptor_tuple_pointer_pointer;
+static Descriptor descriptor_code_fragment;
+static Descriptor descriptor_array_code_fragment;
+static Descriptor descriptor_array_code_fragment_ptr;
+static Descriptor descriptor_code_fragment_pointer;
+static Descriptor descriptor_code_fragment_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -5521,6 +5536,27 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(tuple, Tuple,
   },
 );
 MASS_DEFINE_TYPE_VALUE(tuple);
+MASS_DEFINE_OPAQUE_C_TYPE(array_code_fragment_ptr, Array_Code_Fragment_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_code_fragment, Array_Code_Fragment)
+MASS_DEFINE_STRUCT_DESCRIPTOR(code_fragment, Code_Fragment,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_scope_pointer,
+      .name = slice_literal_fields("scope"),
+    },
+    .Base_Relative.offset = offsetof(Code_Fragment, scope),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .declaration = {
+      .descriptor = &descriptor_value_view,
+      .name = slice_literal_fields("children"),
+    },
+    .Base_Relative.offset = offsetof(Code_Fragment, children),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(code_fragment);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)

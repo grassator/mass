@@ -1592,6 +1592,19 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to should be able to handle fragment statement") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "test_fragment :: ~> { return 42 }\n"
+        "checker :: fn() -> (s64) {\n"
+          "test_fragment\n"
+          "21"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to define and use a syntax macro matching a curly brace block") {
       s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
         "checker", &test_context,
