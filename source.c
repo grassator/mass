@@ -5861,9 +5861,11 @@ token_parse_block_view(
       parse_result->descriptor == &descriptor_code_fragment &&
       parse_result->storage.tag == Storage_Tag_Static
     ) {
-      // TODO consider changing the scope
       const Code_Fragment *fragment = storage_static_as_c_type(&parse_result->storage, Code_Fragment);
+      Scope *saved_scope = context->scope;
+      context->scope = fragment->scope;
       parse_result = token_parse_block_view(context, fragment->children);
+      context->scope = saved_scope;
     }
     dyn_array_push(temp_lazy_statements, parse_result);
 
