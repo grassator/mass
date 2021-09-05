@@ -474,11 +474,12 @@ print_scope_define_function(
     Argument_Type *arg = &function->arguments[i];
     if (i != 0) fprintf(file, ",\n");
     if (arg->maybe_default_expression) {
-      fprintf(file, "    MASS_FN_ARG_WITH_DEFAULT(\"%s\", "DEFAULT_EXPR_FORMAT", &",
+      fprintf(file, "    function_parameter_with_default(slice_literal(\"%s\"), "DEFAULT_EXPR_FORMAT,
         arg->name, function->name, arg->name);
     } else {
-      fprintf(file, "    MASS_FN_ARG(\"%s\", &", arg->name);
+      fprintf(file, "    function_parameter(slice_literal(\"%s\")", arg->name);
     }
+    fprintf(file, ", &");
     print_mass_struct_descriptor_type(file, arg->type);
     fprintf(file, ")");
   }
@@ -1657,6 +1658,7 @@ main(void) {
     { "Value_View", "maybe_default_expression" },
   }));
 
+  // TODO rename to Function_Info_Flags
   push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Compile_Time", 1 << 1 },

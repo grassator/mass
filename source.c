@@ -6571,8 +6571,8 @@ module_compiler_init(
   MASS_DEFINE_FUNCTION(
     Descriptor_Function_Flags_None,
     compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
-    MASS_FN_ARG("context", &descriptor_execution_context_pointer),
-    MASS_FN_ARG("view", &descriptor_value_view),
+    function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
+    function_parameter(slice_literal("view"), &descriptor_value_view),
   );
 }
 

@@ -15,6 +15,31 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
   .offsets = {0},
 };
 
+static inline Function_Parameter
+function_parameter_with_default(
+  Slice name,
+  Value_View default_expression,
+  const Descriptor *descriptor
+) {
+   return (Function_Parameter){
+    .tag = Function_Parameter_Tag_Runtime,
+    .declaration = {
+      .name = name,
+      .descriptor = descriptor,
+      .source_range = COMPILER_SOURCE_RANGE,
+    },
+    .maybe_default_expression = default_expression,
+  };
+}
+
+static  inline Function_Parameter
+function_parameter(
+  Slice name,
+  const Descriptor *descriptor
+) {
+  return function_parameter_with_default(name, (Value_View){0}, descriptor);
+}
+
 typedef struct {
   u64 occupied;
 } Temp_Mark;

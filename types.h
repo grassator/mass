@@ -91,16 +91,6 @@
 #define MASS_DEFINE_OPAQUE_C_TYPE(_NAME_, _C_TYPE_)\
   MASS_DEFINE_OPAQUE_TYPE(_NAME_, sizeof(_C_TYPE_) * CHAR_BIT, _Alignof(_C_TYPE_) * CHAR_BIT)
 
-#define MASS_FN_ARG(_NAME_, _DESCRIPTOR_)\
-  {\
-    .tag = Function_Parameter_Tag_Runtime,\
-    .declaration = {\
-      .name = slice_literal_fields(_NAME_),\
-      .descriptor = (_DESCRIPTOR_),\
-      .source_range = COMPILER_SOURCE_RANGE,\
-    },\
-  }
-
 #define MASS_FN_ARG_DEFAULT_EXPRESSION(_VAR_NAME_, _EXPR_)\
   Value_View _VAR_NAME_;\
   {\
@@ -110,17 +100,6 @@
       .text = slice_literal(_EXPR_),\
     };\
     MASS_ON_ERROR(tokenize(compilation, fake_file, &_VAR_NAME_)) panic("unreached");\
-  }
-
-#define MASS_FN_ARG_WITH_DEFAULT(_NAME_, _VIEW_, _DESCRIPTOR_)\
-  {\
-    .tag = Function_Parameter_Runtime,\
-    .declaration = {\
-      .name = slice_literal_fields(_NAME_),\
-      .descriptor = (_DESCRIPTOR_),\
-      .source_range = COMPILER_SOURCE_RANGE,\
-    },\
-    .maybe_default_expression = (_VIEW_),\
   }
 
 #define MASS_DEFINE_FUNCTION_INFO_HELPER(_FLAGS_, _RETURN_DESCRIPTOR_, ...)\
