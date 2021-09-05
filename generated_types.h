@@ -516,22 +516,22 @@ typedef struct Function_Parameter Function_Parameter;
 typedef dyn_array_type(Function_Parameter *) Array_Function_Parameter_Ptr;
 typedef dyn_array_type(const Function_Parameter *) Array_Const_Function_Parameter_Ptr;
 
-typedef enum Descriptor_Function_Flags {
-  Descriptor_Function_Flags_None = 0,
-  Descriptor_Function_Flags_Compile_Time = 2,
-  Descriptor_Function_Flags_Intrinsic = 4,
-} Descriptor_Function_Flags;
+typedef enum Function_Info_Flags {
+  Function_Info_Flags_None = 0,
+  Function_Info_Flags_Compile_Time = 2,
+  Function_Info_Flags_Intrinsic = 4,
+} Function_Info_Flags;
 
-const char *descriptor_function_flags_name(Descriptor_Function_Flags value) {
-  if (value == 0) return "Descriptor_Function_Flags_None";
-  if (value == 2) return "Descriptor_Function_Flags_Compile_Time";
-  if (value == 4) return "Descriptor_Function_Flags_Intrinsic";
-  assert(!"Unexpected value for enum Descriptor_Function_Flags");
+const char *function_info_flags_name(Function_Info_Flags value) {
+  if (value == 0) return "Function_Info_Flags_None";
+  if (value == 2) return "Function_Info_Flags_Compile_Time";
+  if (value == 4) return "Function_Info_Flags_Intrinsic";
+  assert(!"Unexpected value for enum Function_Info_Flags");
   return 0;
 };
 
-typedef dyn_array_type(Descriptor_Function_Flags *) Array_Descriptor_Function_Flags_Ptr;
-typedef dyn_array_type(const Descriptor_Function_Flags *) Array_Const_Descriptor_Function_Flags_Ptr;
+typedef dyn_array_type(Function_Info_Flags *) Array_Function_Info_Flags_Ptr;
+typedef dyn_array_type(const Function_Info_Flags *) Array_Const_Function_Info_Flags_Ptr;
 
 typedef struct Function_Return Function_Return;
 typedef dyn_array_type(Function_Return *) Array_Function_Return_Ptr;
@@ -1620,7 +1620,7 @@ typedef struct Function_Return {
 typedef dyn_array_type(Function_Return) Array_Function_Return;
 
 typedef struct Function_Info {
-  Descriptor_Function_Flags flags;
+  Function_Info_Flags flags;
   u32 _flags_padding;
   Scope * scope;
   Array_Function_Parameter parameters;
@@ -2419,12 +2419,12 @@ static Descriptor descriptor_array_function_parameter_ptr;
 static Descriptor descriptor_array_const_function_parameter_ptr;
 static Descriptor descriptor_function_parameter_pointer;
 static Descriptor descriptor_function_parameter_pointer_pointer;
-static Descriptor descriptor_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags;
-static Descriptor descriptor_array_descriptor_function_flags_ptr;
-static Descriptor descriptor_array_const_descriptor_function_flags_ptr;
-static Descriptor descriptor_descriptor_function_flags_pointer;
-static Descriptor descriptor_descriptor_function_flags_pointer_pointer;
+static Descriptor descriptor_function_info_flags;
+static Descriptor descriptor_array_function_info_flags;
+static Descriptor descriptor_array_function_info_flags_ptr;
+static Descriptor descriptor_array_const_function_info_flags_ptr;
+static Descriptor descriptor_function_info_flags_pointer;
+static Descriptor descriptor_function_info_flags_pointer_pointer;
 static Descriptor descriptor_function_return;
 static Descriptor descriptor_array_function_return;
 static Descriptor descriptor_array_function_return_ptr;
@@ -5258,8 +5258,8 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_parameter, Function_Parameter,
 );
 MASS_DEFINE_TYPE_VALUE(function_parameter);
 /*union struct end*/
-MASS_DEFINE_OPAQUE_C_TYPE(descriptor_function_flags, Descriptor_Function_Flags)
-static C_Enum_Item descriptor_function_flags_items[] = {
+MASS_DEFINE_OPAQUE_C_TYPE(function_info_flags, Function_Info_Flags)
+static C_Enum_Item function_info_flags_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("Compile_Time"), .value = 2 },
 { .name = slice_literal_fields("Intrinsic"), .value = 4 },
@@ -5291,7 +5291,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_info, Function_Info,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_descriptor_function_flags,
+      .descriptor = &descriptor_function_info_flags,
       .name = slice_literal_fields("flags"),
     },
     .Base_Relative.offset = offsetof(Function_Info, flags),

@@ -154,135 +154,135 @@ compiler_scope_define_exports(
     slice_literal("Result_Error"), type_mass_result_error_value
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Function_Info_Flags_None,
     tokenize, "tokenize", &descriptor_mass_result,
     function_parameter(slice_literal("compilation"), &descriptor_compilation_pointer),
     function_parameter(slice_literal("file"), &descriptor_source_file_pointer),
     function_parameter(slice_literal("out_tokens"), &descriptor_value_view_pointer)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_address_of, "address_of", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_type_of, "type_of", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_size_of, "size_of", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Function_Info_Flags_None,
     allocator_allocate_bytes, "allocator_allocate_bytes", &descriptor_void_pointer,
     function_parameter(slice_literal("allocator"), &descriptor_allocator_pointer),
     function_parameter(slice_literal("byte_size"), &descriptor_u64),
     function_parameter(slice_literal("byte_alignment"), &descriptor_u64)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
     function_parameter(slice_literal("allocator"), &descriptor_allocator_pointer),
     function_parameter(slice_literal("descriptor"), &descriptor_descriptor_pointer)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_number_literal_logical_shift_left, "number_literal_logical_shift_left", &descriptor_number_literal,
     function_parameter(slice_literal("input"), &descriptor_number_literal),
     function_parameter(slice_literal("shift"), &descriptor_number_literal)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_number_literal_logical_shift_right, "number_literal_logical_shift_right", &descriptor_number_literal,
     function_parameter(slice_literal("input"), &descriptor_number_literal),
     function_parameter(slice_literal("shift"), &descriptor_number_literal)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_number_literal_bitwise_or, "number_literal_bitwise_or", &descriptor_number_literal,
     function_parameter(slice_literal("a"), &descriptor_number_literal),
     function_parameter(slice_literal("b"), &descriptor_number_literal)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time,
     mass_number_literal_bitwise_and, "number_literal_bitwise_and", &descriptor_number_literal,
     function_parameter(slice_literal("a"), &descriptor_number_literal),
     function_parameter(slice_literal("b"), &descriptor_number_literal)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_add, "add", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_subtract, "subtract", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_multiply, "multiply", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_divide, "divide", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_remainder, "remainder", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_less, "less", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_greater, "greater", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_less_equal, "less_equal", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_greater_equal, "greater_equal", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_equal, "equal", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_not_equal, "not_equal", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)
@@ -308,7 +308,7 @@ global_scope_define_exports(
     slice_literal("Number_Literal"), type_number_literal_value
   );
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None | Descriptor_Function_Flags_Compile_Time | Descriptor_Function_Flags_Intrinsic,
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_import, "import", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("args"), &descriptor_value_view)

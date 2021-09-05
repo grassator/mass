@@ -3685,7 +3685,7 @@ mass_match_overload_candidate(
       score = -1;
     } else {
       overload_info = maybe_function_info_from_value(candidate, args);
-      if (overload_info->flags & Descriptor_Function_Flags_Intrinsic) {
+      if (overload_info->flags & Function_Info_Flags_Intrinsic) {
         score = 0;
       } else {
         score = calculate_arguments_match_score(overload_info, args);
@@ -3782,7 +3782,7 @@ value_is_intrinsic(
   Value *value
 ) {
   const Function_Info *info = maybe_function_info_from_value(value, (Value_View){0});
-  return !!(info && info->flags & Descriptor_Function_Flags_Intrinsic);
+  return !!(info && info->flags & Function_Info_Flags_Intrinsic);
 }
 
 static Value *
@@ -3867,7 +3867,7 @@ token_handle_function_call(
   MASS_ON_ERROR(*context->result) return 0;
   if (
     overload != context->current_compile_time_function_call_target &&
-    info && (info->flags & Descriptor_Function_Flags_Compile_Time)
+    info && (info->flags & Function_Info_Flags_Compile_Time)
   ) {
     // It is important to create a new value with the range of the original expression,
     // otherwise Value_View slicing will not work correctly
@@ -3877,7 +3877,7 @@ token_handle_function_call(
     const Value *saved_call_target = context->current_compile_time_function_call_target;
     context->current_compile_time_function_call_target = temp_overload;
     Value *result;
-    if (info->flags & Descriptor_Function_Flags_Intrinsic) {
+    if (info->flags & Function_Info_Flags_Intrinsic) {
       result = mass_intrinsic_call(context, overload, args_view);
     } else {
       if (maybe_literal && value_is_intrinsic(maybe_literal->body)) {
@@ -5376,8 +5376,8 @@ token_parse_intrinsic_literal(
       .source_range = keyword->source_range,
     },
   });
-  literal->info->flags |= Descriptor_Function_Flags_Compile_Time;
-  literal->info->flags |= Descriptor_Function_Flags_Intrinsic;
+  literal->info->flags |= Function_Info_Flags_Compile_Time;
+  literal->info->flags |= Function_Info_Flags_Intrinsic;
 
   return value_make(context, &descriptor_function_literal, storage_static(literal), view.source_range);
 }
@@ -5547,7 +5547,7 @@ token_parse_function_literal(
   *matched_length = view.length;
 
   if (at) {
-    fn_info->flags |= Descriptor_Function_Flags_Compile_Time;
+    fn_info->flags |= Function_Info_Flags_Compile_Time;
   }
   bool is_syscall = body_value && body_value->descriptor == &descriptor_syscall;
   if (is_syscall) {
@@ -5569,7 +5569,7 @@ token_parse_function_literal(
       fn_descriptor, storage_none, view.source_range
     );
   } else if (body_value) {
-    if (value_is_intrinsic(body_value) && !(fn_info->flags & Descriptor_Function_Flags_Compile_Time)) {
+    if (value_is_intrinsic(body_value) && !(fn_info->flags & Function_Info_Flags_Compile_Time)) {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Parse,
         .source_range = body_value->source_range,
@@ -6569,7 +6569,7 @@ module_compiler_init(
   );
 
   MASS_DEFINE_FUNCTION(
-    Descriptor_Function_Flags_None,
+    Function_Info_Flags_None,
     compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
     function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
     function_parameter(slice_literal("view"), &descriptor_value_view),

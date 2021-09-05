@@ -421,18 +421,18 @@ print_scope_define_function(
   } else {
     fprintf(file, "  MASS_DEFINE_FUNCTION(\n");
   }
-  fprintf(file, "    Descriptor_Function_Flags_None");
+  fprintf(file, "    Function_Info_Flags_None");
   switch(function->kind) {
     case Function_Kind_Default:
     case Function_Kind_Typedef: {
       // Nothing to do
     } break;
     case Function_Kind_Compile_Time: {
-      fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
+      fprintf(file, " | Function_Info_Flags_Compile_Time");
     } break;
     case Function_Kind_Intrinsic: {
-      fprintf(file, " | Descriptor_Function_Flags_Compile_Time");
-      fprintf(file, " | Descriptor_Function_Flags_Intrinsic");
+      fprintf(file, " | Function_Info_Flags_Compile_Time");
+      fprintf(file, " | Function_Info_Flags_Intrinsic");
 
       if (function->argument_count != 2) {
         printf("Intrinsic %s must have 2 arguments", function->name);
@@ -1658,8 +1658,7 @@ main(void) {
     { "Value_View", "maybe_default_expression" },
   }));
 
-  // TODO rename to Function_Info_Flags
-  push_type(type_enum("Descriptor_Function_Flags", (Enum_Type_Item[]){
+  push_type(type_enum("Function_Info_Flags", (Enum_Type_Item[]){
     { "None", 0 },
     { "Compile_Time", 1 << 1 },
     { "Intrinsic", 1 << 2},
@@ -1671,7 +1670,7 @@ main(void) {
   }));
 
   push_type(type_struct("Function_Info", (Struct_Item[]){
-    { "Descriptor_Function_Flags", "flags" },
+    { "Function_Info_Flags", "flags" },
     { "u32", "_flags_padding" },
     { "Scope *", "scope" },
     { "Array_Function_Parameter", "parameters" },
