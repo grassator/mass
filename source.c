@@ -3035,6 +3035,7 @@ mass_handle_tuple_cast_lazy_proc(
 
   const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
   assert(expected_descriptor == payload->target);
+  assert(payload->target->tag == Descriptor_Tag_Struct);
   Value *result = value_from_expected_result(
     context, builder, expected_result, payload->expression->source_range
   );
@@ -3042,6 +3043,52 @@ mass_handle_tuple_cast_lazy_proc(
   return result;
 }
 
+static Value *
+mass_cast_helper(
+  Execution_Context *context,
+  const Descriptor *target_descriptor,
+  Value *expression,
+  Source_Range source_range
+) {
+   Mass_Cast_Lazy_Payload lazy_payload = {
+    .target = target_descriptor,
+    .expression = expression,
+  };
+
+  if (descriptor_is_integer(target_descriptor)) {
+    if (value_is_non_lazy_static(expression)) {
+      Expected_Result expected_result = expected_result_static(target_descriptor);
+      return mass_handle_cast_lazy_proc(context, 0, &expected_result, &lazy_payload);
+    } else {
+      Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+      *heap_payload = lazy_payload;
+
+      return mass_make_lazy_value(
+        context, source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+      );
+    }
+  } else if (
+    expression->descriptor == &descriptor_tuple &&
+    expression->storage.tag == Storage_Tag_Static
+  ) {
+    Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+    *heap_payload = lazy_payload;
+
+    return mass_make_lazy_value(
+      context, source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
+    );
+  }
+
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Type_Mismatch,
+    .source_range = source_range,
+    .Type_Mismatch = {
+      .expected = target_descriptor,
+      .actual = value_or_lazy_value_descriptor(expression),
+    },
+  });
+  return 0;
+}
 
 static Value *
 token_handle_cast(
@@ -3075,46 +3122,7 @@ token_handle_cast(
     });
     return 0;
   }
-  Mass_Cast_Lazy_Payload lazy_payload = {
-    .target = target_descriptor,
-    .expression = expression,
-  };
-
-  if (descriptor_is_integer(target_descriptor)) {
-
-    if (value_is_non_lazy_static(expression)) {
-      Expected_Result expected_result = expected_result_static(target_descriptor);
-      return mass_handle_cast_lazy_proc(context, 0, &expected_result, &lazy_payload);
-    } else {
-      Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
-      *heap_payload = lazy_payload;
-
-      return mass_make_lazy_value(
-        context, it.view.source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
-      );
-    }
-  } else if (
-    expression->descriptor == &descriptor_tuple &&
-    expression->storage.tag == Storage_Tag_Static
-  ) {
-    assert(target_descriptor->tag == Descriptor_Tag_Struct);
-    Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
-    *heap_payload = lazy_payload;
-
-    return mass_make_lazy_value(
-      context, it.view.source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
-    );
-  }
-
-  context_error(context, (Mass_Error) {
-    .tag = Mass_Error_Tag_Type_Mismatch,
-    .source_range = it.view.source_range,
-    .Type_Mismatch = {
-      .expected = target_descriptor,
-      .actual = value_or_lazy_value_descriptor(expression),
-    },
-  });
-  return 0;
+  return mass_cast_helper(context, target_descriptor, expression, it.view.source_range);
 }
 
 static void
@@ -4737,6 +4745,23 @@ mass_handle_apply_operator(
 
   if (value_match_group(rhs_value, Group_Tag_Paren)) {
     return mass_handle_paren_operator(context, operands_view, 0);
+  }
+
+  if (value_match_group(rhs_value, Group_Tag_Square)) {
+    Value *type_value = token_parse_single(context, lhs_value);
+    const Descriptor *target_descriptor = value_ensure_type(context, type_value, source_range);
+    Value *tuple = token_parse_single(context, rhs_value);
+    assert(tuple->descriptor == &descriptor_tuple);
+    assert(tuple->storage.tag == Storage_Tag_Static);
+    return mass_cast_helper(context, target_descriptor, tuple, source_range);
+  }
+
+  if (
+    rhs_value->descriptor == &descriptor_tuple &&
+    rhs_value->storage.tag == Storage_Tag_Static
+  ) {
+    const Descriptor *target_descriptor = value_ensure_type(context, lhs_value, source_range);
+    return mass_cast_helper(context, target_descriptor, rhs_value, source_range);
   }
 
   if (rhs_value->descriptor == &descriptor_value_view) {
