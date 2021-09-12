@@ -453,6 +453,12 @@ value_indirect_from_reference(
 }
 
 static const Descriptor *
+deduce_runtime_descriptor_for_value(
+  const Allocator *allocator,
+  Value *value
+);
+
+static const Descriptor *
 anonymous_struct_descriptor_from_tuple(
   const Allocator *allocator,
   const Tuple *tuple
@@ -518,14 +524,16 @@ deduce_runtime_descriptor_for_value(
   const Allocator *allocator,
   Value *value
 ) {
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
-  if (value_is_static_number_literal(value)) {
-    return &descriptor_s64;
-  } else if (descriptor == &descriptor_tuple) {
+  if (value_is_non_lazy_static(value)) {
+    if (value->descriptor == &descriptor_number_literal) {
+      return &descriptor_s64;
+    }
+    if (value->descriptor == &descriptor_tuple) {
     const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
-    return anonymous_struct_descriptor_from_tuple(allocator, tuple);
+      return anonymous_struct_descriptor_from_tuple(allocator, tuple);
+    }
   }
-  return descriptor;
+  return value_or_lazy_value_descriptor(value);
 }
 
 static inline const Descriptor *
