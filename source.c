@@ -2621,7 +2621,7 @@ token_match_struct_field(
   Slice *out_name,
   const Descriptor **out_descriptor
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  if (context->result->tag != Mass_Result_Tag_Success) return false;
 
   u64 peek_index = 0;
   TOKEN_MATCH(symbol, .tag = Token_Pattern_Tag_Symbol);
@@ -2701,9 +2701,9 @@ token_process_c_struct_definition(
       dyn_array_push(temp_fields, (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
         .declaration = {
-          // TODO provide source_range
           .name = field_name,
           .descriptor = field_descriptor,
+          .source_range = field_view.source_range,
         },
         .Base_Relative.offset = field_byte_offset,
       });
