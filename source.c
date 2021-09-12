@@ -2626,6 +2626,7 @@ token_process_c_struct_definition(
   Value *args
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  Value *result = 0;
 
   if (!value_match_group(args, Group_Tag_Paren)) {
     context_error(context, (Mass_Error) {
@@ -2653,8 +2654,6 @@ token_process_c_struct_definition(
     });
     goto err;
   }
-
-  Value *result = allocator_allocate(context->allocator, Value);
 
   u64 struct_bit_size = 0;
   u64 struct_bit_alignment = 0;
@@ -2714,11 +2713,11 @@ token_process_c_struct_definition(
     },
   };
 
+  result = allocator_allocate(context->allocator, Value);
   *result = type_value_for_descriptor(descriptor);
-  return result;
 
   err:
-  return 0;
+  return result;
 }
 
 typedef void (*Compile_Time_Eval_Proc)(void *);
