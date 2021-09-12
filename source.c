@@ -467,13 +467,6 @@ anonymous_struct_descriptor_from_tuple(
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
     Value *item = *dyn_array_get(tuple->items, i);
 
-    char buffer[32];
-    int buffer_length = snprintf(buffer, countof(buffer), "%"PRIu64, i);
-    assert(buffer_length > 0);
-    char *copy = allocator_allocate_bytes(allocator, buffer_length, _Alignof(char));
-    memcpy(copy, buffer, buffer_length);
-
-    Slice field_name = {.bytes = copy, .length = s32_to_u64(buffer_length)};
     const Descriptor *field_descriptor = item->descriptor;
     if (field_descriptor == &descriptor_number_literal) {
       field_descriptor = &descriptor_s64;
@@ -493,7 +486,7 @@ anonymous_struct_descriptor_from_tuple(
     dyn_array_push(fields, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
       .declaration = {
-        .name = field_name,
+        .name = {0},
         .descriptor = field_descriptor,
         .source_range = item->source_range,
       },
