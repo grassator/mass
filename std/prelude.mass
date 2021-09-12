@@ -45,6 +45,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_end
 }
 
+PRELUDE_MASS :: import("mass")
+
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
@@ -54,7 +56,11 @@ bool :: s8
 true :: 1
 false :: 0
 
-PRELUDE_MASS :: import("mass")
+compile_time_error :: @fn(name : String, description : String) -> () PRELUDE_MASS.compile_time_error
+
+static_assert :: macro(condition : bool, message : String) {
+  @{if condition == false { compile_time_error("Static Assert Failed", message) }}
+}
 
 operator 7 (x == y) equal(x, y)
 operator 7 (x != y) not_equal(x, y)
@@ -158,12 +164,6 @@ Array :: fn(item : Type, length : u64) -> (Type) {
 }
 
 multiply :: Array
-
-compile_time_error :: @fn(name : String, description : String) -> () PRELUDE_MASS.compile_time_error
-
-static_assert :: macro(condition : bool, message : String) {
-  @{if condition == false { compile_time_error("Static Assert Failed", message) }}
-}
 
 external :: fn(
   library_name : String,
