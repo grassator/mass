@@ -473,10 +473,7 @@ anonymous_struct_descriptor_from_tuple(
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
     Value *item = *dyn_array_get(tuple->items, i);
 
-    const Descriptor *field_descriptor = item->descriptor;
-    if (field_descriptor == &descriptor_number_literal) {
-      field_descriptor = &descriptor_s64;
-    }
+    const Descriptor *field_descriptor = deduce_runtime_descriptor_for_value(allocator, item);
 
     u64 field_bit_alignment = field_descriptor->bit_alignment.as_u64;
     struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);

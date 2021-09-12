@@ -1873,6 +1873,18 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to parse nested tuples and access their elements") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "test :: fn() -> (s64) {"
+          "p := [[12, 8], 22]\n"
+          "p.0.0 + p.0.1 + p.1"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should be able to parse struct definitions") {
       s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
         "test", &test_context,
