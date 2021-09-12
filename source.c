@@ -2644,6 +2644,7 @@ token_process_c_struct_definition(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   Value *result = 0;
+  Temp_Mark temp_mark = context_temp_mark(context);
 
   if (!value_match_group(args, Group_Tag_Paren)) {
     context_error(context, (Mass_Error) {
@@ -2673,8 +2674,11 @@ token_process_c_struct_definition(
   }
 
   C_Struct_Aligner struct_aligner = {0};
-  // TODO @Leak use a temp array and copy
-  Array_Memory_Layout_Item fields = dyn_array_make(Array_Memory_Layout_Item);
+  Array_Memory_Layout_Item temp_fields = dyn_array_make(
+    Array_Memory_Layout_Item,
+    .allocator = context->temp_allocator,
+    .capacity = 32,
+  );
 
   const Group *layout_group = value_as_group(layout_block);
   if (layout_group->children.length != 0) {
@@ -2694,7 +2698,7 @@ token_process_c_struct_definition(
       }
       u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
-      dyn_array_push(fields, (Memory_Layout_Item) {
+      dyn_array_push(temp_fields, (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
         .declaration = {
           // TODO provide source_range
@@ -2706,6 +2710,9 @@ token_process_c_struct_definition(
     }
   }
   c_struct_aligner_end(&struct_aligner);
+
+  Array_Memory_Layout_Item fields;
+  dyn_array_copy_from_temp(Array_Memory_Layout_Item, context, &fields, temp_fields);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
@@ -2723,6 +2730,7 @@ token_process_c_struct_definition(
   *result = type_value_for_descriptor(descriptor);
 
   err:
+  context_temp_reset_to_mark(context, temp_mark);
   return result;
 }
 
