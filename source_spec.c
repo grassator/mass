@@ -1898,6 +1898,18 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should be able to explicitly cast a tuple to a struct type that matches it") {
+      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "Point :: c_struct({ x : s32; y : s32; });"
+        "test :: fn() -> (s32) {"
+          "cast(Point, [42, 0]).x"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when tuple is assigned to something that is not a struct") {
       test_program_inline_source_base(
         "test", &test_context,

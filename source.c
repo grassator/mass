@@ -12,6 +12,29 @@ value_from_exact_expected_result(
   return expected_result->Exact.value;
 }
 
+static inline Value *
+value_from_expected_result(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Source_Range source_range
+) {
+  switch(expected_result->tag) {
+    case Expected_Result_Tag_Exact: {
+      return value_from_exact_expected_result(expected_result);
+    } break;
+    case Expected_Result_Tag_Flexible: {
+      const Descriptor *return_descriptor = expected_result_descriptor(expected_result);
+      // FIXME :ExpectedStack
+      return return_descriptor == &descriptor_void
+        ? &void_value
+        : reserve_stack(context, builder, return_descriptor, source_range);
+    } break;
+  }
+  panic("UNREACHABLE");
+  return 0;
+}
+
 
 static inline const Descriptor *
 expected_result_descriptor(
@@ -3002,6 +3025,25 @@ mass_handle_cast_lazy_proc(
 }
 
 static Value *
+mass_handle_tuple_cast_lazy_proc(
+  Execution_Context *context,
+  Function_Builder *builder,
+  const Expected_Result *expected_result,
+  Mass_Cast_Lazy_Payload *payload
+) {
+  MASS_ON_ERROR(*context->result) return 0;
+
+  const Descriptor *expected_descriptor = expected_result_descriptor(expected_result);
+  assert(expected_descriptor == payload->target);
+  Value *result = value_from_expected_result(
+    context, builder, expected_result, payload->expression->source_range
+  );
+  MASS_ON_ERROR(assign(context, builder, result, payload->expression)) return 0;
+  return result;
+}
+
+
+static Value *
 token_handle_cast(
   Execution_Context *context,
   Value *args_token
@@ -3012,16 +3054,6 @@ token_handle_cast(
   // First argument is treated as a type
   Value_View type_view = token_split_next(&it, &token_pattern_comma_operator);
   const Descriptor *target_descriptor = token_match_type(context, type_view);
-
-  if (!descriptor_is_integer(target_descriptor)) {
-    // TODO support saying that we want any integer type
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = it.view.source_range,
-      .Type_Mismatch = { .expected = &descriptor_s64, .actual = target_descriptor },
-    });
-    return 0;
-  }
 
   if (it.done) {
     context_error(context, (Mass_Error) {
@@ -3043,23 +3075,46 @@ token_handle_cast(
     });
     return 0;
   }
-
   Mass_Cast_Lazy_Payload lazy_payload = {
     .target = target_descriptor,
     .expression = expression,
   };
 
-  if (value_is_non_lazy_static(expression)) {
-    Expected_Result expected_result = expected_result_static(target_descriptor);
-    return mass_handle_cast_lazy_proc(context, 0, &expected_result, &lazy_payload);
-  } else {
+  if (descriptor_is_integer(target_descriptor)) {
+
+    if (value_is_non_lazy_static(expression)) {
+      Expected_Result expected_result = expected_result_static(target_descriptor);
+      return mass_handle_cast_lazy_proc(context, 0, &expected_result, &lazy_payload);
+    } else {
+      Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
+      *heap_payload = lazy_payload;
+
+      return mass_make_lazy_value(
+        context, it.view.source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+      );
+    }
+  } else if (
+    expression->descriptor == &descriptor_tuple &&
+    expression->storage.tag == Storage_Tag_Static
+  ) {
+    assert(target_descriptor->tag == Descriptor_Tag_Struct);
     Mass_Cast_Lazy_Payload *heap_payload = allocator_allocate(context->allocator, Mass_Cast_Lazy_Payload);
     *heap_payload = lazy_payload;
 
     return mass_make_lazy_value(
-      context, it.view.source_range, heap_payload, target_descriptor, mass_handle_cast_lazy_proc
+      context, it.view.source_range, heap_payload, target_descriptor, mass_handle_tuple_cast_lazy_proc
     );
   }
+
+  context_error(context, (Mass_Error) {
+    .tag = Mass_Error_Tag_Type_Mismatch,
+    .source_range = it.view.source_range,
+    .Type_Mismatch = {
+      .expected = target_descriptor,
+      .actual = value_or_lazy_value_descriptor(expression),
+    },
+  });
+  return 0;
 }
 
 static void
@@ -3187,21 +3242,8 @@ mass_macro_lazy_proc(
   const Expected_Result *expected_result,
   Value *body_value
 ) {
-  Value *result_value = 0;
-  switch(expected_result->tag) {
-    case Expected_Result_Tag_Exact: {
-      result_value = value_from_exact_expected_result(expected_result);
-      break;
-    }
-    case Expected_Result_Tag_Flexible: {
-      const Descriptor *return_descriptor = expected_result_descriptor(expected_result);
-      // FIXME :ExpectedStack
-      result_value = return_descriptor == &descriptor_void
-        ? &void_value
-        : reserve_stack(context, builder, return_descriptor, body_value->source_range);
-      break;
-    }
-  }
+  Value *result_value =
+    value_from_expected_result(context, builder, expected_result, body_value->source_range);
 
   Label_Index saved_return_label = builder->code_block.end_label;
   Value *saved_return_value = builder->return_value;
@@ -4843,6 +4885,7 @@ mass_handle_field_access_lazy_proc(
   Expected_Result expected_struct =
     expected_result_any(value_or_lazy_value_descriptor(payload->struct_));
   Value *struct_ = value_force(context, builder, &expected_struct, payload->struct_);
+  MASS_ON_ERROR(*context->result) return 0;
 
   const Descriptor *struct_descriptor = struct_->descriptor;
   const Descriptor *unwrapped_descriptor = maybe_unwrap_pointer_descriptor(struct_descriptor);
