@@ -458,13 +458,42 @@ deduce_runtime_descriptor_for_value(
   Value *value
 );
 
+typedef struct {
+  u64 bit_size;
+  u64 bit_alignment;
+} C_Struct_Aligner;
+
+static u64
+c_struct_aligner_next_byte_offset(
+  C_Struct_Aligner *aligner,
+  const Descriptor *descriptor
+) {
+  u64 field_bit_alignment = descriptor->bit_alignment.as_u64;
+  aligner->bit_size = u64_align(aligner->bit_size, field_bit_alignment);
+  u64 field_bit_offset = aligner->bit_size;
+  aligner->bit_size += descriptor->bit_size.as_u64;
+  aligner->bit_alignment = u64_max(aligner->bit_alignment, field_bit_alignment);
+
+  u64 field_byte_offset = u64_align(field_bit_offset, CHAR_BIT) / CHAR_BIT;
+  if (field_byte_offset * CHAR_BIT != field_bit_offset) {
+    panic("TODO support non-byte aligned sizes");
+  }
+  return field_byte_offset;
+}
+
+static void
+c_struct_aligner_end(
+  C_Struct_Aligner *aligner
+) {
+  aligner->bit_size = u64_align(aligner->bit_size, aligner->bit_alignment);
+}
+
 static const Descriptor *
 anonymous_struct_descriptor_from_tuple(
   const Allocator *allocator,
   const Tuple *tuple
 ) {
-  u64 struct_bit_size = 0;
-  u64 struct_bit_alignment = 0;
+  C_Struct_Aligner struct_aligner = {0};
   Array_Memory_Layout_Item fields = dyn_array_make(
     Array_Memory_Layout_Item,
     .allocator = allocator,
@@ -474,17 +503,7 @@ anonymous_struct_descriptor_from_tuple(
     Value *item = *dyn_array_get(tuple->items, i);
 
     const Descriptor *field_descriptor = deduce_runtime_descriptor_for_value(allocator, item);
-
-    u64 field_bit_alignment = field_descriptor->bit_alignment.as_u64;
-    struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
-    u64 field_bit_offset = struct_bit_size;
-    struct_bit_size += field_descriptor->bit_size.as_u64;
-    struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
-
-    u64 field_byte_offset = u64_align(field_bit_offset, CHAR_BIT) / CHAR_BIT;
-    if (field_byte_offset * CHAR_BIT != field_bit_offset) {
-      panic("TODO support non-byte aligned sizes");
-    }
+    u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
     dyn_array_push(fields, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -496,15 +515,13 @@ anonymous_struct_descriptor_from_tuple(
       .Base_Relative.offset = field_byte_offset,
     });
   }
-
-
-  struct_bit_size = u64_align(struct_bit_size, struct_bit_alignment);
+  c_struct_aligner_end(&struct_aligner);
 
   Descriptor *tuple_descriptor = allocator_allocate(allocator, Descriptor);
   *tuple_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
-    .bit_size = {struct_bit_size},
-    .bit_alignment = struct_bit_alignment,
+    .bit_size = {struct_aligner.bit_size},
+    .bit_alignment = {struct_aligner.bit_alignment},
     .Struct = {
       .is_tuple = true,
       .memory_layout = {
@@ -2655,8 +2672,8 @@ token_process_c_struct_definition(
     goto err;
   }
 
-  u64 struct_bit_size = 0;
-  u64 struct_bit_alignment = 0;
+  C_Struct_Aligner struct_aligner = {0};
+  // TODO @Leak use a temp array and copy
   Array_Memory_Layout_Item fields = dyn_array_make(Array_Memory_Layout_Item);
 
   const Group *layout_group = value_as_group(layout_block);
@@ -2675,17 +2692,7 @@ token_process_c_struct_definition(
         });
         return 0;
       }
-
-      u64 field_bit_alignment = field_descriptor->bit_alignment.as_u64;
-      struct_bit_size = u64_align(struct_bit_size, field_bit_alignment);
-      u64 field_bit_offset = struct_bit_size;
-      struct_bit_size += field_descriptor->bit_size.as_u64;
-      struct_bit_alignment = u64_max(struct_bit_alignment, field_bit_alignment);
-
-      u64 field_byte_offset = (field_bit_offset + (CHAR_BIT - 1)) / CHAR_BIT;
-      if (field_byte_offset * CHAR_BIT != field_bit_offset) {
-        panic("TODO support non-byte aligned sizes");
-      }
+      u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
       dyn_array_push(fields, (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -2698,14 +2705,13 @@ token_process_c_struct_definition(
       });
     }
   }
-
-  struct_bit_size = u64_align(struct_bit_size, struct_bit_alignment);
+  c_struct_aligner_end(&struct_aligner);
 
   Descriptor *descriptor = allocator_allocate(context->allocator, Descriptor);
   *descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
-    .bit_size = {struct_bit_size},
-    .bit_alignment = struct_bit_alignment,
+    .bit_size = {struct_aligner.bit_size},
+    .bit_alignment = struct_aligner.bit_alignment,
     .Struct = {
       .memory_layout = {
         .items = fields,
