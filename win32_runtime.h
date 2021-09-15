@@ -29,6 +29,7 @@ typedef struct {
   // :ExceptionDataAlignment
   const Function_Builder *builder;
   Jit *jit;
+  Compilation *compilation;
 } Win32_Exception_Data;
 
 void
@@ -290,7 +291,9 @@ win32_program_test_exception_handler(
             const Instruction *instruction =
               win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
             if (instruction && instruction->scope) {
-              Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_name);
+              const Symbol *variable_symbol =
+                mass_ensure_symbol(exception_data->compilation, variable_name, Symbol_Type_Id_Like);
+              Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_symbol);
               Value *value = scope_entry->value;
               if (value) {
                 if (value->descriptor->name.length) {
@@ -580,6 +583,7 @@ win32_program_jit(
         *exception_data = (Win32_Exception_Data) {
           .builder = builder,
           .jit = jit,
+          .compilation = compilation,
         };
       }
     }

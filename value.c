@@ -1608,6 +1608,8 @@ function_literal_info_for_args(
     .info = specialized_info,
   });
 
+  MASS_ON_ERROR(*context->result) return 0;
+
   return specialized_info;
 }
 

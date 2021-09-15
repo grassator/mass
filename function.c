@@ -797,7 +797,10 @@ ensure_function_instance(
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
       Value *arg_value = value_make(&body_context, item->declaration.descriptor, storage, item->declaration.source_range);
       if (item->declaration.name.length) {
-        scope_define_value(body_scope, body_context.epoch, item->declaration.source_range, item->declaration.name, arg_value);
+        // FIXME store Symbols in the operator definition
+        const Symbol *item_symbol =
+          mass_ensure_symbol(context->compilation, item->declaration.name, Symbol_Type_Id_Like);
+        scope_define_value(body_scope, body_context.epoch, item->declaration.source_range, item_symbol, arg_value);
       }
       mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
     }
@@ -805,11 +808,14 @@ ensure_function_instance(
 
   // Return value can be named in which case it should be accessible in the fn body
   if (fn_info->returns.declaration.name.length) {
+    // FIXME store Symbols in the operator definition
+    const Symbol *returns_symbol =
+      mass_ensure_symbol(context->compilation, fn_info->returns.declaration.name, Symbol_Type_Id_Like);
     scope_define_value(
       body_scope,
       body_context.epoch,
       return_value->source_range,
-      fn_info->returns.declaration.name,
+      returns_symbol,
       return_value
     );
   }

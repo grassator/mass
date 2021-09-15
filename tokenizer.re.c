@@ -36,7 +36,6 @@ tokenize(
   u64 offset = 0;
   u64 marker = 0;
   u64 token_start_offset = 0;
-  Symbol_Map *symbol_cache_map = compilation->symbol_cache_map;
 
   #define TOKENIZER_CURRENT_SLICE()\
     slice_sub(input, token_start_offset, offset)
@@ -73,8 +72,8 @@ tokenize(
 
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
-      token_make_symbol(\
-        symbol_cache_map, allocator, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
+      token_make_symbol_value(\
+        compilation, allocator, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
@@ -137,7 +136,7 @@ tokenize(
         dyn_array_push(file->line_offsets, u64_to_u32(offset));
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
-          symbol_cache_map, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
+          compilation, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }

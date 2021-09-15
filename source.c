@@ -240,7 +240,7 @@ scope_print_names(
     for (u64 i = 0; i < scope->map->capacity; ++i) {
       Scope_Map__Entry *entry = &scope->map->entries[i];
       if (entry->occupied) {
-        slice_print(entry->key);
+        slice_print(entry->value->name);
         printf(" ; ");
       }
     }
@@ -249,41 +249,29 @@ scope_print_names(
 }
 
 static inline Scope_Entry *
-scope_lookup_shallow_hashed(
+scope_lookup_shallow(
   const Scope *scope,
-  s32 hash,
-  Slice name
+  const Symbol *symbol
 ) {
   if (!scope->map) return 0;
-  Scope_Entry **entry_pointer = Scope_Map__get_by_hash(scope->map, hash, name);
+  Scope_Entry **entry_pointer = hash_map_get(scope->map, symbol);
   if (!entry_pointer) return 0;
   return *entry_pointer;
 }
 
-
 static inline Scope_Entry *
-scope_lookup_shallow(
+scope_lookup_till_id(
   const Scope *scope,
-  Slice name
-) {
-  s32 hash = Scope_Map__hash(name);
-  return scope_lookup_shallow_hashed(scope, hash, name);
-}
-
-static inline Scope_Entry *
-scope_lookup_hashed(
-  const Scope *scope,
-  s32 hash,
-  Slice name,
+  const Symbol *symbol,
   u64 till_id
 ) {
   for (; scope && scope->id != till_id; scope = scope->parent) {
     const Scope_Using *using = scope->maybe_using;
     for (; using; using = using->next) {
-      Scope_Entry *entry = scope_lookup_hashed(using->scope, hash, name, using->common_ancestor_id);
+      Scope_Entry *entry = scope_lookup_till_id(using->scope, symbol, using->common_ancestor_id);
       if (entry) return entry;
     }
-    Scope_Entry *entry = scope_lookup_shallow_hashed(scope, hash, name);
+    Scope_Entry *entry = scope_lookup_shallow(scope, symbol);
     if (entry) return entry;
   }
   return 0;
@@ -292,10 +280,9 @@ scope_lookup_hashed(
 static inline Scope_Entry *
 scope_lookup(
   const Scope *scope,
-  Slice name
+  const Symbol *symbol
 ) {
-  s32 hash = Scope_Map__hash(name);
-  return scope_lookup_hashed(scope, hash, name, 0);
+  return scope_lookup_till_id(scope, symbol, 0);
 }
 
 static Value *
@@ -1011,7 +998,7 @@ scope_lookup_force(
   const Symbol *symbol,
   const Source_Range *lookup_range
 ) {
-  Scope_Entry *entry = scope_lookup_hashed(scope, symbol->hash, symbol->name, 0);
+  Scope_Entry *entry = scope_lookup(scope, symbol);
 
   if (!entry) {
     context_error(context, (Mass_Error) {
@@ -1036,18 +1023,16 @@ scope_define_value(
   Scope *scope,
   u64 epoch,
   Source_Range source_range,
-  Slice name,
+  const Symbol *symbol,
   Value *value
 ) {
-  assert(name.length);
   if (!scope->map) {
     scope->map = hash_map_make(Scope_Map, scope->allocator);
   }
-  s32 hash = Scope_Map__hash(name);
-  Scope_Entry *it = scope_lookup_shallow_hashed(scope, hash, name);
+  Scope_Entry *it = scope_lookup_shallow(scope, symbol);
   if (it) {
     if (it->value->descriptor != &descriptor_overload_set) {
-      it->value = value_wrap_in_overload_set(scope, it->value, name, &source_range);
+      it->value = value_wrap_in_overload_set(scope, it->value, symbol->name, &source_range);
     }
     Overload_Set *set = storage_static_as_c_type(&it->value->storage, Overload_Set);
     dyn_array_push(set->items, value);
@@ -1055,11 +1040,11 @@ scope_define_value(
     Scope_Entry *allocated = allocator_allocate(scope->allocator, Scope_Entry);
     *allocated = (Scope_Entry) {
       .value = value,
-      .name = name,
+      .name = symbol->name,
       .epoch = epoch,
       .source_range = source_range,
     };
-    hash_map_set_by_hash(scope->map, hash, name, allocated);
+    hash_map_set(scope->map, symbol, allocated);
   }
 }
 
@@ -1122,33 +1107,42 @@ scope_lookup_operator(
   return 0;
 }
 
-static inline Value *
-token_make_symbol(
-  Symbol_Map *cache_map,
-  const Allocator *allocator,
+static inline const Symbol *
+mass_ensure_symbol(
+  Compilation *compilation,
   Slice name,
-  Symbol_Type type,
-  Source_Range source_range
+  Symbol_Type type
 ) {
   s32 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
   if (!symbol) {
     // Symbol type is derived from name anyway so it does not need to be part of the key
-    Symbol **cache_entry = hash_map_get_by_hash(cache_map, hash, name);
+    Symbol **cache_entry = hash_map_get_by_hash(compilation->symbol_cache_map, hash, name);
     if (cache_entry) {
       symbol = *cache_entry;
     }
   }
   if (!symbol) {
-    Symbol *heap_symbol = allocator_allocate(allocator, Symbol);
+    Symbol *heap_symbol = allocator_allocate(compilation->allocator, Symbol);
     *heap_symbol = (Symbol){
       .type = type,
       .name = name,
-      .hash = hash,
     };
     symbol = heap_symbol;
-    hash_map_set_by_hash(cache_map, hash, name, heap_symbol);
+    hash_map_set_by_hash(compilation->symbol_cache_map, hash, name, heap_symbol);
   }
+  return symbol;
+}
+
+static inline Value *
+token_make_symbol_value(
+  Compilation *compilation,
+  const Allocator *allocator, // TODO take from compilation
+  Slice name,
+  Symbol_Type type,
+  Source_Range source_range
+) {
+  const Symbol *symbol = mass_ensure_symbol(compilation, name, type);
 
   return value_init(
     allocator_allocate(allocator, Value),
@@ -1242,7 +1236,7 @@ typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 
 static inline void
 tokenizer_maybe_push_fake_semicolon(
-  Symbol_Map *cache_map,
+  Compilation *compilation,
   const Allocator *allocator,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
@@ -1257,8 +1251,8 @@ tokenizer_maybe_push_fake_semicolon(
   }
   // Do not treat leading newlines as semicolons
   if (!has_children) return;
-  dyn_array_push(*stack, token_make_symbol(
-    cache_map, allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
+  dyn_array_push(*stack, token_make_symbol_value(
+    compilation, allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
   ));
 }
 
@@ -1701,7 +1695,9 @@ token_apply_macro_syntax(
       allocator_allocate(context->allocator, Value),
       &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
-    scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_name, result);
+    const Symbol *capture_symbol =
+      mass_ensure_symbol(context->compilation, capture_name, Symbol_Type_Id_Like);
+    scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_symbol, result);
   }
 
   Execution_Context body_context = *context;
@@ -2206,8 +2202,12 @@ token_handle_user_defined_operator_proc(
     Value *arg = token_parse_single(context, value_view_get(args, i));
     MASS_ON_ERROR(*context->result) return 0;
 
+    // FIXME store Symbols in the operator definition
+    const Symbol *arg_symbol =
+      mass_ensure_symbol(context->compilation, arg_name, Symbol_Type_Id_Like);
+
     // FIXME this should probably use the epoch from the definition, but we do not capture it yet
-    scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_name, arg);
+    scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_symbol, arg);
   }
 
   Execution_Context body_context = *context;
@@ -2255,7 +2255,7 @@ static inline void
 scope_define_lazy_compile_time_expression(
   Execution_Context *context,
   Scope *scope,
-  Slice name,
+  const Symbol *symbol,
   Value_View view
 ) {
   Lazy_Static_Value *lazy_static_value = allocator_allocate(context->allocator, Lazy_Static_Value);
@@ -2270,7 +2270,7 @@ scope_define_lazy_compile_time_expression(
     view.source_range
   );
 
-  scope_define_value(scope, VALUE_STATIC_EPOCH, view.source_range, name, value);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, view.source_range, symbol, value);
 }
 
 static u64
@@ -3201,8 +3201,7 @@ token_parse_constant_definitions(
     goto err;
   }
 
-  Slice name = value_as_symbol(symbol)->name;
-  scope_define_lazy_compile_time_expression(context, context->scope, name, rhs);
+  scope_define_lazy_compile_time_expression(context, context->scope, value_as_symbol(symbol), rhs);
 
   err:
   return statement_length;
@@ -3307,7 +3306,11 @@ mass_handle_macro_call(
 
       arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->declaration.descriptor);
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
-      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->declaration.name, arg_value);
+
+      // FIXME store Symbols in the function definition
+      const Symbol *arg_symbol =
+        mass_ensure_symbol(context->compilation, arg->declaration.name, Symbol_Type_Id_Like);
+      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
 
@@ -3546,7 +3549,9 @@ call_function_overload(
     dyn_array_push(temp_arguments, arg_value);
     Slice name = target_item->declaration.name;
     if (name.length) {
-      scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, name, arg_value);
+      // FIXME store Symbols in the function definition
+      const Symbol *arg_symbol = mass_ensure_symbol(context->compilation, name, Symbol_Type_Id_Like);
+      scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
 
@@ -3686,6 +3691,7 @@ ensure_parameter_descriptors(
         token_match_type(&temp_context, param->maybe_type_expression);
       MASS_ON_ERROR(*temp_context.result) goto err;
     }
+    assert(param->declaration.descriptor);
     Source_Range source_range = param->declaration.source_range;
     Value *param_value = value_init(
       allocator_allocate(temp_context.temp_allocator, Value),
@@ -3693,11 +3699,14 @@ ensure_parameter_descriptors(
       storage_none,
       source_range
     );
+    // FIXME store Symbols in the function definition
+    const Symbol *param_symbol =
+      mass_ensure_symbol(context->compilation, param->declaration.name, Symbol_Type_Id_Like);
     scope_define_value(
       temp_context.scope,
       VALUE_STATIC_EPOCH,
       source_range,
-      param->declaration.name,
+      param_symbol,
       param_value
     );
   }
@@ -3753,6 +3762,7 @@ mass_match_overload_candidate(
       score = -1;
     } else {
       overload_info = maybe_function_info_from_value(candidate, args);
+      if (!overload_info) return;
       if (overload_info->flags & Function_Info_Flags_Intrinsic) {
         score = 0;
       } else {
@@ -4769,7 +4779,11 @@ mass_handle_apply_operator(
     return token_handle_function_call(context, lhs_value, args_view, source_range);
   }
 
-  Scope_Entry *apply_entry = scope_lookup(context->scope, slice_literal("apply"));
+  // FIXME Store "common" compiler symbols
+  const Symbol *apply_symbol =
+    mass_ensure_symbol(context->compilation, slice_literal("apply"), Symbol_Type_Id_Like);
+
+  Scope_Entry *apply_entry = scope_lookup(context->scope, apply_symbol);
   if (!apply_entry) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -5384,30 +5398,30 @@ token_parse_intrinsic_literal(
 
   // TODO would be nice to somehow make it non syntax-dependent
   // This adds local definitions for each of the arguments
-  Value *arguments_symbol = token_make_symbol(
-    context->compilation->symbol_cache_map,
+  Value *arguments_symbol = token_make_symbol_value(
+    context->compilation,
     context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, view.source_range
   );
-  Value *values_symbol = token_make_symbol(
-    context->compilation->symbol_cache_map,
+  Value *values_symbol = token_make_symbol_value(
+    context->compilation,
     context->allocator, slice_literal("values"), Symbol_Type_Id_Like, view.source_range
   );
-  Value *colon_equal_symbol = token_make_symbol(
-    context->compilation->symbol_cache_map,
+  Value *colon_equal_symbol = token_make_symbol_value(
+    context->compilation,
     context->allocator, slice_literal(":="), Symbol_Type_Operator_Like, view.source_range
   );
-  Value *dot_symbol = token_make_symbol(
-    context->compilation->symbol_cache_map,
+  Value *dot_symbol = token_make_symbol_value(
+    context->compilation,
     context->allocator, slice_literal("."), Symbol_Type_Operator_Like, view.source_range
   );
-  Value *semicolon_symbol = token_make_symbol(
-    context->compilation->symbol_cache_map,
+  Value *semicolon_symbol = token_make_symbol_value(
+    context->compilation,
     context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, view.source_range
   );
   for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
     Function_Parameter *param = dyn_array_get(info->parameters, param_index);
-    Value *param_name_symbol = token_make_symbol(
-      context->compilation->symbol_cache_map,
+    Value *param_name_symbol = token_make_symbol_value(
+      context->compilation,
       context->allocator, param->declaration.name, Symbol_Type_Id_Like, view.source_range
     );
     dyn_array_push(wrapped_body_children, param_name_symbol);
@@ -6109,7 +6123,7 @@ token_parse_statement_label(
   // :ForwardLabelRef
   // First try to lookup a label that might have been declared by `goto`
   Value *value;
-  if (scope_lookup(context->scope, name)) {
+  if (scope_lookup(context->scope, symbol)) {
     value = scope_lookup_force(context, context->scope, symbol, &source_range);
   } else {
     Scope *label_scope = context->scope;
@@ -6120,7 +6134,7 @@ token_parse_statement_label(
       allocator_allocate(context->allocator, Value),
       &descriptor_label_index, storage_static(label), source_range
     );
-    scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, name, value);
+    scope_define_value(label_scope, VALUE_STATIC_EPOCH, source_range, symbol, value);
     if (placeholder) {
       return peek_index;
     }
@@ -6355,8 +6369,7 @@ token_parse_definition(
     context, name_token->source_range, payload, descriptor, mass_handle_variable_definition_lazy_proc
   );
   if (out_definition_value) *out_definition_value = variable_value;
-  Slice name = value_as_symbol(name_token)->name;
-  scope_define_value(context->scope, context->epoch, name_token->source_range, name, variable_value);
+  scope_define_value(context->scope, context->epoch, name_token->source_range, value_as_symbol(name_token), variable_value);
 
   return peek_index;
 }
@@ -6441,8 +6454,7 @@ token_define_global_variable(
     }
   }
 
-  Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, VALUE_STATIC_EPOCH, symbol->source_range, scope_name, global_value);
+  scope_define_value(context->scope, VALUE_STATIC_EPOCH, symbol->source_range, value_as_symbol(symbol), global_value);
 }
 
 static void
@@ -6473,8 +6485,7 @@ token_define_local_variable(
 
   const Source_Range *source_range = &symbol->source_range;
 
-  Slice scope_name = value_as_symbol(symbol)->name;
-  scope_define_value(context->scope, context->epoch, *source_range, scope_name, variable_value);
+  scope_define_value(context->scope, context->epoch, *source_range, value_as_symbol(symbol), variable_value);
 
   Mass_Assignment_Lazy_Payload *assignment_payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
@@ -6593,7 +6604,7 @@ token_parse_assignment(
 
 static void
 scope_define_enum(
-  const Allocator *allocator,
+  Compilation *compilation,
   Scope *scope,
   Source_Range source_range,
   Slice enum_name,
@@ -6601,6 +6612,7 @@ scope_define_enum(
   C_Enum_Item *items,
   u64 item_count
 ) {
+  const Allocator *allocator = compilation->allocator;
   Scope *enum_scope = scope_make(allocator, 0);
   for (u64 i = 0; i < item_count; ++i) {
     C_Enum_Item *it = &items[i];
@@ -6610,16 +6622,19 @@ scope_define_enum(
       allocator_allocate(allocator, Value),
       enum_descriptor, storage_static(&it->value), source_range
     );
-    scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it->name, item_value);
+    const Symbol *it_symbol = mass_ensure_symbol(compilation, it->name, Symbol_Type_Id_Like);
+    scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it_symbol, item_value);
   }
 
   Value *enum_value = value_init(
     allocator_allocate(allocator, Value),
     &descriptor_scope, storage_static(enum_scope), source_range
   );
-  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_name, enum_value);
+  const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name, Symbol_Type_Id_Like);
+  scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_value);
 
-  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, slice_literal("_Type"), enum_type_value);
+  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"), Symbol_Type_Id_Like);
+  scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, type_symbol, enum_type_value);
 }
 
 static void
@@ -6649,9 +6664,10 @@ module_compiler_init(
     storage_static_inline(&allocator),
     COMPILER_SOURCE_RANGE
   );
+  const Symbol *allocator_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"), Symbol_Type_Id_Like);
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("allocator"), allocator_value
+    allocator_symbol, allocator_value
   );
 
   MASS_DEFINE_FUNCTION(
@@ -6673,13 +6689,15 @@ scope_define_builtins(
   const Allocator *allocator = context->allocator;
 
   global_scope_define_exports(compilation, scope);
+  const Symbol *void_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"), Symbol_Type_Id_Like);
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("void"), type_void_value
+    void_symbol, type_void_value
   );
+  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("Type"), Symbol_Type_Id_Like);
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Type"), type_descriptor_pointer_value
+    type_symbol, type_descriptor_pointer_value
   );
 
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("~>"), allocator_make(allocator, Operator,
@@ -6885,21 +6903,19 @@ program_import_module(
       Array_Value_Ptr symbols = module->export.Selective.symbols;
       for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
         Value **symbol_pointer = dyn_array_get(symbols, i);
-        Value *symbol = *symbol_pointer;
-        assert(value_is_symbol(symbol));
-        Slice name = value_as_symbol(symbol)->name;
-        Scope_Entry *entry = scope_lookup_shallow(module->own_scope, name);
+        const Symbol *symbol = value_as_symbol(*symbol_pointer);
+        Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
         if (!entry) {
           context_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Undefined_Variable,
-            .source_range = symbol->source_range,
-            .Undefined_Variable = {.name = name},
+            .source_range = (*symbol_pointer)->source_range,
+            .Undefined_Variable = {.name = symbol->name},
           });
           return *context->result;
         }
 
         Value_View expr = value_view_single(symbol_pointer);
-        scope_define_lazy_compile_time_expression(&import_context, module->export.scope, name, expr);
+        scope_define_lazy_compile_time_expression(&import_context, module->export.scope, symbol, expr);
       }
       break;
     }

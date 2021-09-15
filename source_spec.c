@@ -78,13 +78,9 @@ test_program_source_base(
   program_import_module(context, test_module);
   MASS_ON_ERROR(*context->result) return 0;
   Slice id_slice = slice_from_c_string(id);
-  Symbol symbol = {
-    .type = Symbol_Type_Id_Like,
-    .hash = Symbol_Map__hash(id_slice),
-    .name = id_slice,
-  };
+  const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice, Symbol_Type_Id_Like);
   Value *value = scope_lookup_force(
-    context, test_module->own_scope, &symbol, &COMPILER_SOURCE_RANGE
+    context, test_module->own_scope, symbol, &COMPILER_SOURCE_RANGE
   );
   if (value) {
     if (value->descriptor == &descriptor_overload_set) {
@@ -186,25 +182,31 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define_value(root_scope, 0, (Source_Range){0}, slice_literal("test"), test);
-      Scope_Entry *entry = scope_lookup(root_scope, slice_literal("test"));
+      const Symbol *symbol =
+        mass_ensure_symbol(&test_compilation, slice_literal("test"), Symbol_Type_Id_Like);
+      scope_define_value(root_scope, 0, (Source_Range){0}, symbol, test);
+      Scope_Entry *entry = scope_lookup(root_scope, symbol);
       check(entry->value == test);
     }
 
     it("should be able to lookup things from parent scopes") {
       Value *global = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      scope_define_value(root_scope, 0, (Source_Range){0}, slice_literal("global"), global);
+      const Symbol *global_symbol =
+        mass_ensure_symbol(&test_compilation, slice_literal("global"), Symbol_Type_Id_Like);
+      scope_define_value(root_scope, 0, (Source_Range){0}, global_symbol, global);
 
+      const Symbol *test_symbol =
+        mass_ensure_symbol(&test_compilation, slice_literal("test"), Symbol_Type_Id_Like);
       Value *level_1_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
-      scope_define_value(scope_level_1, 0, (Source_Range){0}, slice_literal("test"), level_1_test);
+      scope_define_value(scope_level_1, 0, (Source_Range){0}, test_symbol, level_1_test);
 
       Value *level_2_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_2 = scope_make(test_context.allocator, scope_level_1);
-      scope_define_value(scope_level_2, 0, (Source_Range){0}, slice_literal("test"),  level_2_test);
+      scope_define_value(scope_level_2, 0, (Source_Range){0}, test_symbol,  level_2_test);
 
-      Scope_Entry *entry = scope_lookup(scope_level_2, slice_literal("global"));
+      Scope_Entry *entry = scope_lookup(scope_level_2, global_symbol);
       check(entry->value == global);
     }
   }

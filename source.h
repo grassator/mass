@@ -52,6 +52,13 @@ ensure_parameter_descriptors(
   Function_Info *info
 );
 
+static inline const Symbol *
+mass_ensure_symbol(
+  Compilation *compilation,
+  Slice name,
+  Symbol_Type type
+);
+
 static Overload_Match
 mass_match_overload(
   Value *value,
@@ -69,7 +76,7 @@ scope_define_value(
   Scope *scope,
   u64 epoch,
   Source_Range source_range,
-  Slice name,
+  const Symbol *symbol,
   Value *value
 );
 
@@ -193,7 +200,7 @@ context_error(
 
 static void
 scope_define_enum(
-  const Allocator *allocator,
+  Compilation *compilation,
   Scope *scope,
   Source_Range source_range,
   Slice enum_name,

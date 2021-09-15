@@ -117,13 +117,9 @@ int main(s32 argc, char **argv) {
   }
 
   // FIXME use export scope for this
-  Symbol main_symbol = {
-    .type = Symbol_Type_Id_Like,
-    .hash = Symbol_Map__hash(slice_literal("main")),
-    .name = slice_literal("main"),
-  };
+  const Symbol *main_symbol = mass_ensure_symbol(&compilation, slice_literal("main"), Symbol_Type_Id_Like);
   Value *main = scope_lookup_force(
-    &context, root_module->own_scope, &main_symbol, &COMPILER_SOURCE_RANGE
+    &context, root_module->own_scope, main_symbol, &COMPILER_SOURCE_RANGE
   );
   if (!main) {
     printf("Could not find entry point function `main`");

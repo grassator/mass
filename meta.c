@@ -358,7 +358,8 @@ print_scope_define(
   char *lowercase_name = strtolower(name);
   fprintf(file, "  scope_define_value(\n");
   fprintf(file, "    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,\n");
-  fprintf(file, "    slice_literal(\"%s\"), type_%s_value\n", export_name, lowercase_name);
+  fprintf(file, "    mass_ensure_symbol(compilation, slice_literal(\"%s\"), Symbol_Type_Id_Like),\n", export_name);
+  fprintf(file, "    type_%s_value\n", lowercase_name);
   fprintf(file, "  );\n");
 }
 
@@ -370,7 +371,7 @@ print_scope_enum(
 ) {
   char *lowercase_name = strtolower(name);
   fprintf(file, "  scope_define_enum(\n");
-  fprintf(file, "    compilation->allocator, scope, COMPILER_SOURCE_RANGE,\n");
+  fprintf(file, "    compilation, scope, COMPILER_SOURCE_RANGE,\n");
   fprintf(file, "    slice_literal(\"%s\"), type_%s_value,\n", export_name, lowercase_name);
   fprintf(file, "    %s_items, countof(%s_items)\n", lowercase_name, lowercase_name);
   fprintf(file, "  );\n");
@@ -1151,7 +1152,7 @@ main(void) {
 
   export_compiler(push_type(type_struct("Symbol", (Struct_Item[]){
     { "Symbol_Type", "type" },
-    { "s32", "hash" },
+    { "u32", "_type_padding" },
     { "Slice", "name" },
   })));
 
@@ -1868,8 +1869,10 @@ main(void) {
   }));
 
   push_type(type_hash_map("Scope_Map", {
-    .key_type = "Slice",
+    .key_type = "const Symbol *",
     .value_type = "Scope_Entry *",
+    .hash_function = "hash_pointer",
+    .equal_function = "const_void_pointer_equal",
   }));
 
   push_type(type_hash_map("Macro_Replacement_Map", {

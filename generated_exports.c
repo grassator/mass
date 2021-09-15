@@ -12,146 +12,178 @@ compiler_scope_define_exports(
   (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Value_View"), type_value_view_value
+    mass_ensure_symbol(compilation, slice_literal("Value_View"), Symbol_Type_Id_Like),
+    type_value_view_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Symbol"), type_symbol_value
+    mass_ensure_symbol(compilation, slice_literal("Symbol"), Symbol_Type_Id_Like),
+    type_symbol_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("External_Symbol"), type_external_symbol_value
+    mass_ensure_symbol(compilation, slice_literal("External_Symbol"), Symbol_Type_Id_Like),
+    type_external_symbol_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Syscall"), type_syscall_value
+    mass_ensure_symbol(compilation, slice_literal("Syscall"), Symbol_Type_Id_Like),
+    type_syscall_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Execution_Context"), type_execution_context_value
+    mass_ensure_symbol(compilation, slice_literal("Execution_Context"), Symbol_Type_Id_Like),
+    type_execution_context_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Declaration"), type_declaration_value
+    mass_ensure_symbol(compilation, slice_literal("Declaration"), Symbol_Type_Id_Like),
+    type_declaration_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Value"), type_value_value
+    mass_ensure_symbol(compilation, slice_literal("Value"), Symbol_Type_Id_Like),
+    type_value_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor"), type_descriptor_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor"), Symbol_Type_Id_Like),
+    type_descriptor_value
   );
   scope_define_enum(
-    compilation->allocator, scope, COMPILER_SOURCE_RANGE,
+    compilation, scope, COMPILER_SOURCE_RANGE,
     slice_literal("Descriptor_Tag"), type_descriptor_tag_value,
     descriptor_tag_items, countof(descriptor_tag_items)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor_Function_Instance"), type_descriptor_function_instance_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Function_Instance"), Symbol_Type_Id_Like),
+    type_descriptor_function_instance_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor_Fixed_Size_Array"), type_descriptor_fixed_size_array_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Fixed_Size_Array"), Symbol_Type_Id_Like),
+    type_descriptor_fixed_size_array_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor_Struct"), type_descriptor_struct_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Struct"), Symbol_Type_Id_Like),
+    type_descriptor_struct_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor_Pointer_To"), type_descriptor_pointer_to_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Pointer_To"), Symbol_Type_Id_Like),
+    type_descriptor_pointer_to_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Descriptor_Reference_To"), type_descriptor_reference_to_value
+    mass_ensure_symbol(compilation, slice_literal("Descriptor_Reference_To"), Symbol_Type_Id_Like),
+    type_descriptor_reference_to_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error"), type_mass_error_value
+    mass_ensure_symbol(compilation, slice_literal("Error"), Symbol_Type_Id_Like),
+    type_mass_error_value
   );
   scope_define_enum(
-    compilation->allocator, scope, COMPILER_SOURCE_RANGE,
+    compilation, scope, COMPILER_SOURCE_RANGE,
     slice_literal("Error_Tag"), type_mass_error_tag_value,
     mass_error_tag_items, countof(mass_error_tag_items)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_User_Defined"), type_mass_error_user_defined_value
+    mass_ensure_symbol(compilation, slice_literal("Error_User_Defined"), Symbol_Type_Id_Like),
+    type_mass_error_user_defined_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Circular_Dependency"), type_mass_error_circular_dependency_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Circular_Dependency"), Symbol_Type_Id_Like),
+    type_mass_error_circular_dependency_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Integer_Range"), type_mass_error_integer_range_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Integer_Range"), Symbol_Type_Id_Like),
+    type_mass_error_integer_range_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_File_Open"), type_mass_error_file_open_value
+    mass_ensure_symbol(compilation, slice_literal("Error_File_Open"), Symbol_Type_Id_Like),
+    type_mass_error_file_open_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_File_Too_Large"), type_mass_error_file_too_large_value
+    mass_ensure_symbol(compilation, slice_literal("Error_File_Too_Large"), Symbol_Type_Id_Like),
+    type_mass_error_file_too_large_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Dynamic_Library_Load"), type_mass_error_dynamic_library_load_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Dynamic_Library_Load"), Symbol_Type_Id_Like),
+    type_mass_error_dynamic_library_load_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Dynamic_Library_Symbol_Not_Found"), type_mass_error_dynamic_library_symbol_not_found_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Dynamic_Library_Symbol_Not_Found"), Symbol_Type_Id_Like),
+    type_mass_error_dynamic_library_symbol_not_found_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Unexpected_Token"), type_mass_error_unexpected_token_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Unexpected_Token"), Symbol_Type_Id_Like),
+    type_mass_error_unexpected_token_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Operator_Fixity_Conflict"), type_mass_error_operator_fixity_conflict_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Operator_Fixity_Conflict"), Symbol_Type_Id_Like),
+    type_mass_error_operator_fixity_conflict_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Undefined_Variable"), type_mass_error_undefined_variable_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Undefined_Variable"), Symbol_Type_Id_Like),
+    type_mass_error_undefined_variable_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Redifinition"), type_mass_error_redifinition_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Redifinition"), Symbol_Type_Id_Like),
+    type_mass_error_redifinition_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Unknown_Field"), type_mass_error_unknown_field_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Unknown_Field"), Symbol_Type_Id_Like),
+    type_mass_error_unknown_field_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Invalid_Identifier"), type_mass_error_invalid_identifier_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Invalid_Identifier"), Symbol_Type_Id_Like),
+    type_mass_error_invalid_identifier_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Type_Mismatch"), type_mass_error_type_mismatch_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Type_Mismatch"), Symbol_Type_Id_Like),
+    type_mass_error_type_mismatch_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_No_Matching_Overload"), type_mass_error_no_matching_overload_value
+    mass_ensure_symbol(compilation, slice_literal("Error_No_Matching_Overload"), Symbol_Type_Id_Like),
+    type_mass_error_no_matching_overload_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Error_Undecidable_Overload"), type_mass_error_undecidable_overload_value
+    mass_ensure_symbol(compilation, slice_literal("Error_Undecidable_Overload"), Symbol_Type_Id_Like),
+    type_mass_error_undecidable_overload_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Result"), type_mass_result_value
+    mass_ensure_symbol(compilation, slice_literal("Result"), Symbol_Type_Id_Like),
+    type_mass_result_value
   );
   scope_define_enum(
-    compilation->allocator, scope, COMPILER_SOURCE_RANGE,
+    compilation, scope, COMPILER_SOURCE_RANGE,
     slice_literal("Result_Tag"), type_mass_result_tag_value,
     mass_result_tag_items, countof(mass_result_tag_items)
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Result_Error"), type_mass_result_error_value
+    mass_ensure_symbol(compilation, slice_literal("Result_Error"), Symbol_Type_Id_Like),
+    type_mass_result_error_value
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
@@ -289,7 +321,8 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Allocator"), type_allocator_value
+    mass_ensure_symbol(compilation, slice_literal("Allocator"), Symbol_Type_Id_Like),
+    type_allocator_value
   );
 }
 
@@ -305,7 +338,8 @@ global_scope_define_exports(
   (void)calling_convention;
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Number_Literal"), type_number_literal_value
+    mass_ensure_symbol(compilation, slice_literal("Number_Literal"), Symbol_Type_Id_Like),
+    type_number_literal_value
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
@@ -315,47 +349,58 @@ global_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("u8"), type_u8_value
+    mass_ensure_symbol(compilation, slice_literal("u8"), Symbol_Type_Id_Like),
+    type_u8_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("u16"), type_u16_value
+    mass_ensure_symbol(compilation, slice_literal("u16"), Symbol_Type_Id_Like),
+    type_u16_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("u32"), type_u32_value
+    mass_ensure_symbol(compilation, slice_literal("u32"), Symbol_Type_Id_Like),
+    type_u32_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("u64"), type_u64_value
+    mass_ensure_symbol(compilation, slice_literal("u64"), Symbol_Type_Id_Like),
+    type_u64_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("s8"), type_s8_value
+    mass_ensure_symbol(compilation, slice_literal("s8"), Symbol_Type_Id_Like),
+    type_s8_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("s16"), type_s16_value
+    mass_ensure_symbol(compilation, slice_literal("s16"), Symbol_Type_Id_Like),
+    type_s16_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("s32"), type_s32_value
+    mass_ensure_symbol(compilation, slice_literal("s32"), Symbol_Type_Id_Like),
+    type_s32_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("s64"), type_s64_value
+    mass_ensure_symbol(compilation, slice_literal("s64"), Symbol_Type_Id_Like),
+    type_s64_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("f32"), type_f32_value
+    mass_ensure_symbol(compilation, slice_literal("f32"), Symbol_Type_Id_Like),
+    type_f32_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("f64"), type_f64_value
+    mass_ensure_symbol(compilation, slice_literal("f64"), Symbol_Type_Id_Like),
+    type_f64_value
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    slice_literal("Slice"), type_slice_value
+    mass_ensure_symbol(compilation, slice_literal("Slice"), Symbol_Type_Id_Like),
+    type_slice_value
   );
 }
 

@@ -920,7 +920,7 @@ typedef dyn_array_type(Value_View) Array_Value_View;
 
 typedef struct Symbol {
   Symbol_Type type;
-  s32 hash;
+  u32 _type_padding;
   Slice name;
 } Symbol;
 typedef dyn_array_type(Symbol) Array_Symbol;
@@ -1985,7 +1985,7 @@ typedef struct Calling_Convention {
 typedef dyn_array_type(Calling_Convention) Array_Calling_Convention;
 
 hash_map_slice_template(Symbol_Map, Symbol *)
-hash_map_slice_template(Scope_Map, Scope_Entry *)
+hash_map_template(Scope_Map, const Symbol *, Scope_Entry *, hash_pointer, const_void_pointer_equal)
 hash_map_slice_template(Macro_Replacement_Map, Value_View)
 hash_map_slice_template(Jit_Import_Library_Handle_Map, void *)
 hash_map_slice_template(Imported_Module_Map, Module *)
@@ -2972,10 +2972,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_s32,
-      .name = slice_literal_fields("hash"),
+      .descriptor = &descriptor_u32,
+      .name = slice_literal_fields("_type_padding"),
     },
-    .Base_Relative.offset = offsetof(Symbol, hash),
+    .Base_Relative.offset = offsetof(Symbol, _type_padding),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

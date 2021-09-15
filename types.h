@@ -125,7 +125,8 @@ do {\
     allocator_allocate(allocator, Value),\
     &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
   );\
-  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), info_value);\
+  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_), Symbol_Type_Id_Like);\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, info_value);\
 } while(0)
 
 #define MASS_DEFINE_FUNCTION(_FLAGS_, _FN_, _NAME_, _RETURN_DESCRIPTOR_, ...)\
@@ -138,7 +139,8 @@ do {\
     allocator_allocate(allocator, Value),\
     instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
   );\
-  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, slice_literal(_NAME_), instance_value);\
+  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_), Symbol_Type_Id_Like);\
+  scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, instance_value);\
 } while(0)
 
 typedef struct {

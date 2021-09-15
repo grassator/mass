@@ -38,7 +38,6 @@ tokenize(
   u64 offset = 0;
   u64 marker = 0;
   u64 token_start_offset = 0;
-  Symbol_Map *symbol_cache_map = compilation->symbol_cache_map;
 
   #define TOKENIZER_CURRENT_SLICE()\
     slice_sub(input, token_start_offset, offset)
@@ -75,8 +74,8 @@ tokenize(
 
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
-      token_make_symbol(\
-        symbol_cache_map, allocator, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
+      token_make_symbol_value(\
+        compilation, allocator, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
@@ -90,7 +89,7 @@ tokenize(
   for (;;) {
     token_start_offset = offset;
     
-#line 94 "generated_tokenizer.c"
+#line 93 "generated_tokenizer.c"
 {
   char yych;
   unsigned int yyaccept = 0;
@@ -199,9 +198,9 @@ tokenize(
 yy2:
   ++offset;
 yy3:
-#line 161 "tokenizer.re.c"
+#line 160 "tokenizer.re.c"
   { TOKENIZER_HANDLE_ERROR((Slice){0}); }
-#line 205 "generated_tokenizer.c"
+#line 204 "generated_tokenizer.c"
 yy4:
   yyaccept = 0;
   ++offset;
@@ -215,22 +214,22 @@ yy4:
   default:  goto yy6;
   }
 yy6:
-#line 155 "tokenizer.re.c"
+#line 154 "tokenizer.re.c"
   { continue; }
-#line 221 "generated_tokenizer.c"
+#line 220 "generated_tokenizer.c"
 yy7:
   ++offset;
 yy8:
-#line 136 "tokenizer.re.c"
+#line 135 "tokenizer.re.c"
   {
         dyn_array_push(file->line_offsets, u64_to_u32(offset));
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
-          symbol_cache_map, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
+          compilation, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()
         );
         continue;
       }
-#line 234 "generated_tokenizer.c"
+#line 233 "generated_tokenizer.c"
 yy9:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -267,9 +266,9 @@ yy11:
   default:  goto yy12;
   }
 yy12:
-#line 133 "tokenizer.re.c"
+#line 132 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Operator_Like); continue; }
-#line 273 "generated_tokenizer.c"
+#line 272 "generated_tokenizer.c"
 yy13:
   yyaccept = 1;
   ++offset;
@@ -282,14 +281,14 @@ yy13:
   goto yy37;
 yy14:
   ++offset;
-#line 125 "tokenizer.re.c"
+#line 124 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(Group_Tag_Paren); continue; }
-#line 288 "generated_tokenizer.c"
+#line 287 "generated_tokenizer.c"
 yy16:
   ++offset;
-#line 128 "tokenizer.re.c"
+#line 127 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(')'); continue; }
-#line 293 "generated_tokenizer.c"
+#line 292 "generated_tokenizer.c"
 yy18:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -311,13 +310,13 @@ yy19:
   default:  goto yy20;
   }
 yy20:
-#line 107 "tokenizer.re.c"
+#line 106 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
         continue;
       }
-#line 321 "generated_tokenizer.c"
+#line 320 "generated_tokenizer.c"
 yy21:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -404,29 +403,29 @@ yy23:
   default:  goto yy25;
   }
 yy25:
-#line 158 "tokenizer.re.c"
+#line 157 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Id_Like); continue; }
-#line 410 "generated_tokenizer.c"
+#line 409 "generated_tokenizer.c"
 yy26:
   ++offset;
-#line 126 "tokenizer.re.c"
+#line 125 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(Group_Tag_Square); continue; }
-#line 415 "generated_tokenizer.c"
+#line 414 "generated_tokenizer.c"
 yy28:
   ++offset;
-#line 129 "tokenizer.re.c"
+#line 128 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(']'); continue; }
-#line 420 "generated_tokenizer.c"
+#line 419 "generated_tokenizer.c"
 yy30:
   ++offset;
-#line 127 "tokenizer.re.c"
+#line 126 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(Group_Tag_Curly); continue; }
-#line 425 "generated_tokenizer.c"
+#line 424 "generated_tokenizer.c"
 yy32:
   ++offset;
-#line 130 "tokenizer.re.c"
+#line 129 "tokenizer.re.c"
   { TOKENIZER_GROUP_END('}'); continue; }
-#line 430 "generated_tokenizer.c"
+#line 429 "generated_tokenizer.c"
 yy34:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -457,7 +456,7 @@ yy37:
   }
 yy38:
   ++offset;
-#line 145 "tokenizer.re.c"
+#line 144 "tokenizer.re.c"
   {
         Slice raw_bytes = slice_sub(input, token_start_offset + 1, offset - 1);
         tokenizer_push_string_literal(
@@ -465,7 +464,7 @@ yy38:
         );
         continue;
       }
-#line 469 "generated_tokenizer.c"
+#line 468 "generated_tokenizer.c"
 yy40:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -560,13 +559,13 @@ yy47:
   default:  goto yy49;
   }
 yy49:
-#line 113 "tokenizer.re.c"
+#line 112 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-#line 570 "generated_tokenizer.c"
+#line 569 "generated_tokenizer.c"
 yy50:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -596,19 +595,19 @@ yy50:
   default:  goto yy52;
   }
 yy52:
-#line 119 "tokenizer.re.c"
+#line 118 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);
         continue;
       }
-#line 606 "generated_tokenizer.c"
+#line 605 "generated_tokenizer.c"
 yy53:
-#line 103 "tokenizer.re.c"
+#line 102 "tokenizer.re.c"
   { break; }
-#line 610 "generated_tokenizer.c"
+#line 609 "generated_tokenizer.c"
 }
-#line 162 "tokenizer.re.c"
+#line 161 "tokenizer.re.c"
 
   }
 
