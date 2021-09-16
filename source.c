@@ -2386,8 +2386,11 @@ token_parse_operator_definition(
   // prefix and postfix
   if (definition.length == 2) {
     Value *first =  value_view_get(definition, 0);
-    bool is_first_operator_like =
-      value_is_symbol(first) && value_as_symbol(first)->type == Symbol_Type_Operator_Like;
+    bool is_first_operator_like = false;
+    if (value_is_symbol(first)) {
+      Slice operator_string = value_as_symbol(first)->name;
+      is_first_operator_like = operator_string.length && !isalpha(operator_string.bytes[0]);
+    }
     user_defined_operator->fixity = is_first_operator_like ? Operator_Fixity_Prefix : Operator_Fixity_Postfix;
     user_defined_operator->argument_count = 1;
     if (user_defined_operator->fixity == Operator_Fixity_Prefix) {
