@@ -210,6 +210,8 @@ use_scope(
   Execution_Context *context,
   Scope *scope_to_use
 ) {
+  // TODO `using` should not lookup in parent scopes I guess and instead we probably should
+  //      only allow it modules and add exports
   // This code injects a proxy scope that just uses the same data as the other
   const Scope *common_ancestor = scope_maybe_find_common_ancestor(context->scope, scope_to_use);
   assert(common_ancestor);
