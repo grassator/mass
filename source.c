@@ -221,14 +221,6 @@ use_scope(
     .next = context->scope->maybe_using,
   };
   context->scope->maybe_using = using_entry;
-  Scope *new_scope = scope_make(context->allocator, context->scope);
-
-  // FIXME This kind of hackish, probably there is a better way
-  if (context->module && context->module->own_scope == context->scope) {
-    context->module->own_scope = new_scope;
-  }
-  // FIXME introduce a more generic mechanism for the statements to introduce a new scope
-  context->scope = new_scope;
 }
 
 static void
