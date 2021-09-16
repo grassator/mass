@@ -75,7 +75,7 @@ tokenize(
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
       token_make_symbol_value(\
-        compilation, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
+        compilation, TOKENIZER_CURRENT_SLICE(), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
@@ -267,7 +267,7 @@ yy11:
   }
 yy12:
 #line 132 "tokenizer.re.c"
-  { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Operator_Like); continue; }
+  { TOKENIZER_PUSH_SYMBOL(); continue; }
 #line 272 "generated_tokenizer.c"
 yy13:
   yyaccept = 1;
@@ -404,7 +404,7 @@ yy23:
   }
 yy25:
 #line 157 "tokenizer.re.c"
-  { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Id_Like); continue; }
+  { TOKENIZER_PUSH_SYMBOL(); continue; }
 #line 409 "generated_tokenizer.c"
 yy26:
   ++offset;

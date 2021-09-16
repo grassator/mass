@@ -291,8 +291,7 @@ win32_program_test_exception_handler(
             const Instruction *instruction =
               win32_instruction_for_address(ContextRecord->Rip, exception_data->jit);
             if (instruction && instruction->scope) {
-              const Symbol *variable_symbol =
-                mass_ensure_symbol(exception_data->compilation, variable_name, Symbol_Type_Id_Like);
+              const Symbol *variable_symbol = mass_ensure_symbol(exception_data->compilation, variable_name);
               Scope_Entry *scope_entry = scope_lookup(instruction->scope, variable_symbol);
               Value *value = scope_entry->value;
               if (value) {

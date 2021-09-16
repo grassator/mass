@@ -55,8 +55,7 @@ ensure_parameter_descriptors(
 static inline const Symbol *
 mass_ensure_symbol(
   Compilation *compilation,
-  Slice name,
-  Symbol_Type type
+  Slice name
 );
 
 static Overload_Match

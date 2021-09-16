@@ -78,7 +78,7 @@ test_program_source_base(
   program_import_module(context, test_module);
   MASS_ON_ERROR(*context->result) return 0;
   Slice id_slice = slice_from_c_string(id);
-  const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice, Symbol_Type_Id_Like);
+  const Symbol *symbol = mass_ensure_symbol(context->compilation, id_slice);
   Value *value = scope_lookup_force(
     context, test_module->own_scope, symbol, &COMPILER_SOURCE_RANGE
   );
@@ -182,8 +182,7 @@ spec("source") {
     it("should be able to set and lookup values") {
       Value *test = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      const Symbol *symbol =
-        mass_ensure_symbol(&test_compilation, slice_literal("test"), Symbol_Type_Id_Like);
+      const Symbol *symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       scope_define_value(root_scope, 0, (Source_Range){0}, symbol, test);
       Scope_Entry *entry = scope_lookup(root_scope, symbol);
       check(entry->value == test);
@@ -192,12 +191,10 @@ spec("source") {
     it("should be able to lookup things from parent scopes") {
       Value *global = value_from_s64(&test_context, 42, (Source_Range){0});
       Scope *root_scope = scope_make(test_context.allocator, 0);
-      const Symbol *global_symbol =
-        mass_ensure_symbol(&test_compilation, slice_literal("global"), Symbol_Type_Id_Like);
+      const Symbol *global_symbol = mass_ensure_symbol(&test_compilation, slice_literal("global"));
       scope_define_value(root_scope, 0, (Source_Range){0}, global_symbol, global);
 
-      const Symbol *test_symbol =
-        mass_ensure_symbol(&test_compilation, slice_literal("test"), Symbol_Type_Id_Like);
+      const Symbol *test_symbol = mass_ensure_symbol(&test_compilation, slice_literal("test"));
       Value *level_1_test = value_from_s64(&test_context, 1, (Source_Range){0});
       Scope *scope_level_1 = scope_make(test_context.allocator, root_scope);
       scope_define_value(scope_level_1, 0, (Source_Range){0}, test_symbol, level_1_test);

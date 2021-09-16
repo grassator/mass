@@ -798,8 +798,7 @@ ensure_function_instance(
       Value *arg_value = value_make(&body_context, item->declaration.descriptor, storage, item->declaration.source_range);
       if (item->declaration.name.length) {
         // FIXME store Symbols in the operator definition
-        const Symbol *item_symbol =
-          mass_ensure_symbol(context->compilation, item->declaration.name, Symbol_Type_Id_Like);
+        const Symbol *item_symbol = mass_ensure_symbol(context->compilation, item->declaration.name);
         scope_define_value(body_scope, body_context.epoch, item->declaration.source_range, item_symbol, arg_value);
       }
       mark_occupied_registers(builder, &stack_argument_base, arg_value->descriptor, &arg_value->storage);
@@ -809,8 +808,7 @@ ensure_function_instance(
   // Return value can be named in which case it should be accessible in the fn body
   if (fn_info->returns.declaration.name.length) {
     // FIXME store Symbols in the operator definition
-    const Symbol *returns_symbol =
-      mass_ensure_symbol(context->compilation, fn_info->returns.declaration.name, Symbol_Type_Id_Like);
+    const Symbol *returns_symbol = mass_ensure_symbol(context->compilation, fn_info->returns.declaration.name);
     scope_define_value(
       body_scope,
       body_context.epoch,

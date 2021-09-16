@@ -1104,8 +1104,7 @@ scope_lookup_operator(
 static inline const Symbol *
 mass_ensure_symbol(
   Compilation *compilation,
-  Slice name,
-  Symbol_Type type
+  Slice name
 ) {
   s32 hash = Symbol_Map__hash(name);
   const Symbol *symbol = 0;
@@ -1119,7 +1118,6 @@ mass_ensure_symbol(
   if (!symbol) {
     Symbol *heap_symbol = allocator_allocate(compilation->allocator, Symbol);
     *heap_symbol = (Symbol){
-      .type = type,
       .name = name,
     };
     symbol = heap_symbol;
@@ -1132,10 +1130,9 @@ static inline Value *
 token_make_symbol_value(
   Compilation *compilation,
   Slice name,
-  Symbol_Type type,
   Source_Range source_range
 ) {
-  const Symbol *symbol = mass_ensure_symbol(compilation, name, type);
+  const Symbol *symbol = mass_ensure_symbol(compilation, name);
 
   return value_init(
     allocator_allocate(compilation->allocator, Value),
@@ -1245,7 +1242,7 @@ tokenizer_maybe_push_fake_semicolon(
   // Do not treat leading newlines as semicolons
   if (!has_children) return;
   dyn_array_push(*stack, token_make_symbol_value(
-    compilation, slice_literal(";"), Symbol_Type_Operator_Like, source_range
+    compilation, slice_literal(";"), source_range
   ));
 }
 
@@ -1689,7 +1686,7 @@ token_apply_macro_syntax(
       &descriptor_macro_capture, storage_static(capture), capture_view.source_range
     );
     const Symbol *capture_symbol =
-      mass_ensure_symbol(context->compilation, capture_name, Symbol_Type_Id_Like);
+      mass_ensure_symbol(context->compilation, capture_name);
     scope_define_value(expansion_scope, VALUE_STATIC_EPOCH, capture_view.source_range, capture_symbol, result);
   }
 
@@ -3301,7 +3298,7 @@ mass_handle_macro_call(
 
       // FIXME store Symbols in the function definition
       const Symbol *arg_symbol =
-        mass_ensure_symbol(context->compilation, arg->declaration.name, Symbol_Type_Id_Like);
+        mass_ensure_symbol(context->compilation, arg->declaration.name);
       scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
@@ -3542,7 +3539,7 @@ call_function_overload(
     Slice name = target_item->declaration.name;
     if (name.length) {
       // FIXME store Symbols in the function definition
-      const Symbol *arg_symbol = mass_ensure_symbol(context->compilation, name, Symbol_Type_Id_Like);
+      const Symbol *arg_symbol = mass_ensure_symbol(context->compilation, name);
       scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
@@ -3693,7 +3690,7 @@ ensure_parameter_descriptors(
     );
     // FIXME store Symbols in the function definition
     const Symbol *param_symbol =
-      mass_ensure_symbol(context->compilation, param->declaration.name, Symbol_Type_Id_Like);
+      mass_ensure_symbol(context->compilation, param->declaration.name);
     scope_define_value(
       temp_context.scope,
       VALUE_STATIC_EPOCH,
@@ -4773,7 +4770,7 @@ mass_handle_apply_operator(
 
   // FIXME Store "common" compiler symbols
   const Symbol *apply_symbol =
-    mass_ensure_symbol(context->compilation, slice_literal("apply"), Symbol_Type_Id_Like);
+    mass_ensure_symbol(context->compilation, slice_literal("apply"));
 
   Scope_Entry *apply_entry = scope_lookup(context->scope, apply_symbol);
   if (!apply_entry) {
@@ -5391,24 +5388,24 @@ token_parse_intrinsic_literal(
   // TODO would be nice to somehow make it non syntax-dependent
   // This adds local definitions for each of the arguments
   Value *arguments_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("arguments"), Symbol_Type_Id_Like, view.source_range
+    context->compilation, slice_literal("arguments"), view.source_range
   );
   Value *values_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("values"), Symbol_Type_Id_Like, view.source_range
+    context->compilation, slice_literal("values"), view.source_range
   );
   Value *colon_equal_symbol = token_make_symbol_value(
-    context->compilation, slice_literal(":="), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal(":="), view.source_range
   );
   Value *dot_symbol = token_make_symbol_value(
-    context->compilation, slice_literal("."), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal("."), view.source_range
   );
   Value *semicolon_symbol = token_make_symbol_value(
-    context->compilation, slice_literal(";"), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal(";"), view.source_range
   );
   for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
     Function_Parameter *param = dyn_array_get(info->parameters, param_index);
     Value *param_name_symbol = token_make_symbol_value(
-      context->compilation, param->declaration.name, Symbol_Type_Id_Like, view.source_range
+      context->compilation, param->declaration.name, view.source_range
     );
     dyn_array_push(wrapped_body_children, param_name_symbol);
     dyn_array_push(wrapped_body_children, colon_equal_symbol);
@@ -6608,7 +6605,7 @@ scope_define_enum(
       allocator_allocate(allocator, Value),
       enum_descriptor, storage_static(&it->value), source_range
     );
-    const Symbol *it_symbol = mass_ensure_symbol(compilation, it->name, Symbol_Type_Id_Like);
+    const Symbol *it_symbol = mass_ensure_symbol(compilation, it->name);
     scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, it_symbol, item_value);
   }
 
@@ -6616,10 +6613,10 @@ scope_define_enum(
     allocator_allocate(allocator, Value),
     &descriptor_scope, storage_static(enum_scope), source_range
   );
-  const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name, Symbol_Type_Id_Like);
+  const Symbol *enum_symbol = mass_ensure_symbol(compilation, enum_name);
   scope_define_value(scope, VALUE_STATIC_EPOCH, source_range, enum_symbol, enum_value);
 
-  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"), Symbol_Type_Id_Like);
+  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("_Type"));
   scope_define_value(enum_scope, VALUE_STATIC_EPOCH, source_range, type_symbol, enum_type_value);
 }
 
@@ -6650,7 +6647,7 @@ module_compiler_init(
     storage_static_inline(&allocator),
     COMPILER_SOURCE_RANGE
   );
-  const Symbol *allocator_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"), Symbol_Type_Id_Like);
+  const Symbol *allocator_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     allocator_symbol, allocator_value
@@ -6675,12 +6672,12 @@ scope_define_builtins(
   const Allocator *allocator = context->allocator;
 
   global_scope_define_exports(compilation, scope);
-  const Symbol *void_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"), Symbol_Type_Id_Like);
+  const Symbol *void_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     void_symbol, type_void_value
   );
-  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("Type"), Symbol_Type_Id_Like);
+  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("Type"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     type_symbol, type_descriptor_pointer_value

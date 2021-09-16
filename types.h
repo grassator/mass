@@ -125,7 +125,7 @@ do {\
     allocator_allocate(allocator, Value),\
     &descriptor_function_info, storage_static(function), COMPILER_SOURCE_RANGE\
   );\
-  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_), Symbol_Type_Id_Like);\
+  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_));\
   scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, info_value);\
 } while(0)
 
@@ -139,7 +139,7 @@ do {\
     allocator_allocate(allocator, Value),\
     instance_descriptor, imm64((u64)_FN_), COMPILER_SOURCE_RANGE\
   );\
-  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_), Symbol_Type_Id_Like);\
+  const Symbol *fn_symbol = mass_ensure_symbol(compilation, slice_literal(_NAME_));\
   scope_define_value(scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE, fn_symbol, instance_value);\
 } while(0)
 

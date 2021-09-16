@@ -73,7 +73,7 @@ tokenize(
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
       token_make_symbol_value(\
-        compilation, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
+        compilation, TOKENIZER_CURRENT_SLICE(), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
@@ -129,7 +129,7 @@ tokenize(
       "}" { TOKENIZER_GROUP_END('}'); continue; }
 
       operator = [+*%/=!@^&$\\:;,?|.~<>-]+;
-      operator { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Operator_Like); continue; }
+      operator { TOKENIZER_PUSH_SYMBOL(); continue; }
 
       newline = "\r\n" | "\r" | "\n";
       newline {
@@ -154,7 +154,7 @@ tokenize(
       whitespace { continue; }
 
       identifier = [a-zA-Z_][a-zA-Z_0-9]*; // named definition
-      identifier { TOKENIZER_PUSH_SYMBOL(Symbol_Type_Id_Like); continue; }
+      identifier { TOKENIZER_PUSH_SYMBOL(); continue; }
 
       // default rule (error)
       * { TOKENIZER_HANDLE_ERROR((Slice){0}); }

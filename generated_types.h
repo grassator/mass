@@ -54,21 +54,6 @@ typedef struct Value_View Value_View;
 typedef dyn_array_type(Value_View *) Array_Value_View_Ptr;
 typedef dyn_array_type(const Value_View *) Array_Const_Value_View_Ptr;
 
-typedef enum Symbol_Type {
-  Symbol_Type_Id_Like = 1,
-  Symbol_Type_Operator_Like = 2,
-} Symbol_Type;
-
-const char *symbol_type_name(Symbol_Type value) {
-  if (value == 1) return "Symbol_Type_Id_Like";
-  if (value == 2) return "Symbol_Type_Operator_Like";
-  assert(!"Unexpected value for enum Symbol_Type");
-  return 0;
-};
-
-typedef dyn_array_type(Symbol_Type *) Array_Symbol_Type_Ptr;
-typedef dyn_array_type(const Symbol_Type *) Array_Const_Symbol_Type_Ptr;
-
 typedef struct Symbol Symbol;
 typedef dyn_array_type(Symbol *) Array_Symbol_Ptr;
 typedef dyn_array_type(const Symbol *) Array_Const_Symbol_Ptr;
@@ -919,8 +904,6 @@ typedef struct Value_View {
 typedef dyn_array_type(Value_View) Array_Value_View;
 
 typedef struct Symbol {
-  Symbol_Type type;
-  u32 _type_padding;
   Slice name;
 } Symbol;
 typedef dyn_array_type(Symbol) Array_Symbol;
@@ -2109,12 +2092,6 @@ static Descriptor descriptor_array_value_view;
 static Descriptor descriptor_array_value_view_ptr;
 static Descriptor descriptor_value_view_pointer;
 static Descriptor descriptor_value_view_pointer_pointer;
-static Descriptor descriptor_symbol_type;
-static Descriptor descriptor_array_symbol_type;
-static Descriptor descriptor_array_symbol_type_ptr;
-static Descriptor descriptor_array_const_symbol_type_ptr;
-static Descriptor descriptor_symbol_type_pointer;
-static Descriptor descriptor_symbol_type_pointer_pointer;
 static Descriptor descriptor_symbol;
 static Descriptor descriptor_array_symbol;
 static Descriptor descriptor_array_symbol_ptr;
@@ -2953,30 +2930,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
   },
 );
 MASS_DEFINE_TYPE_VALUE(value_view);
-MASS_DEFINE_OPAQUE_C_TYPE(symbol_type, Symbol_Type)
-static C_Enum_Item symbol_type_items[] = {
-{ .name = slice_literal_fields("Id_Like"), .value = 1 },
-{ .name = slice_literal_fields("Operator_Like"), .value = 2 },
-};
 MASS_DEFINE_OPAQUE_C_TYPE(array_symbol_ptr, Array_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_symbol, Array_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_symbol_type,
-      .name = slice_literal_fields("type"),
-    },
-    .Base_Relative.offset = offsetof(Symbol, type),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .declaration = {
-      .descriptor = &descriptor_u32,
-      .name = slice_literal_fields("_type_padding"),
-    },
-    .Base_Relative.offset = offsetof(Symbol, _type_padding),
-  },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {

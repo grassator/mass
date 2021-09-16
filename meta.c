@@ -358,7 +358,7 @@ print_scope_define(
   char *lowercase_name = strtolower(name);
   fprintf(file, "  scope_define_value(\n");
   fprintf(file, "    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,\n");
-  fprintf(file, "    mass_ensure_symbol(compilation, slice_literal(\"%s\"), Symbol_Type_Id_Like),\n", export_name);
+  fprintf(file, "    mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", export_name);
   fprintf(file, "    type_%s_value\n", lowercase_name);
   fprintf(file, "  );\n");
 }
@@ -1145,14 +1145,7 @@ main(void) {
     { "Source_Range", "source_range" },
   })));
 
-  push_type(type_enum("Symbol_Type", (Enum_Type_Item[]){
-    { "Id_Like", 1 },
-    { "Operator_Like", 2 },
-  }));
-
   export_compiler(push_type(type_struct("Symbol", (Struct_Item[]){
-    { "Symbol_Type", "type" },
-    { "u32", "_type_padding" },
     { "Slice", "name" },
   })));
 
