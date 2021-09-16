@@ -6609,11 +6609,6 @@ scope_define_builtins(
   const Allocator *allocator = context->allocator;
 
   global_scope_define_exports(compilation, scope);
-  const Symbol *void_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"));
-  scope_define_value(
-    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    void_symbol, type_void_value
-  );
   const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("Type"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
