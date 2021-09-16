@@ -271,10 +271,8 @@ x86_64_system_v_memory_layout_item_for_classification(
       Memory_Layout_Item result = {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
         .flags = Memory_Layout_Item_Flags_None,
-        .declaration = {
-          .name = name,
-          .descriptor = classification->descriptor,
-        },
+        .name = name,
+        .descriptor = classification->descriptor,
         .Base_Relative = {.offset = *stack_offset},
       };
       *stack_offset += byte_size;
@@ -294,10 +292,8 @@ x86_64_system_v_memory_layout_item_for_classification(
   absolute:
   return (Memory_Layout_Item){
     .tag = Memory_Layout_Item_Tag_Absolute,
-    .declaration = {
-      .name = name,
-      .descriptor = classification->descriptor,
-    },
+    .name = name,
+    .descriptor = classification->descriptor,
     .Absolute = {.storage = storage},
   };
 }
@@ -347,7 +343,7 @@ system_v_item_iterator_next(
       assert(it->aggregate->tag == Descriptor_Tag_Struct);
       const Memory_Layout_Item *item =
         dyn_array_get(it->aggregate->Struct.memory_layout.items, it->next_index);
-      it->item = item->declaration.descriptor;
+      it->item = item->descriptor;
       assert(item->tag == Memory_Layout_Item_Tag_Base_Relative);
       it->offset = item->Base_Relative.offset;
     } break;
@@ -627,7 +623,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
 
       Value *common_return_value = value_init(
         allocator_allocate(allocator, Value),
-        item.declaration.descriptor,
+        item.descriptor,
         item.Absolute.storage,
         function->returns.declaration.source_range
       );
@@ -685,11 +681,9 @@ calling_convention_x86_64_system_v_call_setup_proc(
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
-      .declaration = {
-        .name = {0}, // Defining return value name happens separately
-        .descriptor = reference,
-        .source_range = function->returns.declaration.source_range,
-      },
+      .name = {0}, // Defining return value name happens separately
+      .descriptor = reference,
+      .source_range = function->returns.declaration.source_range,
       .Absolute = { .storage = storage_register_for_descriptor(Register_DI, reference), },
     });
   }
@@ -848,20 +842,22 @@ calling_convention_x86_64_windows_call_setup_proc(
     if (param->tag == Function_Parameter_Tag_Exact_Static) continue;
     Memory_Layout_Item item = {
       .flags = Memory_Layout_Item_Flags_None,
-      .declaration = param->declaration,
+      .descriptor = param->declaration.descriptor,
+      .name = param->declaration.name,
+      .source_range = param->declaration.source_range,
     };
 
-    u64 byte_size = descriptor_byte_size(item.declaration.descriptor);
+    u64 byte_size = descriptor_byte_size(item.descriptor);
     bool is_large_argument = byte_size > 8;
     Storage arg_storage;
     if (is_large_argument) {
-      item.declaration.descriptor = descriptor_reference_to(allocator, item.declaration.descriptor);
+      item.descriptor = descriptor_reference_to(allocator, item.descriptor);
     }
     if (index < countof(general_registers)) {
-      Register reg = descriptor_is_float(item.declaration.descriptor)
+      Register reg = descriptor_is_float(item.descriptor)
         ? float_registers[index]
         : general_registers[index];
-      arg_storage = storage_register_for_descriptor(reg, item.declaration.descriptor);
+      arg_storage = storage_register_for_descriptor(reg, item.descriptor);
       item.tag = Memory_Layout_Item_Tag_Absolute;
       item.Absolute.storage = arg_storage;
     } else {
@@ -878,11 +874,9 @@ calling_convention_x86_64_windows_call_setup_proc(
     dyn_array_push(result.arguments_layout.items, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Absolute,
       .flags = Memory_Layout_Item_Flags_Uninitialized,
-      .declaration = {
-        .name = {0}, // Defining return value name happens separately
-        .descriptor = return_descriptor,
-        .source_range = function->returns.declaration.source_range,
-      },
+      .name = {0}, // Defining return value name happens separately
+      .descriptor = return_descriptor,
+      .source_range = function->returns.declaration.source_range,
       .Absolute = { .storage = storage_register_for_descriptor(Register_C, return_descriptor), },
     });
   }

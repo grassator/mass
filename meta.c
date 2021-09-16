@@ -770,8 +770,7 @@ print_mass_struct_item(
   while (slice_ends_with(lowercase_type, pointer_suffix)) {
     lowercase_type = slice_sub(lowercase_type, 0, lowercase_type.length - pointer_suffix.length);
   }
-  fprintf(file, "    .declaration = {\n");
-  fprintf(file, "      .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
+  fprintf(file, "    .descriptor = &descriptor_%"PRIslice, SLICE_EXPAND_PRINTF(lowercase_type));
   lowercase_type = original_lowercase_type;
   while (slice_ends_with(lowercase_type, pointer_suffix)) {
     fprintf(file, "_pointer");
@@ -779,8 +778,7 @@ print_mass_struct_item(
   }
   if (item->array_length > 1) fprintf(file, "_%u", item->array_length);
   fprintf(file, ",\n");
-  fprintf(file, "      .name = slice_literal_fields(\"%s\"),\n", item->name);
-  fprintf(file, "    },\n");
+  fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", item->name);
   fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", struct_name, item->name);
   fprintf(file, "  },\n");
 }
@@ -875,10 +873,8 @@ print_mass_descriptor_and_type(
 
         fprintf(file, "  {\n");
         fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
-        fprintf(file, "    .declaration = {\n");
-        fprintf(file, "      .name = slice_literal_fields(\"tag\"),\n");
-        fprintf(file, "      .descriptor = &descriptor_%s_tag,\n", lowercase_name);
-        fprintf(file, "    },\n");
+        fprintf(file, "    .name = slice_literal_fields(\"tag\"),\n");
+        fprintf(file, "    .descriptor = &descriptor_%s_tag,\n", lowercase_name);
         fprintf(file, "    .Base_Relative.offset = offsetof(%s, tag),\n", type->name);
         fprintf(file, "  },\n");
 
@@ -894,10 +890,8 @@ print_mass_descriptor_and_type(
 
             fprintf(file, "  {\n");
             fprintf(file, "    .tag = Memory_Layout_Item_Tag_Base_Relative,\n");
-            fprintf(file, "    .declaration = {\n");
-            fprintf(file, "      .name = slice_literal_fields(\"%s\"),\n", struct_->name);
-            fprintf(file, "      .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
-            fprintf(file, "    },\n");
+            fprintf(file, "    .name = slice_literal_fields(\"%s\"),\n", struct_->name);
+            fprintf(file, "    .descriptor = &descriptor_%s_%s,\n", lowercase_name, struct_lowercase_name);
             fprintf(file, "    .Base_Relative.offset = offsetof(%s, %s),\n", type->name, struct_->name);
             fprintf(file, "  },\n");
           }
@@ -1633,7 +1627,9 @@ main(void) {
   }), (Struct_Item[]){
     { "Memory_Layout_Item_Flags", "flags" },
     { "u32", "_flags_padding" },
-    { "Declaration", "declaration" },
+    { "const Descriptor *", "descriptor" },
+    { "Slice", "name" },
+    { "Source_Range", "source_range" },
   }));
 
   push_type(type_struct("Memory_Layout", (Struct_Item[]){

@@ -1569,7 +1569,9 @@
     <Item Name="tag">tag</Item>
     <Item Name="flags">flags</Item>
     <Item Name="_flags_padding">_flags_padding</Item>
-    <Item Name="declaration">declaration</Item>
+    <Item Name="descriptor">descriptor</Item>
+    <Item Name="name">name</Item>
+    <Item Name="source_range">source_range</Item>
     <Item Name="Absolute" Condition="tag == Memory_Layout_Item_Tag_Absolute">Absolute</Item>
     <Item Name="Base_Relative" Condition="tag == Memory_Layout_Item_Tag_Base_Relative">Base_Relative</Item>
   </Expand>

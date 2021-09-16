@@ -511,11 +511,9 @@ anonymous_struct_descriptor_from_tuple(
 
     dyn_array_push(fields, (Memory_Layout_Item) {
       .tag = Memory_Layout_Item_Tag_Base_Relative,
-      .declaration = {
-        .name = {0},
-        .descriptor = field_descriptor,
-        .source_range = item->source_range,
-      },
+      .name = {0},
+      .descriptor = field_descriptor,
+      .source_range = item->source_range,
       .Base_Relative.offset = field_byte_offset,
     });
   }
@@ -746,7 +744,7 @@ assign_tuple(
   DYN_ARRAY_FOREACH(Memory_Layout_Item, field, layout->items) {
     Value *tuple_item = *dyn_array_get(tuple->items, index);
     Value target_field = {
-      .descriptor = field->declaration.descriptor,
+      .descriptor = field->descriptor,
       .storage = memory_layout_item_storage_at_index(&target->storage, layout, index),
       .source_range = target->source_range,
     };
@@ -854,14 +852,14 @@ assign(
     for (u64 i = 0; i < dyn_array_length(source->descriptor->Struct.memory_layout.items); ++i) {
       Memory_Layout_Item *field = dyn_array_get(source->descriptor->Struct.memory_layout.items, i);
       Value source_field = {
-        .descriptor = field->declaration.descriptor,
+        .descriptor = field->descriptor,
         .storage = memory_layout_item_storage_at_index(
           &source->storage, &source->descriptor->Struct.memory_layout, i
         ),
         .source_range = source->source_range,
       };
       Value target_field = {
-        .descriptor = field->declaration.descriptor,
+        .descriptor = field->descriptor,
         .storage = memory_layout_item_storage_at_index(
           &target->storage, &target->descriptor->Struct.memory_layout, i
         ),
@@ -2712,11 +2710,9 @@ token_process_c_struct_definition(
 
       dyn_array_push(temp_fields, (Memory_Layout_Item) {
         .tag = Memory_Layout_Item_Tag_Base_Relative,
-        .declaration = {
-          .name = field_name,
-          .descriptor = field_descriptor,
-          .source_range = field_view.source_range,
-        },
+        .name = field_name,
+        .descriptor = field_descriptor,
+        .source_range = field_view.source_range,
         .Base_Relative.offset = field_byte_offset,
       });
     }
@@ -3410,7 +3406,7 @@ call_function_overload(
       storage.Memory.location.Stack.area = Stack_Area_Call_Target_Argument;
     }
     Value *param = dyn_array_push_uninitialized(target_params);
-    value_init(param, target_item->declaration.descriptor, storage, target_item->declaration.source_range);
+    value_init(param, target_item->descriptor, storage, target_item->source_range);
 
     // TODO avoid doing this twice - here and below
     u64 target_arg_register_bitset = register_bitset_from_storage(&storage);
@@ -3443,9 +3439,9 @@ call_function_overload(
       source_arg = *dyn_array_get(arguments, i);
     }
     source_arg = maybe_coerce_number_literal_to_integer(
-      context, source_arg, target_item->declaration.descriptor
+      context, source_arg, target_item->descriptor
     );
-    const Descriptor *stack_descriptor = target_item->declaration.descriptor;
+    const Descriptor *stack_descriptor = target_item->descriptor;
     if (stack_descriptor->tag == Descriptor_Tag_Reference_To) {
       stack_descriptor = stack_descriptor->Reference_To.descriptor;
     }
@@ -3465,7 +3461,7 @@ call_function_overload(
       !(builder->register_occupied_bitset & target_arg_register_bitset);
     bool can_assign_straight_to_target = (
       target_arg_registers_are_free &&
-      target_item->declaration.descriptor->tag != Descriptor_Tag_Reference_To
+      target_item->descriptor->tag != Descriptor_Tag_Reference_To
     );
 
     bool can_use_source_registers = false;
@@ -3495,7 +3491,7 @@ call_function_overload(
       register_acquire_bitset(builder, source_registers_bitset);
     } else if (
       value_is_non_lazy_static(source_arg) &&
-      target_item->declaration.descriptor->tag != Descriptor_Tag_Reference_To
+      target_item->descriptor->tag != Descriptor_Tag_Reference_To
     ) {
       arg_value = source_arg;
       should_assign = false;
@@ -3513,7 +3509,7 @@ call_function_overload(
       if (
         // TODO it should be possible to do this for unpacked structs as well,
         //      but it will be quite gnarly
-        target_item->declaration.descriptor->tag != Descriptor_Tag_Reference_To &&
+        target_item->descriptor->tag != Descriptor_Tag_Reference_To &&
         required_register_count == 1 &&
         register_bitset_occupied_count(allowed_temp_registers) > 1
       ) {
@@ -3521,7 +3517,7 @@ call_function_overload(
         register_acquire(builder, temp_register);
         register_bitset_set(&temp_register_argument_bitset, temp_register);
         arg_value = value_register_for_descriptor(
-          context, temp_register, target_item->declaration.descriptor, target_item->declaration.source_range
+          context, temp_register, target_item->descriptor, target_item->source_range
         );
         arg_value->is_temporary = true;
       } else {
@@ -3536,7 +3532,7 @@ call_function_overload(
       MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
-    Slice name = target_item->declaration.name;
+    Slice name = target_item->name;
     if (name.length) {
       // FIXME store Symbols in the function definition
       const Symbol *arg_symbol = mass_ensure_symbol(context->compilation, name);
@@ -4843,7 +4839,7 @@ struct_find_field_by_name(
   assert(descriptor->tag == Descriptor_Tag_Struct);
   for (u64 i = 0; i < dyn_array_length(descriptor->Struct.memory_layout.items); ++i) {
     Memory_Layout_Item *field = dyn_array_get(descriptor->Struct.memory_layout.items, i);
-    if (slice_equal(field->declaration.name, field_name)) {
+    if (slice_equal(field->name, field_name)) {
       return field;
     }
   }
@@ -4906,7 +4902,7 @@ mass_handle_field_access_lazy_proc(
     &struct_->storage, &unwrapped_descriptor->Struct.memory_layout, field
   );
   Value *field_value =
-    value_make(context, field->declaration.descriptor, field_storage, struct_->source_range);
+    value_make(context, field->descriptor, field_storage, struct_->source_range);
   // Since storage_field_access reuses indirect memory storage of the struct
   // the release of memory will be based on the field value release and we need
   // to propagate the temporary flag correctly
@@ -4993,7 +4989,7 @@ mass_make_lazy_struct_field_access(
     context,
     struct_->source_range,
     lazy_payload,
-    field->declaration.descriptor,
+    field->descriptor,
     mass_handle_field_access_lazy_proc
   );
 }

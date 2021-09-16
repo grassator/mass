@@ -911,8 +911,8 @@ storage_static_equal_internal(
         switch(a_field->tag) {
           case Memory_Layout_Item_Tag_Base_Relative: {
             if (!storage_static_equal_internal(
-              a_field->declaration.descriptor, (s8 *)a_memory + a_field->Base_Relative.offset,
-              b_field->declaration.descriptor, (s8 *)b_memory + b_field->Base_Relative.offset
+              a_field->descriptor, (s8 *)a_memory + a_field->Base_Relative.offset,
+              b_field->descriptor, (s8 *)b_memory + b_field->Base_Relative.offset
             )) {
               return false;
             }
@@ -1654,7 +1654,7 @@ memory_layout_item_find_by_name(
 ) {
   for (u64 i = 0; i < dyn_array_length(layout->items); ++i) {
     Memory_Layout_Item *field = dyn_array_get(layout->items, i);
-    if (slice_equal(field->declaration.name, field_name)) {
+    if (slice_equal(field->name, field_name)) {
       return field;
     }
   }
@@ -1675,7 +1675,7 @@ memory_layout_item_storage(
     }
     case Memory_Layout_Item_Tag_Base_Relative: {
       return storage_with_offset_and_bit_size(
-        base, u64_to_s32(item->Base_Relative.offset), item->declaration.descriptor->bit_size
+        base, u64_to_s32(item->Base_Relative.offset), item->descriptor->bit_size
       );
     }
   }
