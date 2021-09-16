@@ -3538,35 +3538,38 @@ call_function_overload(
   }
 
   u64 target_volatile_registers_bitset = call_setup->calling_convention->register_volatile_bitset;
-  u64 saved_registers_bitset = 0;
   u64 expected_result_bitset = maybe_expected_storage
     ? register_bitset_from_storage(maybe_expected_storage)
     : 0;
 
-  for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
-    if (!register_bitset_get(target_volatile_registers_bitset, reg_index)) continue;
-    if (!register_bitset_get(builder->register_occupied_bitset, reg_index)) continue;
-    if (register_bitset_get(copied_straight_to_param_bitset, reg_index)) continue;
-    if (register_bitset_get(temp_register_argument_bitset, reg_index)) continue;
+  u64 saved_registers_from_arguments_bitset = (
+    // Need to save registers that are volatile in the callee and are actually used in the caller,
+    (target_volatile_registers_bitset & builder->register_occupied_bitset)
+    &
+    // but only if we are not using them for optimized arguments assignment.
+    (~(copied_straight_to_param_bitset | temp_register_argument_bitset))
+  );
+  // We must not save the register(s) that we will overwrite with the result
+  // otherwise we will overwrite it with the restored value
+  u64 saved_registers_bitset = saved_registers_from_arguments_bitset & ~expected_result_bitset;
+  if (saved_registers_bitset) {
+    // TODO can use bit scan to skip to the used register
+    for (Register reg_index = 0; reg_index <= Register_R15; ++reg_index) {
+      if (!register_bitset_get(saved_registers_bitset, reg_index)) continue;
 
-    register_bitset_set(&saved_registers_bitset, reg_index);
+      Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
+        .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
+        .stack = reserve_stack_storage(builder, descriptor_void_pointer.bit_size),
+      });
 
-    // We must not save the register that we will overwrite with the result
-    // otherwise we will overwrite it with the restored value
-    if (register_bitset_get(expected_result_bitset, reg_index)) continue;
-
-    Saved_Register *saved = dyn_array_push(stack_saved_registers, (Saved_Register) {
-      .reg = storage_register_for_descriptor(reg_index, &descriptor_void_pointer),
-      .stack = reserve_stack_storage(builder, descriptor_void_pointer.bit_size),
-    });
-
-    push_eagerly_encoded_assembly(
-      &builder->code_block, *source_range,
-      &(Instruction_Assembly){mov, {saved->stack, saved->reg}}
-    );
+      push_eagerly_encoded_assembly(
+        &builder->code_block, *source_range,
+        &(Instruction_Assembly){mov, {saved->stack, saved->reg}}
+      );
+    }
   }
 
-  register_release_bitset(builder, saved_registers_bitset);
+  register_release_bitset(builder, saved_registers_from_arguments_bitset);
   u64 spilled_param_register_bitset = argument_register_bitset & ~copied_straight_to_param_bitset;
   register_acquire_bitset(builder, spilled_param_register_bitset);
 
@@ -3583,7 +3586,6 @@ call_function_overload(
     builder->max_call_parameters_stack_size,
     call_setup->parameters_stack_size
   );
-
 
   switch(call_setup->jump.tag) {
     case Function_Call_Jump_Tag_Call: {
@@ -3628,9 +3630,8 @@ call_function_overload(
   Value *expected_value =
     expected_result_ensure_value_or_temp(context, builder, expected_result, fn_return_value);
 
-
   // This is awkward that we need to manually clear return bitset because
-  // it *might* be set depending on whether the expected result it a temp.
+  // it *might* be set depending on whether the expected result is a temp.
   // The whole thing feels a bit fishy but not sure what is the fix.
   if (expected_result->tag == Expected_Result_Tag_Exact) {
     builder->register_occupied_bitset &= ~return_value_bitset;
@@ -3643,7 +3644,7 @@ call_function_overload(
     );
   }
 
-  register_acquire_bitset(builder, saved_registers_bitset);
+  register_acquire_bitset(builder, saved_registers_from_arguments_bitset);
 
   context_temp_reset_to_mark(context, temp_mark);
 
