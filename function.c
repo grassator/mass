@@ -797,7 +797,7 @@ ensure_function_instance(
       Storage storage = memory_layout_item_storage(&stack_argument_base, arguments_layout, item);
       Value *arg_value = value_make(&body_context, item->descriptor, storage, item->source_range);
       if (item->name.length) {
-        // FIXME store Symbols in the operator definition
+        // TODO figure out how to avoid this lookup
         const Symbol *item_symbol = mass_ensure_symbol(context->compilation, item->name);
         scope_define_value(body_scope, body_context.epoch, item->source_range, item_symbol, arg_value);
       }
