@@ -2191,13 +2191,9 @@ token_handle_user_defined_operator_proc(
   assert(operator->argument_count == args.length);
 
   for (u8 i = 0; i < operator->argument_count; ++i) {
-    Slice arg_name = operator->argument_names[i];
+    const Symbol *arg_symbol = operator->argument_symbols[i];
     Value *arg = token_parse_single(context, value_view_get(args, i));
     MASS_ON_ERROR(*context->result) return 0;
-
-    // FIXME store Symbols in the operator definition
-    const Symbol *arg_symbol =
-      mass_ensure_symbol(context->compilation, arg_name, Symbol_Type_Id_Like);
 
     // FIXME this should probably use the epoch from the definition, but we do not capture it yet
     scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_symbol, arg);
@@ -2425,7 +2421,7 @@ token_parse_operator_definition(
       });
       goto err;
     }
-    user_defined_operator->argument_names[i] = value_as_symbol(arguments[i])->name;
+    user_defined_operator->argument_symbols[i] = value_as_symbol(arguments[i]);
   }
 
   Operator *operator = allocator_allocate(context->allocator, Operator);

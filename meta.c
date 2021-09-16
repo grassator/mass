@@ -1476,7 +1476,7 @@ main(void) {
   push_type(type_struct("User_Defined_Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
     { "u32", "argument_count" },
-    { "Slice", "argument_names", 2 },
+    { "const Symbol *", "argument_symbols", 2 },
     { "Value_View", "body" },
     { "Scope *", "scope" },
   }));

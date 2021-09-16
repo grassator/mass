@@ -1360,7 +1360,7 @@ typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 typedef struct User_Defined_Operator {
   Operator_Fixity fixity;
   u32 argument_count;
-  Slice argument_names[2];
+  const Symbol * argument_symbols[2];
   Value_View body;
   Scope * scope;
 } User_Defined_Operator;
@@ -2723,7 +2723,7 @@ static Descriptor descriptor_storage_3 = MASS_DESCRIPTOR_STATIC_ARRAY(Storage, 3
 static Descriptor descriptor_u8_15 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 15, &descriptor_u8);
 static Descriptor descriptor_instruction_15 = MASS_DESCRIPTOR_STATIC_ARRAY(Instruction, 15, &descriptor_instruction);
 static Descriptor descriptor_u8_16 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 16, &descriptor_u8);
-static Descriptor descriptor_slice_2 = MASS_DESCRIPTOR_STATIC_ARRAY(Slice, 2, &descriptor_slice);
+static Descriptor descriptor_symbol_pointer_2 = MASS_DESCRIPTOR_STATIC_ARRAY(const Symbol *, 2, &descriptor_symbol_pointer);
 static Descriptor descriptor_overload_set_pointer_16 = MASS_DESCRIPTOR_STATIC_ARRAY(const Overload_Set *, 16, &descriptor_overload_set_pointer);
 static Descriptor descriptor_u8_4 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 4, &descriptor_u8);
 static Descriptor descriptor_u8_3 = MASS_DESCRIPTOR_STATIC_ARRAY(u8, 3, &descriptor_u8);
@@ -4421,10 +4421,10 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(user_defined_operator, User_Defined_Operator,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .declaration = {
-      .descriptor = &descriptor_slice_2,
-      .name = slice_literal_fields("argument_names"),
+      .descriptor = &descriptor_symbol_pointer_2,
+      .name = slice_literal_fields("argument_symbols"),
     },
-    .Base_Relative.offset = offsetof(User_Defined_Operator, argument_names),
+    .Base_Relative.offset = offsetof(User_Defined_Operator, argument_symbols),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
