@@ -17,14 +17,14 @@ static const Source_Range COMPILER_SOURCE_RANGE = {
 
 static inline Function_Parameter
 function_parameter_with_default(
-  Slice name,
+  const Symbol *symbol,
   Value_View default_expression,
   const Descriptor *descriptor
 ) {
    return (Function_Parameter){
     .tag = Function_Parameter_Tag_Runtime,
     .declaration = {
-      .name = name,
+      .symbol = symbol,
       .descriptor = descriptor,
       .source_range = COMPILER_SOURCE_RANGE,
     },
@@ -34,10 +34,10 @@ function_parameter_with_default(
 
 static  inline Function_Parameter
 function_parameter(
-  Slice name,
+  const Symbol *symbol,
   const Descriptor *descriptor
 ) {
-  return function_parameter_with_default(name, (Value_View){0}, descriptor);
+  return function_parameter_with_default(symbol, (Value_View){0}, descriptor);
 }
 
 typedef struct {

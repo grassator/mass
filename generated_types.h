@@ -1471,7 +1471,7 @@ overload_match_as_found(Overload_Match *overload_match) {
 typedef dyn_array_type(Overload_Match) Array_Overload_Match;
 typedef struct Declaration {
   const Descriptor * descriptor;
-  Slice name;
+  const Symbol * symbol;
   Source_Range source_range;
 } Declaration;
 typedef dyn_array_type(Declaration) Array_Declaration;
@@ -4419,9 +4419,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(declaration, Declaration,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_slice,
-    .name = slice_literal_fields("name"),
-    .Base_Relative.offset = offsetof(Declaration, name),
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .Base_Relative.offset = offsetof(Declaration, symbol),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

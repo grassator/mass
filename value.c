@@ -117,7 +117,7 @@ mass_error_append_function_signature_string(
   DYN_ARRAY_FOREACH(Function_Parameter, arg, info->parameters) {
     if (first) first = false;
     else APPEND_LITERAL(", ");
-    APPEND_SLICE(arg->declaration.name);
+    APPEND_SLICE(arg->declaration.symbol->name);
     APPEND_LITERAL(" : ");
     mass_error_append_descriptor(result, arg->declaration.descriptor);
   }

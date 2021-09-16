@@ -806,14 +806,12 @@ ensure_function_instance(
   }
 
   // Return value can be named in which case it should be accessible in the fn body
-  if (fn_info->returns.declaration.name.length) {
-    // FIXME store Symbols in the operator definition
-    const Symbol *returns_symbol = mass_ensure_symbol(context->compilation, fn_info->returns.declaration.name);
+  if (fn_info->returns.declaration.symbol) {
     scope_define_value(
       body_scope,
       body_context.epoch,
       return_value->source_range,
-      returns_symbol,
+      fn_info->returns.declaration.symbol,
       return_value
     );
   }

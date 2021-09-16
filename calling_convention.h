@@ -616,8 +616,11 @@ calling_convention_x86_64_system_v_call_setup_proc(
       );
     } else {
       u64 stack_offset = 0;
+      Slice return_name = function->returns.declaration.symbol
+        ? function->returns.declaration.symbol->name
+        : (Slice){0};
       Memory_Layout_Item item = x86_64_system_v_memory_layout_item_for_classification(
-        &registers, &classification, function->returns.declaration.name, &stack_offset
+        &registers, &classification, return_name, &stack_offset
       );
       assert(item.tag == Memory_Layout_Item_Tag_Absolute);
 
@@ -669,7 +672,7 @@ calling_convention_x86_64_system_v_call_setup_proc(
     x86_64_system_v_adjust_classification_if_no_register_available(&registers, &classification);
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
-      &registers, &classification, param->declaration.name, &stack_offset
+      &registers, &classification, param->declaration.symbol->name, &stack_offset
     );
 
     dyn_array_push(result.arguments_layout.items, struct_item);
@@ -758,7 +761,7 @@ calling_convention_x86_64_system_v_syscall_setup_proc(
     }
 
     Memory_Layout_Item struct_item = x86_64_system_v_memory_layout_item_for_classification(
-      &registers, &classification, param->declaration.name, &stack_offset
+      &registers, &classification, param->declaration.symbol->name, &stack_offset
     );
     // 4. System-calls are limited to six arguments, no argument is passed directly on the stack.
     dyn_array_push(result.arguments_layout.items, struct_item);
@@ -843,7 +846,7 @@ calling_convention_x86_64_windows_call_setup_proc(
     Memory_Layout_Item item = {
       .flags = Memory_Layout_Item_Flags_None,
       .descriptor = param->declaration.descriptor,
-      .name = param->declaration.name,
+      .name = param->declaration.symbol->name,
       .source_range = param->declaration.source_range,
     };
 

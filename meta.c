@@ -475,14 +475,16 @@ print_scope_define_function(
     Argument_Type *arg = &function->arguments[i];
     if (i != 0) fprintf(file, ",\n");
     if (arg->maybe_default_expression) {
-      fprintf(file, "    function_parameter_with_default(slice_literal(\"%s\"), "DEFAULT_EXPR_FORMAT,
+      fprintf(file, "    function_parameter_with_default(\n");
+      fprintf(file, "      slice_literal(\"%s\"), "DEFAULT_EXPR_FORMAT",\n",
         arg->name, function->name, arg->name);
     } else {
-      fprintf(file, "    function_parameter(slice_literal(\"%s\")", arg->name);
+      fprintf(file, "    function_parameter(\n");
+      fprintf(file, "      mass_ensure_symbol(compilation, slice_literal(\"%s\")),\n", arg->name);
     }
-    fprintf(file, ", &");
+    fprintf(file, "&");
     print_mass_struct_descriptor_type(file, arg->type);
-    fprintf(file, ")");
+    fprintf(file, "\n    )");
   }
   fprintf(file, "\n  );\n");
 }
@@ -1552,7 +1554,7 @@ main(void) {
 
   export_compiler(push_type(type_struct("Declaration", (Struct_Item[]){
     { "const Descriptor *", "descriptor" },
-    { "Slice", "name" },
+    { "const Symbol *", "symbol" },
     { "Source_Range", "source_range" },
   })));
 

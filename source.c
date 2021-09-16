@@ -1853,7 +1853,7 @@ token_match_argument(
         .storage = static_value->storage,
       },
       .declaration = {
-        .name = value_as_symbol(name_token)->name,
+        .symbol = value_as_symbol(name_token),
         .descriptor = static_value->descriptor,
         .source_range = definition.source_range,
       },
@@ -1938,7 +1938,7 @@ token_match_argument(
     .maybe_default_expression = default_expression,
     .maybe_type_expression = maybe_type_expression,
     .declaration = {
-      .name = value_as_symbol(name_token)->name,
+      .symbol = value_as_symbol(name_token),
       .descriptor = descriptor,
       .source_range = definition.source_range,
     },
@@ -1980,7 +1980,7 @@ token_match_return_type(
 
     returns.maybe_type_expression = rhs;
     returns.declaration.source_range = rhs.source_range,
-    returns.declaration.name = value_as_symbol(value_view_get(lhs, 0))->name;
+    returns.declaration.symbol = value_as_symbol(value_view_get(lhs, 0));
   } else {
     returns.maybe_type_expression = view;
   }
@@ -3276,7 +3276,7 @@ mass_handle_macro_call(
   for(u64 i = 0; i < dyn_array_length(literal->info->parameters); ++i) {
     MASS_ON_ERROR(*context->result) return 0;
     Function_Parameter *arg = dyn_array_get(literal->info->parameters, i);
-    if (arg->declaration.name.length) {
+    if (arg->declaration.symbol) {
       Value *arg_value;
       if (i >= args_view.length) {
         // We should catch the missing default expression in the matcher
@@ -3292,10 +3292,7 @@ mass_handle_macro_call(
       arg_value = maybe_coerce_number_literal_to_integer(context, arg_value, arg->declaration.descriptor);
       u64 arg_epoch = value_is_non_lazy_static(arg_value) ? VALUE_STATIC_EPOCH : context->epoch;
 
-      // FIXME store Symbols in the function definition
-      const Symbol *arg_symbol =
-        mass_ensure_symbol(context->compilation, arg->declaration.name);
-      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg_symbol, arg_value);
+      scope_define_value(body_scope, arg_epoch, arg_value->source_range, arg->declaration.symbol, arg_value);
     }
   }
 
@@ -3684,14 +3681,11 @@ ensure_parameter_descriptors(
       storage_none,
       source_range
     );
-    // FIXME store Symbols in the function definition
-    const Symbol *param_symbol =
-      mass_ensure_symbol(context->compilation, param->declaration.name);
     scope_define_value(
       temp_context.scope,
       VALUE_STATIC_EPOCH,
       source_range,
-      param_symbol,
+      param->declaration.symbol,
       param_value
     );
   }
@@ -5355,9 +5349,10 @@ token_parse_intrinsic_literal(
   );
   for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
     Function_Parameter *param = dyn_array_get(info->parameters, param_index);
-    Value *param_name_symbol = token_make_symbol_value(
-      context->compilation, param->declaration.name, view.source_range
+    Value *param_name_symbol = value_make(
+      context, &descriptor_symbol, storage_static(param->declaration.symbol), view.source_range
     );
+
     dyn_array_push(wrapped_body_children, param_name_symbol);
     dyn_array_push(wrapped_body_children, colon_equal_symbol);
     dyn_array_push(wrapped_body_children, arguments_symbol);
@@ -5398,14 +5393,14 @@ token_parse_intrinsic_literal(
   );
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .declaration = {
-      .name = slice_literal("context"),
+      .symbol = mass_ensure_symbol(context->compilation, slice_literal("context")),
       .descriptor = &descriptor_execution_context_pointer,
       .source_range = keyword->source_range,
     },
   });
   dyn_array_push(literal->info->parameters, (Function_Parameter) {
     .declaration = {
-      .name = slice_literal("arguments"),
+      .symbol = mass_ensure_symbol(context->compilation, slice_literal("arguments")),
       .descriptor = &descriptor_value_view,
       .source_range = keyword->source_range,
     },
@@ -6598,17 +6593,16 @@ module_compiler_init(
     storage_static_inline(&allocator),
     COMPILER_SOURCE_RANGE
   );
-  const Symbol *allocator_symbol = mass_ensure_symbol(compilation, slice_literal("allocator"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    allocator_symbol, allocator_value
+    mass_ensure_symbol(compilation, slice_literal("allocator")), allocator_value
   );
 
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
     compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
-    function_parameter(slice_literal("context"), &descriptor_execution_context_pointer),
-    function_parameter(slice_literal("view"), &descriptor_value_view),
+    function_parameter(mass_ensure_symbol(compilation, slice_literal("context")), &descriptor_execution_context_pointer),
+    function_parameter(mass_ensure_symbol(compilation, slice_literal("view")), &descriptor_value_view),
   );
 }
 
