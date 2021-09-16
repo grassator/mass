@@ -3420,6 +3420,7 @@ call_function_overload(
     Memory_Layout_Item *target_item = dyn_array_get(call_setup->arguments_layout.items, i);
     Value *target_arg = dyn_array_get(target_params, i);
     Value *source_arg;
+    const Symbol *arg_symbol = 0;
     if (i >= dyn_array_length(arguments)) {
       if (target_item->flags & Memory_Layout_Item_Flags_Uninitialized) {
         source_arg = &void_value;
@@ -3433,6 +3434,8 @@ call_function_overload(
         MASS_ON_ERROR(*arg_context.result) return 0;
       }
     } else {
+      Function_Parameter *declared_argument = dyn_array_get(fn_info->parameters, i);
+      arg_symbol = declared_argument->declaration.symbol;
       source_arg = *dyn_array_get(arguments, i);
     }
     source_arg = maybe_coerce_number_literal_to_integer(
@@ -3529,10 +3532,7 @@ call_function_overload(
       MASS_ON_ERROR(assign(context, builder, arg_value, source_arg)) return 0;
     }
     dyn_array_push(temp_arguments, arg_value);
-    Slice name = target_item->name;
-    if (name.length) {
-      // FIXME store Symbols in the function definition
-      const Symbol *arg_symbol = mass_ensure_symbol(context->compilation, name);
+    if (arg_symbol) {
       scope_define_value(default_arguments_scope, context->epoch, arg_value->source_range, arg_symbol, arg_value);
     }
   }
