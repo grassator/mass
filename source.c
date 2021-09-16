@@ -1610,6 +1610,9 @@ token_match_pattern(
         if (!token) {
           return 0;
         }
+        // fallthrough
+      }
+      case Macro_Pattern_Tag_Any_Token_Single: {
         dyn_array_push(*out_match, value_view_slice(&view, view_index, view_index + 1));
         view_index++;
         break;
@@ -2580,8 +2583,7 @@ token_parse_syntax_definition(
         last_pattern = dyn_array_last(pattern);
       } else if (slice_equal(symbol_name, slice_literal(".@"))) {
         last_pattern = dyn_array_push(pattern, (Macro_Pattern) {
-          .tag = Macro_Pattern_Tag_Single_Token,
-          .Single_Token = { .token_pattern = { .tag = Token_Pattern_Tag_Any } },
+          .tag = Macro_Pattern_Tag_Any_Token_Single,
         });
       } else if (slice_equal(symbol_name, slice_literal("..@"))) {
         last_pattern = dyn_array_push(pattern, (Macro_Pattern) {

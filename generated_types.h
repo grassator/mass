@@ -1373,8 +1373,9 @@ typedef struct Operator {
 typedef dyn_array_type(Operator) Array_Operator;
 
 typedef enum {
-  Macro_Pattern_Tag_Any_Token_Sequence = 0,
-  Macro_Pattern_Tag_Single_Token = 1,
+  Macro_Pattern_Tag_Any_Token_Single = 0,
+  Macro_Pattern_Tag_Any_Token_Sequence = 1,
+  Macro_Pattern_Tag_Single_Token = 2,
 } Macro_Pattern_Tag;
 
 typedef struct Macro_Pattern_Single_Token {
@@ -4152,8 +4153,9 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern_ptr, Array_Macro_Pattern_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_macro_pattern, Array_Macro_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(macro_pattern_tag, Macro_Pattern_Tag)
 static C_Enum_Item macro_pattern_tag_items[] = {
-{ .name = slice_literal_fields("Any_Token_Sequence"), .value = 0 },
-{ .name = slice_literal_fields("Single_Token"), .value = 1 },
+{ .name = slice_literal_fields("Any_Token_Single"), .value = 0 },
+{ .name = slice_literal_fields("Any_Token_Sequence"), .value = 1 },
+{ .name = slice_literal_fields("Single_Token"), .value = 2 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(macro_pattern_single_token, Macro_Pattern_Single_Token,
   {

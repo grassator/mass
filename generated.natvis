@@ -1143,6 +1143,9 @@
   </Expand>
 </Type>
 <Type Name="Macro_Pattern">
+  <DisplayString Condition="tag == Macro_Pattern_Tag_Any_Token_Single">
+    Any_Token_Single
+  </DisplayString>
   <DisplayString Condition="tag == Macro_Pattern_Tag_Any_Token_Sequence">
     Any_Token_Sequence
   </DisplayString>

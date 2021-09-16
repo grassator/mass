@@ -1483,6 +1483,7 @@ main(void) {
   }));
 
   push_type(add_common_fields(type_union("Macro_Pattern", (Struct_Type[]){
+    struct_empty("Any_Token_Single"),
     struct_empty("Any_Token_Sequence"),
     struct_fields("Single_Token", (Struct_Item[]){
       { "Token_Pattern", "token_pattern" },
