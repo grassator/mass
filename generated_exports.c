@@ -267,6 +267,18 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None,
+    compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("view")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None,
     descriptor_pointer_to, "descriptor_pointer_to", &descriptor_descriptor_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("allocator")),

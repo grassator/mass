@@ -709,6 +709,9 @@ static Value * mass_compile_time_error
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
 
+static Value * compile_time_eval
+  (Execution_Context * context, Value_View view);
+
 static Descriptor * descriptor_pointer_to
   (const Allocator * allocator, const Descriptor * descriptor);
 
@@ -2542,6 +2545,7 @@ static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
+static Descriptor descriptor_compile_time_eval;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_mass_number_literal_logical_shift_left;
 static Descriptor descriptor_mass_number_literal_logical_shift_right;

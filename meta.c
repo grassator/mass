@@ -1975,6 +1975,12 @@ main(void) {
       { "u64", "byte_alignment" },
     })
   ));
+  export_compiler_custom_name("compile_time_eval", push_type(
+    type_function(Default, "compile_time_eval", "Value *", (Argument_Type[]){
+      { "Execution_Context *", "context" },
+      { "Value_View", "view" },
+    })
+  ));
 
   export_compiler_custom_name("descriptor_pointer_to", push_type(
     type_function(Default, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){

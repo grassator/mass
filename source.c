@@ -6572,8 +6572,6 @@ module_compiler_init(
   Compilation *compilation,
   Module *out_module
 ) {
-  const Calling_Convention *calling_convention =
-    compilation->jit.program->default_calling_convention;
   const Allocator *allocator = compilation->allocator;
   Scope *scope = scope_make(allocator, compilation->root_scope);
   *out_module = (Module) {
@@ -6597,13 +6595,6 @@ module_compiler_init(
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("allocator")), allocator_value
-  );
-
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
-    compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
-    function_parameter(mass_ensure_symbol(compilation, slice_literal("context")), &descriptor_execution_context_pointer),
-    function_parameter(mass_ensure_symbol(compilation, slice_literal("view")), &descriptor_value_view),
   );
 }
 
