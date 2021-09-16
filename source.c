@@ -4808,51 +4808,6 @@ mass_handle_fragment(
 }
 
 static Value *
-mass_handle_reflect_operator(
-  Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
-) {
-  assert(args_view.length == 1);
-  Value *source_value = value_view_get(args_view, 0);
-  value_init(
-    hash_map_set(context->compilation->static_pointer_map, source_value, (Value){0}),
-    &descriptor_value,
-    storage_none,
-    source_value->source_range
-  );
-
-  return value_init(
-    allocator_allocate(context->allocator, Value),
-    &descriptor_value_pointer,
-    storage_static_inline(&source_value),
-    args_view.source_range
-  );
-}
-
-static Value *
-mass_handle_reify_operator(
-  Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
-) {
-  assert(args_view.length == 1);
-  Value *reflected_value = compile_time_eval(context, args_view);
-  if (reflected_value->descriptor != &descriptor_value_pointer) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Type_Mismatch,
-      .source_range = reflected_value->source_range,
-      .Type_Mismatch = {
-        .expected = &descriptor_value_pointer,
-        .actual = reflected_value->descriptor
-      },
-    });
-    return 0;
-  }
-  return *storage_static_as_c_type(&reflected_value->storage, Value *);
-}
-
-static Value *
 mass_handle_at_operator(
   Execution_Context *context,
   Value_View args_view,
@@ -6689,20 +6644,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Right,
     .argument_count = 1,
     .handler = mass_handle_fragment,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
-    .precedence = 30,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .argument_count = 1,
-    .handler = mass_handle_reflect_operator,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("\\"), allocator_make(allocator, Operator,
-    .precedence = 29,
-    .fixity = Operator_Fixity_Postfix,
-    .associativity = Operator_Associativity_Left,
-    .argument_count = 1,
-    .handler = mass_handle_reify_operator,
   )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 20,

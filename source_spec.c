@@ -893,8 +893,8 @@ spec("source") {
       s64 (*checker)() =
         (s64 (*)())test_program_inline_source_function(
           "checker", &test_context,
-          "my_intrinsic :: @fn() -> (Number_Literal) @intrinsic { \\42 }\n"
-          "checker :: fn() -> (s64) { my_intrinsic() }"
+          "intrinsic_id :: @fn(x) @intrinsic { x }\n"
+          "checker :: fn() -> (s64) { intrinsic_id(42) }"
         );
       check(spec_check_mass_result(test_context.result));
       check(checker() == 42);
@@ -1215,28 +1215,6 @@ spec("source") {
   }
 
   describe("Operators") {
-    it("should be able to use prefix backslash operator for reflection") {
-      Descriptor_Tag(*checker)() = (Descriptor_Tag(*)())test_program_inline_source_function(
-        "checker", &test_context,
-        "mass :: import(\"mass\")\n"
-        "checker :: {\n"
-          "mass :: import(\"mass\")\n"
-          "fn() -> (mass.Descriptor_Tag._Type) { (\\42).descriptor.tag }\n"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == Descriptor_Tag_Struct);
-    }
-
-    it("should be able to use postfix backslash operator for reification") {
-        s64(*checker)() = (s64(*)())test_program_inline_source_function(
-            "checker", &test_context,
-            "checker :: fn() -> (s64) { \\42\\ }"
-        );
-        check(spec_check_mass_result(test_context.result));
-        check(checker() == 42);
-    }
-
     it("should be able to parse and run a triple plus function") {
       s64(*checker)(s64, s64, s64) = (s64(*)(s64, s64, s64))test_program_inline_source_function(
         "plus", &test_context,
