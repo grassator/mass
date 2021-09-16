@@ -2338,36 +2338,15 @@ token_parse_operator_definition(
 
   u64 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
+  TOKEN_EXPECT_MATCH(precedence_token, .tag = Token_Pattern_Tag_Any);
+  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
-  TOKEN_MAYBE_MATCH(precedence_token, .tag = Token_Pattern_Tag_Any);
-
-  if (!precedence_token) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = keyword_token->source_range,
-      .detailed_message = slice_literal("'operator' keyword must be followed by a precedence number")
-    });
-    goto err;
-  }
-
-  Source_Range precedence_source_range = precedence_token->source_range;
   Value *precedence_value = token_parse_single(context, precedence_token);
   precedence_value = token_value_force_immediate_integer(context, precedence_value, &descriptor_u64);
   MASS_ON_ERROR(*context->result) goto err;
 
   assert(precedence_value->storage.tag == Storage_Tag_Static);
   u64 precendence = storage_static_value_up_to_u64(&precedence_value->storage);
-
-  TOKEN_MAYBE_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
-
-  if (!pattern_token) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = precedence_source_range,
-      .detailed_message ="Operator definition must have a pattern in () following the precedence"
-    });
-    goto err;
-  }
 
   u64 body_length = 0;
   Value_View rest = value_view_rest(&view, peek_index);
