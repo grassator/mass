@@ -1137,7 +1137,6 @@ mass_ensure_symbol(
 static inline Value *
 token_make_symbol_value(
   Compilation *compilation,
-  const Allocator *allocator, // TODO take from compilation
   Slice name,
   Symbol_Type type,
   Source_Range source_range
@@ -1145,7 +1144,7 @@ token_make_symbol_value(
   const Symbol *symbol = mass_ensure_symbol(compilation, name, type);
 
   return value_init(
-    allocator_allocate(allocator, Value),
+    allocator_allocate(compilation->allocator, Value),
     &descriptor_symbol, storage_static(symbol), source_range
   );
 }
@@ -1252,7 +1251,7 @@ tokenizer_maybe_push_fake_semicolon(
   // Do not treat leading newlines as semicolons
   if (!has_children) return;
   dyn_array_push(*stack, token_make_symbol_value(
-    compilation, allocator, slice_literal(";"), Symbol_Type_Operator_Like, source_range
+    compilation, slice_literal(";"), Symbol_Type_Operator_Like, source_range
   ));
 }
 
@@ -5399,30 +5398,24 @@ token_parse_intrinsic_literal(
   // TODO would be nice to somehow make it non syntax-dependent
   // This adds local definitions for each of the arguments
   Value *arguments_symbol = token_make_symbol_value(
-    context->compilation,
-    context->allocator, slice_literal("arguments"), Symbol_Type_Id_Like, view.source_range
+    context->compilation, slice_literal("arguments"), Symbol_Type_Id_Like, view.source_range
   );
   Value *values_symbol = token_make_symbol_value(
-    context->compilation,
-    context->allocator, slice_literal("values"), Symbol_Type_Id_Like, view.source_range
+    context->compilation, slice_literal("values"), Symbol_Type_Id_Like, view.source_range
   );
   Value *colon_equal_symbol = token_make_symbol_value(
-    context->compilation,
-    context->allocator, slice_literal(":="), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal(":="), Symbol_Type_Operator_Like, view.source_range
   );
   Value *dot_symbol = token_make_symbol_value(
-    context->compilation,
-    context->allocator, slice_literal("."), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal("."), Symbol_Type_Operator_Like, view.source_range
   );
   Value *semicolon_symbol = token_make_symbol_value(
-    context->compilation,
-    context->allocator, slice_literal(";"), Symbol_Type_Operator_Like, view.source_range
+    context->compilation, slice_literal(";"), Symbol_Type_Operator_Like, view.source_range
   );
   for (u64 param_index = 0; param_index < dyn_array_length(info->parameters); ++param_index) {
     Function_Parameter *param = dyn_array_get(info->parameters, param_index);
     Value *param_name_symbol = token_make_symbol_value(
-      context->compilation,
-      context->allocator, param->declaration.name, Symbol_Type_Id_Like, view.source_range
+      context->compilation, param->declaration.name, Symbol_Type_Id_Like, view.source_range
     );
     dyn_array_push(wrapped_body_children, param_name_symbol);
     dyn_array_push(wrapped_body_children, colon_equal_symbol);

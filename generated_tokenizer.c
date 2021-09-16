@@ -75,7 +75,7 @@ tokenize(
   #define TOKENIZER_PUSH_SYMBOL(_TYPE_)\
     dyn_array_push(stack, \
       token_make_symbol_value(\
-        compilation, allocator, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
+        compilation, TOKENIZER_CURRENT_SLICE(), (_TYPE_), TOKENIZER_CURRENT_RANGE()\
       )\
     )
 
