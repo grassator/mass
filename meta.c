@@ -1157,6 +1157,9 @@ main(void) {
     struct_fields("Symbol", (Struct_Item[]){
       { "Slice", "name" },
     }),
+    struct_fields("Cached_Symbol", (Struct_Item[]){
+      { "const Symbol *", "pointer" },
+    }),
     struct_fields("Group", (Struct_Item[]){
       { "Group_Tag", "tag" },
     }),

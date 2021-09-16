@@ -1170,6 +1170,10 @@ value_match(
       }
       return true;
     }
+    case Token_Pattern_Tag_Cached_Symbol: {
+      if (!value_is_symbol(value)) return false;
+      return value_as_symbol(value) == pattern->Cached_Symbol.pointer;
+    }
     case Token_Pattern_Tag_Group: {
       if (!value_is_group(value)) return false;
       return value_as_group(value)->tag == pattern->Group.tag;
@@ -2528,12 +2532,13 @@ token_parse_syntax_definition(
     Value *value = value_view_get(definition, i);
     if (value_is_slice(value)) {
       const Slice *slice = value_as_slice(value);
+      const Symbol *symbol = mass_ensure_symbol(context->compilation, *slice);
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
         .Single_Token = {
           .token_pattern = {
-            .tag = Token_Pattern_Tag_Symbol,
-            .Symbol.name = *slice,
+            .tag = Token_Pattern_Tag_Cached_Symbol,
+            .Cached_Symbol.pointer = symbol,
           }
         },
       });
@@ -5234,7 +5239,7 @@ token_parse_if_expression(
   {
     static const Token_Pattern then_pattern = {
       .tag = Token_Pattern_Tag_Symbol,
-      .Symbol.name = slice_literal_fields("then")
+      .Symbol.name = slice_literal_fields("then"),
     };
     Value_View condition_view = value_view_slice(&view, peek_index, view.length);
     u64 condition_length;
