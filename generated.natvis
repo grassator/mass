@@ -318,9 +318,6 @@
   <DisplayString Condition="tag == Token_Pattern_Tag_Invalid">
     Invalid
   </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Any">
-    Any
-  </DisplayString>
   <DisplayString Condition="tag == Token_Pattern_Tag_Symbol">
     Symbol { Symbol }
   </DisplayString>

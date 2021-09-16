@@ -920,11 +920,10 @@ typedef dyn_array_type(Group) Array_Group;
 
 typedef enum {
   Token_Pattern_Tag_Invalid = 0,
-  Token_Pattern_Tag_Any = 1,
-  Token_Pattern_Tag_Symbol = 2,
-  Token_Pattern_Tag_Cached_Symbol = 3,
-  Token_Pattern_Tag_Group = 4,
-  Token_Pattern_Tag_Or = 5,
+  Token_Pattern_Tag_Symbol = 1,
+  Token_Pattern_Tag_Cached_Symbol = 2,
+  Token_Pattern_Tag_Group = 3,
+  Token_Pattern_Tag_Or = 4,
 } Token_Pattern_Tag;
 
 typedef struct Token_Pattern_Symbol {
@@ -2945,11 +2944,10 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern, Array_Token_Pattern)
 MASS_DEFINE_OPAQUE_C_TYPE(token_pattern_tag, Token_Pattern_Tag)
 static C_Enum_Item token_pattern_tag_items[] = {
 { .name = slice_literal_fields("Invalid"), .value = 0 },
-{ .name = slice_literal_fields("Any"), .value = 1 },
-{ .name = slice_literal_fields("Symbol"), .value = 2 },
-{ .name = slice_literal_fields("Cached_Symbol"), .value = 3 },
-{ .name = slice_literal_fields("Group"), .value = 4 },
-{ .name = slice_literal_fields("Or"), .value = 5 },
+{ .name = slice_literal_fields("Symbol"), .value = 1 },
+{ .name = slice_literal_fields("Cached_Symbol"), .value = 2 },
+{ .name = slice_literal_fields("Group"), .value = 3 },
+{ .name = slice_literal_fields("Or"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_symbol, Token_Pattern_Symbol,
   {

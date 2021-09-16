@@ -1159,9 +1159,6 @@ value_match(
       panic("Invalid pattern tag");
       break;
     }
-    case Token_Pattern_Tag_Any: {
-      return true;
-    }
     case Token_Pattern_Tag_Symbol: {
       if (!value_is_symbol(value)) return false;
       if (pattern->Symbol.name.length) {
@@ -1507,15 +1504,22 @@ value_view_match_till_end_of_statement(
   Value *(_id_) = token_peek_match(view, peek_index, &_id_##__pattern);\
   if (_id_) (++peek_index)
 
-#define TOKEN_EXPECT_MATCH(_id_, ...)\
-  TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
-  if (!_id_) do {\
+#define TOKEN_ERROR_WHEN_MATCHING() \
+  do {\
     context_error(context, (Mass_Error) {\
       .tag = Mass_Error_Tag_Parse,\
       .source_range = value_view_slice(&view, peek_index, peek_index).source_range,\
     });\
     return 0;\
   } while(0)
+
+#define TOKEN_EXPECT_MATCH(_id_, ...)\
+  TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
+  if (!_id_) TOKEN_ERROR_WHEN_MATCHING()
+
+#define TOKEN_EXPECT(_id_)\
+  if (peek_index >= view.length) TOKEN_ERROR_WHEN_MATCHING();\
+  Value *(_id_) = value_view_get(view, peek_index++)
 
 #define TOKEN_MATCH(_id_, ...)\
   TOKEN_MAYBE_MATCH(_id_, __VA_ARGS__);\
@@ -2338,7 +2342,7 @@ token_parse_operator_definition(
 
   u64 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
-  TOKEN_EXPECT_MATCH(precedence_token, .tag = Token_Pattern_Tag_Any);
+  TOKEN_EXPECT(precedence_token);
   TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
@@ -5525,7 +5529,7 @@ token_parse_function_literal(
   Value *returns;
   TOKEN_MAYBE_MATCH(arrow, TOKEN_PATTERN_SYMBOL("->"));
   if (arrow) {
-    TOKEN_EXPECT_MATCH(raw_return, .tag = Token_Pattern_Tag_Any);
+    TOKEN_EXPECT(raw_return);
     returns = raw_return;
   } else {
     Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);

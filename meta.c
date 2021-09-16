@@ -1153,7 +1153,6 @@ main(void) {
 
   push_type(type_union("Token_Pattern", (Struct_Type[]){
     struct_empty("Invalid"),
-    struct_empty("Any"),
     struct_fields("Symbol", (Struct_Item[]){
       { "Slice", "name" },
     }),
