@@ -17,11 +17,10 @@ syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
 //)
 
 syntax statement("while" ..@condition {}@body) {
-  label _loop_start
-  label placeholder _loop_done
-
   break :: ~> { goto _loop_done }
   continue :: ~> { goto _loop_start }
+
+  label _loop_start
   if condition() {
     body(@scope)
     goto _loop_start
@@ -31,18 +30,18 @@ syntax statement("while" ..@condition {}@body) {
 
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre()
-  label _loop_start
-  label placeholder _loop_post
-  label placeholder _loop_done
+
   break :: ~> { goto _loop_done }
   continue :: ~> { goto _loop_post }
+
+  label _loop_start
   if condition() {
     body(@scope)
     label _loop_post
     post()
     goto _loop_start
   }
-  label _loop_end
+  label _loop_done
 }
 
 PRELUDE_MASS :: import("mass")
