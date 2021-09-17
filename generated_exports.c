@@ -555,7 +555,7 @@ global_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    mass_ensure_symbol(compilation, slice_literal("Slice")),
+    mass_ensure_symbol(compilation, slice_literal("String")),
     type_slice_value
   );
 }
