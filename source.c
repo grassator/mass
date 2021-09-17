@@ -2205,12 +2205,6 @@ token_match_call_arguments(
     if (context->result->tag != Mass_Result_Tag_Success) return;
     Value_View view = token_split_next(&it, &token_pattern_comma_operator);
     Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
-    if (parse_result->descriptor == &descriptor_tuple) {
-      //const Tuple *tuple = storage_static_as_c_type(&parse_result->storage, Tuple);
-      //const Descriptor *tuple_descriptor =
-        //anonymous_struct_descriptor_from_tuple(context, tuple);
-      panic("FIXME support inline tuples in arguments");
-    }
     dyn_array_push(*out_args, parse_result);
   }
 }
@@ -3093,38 +3087,16 @@ mass_cast_helper(
 }
 
 static Value *
-token_handle_cast(
+mass_cast(
   Execution_Context *context,
-  Value *args_token
+  Value_View args_view
 ) {
   MASS_ON_ERROR(*context->result) return 0;
-  Value_View_Split_Iterator it = { .view = value_as_group_paren(args_token)->children };
-
-  // First argument is treated as a type
-  Value_View type_view = token_split_next(&it, &token_pattern_comma_operator);
-  const Descriptor *target_descriptor = token_match_type(context, type_view);
-
-  if (it.done) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = it.view.source_range,
-      .detailed_message = slice_literal("cast() expects two arguments")
-    });
-    return 0;
-  }
-
-  Value_View expression_view = token_split_next(&it, &token_pattern_comma_operator);
-  Value *expression = token_parse_expression(context, expression_view, &(u64){0}, 0);
-
-  if (!it.done) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = it.view.source_range,
-      .detailed_message = slice_literal("cast() expects two arguments")
-    });
-    return 0;
-  }
-  return mass_cast_helper(context, target_descriptor, expression, it.view.source_range);
+  assert(args_view.length == 2);
+  const Descriptor *target_descriptor =
+    value_ensure_type(context, value_view_get(args_view, 0), args_view.source_range);
+  Value *expression = value_view_get(args_view, 1);
+  return mass_cast_helper(context, target_descriptor, expression, args_view.source_range);
 }
 
 static void
@@ -4723,9 +4695,7 @@ mass_handle_paren_operator(
   if (value_is_symbol(target)) {
     target_name = value_as_symbol(target)->name;
   }
-  if (slice_equal(target_name, slice_literal("cast"))) {
-    return token_handle_cast(context, args_token);
-  } else if (slice_equal(target_name, slice_literal("c_string"))) {
+  if (slice_equal(target_name, slice_literal("c_string"))) {
     return mass_make_lazy_value(
       context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
     );

@@ -45,6 +45,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 }
 
 PRELUDE_MASS :: import("mass")
+cast :: @fn(type : Type, value) PRELUDE_MASS.cast
 
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 

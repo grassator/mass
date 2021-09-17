@@ -688,6 +688,9 @@ static Value * mass_address_of
 static Value * mass_import
   (Execution_Context * context, Value_View args);
 
+static Value * mass_cast
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_type_of
   (Execution_Context * context, Value_View args);
 
@@ -1636,7 +1639,7 @@ typedef struct Function_Literal {
   u32 _flags_padding;
   Execution_Context context;
   Function_Info * info;
-  const Group_Curly * body;
+  Value * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
 } Function_Literal;
@@ -2554,6 +2557,7 @@ static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_import;
+static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
 static Descriptor descriptor_mass_compile_time_error;
@@ -4887,7 +4891,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_group_curly_pointer,
+    .descriptor = &descriptor_value_pointer,
     .name = slice_literal_fields("body"),
     .Base_Relative.offset = offsetof(Function_Literal, body),
   },
