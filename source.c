@@ -1173,43 +1173,10 @@ static const Token_Pattern token_pattern_semicolon = {
   .Symbol.name = slice_literal_fields(";"),
 };
 
-static inline bool
-value_match(
-  const Value *value,
-  const Token_Pattern *pattern
-) {
-  if (!value) return false;
-  switch(pattern->tag) {
-    case Token_Pattern_Tag_Invalid: {
-      panic("Invalid pattern tag");
-      break;
-    }
-    case Token_Pattern_Tag_Symbol: {
-      if (!value_is_symbol(value)) return false;
-      if (pattern->Symbol.name.length) {
-        Slice name = value_as_symbol(value)->name;
-        if (!slice_equal(pattern->Symbol.name, name)) return false;
-      }
-      return true;
-    }
-    case Token_Pattern_Tag_Cached_Symbol: {
-      if (!value_is_symbol(value)) return false;
-      return value_as_symbol(value) == pattern->Cached_Symbol.pointer;
-    }
-    case Token_Pattern_Tag_Group: {
-      if (!value_is_group(value)) return false;
-      return value_as_group(value)->tag == pattern->Group.tag;
-    }
-    case Token_Pattern_Tag_Or: {
-      return value_match(value, pattern->Or.a) || value_match(value, pattern->Or.b);
-    }
-  }
-  return true;
-}
 
 static inline bool
 value_match_symbol(
-  Value *token,
+  const Value *token,
   Slice name
 ) {
   if (!value_is_symbol(token)) return false;
@@ -1219,11 +1186,38 @@ value_match_symbol(
 
 static inline bool
 value_match_group(
-  Value *token,
+  const Value *token,
   Group_Tag tag
 ) {
   if (!value_is_group(token)) return false;
   return value_as_group(token)->tag == tag;
+}
+
+static inline bool
+value_match(
+  const Value *value,
+  const Token_Pattern *pattern
+) {
+  if (!value) return false;
+  switch(pattern->tag) {
+    case Token_Pattern_Tag_Invalid: {
+      panic("Invalid pattern tag");
+    } break;
+    case Token_Pattern_Tag_Symbol: {
+      return value_match_symbol(value, pattern->Symbol.name);
+    }
+    case Token_Pattern_Tag_Cached_Symbol: {
+      if (!value_is_symbol(value)) return false;
+      return value_as_symbol(value) == pattern->Cached_Symbol.pointer;
+    }
+    case Token_Pattern_Tag_Group: {
+      return value_match_group(value, pattern->Group.tag);
+    }
+    case Token_Pattern_Tag_Or: {
+      return value_match(value, pattern->Or.a) || value_match(value, pattern->Or.b);
+    }
+  }
+  return true;
 }
 
 static inline Value_View
@@ -1265,6 +1259,8 @@ tokenizer_maybe_push_fake_semicolon(
   }
   // Do not treat leading newlines as semicolons
   if (!has_children) return;
+  // :FakeSemicolon
+  assert(range_length(source_range.offsets) == 0);
   dyn_array_push(*stack, token_make_symbol_value(
     compilation, slice_literal(";"), source_range
   ));
@@ -1325,11 +1321,10 @@ tokenizer_group_end(
         Value *last = *dyn_array_last(*stack);
         // :FakeSemicolon
         // We detect fake semicolons with range_length == 0
-        // so it needs to be done like that in the tokenizer
+        // so it needs to be created like that in the tokenizer
         bool is_last_token_a_fake_semicolon = (
           range_length(last->source_range.offsets) == 0 &&
-          value_is_symbol(last) &&
-          slice_equal(value_as_symbol(last)->name, slice_literal(";"))
+          value_match_symbol(last, slice_literal(";"))
         );
         if (!is_last_token_a_fake_semicolon) break;
         dyn_array_pop(*stack);
