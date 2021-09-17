@@ -697,6 +697,9 @@ static Value * mass_type_of
 static Value * mass_size_of
   (Execution_Context * context, Value_View args);
 
+static Value * mass_startup
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_compile_time_error
   (Execution_Context * context, Value_View args);
 
@@ -2560,6 +2563,7 @@ static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
+static Descriptor descriptor_mass_startup;
 static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
 static Descriptor descriptor_compile_time_eval;

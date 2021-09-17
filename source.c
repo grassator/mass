@@ -4516,30 +4516,46 @@ mass_handle_startup_call_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
-  Value *args_token
+  Value *startup_function
 ) {
-  Value_View expression = value_as_group_paren(args_token)->children;
-  Value *startup_function = token_parse_expression(context, expression, &(u64){0}, 0);
-  MASS_ON_ERROR(*context->result) return 0;
-  const Descriptor *descriptor = startup_function->descriptor;
-  if (descriptor != &descriptor_function_literal) goto err;
+  if(startup_function->descriptor != &descriptor_function_literal) goto err;
   const Function_Literal *literal = value_as_function_literal(startup_function);
-
   if (dyn_array_length(literal->info->parameters)) goto err;
   if (literal->info->returns.declaration.descriptor != &descriptor_void) goto err;
 
-  ensure_function_instance(context, startup_function, (Value_View){0});
-  dyn_array_push(context->program->startup_functions, startup_function);
+  // This call is executed at compile time, but the actual startup function
+  // will be run only at runtime so we need to make sure to use the right Program
+  Execution_Context runtime_context = *context;
+  runtime_context.program = context->compilation->runtime_program;
+  ensure_function_instance(&runtime_context, startup_function, (Value_View){0});
 
+  dyn_array_push(runtime_context.program->startup_functions, startup_function);
   return expected_result_validate(expected_result, &void_value);
 
   err:
   context_error(context, (Mass_Error) {
     .tag = Mass_Error_Tag_Parse,
-    .source_range = args_token->source_range,
+    .source_range = startup_function->source_range,
     .detailed_message = slice_literal("`startup` expects a () -> () {...} function as an argument"),
   });
   return 0;
+}
+
+static Value *
+mass_startup(
+  Execution_Context *context,
+  Value_View arguments
+) {
+  assert(arguments.length == 1);
+  Value *startup_function = value_view_get(arguments, 0);
+
+  return mass_make_lazy_value(
+    context,
+    arguments.source_range,
+    startup_function,
+    &descriptor_void,
+    mass_handle_startup_call_lazy_proc
+  );
 }
 
 static Value *
@@ -4644,17 +4660,12 @@ mass_handle_paren_operator(
 ) {
   Value *target = value_view_get(args_view, 0);
   Value *args_token = value_view_get(args_view, 1);
-  Source_Range args_range = args_token->source_range;
   Slice target_name = {0};
   if (value_is_symbol(target)) {
     target_name = value_as_symbol(target)->name;
   }
   if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
-  } else if (slice_equal(target_name, slice_literal("startup"))) {
-    return mass_make_lazy_value(
-      context, args_range, args_token, &descriptor_void, mass_handle_startup_call_lazy_proc
-    );
   } else {
     return token_handle_parsed_function_call(context, target, args_token, args_view.source_range);
   }

@@ -1969,6 +1969,7 @@ main(void) {
   export_compiler_custom_name("cast", push_type(type_intrinsic("mass_cast")));
   export_compiler_custom_name("type_of", push_type(type_intrinsic("mass_type_of")));
   export_compiler_custom_name("size_of", push_type(type_intrinsic("mass_size_of")));
+  export_compiler_custom_name("startup", push_type(type_intrinsic("mass_startup")));
 
   export_compiler_custom_name("compile_time_error", push_type(type_intrinsic("mass_compile_time_error")));
 

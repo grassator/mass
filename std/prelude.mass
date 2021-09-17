@@ -47,6 +47,9 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 PRELUDE_MASS :: import("mass")
 cast :: @fn(type : Type, value) PRELUDE_MASS.cast
 
+// FIXME Support specifying a type here
+startup :: PRELUDE_MASS.startup
+
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 
 syntax statement("goto" .@label) { inline_machine_code_bytes(0xE9, label()) }
