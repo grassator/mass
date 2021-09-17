@@ -309,9 +309,11 @@ storage_static_as_c_type_internal(
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
-DEFINE_VALUE_IS_AS_HELPERS(Group, group)
 DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)
+DEFINE_VALUE_IS_AS_HELPERS(Group_Curly, group_curly)
+DEFINE_VALUE_IS_AS_HELPERS(Group_Square, group_square)
 
 static inline Label *
 program_get_label(

@@ -1186,11 +1186,18 @@ value_match_symbol(
 
 static inline bool
 value_match_group(
-  const Value *token,
-  Group_Tag tag
+  const Value *value,
+  Group_Tag group_tag
 ) {
-  if (!value_is_group(token)) return false;
-  return value_as_group(token)->tag == tag;
+  switch(group_tag) {
+    case Group_Tag_Paren: return value->descriptor == &descriptor_group_paren;
+    case Group_Tag_Curly: return value->descriptor == &descriptor_group_curly;
+    case Group_Tag_Square: return value->descriptor == &descriptor_group_square;
+    default: {
+      panic("UNREACHABLE");
+      return false;
+    } break;
+  }
 }
 
 static inline bool
@@ -1237,7 +1244,7 @@ temp_token_array_into_value_view(
 }
 
 typedef struct {
-  Group *group;
+  const Descriptor *descriptor;
   u64 index;
 } Tokenizer_Parent;
 typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
@@ -1245,7 +1252,7 @@ typedef dyn_array_type(Tokenizer_Parent) Array_Tokenizer_Parent;
 static inline void
 tokenizer_maybe_push_fake_semicolon(
   Compilation *compilation,
-  const Allocator *allocator,
+  const Allocator *allocator, // FIXME not necessary
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
   Source_Range source_range
@@ -1253,8 +1260,7 @@ tokenizer_maybe_push_fake_semicolon(
   bool has_children = dyn_array_length(*stack) != 0;
   if (dyn_array_length(*parent_stack)) {
     Tokenizer_Parent *parent = dyn_array_last(*parent_stack);
-    Value *parent_value = *dyn_array_get(*stack, parent->index);
-    if(value_as_group(parent_value)->tag != Group_Tag_Curly) return;
+    if(parent->descriptor != &descriptor_group_curly) return;
     has_children = parent->index + 1 != dyn_array_length(*stack);
   }
   // Do not treat leading newlines as semicolons
@@ -1271,17 +1277,15 @@ tokenizer_group_start(
   const Allocator *allocator,
   Array_Value_Ptr *stack,
   Array_Tokenizer_Parent *parent_stack,
-  Group_Tag tag,
+  const Descriptor *group_descriptor,
   Source_Range source_range
 ) {
-  Group *group = allocator_allocate(allocator, Group);
-  group->tag = tag;
   Value *value = value_init(
     allocator_allocate(allocator, Value),
-    &descriptor_group, storage_static(group), source_range
+    group_descriptor, storage_none, source_range
   );
   dyn_array_push(*parent_stack, (Tokenizer_Parent){
-    .group = group,
+    .descriptor = group_descriptor,
     .index = dyn_array_length(*stack)
   });
   dyn_array_push(*stack, value);
@@ -1301,42 +1305,44 @@ tokenizer_group_end(
     parent = dyn_array_last(*parent_stack);
     parent_value = *dyn_array_get(*stack, parent->index);
   }
-  if (!parent_value || !value_is_group(parent_value)) {
+  if (
+    !parent_value ||
+    !(
+      value_is_group_paren(parent_value) ||
+      value_is_group_curly(parent_value) ||
+      value_is_group_square(parent_value)
+     )
+  ) {
     panic("Tokenizer: unexpected parent stack entry");
   }
 
   Slice expected_paren = {0};
-  switch (parent->group->tag) {
-    case Group_Tag_Paren: {
-      expected_paren = slice_literal(")");
-      break;
-    }
-    case Group_Tag_Curly: {
-      // Newlines at the end of the block do not count as semicolons otherwise this:
-      // { 42
-      // }
-      // is being interpreted as:
-      // { 42 ; }
-      while (parent->index + 1 < dyn_array_length(*stack)) {
-        Value *last = *dyn_array_last(*stack);
-        // :FakeSemicolon
-        // We detect fake semicolons with range_length == 0
-        // so it needs to be created like that in the tokenizer
-        bool is_last_token_a_fake_semicolon = (
-          range_length(last->source_range.offsets) == 0 &&
-          value_match_symbol(last, slice_literal(";"))
-        );
-        if (!is_last_token_a_fake_semicolon) break;
-        dyn_array_pop(*stack);
-      }
+  if (parent->descriptor == &descriptor_group_paren) {
+    expected_paren = slice_literal(")");
+  } else if (parent->descriptor == &descriptor_group_square) {
+    expected_paren = slice_literal("]");
+  } else if (parent->descriptor == &descriptor_group_curly) {
+    expected_paren = slice_literal("}");
 
-      expected_paren = slice_literal("}");
-      break;
+    // Newlines at the end of the block do not count as semicolons otherwise this:
+    // { 42
+    // }
+    // is being interpreted as:
+    // { 42 ; }
+    while (parent->index + 1 < dyn_array_length(*stack)) {
+      Value *last = *dyn_array_last(*stack);
+      // :FakeSemicolon
+      // We detect fake semicolons with range_length == 0
+      // so it needs to be created like that in the tokenizer
+      bool is_last_token_a_fake_semicolon = (
+        range_length(last->source_range.offsets) == 0 &&
+        value_match_symbol(last, slice_literal(";"))
+      );
+      if (!is_last_token_a_fake_semicolon) break;
+      dyn_array_pop(*stack);
     }
-    case Group_Tag_Square: {
-      expected_paren = slice_literal("]");
-      break;
-    }
+  } else {
+    panic("UNREACHABLE");
   }
   if (actual_paren != expected_paren.bytes[0]) {
     return false;
@@ -1348,9 +1354,27 @@ tokenizer_group_end(
   children_range.offsets.from += 1;
   Value **children_values = dyn_array_raw(*stack) + parent->index + 1;
   u64 child_count = dyn_array_length(*stack) - parent->index - 1;
-  parent->group->children = temp_token_array_into_value_view(
+
+  Value_View children = temp_token_array_into_value_view(
     allocator, children_values, child_count, children_range
   );
+  assert(parent_value->storage.tag == Storage_Tag_None);
+  if (parent->descriptor == &descriptor_group_paren) {
+    Group_Paren *group = allocator_allocate(allocator, Group_Paren);
+    *group = (Group_Paren){.children = children};
+    parent_value->storage = storage_static(group);
+  } else if (parent->descriptor == &descriptor_group_square) {
+    Group_Curly *group = allocator_allocate(allocator, Group_Curly);
+    *group = (Group_Curly){.children = children};
+    parent_value->storage = storage_static(group);
+  } else if (parent->descriptor == &descriptor_group_curly) {
+    Group_Square *group = allocator_allocate(allocator, Group_Square);
+    *group = (Group_Square){.children = children};
+    parent_value->storage = storage_static(group);
+  } else {
+    panic("UNREACHABLE");
+  }
+
   stack->data->length = parent->index + 1; // pop the children
   dyn_array_pop(*parent_stack);
 
@@ -1593,23 +1617,17 @@ token_parse_single(
   Execution_Context *context,
   Value *value
 ) {
-  if (value_is_group(value)) {
-    const Group *group = value_as_group(value);
-    switch(group->tag) {
-      case Group_Tag_Paren: {
-        return token_parse_expression(context, group->children, &(u64){0}, 0);
-      }
-      case Group_Tag_Curly: {
-        return token_parse_block(context, value);
-      }
-      case Group_Tag_Square: {
-        return token_parse_tuple(context, group->children);
-      }
-    }
-  } else if(value_is_symbol(value)) {
+  if (value->descriptor == &descriptor_group_paren) {
+    return token_parse_expression(context, value_as_group_paren(value)->children, &(u64){0}, 0);
+  } else if (value->descriptor == &descriptor_group_curly) {
+    return token_parse_block(context, value_as_group_curly(value));
+  } else if (value->descriptor == &descriptor_group_square) {
+    return token_parse_tuple(context, value_as_group_square(value)->children);
+  } else if (value_is_symbol(value)) {
     return scope_lookup_force(context, context->scope, value_as_symbol(value), &value->source_range);
+  } else {
+    return value;
   }
-  return value;
 }
 
 typedef enum {
@@ -2188,17 +2206,16 @@ value_force_exact(
 static void
 token_match_call_arguments(
   Execution_Context *context,
-  Value *token,
+  const Group_Paren *args_group,
   Array_Value_Ptr *out_args
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return;
 
   dyn_array_clear(*out_args);
 
-  const Group *group = value_as_group(token);
-  if (group->children.length == 0) return;
+  if (args_group->children.length == 0) return;
 
-  Value_View_Split_Iterator it = { .view = group->children };
+  Value_View_Split_Iterator it = { .view = args_group->children };
 
   while (!it.done) {
     if (context->result->tag != Mass_Result_Tag_Success) return;
@@ -2323,7 +2340,7 @@ token_parse_exports(
 
   context->module->export.source_range = keyword_token->source_range;
 
-  Value_View children = value_as_group(block)->children;
+  Value_View children = value_as_group_curly(block)->children;
   if (children.length == 1) {
     if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
       context->module->export.tag = Module_Export_Tag_All;
@@ -2388,7 +2405,7 @@ token_parse_operator_definition(
   Value_View body_view = value_view_match_till_end_of_statement(rest, &body_length);
   peek_index += body_length;
 
-  Value_View definition = value_as_group(pattern_token)->children;
+  Value_View definition = value_as_group_paren(pattern_token)->children;
 
   user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
   *user_defined_operator = (User_Defined_Operator) {
@@ -2541,7 +2558,7 @@ token_parse_syntax_definition(
   TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
 
   Value_View replacement = value_view_match_till_end_of_statement(view, &peek_index);
-  Value_View definition = value_as_group(pattern_token)->children;
+  Value_View definition = value_as_group_paren(pattern_token)->children;
 
   Array_Macro_Pattern pattern = dyn_array_make(Array_Macro_Pattern);
 
@@ -2559,22 +2576,24 @@ token_parse_syntax_definition(
           }
         },
       });
-    } else if (value_is_group(value)) {
-      const Group *group = value_as_group(value);
-      if (group->children.length) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = value->source_range,
-          .detailed_message = slice_literal("Nested group matches are not supported in syntax declarations")
-        });
-        goto err;
+    } else if (
+      value->descriptor == &descriptor_group_paren ||
+      value->descriptor == &descriptor_group_square ||
+      value->descriptor == &descriptor_group_curly
+    ) {
+      // FIXME add generic descriptor matcher
+      Group_Tag group_tag = Group_Tag_Paren;
+      if (value->descriptor == &descriptor_group_curly) {
+        group_tag = Group_Tag_Curly;
+      } else if (value->descriptor == &descriptor_group_square) {
+        group_tag = Group_Tag_Square;
       }
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
         .Single_Token = {
           .token_pattern = {
             .tag = Token_Pattern_Tag_Group,
-            .Group.tag = group->tag,
+            .Group.tag = group_tag,
           }
         },
       });
@@ -2685,7 +2704,7 @@ token_process_c_struct_definition(
     });
     goto err;
   }
-  const Group *args_group = value_as_group(args);
+  const Group_Paren *args_group = value_as_group_paren(args);
   if (args_group->children.length != 1) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -2711,7 +2730,7 @@ token_process_c_struct_definition(
     .capacity = 32,
   );
 
-  const Group *layout_group = value_as_group(layout_block);
+  const Group_Curly *layout_group = value_as_group_curly(layout_block);
   if (layout_group->children.length != 0) {
     Value_View_Split_Iterator it = { .view = layout_group->children };
     while (!it.done) {
@@ -2908,7 +2927,7 @@ token_handle_c_string(
     .capacity = 16,
   );
 
-  token_match_call_arguments(context, args_token, &args);
+  token_match_call_arguments(context, value_as_group_paren(args_token), &args);
   Value *result_value = 0;
   if (dyn_array_length(args) != 1) {
     context_error(context, (Mass_Error) {
@@ -3102,7 +3121,7 @@ token_handle_cast(
   Value *args_token
 ) {
   MASS_ON_ERROR(*context->result) return 0;
-  Value_View_Split_Iterator it = { .view = value_as_group(args_token)->children };
+  Value_View_Split_Iterator it = { .view = value_as_group_paren(args_token)->children };
 
   // First argument is treated as a type
   Value_View type_view = token_split_next(&it, &token_pattern_comma_operator);
@@ -3319,7 +3338,7 @@ mass_handle_macro_call(
 
   Execution_Context body_context = *context;
   body_context.scope = body_scope;
-  Value *body_value = token_parse_block_no_scope(&body_context, literal->body);
+  Value *body_value = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
   MASS_ON_ERROR(*context->result) return 0;
 
   const Descriptor *return_descriptor = value_or_lazy_value_descriptor(body_value);
@@ -4010,13 +4029,13 @@ token_handle_parsed_function_call(
   MASS_ON_ERROR(*context->result) goto defer;
 
   Value_View args_view;
-  if(value_match_group(args_token, Group_Tag_Paren)) {
+  if(value_is_group_paren(args_token)) {
     Array_Value_Ptr temp_args = dyn_array_make(
       Array_Value_Ptr,
       .allocator = context->temp_allocator,
       .capacity = 32,
     );
-    token_match_call_arguments(context, args_token, &temp_args);
+    token_match_call_arguments(context, value_as_group_paren(args_token), &temp_args);
     MASS_ON_ERROR(*context->result) goto defer;
     args_view = value_view_from_value_array(temp_args, &source_range);
   } else if (args_token->descriptor == &descriptor_value_view) {
@@ -4596,7 +4615,7 @@ mass_handle_startup_call_lazy_proc(
   const Expected_Result *expected_result,
   Value *args_token
 ) {
-  Value_View expression = value_as_group(args_token)->children;
+  Value_View expression = value_as_group_paren(args_token)->children;
   Value *startup_function = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return 0;
   const Descriptor *descriptor = startup_function->descriptor;
@@ -4807,9 +4826,7 @@ mass_handle_fragment(
   assert(args_view.length == 1);
   // TODO consider using empty space operator instead
   Value *source_value = value_view_get(args_view, 0);
-  assert(value_is_group(source_value)); // TODO user error
-  const Group *group = value_as_group(source_value);
-  assert(group->tag == Group_Tag_Curly); // TODO user error
+  const Group_Curly *group = value_as_group_curly(source_value); // TODO user error
   Code_Fragment *fragment = allocator_allocate(context->allocator, Code_Fragment);
   *fragment = (Code_Fragment) {
     .scope = context->scope,
@@ -4833,9 +4850,9 @@ mass_handle_at_operator(
       allocator_allocate(context->allocator, Value),
       &descriptor_scope, storage_static(context->scope), body_range
     );
-  } else if (value_match_group(body, Group_Tag_Paren)) {
-    return compile_time_eval(context, value_as_group(body)->children);
-  } else if (value_match_group(body, Group_Tag_Curly)) {
+  } else if (value_is_group_paren(body)) {
+    return compile_time_eval(context, value_as_group_paren(body)->children);
+  } else if (value_is_group_curly(body)) {
     return compile_time_eval(context, args_view);
   } else {
     context_error(context, (Mass_Error) {
@@ -5394,14 +5411,14 @@ token_parse_intrinsic_literal(
 
   dyn_array_push(wrapped_body_children, body);
 
-  Group *wrapped_body_group = allocator_allocate(context->allocator, Group);
-  wrapped_body_group->tag = Group_Tag_Curly;
+  Group_Curly *wrapped_body_group = allocator_allocate(context->allocator, Group_Curly);
   wrapped_body_group->children = value_view_from_value_array(wrapped_body_children, &body->source_range);
 
   Value *wrapped_body_value = value_make(
-    context, &descriptor_group, storage_static(wrapped_body_group), body->source_range
+    context, &descriptor_group_curly, storage_static(wrapped_body_group), body->source_range
   );
 
+  // TODO maybe store Group_Curly directly in the Function_Literal?
   Function_Literal *literal = mass_make_fake_function_literal(
     context, wrapped_body_value, &descriptor_value_pointer, &keyword->source_range
   );
@@ -5483,17 +5500,8 @@ function_info_from_parameters_and_return_type(
     dyn_array_copy_from_temp(Array_Function_Parameter, context, &fn_info->parameters, temp_params);
   }
 
-  if (value_is_group(return_types)) {
-    const Group *return_types_group = value_as_group(return_types);
-    if (return_types_group->tag != Group_Tag_Paren) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .detailed_message = slice_literal("Return type can only be a type name or a parenthesized list"),
-        .source_range = return_types->source_range,
-      });
-      return 0;
-    }
-    Value_View return_types_view = return_types_group->children;
+  if (value_is_group_paren(return_types)) {
+    Value_View return_types_view = value_as_group_paren(return_types)->children;
     if (return_types_view.length == 0) {
       fn_info->returns = (Function_Return) { .declaration.descriptor = &descriptor_void, };
     } else {
@@ -5563,15 +5571,16 @@ token_parse_function_literal(
     TOKEN_EXPECT(raw_return);
     returns = raw_return;
   } else {
-    Group *group = allocator_make(context->allocator, Group, .tag = Group_Tag_Paren);
+    Group_Paren *group = allocator_allocate(context->allocator, Group_Paren);
+    *group = (Group_Paren){0};
     returns = value_init(
       allocator_allocate(context->allocator, Value),
-      &descriptor_group, storage_static(group), keyword->source_range
+      &descriptor_group_paren, storage_static(group), keyword->source_range
     );
   }
 
   Slice name = maybe_name ? value_as_symbol(maybe_name)->name : (Slice){0};
-  Value_View args_view = value_as_group(args)->children;
+  Value_View args_view = value_as_group_paren(args)->children;
   Function_Info *fn_info =
     function_info_from_parameters_and_return_type(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
@@ -5960,23 +5969,20 @@ token_parse_block_view(
 static inline Value *
 token_parse_block_no_scope(
   Execution_Context *context,
-  Value *block
+  const Group_Curly *group
 ) {
-  const Group *group = value_as_group(block);
-  assert(group->tag == Group_Tag_Curly);
-
   return token_parse_block_view(context, group->children);
 }
 
 static inline Value *
 token_parse_block(
   Execution_Context *context,
-  Value *block
+  const Group_Curly *group
 ) {
   Execution_Context body_context = *context;
   Scope *block_scope = scope_make(context->allocator, context->scope);
   body_context.scope = block_scope;
-  return token_parse_block_no_scope(&body_context, block);
+  return token_parse_block_no_scope(&body_context, group);
 }
 
 static u64
@@ -6158,7 +6164,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
 ) {
   Instruction_Bytes bytes = {0};
 
-  Value_View_Split_Iterator it = { .view = value_as_group(args_token)->children };
+  Value_View_Split_Iterator it = { .view = value_as_group_paren(args_token)->children };
 
   enum {MAX_PATCH_COUNT = 2};
   Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};

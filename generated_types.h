@@ -58,9 +58,17 @@ typedef struct Symbol Symbol;
 typedef dyn_array_type(Symbol *) Array_Symbol_Ptr;
 typedef dyn_array_type(const Symbol *) Array_Const_Symbol_Ptr;
 
-typedef struct Group Group;
-typedef dyn_array_type(Group *) Array_Group_Ptr;
-typedef dyn_array_type(const Group *) Array_Const_Group_Ptr;
+typedef struct Group_Paren Group_Paren;
+typedef dyn_array_type(Group_Paren *) Array_Group_Paren_Ptr;
+typedef dyn_array_type(const Group_Paren *) Array_Const_Group_Paren_Ptr;
+
+typedef struct Group_Curly Group_Curly;
+typedef dyn_array_type(Group_Curly *) Array_Group_Curly_Ptr;
+typedef dyn_array_type(const Group_Curly *) Array_Const_Group_Curly_Ptr;
+
+typedef struct Group_Square Group_Square;
+typedef dyn_array_type(Group_Square *) Array_Group_Square_Ptr;
+typedef dyn_array_type(const Group_Square *) Array_Const_Group_Square_Ptr;
 
 typedef struct Token_Pattern Token_Pattern;
 typedef dyn_array_type(Token_Pattern *) Array_Token_Pattern_Ptr;
@@ -911,12 +919,20 @@ typedef struct Symbol {
 } Symbol;
 typedef dyn_array_type(Symbol) Array_Symbol;
 
-typedef struct Group {
-  Group_Tag tag;
-  u32 _tag_padding;
+typedef struct Group_Paren {
   Value_View children;
-} Group;
-typedef dyn_array_type(Group) Array_Group;
+} Group_Paren;
+typedef dyn_array_type(Group_Paren) Array_Group_Paren;
+
+typedef struct Group_Curly {
+  Value_View children;
+} Group_Curly;
+typedef dyn_array_type(Group_Curly) Array_Group_Curly;
+
+typedef struct Group_Square {
+  Value_View children;
+} Group_Square;
+typedef dyn_array_type(Group_Square) Array_Group_Square;
 
 typedef enum {
   Token_Pattern_Tag_Invalid = 0,
@@ -2112,11 +2128,21 @@ static Descriptor descriptor_array_symbol;
 static Descriptor descriptor_array_symbol_ptr;
 static Descriptor descriptor_symbol_pointer;
 static Descriptor descriptor_symbol_pointer_pointer;
-static Descriptor descriptor_group;
-static Descriptor descriptor_array_group;
-static Descriptor descriptor_array_group_ptr;
-static Descriptor descriptor_group_pointer;
-static Descriptor descriptor_group_pointer_pointer;
+static Descriptor descriptor_group_paren;
+static Descriptor descriptor_array_group_paren;
+static Descriptor descriptor_array_group_paren_ptr;
+static Descriptor descriptor_group_paren_pointer;
+static Descriptor descriptor_group_paren_pointer_pointer;
+static Descriptor descriptor_group_curly;
+static Descriptor descriptor_array_group_curly;
+static Descriptor descriptor_array_group_curly_ptr;
+static Descriptor descriptor_group_curly_pointer;
+static Descriptor descriptor_group_curly_pointer_pointer;
+static Descriptor descriptor_group_square;
+static Descriptor descriptor_array_group_square;
+static Descriptor descriptor_array_group_square_ptr;
+static Descriptor descriptor_group_square_pointer;
+static Descriptor descriptor_group_square_pointer_pointer;
 static Descriptor descriptor_token_pattern;
 static Descriptor descriptor_array_token_pattern;
 static Descriptor descriptor_array_token_pattern_ptr;
@@ -2915,29 +2941,39 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(symbol, Symbol,
   },
 );
 MASS_DEFINE_TYPE_VALUE(symbol);
-MASS_DEFINE_OPAQUE_C_TYPE(array_group_ptr, Array_Group_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_group, Array_Group)
-MASS_DEFINE_STRUCT_DESCRIPTOR(group, Group,
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_group_tag,
-    .name = slice_literal_fields("tag"),
-    .Base_Relative.offset = offsetof(Group, tag),
-  },
-  {
-    .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
-    .name = slice_literal_fields("_tag_padding"),
-    .Base_Relative.offset = offsetof(Group, _tag_padding),
-  },
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_paren_ptr, Array_Group_Paren_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_paren, Array_Group_Paren)
+MASS_DEFINE_STRUCT_DESCRIPTOR(group_paren, Group_Paren,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_value_view,
     .name = slice_literal_fields("children"),
-    .Base_Relative.offset = offsetof(Group, children),
+    .Base_Relative.offset = offsetof(Group_Paren, children),
   },
 );
-MASS_DEFINE_TYPE_VALUE(group);
+MASS_DEFINE_TYPE_VALUE(group_paren);
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly_ptr, Array_Group_Curly_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_curly, Array_Group_Curly)
+MASS_DEFINE_STRUCT_DESCRIPTOR(group_curly, Group_Curly,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_value_view,
+    .name = slice_literal_fields("children"),
+    .Base_Relative.offset = offsetof(Group_Curly, children),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(group_curly);
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_square_ptr, Array_Group_Square_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_group_square, Array_Group_Square)
+MASS_DEFINE_STRUCT_DESCRIPTOR(group_square, Group_Square,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_value_view,
+    .name = slice_literal_fields("children"),
+    .Base_Relative.offset = offsetof(Group_Square, children),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(group_square);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern_ptr, Array_Token_Pattern_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_token_pattern, Array_Token_Pattern)

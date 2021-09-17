@@ -816,8 +816,8 @@ ensure_function_instance(
     );
   }
   Value *parse_result = 0;
-  if (value_is_group(literal->body)) {
-    parse_result = token_parse_block_no_scope(&body_context, literal->body);
+  if (value_is_group_curly(literal->body)) {
+    parse_result = token_parse_block_no_scope(&body_context, value_as_group_curly(literal->body));
   } else if (literal->body->descriptor == &descriptor_value_view) {
     const Value_View *view = storage_static_as_c_type(&literal->body->storage, Value_View);
     parse_result = token_parse_block_view(&body_context, *view);

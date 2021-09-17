@@ -154,13 +154,13 @@ token_parse_block_view(
 static PRELUDE_NO_DISCARD Value *
 token_parse_block_no_scope(
   Execution_Context *context,
-  Value *block
+  const Group_Curly *group
 );
 
 static PRELUDE_NO_DISCARD Value *
 token_parse_block(
   Execution_Context *program,
-  Value *block
+  const Group_Curly *group
 );
 
 static Module *

@@ -301,12 +301,11 @@ spec("source") {
       check(tokens.length == 1);
 
       Value *paren = value_view_get(tokens, 0);
-      check(value_is_group(paren));
-      check(value_as_group(paren)->tag == Group_Tag_Paren);
-      check(value_as_group(paren)->children.length == 1);
+      check(value_is_group_paren(paren));
+      check(value_as_group_paren(paren)->children.length == 1);
       spec_check_slice(source_from_source_range(&paren->source_range), slice_literal("(x)"));
 
-      Value *id = value_view_get(value_as_group(paren)->children, 0);
+      Value *id = value_view_get(value_as_group_paren(paren)->children, 0);
       check(value_is_symbol(id));
     }
 
@@ -330,15 +329,13 @@ spec("source") {
       check(tokens.length == 1);
 
       Value *curly = value_view_get(tokens, 0);
-      check(value_is_group(curly));
-      check(value_as_group(curly)->tag == Group_Tag_Curly);
-      check(value_as_group(curly)->children.length == 1);
+      check(value_is_group_curly(curly));
+      check(value_as_group_curly(curly)->children.length == 1);
       spec_check_slice(source_from_source_range(&curly->source_range), slice_literal("{[]}"));
 
-      Value *square = value_view_get(value_as_group(curly)->children, 0);
-      check(value_is_group(square));
-      check(value_as_group(square)->tag == Group_Tag_Square);
-      check(value_as_group(square)->children.length == 0);
+      Value *square = value_view_get(value_as_group_curly(curly)->children, 0);
+      check(value_is_group_square(square));
+      check(value_as_group_square(square)->children.length == 0);
       spec_check_slice(source_from_source_range(&square->source_range), slice_literal("[]"));
     }
 

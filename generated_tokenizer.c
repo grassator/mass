@@ -282,7 +282,7 @@ yy13:
 yy14:
   ++offset;
 #line 124 "tokenizer.re.c"
-  { TOKENIZER_GROUP_START(Group_Tag_Paren); continue; }
+  { TOKENIZER_GROUP_START(&descriptor_group_paren); continue; }
 #line 287 "generated_tokenizer.c"
 yy16:
   ++offset;
@@ -409,7 +409,7 @@ yy25:
 yy26:
   ++offset;
 #line 125 "tokenizer.re.c"
-  { TOKENIZER_GROUP_START(Group_Tag_Square); continue; }
+  { TOKENIZER_GROUP_START(&descriptor_group_square); continue; }
 #line 414 "generated_tokenizer.c"
 yy28:
   ++offset;
@@ -419,7 +419,7 @@ yy28:
 yy30:
   ++offset;
 #line 126 "tokenizer.re.c"
-  { TOKENIZER_GROUP_START(Group_Tag_Curly); continue; }
+  { TOKENIZER_GROUP_START(&descriptor_group_curly); continue; }
 #line 424 "generated_tokenizer.c"
 yy32:
   ++offset;

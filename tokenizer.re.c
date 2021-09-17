@@ -121,9 +121,9 @@ tokenize(
         continue;
       }
 
-      "(" { TOKENIZER_GROUP_START(Group_Tag_Paren); continue; }
-      "[" { TOKENIZER_GROUP_START(Group_Tag_Square); continue; }
-      "{" { TOKENIZER_GROUP_START(Group_Tag_Curly); continue; }
+      "(" { TOKENIZER_GROUP_START(&descriptor_group_paren); continue; }
+      "[" { TOKENIZER_GROUP_START(&descriptor_group_square); continue; }
+      "{" { TOKENIZER_GROUP_START(&descriptor_group_curly); continue; }
       ")" { TOKENIZER_GROUP_END(')'); continue; }
       "]" { TOKENIZER_GROUP_END(']'); continue; }
       "}" { TOKENIZER_GROUP_END('}'); continue; }

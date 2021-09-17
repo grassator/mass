@@ -1145,9 +1145,15 @@ main(void) {
     { "Slice", "name" },
   })));
 
-  push_type(type_struct("Group", (Struct_Item[]){
-    { "Group_Tag", "tag" },
-    { "u32", "_tag_padding" },
+  push_type(type_struct("Group_Paren", (Struct_Item[]){
+    { "Value_View", "children" },
+  }));
+
+  push_type(type_struct("Group_Curly", (Struct_Item[]){
+    { "Value_View", "children" },
+  }));
+
+  push_type(type_struct("Group_Square", (Struct_Item[]){
     { "Value_View", "children" },
   }));
 
