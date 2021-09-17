@@ -2661,38 +2661,11 @@ token_match_struct_field(
 static Value *
 token_process_c_struct_definition(
   Execution_Context *context,
-  Value *args
+  Value *layout_block
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   Value *result = 0;
   Temp_Mark temp_mark = context_temp_mark(context);
-
-  if (!value_is_group_paren(args)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args->source_range,
-      .detailed_message = slice_literal("c_struct must be followed by ()")
-    });
-    goto err;
-  }
-  const Group_Paren *args_group = value_as_group_paren(args);
-  if (args_group->children.length != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args->source_range,
-      .detailed_message = slice_literal("c_struct expects one argument")
-    });
-    goto err;
-  }
-  Value *layout_block = value_view_get(args_group->children, 0);
-  if (!value_is_group_curly(layout_block)) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args->source_range,
-      .detailed_message = slice_literal("c_struct expects a {} block as the argument")
-    });
-    goto err;
-  }
 
   C_Struct_Aligner struct_aligner = {0};
   Array_Memory_Layout_Item temp_fields = dyn_array_make(
@@ -2748,7 +2721,6 @@ token_process_c_struct_definition(
   result = allocator_allocate(context->allocator, Value);
   *result = type_value_for_descriptor(descriptor);
 
-  err:
   context_temp_reset_to_mark(context, temp_mark);
   return result;
 }
@@ -4660,15 +4632,7 @@ mass_handle_paren_operator(
 ) {
   Value *target = value_view_get(args_view, 0);
   Value *args_token = value_view_get(args_view, 1);
-  Slice target_name = {0};
-  if (value_is_symbol(target)) {
-    target_name = value_as_symbol(target)->name;
-  }
-  if (slice_equal(target_name, slice_literal("c_struct"))) {
-    return token_process_c_struct_definition(context, args_token);
-  } else {
-    return token_handle_parsed_function_call(context, target, args_token, args_view.source_range);
-  }
+  return token_handle_parsed_function_call(context, target, args_token, args_view.source_range);
 }
 
 static Value *
@@ -4692,6 +4656,10 @@ mass_handle_apply_operator(
     assert(tuple->descriptor == &descriptor_tuple);
     assert(tuple->storage.tag == Storage_Tag_Static);
     return mass_cast_helper(context, target_descriptor, tuple, source_range);
+  }
+
+  if (value_is_group_curly(rhs_value) && value_match_symbol(lhs_value, slice_literal("c_struct"))) {
+    return token_process_c_struct_definition(context, rhs_value);
   }
 
   if (
