@@ -1946,8 +1946,7 @@ token_match_argument(
     name_token = value_view_get(definition, 0);
     Value *parsed_default_expression =
       token_parse_expression(context, default_expression, &(u64){0}, 0);
-    descriptor = value_or_lazy_value_descriptor(parsed_default_expression);
-    if (value_is_static_number_literal(parsed_default_expression)) descriptor = &descriptor_s64;
+    descriptor = deduce_runtime_descriptor_for_value(context, parsed_default_expression);
   } else {
     Value_View name_tokens;
     Value *operator;
@@ -6366,12 +6365,7 @@ token_define_global_variable(
   Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return;
 
-  const Descriptor *descriptor = value_or_lazy_value_descriptor(value);
-  // x := 42 should always be initialized to s64 to avoid weird suprises
-  if (value_is_static_number_literal(value)) {
-    descriptor = &descriptor_s64;
-  }
-
+  const Descriptor *descriptor = deduce_runtime_descriptor_for_value(context, value);
   Value *global_value;
   if (storage_is_label(&value->storage)) {
     global_value = value;
