@@ -458,7 +458,7 @@ value_indirect_from_reference(
 
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
-  const Allocator *allocator,
+  Execution_Context *context,
   Value *value
 );
 
@@ -492,21 +492,46 @@ c_struct_aligner_end(
   aligner->bit_size = u64_align(aligner->bit_size, aligner->bit_alignment);
 }
 
+typedef enum {
+  Tuple_Eval_Mode_Value,
+  Tuple_Eval_Mode_Type,
+} Tuple_Eval_Mode;
+
+static inline const Descriptor *
+value_ensure_type(
+  Execution_Context *context,
+  Value *value,
+  Source_Range source_range
+);
+
 static const Descriptor *
 anonymous_struct_descriptor_from_tuple(
-  const Allocator *allocator,
-  const Tuple *tuple
+  Execution_Context *context,
+  const Tuple *tuple,
+  Tuple_Eval_Mode tuple_eval_mode
 ) {
   C_Struct_Aligner struct_aligner = {0};
   Array_Memory_Layout_Item fields = dyn_array_make(
     Array_Memory_Layout_Item,
-    .allocator = allocator,
+    .allocator = context->allocator,
     .capacity = dyn_array_length(tuple->items),
   );
   for (u64 i = 0; i < dyn_array_length(tuple->items); ++i) {
     Value *item = *dyn_array_get(tuple->items, i);
 
-    const Descriptor *field_descriptor = deduce_runtime_descriptor_for_value(allocator, item);
+    const Descriptor *field_descriptor;
+    switch(tuple_eval_mode) {
+      case Tuple_Eval_Mode_Value: {
+        field_descriptor = deduce_runtime_descriptor_for_value(context, item);
+      } break;
+      case Tuple_Eval_Mode_Type: {
+        field_descriptor = value_ensure_type(context, item, item->source_range);
+      } break;
+      default: {
+        panic("UNREACHABLE");
+        return 0;
+      } break;
+    }
     u64 field_byte_offset = c_struct_aligner_next_byte_offset(&struct_aligner, field_descriptor);
 
     dyn_array_push(fields, (Memory_Layout_Item) {
@@ -519,7 +544,7 @@ anonymous_struct_descriptor_from_tuple(
   }
   c_struct_aligner_end(&struct_aligner);
 
-  Descriptor *tuple_descriptor = allocator_allocate(allocator, Descriptor);
+  Descriptor *tuple_descriptor = allocator_allocate(context->allocator, Descriptor);
   *tuple_descriptor = (Descriptor) {
     .tag = Descriptor_Tag_Struct,
     .bit_size = {struct_aligner.bit_size},
@@ -537,7 +562,7 @@ anonymous_struct_descriptor_from_tuple(
 
 static const Descriptor *
 deduce_runtime_descriptor_for_value(
-  const Allocator *allocator,
+  Execution_Context *context,
   Value *value
 ) {
   if (value_is_non_lazy_static(value)) {
@@ -546,7 +571,7 @@ deduce_runtime_descriptor_for_value(
     }
     if (value->descriptor == &descriptor_tuple) {
     const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
-      return anonymous_struct_descriptor_from_tuple(allocator, tuple);
+      return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Value);
     }
   }
   return value_or_lazy_value_descriptor(value);
@@ -1456,6 +1481,10 @@ value_ensure_type(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   if (!value) return 0;
+  if (value->descriptor == &descriptor_tuple) {
+    const Tuple *tuple = storage_static_as_c_type(&value->storage, Tuple);
+    return anonymous_struct_descriptor_from_tuple(context, tuple, Tuple_Eval_Mode_Type);
+  }
   if (!same_type(value->descriptor, &descriptor_descriptor_pointer)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Type_Mismatch,
@@ -2181,6 +2210,12 @@ token_match_call_arguments(
     if (context->result->tag != Mass_Result_Tag_Success) return;
     Value_View view = token_split_next(&it, &token_pattern_comma_operator);
     Value *parse_result = token_parse_expression(context, view, &(u64){0}, 0);
+    if (parse_result->descriptor == &descriptor_tuple) {
+      //const Tuple *tuple = storage_static_as_c_type(&parse_result->storage, Tuple);
+      //const Descriptor *tuple_descriptor =
+        //anonymous_struct_descriptor_from_tuple(context, tuple);
+      panic("FIXME support inline tuples in arguments");
+    }
     dyn_array_push(*out_args, parse_result);
   }
 }
@@ -5260,7 +5295,7 @@ token_parse_if_expression(
   // TODO probably want to unify then and else branch before returning
   const Descriptor *result_descriptor = context_is_compile_time_eval(context)
     ? value_or_lazy_value_descriptor(payload->then)
-    : deduce_runtime_descriptor_for_value(context->allocator, payload->then);
+    : deduce_runtime_descriptor_for_value(context, payload->then);
 
   return mass_make_lazy_value(
     context, dummy_range, payload, result_descriptor, mass_handle_if_expression_lazy_proc
@@ -6391,7 +6426,7 @@ token_define_local_variable(
   Value *value = token_parse_expression(context, expression, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return;
   const Descriptor *variable_descriptor =
-    deduce_runtime_descriptor_for_value(context->allocator, value);
+    deduce_runtime_descriptor_for_value(context, value);
 
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);

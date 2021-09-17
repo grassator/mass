@@ -1861,6 +1861,21 @@ same_type_or_can_implicitly_move_cast(
   if (target == source) return true;
   if (target == &descriptor_void) return true;
   if (target->tag != source->tag) return false;
+  if (
+    target->tag == Descriptor_Tag_Struct &&
+    target->Struct.is_tuple
+  ) {
+    assert(source->tag == Descriptor_Tag_Struct);
+    Array_Memory_Layout_Item source_fields = source->Struct.memory_layout.items;
+    Array_Memory_Layout_Item target_fields = target->Struct.memory_layout.items;
+    if (dyn_array_length(source_fields) != dyn_array_length(target_fields)) return false;
+    for (u64 i = 0; i < dyn_array_length(source_fields); ++i) {
+      const Descriptor *source_field = dyn_array_get(source_fields, i)->descriptor;
+      const Descriptor *target_field = dyn_array_get(target_fields, i)->descriptor;
+      if (!same_type_or_can_implicitly_move_cast(target_field, source_field)) return false;
+    }
+    return true;
+  }
   if (descriptor_is_integer(source) && descriptor_is_integer(target)) {
     if (
       descriptor_is_unsigned_integer(source) &&

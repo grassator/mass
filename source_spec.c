@@ -1900,6 +1900,21 @@ spec("source") {
       check(checker() == 42);
     }
 
+    it("should support using tuple as a type") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "test", &test_context,
+        "tuple_id :: fn(x : [s64]) -> (s64) {"
+          "x.0"
+        "}\n"
+        "test :: fn() -> (s64) {"
+          "tuple := [42]\n"
+          "tuple_id(tuple)"
+        "}"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
     it("should report an error when tuple is assigned to something that is not a struct") {
       test_program_inline_source_base(
         "test", &test_context,
