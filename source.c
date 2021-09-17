@@ -1185,22 +1185,6 @@ value_match_symbol(
 }
 
 static inline bool
-value_match_group(
-  const Value *value,
-  Group_Tag group_tag
-) {
-  switch(group_tag) {
-    case Group_Tag_Paren: return value->descriptor == &descriptor_group_paren;
-    case Group_Tag_Curly: return value->descriptor == &descriptor_group_curly;
-    case Group_Tag_Square: return value->descriptor == &descriptor_group_square;
-    default: {
-      panic("UNREACHABLE");
-      return false;
-    } break;
-  }
-}
-
-static inline bool
 value_match(
   const Value *value,
   const Token_Pattern *pattern
@@ -1217,8 +1201,8 @@ value_match(
       if (!value_is_symbol(value)) return false;
       return value_as_symbol(value) == pattern->Cached_Symbol.pointer;
     }
-    case Token_Pattern_Tag_Group: {
-      return value_match_group(value, pattern->Group.tag);
+    case Token_Pattern_Tag_Descriptor: {
+      return value->descriptor == pattern->Descriptor.descriptor;
     }
     case Token_Pattern_Tag_Or: {
       return value_match(value, pattern->Or.a) || value_match(value, pattern->Or.b);
@@ -2326,7 +2310,7 @@ token_parse_exports(
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
   u64 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("exports"));
-  TOKEN_EXPECT_MATCH(block, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+  TOKEN_EXPECT_MATCH(block, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
 
   if (context->module->export.tag != Module_Export_Tag_None) {
     context_error(context, (Mass_Error) {
@@ -2391,7 +2375,7 @@ token_parse_operator_definition(
   u64 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
   TOKEN_EXPECT(precedence_token);
-  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
   precedence_value = token_value_force_immediate_integer(context, precedence_value, &descriptor_u64);
@@ -2555,7 +2539,7 @@ token_parse_syntax_definition(
   TOKEN_MATCH(name, TOKEN_PATTERN_SYMBOL("syntax"));
   TOKEN_EXPECT_MATCH(statement_token, TOKEN_PATTERN_SYMBOL("statement"));
 
-  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
 
   Value_View replacement = value_view_match_till_end_of_statement(view, &peek_index);
   Value_View definition = value_as_group_paren(pattern_token)->children;
@@ -2581,19 +2565,12 @@ token_parse_syntax_definition(
       value->descriptor == &descriptor_group_square ||
       value->descriptor == &descriptor_group_curly
     ) {
-      // FIXME add generic descriptor matcher
-      Group_Tag group_tag = Group_Tag_Paren;
-      if (value->descriptor == &descriptor_group_curly) {
-        group_tag = Group_Tag_Curly;
-      } else if (value->descriptor == &descriptor_group_square) {
-        group_tag = Group_Tag_Square;
-      }
       dyn_array_push(pattern, (Macro_Pattern) {
         .tag = Macro_Pattern_Tag_Single_Token,
         .Single_Token = {
           .token_pattern = {
-            .tag = Token_Pattern_Tag_Group,
-            .Group.tag = group_tag,
+            .tag = Token_Pattern_Tag_Descriptor,
+            .Descriptor.descriptor = value->descriptor,
           }
         },
       });
@@ -2696,7 +2673,7 @@ token_process_c_struct_definition(
   Value *result = 0;
   Temp_Mark temp_mark = context_temp_mark(context);
 
-  if (!value_match_group(args, Group_Tag_Paren)) {
+  if (!value_is_group_paren(args)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args->source_range,
@@ -2714,7 +2691,7 @@ token_process_c_struct_definition(
     goto err;
   }
   Value *layout_block = value_view_get(args_group->children, 0);
-  if (!value_match_group(layout_block, Group_Tag_Curly)) {
+  if (!value_is_group_curly(layout_block)) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = args->source_range,
@@ -4773,11 +4750,11 @@ mass_handle_apply_operator(
   Value *rhs_value = value_view_get(operands_view, 1);
   Source_Range source_range = operands_view.source_range;
 
-  if (value_match_group(rhs_value, Group_Tag_Paren)) {
+  if (value_is_group_paren(rhs_value)) {
     return mass_handle_paren_operator(context, operands_view, 0);
   }
 
-  if (value_match_group(rhs_value, Group_Tag_Square)) {
+  if (value_is_group_square(rhs_value)) {
     Value *type_value = token_parse_single(context, lhs_value);
     const Descriptor *target_descriptor = value_ensure_type(context, type_value, source_range);
     Value *tuple = token_parse_single(context, rhs_value);
@@ -5114,7 +5091,7 @@ mass_handle_dot_operator(
     lhs_forced_descriptor->tag == Descriptor_Tag_Fixed_Size_Array ||
     lhs_forced_descriptor->tag == Descriptor_Tag_Pointer_To
   ) {
-    if (value_match_group(rhs, Group_Tag_Paren) || value_is_number_literal(rhs)) {
+    if (value_is_group_paren(rhs) || value_is_number_literal(rhs)) {
       const Descriptor *descriptor = lhs_forced_descriptor;
       if (descriptor->tag == Descriptor_Tag_Fixed_Size_Array) {
         descriptor = descriptor->Fixed_Size_Array.item;
@@ -5353,7 +5330,7 @@ token_parse_intrinsic_literal(
   u64 peek_index = 0;
   TOKEN_MATCH(at, TOKEN_PATTERN_SYMBOL("@"));
   TOKEN_MATCH(keyword, TOKEN_PATTERN_SYMBOL("intrinsic"));
-  TOKEN_EXPECT_MATCH(body, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+  TOKEN_EXPECT_MATCH(body, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
   if (peek_index != view.length) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
@@ -5418,7 +5395,6 @@ token_parse_intrinsic_literal(
     context, &descriptor_group_curly, storage_static(wrapped_body_group), body->source_range
   );
 
-  // TODO maybe store Group_Curly directly in the Function_Literal?
   Function_Literal *literal = mass_make_fake_function_literal(
     context, wrapped_body_value, &descriptor_value_pointer, &keyword->source_range
   );
@@ -5563,7 +5539,7 @@ token_parse_function_literal(
   }
 
   TOKEN_MAYBE_MATCH(maybe_name, .tag = Token_Pattern_Tag_Symbol);
-  TOKEN_EXPECT_MATCH(args, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  TOKEN_EXPECT_MATCH(args, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
 
   Value *returns;
   TOKEN_MAYBE_MATCH(arrow, TOKEN_PATTERN_SYMBOL("->"));
@@ -5585,7 +5561,7 @@ token_parse_function_literal(
     function_info_from_parameters_and_return_type(context, args_view, returns);
   MASS_ON_ERROR(*context->result) return 0;
 
-  TOKEN_MAYBE_MATCH(body_value, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Curly);
+  TOKEN_MAYBE_MATCH(body_value, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
   if (!body_value) {
     Value_View rest = value_view_match_till(view, &peek_index, end_pattern);
     if (is_macro) {
@@ -6249,7 +6225,7 @@ token_parse_inline_machine_code_bytes(
 
   u64 peek_index = 0;
   TOKEN_MATCH(id_token, TOKEN_PATTERN_SYMBOL("inline_machine_code_bytes"));
-  TOKEN_MAYBE_MATCH(args_token, .tag = Token_Pattern_Tag_Group, .Group.tag = Group_Tag_Paren);
+  TOKEN_MAYBE_MATCH(args_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
   if (!args_token) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,

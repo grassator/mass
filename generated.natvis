@@ -378,8 +378,8 @@
   <DisplayString Condition="tag == Token_Pattern_Tag_Cached_Symbol">
     Cached_Symbol { Cached_Symbol }
   </DisplayString>
-  <DisplayString Condition="tag == Token_Pattern_Tag_Group">
-    Group { Group }
+  <DisplayString Condition="tag == Token_Pattern_Tag_Descriptor">
+    Descriptor { Descriptor }
   </DisplayString>
   <DisplayString Condition="tag == Token_Pattern_Tag_Or">
     Or { Or }
@@ -388,7 +388,7 @@
     <Item Name="tag">tag</Item>
     <Item Name="Symbol" Condition="tag == Token_Pattern_Tag_Symbol">Symbol</Item>
     <Item Name="Cached_Symbol" Condition="tag == Token_Pattern_Tag_Cached_Symbol">Cached_Symbol</Item>
-    <Item Name="Group" Condition="tag == Token_Pattern_Tag_Group">Group</Item>
+    <Item Name="Descriptor" Condition="tag == Token_Pattern_Tag_Descriptor">Descriptor</Item>
     <Item Name="Or" Condition="tag == Token_Pattern_Tag_Or">Or</Item>
   </Expand>
 </Type>

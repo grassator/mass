@@ -1129,12 +1129,6 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
-  push_type(type_enum("Group_Tag", (Enum_Type_Item[]){
-    { "Paren", 1 },
-    { "Square", 2 },
-    { "Curly", 3 },
-  }));
-
   export_compiler(push_type(type_struct("Value_View", (Struct_Item[]){
     { "Value * *", "values" },
     { "u64", "length" },
@@ -1165,8 +1159,8 @@ main(void) {
     struct_fields("Cached_Symbol", (Struct_Item[]){
       { "const Symbol *", "pointer" },
     }),
-    struct_fields("Group", (Struct_Item[]){
-      { "Group_Tag", "tag" },
+    struct_fields("Descriptor", (Struct_Item[]){
+      { "const Descriptor *", "descriptor" },
     }),
     struct_fields("Or", (Struct_Item[]){
       { "const Token_Pattern *", "a" },

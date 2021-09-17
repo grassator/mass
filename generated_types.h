@@ -33,23 +33,6 @@ typedef struct Parse_Error Parse_Error;
 typedef dyn_array_type(Parse_Error *) Array_Parse_Error_Ptr;
 typedef dyn_array_type(const Parse_Error *) Array_Const_Parse_Error_Ptr;
 
-typedef enum Group_Tag {
-  Group_Tag_Paren = 1,
-  Group_Tag_Square = 2,
-  Group_Tag_Curly = 3,
-} Group_Tag;
-
-const char *group_tag_name(Group_Tag value) {
-  if (value == 1) return "Group_Tag_Paren";
-  if (value == 2) return "Group_Tag_Square";
-  if (value == 3) return "Group_Tag_Curly";
-  assert(!"Unexpected value for enum Group_Tag");
-  return 0;
-};
-
-typedef dyn_array_type(Group_Tag *) Array_Group_Tag_Ptr;
-typedef dyn_array_type(const Group_Tag *) Array_Const_Group_Tag_Ptr;
-
 typedef struct Value_View Value_View;
 typedef dyn_array_type(Value_View *) Array_Value_View_Ptr;
 typedef dyn_array_type(const Value_View *) Array_Const_Value_View_Ptr;
@@ -938,7 +921,7 @@ typedef enum {
   Token_Pattern_Tag_Invalid = 0,
   Token_Pattern_Tag_Symbol = 1,
   Token_Pattern_Tag_Cached_Symbol = 2,
-  Token_Pattern_Tag_Group = 3,
+  Token_Pattern_Tag_Descriptor = 3,
   Token_Pattern_Tag_Or = 4,
 } Token_Pattern_Tag;
 
@@ -948,9 +931,9 @@ typedef struct Token_Pattern_Symbol {
 typedef struct Token_Pattern_Cached_Symbol {
   const Symbol * pointer;
 } Token_Pattern_Cached_Symbol;
-typedef struct Token_Pattern_Group {
-  Group_Tag tag;
-} Token_Pattern_Group;
+typedef struct Token_Pattern_Descriptor {
+  const Descriptor * descriptor;
+} Token_Pattern_Descriptor;
 typedef struct Token_Pattern_Or {
   const Token_Pattern * a;
   const Token_Pattern * b;
@@ -961,7 +944,7 @@ typedef struct Token_Pattern {
   union {
     Token_Pattern_Symbol Symbol;
     Token_Pattern_Cached_Symbol Cached_Symbol;
-    Token_Pattern_Group Group;
+    Token_Pattern_Descriptor Descriptor;
     Token_Pattern_Or Or;
   };
 } Token_Pattern;
@@ -975,10 +958,10 @@ token_pattern_as_cached_symbol(Token_Pattern *token_pattern) {
   assert(token_pattern->tag == Token_Pattern_Tag_Cached_Symbol);
   return &token_pattern->Cached_Symbol;
 }
-static inline Token_Pattern_Group *
-token_pattern_as_group(Token_Pattern *token_pattern) {
-  assert(token_pattern->tag == Token_Pattern_Tag_Group);
-  return &token_pattern->Group;
+static inline Token_Pattern_Descriptor *
+token_pattern_as_descriptor(Token_Pattern *token_pattern) {
+  assert(token_pattern->tag == Token_Pattern_Tag_Descriptor);
+  return &token_pattern->Descriptor;
 }
 static inline Token_Pattern_Or *
 token_pattern_as_or(Token_Pattern *token_pattern) {
@@ -1653,7 +1636,7 @@ typedef struct Function_Literal {
   u32 _flags_padding;
   Execution_Context context;
   Function_Info * info;
-  Value * body;
+  const Group_Curly * body;
   Array_Value_Ptr instances;
   Array_Function_Specialization specializations;
 } Function_Literal;
@@ -2112,12 +2095,6 @@ static Descriptor descriptor_array_parse_error;
 static Descriptor descriptor_array_parse_error_ptr;
 static Descriptor descriptor_parse_error_pointer;
 static Descriptor descriptor_parse_error_pointer_pointer;
-static Descriptor descriptor_group_tag;
-static Descriptor descriptor_array_group_tag;
-static Descriptor descriptor_array_group_tag_ptr;
-static Descriptor descriptor_array_const_group_tag_ptr;
-static Descriptor descriptor_group_tag_pointer;
-static Descriptor descriptor_group_tag_pointer_pointer;
 static Descriptor descriptor_value_view;
 static Descriptor descriptor_array_value_view;
 static Descriptor descriptor_array_value_view_ptr;
@@ -2901,12 +2878,6 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(parse_error, Parse_Error,
   },
 );
 MASS_DEFINE_TYPE_VALUE(parse_error);
-MASS_DEFINE_OPAQUE_C_TYPE(group_tag, Group_Tag)
-static C_Enum_Item group_tag_items[] = {
-{ .name = slice_literal_fields("Paren"), .value = 1 },
-{ .name = slice_literal_fields("Square"), .value = 2 },
-{ .name = slice_literal_fields("Curly"), .value = 3 },
-};
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view_ptr, Array_Value_View_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_value_view, Array_Value_View)
 MASS_DEFINE_STRUCT_DESCRIPTOR(value_view, Value_View,
@@ -2982,7 +2953,7 @@ static C_Enum_Item token_pattern_tag_items[] = {
 { .name = slice_literal_fields("Invalid"), .value = 0 },
 { .name = slice_literal_fields("Symbol"), .value = 1 },
 { .name = slice_literal_fields("Cached_Symbol"), .value = 2 },
-{ .name = slice_literal_fields("Group"), .value = 3 },
+{ .name = slice_literal_fields("Descriptor"), .value = 3 },
 { .name = slice_literal_fields("Or"), .value = 4 },
 };
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_symbol, Token_Pattern_Symbol,
@@ -3003,15 +2974,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_cached_symbol, Token_Pattern_Cached_
   },
 );
 MASS_DEFINE_TYPE_VALUE(token_pattern_cached_symbol);
-MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_group, Token_Pattern_Group,
+MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_descriptor, Token_Pattern_Descriptor,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_group_tag,
-    .name = slice_literal_fields("tag"),
-    .Base_Relative.offset = offsetof(Token_Pattern_Group, tag),
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .Base_Relative.offset = offsetof(Token_Pattern_Descriptor, descriptor),
   },
 );
-MASS_DEFINE_TYPE_VALUE(token_pattern_group);
+MASS_DEFINE_TYPE_VALUE(token_pattern_descriptor);
 MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern_or, Token_Pattern_Or,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -3048,9 +3019,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(token_pattern, Token_Pattern,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .name = slice_literal_fields("Group"),
-    .descriptor = &descriptor_token_pattern_group,
-    .Base_Relative.offset = offsetof(Token_Pattern, Group),
+    .name = slice_literal_fields("Descriptor"),
+    .descriptor = &descriptor_token_pattern_descriptor,
+    .Base_Relative.offset = offsetof(Token_Pattern, Descriptor),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
@@ -4916,7 +4887,7 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(function_literal, Function_Literal,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_value_pointer,
+    .descriptor = &descriptor_group_curly_pointer,
     .name = slice_literal_fields("body"),
     .Base_Relative.offset = offsetof(Function_Literal, body),
   },
