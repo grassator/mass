@@ -1632,11 +1632,13 @@ token_match_pattern(
           end_pattern = &peek->Single_Token.token_pattern;
         } else if (mode == Macro_Match_Mode_Statement) {
           end_pattern = &token_pattern_semicolon;
+        } else {
+          panic("UNIMPLEMENTED");
         }
 
         for (; view_index < view.length; ++view_index) {
           Value *token = value_view_get(view, view_index);
-          if (end_pattern && value_match(token, end_pattern)) {
+          if (value_match(token, end_pattern)) {
             break;
           }
         }
