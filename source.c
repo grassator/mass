@@ -2884,52 +2884,6 @@ typedef struct {
 } Operator_Stack_Entry;
 typedef dyn_array_type(Operator_Stack_Entry) Array_Operator_Stack_Entry;
 
-static Value *
-token_handle_c_string(
-  Execution_Context *context,
-  Function_Builder *builder,
-  const Expected_Result *expected_result,
-  Value *args_token
-) {
-  Temp_Mark temp_mark = context_temp_mark(context);
-  Array_Value_Ptr args = dyn_array_make(
-    Array_Value_Ptr,
-    .allocator = context->temp_allocator,
-    .capacity = 16,
-  );
-
-  token_match_call_arguments(context, value_as_group_paren(args_token), &args);
-  Value *result_value = 0;
-  if (dyn_array_length(args) != 1) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
-      .detailed_message = slice_literal("c_string expects a single compile-time known string")
-    });
-    goto defer;
-  }
-  Value *arg_value = *dyn_array_get(args, 0);
-  const Slice *c_string = value_as_slice(arg_value);
-  if (!c_string) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = args_token->source_range,
-      .detailed_message = slice_literal("c_string expects a single compile-time known string")
-    });
-    goto defer;
-  }
-
-  const Value *c_string_bytes =
-    value_global_c_string_from_slice(context, *c_string, arg_value->source_range);
-  result_value = value_from_exact_expected_result(expected_result);
-  load_address(context, builder, &arg_value->source_range, result_value, c_string_bytes->storage);
-
-  defer:
-  context_temp_reset_to_mark(context, temp_mark);
-
-  return result_value;
-}
-
 static Number_Literal
 mass_number_literal_logical_shift_left(
   Number_Literal input,
@@ -4695,11 +4649,7 @@ mass_handle_paren_operator(
   if (value_is_symbol(target)) {
     target_name = value_as_symbol(target)->name;
   }
-  if (slice_equal(target_name, slice_literal("c_string"))) {
-    return mass_make_lazy_value(
-      context, args_range, args_token, &descriptor_u8_pointer, token_handle_c_string
-    );
-  } else if (slice_equal(target_name, slice_literal("c_struct"))) {
+  if (slice_equal(target_name, slice_literal("c_struct"))) {
     return token_process_c_struct_definition(context, args_token);
   } else if (slice_equal(target_name, slice_literal("startup"))) {
     return mass_make_lazy_value(

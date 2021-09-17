@@ -1748,15 +1748,6 @@ spec("source") {
   }
 
   describe("Strings") {
-    it("should parse and return C-compatible strings") {
-      const char *(*checker)(void) = (const char *(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (&u8) { c_string(\"test\") }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      const char *string = checker();
-      check(strcmp(string, "test") == 0);
-    }
     it("should accept string arguments") {
       const char *(*checker)(Slice) = (const char *(*)(Slice))test_program_inline_source_function(
         "checker", &test_context,
