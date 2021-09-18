@@ -2347,40 +2347,6 @@ mass_exports(
 }
 
 static u64
-token_parse_exports(
-  Execution_Context *context,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_data
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-  u64 peek_index = 0;
-  TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("exports"));
-  TOKEN_EXPECT_MATCH(block, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
-
-  if (context->module->exports.tag != Module_Exports_Tag_None) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = keyword_token->source_range,
-      .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
-      .other_source_range = context->module->exports.source_range,
-    });
-    goto err;
-  }
-
-  Value_View fake_args = value_view_slice(&view, peek_index - 1, peek_index);
-  Value *module_exports = mass_exports(context, fake_args);
-  if (module_exports) {
-    assert(module_exports->descriptor ==  &descriptor_module_exports);
-    const Module_Exports *exports = storage_static_as_c_type(&module_exports->storage, Module_Exports);
-    context->module->exports = *exports;
-  }
-
-  err:
-  return peek_index;
-}
-
-static u64
 token_parse_operator_definition(
   Execution_Context *context,
   Value_View view,
@@ -4683,8 +4649,12 @@ mass_handle_apply_operator(
     return mass_cast_helper(context, target_descriptor, tuple, source_range);
   }
 
-  if (value_is_group_curly(rhs_value) && value_match_symbol(lhs_value, slice_literal("c_struct"))) {
-    return token_process_c_struct_definition(context, rhs_value);
+  if (value_is_group_curly(rhs_value)) {
+    if (value_match_symbol(lhs_value, slice_literal("c_struct"))) {
+      return token_process_c_struct_definition(context, rhs_value);
+    } else if (value_match_symbol(lhs_value, slice_literal("exports"))) {
+      return mass_exports(context, value_view_single(&rhs_value));
+    }
   }
 
   if (
@@ -4988,16 +4958,7 @@ mass_handle_dot_operator(
         return 0;
       }
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      Value *lookup = scope_lookup_force(context, module_scope, field_symbol, &args_view.source_range);
-      if (!lookup) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Unknown_Field,
-          .source_range = rhs_range,
-          .Unknown_Field = { .name = field_name, .type = lhs_forced_descriptor },
-        });
-        return 0;
-      }
-      return lookup;
+      return scope_lookup_force(context, module_scope, field_symbol, &args_view.source_range);
     } else {
       Memory_Layout_Item *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {
@@ -5817,15 +5778,37 @@ token_parse_block_view(
       token_parse_expression(context, rest, &match_length, &token_pattern_semicolon);
     MASS_ON_ERROR(*context->result) goto defer;
 
-    if (
-      parse_result->descriptor == &descriptor_code_fragment &&
-      parse_result->storage.tag == Storage_Tag_Static
-    ) {
-      const Code_Fragment *fragment = storage_static_as_c_type(&parse_result->storage, Code_Fragment);
-      Scope *saved_scope = context->scope;
-      context->scope = fragment->scope;
-      parse_result = token_parse_block_view(context, fragment->children);
-      context->scope = saved_scope;
+    if (parse_result->storage.tag == Storage_Tag_Static) {
+      if (parse_result->descriptor == &descriptor_code_fragment) {
+        const Code_Fragment *fragment = storage_static_as_c_type(&parse_result->storage, Code_Fragment);
+        Scope *saved_scope = context->scope;
+        context->scope = fragment->scope;
+        parse_result = token_parse_block_view(context, fragment->children);
+        context->scope = saved_scope;
+      } else if (parse_result->descriptor == &descriptor_module_exports) {
+        Value_View match_view = value_view_slice(&rest, 0, match_length);
+        if (!(context->flags & Execution_Context_Flags_Global)) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Parse,
+            .source_range = match_view.source_range,
+            .detailed_message = slice_literal("Export declarations are only supported at top level"),
+          });
+          goto defer;
+        }
+        if (context->module->exports.tag != Module_Exports_Tag_None) {
+          context_error(context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Parse,
+            .source_range = match_view.source_range,
+            .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
+            .other_source_range = context->module->exports.source_range,
+          });
+          goto defer;
+        }
+        const Module_Exports *exports =
+          storage_static_as_c_type(&parse_result->storage, Module_Exports);
+        context->module->exports = *exports;
+        continue;
+      }
     }
     dyn_array_push(temp_lazy_statements, parse_result);
 
@@ -6578,7 +6561,6 @@ scope_define_builtins(
       {.previous = &default_statement_matchers[6], .proc = token_parse_statement_using},
       {.previous = &default_statement_matchers[7], .proc = token_parse_syntax_definition},
       {.previous = &default_statement_matchers[8], .proc = token_parse_operator_definition},
-      {.previous = &default_statement_matchers[9], .proc = token_parse_exports},
     };
 
     scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
