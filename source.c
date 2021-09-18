@@ -2294,6 +2294,58 @@ scope_define_lazy_compile_time_expression(
   scope_define_value(scope, VALUE_STATIC_EPOCH, view.source_range, symbol, value);
 }
 
+static Value *
+mass_exports(
+  Execution_Context *context,
+  Value_View args
+) {
+  assert(args.length == 1);
+  Value *block = value_view_get(args, 0);
+  Value_View children = value_as_group_curly(block)->children;
+
+  Module_Export *export = allocator_allocate(context->allocator, Module_Export);
+  *export = (Module_Export){0};
+  Value *result = value_make(
+    context, &descriptor_module_export, storage_static(export), args.source_range
+  );
+
+  if (children.length == 1) {
+    if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
+      *export = (Module_Export) {
+        .tag = Module_Export_Tag_All,
+        .source_range = args.source_range,
+      };
+      return result;
+    }
+  }
+
+  *export = (Module_Export) {
+    .tag = Module_Export_Tag_Selective,
+    .Selective = {
+      // TODO use a temp array first
+      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = children.length / 2 + 1 ),
+    },
+    .source_range = args.source_range,
+  };
+
+  Value_View_Split_Iterator it = { .view = children };
+
+  while (!it.done) {
+    Value_View item = token_split_next(&it, &token_pattern_comma_operator);
+    if (item.length != 1 || !value_is_symbol(value_view_get(item, 0))) {
+      context_error(context, (Mass_Error) {
+        .tag = Mass_Error_Tag_Parse,
+        .source_range = item.source_range,
+        .detailed_message = slice_literal("Exports {} block must contain a comma-separated identifier list")
+      });
+      return 0;
+    }
+    dyn_array_push(export->Selective.symbols, value_view_get(item, 0));
+  }
+
+  return result;
+}
+
 static u64
 token_parse_exports(
   Execution_Context *context,
@@ -2316,39 +2368,12 @@ token_parse_exports(
     goto err;
   }
 
-  context->module->export.source_range = keyword_token->source_range;
-
-  Value_View children = value_as_group_curly(block)->children;
-  if (children.length == 1) {
-    if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
-      context->module->export.tag = Module_Export_Tag_All;
-      return peek_index;
-    }
-  }
-
-  context->module->export = (Module_Export) {
-    .tag = Module_Export_Tag_Selective,
-    .Selective = {
-      .symbols = dyn_array_make(Array_Value_Ptr, .capacity = children.length / 2 + 1 ),
-    },
-  };
-
-  if (children.length != 0) {
-    Value_View_Split_Iterator it = { .view = children };
-
-    while (!it.done) {
-      if (context->result->tag != Mass_Result_Tag_Success) goto err;
-      Value_View item = token_split_next(&it, &token_pattern_comma_operator);
-      if (item.length != 1 || !value_is_symbol(value_view_get(item, 0))) {
-        context_error(context, (Mass_Error) {
-          .tag = Mass_Error_Tag_Parse,
-          .source_range = item.source_range,
-          .detailed_message = slice_literal("Exports {} block must contain a comma-separated identifier list")
-        });
-        goto err;
-      }
-      dyn_array_push(context->module->export.Selective.symbols, value_view_get(item, 0));
-    }
+  Value_View fake_args = value_view_slice(&view, peek_index - 1, peek_index);
+  Value *module_export = mass_exports(context, fake_args);
+  if (module_export) {
+    assert(module_export->descriptor ==  &descriptor_module_export);
+    const Module_Export *exports = storage_static_as_c_type(&module_export->storage, Module_Export);
+    context->module->export = *exports;
   }
 
   err:
