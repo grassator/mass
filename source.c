@@ -6550,18 +6550,21 @@ scope_define_builtins(
   )));
 
   {
-    static const Token_Statement_Matcher default_statement_matchers[] = {
-      {.previous = 0,                              .proc = token_parse_constant_definitions},
-      {.previous = &default_statement_matchers[0], .proc = token_parse_explicit_return},
-      {.previous = &default_statement_matchers[1], .proc = token_parse_definition},
-      {.previous = &default_statement_matchers[2], .proc = token_parse_definition_and_assignment_statements},
-      {.previous = &default_statement_matchers[3], .proc = token_parse_assignment},
-      {.previous = &default_statement_matchers[4], .proc = token_parse_inline_machine_code_bytes},
-      {.previous = &default_statement_matchers[5], .proc = token_parse_statement_label},
-      {.previous = &default_statement_matchers[6], .proc = token_parse_statement_using},
-      {.previous = &default_statement_matchers[7], .proc = token_parse_syntax_definition},
-      {.previous = &default_statement_matchers[8], .proc = token_parse_operator_definition},
+    static Token_Statement_Matcher default_statement_matchers[] = {
+      {.proc = token_parse_constant_definitions},
+      {.proc = token_parse_explicit_return},
+      {.proc = token_parse_definition},
+      {.proc = token_parse_definition_and_assignment_statements},
+      {.proc = token_parse_assignment},
+      {.proc = token_parse_inline_machine_code_bytes},
+      {.proc = token_parse_statement_label},
+      {.proc = token_parse_statement_using},
+      {.proc = token_parse_syntax_definition},
+      {.proc = token_parse_operator_definition},
     };
+    for (u64 i = 0; i < countof(default_statement_matchers) - 1; ++i) {
+      default_statement_matchers[i + 1].previous = &default_statement_matchers[i];
+    }
 
     scope->statement_matcher = &default_statement_matchers[countof(default_statement_matchers) - 1];
   }
