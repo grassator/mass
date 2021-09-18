@@ -119,6 +119,14 @@ token_parse_expression(
   const Token_Pattern *end_pattern
 );
 
+static Value *
+token_handle_function_call(
+  Execution_Context *context,
+  Value *target_expression,
+  Value_View args_view,
+  Source_Range source_range
+);
+
 static PRELUDE_NO_DISCARD Value *
 value_force(
   Execution_Context *context,

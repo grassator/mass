@@ -1249,63 +1249,11 @@ spec("source") {
       check(checker() == 42);
     }
 
-    it("should be possible to define infix operators") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "operator 18 (++ x) { x = x + 1; x };"
-        "test :: fn() -> (s64) { y := 41; ++y }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be possible to define postfix operators") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "operator 18 (x ++) { result := x; x = x + 1; result };"
-        "test :: fn() -> (s64) { y := 42; y++ }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be possible to define an overloaded prefix and postfix operator") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "operator 18 (++ x) { x = x + 1; x };"
-        "operator 19 (x ++) { result := x; x = x + 1; result };"
-        "test :: fn() -> (s64) { y := 41; ++y++ }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
-    it("should be possible to define an overloaded prefix and infix operator") {
-      s64(*checker)(s64, s64) = (s64(*)(s64, s64))test_program_inline_source_function(
-        "test", &test_context,
-        "operator 18 (++ x) { x = x + 1; x };"
-        "operator 14 (x ++ y) { x + y };"
-        "test :: fn(x: s64, y: s64) -> (s64) { x ++ ++y }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker(40, 1) == 42);
-    }
-
-    it("should be possible to define infix operators") {
-      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
-        "test", &test_context,
-        "operator 15 (x ** y) { x * y };"
-        "test :: fn() -> (s64) { 21 ** 2 }"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should report an error when defining an overloaded infix operator") {
       test_program_inline_source_base(
         "dummy", &test_context,
-        "operator 15 (x ** y) { x * y };"
-        "operator 15 (x ** y) { x * y };"
+        "operator 15 (x ** y) multiply;"
+        "operator 15 (x ** y) multiply;"
         "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
@@ -1318,8 +1266,8 @@ spec("source") {
     it("should report an error when defining an overloaded infix and postfix operator") {
       test_program_inline_source_base(
         "dummy", &test_context,
-        "operator 15 (x ** y) { x * y };"
-        "operator 15 (x **) { x * x };"
+        "operator 15 (x ** y) multiply;"
+        "operator 15 (x **) multiply;"
         "dummy :: fn() -> (s64) { 21 ** 2 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);

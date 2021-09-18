@@ -70,28 +70,28 @@ static_assert :: macro(condition : bool, message : String) {
   @{if condition { compile_time_error("Static Assert Failed", message) }}
 }
 
-operator 7 (x == y) equal(x, y)
-operator 7 (x != y) not_equal(x, y)
+operator 7 (x == y) equal
+operator 7 (x != y) not_equal
 
-operator 8 (x < y) less(x, y)
-operator 8 (x > y) greater(x, y)
-operator 8 (x <= y) less_equal(x, y)
-operator 8 (x >= y) greater_equal(x, y)
+operator 8 (x < y) less
+operator 8 (x > y) greater
+operator 8 (x <= y) less_equal
+operator 8 (x >= y) greater_equal
 
-operator 10 (x + y) add(x, y)
-operator 10 (x - y) subtract(x, y)
+operator 10 (x + y) add
+operator 10 (x - y) subtract
 
-operator 15 (x * y) multiply(x, y)
-operator 15 (x / y) divide(x, y)
-operator 15 (x % y) remainder(x, y)
+operator 15 (x * y) multiply
+operator 15 (x / y) divide
+operator 15 (x % y) remainder
 
-operator 16 (- x) negate(x)
-operator 16 (& x) address_of(x)
+operator 16 (- x) negate
+operator 16 (& x) address_of
 
-operator 15 (x << y) logical_shift_left(x, y)
-operator 15 (x >> y) logical_shift_right(x, y)
-operator 15 (x | y) bitwise_or(x, y)
-operator 15 (x & y) bitwise_and(x, y)
+operator 15 (x << y) logical_shift_left
+operator 15 (x >> y) logical_shift_right
+operator 15 (x | y) bitwise_or
+operator 15 (x & y) bitwise_and
 
 type_of :: @fn(x) -> (Type) PRELUDE_MASS.type_of
 size_of :: @fn(x) -> (Number_Literal) PRELUDE_MASS.size_of

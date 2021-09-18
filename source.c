@@ -2217,23 +2217,17 @@ token_handle_user_defined_operator_proc(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  // We make a nested scope based on the original scope
-  // instead of current scope for hygiene reasons.
-  Scope *body_scope = scope_make(context->allocator, operator->scope);
   assert(operator->argument_count == args.length);
 
-  for (u8 i = 0; i < operator->argument_count; ++i) {
-    const Symbol *arg_symbol = operator->argument_symbols[i];
-    Value *arg = token_parse_single(context, value_view_get(args, i));
-    MASS_ON_ERROR(*context->result) return 0;
+  Value *fn = scope_lookup_force(context, context->scope, operator->alias, &args.source_range);
+  MASS_ON_ERROR(*context->result) return 0;
 
-    // FIXME this should probably use the epoch from the definition, but we do not capture it yet
-    scope_define_value(body_scope, VALUE_STATIC_EPOCH, arg->source_range, arg_symbol, arg);
+  Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
+  for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
+    *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
   }
-
-  Execution_Context body_context = *context;
-  body_context.scope = body_scope;
-  return token_parse_expression(&body_context, operator->body, &(u64){0}, 0);
+  args = value_view_from_value_array(args_array, &args.source_range);
+  return token_handle_function_call(context, fn, args, args.source_range);
 }
 
 static inline Value *
@@ -2361,6 +2355,17 @@ token_parse_operator_definition(
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
   TOKEN_EXPECT(precedence_token);
   TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
+  TOKEN_EXPECT(alias_token);
+
+  if (!value_is_symbol(alias_token)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = alias_token->source_range,
+      .detailed_message ="Expected a symbol to alias operator to",
+    });
+    goto err;
+  }
+  const Symbol *alias = value_as_symbol(alias_token);
 
   Value *precedence_value = token_parse_single(context, precedence_token);
   precedence_value = token_value_force_immediate_integer(context, precedence_value, &descriptor_u64);
@@ -2369,18 +2374,10 @@ token_parse_operator_definition(
   assert(precedence_value->storage.tag == Storage_Tag_Static);
   u64 precendence = storage_static_value_up_to_u64(&precedence_value->storage);
 
-  u64 body_length = 0;
-  Value_View rest = value_view_rest(&view, peek_index);
-  Value_View body_view = value_view_match_till_end_of_statement(rest, &body_length);
-  peek_index += body_length;
-
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
   user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
-  *user_defined_operator = (User_Defined_Operator) {
-    .body = body_view,
-    .scope = context->scope,
-  };
+  *user_defined_operator = (User_Defined_Operator) { .alias = alias };
 
   Value *operator_token;
   Value *arguments[2] = {0};
@@ -2426,7 +2423,6 @@ token_parse_operator_definition(
       });
       goto err;
     }
-    user_defined_operator->argument_symbols[i] = value_as_symbol(arguments[i]);
   }
 
   Operator *operator = allocator_allocate(context->allocator, Operator);
