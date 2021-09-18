@@ -67,7 +67,7 @@ false :: 0
 compile_time_error :: @fn(name : String, description : String) -> () PRELUDE_MASS.compile_time_error
 
 static_assert :: macro(condition : bool, message : String) {
-  @{if condition == false { compile_time_error("Static Assert Failed", message) }}
+  @{if condition { compile_time_error("Static Assert Failed", message) }}
 }
 
 operator 7 (x == y) equal(x, y)
