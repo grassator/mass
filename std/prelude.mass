@@ -21,6 +21,7 @@ syntax statement("while" ..@condition {}@body) {
   continue :: ~> { goto _loop_start }
 
   label _loop_start
+  label placeholder _loop_done
   if condition() {
     body(@scope)
     goto _loop_start
@@ -35,6 +36,8 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   continue :: ~> { goto _loop_post }
 
   label _loop_start
+  label placeholder _loop_done
+  label placeholder _loop_post
   if condition() {
     body(@scope)
     label _loop_post
@@ -49,6 +52,8 @@ cast :: @fn(type : Type, value) PRELUDE_MASS.cast
 
 // FIXME Support specifying a type here
 startup :: PRELUDE_MASS.startup
+
+inline_machine_code_bytes :: PRELUDE_MASS.inline_machine_code_bytes
 
 debugger :: ~> { inline_machine_code_bytes(0xCC) }
 

@@ -6038,42 +6038,43 @@ token_parse_explicit_return(
   return peek_index;
 }
 
+typedef struct {
+  Array_Value_Ptr args;
+  Source_Range source_range;
+} Inline_Machine_Code_Bytes_Payload;
+
 static Value *
 mass_handle_inline_machine_code_bytes_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
-  Value *args_token
+  Inline_Machine_Code_Bytes_Payload *payload
 ) {
-  Instruction_Bytes bytes = {0};
+  Value_View args_view = value_view_from_value_array(payload->args, &payload->source_range);
+  if (args_view.length >= 15) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = args_view.source_range,
+      .detailed_message = slice_literal("Expected a maximum of 15 bytes"),
+    });
+    return 0;
+  }
 
-  Value_View_Split_Iterator it = { .view = value_as_group_paren(args_token)->children };
+  Instruction_Bytes bytes = {0};
 
   enum {MAX_PATCH_COUNT = 2};
   Instruction_Label_Patch patches[MAX_PATCH_COUNT] = {0};
   s32 patch_count = 0;
 
-  for (u64 argument_count = 0; !it.done; argument_count += 1) {
-    if (argument_count >= 15) {
-      context_error(context, (Mass_Error) {
-        .tag = Mass_Error_Tag_Parse,
-        .source_range = args_token->source_range,
-        .detailed_message = slice_literal("Expected a maximum of 15 bytes"),
-      });
-      return 0;
-    }
-
+  for (u64 arg_index = 0; arg_index < args_view.length; arg_index += 1) {
     MASS_ON_ERROR(*context->result) return 0;
-
-    Value_View view = token_split_next(&it, &token_pattern_comma_operator);
-    Value *value = compile_time_eval(context, view);
-    MASS_ON_ERROR(*context->result) return 0;
+    Value *value = value_view_get(args_view, arg_index);
 
     if (value->descriptor == &descriptor_label_index) {
       if (patch_count == MAX_PATCH_COUNT) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Parse,
-          .source_range = args_token->source_range,
+          .source_range = value->source_range,
           .detailed_message = slice_literal("inline_machine_code_bytes supports no more than 2 labels"),
         });
         return 0;
@@ -6090,7 +6091,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
       value = token_value_force_immediate_integer(context, value, &descriptor_u8);
       MASS_ON_ERROR(*context->result) return 0;
       u8 byte = u64_to_u8(storage_static_value_up_to_u64(&value->storage));
-      bytes.memory[bytes.length++] = s64_to_u8(byte);
+      bytes.memory[bytes.length++] = byte;
     } else {
       context_error(context, (Mass_Error) {
         .tag = Mass_Error_Tag_Expected_Static,
@@ -6104,7 +6105,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     .tag = Instruction_Tag_Bytes,
     .Bytes = bytes,
     .scope = context->scope,
-    .source_range = args_token->source_range,
+    .source_range = args_view.source_range,
     .compiler_source_location = COMPILER_SOURCE_LOCATION,
   });
 
@@ -6113,7 +6114,7 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
     push_instruction(&builder->code_block, (Instruction) {
       .tag = Instruction_Tag_Label_Patch,
       .Label_Patch = patches[i],
-      .source_range = args_token->source_range,
+      .source_range = args_view.source_range,
       .compiler_source_location = COMPILER_SOURCE_LOCATION,
     });
   }
@@ -6121,42 +6122,24 @@ mass_handle_inline_machine_code_bytes_lazy_proc(
   return expected_result_validate(expected_result, &void_value);
 }
 
-static u64
-token_parse_inline_machine_code_bytes(
+static Value *
+mass_inline_machine_code_bytes(
   Execution_Context *context,
-  Value_View view,
-  Lazy_Value *out_lazy_value,
-  void *unused_payload
+  Value_View args_view
 ) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
+  Array_Value_Ptr args_copy = value_view_to_value_array(context->allocator, args_view);
 
-  u64 peek_index = 0;
-  TOKEN_MATCH(id_token, TOKEN_PATTERN_SYMBOL("inline_machine_code_bytes"));
-  TOKEN_MAYBE_MATCH(args_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
-  if (!args_token) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = id_token->source_range,
-      .detailed_message = slice_literal("Expected and argument list in parens"),
-    });
-    goto err;
-  }
+  Inline_Machine_Code_Bytes_Payload *payload =
+    allocator_allocate(context->allocator, Inline_Machine_Code_Bytes_Payload);
+  *payload = (Inline_Machine_Code_Bytes_Payload) {
+    .args = args_copy,
+    .source_range = args_view.source_range,
+  };
 
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
-  if (rest.length) {
-    context_error(context, (Mass_Error) {
-      .tag = Mass_Error_Tag_Parse,
-      .source_range = rest.source_range,
-      .detailed_message = slice_literal("Expected the end of the statement"),
-    });
-    goto err;
-  }
-
-  out_lazy_value->proc = mass_handle_inline_machine_code_bytes_lazy_proc;
-  out_lazy_value->payload = args_token;
-
-  err:
-  return peek_index;
+  return mass_make_lazy_value(
+    context, args_view.source_range, payload, &descriptor_void,
+    mass_handle_inline_machine_code_bytes_lazy_proc
+  );
 }
 
 typedef struct {
@@ -6556,7 +6539,6 @@ scope_define_builtins(
       {.proc = token_parse_definition},
       {.proc = token_parse_definition_and_assignment_statements},
       {.proc = token_parse_assignment},
-      {.proc = token_parse_inline_machine_code_bytes},
       {.proc = token_parse_statement_label},
       {.proc = token_parse_statement_using},
       {.proc = token_parse_syntax_definition},

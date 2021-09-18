@@ -263,6 +263,18 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    mass_inline_machine_code_bytes, "inline_machine_code_bytes", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_compile_time_error, "compile_time_error", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
