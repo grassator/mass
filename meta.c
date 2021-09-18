@@ -1106,7 +1106,7 @@ main(void) {
     { "Range_u32", "offsets" },
   }));
 
-  push_type(add_common_fields(type_union("Module_Export", (Struct_Type[]){
+  push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
     struct_empty("None"),
     struct_empty("All"),
     struct_fields("Selective", (Struct_Item[]){
@@ -1121,7 +1121,7 @@ main(void) {
   push_type(type_struct("Module", (Struct_Item[]){
     { "Source_File", "source_file" },
     { "Scope *", "own_scope" },
-    { "Module_Export", "export" },
+    { "Module_Exports", "exports" },
   }));
 
   push_type(type_struct("Parse_Error", (Struct_Item[]){

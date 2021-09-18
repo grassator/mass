@@ -108,7 +108,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Module_Export">
+<Type Name="Array_Module_Exports">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -117,7 +117,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Module_Export_Ptr">
+<Type Name="Array_Module_Exports_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -126,7 +126,7 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Array_Const_Module_Export_Ptr">
+<Type Name="Array_Const_Module_Exports_Ptr">
   <Expand>
     <Item Name="[length]">data->length</Item>
     <ArrayItems>
@@ -135,21 +135,21 @@
     </ArrayItems>
   </Expand>
 </Type>
-<Type Name="Module_Export">
-  <DisplayString Condition="tag == Module_Export_Tag_None">
+<Type Name="Module_Exports">
+  <DisplayString Condition="tag == Module_Exports_Tag_None">
     None
   </DisplayString>
-  <DisplayString Condition="tag == Module_Export_Tag_All">
+  <DisplayString Condition="tag == Module_Exports_Tag_All">
     All
   </DisplayString>
-  <DisplayString Condition="tag == Module_Export_Tag_Selective">
+  <DisplayString Condition="tag == Module_Exports_Tag_Selective">
     Selective { Selective }
   </DisplayString>
   <Expand>
     <Item Name="tag">tag</Item>
     <Item Name="scope">scope</Item>
     <Item Name="source_range">source_range</Item>
-    <Item Name="Selective" Condition="tag == Module_Export_Tag_Selective">Selective</Item>
+    <Item Name="Selective" Condition="tag == Module_Exports_Tag_Selective">Selective</Item>
   </Expand>
 </Type>
 <Type Name="Array_Module">

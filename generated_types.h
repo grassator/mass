@@ -21,9 +21,9 @@ typedef struct Source_Range Source_Range;
 typedef dyn_array_type(Source_Range *) Array_Source_Range_Ptr;
 typedef dyn_array_type(const Source_Range *) Array_Const_Source_Range_Ptr;
 
-typedef struct Module_Export Module_Export;
-typedef dyn_array_type(Module_Export *) Array_Module_Export_Ptr;
-typedef dyn_array_type(const Module_Export *) Array_Const_Module_Export_Ptr;
+typedef struct Module_Exports Module_Exports;
+typedef dyn_array_type(Module_Exports *) Array_Module_Exports_Ptr;
+typedef dyn_array_type(const Module_Exports *) Array_Const_Module_Exports_Ptr;
 
 typedef struct Module Module;
 typedef dyn_array_type(Module *) Array_Module_Ptr;
@@ -860,33 +860,33 @@ typedef struct Source_Range {
 typedef dyn_array_type(Source_Range) Array_Source_Range;
 
 typedef enum {
-  Module_Export_Tag_None = 0,
-  Module_Export_Tag_All = 1,
-  Module_Export_Tag_Selective = 2,
-} Module_Export_Tag;
+  Module_Exports_Tag_None = 0,
+  Module_Exports_Tag_All = 1,
+  Module_Exports_Tag_Selective = 2,
+} Module_Exports_Tag;
 
-typedef struct Module_Export_Selective {
+typedef struct Module_Exports_Selective {
   Array_Value_Ptr symbols;
-} Module_Export_Selective;
-typedef struct Module_Export {
-  Module_Export_Tag tag;
+} Module_Exports_Selective;
+typedef struct Module_Exports {
+  Module_Exports_Tag tag;
   char _tag_padding[4];
   Scope * scope;
   Source_Range source_range;
   union {
-    Module_Export_Selective Selective;
+    Module_Exports_Selective Selective;
   };
-} Module_Export;
-static inline Module_Export_Selective *
-module_export_as_selective(Module_Export *module_export) {
-  assert(module_export->tag == Module_Export_Tag_Selective);
-  return &module_export->Selective;
+} Module_Exports;
+static inline Module_Exports_Selective *
+module_exports_as_selective(Module_Exports *module_exports) {
+  assert(module_exports->tag == Module_Exports_Tag_Selective);
+  return &module_exports->Selective;
 }
-typedef dyn_array_type(Module_Export) Array_Module_Export;
+typedef dyn_array_type(Module_Exports) Array_Module_Exports;
 typedef struct Module {
   Source_File source_file;
   Scope * own_scope;
-  Module_Export export;
+  Module_Exports exports;
 } Module;
 typedef dyn_array_type(Module) Array_Module;
 
@@ -2085,12 +2085,12 @@ static Descriptor descriptor_array_source_range;
 static Descriptor descriptor_array_source_range_ptr;
 static Descriptor descriptor_source_range_pointer;
 static Descriptor descriptor_source_range_pointer_pointer;
-static Descriptor descriptor_module_export;
-static Descriptor descriptor_array_module_export;
-static Descriptor descriptor_array_module_export_ptr;
-static Descriptor descriptor_array_const_module_export_ptr;
-static Descriptor descriptor_module_export_pointer;
-static Descriptor descriptor_module_export_pointer_pointer;
+static Descriptor descriptor_module_exports;
+static Descriptor descriptor_array_module_exports;
+static Descriptor descriptor_array_module_exports_ptr;
+static Descriptor descriptor_array_const_module_exports_ptr;
+static Descriptor descriptor_module_exports_pointer;
+static Descriptor descriptor_module_exports_pointer_pointer;
 static Descriptor descriptor_module;
 static Descriptor descriptor_array_module;
 static Descriptor descriptor_array_module_ptr;
@@ -2801,50 +2801,50 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(source_range, Source_Range,
 );
 MASS_DEFINE_TYPE_VALUE(source_range);
 /*union struct start */
-MASS_DEFINE_OPAQUE_C_TYPE(array_module_export_ptr, Array_Module_Export_Ptr)
-MASS_DEFINE_OPAQUE_C_TYPE(array_module_export, Array_Module_Export)
-MASS_DEFINE_OPAQUE_C_TYPE(module_export_tag, Module_Export_Tag)
-static C_Enum_Item module_export_tag_items[] = {
+MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports_ptr, Array_Module_Exports_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports, Array_Module_Exports)
+MASS_DEFINE_OPAQUE_C_TYPE(module_exports_tag, Module_Exports_Tag)
+static C_Enum_Item module_exports_tag_items[] = {
 { .name = slice_literal_fields("None"), .value = 0 },
 { .name = slice_literal_fields("All"), .value = 1 },
 { .name = slice_literal_fields("Selective"), .value = 2 },
 };
-MASS_DEFINE_STRUCT_DESCRIPTOR(module_export_selective, Module_Export_Selective,
+MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports_selective, Module_Exports_Selective,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_array_value_ptr,
     .name = slice_literal_fields("symbols"),
-    .Base_Relative.offset = offsetof(Module_Export_Selective, symbols),
+    .Base_Relative.offset = offsetof(Module_Exports_Selective, symbols),
   },
 );
-MASS_DEFINE_TYPE_VALUE(module_export_selective);
-MASS_DEFINE_STRUCT_DESCRIPTOR(module_export, Module_Export,
+MASS_DEFINE_TYPE_VALUE(module_exports_selective);
+MASS_DEFINE_STRUCT_DESCRIPTOR(module_exports, Module_Exports,
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("tag"),
-    .descriptor = &descriptor_module_export_tag,
-    .Base_Relative.offset = offsetof(Module_Export, tag),
+    .descriptor = &descriptor_module_exports_tag,
+    .Base_Relative.offset = offsetof(Module_Exports, tag),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_scope_pointer,
     .name = slice_literal_fields("scope"),
-    .Base_Relative.offset = offsetof(Module_Export, scope),
+    .Base_Relative.offset = offsetof(Module_Exports, scope),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .descriptor = &descriptor_source_range,
     .name = slice_literal_fields("source_range"),
-    .Base_Relative.offset = offsetof(Module_Export, source_range),
+    .Base_Relative.offset = offsetof(Module_Exports, source_range),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
     .name = slice_literal_fields("Selective"),
-    .descriptor = &descriptor_module_export_selective,
-    .Base_Relative.offset = offsetof(Module_Export, Selective),
+    .descriptor = &descriptor_module_exports_selective,
+    .Base_Relative.offset = offsetof(Module_Exports, Selective),
   },
 );
-MASS_DEFINE_TYPE_VALUE(module_export);
+MASS_DEFINE_TYPE_VALUE(module_exports);
 /*union struct end*/
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_ptr, Array_Module_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module, Array_Module)
@@ -2863,9 +2863,9 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(module, Module,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_module_export,
-    .name = slice_literal_fields("export"),
-    .Base_Relative.offset = offsetof(Module, export),
+    .descriptor = &descriptor_module_exports,
+    .name = slice_literal_fields("exports"),
+    .Base_Relative.offset = offsetof(Module, exports),
   },
 );
 MASS_DEFINE_TYPE_VALUE(module);

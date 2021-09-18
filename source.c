@@ -2303,24 +2303,24 @@ mass_exports(
   Value *block = value_view_get(args, 0);
   Value_View children = value_as_group_curly(block)->children;
 
-  Module_Export *export = allocator_allocate(context->allocator, Module_Export);
-  *export = (Module_Export){0};
+  Module_Exports *export = allocator_allocate(context->allocator, Module_Exports);
+  *export = (Module_Exports){0};
   Value *result = value_make(
-    context, &descriptor_module_export, storage_static(export), args.source_range
+    context, &descriptor_module_exports, storage_static(export), args.source_range
   );
 
   if (children.length == 1) {
     if (value_match_symbol(value_view_get(children, 0), slice_literal(".."))) {
-      *export = (Module_Export) {
-        .tag = Module_Export_Tag_All,
+      *export = (Module_Exports) {
+        .tag = Module_Exports_Tag_All,
         .source_range = args.source_range,
       };
       return result;
     }
   }
 
-  *export = (Module_Export) {
-    .tag = Module_Export_Tag_Selective,
+  *export = (Module_Exports) {
+    .tag = Module_Exports_Tag_Selective,
     .Selective = {
       // TODO use a temp array first
       .symbols = dyn_array_make(Array_Value_Ptr, .capacity = children.length / 2 + 1 ),
@@ -2358,22 +2358,22 @@ token_parse_exports(
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("exports"));
   TOKEN_EXPECT_MATCH(block, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_curly);
 
-  if (context->module->export.tag != Module_Export_Tag_None) {
+  if (context->module->exports.tag != Module_Exports_Tag_None) {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
       .source_range = keyword_token->source_range,
       .detailed_message = slice_literal("A module can not have multiple exports statements. Original declaration at:"),
-      .other_source_range = context->module->export.source_range,
+      .other_source_range = context->module->exports.source_range,
     });
     goto err;
   }
 
   Value_View fake_args = value_view_slice(&view, peek_index - 1, peek_index);
-  Value *module_export = mass_exports(context, fake_args);
-  if (module_export) {
-    assert(module_export->descriptor ==  &descriptor_module_export);
-    const Module_Export *exports = storage_static_as_c_type(&module_export->storage, Module_Export);
-    context->module->export = *exports;
+  Value *module_exports = mass_exports(context, fake_args);
+  if (module_exports) {
+    assert(module_exports->descriptor ==  &descriptor_module_exports);
+    const Module_Exports *exports = storage_static_as_c_type(&module_exports->storage, Module_Exports);
+    context->module->exports = *exports;
   }
 
   err:
@@ -2534,7 +2534,7 @@ mass_import(
     }
   }
 
-  return value_make(context, &descriptor_scope, storage_static(module->export.scope), args.source_range);
+  return value_make(context, &descriptor_scope, storage_static(module->exports.scope), args.source_range);
 
   parse_err:
   context_error(context, (Mass_Error) {
@@ -6501,8 +6501,8 @@ module_compiler_init(
       .path = slice_literal("__mass_internal__"),
     },
     .own_scope = scope,
-    .export = {
-      .tag = Module_Export_Tag_All,
+    .exports = {
+      .tag = Module_Exports_Tag_All,
       .scope = scope,
     },
   };
@@ -6712,18 +6712,18 @@ program_import_module(
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);
   MASS_TRY(parse_result);
-  switch(module->export.tag) {
-    case Module_Export_Tag_None: {
-      module->export.scope = scope_make(context->allocator, module->own_scope->parent);
+  switch(module->exports.tag) {
+    case Module_Exports_Tag_None: {
+      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
       break;
     }
-    case Module_Export_Tag_All: {
-      module->export.scope = module->own_scope;
+    case Module_Exports_Tag_All: {
+      module->exports.scope = module->own_scope;
       break;
     }
-    case Module_Export_Tag_Selective: {
-      module->export.scope = scope_make(context->allocator, module->own_scope->parent);
-      Array_Value_Ptr symbols = module->export.Selective.symbols;
+    case Module_Exports_Tag_Selective: {
+      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
+      Array_Value_Ptr symbols = module->exports.Selective.symbols;
       for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
         Value **symbol_pointer = dyn_array_get(symbols, i);
         const Symbol *symbol = value_as_symbol(*symbol_pointer);
@@ -6738,7 +6738,7 @@ program_import_module(
         }
 
         Value_View expr = value_view_single(symbol_pointer);
-        scope_define_lazy_compile_time_expression(&import_context, module->export.scope, symbol, expr);
+        scope_define_lazy_compile_time_expression(&import_context, module->exports.scope, symbol, expr);
       }
       break;
     }
