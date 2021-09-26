@@ -1614,6 +1614,15 @@ token_parse_single(
   }
 }
 
+static Value *
+mass_unquote(
+  Execution_Context *context,
+  Value_View args
+) {
+  assert(args.length == 1);
+  return token_parse_single(context, value_view_get(args, 0));
+}
+
 typedef enum {
   Macro_Match_Mode_Expression,
   Macro_Match_Mode_Statement

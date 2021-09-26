@@ -128,7 +128,7 @@ tokenize(
       "]" { TOKENIZER_GROUP_END(']'); continue; }
       "}" { TOKENIZER_GROUP_END('}'); continue; }
 
-      operator = [+*%/=!@^&$\\:;,?|.~<>-]+;
+      operator = ['+*%/=!@^&$\\:;,?|.~<>-]+;
       operator { TOKENIZER_PUSH_SYMBOL(); continue; }
 
       newline = "\r\n" | "\r" | "\n";

@@ -85,13 +85,19 @@ operator 15 (x * y) multiply
 operator 15 (x / y) divide
 operator 15 (x % y) remainder
 
-operator 16 (- x) negate
-operator 16 (& x) address_of
-
 operator 15 (x << y) logical_shift_left
 operator 15 (x >> y) logical_shift_right
 operator 15 (x | y) bitwise_or
 operator 15 (x & y) bitwise_and
+
+operator 16 (- x) negate
+operator 16 (& x) address_of
+
+operator 30 (' x) quote
+operator 30 (x ') unquote
+
+quote :: @fn(x) @intrinsic { x }
+unquote :: @fn(x) PRELUDE_MASS.unquote
 
 type_of :: @fn(x) -> (Type) PRELUDE_MASS.type_of
 size_of :: @fn(x) -> (Number_Literal) PRELUDE_MASS.size_of

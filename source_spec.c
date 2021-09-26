@@ -1328,6 +1328,29 @@ spec("source") {
     }
   }
 
+  describe("Quote / Unquote") {
+    it("should be possible to use for non-lexical symbol lookup") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "my_symbol :: 'foo\n"
+        "foo :: 42\n"
+        "checker :: fn() -> (s64) { my_symbol' }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+    it("should be possible to use for splicing in a block") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "my_block :: '{ foo }\n"
+        "foo :: 42\n"
+        "checker :: fn() -> (s64) { my_block' }"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+  }
+
   describe("Compile Time Execution") {
     it("should correctly detect direct circular dependency in static declarations") {
       test_program_inline_source_base(

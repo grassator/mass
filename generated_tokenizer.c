@@ -104,6 +104,7 @@ tokenize(
   case '$':
   case '%':
   case '&':
+  case '\'':
   case '*':
   case '+':
   case ',':
@@ -200,7 +201,7 @@ yy2:
 yy3:
 #line 160 "tokenizer.re.c"
   { TOKENIZER_HANDLE_ERROR((Slice){0}); }
-#line 204 "generated_tokenizer.c"
+#line 205 "generated_tokenizer.c"
 yy4:
   yyaccept = 0;
   ++offset;
@@ -216,7 +217,7 @@ yy4:
 yy6:
 #line 154 "tokenizer.re.c"
   { continue; }
-#line 220 "generated_tokenizer.c"
+#line 221 "generated_tokenizer.c"
 yy7:
   ++offset;
 yy8:
@@ -229,7 +230,7 @@ yy8:
         );
         continue;
       }
-#line 233 "generated_tokenizer.c"
+#line 234 "generated_tokenizer.c"
 yy9:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -246,6 +247,7 @@ yy11:
   case '$':
   case '%':
   case '&':
+  case '\'':
   case '*':
   case '+':
   case ',':
@@ -268,7 +270,7 @@ yy11:
 yy12:
 #line 132 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 272 "generated_tokenizer.c"
+#line 274 "generated_tokenizer.c"
 yy13:
   yyaccept = 1;
   ++offset;
@@ -283,12 +285,12 @@ yy14:
   ++offset;
 #line 124 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_paren); continue; }
-#line 287 "generated_tokenizer.c"
+#line 289 "generated_tokenizer.c"
 yy16:
   ++offset;
 #line 127 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(')'); continue; }
-#line 292 "generated_tokenizer.c"
+#line 294 "generated_tokenizer.c"
 yy18:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -316,7 +318,7 @@ yy20:
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
         continue;
       }
-#line 320 "generated_tokenizer.c"
+#line 322 "generated_tokenizer.c"
 yy21:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -405,27 +407,27 @@ yy23:
 yy25:
 #line 157 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 409 "generated_tokenizer.c"
+#line 411 "generated_tokenizer.c"
 yy26:
   ++offset;
 #line 125 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_square); continue; }
-#line 414 "generated_tokenizer.c"
+#line 416 "generated_tokenizer.c"
 yy28:
   ++offset;
 #line 128 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(']'); continue; }
-#line 419 "generated_tokenizer.c"
+#line 421 "generated_tokenizer.c"
 yy30:
   ++offset;
 #line 126 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_curly); continue; }
-#line 424 "generated_tokenizer.c"
+#line 426 "generated_tokenizer.c"
 yy32:
   ++offset;
 #line 129 "tokenizer.re.c"
   { TOKENIZER_GROUP_END('}'); continue; }
-#line 429 "generated_tokenizer.c"
+#line 431 "generated_tokenizer.c"
 yy34:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -464,7 +466,7 @@ yy38:
         );
         continue;
       }
-#line 468 "generated_tokenizer.c"
+#line 470 "generated_tokenizer.c"
 yy40:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -483,6 +485,7 @@ yy41:
   case '$':
   case '%':
   case '&':
+  case '\'':
   case '*':
   case '+':
   case ',':
@@ -565,7 +568,7 @@ yy49:
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-#line 569 "generated_tokenizer.c"
+#line 572 "generated_tokenizer.c"
 yy50:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
@@ -601,11 +604,11 @@ yy52:
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);
         continue;
       }
-#line 605 "generated_tokenizer.c"
+#line 608 "generated_tokenizer.c"
 yy53:
 #line 102 "tokenizer.re.c"
   { break; }
-#line 609 "generated_tokenizer.c"
+#line 612 "generated_tokenizer.c"
 }
 #line 161 "tokenizer.re.c"
 

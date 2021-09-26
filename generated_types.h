@@ -688,6 +688,9 @@ static Value * mass_address_of
 static Value * mass_import
   (Execution_Context * context, Value_View args);
 
+static Value * mass_unquote
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_cast
   (Execution_Context * context, Value_View args);
 
@@ -2561,6 +2564,7 @@ static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_import;
+static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;
