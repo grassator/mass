@@ -5557,7 +5557,12 @@ token_parse_expression(
 ) {
   if (context->result->tag != Mass_Result_Tag_Success) return 0;
 
-  if(!view.length) return &void_value;
+  if(view.length == 0) return &void_value;
+  if(view.length == 1) {
+    *out_match_length = 1;
+    return token_parse_single(context, value_view_get(view, 0));
+  }
+
   Value *result = 0;
 
   Temp_Mark temp_mark = context_temp_mark(context);
