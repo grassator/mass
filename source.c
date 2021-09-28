@@ -4677,23 +4677,6 @@ mass_handle_apply_operator(
     return mass_handle_paren_operator(context, operands_view, 0);
   }
 
-  if (value_is_group_square(rhs_value)) {
-    Value *type_value = token_parse_single(context, lhs_value);
-    const Descriptor *target_descriptor = value_ensure_type(context, type_value, source_range);
-    Value *tuple = token_parse_single(context, rhs_value);
-    assert(tuple->descriptor == &descriptor_tuple);
-    assert(tuple->storage.tag == Storage_Tag_Static);
-    return mass_cast_helper(context, target_descriptor, tuple, source_range);
-  }
-
-  if (
-    rhs_value->descriptor == &descriptor_tuple &&
-    rhs_value->storage.tag == Storage_Tag_Static
-  ) {
-    const Descriptor *target_descriptor = value_ensure_type(context, lhs_value, source_range);
-    return mass_cast_helper(context, target_descriptor, rhs_value, source_range);
-  }
-
   if (rhs_value->descriptor == &descriptor_value_view) {
     Value_View args_view = *storage_static_as_c_type(&rhs_value->storage, Value_View);
     return token_handle_function_call(context, lhs_value, args_view, source_range);

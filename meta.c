@@ -1718,9 +1718,9 @@ main(void) {
     { "Value *", "callee_return_value" },
   }));
 
-  push_type(type_struct("Tuple", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Tuple", (Struct_Item[]){
     { "Array_Value_Ptr", "items"},
-  }));
+  })));
 
   push_type(type_struct("Code_Fragment", (Struct_Item[]){
     { "Scope *", "scope"},
