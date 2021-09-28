@@ -325,6 +325,25 @@ program_get_label(
 }
 
 static bool
+same_function_signature(
+  const Function_Info *a_info,
+  const Function_Info *b_info
+) {
+  if (!same_type(a_info->returns.declaration.descriptor, b_info->returns.declaration.descriptor)) {
+    return false;
+  }
+  if (dyn_array_length(a_info->parameters) != dyn_array_length(b_info->parameters)) {
+    return false;
+  }
+  for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
+    Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
+    Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
+    if(!same_type(a_arg->declaration.descriptor, b_arg->declaration.descriptor)) return false;
+  }
+  return true;
+}
+
+static bool
 same_type(
   const Descriptor *a,
   const Descriptor *b
@@ -367,23 +386,7 @@ same_type(
       return a == b;
     }
     case Descriptor_Tag_Function_Instance: {
-      const Function_Info *a_info = a->Function_Instance.info;
-      const Function_Info *b_info = b->Function_Instance.info;
-      if (!same_type(a_info->returns.declaration.descriptor, b_info->returns.declaration.descriptor)) {
-        return false;
-      }
-      if (
-        dyn_array_length(a_info->parameters) !=
-        dyn_array_length(b_info->parameters)
-      ) {
-        return false;
-      }
-      for (u64 i = 0; i < dyn_array_length(a_info->parameters); ++i) {
-        Function_Parameter *a_arg = dyn_array_get(a_info->parameters, i);
-        Function_Parameter *b_arg = dyn_array_get(b_info->parameters, i);
-        if(!same_type(a_arg->declaration.descriptor, b_arg->declaration.descriptor)) return false;
-      }
-      return true;
+      return same_function_signature(a->Function_Instance.info, b->Function_Instance.info);
     }
     default: {
       assert(!"Unsupported descriptor type");
@@ -1900,16 +1903,19 @@ same_value_type_or_can_implicitly_move_cast(
   const Descriptor *target,
   Value *source
 ) {
-  if (
-    source->descriptor == &descriptor_overload_set &&
-    target->tag == Descriptor_Tag_Function_Instance
-  ) {
-    const Overload_Set *set = storage_static_as_c_type(&source->storage, Overload_Set);
-    for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
-      Value *overload = *dyn_array_get(set->items, i);
-      if (same_value_type_or_can_implicitly_move_cast(target, overload)) return true;
+  if (target->tag == Descriptor_Tag_Function_Instance) {
+    if (source->descriptor == &descriptor_overload_set) {
+      const Overload_Set *set = storage_static_as_c_type(&source->storage, Overload_Set);
+      for (u64 i = 0; i < dyn_array_length(set->items); i += 1) {
+        Value *overload = *dyn_array_get(set->items, i);
+        if (same_value_type_or_can_implicitly_move_cast(target, overload)) return true;
+      }
+      return false;
     }
-    return false;
+    if (source->descriptor == &descriptor_function_literal) {
+      const Function_Literal *literal = value_as_function_literal(source);
+      return same_function_signature(target->Function_Instance.info, literal->info);
+    }
   }
   if (value_is_static_number_literal(source) && target != &descriptor_number_literal) {
     // Allow literal `0` to be cast to a pointer

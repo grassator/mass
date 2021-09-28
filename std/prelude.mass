@@ -49,9 +49,7 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
 
 MASS :: import("mass")
 cast :: @fn(type : Type, value) MASS.cast
-
-// FIXME Support specifying a type here
-startup :: MASS.startup
+startup :: @fn(callback : fn() -> ()) -> () MASS.startup
 
 inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 
