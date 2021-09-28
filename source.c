@@ -4951,15 +4951,23 @@ mass_handle_dot_operator(
         return 0;
       }
       const Scope *module_scope = storage_static_as_c_type(&lhs->storage, Scope);
-      return scope_lookup_force(context, module_scope, field_symbol, &args_view.source_range);
+      Scope_Entry *entry = scope_lookup_shallow(module_scope, field_symbol);
+      if (!entry) {
+        context_error(context, (Mass_Error) {
+          .tag = Mass_Error_Tag_Unknown_Field,
+          .source_range = rhs_range,
+          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
+        });
+        return 0;
+      }
+      return scope_entry_force_value(context, entry);
     } else {
       Memory_Layout_Item *field = struct_find_field_by_name(unwrapped_descriptor, field_name);
       if (!field) {
         context_error(context, (Mass_Error) {
           .tag = Mass_Error_Tag_Unknown_Field,
           .source_range = rhs_range,
-          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor,
-          },
+          .Unknown_Field = { .name = field_name, .type = unwrapped_descriptor, },
         });
         return 0;
       }
