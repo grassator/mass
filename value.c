@@ -941,6 +941,7 @@ storage_static_equal(
   const Descriptor *b_descriptor,
   const Storage *b_storage
 ) {
+  if (!same_type(a_descriptor, b_descriptor)) return false;
   assert(a_storage->tag == Storage_Tag_Static);
   assert(b_storage->tag == Storage_Tag_Static);
   assert(a_storage->bit_size.as_u64 == b_storage->bit_size.as_u64);
