@@ -701,6 +701,9 @@ static Value * mass_quote
 static Value * mass_unquote
   (Execution_Context * context, Value_View args);
 
+static Value * mass_exports
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_cast
   (Execution_Context * context, Value_View args);
 
@@ -2588,6 +2591,7 @@ static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_inline_module;
 static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;
+static Descriptor descriptor_mass_exports;
 static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
 static Descriptor descriptor_mass_size_of;

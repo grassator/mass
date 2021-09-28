@@ -2319,9 +2319,9 @@ mass_exports(
   Execution_Context *context,
   Value_View args
 ) {
-  assert(args.length == 1);
-  Value *block = value_view_get(args, 0);
-  Value_View children = value_as_group_curly(block)->children;
+  assert(args.length == 2);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("exports")));
+  Value_View children = value_as_group_curly(value_view_get(args, 1))->children;
 
   Module_Exports *export = allocator_allocate(context->allocator, Module_Exports);
   *export = (Module_Exports){0};
@@ -4678,8 +4678,6 @@ mass_handle_apply_operator(
   if (value_is_group_curly(rhs_value)) {
     if (value_match_symbol(lhs_value, slice_literal("c_struct"))) {
       return token_process_c_struct_definition(context, rhs_value);
-    } else if (value_match_symbol(lhs_value, slice_literal("exports"))) {
-      return mass_exports(context, value_view_single(&rhs_value));
     }
   }
 

@@ -71,6 +71,7 @@ static_assert :: macro(condition : bool, message : String) {
 }
 
 apply :: @fn(symbol :: 'module, curly : MASS.Group_Curly) MASS.inline_module
+apply :: @fn(symbol :: 'exports, curly : MASS.Group_Curly) MASS.exports
 
 operator 7 (x == y) equal
 operator 7 (x != y) not_equal
