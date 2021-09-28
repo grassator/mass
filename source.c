@@ -4718,20 +4718,14 @@ mass_handle_at_operator(
 ) {
   assert(args_view.length == 1);
   Value *body = value_view_get(args_view, 0);
-  Source_Range body_range = body->source_range;
-  if (value_match_symbol(body, slice_literal("scope"))) {
-    return value_init(
-      allocator_allocate(context->allocator, Value),
-      &descriptor_scope, storage_static(context->scope), body_range
-    );
-  } else if (value_is_group_paren(body)) {
+  if (value_is_group_paren(body)) {
     return compile_time_eval(context, value_as_group_paren(body)->children);
   } else if (value_is_group_curly(body)) {
     return compile_time_eval(context, args_view);
   } else {
     context_error(context, (Mass_Error) {
       .tag = Mass_Error_Tag_Parse,
-      .source_range = body_range,
+      .source_range = args_view.source_range,
       .detailed_message = slice_literal("@ operator must be followed by an expression in () or {}"),
     });
     return 0;

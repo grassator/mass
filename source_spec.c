@@ -739,19 +739,6 @@ spec("source") {
       check(actual == 42);
     }
 
-    it("should be able to refer to the current scope") {
-      s32(*checker)(void) = (s32(*)(void))test_program_inline_source_function(
-        "checker", &test_context,
-        "checker :: fn() -> (s32) {"
-          "result : s32 = 42;"
-          "this_scope :: @scope;"
-          "this_scope.result"
-        "}"
-      );
-      check(spec_check_mass_result(test_context.result));
-      check(checker() == 42);
-    }
-
     it("should be able to run fibonnacii") {
       s64(*fibonnacci)(s64) = (s64(*)(s64))test_program_inline_source_function(
         "fibonnacci", &test_context,
@@ -1429,11 +1416,11 @@ spec("source") {
       check(literal->negative == false);
     }
 
-    it("should be able combine if / else, @scope and using for conditional definitions") {
+    it("should be able combine if / else, inline modules and `using` for conditional definitions") {
       Value *value = test_program_inline_source_base(
         "TEST", &test_context,
         "CONDITION :: 1\n"
-        "using if CONDITION then { TEST :: 42; @scope } else { TEST :: 1000; @scope }\n"
+        "using if CONDITION then module { TEST :: 42 } else module { TEST :: 1000 }\n"
       );
 
       check(value);
