@@ -471,8 +471,6 @@ spec("source") {
         "main :: fn() -> () { if true else 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Parse);
     }
     it("should report an error on double `then` inside of an if expression") {
       test_program_inline_source_base(
@@ -480,8 +478,6 @@ spec("source") {
         "main :: fn() -> () { if true then 0 then 42 }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Parse);
     }
     it("should be able to parse and run if statement") {
       s8(*checker)(s32) = (s8(*)(s32))test_program_inline_source_function(
@@ -526,8 +522,6 @@ spec("source") {
         "main :: fn() -> () { if (1 < 0) { 0 } 42; }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
-      Mass_Error *error = &test_context.result->Error.error;
-      check(error->tag == Mass_Error_Tag_Parse);
     }
   }
 
@@ -924,8 +918,8 @@ spec("source") {
     it("should report an error when a non-compile-time fn has an intrinsic body") {
       test_program_inline_source_base(
         "checker", &test_context,
-        "my_intrinsic :: fn() -> (Number_Literal) intrinsic { \\42 }\n"
-        "checker :: fn() -> (s64) { my_intrinsic() }"
+        "my_intrinsic :: fn() -> () @intrinsic { 0 }\n"
+        "checker :: fn() -> () { my_intrinsic() }"
       );
       check(test_context.result->tag == Mass_Result_Tag_Error);
       Mass_Error *error = &test_context.result->Error.error;

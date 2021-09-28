@@ -4680,8 +4680,6 @@ mass_handle_apply_operator(
       return token_process_c_struct_definition(context, rhs_value);
     } else if (value_match_symbol(lhs_value, slice_literal("exports"))) {
       return mass_exports(context, value_view_single(&rhs_value));
-    } else if (value_match_symbol(lhs_value, slice_literal("module"))) {
-      return mass_inline_module(context, operands_view);
     }
   }
 
