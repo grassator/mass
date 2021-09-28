@@ -6632,7 +6632,7 @@ mass_inline_module(
   const Group_Curly *curly = value_as_group_curly(value_view_get(args, 1));
 
   Module *module = allocator_allocate(context->allocator, Module);
-  Scope *own_scope = scope_make(context->allocator, context->compilation->root_scope);
+  Scope *own_scope = scope_make(context->allocator, context->scope);
   module_init(module, args.source_range.file->path, args.source_range.file->text, own_scope);
   Execution_Context import_context = execution_context_from_compilation(context->compilation);
   import_context.module = module;

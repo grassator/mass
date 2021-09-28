@@ -17,13 +17,13 @@ syntax statement("if" ..@condition {}@then_branch "else" {}@else_branch) {
 //)
 
 syntax statement("while" ..@condition {}@body) {
-  break :: ~> { goto _loop_done }
-  continue :: ~> { goto _loop_start }
-
   label _loop_start
   label placeholder _loop_done
   if condition() {
-    body(@scope)
+    body(module {
+      break :: ~> { goto _loop_done }
+      continue :: ~> { goto _loop_start }
+    })
     goto _loop_start
   }
   label _loop_done
@@ -32,14 +32,14 @@ syntax statement("while" ..@condition {}@body) {
 syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   pre()
 
-  break :: ~> { goto _loop_done }
-  continue :: ~> { goto _loop_post }
-
   label _loop_start
   label placeholder _loop_done
   label placeholder _loop_post
   if condition() {
-    body(@scope)
+    body(module {
+      break :: ~> { goto _loop_done }
+      continue :: ~> { goto _loop_start }
+    })
     label _loop_post
     post()
     goto _loop_start
