@@ -1967,8 +1967,7 @@ main(void) {
     { "Value_View *", "out_tokens" },
   })));
 
-  export_global_custom_name("import", push_type(type_intrinsic("mass_import")));
-
+  export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
