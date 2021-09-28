@@ -2742,6 +2742,17 @@ token_process_c_struct_definition(
   return result;
 }
 
+static Value *
+mass_c_struct(
+  Execution_Context *context,
+  Value_View args
+) {
+  assert(args.length == 2);
+  assert(args.length == 2);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("c_struct")));
+  return token_process_c_struct_definition(context, value_view_get(args, 1));
+}
+
 typedef void (*Compile_Time_Eval_Proc)(void *);
 
 static inline u64
@@ -4673,12 +4684,6 @@ mass_handle_apply_operator(
     assert(tuple->descriptor == &descriptor_tuple);
     assert(tuple->storage.tag == Storage_Tag_Static);
     return mass_cast_helper(context, target_descriptor, tuple, source_range);
-  }
-
-  if (value_is_group_curly(rhs_value)) {
-    if (value_match_symbol(lhs_value, slice_literal("c_struct"))) {
-      return token_process_c_struct_definition(context, rhs_value);
-    }
   }
 
   if (
