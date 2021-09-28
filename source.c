@@ -4711,16 +4711,13 @@ mass_handle_fragment(
 }
 
 static Value *
-mass_handle_at_operator(
+mass_eval(
   Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
+  Value_View args_view
 ) {
   assert(args_view.length == 1);
   Value *body = value_view_get(args_view, 0);
-  if (value_is_group_paren(body)) {
-    return compile_time_eval(context, value_as_group_paren(body)->children);
-  } else if (value_is_group_curly(body)) {
+  if (value_is_group_paren(body) || value_is_group_curly(body)) {
     return compile_time_eval(context, args_view);
   } else {
     context_error(context, (Mass_Error) {
@@ -6536,13 +6533,6 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_apply_operator,
-  )));
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("@"), allocator_make(allocator, Operator,
-    .precedence = 20,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .argument_count = 1,
-    .handler = mass_handle_at_operator,
   )));
 
   {

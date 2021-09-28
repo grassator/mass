@@ -692,6 +692,9 @@ static Value * mass_import
 static Value * mass_address_of
   (Execution_Context * context, Value_View args);
 
+static Value * mass_eval
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_inline_module
   (Execution_Context * context, Value_View args);
 
@@ -727,9 +730,6 @@ static Value * mass_compile_time_error
 
 static void * allocator_allocate_bytes
   (const Allocator * allocator, u64 byte_size, u64 byte_alignment);
-
-static Value * compile_time_eval
-  (Execution_Context * context, Value_View view);
 
 static Descriptor * descriptor_pointer_to
   (const Allocator * allocator, const Descriptor * descriptor);
@@ -2591,6 +2591,7 @@ static Descriptor descriptor_x64_mnemonic_pointer_pointer;
 static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_address_of;
+static Descriptor descriptor_mass_eval;
 static Descriptor descriptor_mass_inline_module;
 static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;
@@ -2603,7 +2604,6 @@ static Descriptor descriptor_mass_startup;
 static Descriptor descriptor_mass_inline_machine_code_bytes;
 static Descriptor descriptor_mass_compile_time_error;
 static Descriptor descriptor_allocator_allocate_bytes;
-static Descriptor descriptor_compile_time_eval;
 static Descriptor descriptor_descriptor_pointer_to;
 static Descriptor descriptor_mass_number_literal_logical_shift_left;
 static Descriptor descriptor_mass_number_literal_logical_shift_right;

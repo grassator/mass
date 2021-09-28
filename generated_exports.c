@@ -252,6 +252,18 @@ compiler_scope_define_exports(
   );
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    mass_eval, "eval", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_inline_module, "inline_module", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
@@ -396,18 +408,6 @@ compiler_scope_define_exports(
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("byte_alignment")),
 &descriptor_u64
-    )
-  );
-  MASS_DEFINE_FUNCTION(
-    Function_Info_Flags_None,
-    compile_time_eval, "compile_time_eval", &descriptor_value_pointer,
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("context")),
-&descriptor_execution_context_pointer
-    ),
-    function_parameter(
-      mass_ensure_symbol(compilation, slice_literal("view")),
-&descriptor_value_view
     )
   );
   MASS_DEFINE_FUNCTION(

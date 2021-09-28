@@ -1969,6 +1969,7 @@ main(void) {
 
   export_compiler_custom_name("import", push_type(type_intrinsic("mass_import")));
   export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
+  export_compiler_custom_name("eval", push_type(type_intrinsic("mass_eval")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
   export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
@@ -1987,12 +1988,6 @@ main(void) {
       { "const Allocator *", "allocator" },
       { "u64", "byte_size" },
       { "u64", "byte_alignment" },
-    })
-  ));
-  export_compiler_custom_name("compile_time_eval", push_type(
-    type_function(Default, "compile_time_eval", "Value *", (Argument_Type[]){
-      { "Execution_Context *", "context" },
-      { "Value_View", "view" },
     })
   ));
 
