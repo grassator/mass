@@ -4653,17 +4653,6 @@ mass_compile_time_error(
 }
 
 static Value *
-mass_handle_paren_operator(
-  Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
-) {
-  Value *target = value_view_get(args_view, 0);
-  Value *args_token = value_view_get(args_view, 1);
-  return token_handle_parsed_function_call(context, target, args_token, args_view.source_range);
-}
-
-static Value *
 mass_handle_apply_operator(
   Execution_Context *context,
   Value_View operands_view,
@@ -4674,7 +4663,9 @@ mass_handle_apply_operator(
   Source_Range source_range = operands_view.source_range;
 
   if (value_is_group_paren(rhs_value)) {
-    return mass_handle_paren_operator(context, operands_view, 0);
+    return token_handle_parsed_function_call(
+      context, lhs_value, rhs_value, operands_view.source_range
+    );
   }
 
   if (rhs_value->descriptor == &descriptor_value_view) {
