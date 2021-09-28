@@ -2159,9 +2159,6 @@ value_force(
   MASS_ON_ERROR(*context->result) return 0;
   if (!value) return 0;
 
-  value = token_parse_single(context, value);
-  MASS_ON_ERROR(*context->result) return 0;
-
   if (value->descriptor == &descriptor_lazy_value) {
     Lazy_Value *lazy = storage_static_as_c_type(&value->storage, Lazy_Value);
     if (lazy->epoch != VALUE_STATIC_EPOCH && lazy->epoch != context->epoch) {
@@ -4988,6 +4985,7 @@ mass_handle_dot_operator(
       } else {
         descriptor = descriptor->Pointer_To.descriptor;
       }
+      rhs = token_parse_single(context, rhs);
       Mass_Array_Access_Lazy_Payload *lazy_payload =
         allocator_allocate(context->allocator, Mass_Array_Access_Lazy_Payload);
       *lazy_payload = (Mass_Array_Access_Lazy_Payload) { .array = lhs, .index = rhs };
