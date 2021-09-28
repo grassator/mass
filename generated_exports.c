@@ -37,6 +37,11 @@ compiler_scope_define_exports(
   );
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("Quoted")),
+    type_quoted_value
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
     mass_ensure_symbol(compilation, slice_literal("External_Symbol")),
     type_external_symbol_value
   );
@@ -231,6 +236,18 @@ compiler_scope_define_exports(
   MASS_DEFINE_FUNCTION(
     Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
     mass_inline_module, "inline_module", &descriptor_value_pointer,
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("context")),
+&descriptor_execution_context_pointer
+    ),
+    function_parameter(
+      mass_ensure_symbol(compilation, slice_literal("args")),
+&descriptor_value_view
+    )
+  );
+  MASS_DEFINE_FUNCTION(
+    Function_Info_Flags_None | Function_Info_Flags_Compile_Time | Function_Info_Flags_Intrinsic,
+    mass_quote, "quote", &descriptor_value_pointer,
     function_parameter(
       mass_ensure_symbol(compilation, slice_literal("context")),
 &descriptor_execution_context_pointer

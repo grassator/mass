@@ -194,6 +194,10 @@ typedef struct Macro_Capture Macro_Capture;
 typedef dyn_array_type(Macro_Capture *) Array_Macro_Capture_Ptr;
 typedef dyn_array_type(const Macro_Capture *) Array_Const_Macro_Capture_Ptr;
 
+typedef struct Quoted Quoted;
+typedef dyn_array_type(Quoted *) Array_Quoted_Ptr;
+typedef dyn_array_type(const Quoted *) Array_Const_Quoted_Ptr;
+
 typedef struct External_Symbol External_Symbol;
 typedef dyn_array_type(External_Symbol *) Array_External_Symbol_Ptr;
 typedef dyn_array_type(const External_Symbol *) Array_Const_External_Symbol_Ptr;
@@ -691,6 +695,9 @@ static Value * mass_address_of
 static Value * mass_inline_module
   (Execution_Context * context, Value_View args);
 
+static Value * mass_quote
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_unquote
   (Execution_Context * context, Value_View args);
 
@@ -1036,6 +1043,11 @@ typedef struct Macro_Capture {
 } Macro_Capture;
 typedef dyn_array_type(Macro_Capture) Array_Macro_Capture;
 
+typedef struct Quoted {
+  Value * value;
+} Quoted;
+typedef dyn_array_type(Quoted) Array_Quoted;
+
 typedef struct External_Symbol {
   Slice library_name;
   Slice symbol_name;
@@ -1368,7 +1380,8 @@ typedef dyn_array_type(Execution_Context) Array_Execution_Context;
 
 typedef struct User_Defined_Operator {
   Operator_Fixity fixity;
-  u32 argument_count;
+  u16 argument_count;
+  u16 is_intrinsic;
   const Symbol * alias;
 } User_Defined_Operator;
 typedef dyn_array_type(User_Defined_Operator) Array_User_Defined_Operator;
@@ -2192,6 +2205,11 @@ static Descriptor descriptor_array_macro_capture;
 static Descriptor descriptor_array_macro_capture_ptr;
 static Descriptor descriptor_macro_capture_pointer;
 static Descriptor descriptor_macro_capture_pointer_pointer;
+static Descriptor descriptor_quoted;
+static Descriptor descriptor_array_quoted;
+static Descriptor descriptor_array_quoted_ptr;
+static Descriptor descriptor_quoted_pointer;
+static Descriptor descriptor_quoted_pointer_pointer;
 static Descriptor descriptor_external_symbol;
 static Descriptor descriptor_array_external_symbol;
 static Descriptor descriptor_array_external_symbol_ptr;
@@ -2568,6 +2586,7 @@ static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_inline_module;
+static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;
 static Descriptor descriptor_mass_cast;
 static Descriptor descriptor_mass_type_of;
@@ -3275,6 +3294,17 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(macro_capture, Macro_Capture,
   },
 );
 MASS_DEFINE_TYPE_VALUE(macro_capture);
+MASS_DEFINE_OPAQUE_C_TYPE(array_quoted_ptr, Array_Quoted_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_quoted, Array_Quoted)
+MASS_DEFINE_STRUCT_DESCRIPTOR(quoted, Quoted,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_value_pointer,
+    .name = slice_literal_fields("value"),
+    .Base_Relative.offset = offsetof(Quoted, value),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(quoted);
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol_ptr, Array_External_Symbol_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_external_symbol, Array_External_Symbol)
 MASS_DEFINE_STRUCT_DESCRIPTOR(external_symbol, External_Symbol,
@@ -4105,9 +4135,15 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(user_defined_operator, User_Defined_Operator,
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,
-    .descriptor = &descriptor_u32,
+    .descriptor = &descriptor_u16,
     .name = slice_literal_fields("argument_count"),
     .Base_Relative.offset = offsetof(User_Defined_Operator, argument_count),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_u16,
+    .name = slice_literal_fields("is_intrinsic"),
+    .Base_Relative.offset = offsetof(User_Defined_Operator, is_intrinsic),
   },
   {
     .tag = Memory_Layout_Item_Tag_Base_Relative,

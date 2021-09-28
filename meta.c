@@ -1262,6 +1262,10 @@ main(void) {
     { "Source_Range", "source_range" },
   }));
 
+  export_compiler(push_type(type_struct("Quoted", (Struct_Item[]){
+    { "Value *", "value" },
+  })));
+
   export_compiler(push_type(type_struct("External_Symbol", (Struct_Item[]){
     { "Slice", "library_name" },
     { "Slice", "symbol_name" },
@@ -1466,7 +1470,8 @@ main(void) {
 
   push_type(type_struct("User_Defined_Operator", (Struct_Item[]){
     { "Operator_Fixity", "fixity" },
-    { "u32", "argument_count" },
+    { "u16", "argument_count" },
+    { "u16", "is_intrinsic" },
     { "const Symbol *", "alias" },
   }));
 
@@ -1966,6 +1971,7 @@ main(void) {
 
   export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
   export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
+  export_compiler_custom_name("quote", push_type(type_intrinsic("mass_quote")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("cast", push_type(type_intrinsic("mass_cast")));
   export_compiler_custom_name("type_of", push_type(type_intrinsic("mass_type_of")));

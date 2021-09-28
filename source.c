@@ -1607,11 +1607,29 @@ token_parse_single(
     return token_parse_block(context, value_as_group_curly(value));
   } else if (value->descriptor == &descriptor_group_square) {
     return token_parse_tuple(context, value_as_group_square(value)->children);
+  } else if (value->descriptor == &descriptor_quoted) {
+    Quoted *quoted = storage_static_as_c_type(&value->storage, Quoted);
+    return quoted->value;
   } else if (value_is_symbol(value)) {
     return scope_lookup_force(context, context->scope, value_as_symbol(value), &value->source_range);
   } else {
     return value;
   }
+}
+
+static Value *
+mass_quote(
+  Execution_Context *context,
+  Value_View args
+) {
+  assert(args.length == 1);
+  Value *value = value_view_get(args, 0);
+  Quoted quoted = {.value = value};
+  Value *result = value_init(
+    allocator_allocate(context->allocator, Value),
+    &descriptor_quoted, storage_static_inline(&quoted), args.source_range
+  );
+  return result;
 }
 
 static Value *
@@ -2228,11 +2246,13 @@ token_handle_user_defined_operator_proc(
   Value *fn = scope_lookup_force(context, context->scope, operator->alias, &args.source_range);
   MASS_ON_ERROR(*context->result) return 0;
 
-  Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
-  for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
-    *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
+  if (!operator->is_intrinsic) {
+    Array_Value_Ptr args_array = value_view_to_value_array(context->temp_allocator, args);
+    for (u64 i = 0; i < dyn_array_length(args_array); ++i) {
+      *dyn_array_get(args_array, i) = token_parse_single(context, *dyn_array_get(args_array, i));
+    }
+    args = value_view_from_value_array(args_array, &args.source_range);
   }
-  args = value_view_from_value_array(args_array, &args.source_range);
   return token_handle_function_call(context, fn, args, args.source_range);
 }
 
@@ -2359,6 +2379,7 @@ token_parse_operator_definition(
 
   u64 peek_index = 0;
   TOKEN_MATCH(keyword_token, TOKEN_PATTERN_SYMBOL("operator"));
+  TOKEN_MAYBE_MATCH(intrinsic_token, TOKEN_PATTERN_SYMBOL("intrinsic"));
   TOKEN_EXPECT(precedence_token);
   TOKEN_EXPECT_MATCH(pattern_token, .tag = Token_Pattern_Tag_Descriptor, .Descriptor.descriptor = &descriptor_group_paren);
   TOKEN_EXPECT(alias_token);
@@ -2383,7 +2404,10 @@ token_parse_operator_definition(
   Value_View definition = value_as_group_paren(pattern_token)->children;
 
   user_defined_operator = allocator_allocate(context->allocator, User_Defined_Operator);
-  *user_defined_operator = (User_Defined_Operator) { .alias = alias };
+  *user_defined_operator = (User_Defined_Operator) {
+    .is_intrinsic = !!intrinsic_token,
+    .alias = alias,
+  };
 
   Value *operator_token;
   Value *arguments[2] = {0};
