@@ -47,7 +47,6 @@ syntax statement("for" ..@pre ";" ..@condition ";" ..@post {}@body) {
   label _loop_done
 }
 
-MASS :: import("mass")
 cast :: @fn(type : Type, value) MASS.cast
 startup :: @fn(callback : fn() -> ()) -> () MASS.startup
 

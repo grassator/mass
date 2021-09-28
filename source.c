@@ -6506,10 +6506,20 @@ scope_define_builtins(
   const Allocator *allocator = context->allocator;
 
   global_scope_define_exports(compilation, scope);
-  const Symbol *type_symbol = mass_ensure_symbol(compilation, slice_literal("Type"));
   scope_define_value(
     scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
-    type_symbol, type_descriptor_pointer_value
+    mass_ensure_symbol(compilation, slice_literal("Type")), type_descriptor_pointer_value
+  );
+
+  Value *compiler_module_value = value_init(
+    allocator_allocate(allocator, Value),
+    &descriptor_scope,
+    storage_static(compilation->compiler_module.exports.scope),
+    COMPILER_SOURCE_RANGE
+  );
+  scope_define_value(
+    scope, VALUE_STATIC_EPOCH, COMPILER_SOURCE_RANGE,
+    mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
   );
 
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("~>"), allocator_make(allocator, Operator,

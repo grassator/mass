@@ -1760,8 +1760,8 @@ compilation_init(
   jit_init(&compilation->jit, jit_program);
 
   compilation->root_scope = scope_make(compilation->allocator, 0);
-  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
   module_compiler_init(compilation, &compilation->compiler_module);
+  scope_define_builtins(compilation, compilation->root_scope, host_calling_convention());
 }
 
 static void
