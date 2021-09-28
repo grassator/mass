@@ -4692,10 +4692,9 @@ mass_handle_apply_operator(
 }
 
 static Value *
-mass_handle_fragment(
+mass_fragment(
   Execution_Context *context,
-  Value_View args_view,
-  void *unused_payload
+  Value_View args_view
 ) {
   assert(args_view.length == 1);
   // TODO consider using empty space operator instead
@@ -6513,13 +6512,6 @@ scope_define_builtins(
     mass_ensure_symbol(compilation, slice_literal("MASS")), compiler_module_value
   );
 
-  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("~>"), allocator_make(allocator, Operator,
-    .precedence = 30,
-    .fixity = Operator_Fixity_Prefix,
-    .associativity = Operator_Associativity_Right,
-    .argument_count = 1,
-    .handler = mass_handle_fragment,
-  )));
   MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal("."), allocator_make(allocator, Operator,
     .precedence = 20,
     .fixity = Operator_Fixity_Infix,

@@ -52,6 +52,7 @@ cast :: @fn(type : Type, value) MASS.cast
 startup :: @fn(callback : fn() -> ()) -> () MASS.startup
 eval :: @fn(curly : MASS.Group_Curly) MASS.eval
 eval :: @fn(paren : MASS.Group_Paren) MASS.eval
+fragment :: @fn(curly : MASS.Group_Curly) MASS.fragment
 
 inline_machine_code_bytes :: MASS.inline_machine_code_bytes
 
@@ -99,6 +100,7 @@ operator 16 (- x) negate
 operator 16 (& x) address_of
 
 operator intrinsic 20 (@ x) eval
+operator intrinsic 25 (~> x) fragment
 
 operator intrinsic 30 (' x) quote
 operator intrinsic 30 (x ') unquote

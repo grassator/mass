@@ -695,6 +695,9 @@ static Value * mass_address_of
 static Value * mass_eval
   (Execution_Context * context, Value_View args);
 
+static Value * mass_fragment
+  (Execution_Context * context, Value_View args);
+
 static Value * mass_inline_module
   (Execution_Context * context, Value_View args);
 
@@ -2592,6 +2595,7 @@ static Descriptor descriptor_tokenize;
 static Descriptor descriptor_mass_import;
 static Descriptor descriptor_mass_address_of;
 static Descriptor descriptor_mass_eval;
+static Descriptor descriptor_mass_fragment;
 static Descriptor descriptor_mass_inline_module;
 static Descriptor descriptor_mass_quote;
 static Descriptor descriptor_mass_unquote;
