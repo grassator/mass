@@ -4656,6 +4656,8 @@ mass_handle_apply_operator(
       return token_process_c_struct_definition(context, rhs_value);
     } else if (value_match_symbol(lhs_value, slice_literal("exports"))) {
       return mass_exports(context, value_view_single(&rhs_value));
+    } else if (value_match_symbol(lhs_value, slice_literal("module"))) {
+      return mass_inline_module(context, operands_view);
     }
   }
 
@@ -6560,6 +6562,85 @@ scope_define_builtins(
   }
 }
 
+static void
+module_process_exports(
+  Execution_Context *import_context,
+  Module *module
+) {
+  switch(module->exports.tag) {
+    case Module_Exports_Tag_None: {
+      module->exports.scope = scope_make(import_context->allocator, module->own_scope->parent);
+      break;
+    }
+    case Module_Exports_Tag_All: {
+      module->exports.scope = module->own_scope;
+      break;
+    }
+    case Module_Exports_Tag_Selective: {
+      module->exports.scope = scope_make(import_context->allocator, module->own_scope->parent);
+      Array_Value_Ptr symbols = module->exports.Selective.symbols;
+      for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
+        Value **symbol_pointer = dyn_array_get(symbols, i);
+        const Symbol *symbol = value_as_symbol(*symbol_pointer);
+        Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
+        if (!entry) {
+          context_error(import_context, (Mass_Error) {
+            .tag = Mass_Error_Tag_Undefined_Variable,
+            .source_range = (*symbol_pointer)->source_range,
+            .Undefined_Variable = {.name = symbol->name},
+          });
+        }
+
+        Value_View expr = value_view_single(symbol_pointer);
+        scope_define_lazy_compile_time_expression(import_context, module->exports.scope, symbol, expr);
+      }
+      break;
+    }
+  }
+}
+
+static inline void
+module_init(
+  Module *module,
+  Slice file_path,
+  Slice text,
+  Scope *scope
+) {
+  *module = (Module) {
+    .exports = {.tag = Module_Exports_Tag_None},
+    .source_file = { // FIXME change to Source_Range
+      .path = file_path,
+      .text = text,
+    },
+    .own_scope = scope,
+  };
+}
+
+static Value *
+mass_inline_module(
+  Execution_Context *context,
+  Value_View args
+) {
+  assert(args.length == 2);
+  assert(value_match_symbol(value_view_get(args, 0), slice_literal("module")));
+  const Group_Curly *curly = value_as_group_curly(value_view_get(args, 1));
+
+  Module *module = allocator_allocate(context->allocator, Module);
+  Scope *own_scope = scope_make(context->allocator, context->compilation->root_scope);
+  module_init(module, args.source_range.file->path, args.source_range.file->text, own_scope);
+  Execution_Context import_context = execution_context_from_compilation(context->compilation);
+  import_context.module = module;
+  import_context.scope = module->own_scope;
+  Value *block_result = token_parse_block_view(&import_context, curly->children);
+  value_force_exact(&import_context, 0, &void_value, block_result);
+  if (module->exports.tag == Module_Exports_Tag_None) {
+    module->exports.tag = Module_Exports_Tag_All;
+  }
+  module_process_exports(&import_context, module);
+
+  return value_make(context, &descriptor_scope, storage_static(module->exports.scope), args.source_range);
+}
+
 static inline Mass_Result
 program_parse(
   Execution_Context *context
@@ -6631,22 +6712,6 @@ program_absolute_path(
   return result_buffer;
 }
 
-static inline void
-program_module_init(
-  Module *module,
-  Slice file_path,
-  Slice text,
-  Scope *scope
-) {
-  *module = (Module) {
-    .source_file = {
-      .path = file_path,
-      .text = text,
-    },
-    .own_scope = scope,
-  };
-}
-
 static Module *
 program_module_from_file(
   Execution_Context *context,
@@ -6672,7 +6737,7 @@ program_module_from_file(
   }
 
   Module *module = allocator_allocate(context->allocator, Module);
-  program_module_init(module, file_path, fixed_buffer_as_slice(buffer), scope);
+  module_init(module, file_path, fixed_buffer_as_slice(buffer), scope);
   return module;
 }
 
@@ -6687,37 +6752,7 @@ program_import_module(
   import_context.scope = module->own_scope;
   Mass_Result parse_result = program_parse(&import_context);
   MASS_TRY(parse_result);
-  switch(module->exports.tag) {
-    case Module_Exports_Tag_None: {
-      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
-      break;
-    }
-    case Module_Exports_Tag_All: {
-      module->exports.scope = module->own_scope;
-      break;
-    }
-    case Module_Exports_Tag_Selective: {
-      module->exports.scope = scope_make(context->allocator, module->own_scope->parent);
-      Array_Value_Ptr symbols = module->exports.Selective.symbols;
-      for(u64 i = 0; i < dyn_array_length(symbols); i += 1) {
-        Value **symbol_pointer = dyn_array_get(symbols, i);
-        const Symbol *symbol = value_as_symbol(*symbol_pointer);
-        Scope_Entry *entry = scope_lookup_shallow(module->own_scope, symbol);
-        if (!entry) {
-          context_error(context, (Mass_Error) {
-            .tag = Mass_Error_Tag_Undefined_Variable,
-            .source_range = (*symbol_pointer)->source_range,
-            .Undefined_Variable = {.name = symbol->name},
-          });
-          return *context->result;
-        }
-
-        Value_View expr = value_view_single(symbol_pointer);
-        scope_define_lazy_compile_time_expression(&import_context, module->exports.scope, symbol, expr);
-      }
-      break;
-    }
-  }
+  module_process_exports(&import_context, module);
   return *context->result;
 }
 

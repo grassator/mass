@@ -70,6 +70,9 @@ static_assert :: macro(condition : bool, message : String) {
   @{if condition { compile_time_error("Static Assert Failed", message) }}
 }
 
+// FIXME deal with this
+//apply :: @fn(_ :: Symbol["module"], curly : PRELUDE_MASS.Group_Curly) PRELUDE_MASS.inline_module
+
 operator 7 (x == y) equal
 operator 7 (x != y) not_equal
 

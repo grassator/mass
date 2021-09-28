@@ -1139,17 +1139,17 @@ main(void) {
     { "Slice", "name" },
   })));
 
-  push_type(type_struct("Group_Paren", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Group_Paren", (Struct_Item[]){
     { "Value_View", "children" },
-  }));
+  })));
 
-  push_type(type_struct("Group_Curly", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Group_Curly", (Struct_Item[]){
     { "Value_View", "children" },
-  }));
+  })));
 
-  push_type(type_struct("Group_Square", (Struct_Item[]){
+  export_compiler(push_type(type_struct("Group_Square", (Struct_Item[]){
     { "Value_View", "children" },
-  }));
+  })));
 
   push_type(type_union("Token_Pattern", (Struct_Type[]){
     struct_empty("Invalid"),
@@ -1962,8 +1962,10 @@ main(void) {
     { "Value_View *", "out_tokens" },
   })));
 
-  export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
   export_global_custom_name("import", push_type(type_intrinsic("mass_import")));
+
+  export_compiler_custom_name("address_of", push_type(type_intrinsic("mass_address_of")));
+  export_compiler_custom_name("inline_module", push_type(type_intrinsic("mass_inline_module")));
   export_compiler_custom_name("unquote", push_type(type_intrinsic("mass_unquote")));
   export_compiler_custom_name("cast", push_type(type_intrinsic("mass_cast")));
   export_compiler_custom_name("type_of", push_type(type_intrinsic("mass_type_of")));

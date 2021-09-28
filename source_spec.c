@@ -69,7 +69,7 @@ test_program_source_base(
   switch(source.tag) {
     case Test_Program_Source_Tag_Inline: {
       test_module = allocator_allocate(context->allocator, Module);
-      program_module_init(test_module, test_file_name, source.text, context->scope);
+      module_init(test_module, test_file_name, source.text, context->scope);
     } break;
     case Test_Program_Source_Tag_File: {
       test_module = program_module_from_file(context, source.path, context->scope);
@@ -2152,6 +2152,30 @@ spec("source") {
       check(error->tag == Mass_Error_Tag_User_Defined);
       spec_check_slice(error->User_Defined.name, slice_literal("Static Assert Failed"));
       spec_check_slice(error->detailed_message, slice_literal("Oops"));
+    }
+
+    it("should support inline modules") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> s64 {"
+          "Foo :: module { answer :: 42 }\n"
+          "Foo.answer"
+        "}\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
+    }
+
+    it("should support global static variables inside inline modules") {
+      s64(*checker)(void) = (s64(*)(void))test_program_inline_source_function(
+        "checker", &test_context,
+        "checker :: fn() -> s64 {"
+          "Foo :: module { answer := 42 }\n"
+          "Foo.answer"
+        "}\n"
+      );
+      check(spec_check_mass_result(test_context.result));
+      check(checker() == 42);
     }
   }
 
