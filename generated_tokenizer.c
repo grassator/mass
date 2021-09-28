@@ -104,7 +104,6 @@ tokenize(
   case '$':
   case '%':
   case '&':
-  case '\'':
   case '*':
   case '+':
   case ',':
@@ -122,10 +121,11 @@ tokenize(
   case '|':
   case '~':  goto yy10;
   case '"':  goto yy13;
-  case '(':  goto yy14;
-  case ')':  goto yy16;
-  case '/':  goto yy18;
-  case '0':  goto yy19;
+  case '\'':  goto yy14;
+  case '(':  goto yy15;
+  case ')':  goto yy17;
+  case '/':  goto yy19;
+  case '0':  goto yy20;
   case '1':
   case '2':
   case '3':
@@ -134,7 +134,7 @@ tokenize(
   case '6':
   case '7':
   case '8':
-  case '9':  goto yy21;
+  case '9':  goto yy22;
   case 'A':
   case 'B':
   case 'C':
@@ -187,13 +187,13 @@ tokenize(
   case 'w':
   case 'x':
   case 'y':
-  case 'z':  goto yy23;
-  case '[':  goto yy26;
-  case ']':  goto yy28;
-  case '{':  goto yy30;
-  case '}':  goto yy32;
+  case 'z':  goto yy24;
+  case '[':  goto yy27;
+  case ']':  goto yy29;
+  case '{':  goto yy31;
+  case '}':  goto yy33;
   default:
-    if (offset >= input.length) goto yy53;
+    if (offset >= input.length) goto yy54;
     goto yy2;
   }
 yy2:
@@ -211,7 +211,7 @@ yy4:
   case '\t':
   case '\v':
   case ' ':  goto yy4;
-  case '/':  goto yy34;
+  case '/':  goto yy35;
   default:  goto yy6;
   }
 yy6:
@@ -247,7 +247,6 @@ yy11:
   case '$':
   case '%':
   case '&':
-  case '\'':
   case '*':
   case '+':
   case ',':
@@ -270,7 +269,7 @@ yy11:
 yy12:
 #line 132 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 274 "generated_tokenizer.c"
+#line 273 "generated_tokenizer.c"
 yy13:
   yyaccept = 1;
   ++offset;
@@ -278,48 +277,51 @@ yy13:
   yych = offset < input.length ? input.bytes[offset] : 0;
   if (yych <= 0x00) {
     if (offset >= input.length) goto yy3;
-    goto yy36;
+    goto yy37;
   }
-  goto yy37;
+  goto yy38;
 yy14:
+  ++offset;
+  goto yy12;
+yy15:
   ++offset;
 #line 124 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_paren); continue; }
-#line 289 "generated_tokenizer.c"
-yy16:
+#line 291 "generated_tokenizer.c"
+yy17:
   ++offset;
 #line 127 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(')'); continue; }
-#line 294 "generated_tokenizer.c"
-yy18:
+#line 296 "generated_tokenizer.c"
+yy19:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
   case 0x00:  goto yy12;
-  case '/':  goto yy41;
+  case '/':  goto yy42;
   default:  goto yy11;
   }
-yy19:
+yy20:
   yyaccept = 2;
   ++offset;
   marker = offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
   case 'B':
-  case 'b':  goto yy43;
+  case 'b':  goto yy44;
   case 'X':
-  case 'x':  goto yy44;
-  default:  goto yy20;
+  case 'x':  goto yy45;
+  default:  goto yy21;
   }
-yy20:
+yy21:
 #line 106 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_10, digits);
         continue;
       }
-#line 322 "generated_tokenizer.c"
-yy21:
+#line 324 "generated_tokenizer.c"
+yy22:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -332,10 +334,10 @@ yy21:
   case '6':
   case '7':
   case '8':
-  case '9':  goto yy21;
-  default:  goto yy20;
+  case '9':  goto yy22;
+  default:  goto yy21;
   }
-yy23:
+yy24:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -401,41 +403,41 @@ yy23:
   case 'w':
   case 'x':
   case 'y':
-  case 'z':  goto yy23;
-  default:  goto yy25;
+  case 'z':  goto yy24;
+  default:  goto yy26;
   }
-yy25:
+yy26:
 #line 157 "tokenizer.re.c"
   { TOKENIZER_PUSH_SYMBOL(); continue; }
-#line 411 "generated_tokenizer.c"
-yy26:
+#line 413 "generated_tokenizer.c"
+yy27:
   ++offset;
 #line 125 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_square); continue; }
-#line 416 "generated_tokenizer.c"
-yy28:
+#line 418 "generated_tokenizer.c"
+yy29:
   ++offset;
 #line 128 "tokenizer.re.c"
   { TOKENIZER_GROUP_END(']'); continue; }
-#line 421 "generated_tokenizer.c"
-yy30:
+#line 423 "generated_tokenizer.c"
+yy31:
   ++offset;
 #line 126 "tokenizer.re.c"
   { TOKENIZER_GROUP_START(&descriptor_group_curly); continue; }
-#line 426 "generated_tokenizer.c"
-yy32:
+#line 428 "generated_tokenizer.c"
+yy33:
   ++offset;
 #line 129 "tokenizer.re.c"
   { TOKENIZER_GROUP_END('}'); continue; }
-#line 431 "generated_tokenizer.c"
-yy34:
+#line 433 "generated_tokenizer.c"
+yy35:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
-  case '/':  goto yy45;
-  default:  goto yy35;
+  case '/':  goto yy46;
+  default:  goto yy36;
   }
-yy35:
+yy36:
   offset = marker;
   switch (yyaccept) {
   case 0:
@@ -443,20 +445,20 @@ yy35:
   case 1:
     goto yy3;
   default:
-    goto yy20;
+    goto yy21;
   }
-yy36:
+yy37:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
-yy37:
-  switch (yych) {
-  case '"':  goto yy38;
-  case '\\':  goto yy40;
-  default:
-    if (offset >= input.length) goto yy35;
-    goto yy36;
-  }
 yy38:
+  switch (yych) {
+  case '"':  goto yy39;
+  case '\\':  goto yy41;
+  default:
+    if (offset >= input.length) goto yy36;
+    goto yy37;
+  }
+yy39:
   ++offset;
 #line 144 "tokenizer.re.c"
   {
@@ -466,16 +468,16 @@ yy38:
         );
         continue;
       }
-#line 470 "generated_tokenizer.c"
-yy40:
+#line 472 "generated_tokenizer.c"
+yy41:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   if (yych <= 0x00) {
-    if (offset >= input.length) goto yy35;
-    goto yy36;
+    if (offset >= input.length) goto yy36;
+    goto yy37;
   }
-  goto yy36;
-yy41:
+  goto yy37;
+yy42:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -485,7 +487,6 @@ yy41:
   case '$':
   case '%':
   case '&':
-  case '\'':
   case '*':
   case '+':
   case ',':
@@ -502,20 +503,20 @@ yy41:
   case '\\':
   case '^':
   case '|':
-  case '~':  goto yy41;
+  case '~':  goto yy42;
   default:
     if (offset >= input.length) goto yy12;
-    goto yy45;
+    goto yy46;
   }
-yy43:
+yy44:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
   case '0':
-  case '1':  goto yy47;
-  default:  goto yy35;
+  case '1':  goto yy48;
+  default:  goto yy36;
   }
-yy44:
+yy45:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -540,10 +541,10 @@ yy44:
   case 'c':
   case 'd':
   case 'e':
-  case 'f':  goto yy50;
-  default:  goto yy35;
+  case 'f':  goto yy51;
+  default:  goto yy36;
   }
-yy45:
+yy46:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -551,25 +552,25 @@ yy45:
   case '\r':  goto yy6;
   default:
     if (offset >= input.length) goto yy6;
-    goto yy45;
+    goto yy46;
   }
-yy47:
+yy48:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
   case '0':
-  case '1':  goto yy47;
-  default:  goto yy49;
+  case '1':  goto yy48;
+  default:  goto yy50;
   }
-yy49:
+yy50:
 #line 112 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_2, digits);
         continue;
       }
-#line 572 "generated_tokenizer.c"
-yy50:
+#line 573 "generated_tokenizer.c"
+yy51:
   ++offset;
   yych = offset < input.length ? input.bytes[offset] : 0;
   switch (yych) {
@@ -594,21 +595,21 @@ yy50:
   case 'c':
   case 'd':
   case 'e':
-  case 'f':  goto yy50;
-  default:  goto yy52;
+  case 'f':  goto yy51;
+  default:  goto yy53;
   }
-yy52:
+yy53:
 #line 118 "tokenizer.re.c"
   {
         Slice digits = slice_sub(input, token_start_offset + 2, offset);
         TOKENIZER_PUSH_LITERAL(Number_Base_16, digits);
         continue;
       }
-#line 608 "generated_tokenizer.c"
-yy53:
+#line 609 "generated_tokenizer.c"
+yy54:
 #line 102 "tokenizer.re.c"
   { break; }
-#line 612 "generated_tokenizer.c"
+#line 613 "generated_tokenizer.c"
 }
 #line 161 "tokenizer.re.c"
 
