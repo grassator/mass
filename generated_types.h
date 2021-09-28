@@ -882,7 +882,7 @@ typedef struct Source_Range {
 typedef dyn_array_type(Source_Range) Array_Source_Range;
 
 typedef enum {
-  Module_Exports_Tag_None = 0,
+  Module_Exports_Tag_Not_Specified = 0,
   Module_Exports_Tag_All = 1,
   Module_Exports_Tag_Selective = 2,
 } Module_Exports_Tag;
@@ -2841,7 +2841,7 @@ MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports_ptr, Array_Module_Exports_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_module_exports, Array_Module_Exports)
 MASS_DEFINE_OPAQUE_C_TYPE(module_exports_tag, Module_Exports_Tag)
 static C_Enum_Item module_exports_tag_items[] = {
-{ .name = slice_literal_fields("None"), .value = 0 },
+{ .name = slice_literal_fields("Not_Specified"), .value = 0 },
 { .name = slice_literal_fields("All"), .value = 1 },
 { .name = slice_literal_fields("Selective"), .value = 2 },
 };

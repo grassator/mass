@@ -136,8 +136,8 @@
   </Expand>
 </Type>
 <Type Name="Module_Exports">
-  <DisplayString Condition="tag == Module_Exports_Tag_None">
-    None
+  <DisplayString Condition="tag == Module_Exports_Tag_Not_Specified">
+    Not_Specified
   </DisplayString>
   <DisplayString Condition="tag == Module_Exports_Tag_All">
     All

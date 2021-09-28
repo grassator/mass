@@ -1107,7 +1107,7 @@ main(void) {
   }));
 
   push_type(add_common_fields(type_union("Module_Exports", (Struct_Type[]){
-    struct_empty("None"),
+    struct_empty("Not_Specified"),
     struct_empty("All"),
     struct_fields("Selective", (Struct_Item[]){
       { "Array_Value_Ptr", "symbols" },

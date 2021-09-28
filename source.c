@@ -5804,7 +5804,7 @@ token_parse_block_view(
           });
           goto defer;
         }
-        if (context->module->exports.tag != Module_Exports_Tag_None) {
+        if (context->module->exports.tag != Module_Exports_Tag_Not_Specified) {
           context_error(context, (Mass_Error) {
             .tag = Mass_Error_Tag_Parse,
             .source_range = match_view.source_range,
@@ -6567,10 +6567,7 @@ module_process_exports(
   Module *module
 ) {
   switch(module->exports.tag) {
-    case Module_Exports_Tag_None: {
-      module->exports.scope = scope_make(import_context->allocator, module->own_scope->parent);
-      break;
-    }
+    case Module_Exports_Tag_Not_Specified: // Export everything when no explicit exports specified
     case Module_Exports_Tag_All: {
       module->exports.scope = module->own_scope;
       break;
@@ -6606,7 +6603,7 @@ module_init(
   Scope *scope
 ) {
   *module = (Module) {
-    .exports = {.tag = Module_Exports_Tag_None},
+    .exports = {.tag = Module_Exports_Tag_Not_Specified},
     .source_file = { // FIXME change to Source_Range
       .path = file_path,
       .text = text,
@@ -6632,9 +6629,6 @@ mass_inline_module(
   import_context.scope = module->own_scope;
   Value *block_result = token_parse_block_view(&import_context, curly->children);
   value_force_exact(&import_context, 0, &void_value, block_result);
-  if (module->exports.tag == Module_Exports_Tag_None) {
-    module->exports.tag = Module_Exports_Tag_All;
-  }
   module_process_exports(&import_context, module);
 
   return value_make(context, &descriptor_scope, storage_static(module->exports.scope), args.source_range);
@@ -6763,4 +6757,3 @@ program_load_file_module_into_root_scope(
   Module *module = program_module_from_file(context, file_path, context->compilation->root_scope);
   return program_import_module(context, module);
 }
-
