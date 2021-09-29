@@ -6400,6 +6400,26 @@ token_parse_definition_and_assignment_statements(
   return statement_length;
 }
 
+static Value *
+mass_define_stack_value_from_typed_symbol(
+  Execution_Context *context,
+  const Typed_Symbol *typed_symbol,
+  Source_Range source_range
+) {
+  Mass_Variable_Definition_Lazy_Payload *payload =
+    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+  *payload = (Mass_Variable_Definition_Lazy_Payload){
+    .source_range = source_range,
+    .descriptor = typed_symbol->descriptor,
+  };
+  Value *defined = mass_make_lazy_value(
+    context, source_range, payload,
+    typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
+  );
+  scope_define_value(context->scope, context->epoch, source_range, typed_symbol->symbol, defined);
+  return defined;
+}
+
 static u64
 token_parse_assignment(
   Execution_Context *context,
@@ -6427,17 +6447,7 @@ token_parse_assignment(
 
   if (value_is_typed_symbol(target)) {
     const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
-    Mass_Variable_Definition_Lazy_Payload *payload =
-      allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
-    *payload = (Mass_Variable_Definition_Lazy_Payload){
-      .source_range = target->source_range,
-      .descriptor = typed_symbol->descriptor,
-    };
-    target = mass_make_lazy_value(
-      context, lhs.source_range, payload,
-      typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
-    );
-    scope_define_value(context->scope, context->epoch, lhs.source_range, typed_symbol->symbol, target);
+    target = mass_define_stack_value_from_typed_symbol(context, typed_symbol, lhs.source_range);
   }
 
   const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target);
