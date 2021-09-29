@@ -216,4 +216,11 @@ scope_define_enum(
   u64 item_count
 );
 
+static Value *
+mass_define_stack_value_from_typed_symbol(
+  Execution_Context *context,
+  const Typed_Symbol *typed_symbol,
+  Source_Range source_range
+);
+
 #endif

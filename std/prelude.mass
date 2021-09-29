@@ -182,16 +182,14 @@ logical_shift_right :: MASS.number_literal_logical_shift_right
 bitwise_or :: MASS.number_literal_bitwise_or
 bitwise_and :: MASS.number_literal_bitwise_and
 
-Array :: fn(item : Type, length : u64) -> (Type) {
-  mass :: MASS
-
-  byte_size :: mass.Descriptor.bit_size.as_u64 / 8
-  byte_alignment :: mass.Descriptor.bit_alignment.as_u64 / 8
+Array :: @fn(item : Type, length : u64) -> (Type) {
+  byte_size :: MASS.Descriptor.bit_size.as_u64 / 8
+  byte_alignment :: MASS.Descriptor.bit_alignment.as_u64 / 8
   t : Type = MASS.allocator_allocate_bytes(MASS.allocator, byte_size, byte_alignment)
   // FIXME the following should work, but breaks on Linux
-  //t : Type = compile_time_allocate(mass.Descriptor)
+  //t : Type = compile_time_allocate(MASS.Descriptor)
 
-  t.tag = mass.Descriptor_Tag.Fixed_Size_Array
+  t.tag = MASS.Descriptor_Tag.Fixed_Size_Array
   t.bit_size = [item.bit_size.as_u64 * length]
   t.bit_alignment = item.bit_alignment
   t.Fixed_Size_Array = [item, length]

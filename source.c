@@ -5821,6 +5821,10 @@ token_parse_block_view(
         context->scope = fragment->scope;
         parse_result = token_parse_block_view(context, fragment->children);
         context->scope = saved_scope;
+      } else if (parse_result->descriptor == &descriptor_typed_symbol) {
+        parse_result = mass_define_stack_value_from_typed_symbol(
+          context, value_as_typed_symbol(parse_result), parse_result->source_range
+        );
       } else if (parse_result->descriptor == &descriptor_module_exports) {
         Value_View match_view = value_view_slice(&rest, 0, match_length);
         if (!(context->flags & Execution_Context_Flags_Global)) {
@@ -6197,42 +6201,6 @@ mass_handle_variable_definition_lazy_proc(
   }
 }
 
-static u64
-token_parse_definition(
-  Execution_Context *context,
-  Value_View view,
-  Lazy_Value *unused_lazy_value,
-  Value **out_definition_value
-) {
-  if (context->result->tag != Mass_Result_Tag_Success) return 0;
-
-  u64 peek_index = 0;
-  TOKEN_MATCH(name_token, .tag = Token_Pattern_Tag_Symbol);
-  TOKEN_MATCH(define, TOKEN_PATTERN_SYMBOL(":"));
-
-  Value_View rest = value_view_match_till_end_of_statement(view, &peek_index);
-  const Descriptor *descriptor = token_match_type(context, rest);
-  MASS_ON_ERROR(*context->result) return 0;
-
-  Mass_Variable_Definition_Lazy_Payload *payload =
-    allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
-  *payload = (Mass_Variable_Definition_Lazy_Payload){
-    .source_range = name_token->source_range,
-    .descriptor = descriptor,
-  };
-
-  // We are creating a custom lazy value here instead of a statement because if the value
-  // is never referenced we can skip running the lazy proc. This is safe because these
-  // definitions do not have an initializer and thus do not produce side effects.
-  Value *variable_value = mass_make_lazy_value(
-    context, name_token->source_range, payload, descriptor, mass_handle_variable_definition_lazy_proc
-  );
-  if (out_definition_value) *out_definition_value = variable_value;
-  scope_define_value(context->scope, context->epoch, name_token->source_range, value_as_symbol(name_token), variable_value);
-
-  return peek_index;
-}
-
 typedef struct {
   Source_Range source_range;
   Value *target;
@@ -6598,7 +6566,6 @@ scope_define_builtins(
     static Token_Statement_Matcher default_statement_matchers[] = {
       {.proc = token_parse_constant_definitions},
       {.proc = token_parse_explicit_return},
-      {.proc = token_parse_definition},
       {.proc = token_parse_definition_and_assignment_statements},
       {.proc = token_parse_assignment},
       {.proc = token_parse_statement_label},
