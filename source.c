@@ -4692,6 +4692,35 @@ mass_handle_apply_operator(
 }
 
 static Value *
+mass_handle_typed_symbol_operator(
+  Execution_Context *context,
+  Value_View operands,
+  void *unused_payload
+) {
+  Value *lhs_value = value_view_get(operands, 0);
+  Value *rhs_value = token_parse_single(context, value_view_get(operands, 1));
+  Source_Range source_range = operands.source_range;
+
+  if (!value_is_symbol(lhs_value)) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_Parse,
+      .source_range = source_range,
+      .detailed_message ="operator : expects a symbol on the left hand side"
+    });
+    return 0;
+  }
+
+  const Descriptor *descriptor = value_ensure_type(context, rhs_value, source_range);
+  Typed_Symbol *typed_symbol = allocator_allocate(context->allocator, Typed_Symbol);
+  *typed_symbol = (Typed_Symbol) {
+    .symbol = value_as_symbol(lhs_value),
+    .descriptor = descriptor,
+  };
+
+  return value_make(context, &descriptor_typed_symbol, storage_static(typed_symbol), source_range);
+}
+
+static Value *
 mass_fragment(
   Execution_Context *context,
   Value_View args_view
@@ -6150,8 +6179,8 @@ mass_inline_machine_code_bytes(
 }
 
 typedef struct {
-  Value *name_token;
   const Descriptor *descriptor;
+  Source_Range source_range;
 } Mass_Variable_Definition_Lazy_Payload;
 
 static Value *
@@ -6162,9 +6191,9 @@ mass_handle_variable_definition_lazy_proc(
   Mass_Variable_Definition_Lazy_Payload *payload
 ) {
   if (payload->descriptor == &descriptor_void) {
-    return value_make(context, payload->descriptor, storage_none, payload->name_token->source_range);
+    return value_make(context, payload->descriptor, storage_none, payload->source_range);
   } else {
-    return reserve_stack(context, builder, payload->descriptor, payload->name_token->source_range);
+    return reserve_stack(context, builder, payload->descriptor, payload->source_range);
   }
 }
 
@@ -6188,7 +6217,7 @@ token_parse_definition(
   Mass_Variable_Definition_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
   *payload = (Mass_Variable_Definition_Lazy_Payload){
-    .name_token = name_token,
+    .source_range = name_token->source_range,
     .descriptor = descriptor,
   };
 
@@ -6299,7 +6328,7 @@ token_define_local_variable(
   Mass_Variable_Definition_Lazy_Payload *variable_payload =
     allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
   *variable_payload = (Mass_Variable_Definition_Lazy_Payload){
-    .name_token = symbol,
+    .source_range = symbol->source_range,
     .descriptor = variable_descriptor,
   };
 
@@ -6392,11 +6421,24 @@ token_parse_assignment(
   Mass_Assignment_Lazy_Payload *payload =
     allocator_allocate(context->allocator, Mass_Assignment_Lazy_Payload);
 
-  Value *target = 0;
-  token_parse_definition(context, lhs, 0, &target);
-  if (!target) target = token_parse_expression(context, lhs, &(u64){0}, 0);
+  Value *target = token_parse_expression(context, lhs, &(u64){0}, 0);
   Value *source = token_parse_expression(context, rhs, &(u64){0}, 0);
   MASS_ON_ERROR(*context->result) return 0;
+
+  if (value_is_typed_symbol(target)) {
+    const Typed_Symbol *typed_symbol = value_as_typed_symbol(target);
+    Mass_Variable_Definition_Lazy_Payload *payload =
+      allocator_allocate(context->allocator, Mass_Variable_Definition_Lazy_Payload);
+    *payload = (Mass_Variable_Definition_Lazy_Payload){
+      .source_range = target->source_range,
+      .descriptor = typed_symbol->descriptor,
+    };
+    target = mass_make_lazy_value(
+      context, lhs.source_range, payload,
+      typed_symbol->descriptor, mass_handle_variable_definition_lazy_proc
+    );
+    scope_define_value(context->scope, context->epoch, lhs.source_range, typed_symbol->symbol, target);
+  }
 
   const Descriptor *target_descriptor = value_or_lazy_value_descriptor(target);
 
@@ -6533,6 +6575,13 @@ scope_define_builtins(
     .associativity = Operator_Associativity_Left,
     .argument_count = 2,
     .handler = mass_handle_apply_operator,
+  )));
+  MASS_MUST_SUCCEED(scope_define_operator(scope, COMPILER_SOURCE_RANGE, slice_literal(":"), allocator_make(allocator, Operator,
+    .precedence = 1,
+    .fixity = Operator_Fixity_Infix,
+    .associativity = Operator_Associativity_Left,
+    .argument_count = 2,
+    .handler = mass_handle_typed_symbol_operator,
   )));
 
   {

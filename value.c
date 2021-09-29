@@ -309,6 +309,7 @@ storage_static_as_c_type_internal(
 DEFINE_VALUE_IS_AS_HELPERS(Function_Literal, function_literal)
 DEFINE_VALUE_IS_AS_HELPERS(Slice, slice)
 DEFINE_VALUE_IS_AS_HELPERS(Symbol, symbol)
+DEFINE_VALUE_IS_AS_HELPERS(Typed_Symbol, typed_symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Number_Literal, number_literal)
 DEFINE_VALUE_IS_AS_HELPERS(External_Symbol, external_symbol)
 DEFINE_VALUE_IS_AS_HELPERS(Group_Paren, group_paren)

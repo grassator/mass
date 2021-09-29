@@ -577,6 +577,10 @@ typedef struct Code_Fragment Code_Fragment;
 typedef dyn_array_type(Code_Fragment *) Array_Code_Fragment_Ptr;
 typedef dyn_array_type(const Code_Fragment *) Array_Const_Code_Fragment_Ptr;
 
+typedef struct Typed_Symbol Typed_Symbol;
+typedef dyn_array_type(Typed_Symbol *) Array_Typed_Symbol_Ptr;
+typedef dyn_array_type(const Typed_Symbol *) Array_Const_Typed_Symbol_Ptr;
+
 typedef struct Descriptor Descriptor;
 typedef dyn_array_type(Descriptor *) Array_Descriptor_Ptr;
 typedef dyn_array_type(const Descriptor *) Array_Const_Descriptor_Ptr;
@@ -1720,6 +1724,12 @@ typedef struct Code_Fragment {
 } Code_Fragment;
 typedef dyn_array_type(Code_Fragment) Array_Code_Fragment;
 
+typedef struct Typed_Symbol {
+  const Symbol * symbol;
+  const Descriptor * descriptor;
+} Typed_Symbol;
+typedef dyn_array_type(Typed_Symbol) Array_Typed_Symbol;
+
 typedef enum {
   Descriptor_Tag_Opaque = 0,
   Descriptor_Tag_Function_Instance = 1,
@@ -2513,6 +2523,11 @@ static Descriptor descriptor_array_code_fragment;
 static Descriptor descriptor_array_code_fragment_ptr;
 static Descriptor descriptor_code_fragment_pointer;
 static Descriptor descriptor_code_fragment_pointer_pointer;
+static Descriptor descriptor_typed_symbol;
+static Descriptor descriptor_array_typed_symbol;
+static Descriptor descriptor_array_typed_symbol_ptr;
+static Descriptor descriptor_typed_symbol_pointer;
+static Descriptor descriptor_typed_symbol_pointer_pointer;
 static Descriptor descriptor_descriptor;
 static Descriptor descriptor_array_descriptor;
 static Descriptor descriptor_array_descriptor_ptr;
@@ -5071,6 +5086,23 @@ MASS_DEFINE_STRUCT_DESCRIPTOR(code_fragment, Code_Fragment,
   },
 );
 MASS_DEFINE_TYPE_VALUE(code_fragment);
+MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol_ptr, Array_Typed_Symbol_Ptr)
+MASS_DEFINE_OPAQUE_C_TYPE(array_typed_symbol, Array_Typed_Symbol)
+MASS_DEFINE_STRUCT_DESCRIPTOR(typed_symbol, Typed_Symbol,
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_symbol_pointer,
+    .name = slice_literal_fields("symbol"),
+    .Base_Relative.offset = offsetof(Typed_Symbol, symbol),
+  },
+  {
+    .tag = Memory_Layout_Item_Tag_Base_Relative,
+    .descriptor = &descriptor_descriptor_pointer,
+    .name = slice_literal_fields("descriptor"),
+    .Base_Relative.offset = offsetof(Typed_Symbol, descriptor),
+  },
+);
+MASS_DEFINE_TYPE_VALUE(typed_symbol);
 /*union struct start */
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor_ptr, Array_Descriptor_Ptr)
 MASS_DEFINE_OPAQUE_C_TYPE(array_descriptor, Array_Descriptor)

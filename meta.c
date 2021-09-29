@@ -1727,6 +1727,11 @@ main(void) {
     { "Value_View", "children"},
   }));
 
+  push_type(type_struct("Typed_Symbol", (Struct_Item[]){
+    { "const Symbol *", "symbol"},
+    { "const Descriptor *", "descriptor"},
+  }));
+
   export_compiler(push_type(add_common_fields(type_union("Descriptor", (Struct_Type[]){
     struct_empty("Opaque"),
     struct_fields("Function_Instance", (Struct_Item[]){
@@ -1993,7 +1998,7 @@ main(void) {
   ));
 
   export_compiler_custom_name("descriptor_pointer_to", push_type(
-    type_function(Default, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
+    type_function(Compile_Time, "descriptor_pointer_to", "Descriptor *", (Argument_Type[]){
       { "const Allocator *", "allocator" },
       { "const Descriptor *", "descriptor" },
     })
