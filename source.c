@@ -6752,13 +6752,21 @@ program_module_from_file(
     });
     return 0;
   }
-
-  Module *module = allocator_allocate(context->allocator, Module);
   Source_File *source_file = allocator_allocate(context->allocator, Source_File);
   *source_file = (Source_File) {
     .path = file_path,
     .text = fixed_buffer_as_slice(buffer),
   };
+  if (buffer->occupied > UINT32_MAX) {
+    context_error(context, (Mass_Error) {
+      .tag = Mass_Error_Tag_File_Too_Large,
+      .File_Too_Large = { .path = file_path },
+      .source_range = { .file = source_file, .offsets = {.from = UINT32_MAX, .to = UINT32_MAX} },
+    });
+    return 0;
+  }
+
+  Module *module = allocator_allocate(context->allocator, Module);
   *module = (Module) {
     .source_range = source_range_from_source_file(source_file),
     .own_scope = scope,

@@ -14,13 +14,6 @@ tokenize(
   // FIXME remove this cast when line offsets are gone
   Source_File *file = (Source_File *)source_range.file;
   Slice input = source_from_source_range(&source_range);
-  if (input.length > UINT32_MAX) {
-    return mass_error((Mass_Error) {
-      .tag = Mass_Error_Tag_File_Too_Large,
-      .File_Too_Large = { .path = file->path },
-      .source_range = { .file = file, .offsets = {.from = UINT32_MAX, .to = UINT32_MAX} },
-    });
-  }
 
   const Allocator *allocator = compilation->allocator;
   assert(!dyn_array_is_initialized(file->line_offsets));
