@@ -5684,6 +5684,11 @@ typedef Value *(*Expression_Matcher_Proc)(
   const Token_Pattern *end_pattern
 );
 
+typedef struct {
+  Expression_Matcher_Proc proc;
+  bool matches_end_of_expression;
+} Expression_Matcher;
+
 static PRELUDE_NO_DISCARD Value *
 token_parse_expression(
   Execution_Context *context,
@@ -5719,9 +5724,9 @@ token_parse_expression(
   bool is_previous_an_operator = true;
   u64 matched_length = view.length;
 
-  static Expression_Matcher_Proc expression_matchers[] = {
-    token_parse_if_expression,
-    token_parse_function_literal
+  static const Expression_Matcher expression_matchers[] = {
+    { .proc = token_parse_if_expression, .matches_end_of_expression = true },
+    { .proc = token_parse_function_literal, .matches_end_of_expression = false },
   };
 
   for (u64 i = 0; ; ++i) {
@@ -5730,15 +5735,18 @@ token_parse_expression(
 
     Value_View rest = value_view_rest(&view, i);
     for (u64 matcher_index = 0; matcher_index < countof(expression_matchers); matcher_index += 1) {
-      Expression_Matcher_Proc matcher = expression_matchers[matcher_index];
+      const Expression_Matcher *matcher = &expression_matchers[matcher_index];
       u64 match_length = 0;
-      Value *match_result = matcher(context, rest, &match_length, end_pattern);
+      Value *match_result = matcher->proc(context, rest, &match_length, end_pattern);
       MASS_ON_ERROR(*context->result) goto defer;
-      if (match_length) {
-        assert(match_result);
-        dyn_array_push(value_stack, match_result);
-        // Skip over the matched slice
-        i += match_length;
+      if (!match_length) continue;
+      assert(match_result);
+      dyn_array_push(value_stack, match_result);
+      i += match_length; // Skip over the matched slice
+      if (matcher->matches_end_of_expression) {
+        matched_length = i;
+        goto drain;
+      } else {
         goto repeat;
       }
     }
