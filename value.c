@@ -53,49 +53,26 @@ source_range_from_source_file(
   };
 }
 
-static Source_Position
-source_file_offset_to_position(
-  const Source_File *file,
-  u64 offset
-) {
-  // Binary search in lines
-  s64 left_bound = 0;
-  s64 right_bound = dyn_array_length(file->line_offsets) - 1;
-  s64 line_index = 0;
-  u64 line_offset = 0;
-  while (left_bound <= right_bound) {
-    line_index = left_bound + (right_bound - left_bound) / 2;
-    u32 line_from = *dyn_array_get(file->line_offsets, line_index);
-    u32 line_to = line_index + 1 >= (s64)dyn_array_length(file->line_offsets)
-      ? u64_to_u32(file->text.length)
-      : *dyn_array_get(file->line_offsets, line_index + 1);
-    if (offset < line_from) {
-      right_bound = line_index - 1;
-    } else if (offset >= line_to) {
-      left_bound = line_index + 1;
-    } else {
-      line_offset = line_from;
-      break;
-    }
-  }
-
-  u64 column = offset - line_offset;
-  return (Source_Position) {
-    .line = line_index + 1,
-    .column = column,
-  };
-}
-
-void
+static void
 source_range_print_start_position(
   const Source_Range *source_range
 ) {
-  if (!source_range->file || !dyn_array_is_initialized(source_range->file->line_offsets)) {
+  if (!source_range->file) {
     printf(":(0:0)\n");
     return;
   }
-  Source_Position from_position =
-    source_file_offset_to_position(source_range->file, source_range->offsets.from);
+  Source_Position from_position = {.line = 1, .column = 0};
+  Slice source = source_range->file->text;
+  u64 line_start_offset = 0;
+  for (u64 i = 0; i < source.length; ++i) {
+    if (source.bytes[i] != '\n') continue;
+    // if the range starts at the \n it is considered part of the current line, not the next one
+    if (i == source_range->offsets.from) break;
+    from_position.line += 1;
+    if (i > source_range->offsets.from) break;
+    line_start_offset = i + 1;
+  }
+  from_position.column = source_range->offsets.from - line_start_offset;
   slice_print(source_range->file->path);
   printf(":(%" PRIu64 ":%" PRIu64 ")\n", from_position.line, from_position.column);
 }

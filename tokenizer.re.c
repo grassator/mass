@@ -11,15 +11,10 @@ tokenize(
   Source_Range source_range,
   Value_View *out_tokens
 ) {
-  // FIXME remove this cast when line offsets are gone
-  Source_File *file = (Source_File *)source_range.file;
+  const Source_File *file = source_range.file;
   Slice input = source_from_source_range(&source_range);
 
   const Allocator *allocator = compilation->allocator;
-  assert(!dyn_array_is_initialized(file->line_offsets));
-  // FIXME do this lazily
-  file->line_offsets = dyn_array_make(Array_u32, .capacity = file->text.length / 40);
-  dyn_array_push(file->line_offsets, 0);
 
   Array_Value_Ptr stack = dyn_array_make(Array_Value_Ptr, .capacity = 100);
   Array_Tokenizer_Parent parent_stack =
@@ -129,7 +124,6 @@ tokenize(
 
       newline = "\r\n" | "\r" | "\n";
       newline {
-        dyn_array_push(file->line_offsets, u64_to_u32(offset));
         token_start_offset = offset; // :FakeSemicolon
         tokenizer_maybe_push_fake_semicolon(
           compilation, allocator, &stack, &parent_stack, TOKENIZER_CURRENT_RANGE()

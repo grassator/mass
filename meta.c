@@ -1098,7 +1098,6 @@ main(void) {
   push_type(type_struct("Source_File", (Struct_Item[]){
     { "Slice", "path" },
     { "Slice", "text" },
-    { "Array_u32", "line_offsets" },
   }));
 
   push_type(type_struct("Source_Range", (Struct_Item[]){
