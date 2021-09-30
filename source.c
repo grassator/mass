@@ -4302,17 +4302,15 @@ mass_handle_arithmetic_operation(
 
   const Descriptor *descriptor = large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
 
+  Mass_Arithmetic_Operator_Lazy_Payload stack_lazy_payload =
+    { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(descriptor);
-    Mass_Arithmetic_Operator_Lazy_Payload lazy_payload =
-      { .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range };
-    return mass_handle_arithmetic_operation_lazy_proc(context, 0, &expected_result, &lazy_payload);
+    return mass_handle_arithmetic_operation_lazy_proc(context, 0, &expected_result, &stack_lazy_payload);
   } else {
     Mass_Arithmetic_Operator_Lazy_Payload *lazy_payload =
       allocator_allocate(context->allocator, Mass_Arithmetic_Operator_Lazy_Payload);
-    *lazy_payload = (Mass_Arithmetic_Operator_Lazy_Payload) {
-      .lhs = lhs, .rhs = rhs, .operator = operator, .source_range = arguments.source_range,
-    };
+    *lazy_payload = stack_lazy_payload;
     return mass_make_lazy_value(
       context, arguments.source_range, lazy_payload, descriptor, mass_handle_arithmetic_operation_lazy_proc
     );
@@ -4339,6 +4337,7 @@ typedef struct {
   Compare_Type compare_type;
   Value *lhs;
   Value *rhs;
+  Source_Range source_range;
 } Mass_Comparison_Operator_Lazy_Payload;
 
 static Value *
@@ -4346,11 +4345,10 @@ mass_handle_comparison_operation_lazy_proc(
   Execution_Context *context,
   Function_Builder *builder,
   const Expected_Result *expected_result,
-  void *raw_payload
+  Mass_Comparison_Operator_Lazy_Payload *payload
 ) {
-  Mass_Comparison_Operator_Lazy_Payload *payload = raw_payload;
   Compare_Type compare_type = payload->compare_type;
-  const Source_Range *source_range = &payload->lhs->source_range;
+  const Source_Range *source_range = &payload->source_range;
 
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, payload->lhs, payload->rhs);
@@ -4488,17 +4486,15 @@ mass_handle_comparison_operation(
   const Descriptor *descriptor =
     large_enough_common_integer_descriptor_for_values(context, lhs, rhs);
 
+  Mass_Comparison_Operator_Lazy_Payload stack_lazy_payload =
+    { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
   if (value_is_non_lazy_static(lhs) && value_is_non_lazy_static(rhs)) {
     Expected_Result expected_result = expected_result_static(descriptor);
-    Mass_Comparison_Operator_Lazy_Payload lazy_payload =
-      { .lhs = lhs, .rhs = rhs, .compare_type = compare_type };
-    return mass_handle_comparison_operation_lazy_proc(context, 0, &expected_result, &lazy_payload);
+    return mass_handle_comparison_operation_lazy_proc(context, 0, &expected_result, &stack_lazy_payload);
   } else {
     Mass_Comparison_Operator_Lazy_Payload *payload =
       allocator_allocate(context->allocator, Mass_Comparison_Operator_Lazy_Payload);
-    *payload = (Mass_Comparison_Operator_Lazy_Payload) {
-      .lhs = lhs, .rhs = rhs, .compare_type = compare_type,
-    };
+    *payload = stack_lazy_payload;
     return mass_make_lazy_value(
       context, arguments.source_range, payload, &descriptor_s8, mass_handle_comparison_operation_lazy_proc
     );
