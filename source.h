@@ -39,13 +39,6 @@ expected_result_ensure_value_or_temp(
 static inline u64
 get_new_epoch();
 
-static inline Value *
-maybe_coerce_number_literal_to_integer(
-  Execution_Context *context,
-  Value *value,
-  const Descriptor *target_descriptor
-);
-
 static void
 ensure_parameter_descriptors(
   const Execution_Context *context,

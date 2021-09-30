@@ -61,6 +61,7 @@ instruction_add_source_location_internal(
   do {\
     const Expected_Result *fold_result = (_result_);\
     const Descriptor *fold_descriptor = expected_result_descriptor(fold_result);\
+    const Source_Range *fold_range = (_loc_);\
     Execution_Context *fold_context = (_context_);\
     Value *fold_a = (_a_);\
     Value *fold_b = (_b_);\
@@ -71,19 +72,19 @@ instruction_add_source_location_internal(
       fold_b->storage.tag == Storage_Tag_Static\
     ) {\
       if (descriptor_is_signed_integer(fold_descriptor)) {\
-        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_s64);\
-        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_s64);\
+        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_s64, fold_range);\
+        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_s64, fold_range);\
         s64 a_s64 = storage_static_value_up_to_s64(&fold_a->storage);\
         s64 b_s64 = storage_static_value_up_to_s64(&fold_b->storage);\
         s64 constant_result = a_s64 _operator_ b_s64;\
-        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, (_loc_));\
+        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, fold_range);\
       } else {\
-        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_u64);\
-        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_u64);\
+        fold_a = maybe_coerce_number_literal_to_integer(fold_context, fold_a, &descriptor_u64, fold_range);\
+        fold_b = maybe_coerce_number_literal_to_integer(fold_context, fold_b, &descriptor_u64, fold_range);\
         u64 a_u64 = storage_static_value_up_to_u64(&fold_a->storage);\
         u64 b_u64 = storage_static_value_up_to_u64(&fold_b->storage);\
         u64 constant_result = a_u64 _operator_ b_u64;\
-        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, (_loc_));\
+        return maybe_constant_fold_internal(fold_context, (_builder_), constant_result, fold_result, fold_range);\
       }\
     }\
   } while(0)
